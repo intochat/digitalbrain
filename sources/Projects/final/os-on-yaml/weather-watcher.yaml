@@ -1,0 +1,47 @@
+schemaVersion: "os-on-yaml/v0"
+neuron:
+  id: weather-watcher
+  grainType: weather-watcher
+  version: 0.2.0
+  desc: Answers weather questions with live data, packed from real daily use
+  handles:
+    - synapse: WeatherQuery
+      fields:
+        - name: City
+          type: string
+          required: true
+  emits:
+    - WeatherResult
+    - UiSurface
+  region: widgets
+  pinned: true
+  order: 2
+  observedSynapses: 0
+  rules:
+    - on: WeatherResult
+      as: result
+      do:
+        - emit:
+            type: WeatherResult
+            args:
+              city: "{result.City}"
+              summary: "see surface"
+        - show:
+            card:
+              title: "Weather — {result.City}"
+              content:
+                - kind: text
+                  text: "$summary"
+                - kind: text
+                  text: "source: $sourceUrl"
+scenarios:
+  - name: "a weather result produces a result and a surface"
+    when:
+      emit: WeatherResult
+      args:
+        city: "Kyiv"
+    then:
+      - broadcast: WeatherResult
+        with:
+          city: "Kyiv"
+      - broadcast: UiSurface

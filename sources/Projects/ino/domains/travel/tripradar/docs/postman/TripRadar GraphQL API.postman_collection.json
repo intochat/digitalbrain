@@ -1,0 +1,959 @@
+{
+  "info": {
+    "_postman_id": "d68ee2a4-4b0a-4f63-ba14-a3dd63211427",
+    "name": "TripRadar GraphQL API ✅",
+    "description": "Comprehensive GraphQL API collection for TripRadar SerpApi travel services. Includes Maps, Local Places, Events, Flights, Hotels, Place Reviews, and TripAdvisor Search/Place APIs with example queries.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "39446265"
+  },
+  "item": [
+    {
+      "name": "Serp API ✅",
+      "item": [
+        {
+          "name": "🗺️ Maps ✅",
+          "item": [
+            {
+              "name": "Get Place by Place ID ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query GetPlaceDetails {\n  maps(request: {\n    placeId: \"ChIJN1t_tDeuEmsRUsoyG83frY4\"\n  }) {\n    searchMetadata {\n      id\n      status\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      placeId\n      googleDomain\n      hl\n      gl\n    }\n    placeResults {\n      title\n      placeId\n      address\n      rating\n      reviews\n      website\n      phone\n      type\n      price\n      description\n      gpsCoordinates {\n        latitude\n        longitude\n      }\n      serviceOptions {\n        dineIn\n        takeout\n        delivery\n      }\n      userReviews {\n        summary {\n          snippet\n        }\n        mostRelevant {\n          username\n          rating\n          description\n          date\n        }\n      }\n      images {\n        title\n        thumbnail\n      }\n      hours\n      openState\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Get comprehensive place details using Google Place ID. Returns detailed information including reviews, photos, hours, and contact information."
+              },
+              "response": []
+            },
+            {
+              "name": "Search Places by Query with Location - ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query SearchCoffeeShops {\n  maps(request: {\n    searchQuery: { q: \"coffee shop\" }\n    type: \"search\"\n    ll: \"@40.7455096,-74.0083012,14z\"\n    localization: {\n      gl: \"us\"\n      hl: \"en\"\n      currency: \"USD\"\n      googleDomain: \"google.com\"\n    }\n    pagination: { start: 0 }\n  }) {\n    searchMetadata {\n      id\n      status\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      placeId\n      googleDomain\n      hl\n      gl\n    }\n    localResults {\n      title\n      placeId\n      address\n      rating\n      reviews\n      website\n      phone\n      type\n      price\n      description\n      gpsCoordinates {\n        latitude\n        longitude\n      }\n      serviceOptions {\n        dineIn\n        takeout\n        delivery\n      }\n      userReviews {\n        summary {\n          snippet\n        }\n        mostRelevant {\n          username\n          rating\n          description\n          date\n        }\n      }\n      images {\n        title\n        thumbnail\n      }\n      hours\n      openState\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Search for places using a query term with geographic location. Useful for finding businesses near specific coordinates."
+              },
+              "response": []
+            },
+            {
+              "name": "Search with French Localization - ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query SearchMuseumsParis {\n  maps(request: {\n    searchQuery: { q: \"museum\" }\n    type: \"search\"\n    ll: \"@48.8588443,2.2943506,15z\"\n    localization: {\n      gl: \"fr\"\n      hl: \"fr\"\n      currency: \"EUR\"\n      googleDomain: \"google.fr\"\n    }\n  }) {\n    searchMetadata {\n      id\n      status\n    }\n    searchParameters {\n      engine\n      type\n      googleDomain\n      hl\n      gl\n    }\n    localResults {\n      title\n      address\n      rating\n      reviews\n      type\n      price\n      description\n      website\n      phone\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Example of localized search using French language and country settings. Demonstrates international usage."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Place with Fresh Data (No Cache) - ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query GetFreshPlaceData {\n  maps(request: {\n    placeId: \"ChIJN1t_tDeuEmsRUsoyG83frY4\"\n    noCache: true\n  }) {\n    searchMetadata {\n      id\n      status\n      totalTimeTaken\n    }\n    placeResults {\n      title\n      rating\n      reviews\n      openState\n      phone\n      website\n      address\n      popularTimes {\n        graphResults\n        liveHash {\n          info\n          timeSpent\n        }\n      }\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Forces fresh data retrieval bypassing cache. Useful when you need the most current information about a place."
+              },
+              "response": []
+            },
+            {
+              "name": "Search with Pagination - ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query SearchWithPagination {\n  maps(request: {\n    searchQuery: { q: \"restaurant\" }\n    type: \"search\"\n    ll: \"@51.5074,-0.1278,13z\"\n    localization: {\n      gl: \"uk\"\n      hl: \"en\"\n      currency: \"GBP\"\n      googleDomain: \"google.co.uk\"\n    }\n    pagination: { start: 10 }\n  }) {\n    searchMetadata {\n      id\n      status\n    }\n    localResults {\n      title\n      address\n      rating\n      reviews\n      type\n      price\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Demonstrates pagination for search results. Use start parameter to get additional results."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "🧭 Maps Directions ✅",
+          "item": [
+            {
+              "name": "Maps Directions ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query MapsDirections {\n  mapsDirections(request: {\n    startAddr: \"Times Square, New York, NY\"\n    endAddr: \"Central Park, New York, NY\"\n    travelMode: 1\n    distanceUnit: 0\n    avoid: \"tolls\"\n    hl: \"en\"\n    gl: \"us\"\n  }) {\n    searchMetadata {\n      id\n      status\n      googleMapsDirectionsUrl\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      startAddr\n      endAddr\n      startDataId\n      endDataId\n      startCoords\n      endCoords\n      travelMode\n      distanceUnit\n      avoid\n      prefer\n      hl\n      gl\n    }\n    placesInfo\n    directions\n    durations\n    error\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Google Maps directions via SerpApi."
+              },
+              "response": []
+            }
+          ],
+          "description": "Directions results powered by Google Maps Directions API (SerpApi)."
+        },
+        {
+          "name": "📍 Maps Place Results ✅",
+          "item": [
+            {
+              "name": "Maps Place Results ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query MapsPlaceResults {\n  mapsPlaceResults(request: {\n    placeId: \"ChIJN1t_tDeuEmsRUsoyG83frY4\"\n    gl: \"us\"\n  }) {\n    searchMetadata {\n      id\n      status\n      googleMapsUrl\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      type\n      data\n      placeId\n      dataCid\n      gl\n    }\n    placeResults\n    error\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Google Maps place results via SerpApi."
+              },
+              "response": []
+            }
+          ],
+          "description": "Place results powered by Google Maps Place Results API (SerpApi)."
+        },
+        {
+          "name": "⭐ Place Reviews ✅",
+          "item": [
+            {
+              "name": "Get Place Reviews by Place ID -✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query GetPlaceReviews {\n  placeReviews(request: {\n    placeId: \"ChIJN1t_tDeuEmsRUsoyG83frY4\"\n    localization: {\n      gl: \"us\"\n      hl: \"en\"\n      currency: \"USD\"\n    }\n    filters: {\n      sortBy: \"ratingHigh\"\n    }\n  }) {\n    searchMetadata {\n      id\n      status\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      placeId\n      sortBy\n      hl\n      num\n    }\n    placeInfo {\n      title\n      placeId\n      dataId\n      rating\n      reviews\n      type\n      types\n      address\n      phone\n      website\n      description\n      price\n      openState\n      gpsCoordinates {\n        latitude\n        longitude\n      }\n      operatingHours {\n        monday\n        tuesday\n        wednesday\n        thursday\n        friday\n        saturday\n        sunday\n      }\n      editorialSummary {\n        overview\n      }\n      userReview {\n        rating\n        snippet\n      }\n    }\n    topics {\n      keyword\n      mentions\n      id\n    }\n    reviews {\n      position\n      user {\n        name\n        contributorId\n        thumbnail\n        localGuide\n        reviews\n        photos\n      }\n      rating\n      date\n      isoDate\n      snippet\n      extractedSnippet {\n        original\n      }\n      likes\n      images\n      source\n      reviewId\n      details {\n        service\n        mealType\n        pricePerPerson\n        food\n        atmosphere\n        recommendedDishes\n        vegetarianOptions\n        dietaryRestrictions\n        kidFriendliness\n        wheelchairAccessibility\n      }\n      response {\n        date\n        snippet\n      }\n    }\n    pagination {\n      nextPageToken\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Get comprehensive reviews for a specific place using place_id from Maps API. Includes place info, review topics, and detailed reviews."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "🍽️ OpenTable Reviews ✅",
+          "item": [
+            {
+              "name": "Get OpenTable Reviews by RID - ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query OpenTableReviews {\n  openTableReviews(request: {\n    rid: \"r/central-park-boathouse-new-york-2\"\n    openTableDomain: \"opentable.com\"\n    page: 1\n  }) {\n    searchMetadata {\n      id\n      status\n      openTableReviewsUrl\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      rid\n      openTableDomain\n      page\n    }\n    searchInformation {\n      page\n      totalPages\n    }\n    reviewsSummary {\n      reviewsCount\n      ratingsCount\n      ratingsSummary {\n        overall\n        food\n        service\n        ambience\n        value\n        noise\n      }\n      ratings {\n        stars\n        count\n      }\n      aiSummary\n    }\n    awards {\n      location\n      name\n    }\n    reviews {\n      id\n      content\n      submittedAt\n      dinedAt\n      rating {\n        overall\n        food\n        service\n        ambience\n        value\n        noise\n      }\n      ratings {\n        overall\n        food\n        service\n        ambience\n        value\n        noise\n      }\n      user {\n        name\n        numberOfReviews\n        location\n        avatar\n        vip\n      }\n      helpfulness {\n        up\n        score\n      }\n      images {\n        id\n        timestamp\n        variants {\n          size\n          url\n        }\n      }\n      response {\n        content\n        date\n      }\n    }\n    serpApiPagination {\n      previous\n      next\n    }\n    error\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Get OpenTable restaurant reviews via SerpApi using the restaurant RID from the OpenTable URL."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "🏨 Hotels ✅",
+          "item": [
+            {
+              "name": "Search Hotels with Filters - ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query SearchHotels {\n  hotels(request: {\n    searchQuery: {\n      q: \"hotels in Manhattan\"\n    }\n    advancedParameters: {\n      checkInDate: \"2025-12-15\"\n      checkOutDate: \"2025-12-18\"\n    #   adults: 2\n      children: 2\n      childrenAges: [8, 11]\n    }\n    localization: {\n      gl: \"us\"\n      hl: \"en\"\n      currency: \"USD\"\n    }\n    filters: {\n      sortBy: HighestRating\n      minPrice: 150\n      maxPrice: 400\n      rating: Rating40Plus\n      freeCancellation: true\n      propertyTypes: [\"BeachHotels\", \"BoutiqueHotels\"]\n      amenities: [\"FreeWiFi\", \"FitnessCenter\", \"Restaurant\"]\n    }\n  }) {\n    searchMetadata {\n      id\n      status\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      query\n      checkInDate\n      checkOutDate\n      adults\n      children\n      currency\n    }\n    searchInformation {\n      totalResults\n    }\n    properties {\n      name\n      description\n      type\n      gpsCoordinates {\n        latitude\n        longitude\n      }\n      hotelClass\n      extractedHotelClass\n      overallRating\n      reviews\n      locationRating\n      ratePerNight {\n        lowest\n        extractedLowest\n      }\n      totalRate {\n        lowest\n        extractedLowest\n      }\n      amenities\n      ecoCertified\n      images {\n        thumbnail\n        originalImage\n      }\n      nearbyPlaces {\n        name\n        transportations {\n          type\n          duration\n        }\n      }\n      reviewsBreakdown {\n        name\n        positive\n        negative\n        totalMentioned\n      }\n      checkInTime\n      checkOutTime\n      propertyToken\n    }\n    serpapiPagination {\n      nextPageToken\n      currentFrom\n      currentTo\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Search for hotels in Manhattan with comprehensive filters including rating, price range, amenities, and property types."
+              },
+              "response": []
+            },
+            {
+              "name": "Search Vacation Rentals - ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query SearchVacationRentals {\n  hotels(request: {\n    searchQuery: {\n      q: \"vacation rentals in Miami Beach\"\n    }\n    advancedParameters: {\n      checkInDate: \"2025-12-01\"\n      checkOutDate: \"2025-12-07\"\n      adults: 4\n      children: 2\n      childrenAges: [10, 12]\n    }\n    localization: {\n      gl: \"us\"\n      hl: \"en\"\n      currency: \"USD\"\n    }\n    vacationRentalsFilters: {\n      vacationRentals: true\n      bedrooms: 3\n      bathrooms: 2\n    }\n    filters: {\n      propertyTypes:  [\"Villas\", \"Houses\"]\n      amenities: [\"Pool\", \"Kitchen\"]\n      maxPrice: 500\n    }\n  }) {\n    searchMetadata {\n      id\n      status\n    }\n    properties {\n      name\n      description\n      type\n      gpsCoordinates {\n        latitude\n        longitude\n      }\n      overallRating\n      reviews\n      ratePerNight {\n        lowest\n        extractedLowest\n      }\n      amenities\n      images {\n        thumbnail\n      }\n      nearbyPlaces {\n        name\n        transportations {\n          type\n          duration\n        }\n      }\n      propertyToken\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Search for vacation rentals in Miami Beach with specific bedroom/bathroom requirements and vacation rental amenities."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "✈️ Flights ✅",
+          "item": [
+            {
+              "name": "Search Round Trip Flights ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query SearchRoundTripFlights {\n  flights(request: {\n    flightSearch: {\n      departureId: \"SOF\"\n      arrivalId: \"VIE\"\n    }\n    advancedOptions: {\n      type: OneWay\n      outboundDate: \"2025-12-15\"\n    #   returnDate: \"2025-09-22\"\n      travelClass: Economy\n    }\n    passengers: {\n    #   adults: 2\n    #   children: 1\n    #   infantsOnLap: 0\n    }\n    localization: {\n      gl: \"us\"\n      hl: \"en\"\n      currency: \"USD\"\n    }\n    sorting: {\n      sortBy: Price\n    }\n    filters: {\n      stops: OneStopOrFewer\n      bags: 1\n    }\n  }) {\n    searchMetadata {\n      id\n      status\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      departureId\n      arrivalId\n      outboundDate\n      travelClass\n      adults\n      currency\n    }\n    bestFlights {\n      flights {\n        departureAirport {\n          name\n          code\n          time\n        }\n        arrivalAirport {\n          name\n          code\n          time\n        }\n        duration\n        airline\n        flightNumber\n        travelClass\n      }\n      layovers {\n        name\n        duration\n      }\n      totalDuration\n      price\n      carbonEmissions {\n        thisFlight\n        typicalForThisRoute\n        differencePercent\n      }\n      bookingToken\n    }\n    otherFlights {\n      price\n      totalDuration\n      flights {\n        airline\n        flightNumber\n        departureAirport {\n          name\n          time\n        }\n        arrivalAirport {\n          name\n          time\n        }\n      }\n    }\n    priceInsights {\n      lowestPrice\n      priceLevel\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Search for round-trip flights from JFK to LAX with passenger details, filters, and sorting options."
+              },
+              "response": []
+            },
+            {
+              "name": "Search One Way International Flight - ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query SearchOneWayFlight {\n  flights(request: {\n    flightSearch: {\n      departureId: \"LHR\"\n      arrivalId: \"CDG\"\n    }\n    advancedOptions: {\n      type: OneWay\n      outboundDate: \"2025-12-10\"\n      travelClass: Business\n    }\n    passengers: {\n      adults: 1\n    }\n    localization: {\n      gl: \"uk\"\n      hl: \"en\"\n      currency: \"GBP\"\n    }\n    sorting: {\n      sortBy: DepartureTime\n    }\n    filters: {\n      stops: Nonstop\n      includeAirlines: \"BA,AF\"\n    }\n  }) {\n    searchMetadata {\n      id\n      status\n    }\n    bestFlights {\n      flights {\n        departureAirport {\n          name\n          code\n          time\n        }\n        arrivalAirport {\n          name\n          code\n          time\n        }\n        airline\n        flightNumber\n        duration\n        travelClass\n      }\n      price\n      totalDuration\n      bookingToken\n    }\n    airports {\n      departure {\n        airport {\n          id\n          name\n        }\n        city\n        country\n      }\n      arrival {\n        airport {\n          id\n          name\n        }\n        city\n        country\n      }\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Search for one-way business class flights from London to Paris with nonstop filter and specific airlines."
+              },
+              "response": []
+            },
+            {
+              "name": "Explore Flight Destinations - ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query ExploreFlightDestinations {\n  flightExplore(request: {\n    departureId: \"JFK\"\n    arrivalAreaId: \"/m/02j9z\"\n    month: 6\n    travelDuration: 2\n    travelClass: 1\n    adults: 1\n    stops: 2\n    maxPrice: 600\n    gl: \"us\"\n    hl: \"en\"\n    currency: \"USD\"\n  }) {\n    searchMetadata {\n      id\n      status\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      departureId\n      arrivalId\n      arrivalAreaId\n      gl\n      hl\n      currency\n      type\n      outboundDate\n      returnDate\n      month\n      travelDuration\n      travelClass\n      adults\n      children\n      infantsInSeat\n      infantsOnLap\n      stops\n      travelMode\n      interest\n      includeAirlines\n      bags\n      maxPrice\n      maxDuration\n    }\n    startDate\n    endDate\n    destinations {\n      destinationId\n      name\n      country\n      gpsCoordinates {\n        latitude\n        longitude\n      }\n      thumbnail\n      destinationAirport {\n        code\n        id\n        name\n        location\n      }\n      startDate\n      endDate\n      flightPrice\n      hotelPrice\n      flightDuration\n      numberOfStops\n      airline\n      airlineCode\n      link\n      serpApiLink\n    }\n    flights {\n      departureAirport {\n        code\n        id\n        name\n        location\n      }\n      arrivalAirport {\n        code\n        id\n        name\n        location\n      }\n      duration\n      price\n      cheapestFlight\n      numberOfStops\n      airline\n      airlineCode\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Explore destinations from a departure airport using Google Travel Explore. Returns destination options with prices, dates, and flight details."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "🎫 Events ✅",
+          "item": [
+            {
+              "name": "Search Events in New York - ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query SearchEvents {\n  events(request: {\n    search: {\n      q: \"concerts\"\n    }\n    geographicLocation: {\n      location: \"New York, NY\"\n    }\n    localization: {\n      gl: \"us\"\n      hl: \"en\"\n      currency: \"USD\"\n    }\n    filters: {\n      htichips: [\"date:today\"]\n    }\n  }) {\n    searchMetadata {\n      id\n      status\n      totalTimeTaken\n    }\n    searchParameters {\n      query\n      engine\n    }\n    searchInformation {\n      totalResults\n    }\n    eventsResults {\n      title\n      description\n      address\n      link\n      thumbnail\n      date {\n        startDate\n        when\n      }\n      venue {\n        name\n        rating\n        reviews\n        link\n      }\n      ticketInfo {\n        source\n        link\n        linkType\n      }\n      eventLocationMap {\n        image\n        link\n      }\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Search for events like concerts, shows, and activities in New York with date and type filters."
+              },
+              "response": []
+            },
+            {
+              "name": "Search Theater Events in London with Date Filter - ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query SearchTheaterEvents {\n  events(request: {\n    search: {\n      q: \"theater shows\"\n    }\n    geographicLocation: {\n      location: \"London\"\n    }\n    localization: {\n      gl: \"uk\"\n      hl: \"en\"\n      currency: \"GBP\"\n    }\n    filters: {\n      htichips: [\"date:weekend\"]\n    }\n  }) {\n    searchMetadata {\n      id\n      status\n    }\n    eventsResults {\n      title\n      description\n      address\n      date {\n        startDate\n        when\n      }\n      venue {\n        name\n        rating\n      }\n      ticketInfo {\n        source\n        link\n      }\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Search for theater events in London with weekend date filter and theater type filter."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "🏢 Local Places ✅",
+          "item": [
+            {
+              "name": "Search Restaurants with Filters ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query SearchRestaurants {\n  localPlaces(request: {\n    searchQuery: {\n      q: \"restaurants\"\n    }\n    advancedParameters: {\n      location: \"New York, NY\"\n      uule: \"\"\n    }\n    filters: {\n      tbs: \"lf:1,lf_ui:9\"  # Open now filter\n    }\n    pagination: {\n      start: 0\n    }\n    localization: {\n      gl: \"us\"\n      hl: \"en\"\n      currency: \"USD\"\n    }\n  }) {\n    searchMetadata {\n      id\n      status\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      q\n      locationRequested    \n      locationUsed         \n      hl\n      gl\n    }\n    localResults {\n      position\n      title\n      placeId\n      address\n      rating\n      reviews              \n      price                \n      type\n      thumbnail\n      gpsCoordinates {\n        latitude\n        longitude\n      }\n      hours               \n      links {\n        website            \n        directions\n        order\n      }\n      serviceOptions {\n        dineIn\n        takeout\n        delivery\n        reservable\n      }\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Search for restaurants with advanced filtering, sorting, and pagination options."
+              },
+              "response": []
+            },
+            {
+              "name": "Search by GPS Coordinates ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query SearchByGPS {\n  localPlaces(request: {\n    searchQuery: {\n      q: \"coffee\"\n    }\n    advancedParameters: {\n      location: \"37.7749,-122.4194\"\n      uule: \"\"\n    }\n    filters: {\n      tbs: \"lf:1,lf_ui:9\" \n    }\n    pagination: {\n      start: 0\n    }\n    localization: {\n      gl: \"us\"\n      hl: \"en\"\n      currency: \"USD\"\n    }\n  }) {\n    searchMetadata {\n      id\n      status\n      totalTimeTaken\n    }\n    localResults {\n      position\n      title\n      address\n      rating\n      reviews             \n      placeId\n      type\n      price\n      hours              \n      phone\n      gpsCoordinates {\n        latitude\n        longitude\n      }\n      serviceOptions {\n        dineIn\n        takeout\n        delivery\n      }\n      links {\n        website\n        directions\n      }\n    }\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Search for places using GPS coordinates instead of location name."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "🏛️ TripAdvisor ✅",
+          "item": [
+            {
+              "name": "TripAdvisor Search ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query TripAdvisorSearch {\n  tripAdvisorSearch(request: {\n    q: \"new york hotel\"\n    tripadvisorDomain: \"tripadvisor.com\"\n    ssrc: \"h\"\n    offset: 0\n    limit: 10\n  }) {\n    searchMetadata {\n      id\n      status\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      q\n      tripadvisorDomain\n      ssrc\n      offset\n      limit\n      lat\n      lon\n    }\n    searchInformation {\n      totalResults\n    }\n    places\n    forums\n    locations\n    serpapiPagination\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "TripAdvisor search via SerpApi (search results + pagination)."
+              },
+              "response": []
+            },
+            {
+              "name": "TripAdvisor Place ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query TripAdvisorPlace {\n  tripAdvisorPlace(request: {\n    placeId: \"g60763-d1465316\"\n    tripadvisorDomain: \"tripadvisor.com\"\n  }) {\n    searchMetadata {\n      id\n      status\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      placeId\n      tripadvisorDomain\n    }\n    searchInformation {\n      totalResults\n    }\n    placeResult\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "TripAdvisor place details via SerpApi (single place result)."
+              },
+              "response": []
+            }
+          ],
+          "description": "TripAdvisor search and place details powered by SerpApi."
+        },
+        {
+          "name": "⭐ Yelp ✅",
+          "item": [
+            {
+              "name": "Yelp Search ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query YelpSearch {\n  yelpSearch(request: {\n    findLoc: \"New York, NY\"\n    findDesc: \"coffee\"\n    yelpDomain: \"www.yelp.com\"\n    sortBy: \"rating\"\n    attrs: \"wheelchair_accessible\"\n    cflt: \"restaurants,coffee\"\n    start: 0\n  }) {\n    searchMetadata {\n      id\n      status\n      yelpUrl\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      findDesc\n      findLoc\n      yelpDomain\n      sortBy\n      attrs\n      cflt\n      start\n    }\n    searchInformation {\n      totalResults\n    }\n    filters\n    adsResults\n    organicResults\n    pagination\n    serpApiPagination\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Yelp search via SerpApi (organic results + ads + pagination)."
+              },
+              "response": []
+            },
+            {
+              "name": "Yelp Place ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query YelpPlace {\n  yelpPlace(request: {\n    placeId: \"E8RJkjfdcwgtyoPMjQ_Olg\"\n    yelpDomain: \"www.yelp.com\"\n  }) {\n    searchMetadata {\n      id\n      status\n      yelpPlaceUrl\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      placeId\n      yelpDomain\n      fullMenu\n      menuName\n    }\n    searchInformation {\n      totalResults\n    }\n    placeResults\n    error\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Yelp place details via SerpApi."
+              },
+              "response": []
+            },
+            {
+              "name": "Yelp Place Full Menu ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query YelpPlaceFullMenu {\n  yelpPlaceFullMenu(request: {\n    placeId: \"E8RJkjfdcwgtyoPMjQ_Olg\"\n    yelpDomain: \"www.yelp.com\"\n    fullMenu: true\n    menuName: \"Lunch\"\n  }) {\n    searchMetadata {\n      id\n      status\n      yelpPlaceUrl\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      placeId\n      yelpDomain\n      fullMenu\n      menuName\n    }\n    searchInformation {\n      totalResults\n    }\n    placeResults\n    fullMenuResults\n    error\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Yelp place full menu via SerpApi."
+              },
+              "response": []
+            },
+            {
+              "name": "Yelp Reviews ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query YelpReviews {\n  yelpReviews(request: {\n    placeId: \"E8RJkjfdcwgtyoPMjQ_Olg\"\n    yelpDomain: \"www.yelp.com\"\n    language: \"en\"\n    sortBy: \"relevance_desc\"\n    rating: 5\n    notRecommended: true\n    start: 0\n    num: 20\n    q: \"service\"\n  }) {\n    searchMetadata {\n      id\n      status\n      yelpReviewsUrl\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      placeId\n      yelpDomain\n      language\n      sortBy\n      rating\n      notRecommended\n      start\n      num\n      q\n    }\n    searchInformation {\n      totalResults\n    }\n    reviewLanguages\n    reviews\n    serpApiPagination\n    error\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Yelp reviews via SerpApi (reviews + pagination)."
+              },
+              "response": []
+            }
+          ],
+          "description": "Yelp search, place details, full menu, and reviews powered by SerpApi."
+        },
+        {
+          "name": "📺 YouTube Search ✅",
+          "item": [
+            {
+              "name": "YouTube Search ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query YouTubeSearch {\n  youtubeSearch(request: {\n    search_query: \"travel vlog\"\n    hl: \"en\"\n    gl: \"us\"\n    output: \"json\"\n    no_cache: true\n  }) {\n    searchMetadata {\n      id\n      status\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      searchQuery\n      gl\n      hl\n      sp\n      noCache\n      async\n      zeroTrace\n      output\n      jsonRestrictor\n    }\n    searchInformation {\n      totalResults\n      videoResultsState\n    }\n    videoResults\n    channelResults\n    playlistResults\n    movieResults\n    adsResults\n    serpapiPagination\n    pagination\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "YouTube search via SerpApi (video, channel, playlist, and pagination results)."
+              },
+              "response": []
+            }
+          ],
+          "description": "YouTube search powered by SerpApi."
+        },
+        {
+          "name": "🔎 Google Light ✅",
+          "item": [
+            {
+              "name": "Google Light Search ✅",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query GoogleLightSearch {\n  googleLightSearch(request: {\n    searchQuery: { q: \"weather in Paris\" }\n    geographicLocation: { location: \"Austin, TX, United States\" }\n    localization: { googleDomain: \"google.com\", gl: \"us\", hl: \"en\" }\n    pagination: { start: 0 }\n    lr: \"lang_en\"\n    safe: \"active\"\n    device: \"desktop\"\n    no_cache: true\n    output: \"json\"\n  }) {\n    searchMetadata {\n      id\n      status\n      totalTimeTaken\n    }\n    searchParameters {\n      engine\n      q\n      location\n      googleDomain\n      gl\n      hl\n      lr\n      safe\n      device\n      start\n      noCache\n      async\n      output\n    }\n    searchInformation {\n      totalResults\n    }\n    organicResults\n    relatedSearches\n    pagination\n    serpapiPagination\n    raw\n  }\n}",
+                    "variables": ""
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/graphql",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "graphql"
+                  ]
+                },
+                "description": "Google Light search via SerpApi with localization and lr filtering."
+              },
+              "response": []
+            }
+          ],
+          "description": "Google Light search powered by SerpApi."
+        }
+      ],
+      "description": "Maps API endpoints for getting detailed place information from Google Maps via SerpAPI."
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Set dynamic variables for testing",
+          "if (!pm.collectionVariables.get('username')) {",
+          "    pm.collectionVariables.set('username', 'demoUser');",
+          "}",
+          "",
+          "// Auto-set Origin Verify secret if not already set",
+          "if (!pm.collectionVariables.get('originVerify')) {",
+          "    pm.collectionVariables.set('originVerify', '');",
+          "}",
+          "",
+          "// Add timestamp for cache-busting if needed",
+          "pm.collectionVariables.set('timestamp', new Date().getTime());",
+          "",
+          "// Add Origin Verify header when configured",
+          "const originVerify = pm.collectionVariables.get('originVerify');",
+          "if (originVerify) {",
+          "    pm.request.headers.upsert({ key: \"X-Origin-Verify\", value: originVerify });",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Common test for all GraphQL requests",
+          "pm.test('Status code is 200', function () {",
+          "    pm.response.to.have.status(200);",
+          "});",
+          "",
+          "pm.test('Response is valid JSON', function () {",
+          "    pm.response.to.be.json;",
+          "});",
+          "",
+          "pm.test('No GraphQL errors', function () {",
+          "    const responseJson = pm.response.json();",
+          "    pm.expect(responseJson).to.not.have.property('errors');",
+          "});",
+          "",
+          "pm.test('Response has data', function () {",
+          "    const responseJson = pm.response.json();",
+          "    pm.expect(responseJson).to.have.property('data');",
+          "    pm.expect(responseJson.data).to.not.be.null;",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5330",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "username",
+      "value": "demoUser",
+      "type": "string"
+    },
+    {
+      "key": "timestamp",
+      "value": ""
+    },
+    {
+      "key": "originVerify",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

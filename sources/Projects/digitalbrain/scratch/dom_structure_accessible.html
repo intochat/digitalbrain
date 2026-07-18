@@ -1,0 +1,96 @@
+<!DOCTYPE html><html lang="en-US"><head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="DigitalBrain — an AI-native runtime. Describe what you want in plain English; DigitalBrain writes the spec, proves it with a test, and grows the behavior live. Built on .NET Aspire, Orleans, and Reqnroll.">
+
+  <!-- Open Graph / social share -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="DigitalBrain — Software that grows with you">
+  <meta property="og:description" content="An AI-native runtime. Plain English becomes a spec, becomes guaranteed-green code. Open source.">
+  <meta property="og:site_name" content="DigitalBrain">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="DigitalBrain — Software that grows with you">
+  <meta name="twitter:description" content="An AI-native runtime. Plain English becomes a spec, becomes guaranteed-green code. Open source.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="DigitalBrain">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png">
+
+  <title>DigitalBrain</title>
+  <link rel="manifest" href="manifest.json">
+  <script>
+    window.KERNEL_PORT = null;
+    
+    // Use cache-busting to ensure we always get the latest port on reload
+    fetch('kernel_port.txt?t=' + new Date().getTime())
+      .then(r => {
+        if (!r.ok) throw new Error("Status " + r.status);
+        return r.text();
+      })
+      .then(t => {
+        window.KERNEL_PORT = t.trim();
+        console.log("Dynamically resolved kernel port from server: " + window.KERNEL_PORT);
+        bootstrapFlutter();
+      })
+      .catch(e => {
+        console.warn("Failed to fetch kernel_port.txt:", e);
+        bootstrapFlutter(); // Load anyway as fallback
+      });
+
+    function bootstrapFlutter() {
+      var script = document.createElement('script');
+      script.src = "flutter_bootstrap.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  </script>
+<script type="application/javascript" src="http://localhost:5800/main.dart.js"></script><meta name="generator" content="Flutter"><meta flt-viewport="" name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"></head>
+<body flt-embedding="full-page" flt-renderer="canvaskit" flt-build-mode="release" spellcheck="false" style="position: fixed; inset: 0px; overflow: hidden; padding: 0px; margin: 0px; user-select: none; touch-action: none;">
+  <!--
+    You can customize the "flutter_bootstrap.js" script.
+    This is useful to provide a custom configuration to the Flutter loader
+    or to give the user feedback during the initialization process.
+
+    For more details:
+    * https://docs.flutter.dev/platform-integration/web/initialization
+  -->
+
+
+<script src="flutter_bootstrap.js" async=""></script><p aria-hidden="true" style="position: fixed; bottom: 100%; visibility: hidden; opacity: 0; pointer-events: none; width: auto; height: auto; white-space: nowrap; line-height: 9999px; letter-spacing: 9999px; word-spacing: 9999px; margin: 0px 0px 9999px;">flutter typography measurement</p><flt-announcement-host><flt-announcement-polite aria-live="polite" style="position: fixed; overflow: hidden; transform: translate(-99999px, -99999px); width: 1px; height: 1px;"></flt-announcement-polite><flt-announcement-assertive aria-live="assertive" style="position: fixed; overflow: hidden; transform: translate(-99999px, -99999px); width: 1px; height: 1px;"></flt-announcement-assertive></flt-announcement-host><flutter-view flt-view-id="0" tabindex="-1" style="position: absolute; inset: 0px; width: 1280px; height: 800px;"><flt-glass-pane></flt-glass-pane><flt-text-editing-host></flt-text-editing-host><flt-semantics-host style="position: absolute; transform-origin: 0px 0px 0px; transform: scale(1);"><flt-semantics id="flt-semantic-node-0" style="position: absolute; overflow: visible; filter: opacity(0%); color: rgba(0, 0, 0, 0); pointer-events: none; width: 1280px; height: 800px;"><flt-semantics id="flt-semantic-node-1" style="position: absolute; overflow: visible; pointer-events: none; width: 1280px; height: 800px;"><flt-semantics id="flt-semantic-node-25" style="position: absolute; overflow: visible; pointer-events: none; z-index: 2; width: 1280px; height: 800px;"></flt-semantics><flt-semantics id="flt-semantic-node-2" style="position: absolute; overflow: visible; pointer-events: none; z-index: 1; width: 1280px; height: 800px;"><flt-semantics id="flt-semantic-node-3" style="position: absolute; overflow: visible; pointer-events: none; width: 1280px; height: 800px;"><flt-semantics id="flt-semantic-node-4" tabindex="0" style="position: absolute; overflow: visible; pointer-events: none; width: 1280px; height: 800px;"><flt-semantics id="flt-semantic-node-5" role="group" tabindex="0" aria-label="synapses  15/200
+DigitalBrain" style="position: absolute; overflow: visible; pointer-events: none; width: 1280px; height: 800px;"><flt-semantics id="flt-semantic-node-6" role="button" flt-tappable="" style="position: absolute; overflow: visible; pointer-events: all; z-index: 1; width: 1280px; height: 744px;">DYNAMIC · 1
+SYSTEM · 1
+Creator
+Identity
+Travel
+Gmail
+Ai
+Sqlite
+Onboarding
+TaskManager
+WordConnector
+DiagramExporter
+PostgresDb
+Marketplace
+License</flt-semantics><flt-semantics id="flt-semantic-node-17" role="button" flt-tappable="" style="position: absolute; overflow: visible; pointer-events: all; z-index: 7; width: 113.903px; height: 32px; transform-origin: 0px 0px 0px; transform: matrix(1, 0, 0, 1, 1091.1, 26);">Search
+⌘K</flt-semantics><flt-semantics id="flt-semantic-node-19" role="button" flt-tappable="" style="position: absolute; overflow: visible; pointer-events: all; z-index: 9; width: 79.9874px; height: 37px; transform-origin: 0px 0px 0px; transform: matrix(1, 0, 0, 1, 553.364, 660);">Assist</flt-semantics><flt-semantics id="flt-semantic-node-20" role="button" flt-tappable="" style="position: absolute; overflow: visible; pointer-events: all; z-index: 10; width: 93.2843px; height: 37px; transform-origin: 0px 0px 0px; transform: matrix(1, 0, 0, 1, 633.352, 660);">Operate</flt-semantics><flt-semantics id="flt-semantic-node-7" role="group" aria-label="ORLEANS TIMELINE DEBUGGER
+15/200 synapses" flt-tappable="" style="position: absolute; overflow: visible; pointer-events: all; z-index: 2; width: 1280px; height: 51px; transform-origin: 0px 0px 0px; transform: matrix(1, 0, 0, 1, 0, 693);"><flt-semantics id="flt-semantic-node-8" role="button" tabindex="0" flt-tappable="" style="position: absolute; overflow: visible; pointer-events: all; width: 115.714px; height: 32px; transform-origin: 0px 0px 0px; transform: matrix(1, 0, 0, 1, 1112.29, 10);">Fire Synapse</flt-semantics></flt-semantics><flt-semantics id="flt-semantic-node-21" role="button" tabindex="0" flt-tappable="" style="position: absolute; overflow: visible; pointer-events: all; z-index: 11; width: 40px; height: 40px; transform-origin: 0px 0px 0px; transform: matrix(1, 0, 0, 1, 363, 725);">Attach local file (paperclip)</flt-semantics><flt-semantics id="flt-semantic-node-23" role="button" tabindex="0" flt-tappable="" style="position: absolute; overflow: visible; pointer-events: all; z-index: 13; width: 40px; height: 40px; transform-origin: 0px 0px 0px; transform: matrix(1, 0, 0, 1, 839, 725);">Hold to speak</flt-semantics><flt-semantics id="flt-semantic-node-24" role="button" aria-disabled="true" style="position: absolute; overflow: visible; pointer-events: all; z-index: 14; width: 40px; height: 40px; transform-origin: 0px 0px 0px; transform: matrix(1, 0, 0, 1, 883, 725);"></flt-semantics><flt-semantics id="flt-semantic-node-22" style="position: absolute; overflow: visible; pointer-events: all; z-index: 12; width: 430px; height: 36px; transform-origin: 0px 0px 0px; transform: matrix(1, 0, 0, 1, 409, 727);"><input spellcheck="false" autocorrect="off" autocomplete="off" data-semantics-role="text-field" aria-label="Enter brain prompt..." type="text" style="position: absolute; top: 0px; left: 0px; width: 430px; height: 36px;"></flt-semantics><flt-semantics id="flt-semantic-node-15" aria-label="live" aria-owns="flt-semantic-node-26" style="position: absolute; overflow: visible; pointer-events: all; z-index: 5; width: 912.999px; height: 40px; transform-origin: 0px 0px 0px; transform: matrix(1, 0, 0, 1, 291.001, 752);"><input type="range" role="slider" tabindex="0" aria-valuenow="1" aria-valuetext="100%" max="2" aria-valuemax="2" min="0" aria-valuemin="0"></flt-semantics><flt-semantics id="flt-semantic-node-13" role="button" tabindex="0" flt-tappable="" style="position: absolute; overflow: visible; pointer-events: all; z-index: 3; width: 65.5848px; height: 32px; transform-origin: 0px 0px 0px; transform: matrix(1, 0, 0, 1, 117.438, 756);">Show more</flt-semantics><flt-semantics id="flt-semantic-node-14" aria-label="Show everything" role="checkbox" aria-disabled="true" disabled="true" aria-checked="false" style="position: absolute; overflow: visible; pointer-events: all; z-index: 4; width: 99.9785px; height: 29px; transform-origin: 0px 0px 0px; transform: matrix(1, 0, 0, 1, 183.022, 757.5);"></flt-semantics><flt-semantics id="flt-semantic-node-18" role="button" tabindex="0" flt-tappable="" style="position: absolute; overflow: visible; pointer-events: all; z-index: 8; width: 18px; height: 18px; transform-origin: 0px 0px 0px; transform: matrix(1, 0, 0, 1, 1217, 33);"></flt-semantics><flt-semantics id="flt-semantic-node-16" role="button" tabindex="0" flt-tappable="" style="position: absolute; overflow: visible; pointer-events: all; z-index: 6; width: 56px; height: 32px; transform-origin: 0px 0px 0px; transform: matrix(1, 0, 0, 1, 1212, 756);">Live</flt-semantics></flt-semantics></flt-semantics></flt-semantics></flt-semantics><flt-semantics id="flt-semantic-node-26" style="position: absolute; overflow: visible; pointer-events: none; z-index: 3; width: 1280px; height: 800px;"></flt-semantics></flt-semantics></flt-semantics></flt-semantics-host><style id="flt-text-editing-stylesheet">flutter-view flt-scene-host {  font: normal normal 14px sans-serif;}flutter-view flt-semantics input[type=range] {  appearance: none;  -webkit-appearance: none;  width: 100%;  position: absolute;  border: none;  top: 0;  right: 0;  bottom: 0;  left: 0;}flutter-view input::selection {  background-color: transparent;}flutter-view textarea::selection {  background-color: transparent;}flutter-view flt-semantics input,flutter-view flt-semantics textarea,flutter-view flt-semantics [contentEditable="true"] {  caret-color: transparent;}flutter-view .flt-text-editing::placeholder {  opacity: 0;}flutter-view:focus { outline: rgb(0, 0, 0) none 0px;}flutter-view .transparentTextEditing:-webkit-autofill,flutter-view .transparentTextEditing:-webkit-autofill:hover,flutter-view .transparentTextEditing:-webkit-autofill:focus,flutter-view .transparentTextEditing:-webkit-autofill:active {  opacity: 0 !important;}</style></flutter-view></body></html>

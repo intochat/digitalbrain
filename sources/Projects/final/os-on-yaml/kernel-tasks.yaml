@@ -1,0 +1,29 @@
+schemaVersion: "os-on-yaml/v0"
+neuron:
+  id: kernel-tasks
+  grainType: kernel-tasks
+  version: 1.0.0
+  desc: Active tasks and reminders, always at hand
+  emits:
+    - UiSurface
+    - KernelTaskListed
+  region: widgets
+  pinned: true
+  order: 1
+  isSystem: true
+  observedSynapses: 0
+  rules:
+    - on: SetAlarm
+      do:
+        - show:
+            card:
+              title: "Task reminder"
+              content:
+                - kind: text
+                  text: "Active task set"
+                - kind: button
+                  label: "Inspect"
+                  action:
+                    type: InspectKernelTask
+                    args:
+                      taskId: "reminder"

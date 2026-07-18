@@ -1,0 +1,21 @@
+schemaVersion: "os-on-yaml/v0"
+neuron:
+  id: transcription
+  grainType: transcription
+  version: 1.0.0
+  desc: Transcription (system)
+  emits:
+    - UiSurface
+  isSystem: true
+  observedSynapses: 0
+  rules:
+    - on: VoiceMessageRecorded
+      do:
+        - show:
+            card:
+              title: "Transcribing..."
+              content:
+                - kind: text
+                  text: "Processing voice input"
+                - kind: progress
+                  text: "0|50"

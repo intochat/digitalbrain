@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net11.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-DigitalBrain.Kernel-ea55b00e-5a06-4791-b7d3-a9f3aabb83f9</UserSecretsId>
+    <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
+    <ContainerRepository>digitalbrain-kernel</ContainerRepository>
+    <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:11.0-preview</ContainerBaseImage>
+    <RuntimeIdentifiers>linux-x64;win-x64</RuntimeIdentifiers>
+    <ContainerRuntimeIdentifier>linux-x64</ContainerRuntimeIdentifier>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DigitalBrain.Kernel.Contracts\DigitalBrain.Kernel.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Google\DigitalBrain.Integrations.Google.csproj" />
+    <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Salesforce\DigitalBrain.Integrations.Salesforce.csproj" />
+    <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Web\DigitalBrain.Integrations.Web.csproj" />
+    <ProjectReference Include="..\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
+  </ItemGroup>
+</Project>

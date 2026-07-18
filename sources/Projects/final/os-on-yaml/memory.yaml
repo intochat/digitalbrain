@@ -1,0 +1,18 @@
+schemaVersion: "os-on-yaml/v0"
+neuron:
+  id: memory
+  grainType: memory
+  version: 1.0.0
+  desc: Memory experience
+  emits:
+    - UiSurface
+  observedSynapses: 0
+  rules:
+    - on: RememberSynapse
+      do:
+        - show:
+            card:
+              title: "Remembered"
+              content:
+                - kind: text
+                  text: "Stored in memory"

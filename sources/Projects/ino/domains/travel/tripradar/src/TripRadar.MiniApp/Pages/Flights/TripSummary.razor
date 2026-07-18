@@ -1,0 +1,9 @@
+@using TripRadar.MiniApp.Client.Infrastructure.Localization
+@attribute [Route(AppRoutes.FlightTrip)]
+@inject IStringLocalizer<SharedResource> L
+
+<PageHeader Title="@L["TripSummaryTitle"]" ShowBack BackRoute="@AppRoutes.FlightResults" />
+
+<div class="p-4">
+    <EmptyState Icon="luggage" Title="@L["TripSummaryDetails"]" Message="@L["TripSummaryComingSoon"]" />
+</div>

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <RootNamespace>Ino.Domains.Recall</RootNamespace>
+    <AssemblyName>Ino.Domains.Recall</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Server" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Ino.Core\Ino.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.Core.Hosting\Ino.Core.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.ServiceDefaults\Ino.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.Llm.Xai\Ino.Llm.Xai.csproj" />
+    <ProjectReference Include="..\Ino.Domains.Recall.Contracts\Ino.Domains.Recall.Contracts.csproj" />
+    <!-- RecallNeuron's IMemoryLookup dependency comes from IAW. The silo's
+         Program.cs calls Aspire.IAW.AddIAW() before AddDomain to register
+         IawMemoryProvider + IMemoryLookup + QdrantClient + IEmbeddingGenerator.
+         Same wiring pattern as Reminders (Phase 4 Slice B). -->
+    <ProjectReference Include="..\..\..\iaw\src\Aspire.Client\Aspire.Client.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Features\**\*.feature">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Features\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
+    </Content>
+  </ItemGroup>
+
+</Project>

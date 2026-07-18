@@ -1,0 +1,606 @@
+import 'dart:convert';
+
+import 'package:digitalbrain_flutter/runtime/protocol/surface_protocol.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'test_fixtures.dart';
+
+void main() {
+  test('advertises exactly the declared protocol capability versions', () {
+    const capabilities = ClientCapabilities(protocolVersions: {3});
+
+    expect(capabilities.names, contains('ui.protocol.v3'));
+    expect(capabilities.names, isNot(contains('ui.protocol.v2')));
+    expect(
+      const ClientCapabilities().names,
+      contains('ui.native.ino-conversation'),
+    );
+    expect(
+      const ClientCapabilities().names,
+      contains('ui.native.feature-approval'),
+    );
+  });
+
+  test('decodes an exact-digest Feature approval surface', () {
+    final envelope = const SurfaceEnvelopeDecoder().decode(
+      surfaceJsonString(payload: featureApprovalPayload()),
+    );
+
+    final payload = envelope.payload as FeatureApprovalSurfacePayload;
+    expect(payload.installationId, 'email-summarizer');
+    expect(payload.approvalId, hasLength(64));
+    expect(payload.releaseDigest, hasLength(64));
+    expect(payload.revision, 7);
+    expect(payload.addedCapabilities, ['gmail.message.read.v1']);
+    expect(payload.capabilityBindings.single.provider, 'google');
+    expect(
+      payload.capabilityBindings.single.providerConnectionId,
+      'google-primary',
+    );
+    expect(
+      payload.capabilityBindings.single.constraints['maximumMessages'],
+      20,
+    );
+  });
+
+  test('decodes a complete SurfaceEnvelope and typed action binding', () {
+    final envelope = const SurfaceEnvelopeDecoder().decode(
+      surfaceJsonString(actions: [testActionJson()]),
+    );
+
+    expect(envelope.protocolVersion, 2);
+    expect(envelope.ownerId, 'owner-a');
+    expect(envelope.actorId, 'actor-a');
+    expect(envelope.payload, isA<NativeSurfacePayload>());
+    expect(envelope.actions.single.bindingId, 'refresh-binding');
+    expect(envelope.actions.single.actionToken, 'signed-action-token');
+  });
+
+  test('decodes a conversation-projected surface cause', () {
+    final source = surfaceJsonMap()
+      ..['cause'] = {'kind': 'conversation', 'id': 'conversation-a'};
+
+    final envelope = const SurfaceEnvelopeDecoder().decode(jsonEncode(source));
+
+    expect(envelope.cause.kind, 'conversation');
+    expect(envelope.cause.id, 'conversation-a');
+  });
+
+  test(
+    'decodes a typed INO conversation with authoritative operation identity',
+    () {
+      final envelope = const SurfaceEnvelopeDecoder().decode(
+        surfaceJsonString(
+          payload: inoConversationPayload(
+            messages: [
+              inoMessage(role: 'user', text: 'Hello', state: 'queued'),
+              inoMessage(
+                role: 'assistant',
+                text: 'How can I help?',
+                state: 'succeeded',
+              ),
+            ],
+            operation: inoOperation(state: 'succeeded'),
+          ),
+          actions: [testInoActionJson()],
+        ),
+      );
+
+      final payload = envelope.payload as InoConversationSurfacePayload;
+      expect(payload.intro, 'Ask DigitalBrain about this workspace.');
+      expect(payload.messages, hasLength(2));
+      expect(payload.messages.first.turnKey, startsWith('turn-user-'));
+      expect(payload.messages.first.role, InoConversationRole.user);
+      expect(payload.messages.last.role, InoConversationRole.assistant);
+      expect(payload.operation?.state, InoConversationOperationState.succeeded);
+      expect(payload.operation?.operationId, 'operation-a');
+      expect(payload.operation?.phase, InoConversationOperationPhase.succeeded);
+      expect(payload.operation?.version, 1);
+      expect(payload.operation?.retryable, isFalse);
+      expect(envelope.actions.single.bindingId, 'ino.send');
+      expect(envelope.actions.single.actionType, 'ino.interact');
+    },
+  );
+
+  test('decodes distinct approved and applying-effect operation phases', () {
+    for (final expectation in <({String phase, String state})>[
+      (phase: 'approved', state: 'queued'),
+      (phase: 'applying-effect', state: 'running'),
+    ]) {
+      final envelope = const SurfaceEnvelopeDecoder().decode(
+        surfaceJsonString(
+          payload: inoConversationPayload(
+            operation: inoOperation(
+              state: expectation.state,
+              phase: expectation.phase,
+            ),
+          ),
+        ),
+      );
+
+      final payload = envelope.payload as InoConversationSurfacePayload;
+      expect(payload.operation?.phase.wire, expectation.phase);
+    }
+  });
+
+  test('parses bounded capability and proposal receipts', () {
+    final envelope = const SurfaceEnvelopeDecoder().decode(
+      surfaceJsonString(
+        payload: inoConversationPayload(
+          operation: inoOperation(
+            state: 'succeeded',
+            capability: inoCapability(),
+            proposal: inoFeatureProposal(),
+          ),
+        ),
+      ),
+    );
+
+    final operation =
+        (envelope.payload as InoConversationSurfacePayload).operation!;
+    expect(operation.capability?.kind, InoCapabilityResolutionKind.match);
+    expect(operation.capability?.id, 'salesforce.record.read.v1');
+    expect(operation.capability?.name, 'Read Salesforce records');
+    expect(operation.capability?.confidence, 0.91);
+    expect(operation.proposal?.label, 'Open Studio');
+    expect(
+      operation.proposal?.route,
+      '/features/proposals/proposal-0123456789abcdef0123456789abcdef',
+    );
+  });
+
+  test('omits capability and proposal when the operation carries neither', () {
+    final envelope = const SurfaceEnvelopeDecoder().decode(
+      surfaceJsonString(
+        payload: inoConversationPayload(
+          operation: inoOperation(state: 'succeeded'),
+        ),
+      ),
+    );
+
+    final operation =
+        (envelope.payload as InoConversationSurfacePayload).operation!;
+    expect(operation.capability, isNull);
+    expect(operation.proposal, isNull);
+  });
+
+  test('rejects external or malformed proposal routes', () {
+    expect(
+      () => const SurfaceEnvelopeDecoder().decode(
+        surfaceJsonString(
+          payload: inoConversationPayload(
+            operation: inoOperation(
+              state: 'succeeded',
+              proposal: inoFeatureProposal(route: 'https://example.com'),
+            ),
+          ),
+        ),
+      ),
+      throwsFormatException,
+    );
+  });
+
+  test('rejects malformed capability receipts', () {
+    final oversizedId = 'x' * 129;
+    final oversizedName = 'x' * 81;
+    final invalidCapabilities = <Map<String, Object?>>[
+      inoCapability(kind: 'bogus'),
+      inoCapability(id: oversizedId),
+      inoCapability(name: oversizedName),
+      inoCapability(confidence: 1.5),
+      inoCapability(confidence: -0.1),
+      inoCapability(id: 42),
+      inoCapability(name: 42),
+      inoCapability(kind: 7),
+    ];
+
+    for (final capability in invalidCapabilities) {
+      expect(
+        () => const SurfaceEnvelopeDecoder().decode(
+          surfaceJsonString(
+            payload: inoConversationPayload(
+              operation: inoOperation(
+                state: 'succeeded',
+                capability: capability,
+              ),
+            ),
+          ),
+        ),
+        throwsFormatException,
+        reason: capability.toString(),
+      );
+    }
+  });
+
+  test('rejects malformed feature proposal references', () {
+    final oversizedId = 'proposal-${'x' * 129}';
+    const validId = 'proposal-0123456789abcdef0123456789abcdef';
+    const validRoute = '/features/proposals/$validId';
+    final invalidProposals = <Map<String, Object?>>[
+      inoFeatureProposal(route: 'https://example.com'),
+      inoFeatureProposal(route: '/features/proposals/not-a-proposal-id'),
+      inoFeatureProposal(
+        id: oversizedId,
+        route: '/features/proposals/$oversizedId',
+      ),
+      inoFeatureProposal(label: 'x' * 81),
+      inoFeatureProposal(route: '$validRoute/extra'),
+      inoFeatureProposal(route: '$validRoute?query=1'),
+      inoFeatureProposal(route: '$validRoute#fragment'),
+      inoFeatureProposal(route: '$validRoute/../x'),
+      inoFeatureProposal(
+        route:
+            '/features/proposals/proposal-'
+            '0123456789ABCDEF0123456789ABCDEF',
+      ),
+      inoFeatureProposal(
+        id: 'proposal-ffffffffffffffffffffffffffffffff',
+        route: validRoute,
+      ),
+    ];
+
+    for (final proposal in invalidProposals) {
+      expect(
+        () => const SurfaceEnvelopeDecoder().decode(
+          surfaceJsonString(
+            payload: inoConversationPayload(
+              operation: inoOperation(state: 'succeeded', proposal: proposal),
+            ),
+          ),
+        ),
+        throwsFormatException,
+        reason: proposal.toString(),
+      );
+    }
+  });
+
+  test('decodes only the complete safe legacy INO operation shape', () {
+    final envelope = const SurfaceEnvelopeDecoder().decode(
+      surfaceJsonString(
+        payload: inoConversationPayload(
+          operation: const {
+            'state': 'responding',
+            'retryable': true,
+            'safeReason': 'The previous operation is still running.',
+          },
+        ),
+      ),
+    );
+
+    final operation =
+        (envelope.payload as InoConversationSurfacePayload).operation!;
+    expect(operation.operationId, isEmpty);
+    expect(operation.phase, InoConversationOperationPhase.running);
+    expect(operation.version, 0);
+    expect(operation.state, InoConversationOperationState.responding);
+    expect(operation.retryable, isTrue);
+    expect(operation.toJson(), {
+      'state': 'responding',
+      'retryable': true,
+      'safeReason': 'The previous operation is still running.',
+      'action': null,
+    });
+  });
+
+  test(
+    'rejects partial metadata and approval authority in legacy operations',
+    () {
+      final invalidOperations = <Map<String, Object?>>[
+        for (final metadata in const <Map<String, Object?>>[
+          {'operationId': 'operation-a'},
+          {'phase': 'running'},
+          {'version': 1},
+        ])
+          {'state': 'running', 'retryable': false, ...metadata},
+        {
+          'state': 'awaiting-approval',
+          'retryable': false,
+          'approvalId': 'approval-a',
+        },
+      ];
+
+      for (final operation in invalidOperations) {
+        expect(
+          () => const SurfaceEnvelopeDecoder().decode(
+            surfaceJsonString(
+              payload: inoConversationPayload(operation: operation),
+            ),
+          ),
+          throwsFormatException,
+        );
+      }
+    },
+  );
+
+  test('rejects malformed or sensitive INO conversation data', () {
+    final decoder = SurfaceEnvelopeDecoder(
+      oauthStartOrigin: Uri.parse('https://brain.example:7443'),
+    );
+    final tooLongFlow = List<String>.filled(1025, 'a').join();
+    final invalidPayloads = <Map<String, Object?>>[
+      inoConversationPayload(
+        messages: [inoMessage(role: 'system', text: 'Hidden', state: 'queued')],
+      ),
+      inoConversationPayload(operation: inoOperation(state: 'unknown')),
+      inoConversationPayload(
+        messages: [
+          {
+            ...inoMessage(role: 'user', text: 'Hello', state: 'queued'),
+            'actorId': 'must-not-reach-renderer',
+          },
+        ],
+      ),
+      inoConversationPayload(
+        messages: [
+          inoMessage(
+            role: 'user',
+            text: 'Hello',
+            state: 'queued',
+            turnKey: 'not a safe key',
+          ),
+        ],
+      ),
+      inoConversationPayload(
+        operation: {
+          ...inoOperation(state: 'failed', retryable: true),
+          'operationId': 'must-not-reach-renderer!',
+        },
+      ),
+      inoConversationPayload(
+        operation: inoOperation(
+          state: 'succeeded',
+          action: googleConnectionAction(target: 'https://example.com/auth'),
+        ),
+      ),
+      for (final target in [
+        'https://accounts.google.com/',
+        'https://accounts.google.com:444/o/oauth2/v2/auth?state=opaque',
+        'https://user@accounts.google.com/o/oauth2/v2/auth?state=opaque',
+        'https://accounts.google.com/o/oauth2/v2/auth?state=opaque#fragment',
+        'https://brain.example:7443/oauth/start/google?f=0123456789abcdefghijklmnopqrstuv',
+        '/oauth/start/google?t=0123456789abcdefghijklmnopqrstuv',
+        '/oauth/start/google?f=too-short',
+        '/oauth/start/google?f=0123456789abcdefghijklmnopqrstu%',
+        '/oauth/start/google?f=$tooLongFlow',
+        '/oauth/start/google?f=0123456789abcdefghijklmnopqrstuv&state=provider-state',
+        '/oauth/start/google?f=0123456789abcdefghijklmnopqrstuv#fragment',
+      ])
+        inoConversationPayload(
+          operation: inoOperation(
+            state: 'succeeded',
+            action: googleConnectionAction(target: target),
+          ),
+        ),
+      for (final target in [
+        'http://brain.example/oauth/start/salesforce?t=opaque-token',
+        'https://evil.example/oauth/start/salesforce?t=opaque-token',
+        'https://login.salesforce.com/services/oauth2/authorize?response_type=code',
+        'http://localhost:51014/oauth/callback/salesforce?t=opaque-token',
+        'http://localhost:51014/oauth/start/salesforce?t=opaque-token&state=provider-state',
+        'http://localhost:51014/oauth/start/salesforce?t=',
+        'http://user@localhost:51014/oauth/start/salesforce?t=opaque-token',
+        'http://localhost:51014/oauth/start/salesforce?t=opaque-token#fragment',
+        '/oauth/start/salesforce?t=0123456789abcdefghijklmnopqrstuv',
+        '/oauth/start/salesforce?f=too-short',
+        '/oauth/start/unknown?f=0123456789abcdefghijklmnopqrstuv',
+      ])
+        inoConversationPayload(
+          operation: inoOperation(
+            state: 'succeeded',
+            action: salesforceConnectionAction(target: target),
+          ),
+        ),
+    ];
+
+    for (final payload in invalidPayloads) {
+      expect(
+        () => decoder.decode(surfaceJsonString(payload: payload)),
+        throwsFormatException,
+      );
+    }
+  });
+
+  test('decodes only the bounded Google connection action', () {
+    final envelope =
+        SurfaceEnvelopeDecoder(
+          oauthStartOrigin: Uri.parse('https://brain.example:7443'),
+        ).decode(
+          surfaceJsonString(
+            payload: inoConversationPayload(
+              operation: inoOperation(
+                state: 'succeeded',
+                action: googleConnectionAction(),
+              ),
+            ),
+          ),
+        );
+
+    final operation =
+        (envelope.payload as InoConversationSurfacePayload).operation!;
+    expect(operation.action?.kind, 'openUrl');
+    expect(operation.action?.label, 'Connect Google');
+    expect(operation.action?.target.host, 'brain.example');
+    expect(operation.action?.target.path, '/oauth/start/google');
+    expect(operation.action?.target.queryParameters.keys, ['f']);
+  });
+
+  test('decodes the bounded Salesforce connection action', () {
+    final envelope =
+        SurfaceEnvelopeDecoder(
+          oauthStartOrigin: Uri.parse('https://brain.example:7443'),
+        ).decode(
+          surfaceJsonString(
+            payload: inoConversationPayload(
+              operation: inoOperation(
+                state: 'succeeded',
+                action: salesforceConnectionAction(),
+              ),
+            ),
+          ),
+        );
+
+    final operation =
+        (envelope.payload as InoConversationSurfacePayload).operation!;
+    expect(operation.action?.kind, 'openUrl');
+    expect(operation.action?.label, 'Connect Salesforce');
+    expect(operation.action?.target.host, 'brain.example');
+    expect(operation.action?.target.path, '/oauth/start/salesforce');
+    expect(operation.action?.target.queryParameters.keys, ['f']);
+  });
+
+  test('decodes an awaiting authorization conversation state', () {
+    final envelope =
+        SurfaceEnvelopeDecoder(
+          oauthStartOrigin: Uri.parse('https://brain.example:7443'),
+        ).decode(
+          surfaceJsonString(
+            payload: inoConversationPayload(
+              messages: [
+                inoMessage(
+                  role: 'assistant',
+                  text: 'Connect Salesforce to continue.',
+                  state: 'awaiting-authorization',
+                ),
+              ],
+              operation: inoOperation(
+                state: 'awaiting-authorization',
+                action: salesforceConnectionAction(),
+              ),
+            ),
+          ),
+        );
+
+    final payload = envelope.payload as InoConversationSurfacePayload;
+    expect(
+      payload.messages.single.state,
+      InoConversationTurnState.awaitingAuthorization,
+    );
+    expect(
+      payload.operation?.state,
+      InoConversationOperationState.awaitingAuthorization,
+    );
+    expect(payload.messages.single.toJson()['state'], 'awaiting-authorization');
+    expect(payload.operation?.toJson()['state'], 'awaiting-authorization');
+    expect(payload.operation?.action?.target.host, 'brain.example');
+    expect(payload.operation?.action?.target.path, '/oauth/start/salesforce');
+  });
+
+  test('requires a trusted HTTPS runtime origin for connection actions', () {
+    final decoder = SurfaceEnvelopeDecoder(
+      oauthStartOrigin: Uri.parse('https://brain.example:7443'),
+    );
+    final accepted = decoder.decode(
+      surfaceJsonString(
+        payload: inoConversationPayload(
+          operation: inoOperation(
+            state: 'succeeded',
+            action: salesforceConnectionAction(),
+          ),
+        ),
+      ),
+    );
+
+    final operation =
+        (accepted.payload as InoConversationSurfacePayload).operation!;
+    expect(operation.action?.target.host, 'brain.example');
+    for (final origin in [
+      'http://localhost:7443',
+      'https://user@brain.example:7443',
+      'https://brain.example:7443/runtime',
+    ]) {
+      expect(
+        () =>
+            SurfaceEnvelopeDecoder(oauthStartOrigin: Uri.parse(origin)).decode(
+              surfaceJsonString(
+                payload: inoConversationPayload(
+                  operation: inoOperation(
+                    state: 'succeeded',
+                    action: salesforceConnectionAction(),
+                  ),
+                ),
+              ),
+            ),
+        throwsFormatException,
+      );
+    }
+    expect(
+      () => const SurfaceEnvelopeDecoder().decode(
+        surfaceJsonString(
+          payload: inoConversationPayload(
+            operation: inoOperation(
+              state: 'succeeded',
+              action: googleConnectionAction(),
+            ),
+          ),
+        ),
+      ),
+      throwsFormatException,
+    );
+  });
+
+  test('rejects unsupported protocol and capability requirements', () {
+    final wrongVersion = surfaceJsonMap()..['protocolVersion'] = 3;
+    final unsupported = surfaceJsonMap()
+      ..['requiredClientCapabilities'] = ['ui.payload.future'];
+
+    expect(
+      () => const SurfaceEnvelopeDecoder().decode(jsonEncode(wrongVersion)),
+      throwsFormatException,
+    );
+    expect(
+      () => const SurfaceEnvelopeDecoder().decode(jsonEncode(unsupported)),
+      throwsA(isA<UnsupportedSurfaceCapability>()),
+    );
+  });
+
+  test(
+    'rejects credentials and private identifiers hidden in payload data',
+    () {
+      for (final key in [
+        'accessToken',
+        'refresh_token',
+        'action-token',
+        'ownerId',
+        'actor_id',
+        'clientId',
+        'grants',
+        'actor',
+        'actorId',
+        'secret',
+        'session-id',
+      ]) {
+        final source = surfaceJsonString(
+          payload: {
+            'kind': 'native',
+            'nativeKind': 'message',
+            'data': {key: 'must-not-reach-renderer'},
+          },
+        );
+        expect(
+          () => const SurfaceEnvelopeDecoder().decode(source),
+          throwsFormatException,
+          reason: key,
+        );
+      }
+    },
+  );
+
+  test('rejects action binding for the wrong surface revision', () {
+    final source = surfaceJsonString(
+      actions: [testActionJson(surfaceRevision: 2)],
+    );
+
+    expect(
+      () => const SurfaceEnvelopeDecoder().decode(source),
+      throwsFormatException,
+    );
+  });
+
+  test('enforces the negotiated envelope byte limit', () {
+    final decoder = SurfaceEnvelopeDecoder(
+      capabilities: const ClientCapabilities(maximumPayloadBytes: 32),
+    );
+
+    expect(() => decoder.decode(surfaceJsonString()), throwsFormatException);
+  });
+}

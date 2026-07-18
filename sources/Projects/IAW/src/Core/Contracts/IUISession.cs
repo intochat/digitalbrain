@@ -1,0 +1,18 @@
+using Core.Contracts.UI;
+
+namespace Core.Contracts;
+
+public interface IUISession : IGrainWithStringKey
+{
+    Task<CallbackResult> HandleCallback(string callbackId, string callbackData, CancellationToken ct);
+    Task RegisterOptions(string optionsId, string prompt, PendingOption[] options, string projectSlug, string type, CancellationToken ct);
+    Task<bool> HasPendingFreeTextInput(string topicId, CancellationToken ct);
+    Task<WizardState> StartWizard(string wizardId, WizardStep[] steps, string projectSlug, CancellationToken ct);
+    Task<WizardState> AdvanceWizard(string wizardId, string selection, CancellationToken ct);
+    Task<PaginatorState> StartPaginator(string paginatorId, string[] items, int pageSize, string projectSlug, CancellationToken ct);
+    Task<PaginatorState> NavigatePaginator(string paginatorId, string direction, CancellationToken ct);
+    Task<MenuState> StartMenu(string menuId, MenuNode root, string projectSlug, CancellationToken ct);
+    Task<MenuState> NavigateMenu(string menuId, string action, CancellationToken ct);
+    Task<FormState> StartForm(string formId, FormField[] fields, string projectSlug, CancellationToken ct);
+    Task<FormState> AdvanceForm(string formId, string value, CancellationToken ct);
+}

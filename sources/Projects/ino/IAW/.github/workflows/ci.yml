@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 11.0.x
+          dotnet-quality: preview
+
+      - name: Restore
+        run: dotnet restore IAW.slnx
+
+      - name: Build
+        run: dotnet build IAW.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test IAW.slnx --no-build --configuration Release --verbosity normal
+
+      - name: Pack (validation only)
+        run: dotnet pack IAW.slnx --no-build --configuration Release --output ./nupkgs
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: nupkgs
+          path: |
+            ./nupkgs/*.nupkg
+            ./nupkgs/*.snupkg
+          retention-days: 7

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.V2.Core\DigitalBrain.V2.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Server" Version="10.1.1-preview.1" />
+    <PackageReference Include="Microsoft.Orleans.Streaming" Version="10.1.1-preview.1" />
+    <!-- Simulation derives from xUnit's IAsyncLifetime and calls Assert. A library uses the
+         non-executable core + assert packages; the executable runner lives in the capsule's
+         *.Simulations project. -->
+    <PackageReference Include="xunit.v3.extensibility.core" Version="4.0.0-pre.108" />
+    <PackageReference Include="xunit.v3.assert" Version="4.0.0-pre.108" />
+  </ItemGroup>
+
+</Project>

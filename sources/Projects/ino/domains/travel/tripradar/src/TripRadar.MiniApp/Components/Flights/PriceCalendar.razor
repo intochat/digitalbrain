@@ -1,0 +1,109 @@
+@using TripRadar.MiniApp.Client.Infrastructure.Contracts
+@using TripRadar.MiniApp.Client.Infrastructure.Localization
+@inject IPriceCalendarManager CalendarService
+@inject IStringLocalizer<SharedResource> L
+
+
+@if (Visible)
+{
+    <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/40" @onclick="CloseOverlay">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-2xl shadow-2xl max-h-[85vh] flex flex-col animate-slide-up" @onclick:stopPropagation>
+
+            @* Drag handle *@
+            <div class="flex justify-center pt-3 pb-1">
+                <div class="w-10 h-1 bg-gray-300 dark:bg-slate-700 rounded-full"></div>
+            </div>
+
+            @* Header *@
+            <div class="flex items-center justify-between px-5 pb-3">
+                <div>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">@L["PriceCalTitle"]</h2>
+                    <p class="text-sm text-gray-500 dark:text-slate-400 mt-0.5">@Subtitle</p>
+                </div>
+                <button @onclick="CloseOverlay" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 focus:outline-none">
+                    <span class="material-symbols-outlined text-xl text-gray-400">close</span>
+                </button>
+            </div>
+
+            @* Month navigation *@
+            <div class="flex items-center justify-between px-5 py-2">
+                <button @onclick="PreviousMonth" disabled="@(!CanGoPrevious)"
+                        class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-30 focus:outline-none">
+                    <span class="material-symbols-outlined">chevron_left</span>
+                </button>
+                <span class="text-base font-semibold text-gray-900 dark:text-white">@_displayedDate.ToString("MMMM yyyy")</span>
+                <button @onclick="NextMonth" disabled="@(!CanGoNext)"
+                        class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-30 focus:outline-none">
+                    <span class="material-symbols-outlined">chevron_right</span>
+                </button>
+            </div>
+
+            @if (_loadingDates.Count > 0)
+            {
+                <div class="px-5 pb-2">
+                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40 rounded-lg">
+                        <div class="fetch-spinner"></div>
+                        <span class="text-[11px] font-semibold text-blue-600 dark:text-blue-400">@string.Format(L["PriceCalFetchingCount"], _loadingDates.Count)</span>
+                    </div>
+                </div>
+            }
+
+            @* Day headers *@
+            <div class="grid grid-cols-7 px-5 mb-1">
+                @foreach (var h in _dayHeaders)
+                {
+                    <div class="text-center text-xs font-medium text-gray-400 dark:text-slate-500 py-1">@h</div>
+                }
+            </div>
+
+            @* Calendar grid *@
+            <div class="flex-1 overflow-y-auto px-5 pb-3">
+                <div class="grid grid-cols-7 gap-px">
+                    @for (var i = 0; i < _leadingBlanks; i++)
+                    {
+                        <div class="min-h-[52px]"></div>
+                    }
+
+                    @foreach (var cell in _cells)
+                    {
+                        var isSelected = cell.DateString == _selectedDate;
+                        var hasPrice = CanLoadPrices && _loadedPrices.ContainsKey(cell.DateString);
+                        var priceBand = hasPrice ? GetPriceBand(cell.DateString) : PriceBand.None;
+                        var isLoading = CanLoadPrices && _loadingDates.Contains(cell.DateString);
+
+                        <button class="@CellClass(cell.IsPast, isSelected, priceBand, isLoading)"
+                                disabled="@cell.IsPast"
+                                @onclick="() => OnDateClick(cell.DateString)">
+                            <span class="@DayTextClass(cell.IsPast, isSelected, priceBand, isLoading)">@cell.Day</span>
+                            @if (isLoading)
+                            {
+                                <div class="price-loading-skeleton"></div>
+                            }
+                            else if (hasPrice)
+                            {
+                                <span class="@PriceTextClass(isSelected, priceBand)">
+                                    @CurrencyFormat.FormatPrice(_loadedPrices[cell.DateString].LowestPrice!.Value, _loadedPrices[cell.DateString].Currency)
+                                </span>
+                            }
+                        </button>
+                    }
+                </div>
+            </div>
+
+            @* Hint *@
+            <div class="px-5 pb-2">
+                <p class="text-xs text-center text-gray-400 dark:text-slate-500">@HintText</p>
+            </div>
+
+            @* Footer *@
+            <div class="px-5 pb-5 pt-2 border-t border-gray-100 dark:border-slate-800">
+                <button @onclick="ApplySelectedDate"
+                        disabled="@(string.IsNullOrEmpty(_selectedDate))"
+                        class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 dark:disabled:bg-slate-800 disabled:text-gray-400 dark:disabled:text-slate-600 text-white font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] focus:outline-none">
+                    @ApplyButtonText
+                </button>
+            </div>
+        </div>
+    </div>
+}
+

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    Kernel-level E2E tests: discovery table + install/marketplace flow. Both
+    drive the silos via raw HTTP through InoTestAppHost — no browser needed.
+    Per-domain neuron tests (browser-driven via Playwright) live under
+    domains/<x>/Ino.Domains.<x>.Tests via the Ino.Testing.E2E lib.
+  -->
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="Grpc.Net.Client" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ino.Core\Ino.Core.csproj" />
+    <ProjectReference Include="..\..\src\Ino.Core.Hosting\Ino.Core.Hosting.csproj" />
+    <ProjectReference Include="..\..\src\Ino.Aspire.Hosting\Ino.Aspire.Hosting.csproj" />
+    <ProjectReference Include="..\..\src\Ino.Testing\Ino.Testing.csproj" />
+    <ProjectReference Include="..\..\src\Ino.AppHost\Ino.AppHost.csproj" />
+    <ProjectReference Include="..\..\src\Ino.Gateway.Grpc\Ino.Gateway.Grpc.csproj" />
+  </ItemGroup>
+
+</Project>

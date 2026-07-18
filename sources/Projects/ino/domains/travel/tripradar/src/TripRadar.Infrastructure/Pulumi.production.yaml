@@ -1,0 +1,15 @@
+config:
+  tripradar:environment: production
+  tripradar:location: westeurope
+  tripradar:resourceGroupName: tripradar-prod-rg
+  tripradar:namingPrefix: trprod
+  tripradar:enableFrontDoor: true
+  tripradar:frontDoorSku: Standard_AzureFrontDoor
+  tripradar:domains:websiteHost: tripradar.io
+  tripradar:domains:miniAppHost: app.tripradar.io
+  tripradar:domains:apiHost: api.tripradar.io
+  tripradar:api:allowedCorsOrigins: https://tripradar.io,https://app.tripradar.io
+  tripradar:network:vnetAddressSpace: 10.10.0.0/16
+  tripradar:network:containerAppsSubnet: 10.10.0.0/23
+  tripradar:network:databaseSubnet: 10.10.3.0/24
+  tripradar:network:privateEndpointsSubnet: 10.10.2.0/24

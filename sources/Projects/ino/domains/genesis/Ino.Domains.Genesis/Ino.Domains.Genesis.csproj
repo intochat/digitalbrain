@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <RootNamespace>Ino.Domains.Genesis</RootNamespace>
+    <AssemblyName>Ino.Domains.Genesis</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Server" />
+    <!-- Roslyn scripting — CreatorNeuron compiles draft script bodies for
+         validity before registering, and RoslynPlan executes them at
+         routing time. CSharp.Scripting brings the compiler + script host
+         needed for both. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Ino.Core\Ino.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.Core.Hosting\Ino.Core.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.ServiceDefaults\Ino.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.Llm.Xai\Ino.Llm.Xai.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.Kernel.Contracts\Ino.Kernel.Contracts.csproj" />
+    <ProjectReference Include="..\Ino.Domains.Genesis.Contracts\Ino.Domains.Genesis.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

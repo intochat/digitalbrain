@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsPackable>true</IsPackable>
+    <PackageId>DigitalBrain.Sdk</PackageId>
+    <Description>DigitalBrain SDK for Software 1.0: neurons and synapses to bring legacy systems (Roslyn syntax, file systems, Aspire orchs, AI, DB) into the brain. Includes Aspire hosting extensions for packing silo as single experience (ship like Aspire NuGet integrations).</Description>
+    <PackageTags>digitalbrain;sdk;software1.0;neurons;aspire;hosting;nuget</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting" Version="13.1.0" />
+    <PackageReference Include="Aspire.Hosting.Orleans" Version="13.1.0" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" Version="10.1.1-preview.1" />
+  </ItemGroup>
+
+</Project>

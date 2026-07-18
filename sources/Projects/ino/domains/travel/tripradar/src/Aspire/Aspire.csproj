@@ -1,0 +1,34 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.2.3">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net11.0</TargetFramework>
+    <RuntimeIdentifiers>win-x64;linux-x64;osx-arm64</RuntimeIdentifiers>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>c7c9b01e-2d0e-4c69-bfb4-b358bad4d324</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.JavaScript" />
+    <PackageReference Include="Aspire.Hosting.Kafka" />
+    <PackageReference Include="Aspire.Hosting.Elasticsearch" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <PackageReference Include="Aspire.Hosting.Redis" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.Flagd" />
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.McpInspector" />
+
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.Stripe" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" />
+    <PackageReference Include="Telegram.BotAPI" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TripRadar.Bot\TripRadar.Bot.csproj" />
+    <ProjectReference Include="..\TripRadar.Server.API\TripRadar.Server.API.csproj" />
+    <ProjectReference Include="..\TripRadar.Server.Db\TripRadar.Server.Db.csproj" />
+    <ProjectReference Include="..\TripRadar.Server.Jobs.API\TripRadar.Server.Jobs.API.csproj" />
+  </ItemGroup>
+
+</Project>

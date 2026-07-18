@@ -1,0 +1,148 @@
+{
+  "id": "tokyo",
+  "label": "Plan a 5-day Tokyo trip in late October",
+  "duration_s": 6.6,
+  "events": [
+    {
+      "t": 0.0,
+      "kind": "orb",
+      "state": "listening"
+    },
+    {
+      "t": 0.0,
+      "kind": "utter",
+      "text": "Plan a 5-day Tokyo trip in late October, rain-friendly, mid-budget, leave from Kyiv."
+    },
+    {
+      "t": 1.2,
+      "kind": "orb",
+      "state": "thinking"
+    },
+    {
+      "t": 1.2,
+      "kind": "syn",
+      "from": "Cortex",
+      "to": "PlanTrip",
+      "payload": {
+        "intent": "plan_trip",
+        "city": "Tokyo"
+      },
+      "gold": false
+    },
+    {
+      "t": 1.6,
+      "kind": "syn",
+      "from": "PlanTrip",
+      "to": "FindFlights",
+      "payload": {
+        "from": "KBP",
+        "to": "NRT",
+        "when": "2026-10-22..27",
+        "tier": "mid"
+      },
+      "gold": false
+    },
+    {
+      "t": 1.62,
+      "kind": "syn",
+      "from": "PlanTrip",
+      "to": "FindHotels",
+      "payload": {
+        "city": "Tokyo",
+        "tier": "mid",
+        "constraints": [
+          "rain-friendly"
+        ]
+      },
+      "gold": false
+    },
+    {
+      "t": 1.64,
+      "kind": "syn",
+      "from": "PlanTrip",
+      "to": "FindPlaces",
+      "payload": {
+        "city": "Tokyo",
+        "mood": "rain-friendly"
+      },
+      "gold": false
+    },
+    {
+      "t": 2.0,
+      "kind": "syn",
+      "from": "Preferences",
+      "to": "PlanTrip",
+      "payload": {
+        "ryokanBias": 0.62,
+        "hotelChainBias": -0.38,
+        "source": "recall.priorTrips"
+      },
+      "gold": true
+    },
+    {
+      "t": 2.4,
+      "kind": "syn",
+      "from": "Forecast",
+      "to": "PlanTrip",
+      "payload": {
+        "tokyo_oct": {
+          "d1": 0.22,
+          "d2": 0.61,
+          "d3": 0.78,
+          "d4": 0.3,
+          "d5": 0.18
+        }
+      },
+      "gold": false
+    },
+    {
+      "t": 3.0,
+      "kind": "card",
+      "id": "flights",
+      "stage": "enter",
+      "from": "travel"
+    },
+    {
+      "t": 3.8,
+      "kind": "card",
+      "id": "hotels",
+      "stage": "enter",
+      "from": "travel"
+    },
+    {
+      "t": 4.6,
+      "kind": "card",
+      "id": "itinerary",
+      "stage": "enter",
+      "from": "travel"
+    },
+    {
+      "t": 5.4,
+      "kind": "syn",
+      "from": "PlanTrip",
+      "to": "VisaReminder",
+      "payload": {
+        "topic": "visa",
+        "remindIn": "3 days"
+      },
+      "gold": false
+    },
+    {
+      "t": 5.5,
+      "kind": "card",
+      "id": "reminder",
+      "stage": "enter",
+      "from": "reminders"
+    },
+    {
+      "t": 6.0,
+      "kind": "orb",
+      "state": "celebrating"
+    },
+    {
+      "t": 6.2,
+      "kind": "orb",
+      "state": "idle"
+    }
+  ]
+}

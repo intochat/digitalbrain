@@ -1,0 +1,92 @@
+<Project Sdk="Microsoft.Build.NoTargets/3.7.0">
+  <!--
+    Flutter client project under src/DigitalBrain.Clients.Flutter/. The project file is named Flutter.proj (just like v1/UI/flutter/Flutter.proj for cross-reboot naming consistency).
+
+    Includes platform sources (windows/ brought in from v1). Provides the dotnet build prebuild coordination for the web bundle (final Aspire + slnx contract).
+
+    - When the flutter CLI is on PATH: runs `flutter build web` (with the no-tree-shake-icons flag; incremental via Inputs/Outputs
+      over lib/, web/, pubspec*). The resulting bundle lives in the standard build/web (ready for `flutter run`,
+      E2E harnesses, or future static hosting from a kernel wwwroot).
+    - When flutter is not on PATH (common in pure .NET/CI environments or the current placeholder for aspire run):
+      emits a clear message and skips cleanly. The rest of the solution still builds. Set SkipFlutterBuild=true
+      to force the skip even if flutter is present.
+    - The IFlutter neuron + Aspire executable resource ("flutter-client") owns start/restart (via ResourceCommandService under real aspire, or best-effort spawn).
+      This project participates in `dotnet build` to keep a fresh web bundle (Inputs/Outputs incremental).
+
+    See also:
+    - src/DigitalBrain.Clients.Flutter/ (pubspec + lib/ + windows/ embedder brought in)
+    - AppHost.cs (flutter-client executable resource)
+    - Sdk/Microsoft/Flutter/* + IFlutter
+    - Kernel/Experiences/SurfaceStreamService.cs
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <!-- No real .NET output from this coordination project. -->
+    <NoWarn>$(NoWarn);MSB3277;CS2008</NoWarn>
+  </PropertyGroup>
+
+  <!-- Flutter auto-prebuild configuration (mirrors ino/ exactly for familiarity). -->
+  <PropertyGroup>
+    <FlutterProjectDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</FlutterProjectDir>
+    <FlutterWebOutputDir>$(FlutterProjectDir)\build\web</FlutterWebOutputDir>
+    <SkipFlutterBuild Condition="'$(SkipFlutterBuild)' == ''">false</SkipFlutterBuild>
+  </PropertyGroup>
+
+  <!-- Platform sources (v1 style) + build triggers for the web prebuild target. -->
+  <ItemGroup>
+    <None Include="pubspec.yaml" />
+    <None Include="analysis_options.yaml" />
+    <None Include="lib\**\*" />
+    <None Include="web\**\*" />
+    <None Include="windows\**\*" Exclude="windows\flutter\ephemeral\**;windows\runner\Debug\**;windows\runner\Release\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FlutterSource Include="$(FlutterProjectDir)lib\**\*" />
+    <FlutterSource Include="$(FlutterProjectDir)web\**\*" />
+    <FlutterSource Include="$(FlutterProjectDir)pubspec.yaml" />
+    <FlutterSource Include="$(FlutterProjectDir)pubspec.lock" />
+    <FlutterSource Include="$(FlutterProjectDir)windows\**\*" />
+  </ItemGroup>
+
+  <!-- Probe for flutter CLI presence without failing the build. -->
+  <Target Name="_DetectFlutter">
+    <Exec Command="flutter --version"
+          ContinueOnError="true"
+          IgnoreStandardErrorWarningFormat="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low">
+      <Output TaskParameter="ExitCode" PropertyName="_FlutterExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <HasFlutter Condition="'$(_FlutterExitCode)' == '0'">true</HasFlutter>
+      <HasFlutter Condition="'$(_FlutterExitCode)' != '0'">false</HasFlutter>
+    </PropertyGroup>
+  </Target>
+
+  <!-- The actual prebuilt web step. Runs as part of any `dotnet build` that includes this project.
+       Uses standard MSBuild incremental semantics: if none of the FlutterSource inputs are newer than
+       the marker output, the target body is skipped (fast "up-to-date"). -->
+  <Target Name="BuildFlutterWeb"
+          DependsOnTargets="_DetectFlutter"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(SkipFlutterBuild)' != 'true'"
+          Inputs="@(FlutterSource)"
+          Outputs="$(FlutterWebOutputDir)\index.html">
+    <Message Condition="'$(HasFlutter)' != 'true'" Importance="high"
+             Text="Flutter not on PATH — skipping Flutter web prebuild for DigitalBrain.Clients.Flutter. The client will still be usable via `flutter run` (if you install Flutter) or the current Aspire executable resource placeholder. Set SkipFlutterBuild=true to suppress this message." />
+    <Message Condition="'$(HasFlutter)' == 'true' And !Exists('$(FlutterWebOutputDir)\index.html')" Importance="high"
+             Text="Prebuilding Flutter web bundle (dotnet build integration) → $(FlutterWebOutputDir)" />
+    <Exec Condition="'$(HasFlutter)' == 'true' And !Exists('$(FlutterWebOutputDir)\index.html')"
+          Command="flutter build web --no-tree-shake-icons"
+          WorkingDirectory="$(FlutterProjectDir)" />
+  </Target>
+
+  <!-- Make sure building this .proj explicitly still does the flutter work (coordination). -->
+  <Target Name="Build" DependsOnTargets="BuildFlutterWeb" />
+
+</Project>

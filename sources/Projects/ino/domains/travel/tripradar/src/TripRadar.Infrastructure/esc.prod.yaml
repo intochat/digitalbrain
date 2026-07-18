@@ -1,0 +1,99 @@
+imports:
+  - tripradar/base
+
+values:
+  azure:
+    subscriptionId: prod-subscription-id
+    location: westeurope
+    resourceGroupName: tripradar-prod-rg
+    namingPrefix: trprod
+    frontDoorId: /subscriptions/prod-subscription/resourceGroups/tripradar-prod-rg/providers/Microsoft.Cdn/profiles/tripradar-prod
+  domains:
+    website: tripradar.io
+    miniApp: app.tripradar.io
+    api: api.tripradar.io
+  api:
+    corsOrigins: https://tripradar.io,https://app.tripradar.io
+  postgres:
+    serverFqdn: tripradar-prod-postgres.postgres.database.azure.com
+    database: tripradar
+  network:
+    vnetAddressSpace: 10.10.0.0/16
+    containerAppsSubnet: 10.10.0.0/23
+    databaseSubnet: 10.10.3.0/24
+    privateEndpointsSubnet: 10.10.2.0/24
+  email:
+    baseUrl: https://tripradar.io
+    redirectUrl: https://tripradar.io/auth/callback
+    logoUrl: https://tripradar.io/logo.png
+  google:
+    clientId:
+      fn::secret: prod-google-client-id
+    clientSecret:
+      fn::secret: prod-google-client-secret
+  stripe:
+    successUrl: https://tripradar.io/billing/success
+    cancelUrl: https://tripradar.io/billing/cancel
+  telegram:
+    botUsername: tripradar_auth_bot
+    authBaseUrl: https://tripradar.io
+  kafka:
+    bootstrapServers: prod-kafka-bootstrap-servers
+  storage:
+    publicBlobBaseUrl: https://tripradarprodstorage.blob.core.windows.net
+  observability:
+    jaegerEndpoint: https://jaeger.tripradar.io
+    otlpEndpoint: https://otel.tripradar.io
+  environmentVariables:
+    DB_PASSWORD:
+      fn::secret: prod-db-password
+    JWT_KEY:
+      fn::secret: prod-jwt-key
+    JWT_REFRESH_TOKEN_KEY:
+      fn::secret: prod-jwt-refresh-token-key
+    API_KEY:
+      fn::secret: prod-api-key
+    INTERNAL_API_KEY:
+      fn::secret: prod-internal-api-key
+    HANGFIRE_DASHBOARD_KEY:
+      fn::secret: prod-hangfire-dashboard-key
+    APP_SECRET:
+      fn::secret: prod-app-secret
+    ENCRYPTION_USER_DATA_KEY:
+      fn::secret: prod-encryption-user-data-key
+    TELEGRAM_BOT_TOKEN:
+      fn::secret: prod-telegram-bot-token
+    TELEGRAM_CLIENT_ID:
+      fn::secret: prod-telegram-client-id
+    TELEGRAM_CLIENT_SECRET:
+      fn::secret: prod-telegram-client-secret
+    STRIPE_SECRET_KEY:
+      fn::secret: prod-stripe-secret-key
+    STRIPE_PUBLISHABLE_KEY:
+      fn::secret: prod-stripe-publishable-key
+    STRIPE_WEBHOOK_SECRET:
+      fn::secret: prod-stripe-webhook-secret
+    STRIPE_BASIC_TIER_PRICE_ID:
+      fn::secret: prod-stripe-basic-tier-price-id
+    STRIPE_ESSENTIAL_TIER_PRICE_ID:
+      fn::secret: prod-stripe-essential-tier-price-id
+    STRIPE_ADVANCED_TIER_PRICE_ID:
+      fn::secret: prod-stripe-advanced-tier-price-id
+    STRIPE_BASIC_TIER_YEARLY_PRICE_ID:
+      fn::secret: prod-stripe-basic-tier-yearly-price-id
+    STRIPE_ESSENTIAL_TIER_YEARLY_PRICE_ID:
+      fn::secret: prod-stripe-essential-tier-yearly-price-id
+    STRIPE_ADVANCED_TIER_YEARLY_PRICE_ID:
+      fn::secret: prod-stripe-advanced-tier-yearly-price-id
+    SERP_API_KEY:
+      fn::secret: prod-serp-api-key
+    EMAIL_CONNECTION_STRING:
+      fn::secret: prod-email-connection-string
+    EMAIL_SENDER_EMAIL:
+      fn::secret: prod-email-sender-email
+    EMAIL_SENDER_NAME:
+      fn::secret: prod-email-sender-name
+    BLOB_STORAGE_SAS_TOKEN:
+      fn::secret: prod-blob-storage-sas-token
+    KAFKA_CONNECTION_STRING:
+      fn::secret: prod-kafka-connection-string

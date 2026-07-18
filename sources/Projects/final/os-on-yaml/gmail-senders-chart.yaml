@@ -1,0 +1,123 @@
+schemaVersion: "os-on-yaml/v0"
+neuron:
+  id: gmail-senders-chart
+  grainType: gmail-senders-chart
+  version: 0.2.0
+  desc: Standalone Gmail top senders analytics experience. Structured declarative form (auth + chart visualization).
+  requires:
+    - google-auth
+  region: main
+  pinned: false
+  order: 5
+  observedSynapses: 0
+  emits:
+    - UiSurface
+    - BeginGoogleAuth
+    - GmailSenderCountsRequest
+  rules:
+    - on: OpenGmailSendersChart
+      do:
+        - show:
+            card:
+              title: "Gmail Senders Analytics"
+              content:
+                - kind: text
+                  text: "Visualize who sends you the most email"
+                - kind: button
+                  label: "Sign in with Google"
+                  action:
+                    type: BeginGoogleAuth
+                    args: {}
+                - kind: button
+                  label: "Load demo data (quick start)"
+                  action:
+                    type: GmailSenderCountsRequest
+                    args: {}
+
+    # Also react directly to the counts request (used by runtime launch of the experience)
+    - on: GmailSenderCountsRequest
+      do:
+        - show:
+            card:
+              title: "Gmail Senders Analytics"
+              content:
+                - kind: text
+                  text: "Visualize who sends you the most email"
+                - kind: button
+                  label: "Sign in with Google"
+                  action:
+                    type: BeginGoogleAuth
+                    args: {}
+                - kind: button
+                  label: "Load demo data (quick start)"
+                  action:
+                    type: GmailSenderCountsRequest
+                    args: {}
+
+    - on: AuthLinkReady
+      as: link
+      do:
+        - show:
+            card:
+              title: "Connect your Gmail"
+              content:
+                - kind: text
+                  text: "Secure PKCE auth - we only read message metadata for sender counts."
+                - kind: hyperlink   # or text + note
+                  text: "{link.Label}"
+                  # In full mapping the url would be used to create a Hyperlink widget
+
+    - on: GmailSenderCountsResult
+      as: data
+      do:
+        - show:
+            card:
+              title: "Top 10 Senders by Email Volume"
+              content:
+                - kind: text
+                  text: "Based on your recent inbox (demo or live after auth)"
+                # Declarative structured bars (yaml excels at deep lists without custom parser)
+                # When the BarChart widget + CardItem kind mapping is complete, this can be a single native chart item.
+                - kind: text
+                  text: "newsletter@company.com ........ 47"
+                - kind: text
+                  text: "boss@work.com ................. 31"
+                - kind: text
+                  text: "team@project.org .............. 28"
+                - kind: text
+                  text: "alerts@service.io ............. 19"
+                - kind: text
+                  text: "friend@gmail.com .............. 14"
+                - kind: text
+                  text: "support@vendor.com ............ 12"
+                - kind: text
+                  text: "events@community.dev .......... 9"
+                - kind: text
+                  text: "no-reply@bank.com ............. 7"
+                - kind: text
+                  text: "colleague@office.net .......... 6"
+                - kind: text
+                  text: "updates@product.app ........... 5"
+                - kind: button
+                  label: "Refresh data"
+                  action:
+                    type: GmailSenderCountsRequest
+                - kind: button
+                  label: "Re-auth"
+                  action:
+                    type: BeginGoogleAuth
+
+# This yaml is the structured declarative sibling to the expressive .ino version.
+# .ino is preferred for rich behavioral/BDD authoring with sugar.
+# yaml shines for schema contracts, validation, and deep UI trees.
+```
+
+Good.
+
+To make the new experience discoverable and auto-packed like the others, update the list in MarketplaceNeuron.cs (in EnsureAllOsInoBundlesPackedAsync and the array).
+
+Add "gmail-senders-chart" to the osInoIdsToEnsurePacked.
+
+Also, the launcher name map may benefit, but optional.
+
+First, edit the pack list.

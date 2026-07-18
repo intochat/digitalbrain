@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <IsPackable>true</IsPackable>
+    <PackageId>DigitalBrain.InoLang</PackageId>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <Version>0.1.0-preview</Version>
+    <Description>InoLang: the .ino / os-on-yaml language for DigitalBrain — parser, AST, validator, rule interpreter. Depends only on the protocol seam.</Description>
+    <PackageTags>orleans;digitalbrain;inolang;dsl;yaml</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <PackageReference Include="Microsoft.Orleans.Core.Abstractions" />
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Protocol\DigitalBrain.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

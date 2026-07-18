@@ -1,0 +1,56 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.2.4">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- Mirrors Ino.AppHost's silo set so tests boot the same topology that
+       production runs. Telegram, the website (VitePress), and the
+       cloudflared tunnel are intentionally NOT referenced here — they're
+       not part of the test surface and would otherwise pull npm deps and
+       dashboard prompts the test fixtures don't want to deal with.
+
+       When a new domain silo lands in Ino.AppHost, mirror the
+       <ProjectReference> here as well; the assertion that both AppHosts
+       agree on topology is "production passes + testing passes". -->
+  <ItemGroup>
+    <ProjectReference Include="..\Ino.Kernel\Ino.Kernel.csproj">
+      <OutputItemType>IsAspireProjectResource</OutputItemType>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\Ino.Identity\Ino.Identity.csproj">
+      <OutputItemType>IsAspireProjectResource</OutputItemType>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\domains\travel\Ino.Domains.Travel\Ino.Domains.Travel.csproj">
+      <OutputItemType>IsAspireProjectResource</OutputItemType>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\domains\taxi\Ino.Domains.Taxi\Ino.Domains.Taxi.csproj">
+      <OutputItemType>IsAspireProjectResource</OutputItemType>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\domains\location\Ino.Domains.Location\Ino.Domains.Location.csproj">
+      <OutputItemType>IsAspireProjectResource</OutputItemType>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\domains\reminders\Ino.Domains.Reminders\Ino.Domains.Reminders.csproj">
+      <OutputItemType>IsAspireProjectResource</OutputItemType>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\domains\recall\Ino.Domains.Recall\Ino.Domains.Recall.csproj">
+      <OutputItemType>IsAspireProjectResource</OutputItemType>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\domains\genesis\Ino.Domains.Genesis\Ino.Domains.Genesis.csproj">
+      <OutputItemType>IsAspireProjectResource</OutputItemType>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\Ino.Aspire.Hosting\Ino.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\Ino.Core\Ino.Core.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\Ino.Llm.Xai\Ino.Llm.Xai.csproj" IsAspireProjectResource="false" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Grant Core access to JournalStore/InMemoryDurableList (internal impl details for per-grain journal wiring in Neuron OnActivate). Keeps custom journaling working in tests + real hosts without exposing public API surface. -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>DigitalBrain.Os</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAspireSharedProject>true</IsAspireSharedProject>
+    <!-- Suppress experimental preview for IDurableList from Microsoft.Orleans.Journaling (custom path brought back per user request). -->
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+    <!-- Orleans server bits for shared silo defaults (ISiloBuilder, AddMemoryStreams, AddActivityPropagation, telemetry wiring). Latest via central Directory.Packages.props. -->
+    <PackageReference Include="Microsoft.Orleans.Server" />
+    <!-- Client bits so ConfigureDigitalBrainClientDefaults (AddStreaming + AddMemoryStreams on IClientBuilder) is available. -->
+    <PackageReference Include="Microsoft.Orleans.Client" />
+    <!-- Streaming package required for AddMemoryStreams (timeline provider) on both silo and client. -->
+    <PackageReference Include="Microsoft.Orleans.Streaming" />
+    <!-- Brought back per user request: Microsoft.Orleans.Journaling preview (exact pin in Directory.Packages.props that avoided NU1603).
+         Enables the custom DurableNeuron + IDurableList<Synapse> Incoming/Outgoing journals for causal AI history/replay on re-activate.
+         This shared project provides ConfigureDigitalBrainDefaults used by both TestCluster (Simulation) and real kernel/aspire paths. -->
+    <PackageReference Include="Microsoft.Orleans.Journaling" />
+    <!-- Orleans 10.2 reminder service wiring used by UseDigitalBrain for local/world silos. -->
+    <PackageReference Include="Microsoft.Orleans.Reminders" />
+    <!-- mTLS complete: explicit ref for UseTls / TlsOptions in Extensions (dev LAN + prod notes). Version from central (matches Orleans preview line). -->
+    <PackageReference Include="Microsoft.Orleans.Connections.Security" />
+    <!-- Official Orleans 10.2 Dashboard with lifecycle dependency graph. -->
+    <PackageReference Include="Microsoft.Orleans.Dashboard" />
+    <!-- Core for Synapse type (the exact item stored in the durable journals). Hosting now owns the shared registration so real paths have journals; Core ref is required for the list type param and is already pulled by Kernel/Tests consumers. -->
+    <ProjectReference Include="..\DigitalBrain.Os\DigitalBrain.Os.csproj" />
+
+    <!-- Tiered LLM registration (AddDigitalBrainLlms) for keyed IChatClient fast/balanced/reasoning consumed by LlmNeuron/Agent. Latest via central. -->
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.Ollama" />
+  </ItemGroup>
+
+</Project>

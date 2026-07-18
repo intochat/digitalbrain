@@ -1,0 +1,59 @@
+@using TripRadar.MiniApp.Client.Infrastructure.Localization
+@using TripRadar.MiniApp.Client.Infrastructure.Services.State
+@attribute [Route(AppRoutes.Auth)]
+@inject AuthState AuthState
+@inject TopBarState TopBar
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject IStringLocalizer<SharedResource> L
+
+<div class="flex flex-col items-center justify-center min-h-screen p-8 gap-4">
+    @if (_loading)
+    {
+        <LoadingSpinner Message="@L["AuthAuthenticating"]" />
+    }
+    else if (AuthState.IsAuthenticated)
+    {
+        <div class="text-center space-y-4">
+            <span class="material-symbols-outlined text-5xl text-green-500">check_circle</span>
+            <p class="text-base font-semibold">@L["AuthSuccess"]</p>
+            <p class="text-sm text-slate-500">@L["AuthRedirecting"]</p>
+        </div>
+    }
+    else if (_showDevLogin)
+    {
+        <div class="w-full max-w-sm space-y-6 text-center">
+            <span class="material-symbols-outlined text-5xl text-amber-500">developer_mode</span>
+            <p class="text-base font-semibold">@L["AuthDevMode"]</p>
+            <p class="text-sm text-slate-500">@L["AuthSelectUser"]</p>
+
+            <div class="space-y-3 text-left">
+                <div class="flex items-center gap-2">
+                    <label class="text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">@L["AuthTelegramHandle"]</label>
+                    <input type="text" @bind="_handleInput" placeholder="@Placeholder"
+                           class="flex-1 rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm bg-white dark:bg-slate-800" />
+                </div>
+                <p class="text-xs text-slate-400 leading-snug">@L["AuthTelegramHandleHint"]</p>
+                <button @onclick="DevLoginManual"
+                        class="w-full rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 px-4 transition-colors">
+                    @L["AuthDevLogin"]
+                </button>
+            </div>
+
+            @if (AuthState.LastError is not null)
+            {
+                <p class="text-sm text-red-500">@AuthState.LastError</p>
+            }
+        </div>
+    }
+    else
+    {
+        <ErrorDisplay Title='@L["AuthFailed"]' Message="@(AuthState.LastError ?? "Unknown error")" OnRetry="Retry" />
+
+        <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-xl p-4 text-xs text-slate-500 space-y-1">
+            <p class="font-semibold text-slate-700 dark:text-slate-300">@L["AuthDebugInfo"]</p>
+            <p>initData available: @_hasInitData</p>
+            <p>Telegram WebApp: @_hasTelegramWebApp</p>
+        </div>
+    }
+</div>

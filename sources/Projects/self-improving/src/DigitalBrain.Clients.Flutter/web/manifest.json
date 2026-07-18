@@ -1,0 +1,23 @@
+{
+  "name": "DigitalBrain Flutter Client",
+  "short_name": "DB Flutter",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#00C4B4",
+  "description": "Polished renderer for DigitalBrain neuron surfaces. Started and controlled via the IFlutter grain (Aspire resource aware, exactly like IAspire for worlds/kernels).",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "icons/Icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/Icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

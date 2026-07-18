@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>preview</LangVersion>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <!-- Suppress experimental for IDurableList etc from Orleans.Journaling alpha; brought back per user request for custom Durable. -->
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <!-- Suppress CS0436 for Orleans codegen duplicate invokable types (shared IHandle<T> across Kernel + Awesome + tests) -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Server" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.Redis" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.Redis" />
+    <PackageReference Include="Aspire.StackExchange.Redis" />
+    <!-- Brought back per user: Durable lists via Journaling (Incoming/Outgoing journals for LlmAgent, Creator, Memory, tasks etc). -->
+    <PackageReference Include="Microsoft.Orleans.Journaling" />
+    <PackageReference Include="Microsoft.Orleans.Reminders" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.Redis" />
+    <PackageReference Include="Microsoft.Orleans.Dashboard" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.AI.Ollama" />
+    <!-- Whisper.net for backend voice-to-text (flutter mic recorder -> bytes via gRPC backchannel -> transcription neuron -> text to AgentRequest/LLM). Latest per verification, CPU runtime. Model auto-fetched to pa-files/models on first use. -->
+    <PackageReference Include="Whisper.net" />
+    <PackageReference Include="Whisper.net.Runtime" />
+    <!-- For CreatorNeuron to feel real Roslyn syntax tree generation of neuron/synapse source (valuable want from docs/01-comparison + user "rosyn syntax tree" request). Uses central latest version. Dev-time "creator" path only; no bloat in hot paths. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <!-- gRPC for real UiSurface/surfaces transport seam impl (server streaming from kernel to clients like Flutter/terminals per review #3, 09, E2E). Uses central pkgs added previously (Grpc.AspNetCore for hosting, Grpc.Tools for proto). Small impl slice: minimal proto + service stub + registration (no full client wiring or unskip this turn). -->
+    <PackageReference Include="Grpc.AspNetCore" />
+    <PackageReference Include="Grpc.AspNetCore.Web" />
+    <PackageReference Include="Grpc.Tools" PrivateAssets="All" />
+    <PackageReference Include="BouncyCastle.Cryptography" />
+    <!-- Force central latest MessagePack (3.1.7) to override any transitive 2.5.192 from Orleans/etc (high-sev vuln). CPM + explicit bare ref ensures resolution. -->
+    <PackageReference Include="MessagePack" />
+  </ItemGroup>
+
+  <!-- gRPC proto for Surfaces (UiSurface stream for real transport to clients). Grpc.Tools generates the base/service on build. -->
+  <ItemGroup>
+    <Protobuf Include="Protos\Surfaces.proto" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Os\DigitalBrain.Os.csproj" />
+    <!-- Real bundles (awesome SE team etc.) provide IHandle implementations. Install via brain activates them so dispatch includes new handlers (N+1 proof in tests). No thin coordinator shells. -->
+    <ProjectReference Include="..\DigitalBrain.Awesome\DigitalBrain.Awesome.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Hosting\DigitalBrain.Hosting.csproj" />
+    <!-- F T2: ino assistant (LlmAgentNeuron + MemoryNeuron + 20+ navigation tools) extracted to own OSS layer on the SDK. Kernel refs it (like Awesome) for silo registration + grain activation. SourceGen analyzer reaches via the Ino csproj. -->
+    <ProjectReference Include="..\DigitalBrain.Ino\DigitalBrain.Ino.csproj" />
+    <!-- T2 connectors extraction (polyrepo plan): Kernel now refs Connectors (like Ino) so silo loads GoogleAuthConnectorNeuron/GmailConnector/FileSystemConnectorGrain (GrainTypes "google-auth"/"gmail-last-senders"/"filesystem" preserved). Bare ProjectRef. Enables activation for os/*.ino seeds + launcher + tests without behavior change. SourceGen reaches via Connectors csproj. -->
+    <ProjectReference Include="..\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
+    <!-- Source generator for dispatch manifest + full constellation catalog (IHandle/IEmit + unions) + pre-resolved fast invokers. Re-enabled for whole plan (DurableNeuron support added in gen + Dispatch). Dynamic growth fallback intact. -->
+    <ProjectReference Include="..\DigitalBrain.SourceGen\DigitalBrain.SourceGen.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>

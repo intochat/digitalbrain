@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Ino.Core\Ino.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.Core.Hosting\Ino.Core.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.Testing\Ino.Testing.csproj" />
+    <ProjectReference Include="..\Ino.Domains.Taxi.Contracts\Ino.Domains.Taxi.Contracts.csproj" />
+    <ProjectReference Include="..\Ino.Domains.Taxi\Ino.Domains.Taxi.csproj" />
+    <!-- Plan tests need both LocationNeuron (so the test silo can resolve
+         IJournaledNeuronQuery<LocationVisited>) and its contracts. -->
+    <ProjectReference Include="..\..\location\Ino.Domains.Location\Ino.Domains.Location.csproj" />
+    <ProjectReference Include="..\..\location\Ino.Domains.Location.Contracts\Ino.Domains.Location.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

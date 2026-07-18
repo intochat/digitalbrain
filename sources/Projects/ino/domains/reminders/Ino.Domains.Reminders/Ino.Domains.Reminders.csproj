@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <RootNamespace>Ino.Domains.Reminders</RootNamespace>
+    <AssemblyName>Ino.Domains.Reminders</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Server" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Ino.Core\Ino.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.Core.Hosting\Ino.Core.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.ServiceDefaults\Ino.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.Llm.Xai\Ino.Llm.Xai.csproj" />
+    <ProjectReference Include="..\Ino.Domains.Reminders.Contracts\Ino.Domains.Reminders.Contracts.csproj" />
+    <!-- RemindersNeuron : LlmNeuron : IAW.Core.Agent depends on the IAW
+         substrate at activation time: AgentStateMapper for [AgentState],
+         ILocalDurableJobManager for ScheduleJob/CancelJob, and the IChatClient
+         pipeline. Aspire.Client (the silo-side IAW extension) wires all of
+         it via builder.AddIAW(); without it the grain crashes on first
+         activation with "no factory mapper for AgentStateAttribute". -->
+    <ProjectReference Include="..\..\..\iaw\src\Aspire.Client\Aspire.Client.csproj" />
+  </ItemGroup>
+
+  <!-- Gherkin scenarios consumed by BddMockChatClient + INeuronPromptCorpus
+       — same content-copy pattern as Travel/Taxi. The @neuron:reminders.set
+       and @neuron:reminders.cancel tags feed Cortex's regex fast-path. -->
+  <ItemGroup>
+    <Content Include="Features\**\*.feature">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Features\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
+    </Content>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,30 @@
+.price-bar-chart {
+    width: 100%;
+    height: 8rem;
+    display: block;
+}
+
+.price-bar {
+    cursor: pointer;
+    transition: opacity 0.15s ease, fill 0.15s ease;
+}
+
+.price-bar:hover {
+    opacity: 0.8;
+}
+
+.price-bar-selected {
+    fill: #1c74e9;
+}
+
+.price-bar-cheapest {
+    fill: #22c55e;
+}
+
+.price-bar-default {
+    fill: #e2e8f0;
+}
+
+.dark .price-bar-default {
+    fill: #334155;
+}

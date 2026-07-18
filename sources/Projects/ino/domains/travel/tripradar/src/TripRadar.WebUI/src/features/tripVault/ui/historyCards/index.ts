@@ -1,0 +1,1 @@
+export { HistoryItemCard } from './HistoryItemCard';

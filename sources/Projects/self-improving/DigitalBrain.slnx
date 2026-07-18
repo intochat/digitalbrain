@@ -1,0 +1,33 @@
+<Solution>
+  <Folder Name="/Clients/">
+    <Project Path="src/DigitalBrain.Clients.Flutter/Flutter.proj" Type="C#" />
+  </Folder>
+  <Folder Name="/Os/">
+    <Project Path="src/DigitalBrain.Os/DigitalBrain.Os.csproj" />
+  </Folder>
+  <Folder Name="/Protocol/">
+    <Project Path="src/DigitalBrain.Protocol/DigitalBrain.Protocol.csproj" />
+  </Folder>
+  <Folder Name="/Hosting/">
+    <Project Path="src/DigitalBrain.Hosting/DigitalBrain.Hosting.csproj" />
+  </Folder>
+  <Folder Name="/Kernel/">
+    <Project Path="src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+  </Folder>
+  <Folder Name="/Host/">
+    <Project Path="src/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
+  </Folder>
+  <Folder Name="/AspireHosting/">
+    <Project Path="src/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+  </Folder>
+  <Folder Name="/SourceGen/">
+    <Project Path="src/DigitalBrain.SourceGen/DigitalBrain.SourceGen.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Packages.props" />
+    <File Path="ino.cs" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="src/DigitalBrain.Os.Tests/DigitalBrain.Os.Tests.csproj" />
+  </Folder>
+</Solution>

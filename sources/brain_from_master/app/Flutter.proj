@@ -1,0 +1,99 @@
+<Project Sdk="Microsoft.Build.NoTargets/3.7.0">
+  <!--
+    Flutter client coordination project (NeuroUI Host).
+    - Source kept under app/ (pubspec, lib/, windows/ embedder for desktop).
+    - Referenced from brain/Brain.slnx as first-class entry under /Clients/ (Type="C#").
+    - Participates in `dotnet build` for pub get + incremental web bundle (used by gateway static or E2E).
+    - The live Windows client is launched by Aspire AddFlutterClient (AddExecutable "flutter run -d windows")
+      from the app/ working dir, with service discovery env injected for kernel gRPC + Orleans.
+    Harvested/adapted from Projects/*/Flutter.proj patterns for solution integration.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <RunFlutterBuild Condition="'$(RunFlutterBuild)' == ''">true</RunFlutterBuild>
+    <FlutterCli Condition="'$(FlutterCli)' == ''">flutter</FlutterCli>
+    <FlutterProjectDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</FlutterProjectDir>
+    <FlutterWebOutputDir>$(FlutterProjectDir)\build\web</FlutterWebOutputDir>
+    <SkipFlutterBuild Condition="'$(SkipFlutterBuild)' == ''">true</SkipFlutterBuild>
+    <!-- No .NET assets/restore for pure coordination .proj (dart/flutter sources only). Prevents NETSDK1004 when referenced from .slnx. -->
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <RestorePackages>false</RestorePackages>
+  </PropertyGroup>
+
+  <!-- No-op restore so dotnet build /slnx restore on solution including this .proj succeeds without dart-side NuGet. -->
+  <Target Name="Restore" />
+
+  <ItemGroup>
+    <None Include="pubspec.yaml" />
+    <None Include="analysis_options.yaml" />
+    <None Include="lib\**\*" />
+    <None Include="web\**\*" />
+    <None Include="test\**\*" />
+    <None Include="android\**\*" Exclude="android\.gradle\**;android\build\**" />
+    <None Include="ios\**\*" Exclude="ios\Pods\**;ios\.symlinks\**" />
+    <None Include="macos\**\*" Exclude="macos\Pods\**" />
+    <None Include="linux\**\*" />
+    <None Include="windows\**\*" Exclude="windows\flutter\ephemeral\**;windows\runner\Debug\**;windows\runner\Release\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FlutterSource Include="$(FlutterProjectDir)lib\**\*" />
+    <FlutterSource Include="$(FlutterProjectDir)web\**\*" />
+    <FlutterSource Include="$(FlutterProjectDir)pubspec.yaml" />
+    <FlutterSource Include="$(FlutterProjectDir)pubspec.lock" />
+    <FlutterSource Include="$(FlutterProjectDir)windows\**\*" />
+  </ItemGroup>
+
+  <Target Name="_DetectFlutter">
+    <Exec Command="$(FlutterCli) --version"
+          ContinueOnError="true"
+          IgnoreStandardErrorWarningFormat="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low">
+      <Output TaskParameter="ExitCode" PropertyName="_FlutterExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <HasFlutter Condition="'$(_FlutterExitCode)' == '0'">true</HasFlutter>
+      <HasFlutter Condition="'$(_FlutterExitCode)' != '0'">false</HasFlutter>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="FlutterPubGet"
+          DependsOnTargets="_DetectFlutter"
+          BeforeTargets="Build"
+          Condition="'$(RunFlutterBuild)' == 'true' And '$(SkipFlutterBuild)' != 'true'"
+          Inputs="pubspec.yaml"
+          Outputs="pubspec.lock">
+    <Message Condition="'$(HasFlutter)' != 'true'" Importance="high"
+             Text="Flutter CLI not found on PATH — skipping pub get for NeuroUI client. Aspire flutter run will still work if flutter is installed separately." />
+    <Exec Condition="'$(HasFlutter)' == 'true'"
+          Command="$(FlutterCli) pub get"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="_FlutterPubGetExitCode" />
+    </Exec>
+    <Warning Condition="'$(_FlutterPubGetExitCode)' != '0' And '$(HasFlutter)' == 'true'"
+             Text="flutter pub get failed (exit $(_FlutterPubGetExitCode))." />
+  </Target>
+
+  <Target Name="FlutterBuildWeb"
+          DependsOnTargets="FlutterPubGet"
+          BeforeTargets="Build"
+          Condition="'$(RunFlutterBuild)' == 'true' And '$(SkipFlutterBuild)' != 'true'"
+          Inputs="@(FlutterSource)"
+          Outputs="$(FlutterWebOutputDir)\index.html">
+    <Message Condition="'$(HasFlutter)' == 'true'" Importance="high"
+             Text="Prebuilding NeuroUI web bundle (for gateway / E2E) → $(FlutterWebOutputDir)" />
+    <Exec Condition="'$(HasFlutter)' == 'true'"
+          Command="$(FlutterCli) build web --no-tree-shake-icons"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          IgnoreExitCode="true" />
+  </Target>
+
+  <!-- Explicit Build target for direct invocation / solution visibility. -->
+  <Target Name="Build" DependsOnTargets="FlutterPubGet;FlutterBuildWeb" />
+
+</Project>

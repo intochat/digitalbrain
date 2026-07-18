@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\hosts\DigitalBrain.FeatureBuilder\DigitalBrain.FeatureBuilder.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Kernel.Contracts\DigitalBrain.Kernel.Contracts.csproj" />
+    <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Google.Contracts\DigitalBrain.Integrations.Google.Contracts.csproj" />
+    <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Salesforce.Contracts\DigitalBrain.Integrations.Salesforce.Contracts.csproj" />
+    <ProjectReference Include="..\..\integrations\DigitalBrain.Integrations.Web.Contracts\DigitalBrain.Integrations.Web.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Features.Sdk\DigitalBrain.Features.Sdk.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Features.Testing\DigitalBrain.Features.Testing.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="..\..\features\EmailSummarizer\DigitalBrain.Features.EmailSummarizer.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Aspire.Azure.Data.Tables" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,29 @@
+
+
+
+
+
+
+
+
+
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - lib/grpc/*.pb.dart
+    - lib/grpc/*.pbenum.dart
+    - lib/grpc/*.pbgrpc.dart
+
+linter:
+
+
+
+
+
+
+
+
+
+
+  rules:

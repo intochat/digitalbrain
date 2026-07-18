@@ -1,0 +1,21 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.5.0-preview.1.26310.9">
+  <PropertyGroup>
+    <TargetFramework>net11.0-windows</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DigitalBrain.Hosting</RootNamespace>
+    <AssemblyName>DigitalBrain.AppHost</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Runtime\DigitalBrain.Runtime.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="..\..\sdk\DigitalBrain.SDK\DigitalBrain.SDK.csproj" />
+  </ItemGroup>
+</Project>

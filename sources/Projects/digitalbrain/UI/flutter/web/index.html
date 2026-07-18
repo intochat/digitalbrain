@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="DigitalBrain — an AI-native runtime. Describe what you want in plain English; DigitalBrain writes the spec, proves it with a test, and grows the behavior live. Built on .NET Aspire, Orleans, and Reqnroll.">
+
+  <!-- Open Graph / social share -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="DigitalBrain — Software that grows with you">
+  <meta property="og:description" content="An AI-native runtime. Plain English becomes a spec, becomes guaranteed-green code. Open source.">
+  <meta property="og:site_name" content="DigitalBrain">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="DigitalBrain — Software that grows with you">
+  <meta name="twitter:description" content="An AI-native runtime. Plain English becomes a spec, becomes guaranteed-green code. Open source.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="DigitalBrain">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>DigitalBrain — Software that grows with you</title>
+  <link rel="manifest" href="manifest.json">
+  <script>
+    window.KERNEL_PORT = null;
+    
+    // Use cache-busting to ensure we always get the latest port on reload
+    fetch('kernel_port.txt?t=' + new Date().getTime())
+      .then(r => {
+        if (!r.ok) throw new Error("Status " + r.status);
+        return r.text();
+      })
+      .then(t => {
+        window.KERNEL_PORT = t.trim();
+        console.log("Dynamically resolved kernel port from server: " + window.KERNEL_PORT);
+        bootstrapFlutter();
+      })
+      .catch(e => {
+        console.warn("Failed to fetch kernel_port.txt:", e);
+        bootstrapFlutter(); // Load anyway as fallback
+      });
+
+    function bootstrapFlutter() {
+      var script = document.createElement('script');
+      script.src = "flutter_bootstrap.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  </script>
+</head>
+<body>
+  <!--
+    You can customize the "flutter_bootstrap.js" script.
+    This is useful to provide a custom configuration to the Flutter loader
+    or to give the user feedback during the initialization process.
+
+    For more details:
+    * https://docs.flutter.dev/platform-integration/web/initialization
+  -->
+</body>
+</html>

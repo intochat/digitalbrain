@@ -1,0 +1,26 @@
+# Build output
+**/bin/
+**/obj/
+**/out/
+**/.vs/
+*.user
+
+# .NET / Aspire
+**/artifacts/
+**/publish/
+*.binlog
+
+# Flutter / Dart
+**/.dart_tool/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/Generated/
+
+# Node / misc tooling
+**/node_modules/
+
+# Local state / secrets
+*.env
+.env.*
+**/appsettings.*.local.json

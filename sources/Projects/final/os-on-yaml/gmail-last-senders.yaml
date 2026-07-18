@@ -1,0 +1,31 @@
+schemaVersion: "os-on-yaml/v0"
+neuron:
+  id: gmail-last-senders
+  grainType: gmail-last-senders
+  version: 0.1.0
+  desc: Gmail last senders with grants
+  emits:
+    - GmailSendersResult
+    - UiSurface
+    - SaveFileRequest
+  requires:
+    - google-auth
+  region: widgets
+  pinned: true
+  order: 3
+  observedSynapses: 0
+  rules:
+    - on: GmailLastSendersRequest
+      do:
+        - show:
+            card:
+              title: "Gmail last senders"
+              content:
+                - kind: text
+                  text: "senders from rule path only"
+                - kind: button
+                  label: "Save to file"
+                  action:
+                    type: SaveFileRequest
+                    args:
+                      filePath: "gmail-senders.txt"

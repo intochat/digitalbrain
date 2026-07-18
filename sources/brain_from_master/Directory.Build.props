@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+
+
+
+
+
+
+
+
+
+
+
+    <SkipFlutterBuild Condition="'$(SkipFlutterBuild)' == ''">true</SkipFlutterBuild>
+    <SkipDeployBuild Condition="'$(SkipDeployBuild)' == ''">true</SkipDeployBuild>
+    <EnforceCodeStyleInBuild Condition="'$(EnforceCodeStyleInBuild)' == ''">true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+</Project>

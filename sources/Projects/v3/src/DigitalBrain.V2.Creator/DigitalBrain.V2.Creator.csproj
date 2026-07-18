@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CS0436</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.V2.Core\DigitalBrain.V2.Core.csproj" />
+    <ProjectReference Include="..\DigitalBrain.V2.Catalog\DigitalBrain.V2.Catalog.csproj" />
+    <ProjectReference Include="..\DigitalBrain.V2.Ino\DigitalBrain.V2.Ino.csproj" />
+    <ProjectReference Include="..\DigitalBrain.V2.Testing\DigitalBrain.V2.Testing.csproj" />
+    <ProjectReference Include="..\capsules\Ping\Ping.Contracts\Ping.Contracts.csproj" />
+    <ProjectReference Include="..\capsules\Greeter\Greeter.Contracts\Greeter.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

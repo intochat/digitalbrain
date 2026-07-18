@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <AssemblyName>DigitalBrain.Os</AssemblyName>
+    <RootNamespace>DigitalBrain.Os</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <PackageReference Include="Microsoft.Orleans.Core.Abstractions" />
+    <PackageReference Include="Microsoft.Orleans.Streaming" />
+    <!-- Brought back per user: Pure Orleans.Journaling for durable lists (IDurableList<Synapse> as the journal for causal history/replay in DurableNeuron). -->
+    <PackageReference Include="Microsoft.Orleans.Journaling" />
+    <!-- YamlDotNet for Y2 os-on-yaml dual parser path (latest 18.0.0 per central + Context7). Explicit ref so CPM supplies version; used by YamlParser for schemaVersion docs. -->
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Protocol\DigitalBrain.Protocol.csproj" />
+    <ProjectReference Include="..\DigitalBrain.InoLang\DigitalBrain.InoLang.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,636 @@
+namespace DigitalBrain.InoLang
+{
+    public sealed class CompiledNeuron
+    {
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Diagnostics.Diagnostic> Diagnostics { get; }
+        public DigitalBrain.InoLang.Linking.LinkedNeuron? Linked { get; }
+        public DigitalBrain.InoLang.Planning.ExecutionPlan? Plan { get; }
+        public bool Success { get; }
+        public System.Threading.Tasks.Task<DigitalBrain.InoLang.GateDecision> EvaluateGateAsync(System.Threading.CancellationToken ct) { }
+    }
+    public sealed record GateDecision : System.IEquatable<DigitalBrain.InoLang.GateDecision>
+    {
+        public GateDecision(bool CanActivate, string Reason) { }
+        public bool CanActivate { get; init; }
+        public string Reason { get; init; }
+    }
+    public static class InoCompiler
+    {
+        public static DigitalBrain.InoLang.CompiledNeuron Compile(string source) { }
+        public static DigitalBrain.InoLang.CompiledNeuron Compile(string source, DigitalBrain.InoLang.Linking.IContractCatalog catalog) { }
+    }
+    public static class InoGate
+    {
+        public static System.Threading.Tasks.Task<DigitalBrain.InoLang.GateDecision> EvaluateAsync(DigitalBrain.InoLang.Planning.ExecutionPlan plan, System.Threading.CancellationToken ct) { }
+    }
+}
+namespace DigitalBrain.InoLang.Ast
+{
+    public sealed record ArgsExpr : DigitalBrain.InoLang.Ast.Expr, System.IEquatable<DigitalBrain.InoLang.Ast.ArgsExpr>
+    {
+        public ArgsExpr(System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.NamedArg> Args, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.NamedArg> Args { get; init; }
+    }
+    public sealed record BroadcastTrigger : DigitalBrain.InoLang.Ast.Trigger, System.IEquatable<DigitalBrain.InoLang.Ast.BroadcastTrigger>
+    {
+        public BroadcastTrigger(string Fqn, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Fqn { get; init; }
+    }
+    public sealed record CallExpr : DigitalBrain.InoLang.Ast.Expr, System.IEquatable<DigitalBrain.InoLang.Ast.CallExpr>
+    {
+        public CallExpr(string Builtin, DigitalBrain.InoLang.Ast.Expr Arg, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Ast.Expr Arg { get; init; }
+        public string Builtin { get; init; }
+    }
+    public sealed record CommitStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.CommitStmt>
+    {
+        public CommitStmt(string Branch, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Branch { get; init; }
+    }
+    public sealed record CountStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.CountStmt>
+    {
+        public CountStmt(string Counter, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Counter { get; init; }
+    }
+    public sealed record EmitStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.EmitStmt>
+    {
+        public EmitStmt(string Port, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.NamedArg> Args, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.NamedArg> Args { get; init; }
+        public string Port { get; init; }
+    }
+    public abstract record Expr : System.IEquatable<DigitalBrain.InoLang.Ast.Expr>
+    {
+        protected Expr(DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Text.SourceSpan Span { get; init; }
+    }
+    public sealed record FailureTrigger : DigitalBrain.InoLang.Ast.Trigger, System.IEquatable<DigitalBrain.InoLang.Ast.FailureTrigger>
+    {
+        public FailureTrigger(string Branch, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Branch { get; init; }
+    }
+    public sealed record FieldAccessExpr : DigitalBrain.InoLang.Ast.Expr, System.IEquatable<DigitalBrain.InoLang.Ast.FieldAccessExpr>
+    {
+        public FieldAccessExpr(string PortName, string Field, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Field { get; init; }
+        public string PortName { get; init; }
+    }
+    public sealed record FlowMappingStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.FlowMappingStmt>
+    {
+        public FlowMappingStmt(DigitalBrain.InoLang.Ast.Expr Source, DigitalBrain.InoLang.Ast.Expr Target, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Ast.Expr Source { get; init; }
+        public DigitalBrain.InoLang.Ast.Expr Target { get; init; }
+    }
+    public sealed record ForEachStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.ForEachStmt>
+    {
+        public ForEachStmt(string VarName, DigitalBrain.InoLang.Ast.Expr SourceList, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Stmt> Body, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Stmt> Body { get; init; }
+        public DigitalBrain.InoLang.Ast.Expr SourceList { get; init; }
+        public string VarName { get; init; }
+    }
+    public sealed record GivenNeuronReturns : DigitalBrain.InoLang.Ast.ScenarioStep, System.IEquatable<DigitalBrain.InoLang.Ast.GivenNeuronReturns>
+    {
+        public GivenNeuronReturns(string Port, DigitalBrain.InoLang.Ast.Expr Value, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Port { get; init; }
+        public DigitalBrain.InoLang.Ast.Expr Value { get; init; }
+    }
+    public sealed record GivenPredicate : DigitalBrain.InoLang.Ast.ScenarioStep, System.IEquatable<DigitalBrain.InoLang.Ast.GivenPredicate>
+    {
+        public GivenPredicate(DigitalBrain.InoLang.Ast.CallExpr Subject, string Value, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Ast.CallExpr Subject { get; init; }
+        public string Value { get; init; }
+    }
+    public sealed record Handler : System.IEquatable<DigitalBrain.InoLang.Ast.Handler>
+    {
+        public Handler(DigitalBrain.InoLang.Ast.Trigger Trigger, DigitalBrain.InoLang.Ast.Predicate? Where, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Stmt> Body, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Stmt> Body { get; init; }
+        public DigitalBrain.InoLang.Text.SourceSpan Span { get; init; }
+        public DigitalBrain.InoLang.Ast.Trigger Trigger { get; init; }
+        public DigitalBrain.InoLang.Ast.Predicate? Where { get; init; }
+    }
+    public sealed record IfStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.IfStmt>
+    {
+        public IfStmt(DigitalBrain.InoLang.Ast.Expr Cond, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Stmt> ThenBody, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Stmt> ElseBody, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Ast.Expr Cond { get; init; }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Stmt> ElseBody { get; init; }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Stmt> ThenBody { get; init; }
+    }
+    public sealed record InterpExpr : DigitalBrain.InoLang.Ast.Expr, System.IEquatable<DigitalBrain.InoLang.Ast.InterpExpr>
+    {
+        public InterpExpr(System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Expr> Parts, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Expr> Parts { get; init; }
+    }
+    public sealed record LetAskStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.LetAskStmt>
+    {
+        public LetAskStmt(string Var, string Port, DigitalBrain.InoLang.Ast.Expr Prompt, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Port { get; init; }
+        public DigitalBrain.InoLang.Ast.Expr Prompt { get; init; }
+        public string Var { get; init; }
+    }
+    public sealed record LetExprStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.LetExprStmt>
+    {
+        public LetExprStmt(string Var, DigitalBrain.InoLang.Ast.Expr Value, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Ast.Expr Value { get; init; }
+        public string Var { get; init; }
+    }
+    public sealed record LifecycleTrigger : DigitalBrain.InoLang.Ast.Trigger, System.IEquatable<DigitalBrain.InoLang.Ast.LifecycleTrigger>
+    {
+        public LifecycleTrigger(string Name, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Name { get; init; }
+    }
+    public sealed record LogStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.LogStmt>
+    {
+        public LogStmt(DigitalBrain.InoLang.Ast.Expr Message, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Ast.Expr Message { get; init; }
+    }
+    public sealed record NamedArg : System.IEquatable<DigitalBrain.InoLang.Ast.NamedArg>
+    {
+        public NamedArg(string Name, DigitalBrain.InoLang.Ast.Expr Value) { }
+        public string Name { get; init; }
+        public DigitalBrain.InoLang.Ast.Expr Value { get; init; }
+    }
+    public sealed record NeuronDoc : System.IEquatable<DigitalBrain.InoLang.Ast.NeuronDoc>
+    {
+        public NeuronDoc(string Fqn, string? Intent, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.UsingDecl> Usings, System.Collections.Generic.IReadOnlyList<string> Counters, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Handler> Handlers, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.ScenarioDecl> Scenarios, DigitalBrain.InoLang.Ast.UiDecl? Ui, DigitalBrain.InoLang.Text.SourceSpan Span, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.StateDecl>? States = null) { }
+        public System.Collections.Generic.IReadOnlyList<string> Counters { get; init; }
+        public string Fqn { get; init; }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Handler> Handlers { get; init; }
+        public string? Intent { get; init; }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.ScenarioDecl> Scenarios { get; init; }
+        public DigitalBrain.InoLang.Text.SourceSpan Span { get; init; }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.StateDecl>? States { get; init; }
+        public DigitalBrain.InoLang.Ast.UiDecl? Ui { get; init; }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.UsingDecl> Usings { get; init; }
+    }
+    public sealed record NumberExpr : DigitalBrain.InoLang.Ast.Expr, System.IEquatable<DigitalBrain.InoLang.Ast.NumberExpr>
+    {
+        public NumberExpr(long Value, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public long Value { get; init; }
+    }
+    public enum PortKind
+    {
+        Synapse = 0,
+        Neuron = 1,
+    }
+    public sealed record PortRefExpr : DigitalBrain.InoLang.Ast.Expr, System.IEquatable<DigitalBrain.InoLang.Ast.PortRefExpr>
+    {
+        public PortRefExpr(string Name, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Name { get; init; }
+    }
+    public enum PortSigil
+    {
+        Synapse = 0,
+        Call = 1,
+        Resource = 2,
+        Stream = 3,
+        Predicate = 4,
+    }
+    public sealed record PortTrigger : DigitalBrain.InoLang.Ast.Trigger, System.IEquatable<DigitalBrain.InoLang.Ast.PortTrigger>
+    {
+        public PortTrigger(string Port, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Port { get; init; }
+    }
+    public sealed record Predicate : System.IEquatable<DigitalBrain.InoLang.Ast.Predicate>
+    {
+        public Predicate(DigitalBrain.InoLang.Ast.CallExpr Subject, string Expected, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Expected { get; init; }
+        public DigitalBrain.InoLang.Text.SourceSpan Span { get; init; }
+        public DigitalBrain.InoLang.Ast.CallExpr Subject { get; init; }
+    }
+    public sealed record RecallExpr : DigitalBrain.InoLang.Ast.Expr, System.IEquatable<DigitalBrain.InoLang.Ast.RecallExpr>
+    {
+        public RecallExpr(DigitalBrain.InoLang.Ast.Expr Text, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Ast.Expr Text { get; init; }
+    }
+    public sealed record RememberStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.RememberStmt>
+    {
+        public RememberStmt(DigitalBrain.InoLang.Ast.Expr Text, DigitalBrain.InoLang.Ast.Expr? Value, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Ast.Expr Text { get; init; }
+        public DigitalBrain.InoLang.Ast.Expr? Value { get; init; }
+    }
+    public sealed record RollbackStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.RollbackStmt>
+    {
+        public RollbackStmt(string Branch, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Branch { get; init; }
+    }
+    public sealed record SaveStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.SaveStmt>
+    {
+        public SaveStmt(DigitalBrain.InoLang.Ast.Expr Value, string Port, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Port { get; init; }
+        public DigitalBrain.InoLang.Ast.Expr Value { get; init; }
+    }
+    public sealed record ScenarioDecl : System.IEquatable<DigitalBrain.InoLang.Ast.ScenarioDecl>
+    {
+        public ScenarioDecl(string Name, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.ScenarioStep> Steps, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Name { get; init; }
+        public DigitalBrain.InoLang.Text.SourceSpan Span { get; init; }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.ScenarioStep> Steps { get; init; }
+    }
+    public abstract record ScenarioStep : System.IEquatable<DigitalBrain.InoLang.Ast.ScenarioStep>
+    {
+        protected ScenarioStep(DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Text.SourceSpan Span { get; init; }
+    }
+    public sealed record SpeculateStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.SpeculateStmt>
+    {
+        public SpeculateStmt(string Branch, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Stmt> Body, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Stmt> Body { get; init; }
+        public string Branch { get; init; }
+    }
+    public sealed record StateDecl : System.IEquatable<DigitalBrain.InoLang.Ast.StateDecl>
+    {
+        public StateDecl(string Name, string Type, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Name { get; init; }
+        public DigitalBrain.InoLang.Text.SourceSpan Span { get; init; }
+        public string Type { get; init; }
+    }
+    public abstract record Stmt : System.IEquatable<DigitalBrain.InoLang.Ast.Stmt>
+    {
+        protected Stmt(DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Text.SourceSpan Span { get; init; }
+    }
+    public sealed record StringExpr : DigitalBrain.InoLang.Ast.Expr, System.IEquatable<DigitalBrain.InoLang.Ast.StringExpr>
+    {
+        public StringExpr(string Value, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Value { get; init; }
+    }
+    public sealed record ThenCounter : DigitalBrain.InoLang.Ast.ScenarioStep, System.IEquatable<DigitalBrain.InoLang.Ast.ThenCounter>
+    {
+        public ThenCounter(string Counter, long Value, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Counter { get; init; }
+        public long Value { get; init; }
+    }
+    public sealed record ThenResourceHas : DigitalBrain.InoLang.Ast.ScenarioStep, System.IEquatable<DigitalBrain.InoLang.Ast.ThenResourceHas>
+    {
+        public ThenResourceHas(string Port, DigitalBrain.InoLang.Ast.Expr Value, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Port { get; init; }
+        public DigitalBrain.InoLang.Ast.Expr Value { get; init; }
+    }
+    public sealed record ThenSynapseEmitted : DigitalBrain.InoLang.Ast.ScenarioStep, System.IEquatable<DigitalBrain.InoLang.Ast.ThenSynapseEmitted>
+    {
+        public ThenSynapseEmitted(string Port, string? WithField, DigitalBrain.InoLang.Ast.Expr? WithValue, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string Port { get; init; }
+        public string? WithField { get; init; }
+        public DigitalBrain.InoLang.Ast.Expr? WithValue { get; init; }
+    }
+    public sealed record ThinkStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.ThinkStmt>
+    {
+        public ThinkStmt(DigitalBrain.InoLang.Ast.Expr Goal, string? Neuron, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Ast.Expr Goal { get; init; }
+        public string? Neuron { get; init; }
+    }
+    public abstract record Trigger : System.IEquatable<DigitalBrain.InoLang.Ast.Trigger>
+    {
+        protected Trigger(DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Text.SourceSpan Span { get; init; }
+    }
+    public sealed record UiDecl : System.IEquatable<DigitalBrain.InoLang.Ast.UiDecl>
+    {
+        public UiDecl(string CardName, DigitalBrain.InoLang.Ast.UiWidgetExpr? RootWidget, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string CardName { get; init; }
+        public DigitalBrain.InoLang.Ast.UiWidgetExpr? RootWidget { get; init; }
+        public DigitalBrain.InoLang.Text.SourceSpan Span { get; init; }
+        public string SerializeJson() { }
+    }
+    public sealed record UiWidgetExpr : System.IEquatable<DigitalBrain.InoLang.Ast.UiWidgetExpr>
+    {
+        public UiWidgetExpr(string Name, System.Collections.Generic.IReadOnlyDictionary<string, string> Arguments, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.UiWidgetExpr> Children, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public System.Collections.Generic.IReadOnlyDictionary<string, string> Arguments { get; init; }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.UiWidgetExpr> Children { get; init; }
+        public string Name { get; init; }
+        public System.Collections.Generic.IReadOnlySet<string> RawJsonArgs { get; init; }
+        public DigitalBrain.InoLang.Text.SourceSpan Span { get; init; }
+        public string SerializeJson() { }
+    }
+    public sealed record UsingDecl : System.IEquatable<DigitalBrain.InoLang.Ast.UsingDecl>
+    {
+        public UsingDecl(DigitalBrain.InoLang.Ast.PortSigil Sigil, string Name, DigitalBrain.InoLang.Ast.PortKind Kind, string TargetFqn, string? Key, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public string? Key { get; init; }
+        public DigitalBrain.InoLang.Ast.PortKind Kind { get; init; }
+        public string Name { get; init; }
+        public DigitalBrain.InoLang.Ast.PortSigil Sigil { get; init; }
+        public DigitalBrain.InoLang.Text.SourceSpan Span { get; init; }
+        public string TargetFqn { get; init; }
+    }
+    public sealed record VerifyStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.VerifyStmt>
+    {
+        public VerifyStmt(DigitalBrain.InoLang.Ast.Expr Cond, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Ast.Expr Cond { get; init; }
+    }
+    public sealed record WhenInject : DigitalBrain.InoLang.Ast.ScenarioStep, System.IEquatable<DigitalBrain.InoLang.Ast.WhenInject>
+    {
+        public WhenInject(string Port, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.NamedArg> Args, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.NamedArg> Args { get; init; }
+        public string Port { get; init; }
+    }
+    public sealed record WriteStmt : DigitalBrain.InoLang.Ast.Stmt, System.IEquatable<DigitalBrain.InoLang.Ast.WriteStmt>
+    {
+        public WriteStmt(DigitalBrain.InoLang.Ast.Expr Target, DigitalBrain.InoLang.Ast.Expr Value, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Ast.Expr Target { get; init; }
+        public DigitalBrain.InoLang.Ast.Expr Value { get; init; }
+    }
+}
+namespace DigitalBrain.InoLang.Diagnostics
+{
+    public sealed record Diagnostic : System.IEquatable<DigitalBrain.InoLang.Diagnostics.Diagnostic>
+    {
+        public Diagnostic(string Code, string Message, DigitalBrain.InoLang.Text.SourceSpan Span, DigitalBrain.InoLang.Diagnostics.DiagnosticSeverity Severity) { }
+        public string Code { get; init; }
+        public string Message { get; init; }
+        public DigitalBrain.InoLang.Diagnostics.DiagnosticSeverity Severity { get; init; }
+        public DigitalBrain.InoLang.Text.SourceSpan Span { get; init; }
+    }
+    public sealed class DiagnosticBag
+    {
+        public DiagnosticBag() { }
+        public bool HasErrors { get; }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Diagnostics.Diagnostic> Items { get; }
+        public void Error(string code, string message, DigitalBrain.InoLang.Text.SourceSpan span) { }
+        public void Warning(string code, string message, DigitalBrain.InoLang.Text.SourceSpan span) { }
+    }
+    public enum DiagnosticSeverity
+    {
+        Error = 0,
+        Warning = 1,
+    }
+}
+namespace DigitalBrain.InoLang.Lexing
+{
+    public sealed class Lexer
+    {
+        public Lexer(string source, DigitalBrain.InoLang.Diagnostics.DiagnosticBag diag) { }
+        public System.Collections.Generic.List<DigitalBrain.InoLang.Lexing.Token> Lex() { }
+    }
+    public readonly struct Token : System.IEquatable<DigitalBrain.InoLang.Lexing.Token>
+    {
+        public Token(DigitalBrain.InoLang.Lexing.TokenKind Kind, string Text, DigitalBrain.InoLang.Text.SourceSpan Span) { }
+        public DigitalBrain.InoLang.Lexing.TokenKind Kind { get; init; }
+        public DigitalBrain.InoLang.Text.SourceSpan Span { get; init; }
+        public string Text { get; init; }
+    }
+    public enum TokenKind
+    {
+        NewLine = 0,
+        Indent = 1,
+        Dedent = 2,
+        Eof = 3,
+        LParen = 4,
+        RParen = 5,
+        LBracket = 6,
+        RBracket = 7,
+        Equals = 8,
+        Colon = 9,
+        Comma = 10,
+        Dot = 11,
+        EqEq = 12,
+        Ident = 13,
+        Fqn = 14,
+        String = 15,
+        Number = 16,
+        TelemetryTag = 17,
+        Neuron = 18,
+        Using = 19,
+        Synapse = 20,
+        NeuronKw = 21,
+        On = 22,
+        Where = 23,
+        Is = 24,
+        Let = 25,
+        Ask = 26,
+        To = 27,
+        For = 28,
+        Emit = 29,
+        Save = 30,
+        Into = 31,
+        Remember = 32,
+        Count = 33,
+        Log = 34,
+        Activated = 35,
+        Deactivated = 36,
+        Created = 37,
+        Scenario = 38,
+        Given = 39,
+        When = 40,
+        Then = 41,
+        And = 42,
+        Returns = 43,
+        Has = 44,
+        Emitted = 45,
+        With = 46,
+        Counter = 47,
+        It = 48,
+        If = 49,
+        Else = 50,
+        ForEach = 51,
+        In = 52,
+        Recall = 53,
+        Speculate = 54,
+        Verify = 55,
+        Think = 56,
+        Commit = 57,
+        Rollback = 58,
+        Failure = 59,
+        Ui = 60,
+        GreaterThan = 61,
+        LessThan = 62,
+        GreaterThanOrEqual = 63,
+        LessThanOrEqual = 64,
+        Arrow = 65,
+        Mock = 66,
+        Expect = 67,
+        Write = 68,
+        Test = 69,
+        LBrace = 70,
+        RBrace = 71,
+    }
+}
+namespace DigitalBrain.InoLang.Linking
+{
+    public enum ContractKind
+    {
+        Synapse = 0,
+        Neuron = 1,
+    }
+    public sealed record ContractSchema : System.IEquatable<DigitalBrain.InoLang.Linking.ContractSchema>
+    {
+        public ContractSchema(string Fqn, DigitalBrain.InoLang.Linking.ContractKind Kind, System.Collections.Generic.IReadOnlyList<string> Fields, bool IsDeferred = false) { }
+        public System.Collections.Generic.IReadOnlyList<string> Fields { get; init; }
+        public string Fqn { get; init; }
+        public bool IsDeferred { get; init; }
+        public DigitalBrain.InoLang.Linking.ContractKind Kind { get; init; }
+    }
+    public sealed class DeferredContractCatalog : DigitalBrain.InoLang.Linking.IContractCatalog
+    {
+        public static readonly DigitalBrain.InoLang.Linking.DeferredContractCatalog Instance;
+        public DeferredContractCatalog() { }
+        public System.Collections.Generic.IReadOnlyCollection<DigitalBrain.InoLang.Linking.ContractSchema> GetAllSchemas() { }
+        public void Register(DigitalBrain.InoLang.Linking.ContractSchema schema) { }
+        public DigitalBrain.InoLang.Linking.ContractSchema? Resolve(string fqn) { }
+    }
+    public interface IContractCatalog
+    {
+        System.Collections.Generic.IReadOnlyCollection<DigitalBrain.InoLang.Linking.ContractSchema> GetAllSchemas();
+        void Register(DigitalBrain.InoLang.Linking.ContractSchema schema);
+        DigitalBrain.InoLang.Linking.ContractSchema? Resolve(string fqn);
+    }
+    public sealed class LayeredContractCatalog : DigitalBrain.InoLang.Linking.IContractCatalog
+    {
+        public LayeredContractCatalog(DigitalBrain.InoLang.Linking.IContractCatalog primary, DigitalBrain.InoLang.Linking.IContractCatalog fallback) { }
+        public System.Collections.Generic.IReadOnlyCollection<DigitalBrain.InoLang.Linking.ContractSchema> GetAllSchemas() { }
+        public void Register(DigitalBrain.InoLang.Linking.ContractSchema schema) { }
+        public DigitalBrain.InoLang.Linking.ContractSchema? Resolve(string fqn) { }
+    }
+    public sealed record LinkedNeuron : System.IEquatable<DigitalBrain.InoLang.Linking.LinkedNeuron>
+    {
+        public LinkedNeuron(DigitalBrain.InoLang.Ast.NeuronDoc Doc, System.Collections.Generic.IReadOnlyDictionary<string, DigitalBrain.InoLang.Linking.LinkedPort> Ports) { }
+        public DigitalBrain.InoLang.Ast.NeuronDoc Doc { get; init; }
+        public System.Collections.Generic.IReadOnlyDictionary<string, DigitalBrain.InoLang.Linking.LinkedPort> Ports { get; init; }
+    }
+    public sealed record LinkedPort : System.IEquatable<DigitalBrain.InoLang.Linking.LinkedPort>
+    {
+        public LinkedPort(DigitalBrain.InoLang.Ast.UsingDecl Decl, DigitalBrain.InoLang.Linking.ContractSchema Schema) { }
+        public DigitalBrain.InoLang.Ast.UsingDecl Decl { get; init; }
+        public DigitalBrain.InoLang.Linking.ContractSchema Schema { get; init; }
+    }
+    public sealed class Linker
+    {
+        public static readonly System.Collections.Generic.Dictionary<string, string> StandardAliases;
+        public Linker(DigitalBrain.InoLang.Linking.IContractCatalog catalog, DigitalBrain.InoLang.Diagnostics.DiagnosticBag diagnostics) { }
+        public DigitalBrain.InoLang.Linking.LinkedNeuron? Link(DigitalBrain.InoLang.Ast.NeuronDoc? doc) { }
+    }
+}
+namespace DigitalBrain.InoLang.Parsing
+{
+    public sealed class Parser
+    {
+        public Parser(System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Lexing.Token> tokens, DigitalBrain.InoLang.Diagnostics.DiagnosticBag diagnostics) { }
+        public DigitalBrain.InoLang.Ast.NeuronDoc? ParseDocument() { }
+    }
+}
+namespace DigitalBrain.InoLang.Planning
+{
+    public sealed class ExecutionPlan
+    {
+        public ExecutionPlan(string fqn, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Planning.PlannedHandler> handlers, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.ScenarioDecl> scenarios, System.Collections.Generic.IReadOnlyList<string> counters, System.Collections.Generic.IReadOnlyDictionary<string, DigitalBrain.InoLang.Planning.NeuronBinding> neurons, System.Collections.Generic.IReadOnlyDictionary<string, string>? synapsePorts, DigitalBrain.InoLang.Ast.UiDecl? ui) { }
+        public System.Collections.Generic.IReadOnlyCollection<DigitalBrain.InoLang.Planning.PlannedHandler> AllHandlers { get; }
+        public System.Collections.Generic.IReadOnlyList<string> Counters { get; }
+        public string Fqn { get; }
+        public System.Collections.Generic.IReadOnlyDictionary<string, DigitalBrain.InoLang.Planning.NeuronBinding> Neurons { get; }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.ScenarioDecl> Scenarios { get; }
+        public System.Collections.Generic.IReadOnlyDictionary<string, string> SynapsePorts { get; }
+        public DigitalBrain.InoLang.Ast.UiDecl? Ui { get; }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Planning.PlannedHandler> HandlersFor(DigitalBrain.InoLang.Planning.TriggerKey key) { }
+    }
+    public static class Lowering
+    {
+        public static DigitalBrain.InoLang.Planning.ExecutionPlan Lower(DigitalBrain.InoLang.Linking.LinkedNeuron linked) { }
+    }
+    public sealed record NeuronBinding : System.IEquatable<DigitalBrain.InoLang.Planning.NeuronBinding>
+    {
+        public NeuronBinding(DigitalBrain.InoLang.Ast.PortSigil Sigil, string TargetFqn, string? Key) { }
+        public string? Key { get; init; }
+        public DigitalBrain.InoLang.Ast.PortSigil Sigil { get; init; }
+        public string TargetFqn { get; init; }
+    }
+    public sealed record PlannedHandler : System.IEquatable<DigitalBrain.InoLang.Planning.PlannedHandler>
+    {
+        public PlannedHandler(DigitalBrain.InoLang.Planning.TriggerKey Key, DigitalBrain.InoLang.Ast.Predicate? Where, System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Stmt> Body) { }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Ast.Stmt> Body { get; init; }
+        public DigitalBrain.InoLang.Planning.TriggerKey Key { get; init; }
+        public DigitalBrain.InoLang.Ast.Predicate? Where { get; init; }
+    }
+    public enum TriggerCategory
+    {
+        Port = 0,
+        Broadcast = 1,
+        Lifecycle = 2,
+        Failure = 3,
+    }
+    public readonly struct TriggerKey : System.IEquatable<DigitalBrain.InoLang.Planning.TriggerKey>
+    {
+        public TriggerKey(DigitalBrain.InoLang.Planning.TriggerCategory Category, string Key) { }
+        public DigitalBrain.InoLang.Planning.TriggerCategory Category { get; init; }
+        public string Key { get; init; }
+        public static DigitalBrain.InoLang.Planning.TriggerKey Broadcast(string fqn) { }
+        public static DigitalBrain.InoLang.Planning.TriggerKey Failure(string branch) { }
+        public static DigitalBrain.InoLang.Planning.TriggerKey Lifecycle(string name) { }
+        public static DigitalBrain.InoLang.Planning.TriggerKey Port(string port) { }
+    }
+}
+namespace DigitalBrain.InoLang.Runtime
+{
+    public sealed class ActivationResult
+    {
+        public ActivationResult() { }
+        public System.Collections.Generic.Dictionary<string, long> Counters { get; }
+        public System.Collections.Generic.List<DigitalBrain.InoLang.Runtime.EmittedSynapse> EmittedSynapses { get; }
+        public System.Collections.Generic.List<string> Logs { get; }
+        public System.Collections.Generic.Dictionary<string, string> SavedResources { get; }
+    }
+    public sealed record EmittedSynapse : System.IEquatable<DigitalBrain.InoLang.Runtime.EmittedSynapse>
+    {
+        public EmittedSynapse(string Port, System.Collections.Generic.IReadOnlyDictionary<string, string> Args) { }
+        public System.Collections.Generic.IReadOnlyDictionary<string, string> Args { get; init; }
+        public string Port { get; init; }
+    }
+    public interface INeuronHost
+    {
+        System.Threading.Tasks.Task<string> AskAsync(string port, string prompt, System.Threading.CancellationToken ct);
+        System.Threading.Tasks.Task<bool> EvaluatePredicateAsync(string builtin, string subject, string target, System.Threading.CancellationToken ct);
+    }
+    public sealed class Interpreter
+    {
+        public Interpreter(DigitalBrain.InoLang.Planning.ExecutionPlan plan) { }
+        public System.Action<string, string, string, double, string, System.Guid, System.Guid?>? OnTrace { get; set; }
+        public System.Threading.Tasks.Task<DigitalBrain.InoLang.Runtime.ActivationResult> RunAsync(DigitalBrain.InoLang.Planning.TriggerKey trigger, System.Collections.Generic.IReadOnlyDictionary<string, string> inbound, DigitalBrain.InoLang.Runtime.INeuronHost neurons, System.Threading.CancellationToken ct) { }
+        public System.Threading.Tasks.Task<DigitalBrain.InoLang.Runtime.ActivationResult> RunAsync(DigitalBrain.InoLang.Planning.TriggerKey trigger, System.Collections.Generic.IReadOnlyDictionary<string, string> inbound, DigitalBrain.InoLang.Runtime.INeuronHost neurons, System.Collections.Generic.IReadOnlyDictionary<string, string>? memory, System.Threading.CancellationToken ct) { }
+    }
+}
+namespace DigitalBrain.InoLang.Testing
+{
+    public sealed record ScenarioReport : System.IEquatable<DigitalBrain.InoLang.Testing.ScenarioReport>
+    {
+        public ScenarioReport(System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Testing.ScenarioResult> Results) { }
+        public bool AllPassed { get; }
+        public System.Collections.Generic.IReadOnlyList<DigitalBrain.InoLang.Testing.ScenarioResult> Results { get; init; }
+    }
+    public sealed record ScenarioResult : System.IEquatable<DigitalBrain.InoLang.Testing.ScenarioResult>
+    {
+        public ScenarioResult(string Name, System.Collections.Generic.IReadOnlyList<string> Failures) { }
+        public System.Collections.Generic.IReadOnlyList<string> Failures { get; init; }
+        public string Name { get; init; }
+        public bool Passed { get; }
+    }
+    public sealed class ScenarioRunner
+    {
+        public ScenarioRunner() { }
+        public System.Threading.Tasks.Task<DigitalBrain.InoLang.Testing.ScenarioReport> RunAllAsync(DigitalBrain.InoLang.Planning.ExecutionPlan plan, System.Threading.CancellationToken ct) { }
+    }
+    public sealed class StubNeuronHost : DigitalBrain.InoLang.Runtime.INeuronHost
+    {
+        public StubNeuronHost() { }
+        public System.Collections.Generic.Dictionary<string, string> NeuronReturns { get; }
+        public System.Collections.Generic.Dictionary<string, string> PredicateValues { get; }
+        public System.Threading.Tasks.Task<string> AskAsync(string port, string prompt, System.Threading.CancellationToken ct) { }
+        public System.Threading.Tasks.Task<bool> EvaluatePredicateAsync(string builtin, string subject, string target, System.Threading.CancellationToken ct) { }
+    }
+}
+namespace DigitalBrain.InoLang.Text
+{
+    public sealed class InoSource
+    {
+        public InoSource(string text) { }
+        public string Text { get; }
+        [return: System.Runtime.CompilerServices.TupleElementNames(new string[] {
+                "Line",
+                "Column"})]
+        public System.ValueTuple<int, int> LineColumn(int offset) { }
+    }
+    public readonly struct SourceSpan : System.IEquatable<DigitalBrain.InoLang.Text.SourceSpan>
+    {
+        public SourceSpan(int Start, int End) { }
+        public int End { get; init; }
+        public int Length { get; }
+        public int Start { get; init; }
+        public static DigitalBrain.InoLang.Text.SourceSpan Empty { get; }
+    }
+}

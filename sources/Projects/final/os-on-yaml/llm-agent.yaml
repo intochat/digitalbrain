@@ -1,0 +1,27 @@
+schemaVersion: "os-on-yaml/v0"
+neuron:
+  id: llm-agent
+  grainType: llm-agent
+  version: 1.0.0
+  desc: Ino assistant (LlmAgentNeuron)
+  emits:
+    - AgentResponse
+    - UiSurface
+    - ImprovementProposal
+  region: main
+  observedSynapses: 0
+  rules:
+    - on: AgentRequest
+      do:
+        - show:
+            card:
+              title: "LLM $prompt"
+              content:
+                - kind: text
+                  text: "Thinking..."
+                - kind: button
+                  label: "Run"
+                  action:
+                    type: AgentRequest
+                    args:
+                      prompt: "$prompt"

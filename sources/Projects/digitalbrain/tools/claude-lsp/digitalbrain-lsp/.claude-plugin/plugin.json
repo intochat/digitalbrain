@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "digitalbrain-lsp",
+  "version": "0.2.0",
+  "description": "Activates Claude Code's built-in LSP tool for DigitalBrain: C# via the repo-pinned `dotnet tool run csharp-ls` (no global binary), and Dart via `dart language-server`. No official marketplace plugin fits this repo (C# is a pinned local dotnet tool; Dart has no official plugin at all), so this ships in-repo. Only command/args/extensionToLanguage are set: Claude Code v2.1.143 hard-fails LSP init on the documented-but-unimplemented optional fields (restartOnCrash, maxRestarts, shutdownTimeout, etc.).",
+  "author": {
+    "name": "DigitalBrain"
+  },
+  "keywords": ["lsp", "csharp", "dart", "code-intelligence"],
+  "lspServers": {
+    "csharp": {
+      "command": "dotnet",
+      "args": [
+        "tool",
+        "run",
+        "csharp-ls",
+        "--",
+        "--solution",
+        "${CLAUDE_PROJECT_DIR}/DigitalBrain.slnx"
+      ],
+      "extensionToLanguage": {
+        ".cs": "csharp"
+      }
+    },
+    "dart": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "dart",
+        "language-server",
+        "--client-id",
+        "claude-code"
+      ],
+      "extensionToLanguage": {
+        ".dart": "dart"
+      }
+    }
+  }
+}

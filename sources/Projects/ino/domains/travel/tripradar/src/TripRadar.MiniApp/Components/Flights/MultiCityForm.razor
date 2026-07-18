@@ -1,0 +1,60 @@
+@using TripRadar.MiniApp.Client.Infrastructure.Localization
+@using TripRadar.MiniApp.Client.Infrastructure.Services.State
+@inject FlightSearchState SearchState
+@inject IStringLocalizer<SharedResource> L
+
+<div class="space-y-3">
+    @for (var i = 0; i < SearchState.MultiCityLegs.Count; i++)
+    {
+        var index = i;
+        var leg = SearchState.MultiCityLegs[index];
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3 relative">
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-bold text-slate-400 uppercase">@string.Format(L["MultiCityFlightNumber"], index + 1)</span>
+                @if (index > 0)
+                {
+                    <button @onclick="() => RemoveLeg(index)"
+                            class="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
+                        <span class="material-symbols-outlined text-sm text-slate-400 hover:text-red-500">close</span>
+                    </button>
+                }
+            </div>
+
+            <AirportAutocomplete Placeholder="@L["FlightsDepartureCity"].Value"
+                                 Icon="flight_takeoff"
+                                 DisplayText="@leg.DepartureName"
+                                 CityName="@GetCityName(leg.DepartureName)"
+                                 Flag="@GetFlag(leg.DepartureCountryCode)"
+                                 Badge="@GetBadge(leg.DepartureId)"
+                                 Field="@($"mc-{index}-departure")" />
+
+            <AirportAutocomplete Placeholder="@L["FlightsArrivalCity"].Value"
+                                 Icon="flight_land"
+                                 DisplayText="@leg.ArrivalName"
+                                 CityName="@GetCityName(leg.ArrivalName)"
+                                 Flag="@GetFlag(leg.ArrivalCountryCode)"
+                                 Badge="@GetBadge(leg.ArrivalId)"
+                                 Field="@($"mc-{index}-arrival")" />
+
+            <div>
+                <label class="text-xs text-slate-500 mb-1 block">@L["MultiCityDate"]</label>
+                <div @onclick="() => OnDateClick(index)"
+                     class="@(HasLegRoute(leg) ? "cursor-pointer" : "cursor-default opacity-60") rounded-xl border transition-colors py-2.5 px-3 flex items-center gap-2 @(string.IsNullOrEmpty(leg.Date) ? "border-slate-200 dark:border-slate-700" : "border-primary/30 bg-blue-50/30 dark:bg-blue-900/10")">
+                    <span class="material-symbols-outlined text-lg @(string.IsNullOrEmpty(leg.Date) ? "text-slate-400" : "text-primary")">calendar_today</span>
+                    <span class="text-sm @(string.IsNullOrEmpty(leg.Date) ? "text-slate-400" : "font-semibold text-slate-900 dark:text-white")">
+                        @(FormatDateDisplay(leg.Date) ?? L["FlightsSelectDate"].Value)
+                    </span>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (SearchState.MultiCityLegs.Count < 5)
+    {
+        <button @onclick="AddLeg"
+                class="w-full py-3 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-sm font-semibold text-slate-500 hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-lg">add</span>
+            @L["MultiCityAddFlight"]
+        </button>
+    }
+</div>

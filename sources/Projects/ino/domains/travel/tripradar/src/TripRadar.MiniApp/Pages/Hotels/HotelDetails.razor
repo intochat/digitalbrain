@@ -1,0 +1,190 @@
+@using TripRadar.MiniApp.Client.Infrastructure.Contracts
+@using TripRadar.MiniApp.Client.Infrastructure.Localization
+@using TripRadar.MiniApp.Client.Infrastructure.Services.State
+@attribute [Route(AppRoutes.HotelDetails)]
+@inject HotelSearchState SearchState
+@inject IHotelManager HotelApi
+@inject UserPreferencesState UserPrefs
+@inject IJSRuntime JS
+@inject IStringLocalizer<SharedResource> L
+
+<PageHeader Title="@(_hotel?.Name ?? L["HotelsViewDetails"])" ShowBack BackRoute="@AppRoutes.HotelResults">
+    <RightContent>
+        <div class="flex items-center gap-1">
+            <button class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800">
+                <span class="material-symbols-outlined text-xl">share</span>
+            </button>
+            <button class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800">
+                <span class="material-symbols-outlined text-xl">bookmark</span>
+            </button>
+        </div>
+    </RightContent>
+</PageHeader>
+
+@if (_isLoading)
+{
+    <LoadingSpinner Message="@L["HotelDetailsLoading"]" />
+}
+else if (_error is not null)
+{
+    <ErrorDisplay Title="@L["HotelsSearchFailed"]" Message="@_error" />
+}
+else if (_notFound)
+{
+    <ErrorDisplay Title="@L["HotelDetailsNotFound"]" Message="@L["HotelDetailsNotFoundMsg"]" />
+}
+else if (_hotel is null)
+{
+    <LoadingSpinner Message="@L["HotelDetailsLoading"]" />
+}
+else
+{
+    <div class="miniapp-scroll-surface pb-20">
+        <div class="flex border-b border-slate-100 dark:border-slate-800 px-2 miniapp-horizontal-scroll no-scrollbar">
+            @foreach (var tab in Tabs)
+            {
+                var isActive = _activeTab == tab;
+                <button @onclick="() => _activeTab = tab"
+                        class="@Css.Join("flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+                            isActive ? "border-primary text-primary font-bold" : "border-transparent text-slate-500 hover:text-slate-700")">
+                    @tab
+                </button>
+            }
+        </div>
+
+        @if (_activeTab == L["HotelDetailsOverview"])
+        {
+            @if (_hotel.Images is { Count: > 0 })
+            {
+                <div class="h-48 overflow-hidden">
+                    <img src="@(_hotel.Images[0].OriginalImage ?? _hotel.Images[0].Thumbnail)" alt="" class="w-full h-full object-cover" />
+                </div>
+            }
+
+            <div class="p-4 space-y-4">
+                @if (!string.IsNullOrEmpty(_hotel.Description))
+                {
+                    <div>
+                        <h3 class="text-sm font-bold mb-2">@L["HotelDetailsAbout"]</h3>
+                        <p class="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">@_hotel.Description</p>
+                    </div>
+                }
+
+                @if (_hotel.CheckInTime is not null || _hotel.CheckOutTime is not null)
+                {
+                    <div class="flex rounded-xl border border-slate-200 dark:border-slate-800 divide-x divide-slate-200 dark:divide-slate-800">
+                        <div class="flex-1 p-3 text-center">
+                            <p class="text-xs text-slate-500">@L["HotelsCheckIn"]</p>
+                            <p class="text-sm font-semibold">@(_hotel.CheckInTime ?? "—")</p>
+                        </div>
+                        <div class="flex-1 p-3 text-center">
+                            <p class="text-xs text-slate-500">@L["HotelsCheckOut"]</p>
+                            <p class="text-sm font-semibold">@(_hotel.CheckOutTime ?? "—")</p>
+                        </div>
+                    </div>
+                }
+
+                @if (_hotel.Amenities is { Count: > 0 })
+                {
+                    <div>
+                        <h3 class="text-sm font-bold mb-2">@L["HotelsAmenities"]</h3>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach (var amenity in _hotel.Amenities)
+                            {
+                                <span class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-medium">@amenity</span>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (_hotel.NearbyPlaces is { Count: > 0 })
+                {
+                    <div>
+                        <h3 class="text-sm font-bold mb-2">@L["HotelDetailsNearby"]</h3>
+                        <div class="space-y-2">
+                            @foreach (var place in _hotel.NearbyPlaces.Take(5))
+                            {
+                                <div class="flex items-center gap-3 text-sm">
+                                    <span class="material-symbols-outlined text-slate-400 text-lg">place</span>
+                                    <span class="flex-1">@place.Name</span>
+                                    @if (place.Transportations is { Count: > 0 })
+                                    {
+                                        <span class="text-xs text-slate-500">@place.Transportations[0].Duration</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else if (_activeTab == L["HotelDetailsPrices"])
+        {
+            <div class="p-4 space-y-3">
+                @if (_hotel.Prices is { Count: > 0 })
+                {
+                    @foreach (var price in _hotel.Prices)
+                    {
+                        <div class="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
+                            <div class="flex items-center gap-3">
+                                @if (ProviderLogoResolver.Resolve(price.Logo) is { } providerLogo)
+                                {
+                                    <span class="provider-logo-frame !w-6 !h-6 !rounded-md"><img src="@providerLogo" alt="" /></span>
+                                }
+                                else
+                                {
+                                    <span class="provider-logo-frame !w-6 !h-6 !rounded-md"><span class="provider-logo-fallback !text-xs">@ProviderLogoResolver.Initial(price.Source)</span></span>
+                                }
+                                <span class="text-sm font-medium">@(price.Source ?? L["HotelDetailsProvider"])</span>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-bold text-primary">@(price.RatePerNight?.Lowest ?? "—")</p>
+                                @if (price.FreeCancellation == true)
+                                {
+                                    <p class="text-xs text-green-600">@L["HotelDetailsFreeCancellation"]</p>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <EmptyState Icon="payments" Title="@L["HotelDetailsNoPrices"]" Message="@L["HotelDetailsNoPricesHint"]" />
+                }
+            </div>
+        }
+        else if (_activeTab == L["HotelDetailsPhotos"])
+        {
+            <div class="p-4">
+                @if (_hotel.Images is { Count: > 0 })
+                {
+                    <div class="grid grid-cols-2 gap-2">
+                        @foreach (var img in _hotel.Images)
+                        {
+                            <div class="aspect-square rounded-xl overflow-hidden">
+                                <img src="@(img.OriginalImage ?? img.Thumbnail)" alt="" class="w-full h-full object-cover" loading="lazy" />
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <EmptyState Icon="photo_library" Title="@L["HotelDetailsNoPhotos"]" Message="" />
+                }
+            </div>
+        }
+    </div>
+
+    @if (_hotel.RatePerNight?.ExtractedLowest is { } rate)
+    {
+        <div class="fixed bottom-16 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between z-40">
+            <div>
+                <p class="text-xs text-slate-500">@L["HotelDetailsStartingFrom"]</p>
+                <p class="text-lg font-bold text-primary">@CurrencyFormat.FormatPrice(rate, UserPrefs.Currency)<span class="text-xs font-normal text-slate-500">@L["HotelsPerNight"]</span></p>
+            </div>
+            <button @onclick="OpenBooking" class="bg-primary text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-primary-dark transition-colors">
+                @L["HotelDetailsViewPrices"]
+            </button>
+        </div>
+    }
+}

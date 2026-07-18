@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Ino.Core\Ino.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.Core.Hosting\Ino.Core.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.Kernel.Contracts\Ino.Kernel.Contracts.csproj" />
+    <!-- Ino.Kernel pulled in so the test silo loads the Discovery grain
+         class (kernel-pinned, [PinToSilo("kernel")]). The L1 acceptance
+         scenario needs Discovery to register dynamic neurons and
+         report them back via DumpNeuronsAsync. Cortex and other
+         kernel grains are dormant — DI builds them only on activation,
+         and the tests don't activate them. -->
+    <ProjectReference Include="..\..\..\src\Ino.Kernel\Ino.Kernel.csproj" />
+    <ProjectReference Include="..\..\..\src\Ino.Testing\Ino.Testing.csproj" />
+    <ProjectReference Include="..\Ino.Domains.Genesis.Contracts\Ino.Domains.Genesis.Contracts.csproj" />
+    <ProjectReference Include="..\Ino.Domains.Genesis\Ino.Domains.Genesis.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,25 @@
+schemaVersion: "os-on-yaml/v0"
+neuron:
+  id: awesome-se-team
+  grainType: awesome-se-team
+  version: 1.0.0
+  desc: Software engineering team experience
+  emits:
+    - ReviewResult
+    - UiSurface
+  observedSynapses: 0
+  rules:
+    - on: ReviewProjectRequest
+      do:
+        - show:
+            card:
+              title: "Review in progress"
+              content:
+                - kind: text
+                  text: "Analyzing project..."
+                - kind: button
+                  label: "Run Review"
+                  action:
+                    type: ReviewProjectRequest
+                    args:
+                      path: "$path"

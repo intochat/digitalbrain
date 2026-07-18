@@ -1,0 +1,26 @@
+@inject NavigationManager Nav
+
+<div @onclick="OpenSearch"
+     class="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden cursor-pointer hover:border-primary transition-colors">
+    <span class="material-symbols-outlined text-slate-400 px-3">@Icon</span>
+    <div class="flex-1 py-3 pr-4">
+        @if (!string.IsNullOrEmpty(DisplayText))
+        {
+            <div class="flex items-center gap-2">
+                @if (!string.IsNullOrEmpty(Flag))
+                {
+                    <span class="text-base">@Flag</span>
+                }
+                <span class="text-sm font-medium text-slate-900 dark:text-white truncate">@CityName</span>
+                @if (!string.IsNullOrEmpty(Badge))
+                {
+                    <span class="text-[10px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-full">@Badge</span>
+                }
+            </div>
+        }
+        else
+        {
+            <span class="text-sm text-slate-400">@Placeholder</span>
+        }
+    </div>
+</div>

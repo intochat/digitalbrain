@@ -1,0 +1,56 @@
+schemaVersion: "os-on-yaml/v0"
+neuron:
+  id: marketplace
+  grainType: marketplace
+  version: 1.0.0
+  desc: Marketplace (system)
+  handles:
+    - synapse: InstallFromMarketplace
+    - synapse: PublishToMarketplace
+    - synapse: ListPublished
+  emits:
+    - ExperiencePacked
+    - ExperienceListed
+    - UiSurface
+  isSystem: true
+  region: main
+  observedSynapses: 0
+  rules:
+    - on: ExperienceListed
+      do:
+        - show:
+            card:
+              title: "🛒 Marketplace"
+              content:
+                - kind: column
+                  content:
+                    - kind: text
+                      text: "— Core Bundles (tap install, live update shell) —"
+                    - kind: text
+                      text: "kernel-tasks: active tasks + alarms"
+                    - kind: button
+                      label: "Install kernel-tasks"
+                      action:
+                        type: InstallFromMarketplace
+                        args:
+                          ExperienceId: "kernel-tasks"
+                    - kind: text
+                      text: "creator: proposals + ino gen"
+                    - kind: button
+                      label: "Install creator"
+                      action:
+                        type: InstallFromMarketplace
+                        args:
+                          ExperienceId: "creator"
+                    - kind: text
+                      text: "— Global / Community —"
+                    - kind: button
+                      label: "Search global"
+                      action:
+                        type: ListPublished
+                    - kind: text
+                      text: "— Actions —"
+                    - kind: button
+                      label: "▶ Distribution sim (N+1 + live UI)"
+                      action:
+                        type: RunDistributionSimulation

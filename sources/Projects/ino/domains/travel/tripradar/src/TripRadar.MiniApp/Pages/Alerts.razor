@@ -1,0 +1,60 @@
+@attribute [Route(AppRoutes.Alerts)]
+@inject TrackingState Tracking
+@inject FlightSearchState SearchState
+@inject NavigationManager Nav
+@inject AuthState Auth
+@inject IStringLocalizer<SharedResource> L
+@using TripRadar.MiniApp.Client.Infrastructure.Localization
+@using TripRadar.MiniApp.Client.Infrastructure.Services.State
+@implements IDisposable
+
+<PageHeader Title="@L["AlertsTitle"].Value" ShowBack />
+
+<div class="p-4 space-y-2.5">
+    @if (_loading)
+    {
+        <LoadingSpinner Message="@L["AlertsLoading"].Value" />
+    }
+    else if (_error is not null)
+    {
+        <ErrorDisplay Title="@L["AlertsFailedToLoad"].Value" Message="@_error" OnRetry="Load" />
+    }
+    else if (Tracking.Trackings.Count == 0)
+    {
+        <EmptyState Icon="notifications" Title="@L["AlertsEmpty"].Value"
+                    Message="@L["AlertsEmptyDesc"].Value" />
+    }
+    else
+    {
+        @foreach (var t in Tracking.Trackings)
+        {
+            <div class="@Css.Join("bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl",
+                    t.IsActive ? "" : "opacity-55")">
+                <div class="flex items-center gap-3 p-3.5">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold truncate">@FormatRoute(t)</p>
+                        <p class="text-[11px] text-slate-400 mt-0.5">@FormatDate(t)</p>
+                    </div>
+                    <button @onclick="() => Toggle(t)"
+                            class="@Css.Join("w-10 h-6 rounded-full relative flex-shrink-0 transition-colors",
+                                t.IsActive ? "bg-primary" : "bg-slate-200 dark:bg-slate-700")">
+                        <span class="@Css.Join("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
+                            t.IsActive ? "left-5" : "left-1")"></span>
+                    </button>
+                    <button @onclick="() => Delete(t.UniqueId)"
+                            class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition-colors flex-shrink-0">
+                        <span class="material-symbols-outlined text-xl">delete_outline</span>
+                    </button>
+                </div>
+                <div @onclick="() => ViewPrices(t)"
+                     class="flex items-center justify-between px-3.5 py-2.5 bg-gradient-to-r from-blue-50 to-blue-100/80 dark:from-blue-950/40 dark:to-blue-900/30 border-t border-blue-100 dark:border-blue-900 cursor-pointer hover:from-blue-100 hover:to-blue-200/80 dark:hover:from-blue-950/60 dark:hover:to-blue-900/50 transition-all">
+                    <span class="flex items-center gap-1.5 text-xs font-semibold text-primary">
+                        <span class="material-symbols-outlined text-base">flight</span>
+                        @L["AlertsViewPrices"]
+                    </span>
+                    <span class="material-symbols-outlined text-base text-primary">arrow_forward</span>
+                </div>
+            </div>
+        }
+    }
+</div>

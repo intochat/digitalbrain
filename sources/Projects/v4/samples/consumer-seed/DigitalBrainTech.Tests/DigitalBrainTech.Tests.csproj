@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Testing" Version="13.5.0-preview.1.26281.1" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <!-- Test frameworks provided via central DigitalBrain.Testing.Reqnroll per repo Directory.Build.targets rule (no direct xunit/MSTest in projects) -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- AppHost and Reqnroll project refs removed after move into consumer-seed/ (relative resolution + generator issues in prototype state).
+         Direct test packages were already removed to satisfy Directory.Build.targets guard. This project is now a minimal placeholder for the original Aspire smoke test. -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System.Net" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Aspire.Hosting.ApplicationModel" />
+    <Using Include="Aspire.Hosting.Testing" />
+  </ItemGroup>
+
+</Project>

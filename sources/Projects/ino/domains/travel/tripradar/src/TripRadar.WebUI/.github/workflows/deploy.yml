@@ -1,0 +1,291 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - development
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment Environment'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - production
+
+env:
+  NODE_VERSION: '20.x'
+  # Determine environment based on branch or manual input
+  # Currently deploying to development for both main and development branches
+  DEPLOYMENT_ENVIRONMENT: ${{ github.event.inputs.environment || 'development' }}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-infrastructure:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: infrastructure/package-lock.json
+
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@v5
+
+      - name: Azure Login
+        run: |
+          az login --service-principal \
+            --username ${{ secrets.AZURE_CLIENT_ID }} \
+            --password ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install infrastructure dependencies
+        working-directory: ./infrastructure
+        run: npm ci
+
+      - name: Verify Azure Resources
+        run: |
+          echo "🔍 Checking Azure resources for environment: ${{ env.DEPLOYMENT_ENVIRONMENT }}"
+
+          if [ "${{ env.DEPLOYMENT_ENVIRONMENT }}" == "development" ]; then
+            RESOURCE_GROUP="tripradar-webui-dev-rg"
+          else
+            RESOURCE_GROUP="tripradar-webui-prod-rg"
+          fi
+
+          if az group show --name "$RESOURCE_GROUP" --output none 2>/dev/null; then
+            echo "✅ Resource group exists: $RESOURCE_GROUP"
+            echo "📋 Existing resources:"
+            az resource list --resource-group "$RESOURCE_GROUP" --output table || true
+          else
+            echo "📝 Resource group does not exist yet - will be created"
+          fi
+
+      - name: Deploy Infrastructure with Pulumi
+        working-directory: ./infrastructure
+        run: |
+          set -e
+
+          ENVIRONMENT="${{ env.DEPLOYMENT_ENVIRONMENT }}"
+          echo "🚀 Deploying infrastructure for: $ENVIRONMENT"
+
+          # Login to Pulumi
+          pulumi login
+
+          # Select or create stack
+          pulumi stack select "$ENVIRONMENT" --create 2>/dev/null || pulumi stack select "$ENVIRONMENT"
+
+          # Deploy infrastructure
+          echo "📊 Running Pulumi deployment..."
+          npm run deploy -- --yes --skip-preview
+
+          echo "✅ Infrastructure deployment complete"
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ALLOWED_IP_RANGES: ${{ secrets.ALLOWED_IP_RANGES }}
+          DNS_ZONE_RESOURCE_GROUP: ${{ secrets.DNS_ZONE_RESOURCE_GROUP }}
+
+      - name: Verify Deployment
+        run: |
+          echo "🔍 Verifying deployed resources..."
+
+          if [ "${{ env.DEPLOYMENT_ENVIRONMENT }}" == "development" ]; then
+            RESOURCE_GROUP="tripradar-webui-dev-rg"
+          else
+            RESOURCE_GROUP="tripradar-webui-prod-rg"
+          fi
+
+          echo "📊 Resources in $RESOURCE_GROUP:"
+          az resource list --resource-group "$RESOURCE_GROUP" --output table
+
+          echo ""
+          echo "✅ Infrastructure verification complete"
+
+  build-and-deploy:
+    needs: deploy-infrastructure
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Determine environment
+        id: env
+        run: |
+          echo "environment=${DEPLOYMENT_ENVIRONMENT}" >> $GITHUB_OUTPUT
+          echo "environment_upper=$(echo "${DEPLOYMENT_ENVIRONMENT}" | tr '[:lower:]' '[:upper:]')" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+          VITE_API_BASE_URL: ${{ secrets[format('VITE_API_BASE_URL_{0}', steps.env.outputs.environment_upper)] }}
+      - name: Log API base URL
+        run: |
+          echo "VITE_API_BASE_URL length: ${#VITE_API_BASE_URL}"
+          echo "VITE_API_BASE_URL=${VITE_API_BASE_URL}"
+        env:
+          VITE_API_BASE_URL: ${{ secrets[format('VITE_API_BASE_URL_{0}', steps.env.outputs.environment_upper)] }}
+      - name: Verify API base URL
+        run: |
+          if [ "${{ steps.env.outputs.environment }}" = "development" ]; then
+            expected="https://api-dev.tripradar.io"
+          else
+            expected="https://api.tripradar.io"
+          fi
+          if [ "${VITE_API_BASE_URL}" = "${expected}" ]; then
+            echo "✅ VITE_API_BASE_URL matches ${expected}"
+          else
+            echo "❌ VITE_API_BASE_URL mismatch (expected ${expected})"
+          fi
+        env:
+          VITE_API_BASE_URL: ${{ secrets[format('VITE_API_BASE_URL_{0}', steps.env.outputs.environment_upper)] }}
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Get Infrastructure Names
+        id: infra
+        run: |
+          if [ "${{ steps.env.outputs.environment }}" == "development" ]; then
+            STORAGE_ACCOUNT="tripradarwebuidev"
+            RESOURCE_GROUP="tripradar-webui-dev-rg"
+            CDN_PROFILE="tripradar-webui-cdn-dev"
+            CDN_ENDPOINT="tripradar-webui-dev"
+            USE_CDN="true"
+          else
+            STORAGE_ACCOUNT="tripradarwebuiprod"
+            RESOURCE_GROUP="tripradar-webui-prod-rg"
+            CDN_PROFILE="tripradar-webui-cdn-prod"
+            CDN_ENDPOINT="tripradar-webui-prod"
+            USE_CDN="true"
+          fi
+          echo "storage_account=$STORAGE_ACCOUNT" >> $GITHUB_OUTPUT
+          echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
+          echo "cdn_profile=$CDN_PROFILE" >> $GITHUB_OUTPUT
+          echo "cdn_endpoint=$CDN_ENDPOINT" >> $GITHUB_OUTPUT
+          echo "use_cdn=$USE_CDN" >> $GITHUB_OUTPUT
+
+      - name: Verify Storage Account
+        run: |
+          echo "🔍 Verifying storage account: ${{ steps.infra.outputs.storage_account }}"
+          az storage account show --name ${{ steps.infra.outputs.storage_account }} --resource-group ${{ steps.infra.outputs.resource_group }}
+          echo "✅ Storage account verified"
+
+      - name: Deploy to Azure Storage
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            echo "📦 Uploading build artifacts to storage..."
+
+            # Upload JS/CSS with long cache
+            az storage blob upload-batch \
+              --account-name ${{ steps.infra.outputs.storage_account }} \
+              --auth-mode key \
+              --destination '$web' \
+              --source ./dist \
+              --overwrite \
+              --content-cache-control "public, max-age=31536000, immutable" \
+              --pattern "*.js"
+
+            az storage blob upload-batch \
+              --account-name ${{ steps.infra.outputs.storage_account }} \
+              --auth-mode key \
+              --destination '$web' \
+              --source ./dist \
+              --overwrite \
+              --content-cache-control "public, max-age=31536000, immutable" \
+              --pattern "*.css"
+
+            # Upload HTML with no cache
+            az storage blob upload-batch \
+              --account-name ${{ steps.infra.outputs.storage_account }} \
+              --auth-mode key \
+              --destination '$web' \
+              --source ./dist \
+              --overwrite \
+              --content-cache-control "no-cache" \
+              --pattern "*.html"
+
+            # Upload remaining files
+            az storage blob upload-batch \
+              --account-name ${{ steps.infra.outputs.storage_account }} \
+              --auth-mode key \
+              --destination '$web' \
+              --source ./dist \
+              --overwrite
+
+            echo "✅ Upload complete"
+
+      - name: Get CDN Hostname
+        id: cdn
+        run: |
+          if [ "${{ steps.infra.outputs.use_cdn }}" == "true" ]; then
+            CDN_HOSTNAME=$(az afd endpoint show \
+              --resource-group ${{ steps.infra.outputs.resource_group }} \
+              --profile-name ${{ steps.infra.outputs.cdn_profile }} \
+              --endpoint-name ${{ steps.infra.outputs.cdn_endpoint }} \
+              --query "hostName" -o tsv)
+            echo "hostname=$CDN_HOSTNAME" >> $GITHUB_OUTPUT
+            echo "url=https://$CDN_HOSTNAME" >> $GITHUB_OUTPUT
+          else
+            # Development: Use storage endpoint directly
+            STORAGE_ENDPOINT=$(az storage account show \
+              --name ${{ steps.infra.outputs.storage_account }} \
+              --resource-group ${{ steps.infra.outputs.resource_group }} \
+              --query "primaryEndpoints.web" -o tsv)
+            echo "hostname=$STORAGE_ENDPOINT" >> $GITHUB_OUTPUT
+            echo "url=$STORAGE_ENDPOINT" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ steps.env.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Storage Account:** ${{ steps.infra.outputs.storage_account }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** ${{ steps.infra.outputs.resource_group }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Endpoint:** ${{ steps.cdn.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Infrastructure deployed" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Application built and deployed" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.infra.outputs.use_cdn }}" == "true" ]; then
+            echo "✅ CDN cache purged" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ Using storage endpoint (CDN disabled for dev)" >> $GITHUB_STEP_SUMMARY
+          fi

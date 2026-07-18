@@ -1,0 +1,118 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>Ino.Kernel</RootNamespace>
+    <AssemblyName>Ino.Kernel</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Server" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ino.Core\Ino.Core.csproj" />
+    <ProjectReference Include="..\Ino.Core.Hosting\Ino.Core.Hosting.csproj" />
+    <ProjectReference Include="..\Ino.Kernel.Contracts\Ino.Kernel.Contracts.csproj" />
+    <ProjectReference Include="..\Ino.Aspire.Hosting\Ino.Aspire.Hosting.csproj" />
+    <ProjectReference Include="..\Ino.Gateway.Grpc\Ino.Gateway.Grpc.csproj" />
+    <ProjectReference Include="..\Ino.ServiceDefaults\Ino.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\Ino.Llm.Xai\Ino.Llm.Xai.csproj" />
+    <!-- Phase 4 Slice A removed the kernel's compile-time refs to
+         Travel.Contracts and Taxi.Contracts: Cortex now dispatches through
+         INeuronPlan grains and never news up per-domain synapses. The
+         contracts assemblies still ride along at runtime via the domain
+         impl Private="true" refs below — Orleans deserialization needs the
+         types loadable, not symbol-visible. -->
+    <!-- Location domain ships only substrate (no canonical handler), but its
+         contracts must be reachable from the kernel so Cortex-side type
+         resolution and any plan that reads LocationVisited journals doesn't
+         see the assembly as missing. -->
+    <ProjectReference Include="..\..\domains\location\Ino.Domains.Location.Contracts\Ino.Domains.Location.Contracts.csproj" />
+    <!--
+      Domain assemblies must be on disk beside the kernel-silo process so
+      Orleans can resolve their types when deserializing SiloRegistration
+      payloads from the domain silos. The kernel silo does not activate
+      domain grains (they're placed on their respective silos), but
+      CanonicalRegistration.GrainType carries System.Type refs that Orleans
+      deserializes against the caller's AppDomain.
+
+      Runtime-loaded only — the kernel silo never news-up these grain types.
+    -->
+    <ProjectReference Include="..\..\domains\travel\Ino.Domains.Travel\Ino.Domains.Travel.csproj"
+                      Private="true" />
+    <ProjectReference Include="..\..\domains\taxi\Ino.Domains.Taxi\Ino.Domains.Taxi.csproj"
+                      Private="true" />
+    <ProjectReference Include="..\..\domains\location\Ino.Domains.Location\Ino.Domains.Location.csproj"
+                      Private="true" />
+  </ItemGroup>
+
+  <!--
+    Flutter web auto-build. After a clean checkout the wwwroot/ folder is empty (only
+    .gitkeep is tracked); this target makes `dotnet build` self-sufficient by running
+    `flutter build web` and staging the bundle into wwwroot/ so a single `aspire start`
+    is enough to serve the Flutter app. Skips cleanly when Flutter is not on PATH.
+  -->
+  <PropertyGroup>
+    <FlutterProjectDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\clients\ino.flutter'))</FlutterProjectDir>
+    <FlutterWebOutputDir>$(FlutterProjectDir)\build\web</FlutterWebOutputDir>
+    <FlutterBundleStage>$(MSBuildThisFileDirectory)wwwroot</FlutterBundleStage>
+    <SkipFlutterBuild Condition="'$(SkipFlutterBuild)' == ''">false</SkipFlutterBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FlutterSource Include="$(FlutterProjectDir)\lib\**\*" />
+    <FlutterSource Include="$(FlutterProjectDir)\web\**\*" />
+    <FlutterSource Include="$(FlutterProjectDir)\assets\**\*" />
+    <FlutterSource Include="$(FlutterProjectDir)\tool\**\*" />
+    <FlutterSource Include="$(FlutterProjectDir)\assets\rive\*.schema.json" />
+    <FlutterSource Include="$(FlutterProjectDir)\pubspec.yaml" />
+    <FlutterSource Include="$(FlutterProjectDir)\pubspec.lock" />
+  </ItemGroup>
+
+  <Target Name="_DetectFlutter">
+    <Exec Command="flutter --version"
+          ContinueOnError="true"
+          IgnoreStandardErrorWarningFormat="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low">
+      <Output TaskParameter="ExitCode" PropertyName="_FlutterExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <HasFlutter Condition="'$(_FlutterExitCode)' == '0'">true</HasFlutter>
+      <HasFlutter Condition="'$(_FlutterExitCode)' != '0'">false</HasFlutter>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="GenerateRiveSchemas"
+          DependsOnTargets="_DetectFlutter"
+          BeforeTargets="BuildFlutterWeb"
+          Condition="'$(SkipFlutterBuild)' != 'true' And '$(HasFlutter)' == 'true'">
+    <Message Importance="high"
+             Text="Generating Rive schemas for $(FlutterProjectDir)" />
+    <Exec Command="dart run tool/rive_schema_gen.dart"
+          WorkingDirectory="$(FlutterProjectDir)" />
+  </Target>
+
+  <Target Name="BuildFlutterWeb"
+          DependsOnTargets="_DetectFlutter"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(SkipFlutterBuild)' != 'true'"
+          Inputs="@(FlutterSource)"
+          Outputs="$(FlutterBundleStage)\index.html">
+    <Message Condition="'$(HasFlutter)' != 'true'" Importance="high"
+             Text="Flutter not on PATH — skipping Flutter web build. Ino.Kernel will serve wwwroot/ as-is. Install Flutter and re-run `dotnet build` to regenerate the bundle." />
+    <Message Condition="'$(HasFlutter)' == 'true'" Importance="high"
+             Text="Building Flutter web bundle → $(FlutterBundleStage)" />
+    <Exec Condition="'$(HasFlutter)' == 'true'"
+          Command="flutter build web --no-tree-shake-icons"
+          WorkingDirectory="$(FlutterProjectDir)" />
+    <ItemGroup Condition="'$(HasFlutter)' == 'true'">
+      <_FlutterBundleFile Include="$(FlutterWebOutputDir)\**\*" />
+    </ItemGroup>
+    <Copy Condition="'$(HasFlutter)' == 'true' And '@(_FlutterBundleFile)' != ''"
+          SourceFiles="@(_FlutterBundleFile)"
+          DestinationFiles="@(_FlutterBundleFile->'$(FlutterBundleStage)\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

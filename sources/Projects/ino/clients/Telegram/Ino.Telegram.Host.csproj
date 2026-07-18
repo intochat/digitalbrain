@@ -1,0 +1,103 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>Ino.Telegram.Host</RootNamespace>
+    <AssemblyName>Ino.Telegram.Host</AssemblyName>
+    <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
+    <!-- NU1603 = transitive prerelease ranges from Foundry Local SDK; IDISP004 =
+         IDisposable analyzers from NAudio's WaveFileWriter. Both safe to ignore
+         here, same as the legacy bot project. -->
+    <NoWarn>$(NoWarn);NU1603;IDISP004</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Telegram.BotAPI" />
+    <PackageReference Include="Concentus" />
+    <PackageReference Include="Concentus.Oggfile" />
+    <PackageReference Include="NAudio" />
+    <PackageReference Include="Microsoft.AI.Foundry.Local" />
+    <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="Grpc.Net.ClientFactory" />
+    <PackageReference Include="Grpc.Tools">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Google.Protobuf" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ino.ServiceDefaults\Ino.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <!--
+    Generate a gRPC CLIENT for the same ino.proto Ino.Gateway.Grpc compiles as
+    Server. Linking the proto file means there's exactly one source of truth on
+    disk; the bot's wire contract can't drift from the system silo's.
+  -->
+  <ItemGroup>
+    <Protobuf Include="..\..\src\Ino.Gateway.Grpc\Protos\ino.proto"
+              Link="Protos\ino.proto"
+              GrpcServices="Client" />
+  </ItemGroup>
+
+  <!--
+    Flutter web auto-build — same shape as Ino.System.Host. Telegram's WebApp
+    button needs to load the Flutter mini-app from this host's HTTPS origin
+    (Telegram refuses to load WebApps from arbitrary cross-origin URLs without
+    explicit BotFather configuration), so the bot serves a copy of the same
+    Flutter bundle that lives at clients/ino.flutter. After a clean checkout
+    wwwroot/ has only .gitkeep; this target rebuilds and copies on `dotnet
+    build`. Skips cleanly when Flutter isn't on PATH.
+  -->
+  <PropertyGroup>
+    <FlutterProjectDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\ino.flutter'))</FlutterProjectDir>
+    <FlutterWebOutputDir>$(FlutterProjectDir)\build\web</FlutterWebOutputDir>
+    <FlutterBundleStage>$(MSBuildThisFileDirectory)wwwroot</FlutterBundleStage>
+    <SkipFlutterBuild Condition="'$(SkipFlutterBuild)' == ''">false</SkipFlutterBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FlutterSource Include="$(FlutterProjectDir)\lib\**\*" />
+    <FlutterSource Include="$(FlutterProjectDir)\web\**\*" />
+    <FlutterSource Include="$(FlutterProjectDir)\assets\**\*" />
+    <FlutterSource Include="$(FlutterProjectDir)\pubspec.yaml" />
+    <FlutterSource Include="$(FlutterProjectDir)\pubspec.lock" />
+  </ItemGroup>
+
+  <Target Name="_DetectFlutterTelegram">
+    <Exec Command="flutter --version"
+          ContinueOnError="true"
+          IgnoreStandardErrorWarningFormat="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low">
+      <Output TaskParameter="ExitCode" PropertyName="_FlutterExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <HasFlutter Condition="'$(_FlutterExitCode)' == '0'">true</HasFlutter>
+      <HasFlutter Condition="'$(_FlutterExitCode)' != '0'">false</HasFlutter>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="BuildFlutterWebForTelegram"
+          DependsOnTargets="_DetectFlutterTelegram"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(SkipFlutterBuild)' != 'true'"
+          Inputs="@(FlutterSource)"
+          Outputs="$(FlutterBundleStage)\index.html">
+    <Message Condition="'$(HasFlutter)' != 'true'" Importance="high"
+             Text="Flutter not on PATH — Ino.Telegram.Host will serve wwwroot/ as-is. Install Flutter and re-run `dotnet build` to regenerate the bundle." />
+    <Message Condition="'$(HasFlutter)' == 'true' And !Exists('$(FlutterWebOutputDir)\index.html')" Importance="high"
+             Text="Building Flutter web bundle for Telegram host → $(FlutterBundleStage)" />
+    <Exec Condition="'$(HasFlutter)' == 'true' And !Exists('$(FlutterWebOutputDir)\index.html')"
+          Command="flutter build web --no-tree-shake-icons"
+          WorkingDirectory="$(FlutterProjectDir)" />
+    <ItemGroup Condition="'$(HasFlutter)' == 'true'">
+      <_FlutterBundleFile Include="$(FlutterWebOutputDir)\**\*" />
+    </ItemGroup>
+    <Copy Condition="'$(HasFlutter)' == 'true' And '@(_FlutterBundleFile)' != ''"
+          SourceFiles="@(_FlutterBundleFile)"
+          DestinationFiles="@(_FlutterBundleFile->'$(FlutterBundleStage)\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

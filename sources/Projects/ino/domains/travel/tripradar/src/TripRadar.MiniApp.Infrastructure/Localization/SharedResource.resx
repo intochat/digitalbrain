@@ -1,0 +1,680 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>1.3</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <!-- Nav -->
+  <data name="NavSearch"><value>Search</value></data>
+  <data name="NavAlerts"><value>Alerts</value></data>
+  <data name="NavAccount"><value>Account</value></data>
+
+  <!-- Flights -->
+  <data name="FlightsTitle"><value>Flights</value></data>
+  <data name="FlightsWhereNext"><value>Where to next?</value></data>
+  <data name="FlightsDeparture"><value>Departure</value></data>
+  <data name="FlightsOutbound"><value>Outbound</value></data>
+  <data name="FlightsReturn"><value>Return</value></data>
+  <data name="FlightsDepartureCity"><value>Departure city</value></data>
+  <data name="FlightsArrivalCity"><value>Arrival city</value></data>
+  <data name="FlightsSelectDate"><value>Select date</value></data>
+  <data name="FlightsSearchFlights"><value>Search Flights</value></data>
+  <data name="FlightsToday"><value>Today</value></data>
+  <data name="FlightsTomorrow"><value>Tomorrow</value></data>
+  <data name="FlightsFilters"><value>Filters</value></data>
+  <data name="FlightsStops"><value>Stops</value></data>
+  <data name="FlightsAirlines"><value>Airlines</value></data>
+  <data name="FlightsPrice"><value>Price</value></data>
+
+  <!-- Popular destinations -->
+  <data name="PopularTitle"><value>Popular destinations</value></data>
+  <data name="PopularSeeAll"><value>See all</value></data>
+  <data name="PopularFrom"><value>From {0}</value></data>
+  <data name="PopularRoundTrip"><value>Round trip</value></data>
+  <data name="PopularFromPrice"><value>FROM {0}</value></data>
+  <data name="PopularTrackPrices"><value>Track prices</value></data>
+  <data name="PopularGetAlerts"><value>Get alerts for these routes</value></data>
+
+  <!-- Account -->
+  <data name="AccountTitle"><value>Account</value></data>
+  <data name="AccountManage"><value>Manage your account</value></data>
+  <data name="AccountLanguageRegion"><value>Language &amp; Region</value></data>
+  <data name="AccountLanguage"><value>Language</value></data>
+  <data name="AccountCurrency"><value>Currency</value></data>
+  <data name="AccountCountry"><value>Country</value></data>
+  <data name="AccountNotifications"><value>Notification Settings</value></data>
+  <data name="AccountOpenOnWebsite"><value>Open on Website</value></data>
+  <data name="AccountOpenOnWebsiteError"><value>Could not open website session. Please try again.</value></data>
+  <data name="AccountSignOut"><value>Sign out</value></data>
+  <data name="AccountVersion"><value>TripRadar v1.0</value></data>
+
+  <!-- Alerts -->
+  <data name="AlertsTitle"><value>Price Alerts</value></data>
+  <data name="AlertsEmpty"><value>No active alerts</value></data>
+  <data name="AlertsEmptyDesc"><value>Search for flights and enable price tracking</value></data>
+  <data name="AlertsLoading"><value>Loading alerts...</value></data>
+  <data name="AlertsFailedToLoad"><value>Failed to load</value></data>
+  <data name="AlertsNextCheck"><value>Next check</value></data>
+  <data name="AlertsRemove"><value>Remove</value></data>
+  <data name="AlertsViewPrices"><value>View latest prices</value></data>
+  <data name="AlertsMarkAllRead" xml:space="preserve">
+    <value>Mark all as read</value>
+  </data>
+
+  <!-- Price intelligence -->
+  <data name="PriceIntelTitle"><value>Price Intelligence</value></data>
+  <data name="PriceIntelDateGrid"><value>Date Grid</value></data>
+  <data name="PriceIntelPriceGraph"><value>Price Graph</value></data>
+  <data name="PriceIntelCheapest"><value>Cheapest available</value></data>
+  <data name="PriceIntelAverage"><value>Average: {0}/mo</value></data>
+  <data name="PriceIntelGoodPrice"><value>Good price for {0}</value></data>
+  <data name="PriceIntelCheaperThan"><value>This route is {0} cheaper than the usual median price</value></data>
+  <data name="PriceIntelApply"><value>Apply Selected Dates</value></data>
+  <data name="PriceIntelLow"><value>Low</value></data>
+  <data name="PriceIntelTypical"><value>Typical</value></data>
+  <data name="PriceIntelHigh"><value>High</value></data>
+
+  <!-- Price calendar -->
+  <data name="PriceCalTitle"><value>Pick your travel date</value></data>
+  <data name="PriceCalSubtitle"><value>Tap a date to see nearby prices</value></data>
+  <data name="PriceCalLoadingPrices"><value>Loading nearby prices...</value></data>
+  <data name="PriceCalPricesLoaded"><value>Prices loaded — tap another date to compare</value></data>
+  <data name="PriceCalTapHint"><value>Tap any date to load prices for nearby days</value></data>
+  <data name="PriceCalFetchingCount"><value>Fetching {0} nearby prices…</value></data>
+  <data name="PriceCalCompareHint"><value>Tap another date to compare prices there</value></data>
+  <data name="PriceCalSavings"><value>{0} on {1} — save {2}</value></data>
+  <data name="PriceCalSavingsSub"><value>{0} day(s) {1} than selected</value></data>
+  <data name="PriceCalEarlier"><value>earlier</value></data>
+  <data name="PriceCalLater"><value>later</value></data>
+  <data name="PriceCalSwitch"><value>Switch</value></data>
+  <data name="PriceCalApply"><value>Apply</value></data>
+  <data name="PriceCalApplyWithDate"><value>Apply — {0}</value></data>
+  <data name="PriceCalCheapest"><value>Cheapest: {0} from {1}</value></data>
+  <data name="PriceCalRefreshNote"><value>Price data refreshes daily</value></data>
+
+  <!-- Common -->
+  <data name="CommonRetry"><value>Retry</value></data>
+  <data name="CommonLoading"><value>Loading...</value></data>
+  <data name="CommonError"><value>Something went wrong</value></data>
+  <data name="CommonDone"><value>Done</value></data>
+  <data name="CommonBack"><value>Back</value></data>
+
+  <!-- Services -->
+  <data name="ServicesHotels"><value>Hotels</value></data>
+  <data name="ServicesEvents"><value>Events</value></data>
+  <data name="ServicesRentals"><value>Rentals</value></data>
+
+  <!-- SearchHub -->
+  <data name="SearchHubSubtitle"><value>Find your next adventure</value></data>
+  <data name="SearchHubWhereTo"><value>Where to?</value></data>
+  <data name="SearchHubQuickAccess"><value>Quick Access</value></data>
+  <data name="SearchHubTrending"><value>Trending</value></data>
+  <data name="SearchHubPopularMonth"><value>Popular this month</value></data>
+  <data name="SearchHubDealOfWeek"><value>Deal of the week</value></data>
+  <data name="SearchHubOtherServices"><value>Other Services</value></data>
+  <data name="SearchHubTrackPrices"><value>Track prices</value></data>
+  <data name="SearchHubPriceGraph"><value>Price Graph</value></data>
+  <data name="SearchHubHistoryView"><value>History view</value></data>
+  <data name="SearchHubMyTrips"><value>My Trips</value></data>
+  <data name="SearchHubSavedTrips"><value>Saved trips</value></data>
+  <data name="SearchHubSupport"><value>Support</value></data>
+  <data name="SearchHubGetHelp"><value>Get help</value></data>
+
+  <!-- Flight types -->
+  <data name="FlightsRoundTrip"><value>Round trip</value></data>
+  <data name="FlightsOneWay"><value>One way</value></data>
+  <data name="FlightsMultiCity"><value>Multi-city</value></data>
+
+  <!-- Passengers -->
+  <data name="PassengersAdults"><value>Adults</value></data>
+  <data name="PassengersChildren"><value>Children</value></data>
+  <data name="PassengersInfants"><value>Infants</value></data>
+  <data name="PassengersTraveler"><value>{0} Traveler</value></data>
+  <data name="PassengersTravelers"><value>{0} Travelers</value></data>
+
+  <!-- Flight card -->
+  <data name="FlightsNonstop"><value>Nonstop</value></data>
+  <data name="FlightsStopCount"><value>{0} stop</value></data>
+  <data name="FlightsStopsCount"><value>{0} stops</value></data>
+  <data name="FlightsUnknownAirline"><value>Unknown airline</value></data>
+  <data name="FlightsLayover"><value>{0} layover</value></data>
+  <data name="FlightsLayoverInCity"><value>{0} layover in {1}</value></data>
+  <data name="FlightsCO2Less"><value>{0}% less CO₂</value></data>
+  <data name="FlightsCO2More"><value>{0}% more CO₂</value></data>
+
+  <!-- Price insights -->
+  <data name="PriceInsightLow"><value>Low price</value></data>
+  <data name="PriceInsightTypical"><value>Typical price</value></data>
+  <data name="PriceInsightHigh"><value>High price</value></data>
+  <data name="PriceInsightInfo"><value>Price info</value></data>
+  <data name="PriceInsightRange"><value>Typical: ${0} – ${1}</value></data>
+
+  <!-- Flight results -->
+  <data name="ResultsBestFlights"><value>Best flights</value></data>
+  <data name="ResultsOtherFlights"><value>Other flights</value></data>
+  <data name="ResultsSearching"><value>Searching flights...</value></data>
+  <data name="ResultsSearchFailed"><value>Search failed</value></data>
+  <data name="ResultsNoFlights"><value>No flights found</value></data>
+  <data name="ResultsAdjustFilters"><value>Try adjusting your filters</value></data>
+  <data name="ResultsAdjustSearch"><value>Try adjusting your search criteria</value></data>
+  <data name="ResultsTrack"><value>Track</value></data>
+  <data name="ResultsTracking"><value>Tracking</value></data>
+  <data name="ResultsActiveFilters"><value>Active filters:</value></data>
+  <data name="ResultsNoActiveFilters"><value>None</value></data>
+  <data name="ResultsMaxPrice"><value>Max price:</value></data>
+  <data name="ResultsDeparture"><value>Departure:</value></data>
+  <data name="ResultsClearAll"><value>Clear all filters</value></data>
+  <data name="ResultsClear"><value>Clear</value></data>
+  <data name="ResultsTimes"><value>Times</value></data>
+  <data name="ResultsNoLegFlights"><value>No {0} flights found</value></data>
+  <data name="ResultsLegSelected"><value>{0} selected</value></data>
+  <data name="ResultsChooseLeg"><value>Choose {0}</value></data>
+  <data name="ResultsViewBooking"><value>View Booking</value></data>
+  <data name="FlightsStepLabel"><value>Step {0} — {1}</value></data>
+  <data name="FlightsRunningTotal"><value>total</value></data>
+
+  <!-- Price filter -->
+  <data name="FilterMaxPrice"><value>Max Price</value></data>
+  <data name="FilterEnablePrice"><value>Enable price filter</value></data>
+  <data name="FilterPriceRange"><value>Range: ${0} – ${1}</value></data>
+  <data name="FilterUpTo"><value>Up to ${0}</value></data>
+  <data name="FilterNoPriceLimit"><value>No price limit — showing all flights</value></data>
+
+  <!-- Time filter -->
+  <data name="FilterDepartureTime"><value>Departure Time</value></data>
+  <data name="FilterMorning"><value>Morning (6:00 – 11:59)</value></data>
+  <data name="FilterAfternoon"><value>Afternoon (12:00 – 17:59)</value></data>
+  <data name="FilterEvening"><value>Evening (18:00 – 23:59)</value></data>
+  <data name="FilterNight"><value>Night (0:00 – 5:59)</value></data>
+
+  <!-- Tracking -->
+  <data name="TrackPrice"><value>Track Price</value></data>
+  <data name="TrackHowOften"><value>How often should we check the price for this route?</value></data>
+  <data name="TrackEveryHour"><value>Every hour</value></data>
+  <data name="TrackEvery6Hours"><value>Every 6 hours</value></data>
+  <data name="TrackEvery12Hours"><value>Every 12 hours</value></data>
+  <data name="TrackDaily"><value>Daily</value></data>
+  <data name="PriceAlerts"><value>Price alerts</value></data>
+  <data name="PriceAlertsDesc"><value>Get notified when prices change</value></data>
+  <data name="TrackingActive"><value>Price alerts active</value></data>
+  <data name="TrackingActiveDesc"><value>We'll notify you about changes</value></data>
+  <data name="TrackingUpgradeRequiredTitle"><value>Upgrade required</value></data>
+  <data name="TrackingUpgradeRequiredMessage"><value>Price alerts and query history are available only on Essential and Advanced plans. Your current plan does not include this feature.</value></data>
+  <data name="TrackingUpdateFailedTitle"><value>Could not update price alerts</value></data>
+  <data name="TrackingUpdateFailedMessage"><value>The alert was not changed. Check your connection and try again.</value></data>
+
+  <!-- Booking -->
+  <data name="BookingTitle"><value>Booking</value></data>
+  <data name="BookingLoading"><value>Loading booking options...</value></data>
+  <data name="BookingFailed"><value>Failed to load</value></data>
+  <data name="BookingTimeout"><value>Booking options are taking longer than usual. Please try again.</value></data>
+  <data name="BookingNoFlightSelected"><value>No flight selected. Go back to results and choose a flight again.</value></data>
+  <data name="BookingYourFlight"><value>Your flight</value></data>
+  <data name="BookingBookWith"><value>Book with</value></data>
+  <data name="BookingBook"><value>Book</value></data>
+  <data name="BookingDisclaimer"><value>Prices are fetched in real time and may change. You'll complete your booking on the provider's site.</value></data>
+  <data name="BookingOneWay"><value>One way</value></data>
+  <data name="BookingRoundTrip"><value>Round trip</value></data>
+  <data name="BookingPassenger"><value>{0} passenger</value></data>
+  <data name="BookingPassengers"><value>{0} passengers</value></data>
+  <data name="BookingAirlineDirect"><value>Book directly with the airline</value></data>
+  <data name="BookingSeparateTickets"><value>Separate tickets</value></data>
+  <data name="BookingSeparateTicketsExplanation"><value>This option books your flights as separate tickets. If your first flight is delayed and you miss the connection, the airline won't rebook you for free — you'd need to buy a new ticket yourself.</value></data>
+  <data name="BookingGoodToKnow"><value>Good to know</value></data>
+  <data name="BookingCarryOnBag"><value>Carry-on bag</value></data>
+  <data name="BookingCarryOnBagWithCount"><value>{0} carry-on bag</value></data>
+  <data name="BookingCheckedBag"><value>Checked bag</value></data>
+  <data name="BookingCheckedBagWithOrdinal"><value>{0} checked bag</value></data>
+  <data name="BookingFirstOrdinal"><value>1st</value></data>
+  <data name="BookingSecondOrdinal"><value>2nd</value></data>
+  <data name="BookingThirdOrdinal"><value>3rd</value></data>
+  <data name="CommonGotIt"><value>Got it</value></data>
+
+  <!-- Auth -->
+  <data name="AuthAuthenticating"><value>Authenticating...</value></data>
+  <data name="AuthSuccess"><value>Authenticated successfully</value></data>
+  <data name="AuthRedirecting"><value>Redirecting...</value></data>
+  <data name="AuthDevMode"><value>Development Mode</value></data>
+  <data name="AuthSelectUser"><value>Select a test user to log in</value></data>
+  <data name="AuthUserId"><value>User ID:</value></data>
+  <data name="AuthTelegramHandle"><value>Telegram:</value></data>
+  <data name="AuthTelegramHandleHint"><value>Enter your @username or numeric Telegram user ID. To receive real notifications, /start the bot from that account first.</value></data>
+  <data name="AuthDevLogin"><value>Dev Login</value></data>
+  <data name="AuthFailed"><value>Authentication failed</value></data>
+  <data name="AuthDebugInfo"><value>Debug info:</value></data>
+
+  <!-- Not found -->
+  <data name="NotFoundTitle"><value>Page not found</value></data>
+  <data name="NotFoundMessage"><value>The page you requested is unavailable.</value></data>
+  <data name="NotFoundGoSearch"><value>Go to Search</value></data>
+
+  <!-- Account -->
+  <data name="AccountTraveler"><value>Traveler</value></data>
+
+  <!-- Homepage Hub -->
+  <data name="HomeSubtitle" xml:space="preserve"><value>Your smart travel companion</value></data>
+  <data name="HomeTransport" xml:space="preserve"><value>Transport</value></data>
+  <data name="HomeDiscover" xml:space="preserve"><value>Discover</value></data>
+  <data name="HomeEssentials" xml:space="preserve"><value>Essentials</value></data>
+  <data name="HomeCompanionDesc" xml:space="preserve"><value>AI plans trips, tracks prices &amp; reminds you what to pack</value></data>
+  <data name="ServiceCarRental" xml:space="preserve"><value>Car Rental</value></data>
+  <data name="ServiceTrains" xml:space="preserve"><value>Trains</value></data>
+  <data name="ServiceTransfers" xml:space="preserve"><value>Transfers</value></data>
+  <data name="ServiceExplore" xml:space="preserve"><value>Explore</value></data>
+  <data name="ServiceActivities" xml:space="preserve"><value>Activities</value></data>
+  <data name="ServiceDining" xml:space="preserve"><value>Dining</value></data>
+  <data name="ServiceEsim" xml:space="preserve"><value>eSIM</value></data>
+  <data name="ServiceStorage" xml:space="preserve"><value>Storage</value></data>
+  <data name="ServiceInsurance" xml:space="preserve"><value>Insurance</value></data>
+  <data name="ServiceCurrency" xml:space="preserve"><value>Currency</value></data>
+  <data name="ServiceExploreDesc" xml:space="preserve"><value>Discover hidden gems, top attractions, and local favorites at your destination — curated just for your trip</value></data>
+  <data name="ServiceActivitiesDesc" xml:space="preserve"><value>Find and book tours, excursions, and unique experiences — from cooking classes to guided hikes</value></data>
+  <data name="ServiceEventsDesc" xml:space="preserve"><value>See what's happening at your destination — concerts, festivals, sports, and local events during your stay</value></data>
+  <data name="ServiceDiningDesc" xml:space="preserve"><value>Find the best restaurants, cafes, and street food near you — with reviews, menus, and reservations</value></data>
+  <data name="ServiceEsimDesc" xml:space="preserve"><value>Get instant mobile data in 190+ countries — no physical SIM swap needed, activate before you land</value></data>
+  <data name="ServiceStorageDesc" xml:space="preserve"><value>Find secure luggage storage spots near stations, airports, and attractions — drop your bags and explore freely</value></data>
+  <data name="ServiceInsuranceDesc" xml:space="preserve"><value>Compare and buy travel insurance tailored to your trip — medical, cancellation, and baggage coverage in minutes</value></data>
+  <data name="ServiceCarRentalDesc" xml:space="preserve"><value>Compare car rental deals from top providers at your destination — pick up at the airport or in the city</value></data>
+  <data name="ServiceBudget" xml:space="preserve"><value>Budget</value></data>
+  <data name="ServiceCurrencyDesc" xml:space="preserve"><value>Take a picture of a menu or price tag in foreign currency and get prices converted to your preferred currency instantly</value></data>
+  <data name="ServiceBudgetDesc" xml:space="preserve"><value>Plan your trip budget, track expenses as you go, and review your spending — all in one place</value></data>
+  <data name="HomeMoney" xml:space="preserve"><value>Money</value></data>
+  <data name="BadgeSoon" xml:space="preserve"><value>SOON</value></data>
+  <!-- Companion Page -->
+  <data name="CompanionTitle" xml:space="preserve"><value>Companion</value></data>
+  <data name="CompanionToday" xml:space="preserve"><value>Today</value></data>
+  <data name="CompanionGreeting" xml:space="preserve"><value>Hey! 👋 I'll help you plan trips, track prices, and make sure you never forget your slippers. Here's what I found for you today:</value></data>
+  <data name="CompanionWeather" xml:space="preserve"><value>🌡️ Heads up — Athens dropped 6°C this week. It's 14° at night now. I'd grab a hoodie or light jacket.</value></data>
+  <data name="CompanionUserJacket" xml:space="preserve"><value>Add jacket to my packing list</value></data>
+  <data name="CompanionPacking" xml:space="preserve"><value>Done! ✅ Here's your packing for Barcelona in 3 days:</value></data>
+  <data name="CompanionPackPassport" xml:space="preserve"><value>Passport</value></data>
+  <data name="CompanionPackAdapter" xml:space="preserve"><value>Travel adapter</value></data>
+  <data name="CompanionPackSunscreen" xml:space="preserve"><value>Sunscreen</value></data>
+  <data name="CompanionPackSlippers" xml:space="preserve"><value>Slippers — you asked me to remind you!</value></data>
+  <data name="CompanionWeatherUpdate" xml:space="preserve"><value>Weather update for your trip 👇</value></data>
+  <data name="CompanionWeatherAlert" xml:space="preserve"><value>Dropped 6°C this week — it'll be chilly at night</value></data>
+  <data name="CompanionSuggested" xml:space="preserve"><value>Suggested</value></data>
+  <data name="CompanionAddHoodie" xml:space="preserve"><value>Add hoodie to packing list</value></data>
+  <data name="CompanionPackJacket" xml:space="preserve"><value>Jacket</value></data>
+  <data name="CompanionPackJacketAdded" xml:space="preserve"><value>just added</value></data>
+  <data name="CompanionDealIntro" xml:space="preserve"><value>Found a deal on a flight you're tracking 🔥</value></data>
+  <data name="CompanionDealRoute" xml:space="preserve"><value>Kyiv → Rome</value></data>
+  <data name="CompanionDealLowest" xml:space="preserve"><value>Lowest price in 30 days</value></data>
+  <data name="CompanionDeal" xml:space="preserve"><value>💰 Oh, and your Kyiv → Rome flight just dropped 23% — from $312 to $241. That's the lowest in 30 days!</value></data>
+  <data name="CompanionMaybeLater" xml:space="preserve"><value>Maybe later</value></data>
+  <data name="CompanionShowDeal" xml:space="preserve"><value>Show me this deal</value></data>
+  <data name="CompanionInputPlaceholder" xml:space="preserve"><value>Ask Companion anything...</value></data>
+  <data name="CompanionComingSoon" xml:space="preserve"><value>Coming Soon</value></data>
+  <data name="CompanionComingSoonDesc" xml:space="preserve"><value>We're teaching Companion everything about travel. Stay tuned!</value></data>
+  <!-- Flights - Round trip mode -->
+  <data name="FlightsRoundTripDeals"><value>Deals</value></data>
+  <data name="FlightsBundles"><value>Bundles</value></data>
+  <data name="FlightsPickSeparately"><value>Pick separately</value></data>
+  <data name="FlightsBundleBest"><value>Best</value></data>
+  <data name="FlightsBundleCheapest"><value>Cheapest</value></data>
+  <data name="FlightsBundleFastest"><value>Fastest</value></data>
+  <data name="FlightsBundlesLoading"><value>Finding best bundles...</value></data>
+  <data name="FlightsBundlesEmpty"><value>No bundles available</value></data>
+  <data name="FlightsBundlesEmptyDesc"><value>Try Deals or Pick separately mode instead</value></data>
+  <data name="FlightsSearching"><value>Searching {0} flights...</value></data>
+  <!-- Booking page -->
+  <data name="BookingTripBooked"><value>Trip booked!</value></data>
+  <data name="BookingCheckEmail"><value>Check your email for booking confirmations.</value></data>
+  <data name="BookingBookFlight"><value>Book {0} flight</value></data>
+  <data name="BookingMultiCity"><value>Multi-city</value></data>
+  <!-- City search -->
+  <data name="CitySearchPlaceholder"><value>City or airport...</value></data>
+  <data name="CitySearchAirports"><value>{0} airports</value></data>
+  <data name="CitySearchNoResults"><value>No cities or airports found</value></data>
+  <data name="CitySearchStartTyping"><value>Start typing to search</value></data>
+  <!-- Airport detail -->
+  <data name="AirportDetailTitle"><value>{0} airports</value></data>
+  <data name="AirportDetailSubtitle"><value>Select which airports to include</value></data>
+  <data name="AirportDetailServeCity"><value>{0} airports serve this city</value></data>
+  <data name="AirportDetailKmFromCenter"><value>{0} km from city center</value></data>
+  <data name="AirportDetailSelectAll"><value>Select all {0} airports</value></data>
+  <data name="AirportDetailSelectCodes"><value>Select {0}</value></data>
+  <data name="AirportDetailSelectAirports"><value>Select airports</value></data>
+  <!-- Boarding pass -->
+  <data name="BoardingPassBooked"><value>Booked</value></data>
+  <data name="BoardingPassNonstop"><value>Nonstop</value></data>
+  <data name="BoardingPassStops"><value>{0} stop</value></data>
+  <data name="BoardingPassStopsPlural"><value>{0} stops</value></data>
+  <data name="BoardingPassTotalPaid"><value>Total paid</value></data>
+  <data name="BoardingPassTotal"><value>Total</value></data>
+  <data name="BoardingPassVia"><value>via {0}</value></data>
+  <!-- Continue booking bar -->
+  <data name="ContinueBooking"><value>Continue booking</value></data>
+  <!-- Multi-city -->
+  <data name="MultiCityAddFlight"><value>Add flight</value></data>
+  <!-- Trip summary -->
+  <data name="TripSummaryTitle"><value>Trip Summary</value></data>
+  <data name="TripSummaryDetails"><value>Trip details</value></data>
+  <data name="TripSummaryComingSoon"><value>Trip summary coming soon</value></data>
+
+  <!-- Hotels -->
+  <data name="HotelsTitle"><value>Hotels</value></data>
+  <data name="HotelsFindStay"><value>Find your perfect stay</value></data>
+  <data name="HotelsWherePlaceholder"><value>Where are you going?</value></data>
+  <data name="HotelsCheckIn"><value>Check-in</value></data>
+  <data name="HotelsCheckOut"><value>Check-out</value></data>
+  <data name="HotelsSearch"><value>Search Hotels</value></data>
+  <data name="HotelsSearching"><value>Searching hotels...</value></data>
+  <data name="HotelsSearchFailed"><value>Search failed</value></data>
+  <data name="HotelsPropertiesFound"><value>{0} properties found</value></data>
+  <data name="HotelsNoResults"><value>No hotels found</value></data>
+  <data name="HotelsNoResultsHint"><value>Try adjusting your search criteria</value></data>
+  <data name="HotelsFilters"><value>Filters</value></data>
+  <data name="HotelsPrice"><value>Price</value></data>
+  <data name="HotelsRating"><value>Rating</value></data>
+  <data name="HotelsAmenities"><value>Amenities</value></data>
+  <data name="HotelsPerNight"><value>/night</value></data>
+  <data name="HotelsTotal"><value>total</value></data>
+  <data name="HotelsViewDetails"><value>View Details</value></data>
+  <data name="HotelDetailsNotFound"><value>Hotel not found</value></data>
+  <data name="HotelDetailsNotFoundMsg"><value>The hotel data is no longer available. Please search again.</value></data>
+  <data name="HotelDetailsLoading"><value>Loading hotel details...</value></data>
+  <data name="HotelDetailsAbout"><value>About</value></data>
+  <data name="HotelDetailsNearby"><value>Nearby</value></data>
+  <data name="HotelDetailsOverview"><value>Overview</value></data>
+  <data name="HotelDetailsPrices"><value>Prices</value></data>
+  <data name="HotelDetailsPhotos"><value>Photos</value></data>
+  <data name="HotelDetailsProvider"><value>Provider</value></data>
+  <data name="HotelDetailsFreeCancellation"><value>Free cancellation</value></data>
+  <data name="HotelDetailsNoPrices"><value>No prices available</value></data>
+  <data name="HotelDetailsNoPricesHint"><value>Check back later</value></data>
+  <data name="HotelDetailsNoPhotos"><value>No photos</value></data>
+  <data name="HotelDetailsStartingFrom"><value>Starting from</value></data>
+  <data name="HotelDetailsViewPrices"><value>View Prices</value></data>
+  <data name="HotelsLoadMore"><value>Load More</value></data>
+  <data name="HotelsLoadingMore"><value>Loading...</value></data>
+  <data name="HotelDetailsStars"><value>{0}-star hotel</value></data>
+  <data name="GuestSelectorGuest"><value>{0} Guest</value></data>
+  <data name="GuestSelectorGuests"><value>{0} Guests</value></data>
+  <data name="GuestSelectorAdults"><value>Adults</value></data>
+  <data name="GuestSelectorChildren"><value>Children</value></data>
+  <data name="GuestSelectorDone"><value>Done</value></data>
+  <!-- Multi-city form -->
+  <data name="MultiCityFlightNumber"><value>Flight {0}</value></data>
+  <data name="MultiCityDate"><value>Date</value></data>
+  <data name="MultiCityAirportCount"><value>{0} airports</value></data>
+
+  <!-- Countries (ISO 3166-1 alpha-2) -->
+  <data name="Country_AD"><value>Andorra</value></data>
+  <data name="Country_AE"><value>United Arab Emirates</value></data>
+  <data name="Country_AF"><value>Afghanistan</value></data>
+  <data name="Country_AG"><value>Antigua and Barbuda</value></data>
+  <data name="Country_AI"><value>Anguilla</value></data>
+  <data name="Country_AL"><value>Albania</value></data>
+  <data name="Country_AM"><value>Armenia</value></data>
+  <data name="Country_AO"><value>Angola</value></data>
+  <data name="Country_AQ"><value>Antarctica</value></data>
+  <data name="Country_AR"><value>Argentina</value></data>
+  <data name="Country_AS"><value>American Samoa</value></data>
+  <data name="Country_AT"><value>Austria</value></data>
+  <data name="Country_AU"><value>Australia</value></data>
+  <data name="Country_AW"><value>Aruba</value></data>
+  <data name="Country_AX"><value>Åland Islands</value></data>
+  <data name="Country_AZ"><value>Azerbaijan</value></data>
+  <data name="Country_BA"><value>Bosnia and Herzegovina</value></data>
+  <data name="Country_BB"><value>Barbados</value></data>
+  <data name="Country_BD"><value>Bangladesh</value></data>
+  <data name="Country_BE"><value>Belgium</value></data>
+  <data name="Country_BF"><value>Burkina Faso</value></data>
+  <data name="Country_BG"><value>Bulgaria</value></data>
+  <data name="Country_BH"><value>Bahrain</value></data>
+  <data name="Country_BI"><value>Burundi</value></data>
+  <data name="Country_BJ"><value>Benin</value></data>
+  <data name="Country_BL"><value>Saint Barthélemy</value></data>
+  <data name="Country_BM"><value>Bermuda</value></data>
+  <data name="Country_BN"><value>Brunei</value></data>
+  <data name="Country_BO"><value>Bolivia</value></data>
+  <data name="Country_BQ"><value>Caribbean Netherlands</value></data>
+  <data name="Country_BR"><value>Brazil</value></data>
+  <data name="Country_BS"><value>Bahamas</value></data>
+  <data name="Country_BT"><value>Bhutan</value></data>
+  <data name="Country_BV"><value>Bouvet Island</value></data>
+  <data name="Country_BW"><value>Botswana</value></data>
+  <data name="Country_BY"><value>Belarus</value></data>
+  <data name="Country_BZ"><value>Belize</value></data>
+  <data name="Country_CA"><value>Canada</value></data>
+  <data name="Country_CC"><value>Cocos (Keeling) Islands</value></data>
+  <data name="Country_CD"><value>DR Congo</value></data>
+  <data name="Country_CF"><value>Central African Republic</value></data>
+  <data name="Country_CG"><value>Republic of the Congo</value></data>
+  <data name="Country_CH"><value>Switzerland</value></data>
+  <data name="Country_CI"><value>Côte d'Ivoire</value></data>
+  <data name="Country_CK"><value>Cook Islands</value></data>
+  <data name="Country_CL"><value>Chile</value></data>
+  <data name="Country_CM"><value>Cameroon</value></data>
+  <data name="Country_CN"><value>China</value></data>
+  <data name="Country_CO"><value>Colombia</value></data>
+  <data name="Country_CR"><value>Costa Rica</value></data>
+  <data name="Country_CU"><value>Cuba</value></data>
+  <data name="Country_CV"><value>Cape Verde</value></data>
+  <data name="Country_CW"><value>Curaçao</value></data>
+  <data name="Country_CX"><value>Christmas Island</value></data>
+  <data name="Country_CY"><value>Cyprus</value></data>
+  <data name="Country_CZ"><value>Czechia</value></data>
+  <data name="Country_DE"><value>Germany</value></data>
+  <data name="Country_DJ"><value>Djibouti</value></data>
+  <data name="Country_DK"><value>Denmark</value></data>
+  <data name="Country_DM"><value>Dominica</value></data>
+  <data name="Country_DO"><value>Dominican Republic</value></data>
+  <data name="Country_DZ"><value>Algeria</value></data>
+  <data name="Country_EC"><value>Ecuador</value></data>
+  <data name="Country_EE"><value>Estonia</value></data>
+  <data name="Country_EG"><value>Egypt</value></data>
+  <data name="Country_EH"><value>Western Sahara</value></data>
+  <data name="Country_ER"><value>Eritrea</value></data>
+  <data name="Country_ES"><value>Spain</value></data>
+  <data name="Country_ET"><value>Ethiopia</value></data>
+  <data name="Country_FI"><value>Finland</value></data>
+  <data name="Country_FJ"><value>Fiji</value></data>
+  <data name="Country_FK"><value>Falkland Islands</value></data>
+  <data name="Country_FM"><value>Micronesia</value></data>
+  <data name="Country_FO"><value>Faroe Islands</value></data>
+  <data name="Country_FR"><value>France</value></data>
+  <data name="Country_GA"><value>Gabon</value></data>
+  <data name="Country_GB"><value>United Kingdom</value></data>
+  <data name="Country_GD"><value>Grenada</value></data>
+  <data name="Country_GE"><value>Georgia</value></data>
+  <data name="Country_GF"><value>French Guiana</value></data>
+  <data name="Country_GG"><value>Guernsey</value></data>
+  <data name="Country_GH"><value>Ghana</value></data>
+  <data name="Country_GI"><value>Gibraltar</value></data>
+  <data name="Country_GL"><value>Greenland</value></data>
+  <data name="Country_GM"><value>Gambia</value></data>
+  <data name="Country_GN"><value>Guinea</value></data>
+  <data name="Country_GP"><value>Guadeloupe</value></data>
+  <data name="Country_GQ"><value>Equatorial Guinea</value></data>
+  <data name="Country_GR"><value>Greece</value></data>
+  <data name="Country_GS"><value>South Georgia and the South Sandwich Islands</value></data>
+  <data name="Country_GT"><value>Guatemala</value></data>
+  <data name="Country_GU"><value>Guam</value></data>
+  <data name="Country_GW"><value>Guinea-Bissau</value></data>
+  <data name="Country_GY"><value>Guyana</value></data>
+  <data name="Country_HK"><value>Hong Kong</value></data>
+  <data name="Country_HM"><value>Heard Island and McDonald Islands</value></data>
+  <data name="Country_HN"><value>Honduras</value></data>
+  <data name="Country_HR"><value>Croatia</value></data>
+  <data name="Country_HT"><value>Haiti</value></data>
+  <data name="Country_HU"><value>Hungary</value></data>
+  <data name="Country_ID"><value>Indonesia</value></data>
+  <data name="Country_IE"><value>Ireland</value></data>
+  <data name="Country_IL"><value>Israel</value></data>
+  <data name="Country_IM"><value>Isle of Man</value></data>
+  <data name="Country_IN"><value>India</value></data>
+  <data name="Country_IO"><value>British Indian Ocean Territory</value></data>
+  <data name="Country_IQ"><value>Iraq</value></data>
+  <data name="Country_IR"><value>Iran</value></data>
+  <data name="Country_IS"><value>Iceland</value></data>
+  <data name="Country_IT"><value>Italy</value></data>
+  <data name="Country_JE"><value>Jersey</value></data>
+  <data name="Country_JM"><value>Jamaica</value></data>
+  <data name="Country_JO"><value>Jordan</value></data>
+  <data name="Country_JP"><value>Japan</value></data>
+  <data name="Country_KE"><value>Kenya</value></data>
+  <data name="Country_KG"><value>Kyrgyzstan</value></data>
+  <data name="Country_KH"><value>Cambodia</value></data>
+  <data name="Country_KI"><value>Kiribati</value></data>
+  <data name="Country_KM"><value>Comoros</value></data>
+  <data name="Country_KN"><value>Saint Kitts and Nevis</value></data>
+  <data name="Country_KP"><value>North Korea</value></data>
+  <data name="Country_KR"><value>South Korea</value></data>
+  <data name="Country_KW"><value>Kuwait</value></data>
+  <data name="Country_KY"><value>Cayman Islands</value></data>
+  <data name="Country_KZ"><value>Kazakhstan</value></data>
+  <data name="Country_LA"><value>Laos</value></data>
+  <data name="Country_LB"><value>Lebanon</value></data>
+  <data name="Country_LC"><value>Saint Lucia</value></data>
+  <data name="Country_LI"><value>Liechtenstein</value></data>
+  <data name="Country_LK"><value>Sri Lanka</value></data>
+  <data name="Country_LR"><value>Liberia</value></data>
+  <data name="Country_LS"><value>Lesotho</value></data>
+  <data name="Country_LT"><value>Lithuania</value></data>
+  <data name="Country_LU"><value>Luxembourg</value></data>
+  <data name="Country_LV"><value>Latvia</value></data>
+  <data name="Country_LY"><value>Libya</value></data>
+  <data name="Country_MA"><value>Morocco</value></data>
+  <data name="Country_MC"><value>Monaco</value></data>
+  <data name="Country_MD"><value>Moldova</value></data>
+  <data name="Country_ME"><value>Montenegro</value></data>
+  <data name="Country_MF"><value>Saint Martin</value></data>
+  <data name="Country_MG"><value>Madagascar</value></data>
+  <data name="Country_MH"><value>Marshall Islands</value></data>
+  <data name="Country_MK"><value>North Macedonia</value></data>
+  <data name="Country_ML"><value>Mali</value></data>
+  <data name="Country_MM"><value>Myanmar</value></data>
+  <data name="Country_MN"><value>Mongolia</value></data>
+  <data name="Country_MO"><value>Macau</value></data>
+  <data name="Country_MP"><value>Northern Mariana Islands</value></data>
+  <data name="Country_MQ"><value>Martinique</value></data>
+  <data name="Country_MR"><value>Mauritania</value></data>
+  <data name="Country_MS"><value>Montserrat</value></data>
+  <data name="Country_MT"><value>Malta</value></data>
+  <data name="Country_MU"><value>Mauritius</value></data>
+  <data name="Country_MV"><value>Maldives</value></data>
+  <data name="Country_MW"><value>Malawi</value></data>
+  <data name="Country_MX"><value>Mexico</value></data>
+  <data name="Country_MY"><value>Malaysia</value></data>
+  <data name="Country_MZ"><value>Mozambique</value></data>
+  <data name="Country_NA"><value>Namibia</value></data>
+  <data name="Country_NC"><value>New Caledonia</value></data>
+  <data name="Country_NE"><value>Niger</value></data>
+  <data name="Country_NF"><value>Norfolk Island</value></data>
+  <data name="Country_NG"><value>Nigeria</value></data>
+  <data name="Country_NI"><value>Nicaragua</value></data>
+  <data name="Country_NL"><value>Netherlands</value></data>
+  <data name="Country_NO"><value>Norway</value></data>
+  <data name="Country_NP"><value>Nepal</value></data>
+  <data name="Country_NR"><value>Nauru</value></data>
+  <data name="Country_NU"><value>Niue</value></data>
+  <data name="Country_NZ"><value>New Zealand</value></data>
+  <data name="Country_OM"><value>Oman</value></data>
+  <data name="Country_PA"><value>Panama</value></data>
+  <data name="Country_PE"><value>Peru</value></data>
+  <data name="Country_PF"><value>French Polynesia</value></data>
+  <data name="Country_PG"><value>Papua New Guinea</value></data>
+  <data name="Country_PH"><value>Philippines</value></data>
+  <data name="Country_PK"><value>Pakistan</value></data>
+  <data name="Country_PL"><value>Poland</value></data>
+  <data name="Country_PM"><value>Saint Pierre and Miquelon</value></data>
+  <data name="Country_PN"><value>Pitcairn Islands</value></data>
+  <data name="Country_PR"><value>Puerto Rico</value></data>
+  <data name="Country_PS"><value>Palestine</value></data>
+  <data name="Country_PT"><value>Portugal</value></data>
+  <data name="Country_PW"><value>Palau</value></data>
+  <data name="Country_PY"><value>Paraguay</value></data>
+  <data name="Country_QA"><value>Qatar</value></data>
+  <data name="Country_RE"><value>Réunion</value></data>
+  <data name="Country_RO"><value>Romania</value></data>
+  <data name="Country_RS"><value>Serbia</value></data>
+  <data name="Country_RU"><value>Russia</value></data>
+  <data name="Country_RW"><value>Rwanda</value></data>
+  <data name="Country_SA"><value>Saudi Arabia</value></data>
+  <data name="Country_SB"><value>Solomon Islands</value></data>
+  <data name="Country_SC"><value>Seychelles</value></data>
+  <data name="Country_SD"><value>Sudan</value></data>
+  <data name="Country_SE"><value>Sweden</value></data>
+  <data name="Country_SG"><value>Singapore</value></data>
+  <data name="Country_SH"><value>Saint Helena</value></data>
+  <data name="Country_SI"><value>Slovenia</value></data>
+  <data name="Country_SJ"><value>Svalbard and Jan Mayen</value></data>
+  <data name="Country_SK"><value>Slovakia</value></data>
+  <data name="Country_SL"><value>Sierra Leone</value></data>
+  <data name="Country_SM"><value>San Marino</value></data>
+  <data name="Country_SN"><value>Senegal</value></data>
+  <data name="Country_SO"><value>Somalia</value></data>
+  <data name="Country_SR"><value>Suriname</value></data>
+  <data name="Country_SS"><value>South Sudan</value></data>
+  <data name="Country_ST"><value>São Tomé and Príncipe</value></data>
+  <data name="Country_SV"><value>El Salvador</value></data>
+  <data name="Country_SX"><value>Sint Maarten</value></data>
+  <data name="Country_SY"><value>Syria</value></data>
+  <data name="Country_SZ"><value>Eswatini</value></data>
+  <data name="Country_TC"><value>Turks and Caicos Islands</value></data>
+  <data name="Country_TD"><value>Chad</value></data>
+  <data name="Country_TF"><value>French Southern Territories</value></data>
+  <data name="Country_TG"><value>Togo</value></data>
+  <data name="Country_TH"><value>Thailand</value></data>
+  <data name="Country_TJ"><value>Tajikistan</value></data>
+  <data name="Country_TK"><value>Tokelau</value></data>
+  <data name="Country_TL"><value>Timor-Leste</value></data>
+  <data name="Country_TM"><value>Turkmenistan</value></data>
+  <data name="Country_TN"><value>Tunisia</value></data>
+  <data name="Country_TO"><value>Tonga</value></data>
+  <data name="Country_TR"><value>Turkey</value></data>
+  <data name="Country_TT"><value>Trinidad and Tobago</value></data>
+  <data name="Country_TV"><value>Tuvalu</value></data>
+  <data name="Country_TW"><value>Taiwan</value></data>
+  <data name="Country_TZ"><value>Tanzania</value></data>
+  <data name="Country_UA"><value>Ukraine</value></data>
+  <data name="Country_UG"><value>Uganda</value></data>
+  <data name="Country_UM"><value>U.S. Minor Outlying Islands</value></data>
+  <data name="Country_US"><value>United States</value></data>
+  <data name="Country_UY"><value>Uruguay</value></data>
+  <data name="Country_UZ"><value>Uzbekistan</value></data>
+  <data name="Country_VA"><value>Vatican City</value></data>
+  <data name="Country_VC"><value>Saint Vincent and the Grenadines</value></data>
+  <data name="Country_VE"><value>Venezuela</value></data>
+  <data name="Country_VG"><value>British Virgin Islands</value></data>
+  <data name="Country_VI"><value>U.S. Virgin Islands</value></data>
+  <data name="Country_VN"><value>Vietnam</value></data>
+  <data name="Country_VU"><value>Vanuatu</value></data>
+  <data name="Country_WF"><value>Wallis and Futuna</value></data>
+  <data name="Country_WS"><value>Samoa</value></data>
+  <data name="Country_XK"><value>Kosovo</value></data>
+  <data name="Country_YE"><value>Yemen</value></data>
+  <data name="Country_YT"><value>Mayotte</value></data>
+  <data name="Country_ZA"><value>South Africa</value></data>
+  <data name="Country_ZM"><value>Zambia</value></data>
+  <data name="Country_ZW"><value>Zimbabwe</value></data>
+  <data name="AccountPaidTierIndicator"><value>Paid tier: {0}</value></data>
+</root>

@@ -1,0 +1,28 @@
+<Project>
+  <PropertyGroup>
+
+    <_ToolsRestoredSentinel>$(MSBuildThisFileDirectory).config\.tools-restored</_ToolsRestoredSentinel>
+
+    <_CodeGraphSentinel>$(MSBuildThisFileDirectory).config\.codegraph-initialized</_CodeGraphSentinel>
+  </PropertyGroup>
+
+
+  <Target Name="RestoreDotnetTools" BeforeTargets="Restore;Build"
+          Condition="!Exists('$(_ToolsRestoredSentinel)')">
+    <Exec Command="dotnet tool restore" WorkingDirectory="$(MSBuildThisFileDirectory)" />
+    <Touch Files="$(_ToolsRestoredSentinel)" AlwaysCreate="true" />
+  </Target>
+
+
+
+
+
+  <Target Name="InitCodeGraph" BeforeTargets="Build"
+          Condition=" ! $([System.String]::new('$(MSBuildProjectName)').Contains('AppHost')) And ! $([System.String]::new('$(MSBuildProjectName)').Contains('Transport')) And ! $([System.String]::new('$(MSBuildProjectName)').Contains('Deploy')) And !Exists('$(_CodeGraphSentinel)') ">
+    <Message Text="Initializing CodeGraph index (for codegraph MCP)..." Importance="high" />
+    <MakeDir Directories="$(MSBuildThisFileDirectory).config" />
+
+    <Exec Command="cmd /c &quot;npx --yes @colbymchenry/codegraph init &gt;nul 2&gt;&amp;1 || echo CodeGraph init skipped&quot;" WorkingDirectory="$(MSBuildThisFileDirectory)" ContinueOnError="true" />
+    <Touch Files="$(_CodeGraphSentinel)" AlwaysCreate="true" />
+  </Target>
+</Project>

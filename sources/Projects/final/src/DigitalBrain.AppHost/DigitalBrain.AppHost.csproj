@@ -1,0 +1,29 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.5.0-preview.1.26310.9">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>5c4f81e0-9417-4e5f-a74c-041b1955eea6</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+    <!-- CommunityToolkit Aspire Ollama hosting for proper orchestration of Gemma + Nemotron (model pull, container lifecycle, OpenWebUI for direct chat, connection strings for kernel DI). Pre-declared in central packages for this. -->
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" />
+    <!-- Force central MessagePack 3.1.7 to eliminate 2.5.192 high-sev transitive (Orleans etc). -->
+    <PackageReference Include="MessagePack" />
+    <!-- Aspire.Hosting.Redis for root-only grain storage (Default) on the root kernel under aspire run (marketplace persistence). Version from central; only root references the resource. -->
+    <PackageReference Include="Aspire.Hosting.Redis" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Sdk for explicit DigitalBrain domain hosting integration (AddDigitalBrainDomain, DigitalBrainDomainResource, AddKernel). Treated as non-service (hosting lib). -->
+    <ProjectReference Include="..\DigitalBrain.Hosting\DigitalBrain.Hosting.csproj" IsAspireProjectResource="false" />
+    <!-- Kernel as proper project resource (no string path magic in code; enables Aspire typed refs and child resource graph for domains without reflection/hacks in AppHost or Sdk). -->
+    <ProjectReference Include="..\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" IsAspireProjectResource="false" />
+    <!-- DigitalBrain.Mcp registered dynamically in AddDigitalBrainManifest (like flutter-client exec and google-auth-silo). IsAspireProjectResource=false prevents double wiring; enables build dep + solution visibility. -->
+    <ProjectReference Include="..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" IsAspireProjectResource="false" />
+  </ItemGroup>
+</Project>

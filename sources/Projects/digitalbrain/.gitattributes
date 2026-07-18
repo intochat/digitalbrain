@@ -1,0 +1,5 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# RFW text format requires LF line endings (CRLF breaks the RFW parser)
+*.rfwtxt text eol=lf

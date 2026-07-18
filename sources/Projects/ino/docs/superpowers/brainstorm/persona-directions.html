@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ino persona — three architectures</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400;1,9..144,500&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink:       #08080e;
+    --ink-2:     #0f0f18;
+    --ink-3:     #16161f;
+    --ink-4:     #1c1c28;
+    --hairline:  #1e2030;
+    --hair-2:    #2a2c3d;
+    --cream:     #f3ede2;
+    --cream-2:   #b5afa3;
+    --cream-dim: #706a5f;
+
+    --phosphor:  #7dffb0;
+    --amber:     #ffb87d;
+    --cyan:      #7dd8ff;
+    --rose:      #ff6b9d;
+    --indigo:    #8b7dff;
+    --emerald:   #2ecc71;
+    --magenta:   #ff7dd8;
+
+    --font-serif: 'Fraunces', Georgia, serif;
+    --font-mono:  'JetBrains Mono', 'Menlo', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--ink);
+    color: var(--cream);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.55;
+    font-feature-settings: "liga", "calt", "ss01";
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  body {
+    background:
+      radial-gradient(ellipse at 20% -10%, rgba(125, 216, 255, 0.06), transparent 55%),
+      radial-gradient(ellipse at 80% 110%, rgba(125, 255, 176, 0.05), transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(255, 184, 125, 0.02), transparent 70%),
+      var(--ink);
+  }
+
+  /* grain overlay for texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* scanlines subtle */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 99;
+    opacity: 0.025;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px, transparent 2px,
+      rgba(255,255,255,0.5) 2px, rgba(255,255,255,0.5) 3px
+    );
+  }
+
+  /* ----- meta bar ----- */
+  .meta-bar {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding: 1.25rem 2.5rem;
+    border-bottom: 1px solid var(--hairline);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--cream-dim);
+  }
+  .meta-k { opacity: 0.5; }
+  .meta-v { color: var(--cream); }
+  .meta-gap { flex: 1; }
+  .meta-live::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--phosphor);
+    margin-right: 8px;
+    box-shadow: 0 0 10px var(--phosphor);
+    animation: live-pulse 1.8s ease-in-out infinite;
+    vertical-align: middle;
+  }
+  @keyframes live-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.4; transform: scale(0.85); }
+  }
+
+  /* ----- hero ----- */
+  .hero {
+    padding: 4.5rem 2.5rem 3.5rem;
+    max-width: 1180px;
+    position: relative;
+  }
+
+  .hero .pre {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 300;
+    font-size: 1.15rem;
+    color: var(--cream-2);
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.01em;
+  }
+
+  .hero h1 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    font-size: clamp(2.8rem, 5.5vw, 5.2rem);
+    line-height: 0.93;
+    letter-spacing: -0.025em;
+    color: var(--cream);
+    font-optical-sizing: auto;
+    max-width: 900px;
+  }
+
+  .hero h1 em {
+    font-style: italic;
+    font-weight: 300;
+    color: var(--phosphor);
+    position: relative;
+  }
+
+  .hero h1 em::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    bottom: 0.1em;
+    height: 1px;
+    background: var(--phosphor);
+    opacity: 0.25;
+  }
+
+  .hero .lede {
+    margin-top: 2rem;
+    max-width: 580px;
+    color: var(--cream-2);
+    font-size: 12.5px;
+    line-height: 1.7;
+  }
+  .hero .lede strong { color: var(--cream); font-weight: 500; }
+
+  .hero-ornament {
+    position: absolute;
+    right: 2.5rem;
+    top: 4.5rem;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--cream-dim);
+    text-align: right;
+    display: grid;
+    gap: 0.2rem;
+  }
+  .hero-ornament .row { display: flex; gap: 1rem; justify-content: flex-end; }
+  .hero-ornament .row .k { opacity: 0.5; }
+  .hero-ornament .row .v { color: var(--cream); font-variant-numeric: tabular-nums; }
+
+  /* ----- columns ----- */
+  .columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.35fr;
+    border-top: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .column {
+    padding: 2.75rem 2.25rem 3rem;
+    position: relative;
+    border-right: 1px solid var(--hairline);
+  }
+  .column:last-child { border-right: none; }
+
+  .column[data-column="a"] { --accent: var(--cyan);     --accent-soft: rgba(125,216,255,0.1); }
+  .column[data-column="b"] { --accent: var(--amber);    --accent-soft: rgba(255,184,125,0.1); }
+  .column[data-column="c"] { --accent: var(--phosphor); --accent-soft: rgba(125,255,176,0.1); }
+
+  .column::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    opacity: 0.85;
+  }
+
+  .column-tag {
+    position: absolute;
+    top: 1rem;
+    right: 2.25rem;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--cream-dim);
+  }
+  .column-tag span { color: var(--accent); }
+
+  .column-head {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1.5rem;
+    align-items: start;
+    margin-bottom: 1.75rem;
+  }
+
+  .letter {
+    font-family: var(--font-serif);
+    font-size: 6rem;
+    line-height: 0.75;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--accent);
+    letter-spacing: -0.04em;
+    margin-top: -0.35rem;
+    text-shadow: 0 0 40px currentColor;
+    opacity: 0.92;
+  }
+
+  .head-text h2 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    font-size: 1.55rem;
+    line-height: 1.1;
+    color: var(--cream);
+    margin-bottom: 0.8rem;
+    letter-spacing: -0.015em;
+  }
+  .head-text h2 em { font-style: italic; color: var(--accent); }
+
+  .thesis {
+    font-size: 11px;
+    color: var(--cream-2);
+    line-height: 1.7;
+    max-width: 42ch;
+  }
+  .thesis code {
+    font-family: var(--font-mono);
+    color: var(--accent);
+    background: var(--ink-3);
+    padding: 0 0.25rem;
+    font-size: 10.5px;
+  }
+
+  .column-scope {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .column-scope span {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--hair-2);
+    color: var(--cream-2);
+  }
+  .column-scope span.accent {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ----- orb frame ----- */
+  .orb-frame {
+    margin: 1.75rem 0 1.25rem;
+    padding: 1.5rem 1rem;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.015) 0%, transparent 100%),
+      radial-gradient(ellipse at center, var(--accent-soft) 0%, transparent 70%);
+    border: 1px solid var(--hairline);
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 280px;
+  }
+
+  .orb-frame::before,
+  .orb-frame::after {
+    content: '';
+    position: absolute;
+    width: 12px; height: 12px;
+    border: 1px solid var(--accent);
+  }
+  .orb-frame::before {
+    top: -1px; left: -1px;
+    border-right: none;
+    border-bottom: none;
+  }
+  .orb-frame::after {
+    bottom: -1px; right: -1px;
+    border-left: none;
+    border-top: none;
+  }
+
+  .orb-frame .frame-label {
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--ink);
+    padding: 0 0.6rem;
+    font-size: 8.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--cream-dim);
+  }
+  .orb-frame .frame-label .dot {
+    display: inline-block;
+    width: 4px; height: 4px;
+    background: var(--accent);
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  canvas { display: block; max-width: 100%; }
+
+  /* ----- meters ----- */
+  .meters {
+    display: grid;
+    gap: 0.55rem;
+    margin: 1.25rem 0 1rem;
+    font-size: 9.5px;
+  }
+  .meter {
+    display: grid;
+    grid-template-columns: 56px 1fr 42px;
+    gap: 0.85rem;
+    align-items: center;
+  }
+  .meter-label {
+    color: var(--cream-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .meter-bar {
+    height: 3px;
+    background: var(--ink-4);
+    position: relative;
+    overflow: hidden;
+  }
+  .meter-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: var(--accent);
+    width: 0%;
+    transition: width 120ms ease-out;
+    box-shadow: 0 0 8px currentColor;
+    color: var(--accent);
+  }
+  .meter-fill.bidir-neg { background: var(--rose); color: var(--rose); }
+  .meter-val {
+    color: var(--cream);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    font-size: 10px;
+  }
+
+  /* ----- properties list ----- */
+  .properties {
+    list-style: none;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--cream-2);
+    display: grid;
+    gap: 0.4rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--hairline);
+    margin-top: 1rem;
+  }
+  .properties li { display: flex; gap: 0.6rem; }
+  .properties em {
+    font-style: normal;
+    color: var(--cream-dim);
+    min-width: 70px;
+    letter-spacing: 0.1em;
+  }
+  .properties li.risk em { color: var(--rose); }
+  .properties li.risk { color: var(--rose); opacity: 0.8; }
+
+  /* ----- signal log (direction B) ----- */
+  .signal-log {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--hairline);
+  }
+  .signal-log-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--cream-dim);
+    margin-bottom: 0.6rem;
+  }
+  .signal-log-head .live-dot::before {
+    content: '●';
+    color: var(--accent);
+    margin-right: 6px;
+    animation: blink 1.5s infinite;
+  }
+  @keyframes blink { 0%,60%,100%{opacity:1;} 30%{opacity:0.2;} }
+  .signal-log-head .count { color: var(--cream); font-variant-numeric: tabular-nums; }
+
+  .signal-log-list {
+    display: grid;
+    gap: 0.25rem;
+    min-height: 84px;
+    max-height: 180px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+  }
+  .signal-log-list::-webkit-scrollbar { width: 4px; }
+  .signal-log-list::-webkit-scrollbar-thumb { background: var(--hair-2); }
+
+  .signal-log-empty {
+    font-size: 10px;
+    font-style: italic;
+    color: var(--cream-dim);
+    text-align: center;
+    padding: 1.5rem 0;
+    opacity: 0.6;
+  }
+
+  .signal-entry {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 36px;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.35rem 0;
+    font-size: 9.5px;
+    border-bottom: 1px dashed var(--hairline);
+  }
+  .signal-entry:last-child { border-bottom: none; }
+  .signal-verb {
+    color: var(--cream);
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+  .signal-verb::before {
+    content: '▸ ';
+    color: var(--accent);
+    opacity: 0.7;
+  }
+  .signal-decay-bar {
+    height: 3px;
+    background: var(--ink-4);
+    position: relative;
+  }
+  .signal-decay-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: var(--accent);
+    box-shadow: 0 0 6px currentColor;
+    color: var(--accent);
+  }
+  .signal-age {
+    font-size: 8.5px;
+    color: var(--cream-dim);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ----- direction C trio ----- */
+  .trio {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.75rem;
+    margin: 1.5rem 0 1rem;
+  }
+
+  .persona-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 1rem 0.5rem 0.85rem;
+    border: 1px solid var(--hairline);
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    position: relative;
+  }
+  .persona-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+  }
+  .persona-card[data-persona="jarvis"] { --pcolor: var(--cyan); }
+  .persona-card[data-persona="luna"]   { --pcolor: var(--rose); }
+  .persona-card[data-persona="coach"]  { --pcolor: var(--amber); }
+  .persona-card::before { background: var(--pcolor); opacity: 0.7; }
+
+  .persona-name {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--cream);
+    font-weight: 400;
+  }
+  .persona-name::before {
+    content: '';
+    display: inline-block;
+    width: 5px; height: 5px;
+    background: var(--pcolor);
+    margin-right: 6px;
+    vertical-align: middle;
+    box-shadow: 0 0 8px var(--pcolor);
+  }
+
+  .persona-traits {
+    font-size: 8px;
+    color: var(--cream-dim);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    display: grid;
+    gap: 0.15rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+  }
+  .persona-traits b {
+    color: var(--cream);
+    font-weight: 500;
+  }
+
+  .trio-note {
+    font-size: 9.5px;
+    color: var(--cream-dim);
+    font-style: italic;
+    font-family: var(--font-serif);
+    text-align: center;
+    margin: 0.5rem 0 0;
+    line-height: 1.5;
+  }
+  .trio-note strong { color: var(--cream); font-weight: 400; }
+
+  /* ----- signal bus ----- */
+  .signal-bus {
+    position: sticky;
+    bottom: 0;
+    background:
+      linear-gradient(180deg, rgba(8,8,14,0.4) 0%, var(--ink-2) 60%);
+    border-top: 1px solid var(--hair-2);
+    padding: 1.25rem 2.5rem 1.5rem;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    z-index: 50;
+  }
+
+  .bus-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--cream-dim);
+    margin-bottom: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .bus-label::before {
+    content: '↓';
+    color: var(--phosphor);
+    font-size: 11px;
+    animation: bus-arrow 2s ease-in-out infinite;
+  }
+  @keyframes bus-arrow {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(3px); }
+  }
+  .bus-label .hint {
+    margin-left: auto;
+    opacity: 0.6;
+    font-style: italic;
+    font-family: var(--font-serif);
+    text-transform: none;
+    letter-spacing: 0.01em;
+    font-size: 11px;
+  }
+
+  .bus-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  button {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: var(--ink);
+    color: var(--cream);
+    border: 1px solid var(--hair-2);
+    padding: 0.65rem 1.1rem;
+    cursor: pointer;
+    transition: all 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+    letter-spacing: 0.02em;
+    position: relative;
+    overflow: hidden;
+    --bc: var(--cream);
+  }
+  button::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--bc);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms;
+  }
+  button:hover {
+    border-color: var(--bc);
+    color: var(--bc);
+    transform: translateY(-1px);
+    box-shadow: 0 0 16px -4px var(--bc);
+  }
+  button:active { transform: translateY(0); }
+  button.fired::after {
+    animation: bus-fire 450ms ease-out;
+  }
+  @keyframes bus-fire {
+    0%   { opacity: 0.35; }
+    100% { opacity: 0; }
+  }
+
+  button[data-signal="tool"]        { --bc: var(--cyan); }
+  button[data-signal="llm"]         { --bc: var(--amber); }
+  button[data-signal="user.typing"] { --bc: var(--indigo); }
+  button[data-signal="error"]       { --bc: var(--magenta); }
+  button[data-signal="task.done"]   { --bc: var(--emerald); }
+  button[data-signal="skill.new"]   { --bc: var(--phosphor); }
+
+  button.burst {
+    background: var(--phosphor);
+    color: var(--ink);
+    border-color: var(--phosphor);
+    font-weight: 500;
+  }
+  button.burst:hover {
+    background: #95ffc0;
+    color: var(--ink);
+    box-shadow: 0 0 20px var(--phosphor);
+  }
+  button.reset {
+    border-color: transparent;
+    color: var(--cream-dim);
+    background: transparent;
+  }
+  button.reset:hover {
+    color: var(--rose);
+    border-color: var(--rose);
+    box-shadow: 0 0 16px -6px var(--rose);
+  }
+
+  /* ----- footer ----- */
+  .credits {
+    padding: 2rem 2.5rem 1.5rem;
+    border-top: 1px solid var(--hairline);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--cream-dim);
+  }
+  .credits .right { display: flex; gap: 1.5rem; }
+  .credits a { color: var(--phosphor); text-decoration: none; }
+
+  @media (max-width: 1100px) {
+    .columns { grid-template-columns: 1fr; }
+    .column { border-right: none; border-bottom: 1px solid var(--hairline); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== META BAR ==================== -->
+<div class="meta-bar">
+  <span class="meta-k">doc.</span><span class="meta-v">persona/architectures/0.1</span>
+  <span class="meta-k">scope.</span><span class="meta-v">brainstorm</span>
+  <span class="meta-k">date.</span><span class="meta-v">2026-04-12</span>
+  <span class="meta-k">author.</span><span class="meta-v">ino self-design</span>
+  <span class="meta-gap"></span>
+  <span class="meta-live meta-v">interactive · live</span>
+</div>
+
+<!-- ==================== HERO ==================== -->
+<section class="hero">
+  <div class="pre">A brainstorm prototype —</div>
+  <h1>
+    On the architecture<br>
+    of a <em>living</em> persona.
+  </h1>
+  <p class="lede">
+    Three directions, three live engines running in parallel. Press any signal
+    on the bus below and all three columns receive it at the same instant —
+    each reacts on its own terms. <strong>The point is to feel the difference</strong>,
+    not to read about it.
+  </p>
+
+  <div class="hero-ornament">
+    <div class="row"><span class="k">engines</span><span class="v">3</span></div>
+    <div class="row"><span class="k">signals</span><span class="v">6 verbs</span></div>
+    <div class="row"><span class="k">tick</span><span class="v">60 fps</span></div>
+  </div>
+</section>
+
+<!-- ==================== COLUMNS ==================== -->
+<main class="columns">
+
+  <!-- ====== DIRECTION A — Pulse ====== -->
+  <section class="column" data-column="a">
+    <div class="column-tag">direction <span>a</span></div>
+    <div class="column-head">
+      <div class="letter">A</div>
+      <div class="head-text">
+        <h2>The orb<br><em>has a pulse.</em></h2>
+        <p class="thesis">
+          Push stream replaces the 3-second poll. Every signal snaps the target
+          values; the orb lerps toward it in ~150&nbsp;ms. When input stops, the
+          target resets to idle. No memory, no continuity — pure reactivity.
+        </p>
+        <div class="column-scope">
+          <span class="accent">layers 1 + 3</span>
+          <span>~1 week</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="orb-frame">
+      <canvas id="canvas-a" width="260" height="260"></canvas>
+      <div class="frame-label"><span class="dot"></span>stateless push</div>
+    </div>
+
+    <div class="meters" data-for="a">
+      <div class="meter">
+        <span class="meter-label">arousal</span>
+        <div class="meter-bar"><div class="meter-fill" data-fill="a-arousal"></div></div>
+        <span class="meter-val" data-val="a-arousal">0.15</span>
+      </div>
+      <div class="meter">
+        <span class="meter-label">valence</span>
+        <div class="meter-bar"><div class="meter-fill" data-fill="a-valence"></div></div>
+        <span class="meter-val" data-val="a-valence">+0.00</span>
+      </div>
+      <div class="meter">
+        <span class="meter-label">energy</span>
+        <div class="meter-bar"><div class="meter-fill" data-fill="a-energy"></div></div>
+        <span class="meter-val" data-val="a-energy">0.25</span>
+      </div>
+    </div>
+
+    <ul class="properties">
+      <li><em>memory</em> none</li>
+      <li><em>inertia</em> fast snap, fast reset</li>
+      <li><em>demo wow</em> high</li>
+      <li><em>depth</em> shallow</li>
+      <li class="risk"><em>risk</em> twitchy · hollow when idle</li>
+    </ul>
+  </section>
+
+  <!-- ====== DIRECTION B — Brain ====== -->
+  <section class="column" data-column="b">
+    <div class="column-tag">direction <span>b</span></div>
+    <div class="column-head">
+      <div class="letter">B</div>
+      <div class="head-text">
+        <h2>The persona<br><em>has a brain.</em></h2>
+        <p class="thesis">
+          Durable grain holds a list of synapses, each decaying on its own
+          half-life. The brain state is a weighted blend of surviving signals.
+          Silence lets moods fade. Bursts accumulate. Continuity is free.
+        </p>
+        <div class="column-scope">
+          <span class="accent">layers 1 + 2 + 3</span>
+          <span>~2 weeks</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="orb-frame">
+      <canvas id="canvas-b" width="260" height="260"></canvas>
+      <div class="frame-label"><span class="dot"></span>synapse decay</div>
+    </div>
+
+    <div class="meters" data-for="b">
+      <div class="meter">
+        <span class="meter-label">arousal</span>
+        <div class="meter-bar"><div class="meter-fill" data-fill="b-arousal"></div></div>
+        <span class="meter-val" data-val="b-arousal">0.15</span>
+      </div>
+      <div class="meter">
+        <span class="meter-label">valence</span>
+        <div class="meter-bar"><div class="meter-fill" data-fill="b-valence"></div></div>
+        <span class="meter-val" data-val="b-valence">+0.00</span>
+      </div>
+      <div class="meter">
+        <span class="meter-label">energy</span>
+        <div class="meter-bar"><div class="meter-fill" data-fill="b-energy"></div></div>
+        <span class="meter-val" data-val="b-energy">0.25</span>
+      </div>
+    </div>
+
+    <div class="signal-log">
+      <div class="signal-log-head">
+        <span class="live-dot">recent synapses</span>
+        <span class="count" data-val="b-count">0 active</span>
+      </div>
+      <div class="signal-log-list" id="signal-log-b">
+        <div class="signal-log-empty">no signals · orb at rest</div>
+      </div>
+    </div>
+
+    <ul class="properties">
+      <li><em>memory</em> decaying synapse list</li>
+      <li><em>inertia</em> accumulates · cools slowly</li>
+      <li><em>demo wow</em> medium</li>
+      <li><em>depth</em> architecturally real</li>
+      <li><em>risk</em> slider-tuning days</li>
+    </ul>
+  </section>
+
+  <!-- ====== DIRECTION C — Fork ====== -->
+  <section class="column" data-column="c">
+    <div class="column-tag">direction <span>c</span></div>
+    <div class="column-head">
+      <div class="letter">C</div>
+      <div class="head-text">
+        <h2>Personas are<br><em>primitives you fork.</em></h2>
+        <p class="thesis">
+          Same brain model as B, but each persona is a neuron with a
+          <code>Shape(signal)</code> function that re-weights inputs before they
+          hit its brain. Three personalities, one signal stream — the same event
+          produces three reactions. Users fork their own.
+        </p>
+        <div class="column-scope">
+          <span class="accent">layers 2 + 4 + 5</span>
+          <span>~3 weeks</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="orb-frame">
+      <div class="trio">
+        <div class="persona-card" data-persona="jarvis">
+          <canvas class="sub-orb" data-persona="jarvis" width="120" height="120"></canvas>
+          <div class="persona-name">Jarvis</div>
+          <div class="persona-traits">
+            <div>arousal <b>×0.7</b> · valence <b>×0.5</b></div>
+            <div>decay <b>×1.8</b> · pulse <b>×0.4</b></div>
+          </div>
+        </div>
+        <div class="persona-card" data-persona="luna">
+          <canvas class="sub-orb" data-persona="luna" width="120" height="120"></canvas>
+          <div class="persona-name">Luna</div>
+          <div class="persona-traits">
+            <div>arousal <b>×1.3</b> · valence <b>×1.5</b></div>
+            <div>decay <b>×1.0</b> · pulse <b>×1.2</b></div>
+          </div>
+        </div>
+        <div class="persona-card" data-persona="coach">
+          <canvas class="sub-orb" data-persona="coach" width="120" height="120"></canvas>
+          <div class="persona-name">Coach</div>
+          <div class="persona-traits">
+            <div>arousal <b>×1.6</b> · valence <b>×1.0</b></div>
+            <div>decay <b>×0.6</b> · pulse <b>×1.5</b></div>
+          </div>
+        </div>
+      </div>
+      <div class="frame-label"><span class="dot"></span>personality neurons</div>
+    </div>
+
+    <p class="trio-note">
+      Watch the three orbs react to the same signal. Jarvis <strong>barely
+      moves</strong>. Luna <strong>swells dramatically</strong>. Coach
+      <strong>pulses aggressively</strong>. The difference is not the signal —
+      it&#39;s the neuron in front of the brain.
+    </p>
+
+    <ul class="properties">
+      <li><em>memory</em> per-persona brain</li>
+      <li><em>inertia</em> shaped by trait vector</li>
+      <li><em>demo wow</em> low visual · high architecture</li>
+      <li><em>depth</em> platform-grade</li>
+      <li><em>risk</em> delayed payoff</li>
+    </ul>
+  </section>
+
+</main>
+
+<!-- ==================== SIGNAL BUS ==================== -->
+<footer class="signal-bus">
+  <div class="bus-label">
+    signal bus
+    <span class="hint">— one click fires into all three engines simultaneously · keyboard 1-6, b=burst, r=reset</span>
+  </div>
+  <div class="bus-buttons">
+    <button data-signal="tool">▸ tool.invoked</button>
+    <button data-signal="llm">▸ llm.started</button>
+    <button data-signal="user.typing">▸ user.typing</button>
+    <button data-signal="error">▸ error.raised</button>
+    <button data-signal="task.done">▸ task.completed</button>
+    <button data-signal="skill.new">▸ skill.installed</button>
+    <button data-signal="burst" class="burst">▸▸▸ burst (5 random)</button>
+    <button data-signal="reset" class="reset">⟲ reset all</button>
+  </div>
+</footer>
+
+<section class="credits">
+  <span>ino · persona brainstorm · prototype</span>
+  <div class="right">
+    <span>canvas 2d · fraunces · jetbrains mono</span>
+    <span>file · docs/superpowers/brainstorm/persona-directions.html</span>
+  </div>
+</section>
+
+<!-- ==================== ENGINES ==================== -->
+<script>
+(() => {
+  'use strict';
+
+  // ---------- signal catalog ----------
+  const IDLE_COLOR = '#8b7dff';
+  const IDLE = { arousal: 0.15, valence: 0.0, energy: 0.25, color: IDLE_COLOR };
+
+  const SIGNALS = {
+    'tool': {
+      verb: 'tool.invoked',
+      arousal: 0.55, valence: 0.15, energy: 0.55,
+      halfLife: 1800, color: '#7dd8ff',
+    },
+    'llm': {
+      verb: 'llm.started',
+      arousal: 0.35, valence: 0.05, energy: 0.75,
+      halfLife: 2400, color: '#ffb87d',
+    },
+    'user.typing': {
+      verb: 'user.typing',
+      arousal: 0.28, valence: 0.25, energy: 0.3,
+      halfLife: 800, color: '#8b7dff',
+    },
+    'error': {
+      verb: 'error.raised',
+      arousal: 0.75, valence: -0.65, energy: 0.4,
+      halfLife: 3500, color: '#ff7dd8',
+    },
+    'task.done': {
+      verb: 'task.completed',
+      arousal: 0.5, valence: 0.9, energy: 0.6,
+      halfLife: 2800, color: '#2ecc71',
+    },
+    'skill.new': {
+      verb: 'skill.installed',
+      arousal: 0.45, valence: 0.6, energy: 0.5,
+      halfLife: 4000, color: '#7dffb0',
+    },
+  };
+  const SIGNAL_KEYS = Object.keys(SIGNALS);
+
+  // ---------- color utilities ----------
+  const hex2rgb = (hex) => {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+  };
+  const rgba = (hex, a) => {
+    const [r,g,b] = hex2rgb(hex);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  };
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const lerpColor = (c1, c2, t) => {
+    const a = hex2rgb(c1), b = hex2rgb(c2);
+    const r  = Math.round(lerp(a[0], b[0], t));
+    const g  = Math.round(lerp(a[1], b[1], t));
+    const bl = Math.round(lerp(a[2], b[2], t));
+    return `#${[r,g,bl].map(v => v.toString(16).padStart(2,'0')).join('')}`;
+  };
+  const blendColors = (entries, fallback) => {
+    if (!entries.length) return fallback;
+    let tr = 0, tg = 0, tb = 0, tw = 0;
+    for (const e of entries) {
+      const [r,g,b] = hex2rgb(e.color);
+      tr += r * e.weight; tg += g * e.weight; tb += b * e.weight; tw += e.weight;
+    }
+    if (tw <= 0.001) return fallback;
+    const r  = Math.round(tr / tw);
+    const g  = Math.round(tg / tw);
+    const b  = Math.round(tb / tw);
+    return `#${[r,g,b].map(v => v.toString(16).padStart(2,'0')).join('')}`;
+  };
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const clamp01 = v => clamp(v, 0, 1);
+  const clampBi = v => clamp(v, -1, 1);
+
+  // ---------- direction A: stateless push ----------
+  const engineA = {
+    current: { ...IDLE },
+    target:  { ...IDLE },
+    lastSignalAt: -Infinity,
+    pulseAt: -Infinity,
+    pulseColor: IDLE_COLOR,
+
+    onSignal(sig, now) {
+      this.target = {
+        arousal: sig.arousal,
+        valence: sig.valence,
+        energy:  sig.energy,
+        color:   sig.color,
+      };
+      this.lastSignalAt = now;
+      this.pulseAt = now;
+      this.pulseColor = sig.color;
+    },
+
+    tick(dt, now) {
+      if (now - this.lastSignalAt > 400) {
+        this.target = { ...IDLE };
+      }
+      const k = clamp01(dt / 80);
+      this.current.arousal = lerp(this.current.arousal, this.target.arousal, k);
+      this.current.valence = lerp(this.current.valence, this.target.valence, k);
+      this.current.energy  = lerp(this.current.energy,  this.target.energy,  k);
+      this.current.color   = lerpColor(this.current.color, this.target.color, k);
+    },
+
+    reset() {
+      this.current = { ...IDLE };
+      this.target  = { ...IDLE };
+      this.lastSignalAt = -Infinity;
+      this.pulseAt = -Infinity;
+    },
+  };
+
+  // ---------- direction B: brain with decay ----------
+  const engineB = {
+    signals: [],
+    current: { ...IDLE },
+    pulseAt: -Infinity,
+    pulseColor: IDLE_COLOR,
+
+    onSignal(sig, now) {
+      this.signals.push({
+        verb: sig.verb,
+        arousal: sig.arousal,
+        valence: sig.valence,
+        energy:  sig.energy,
+        color:   sig.color,
+        halfLife: sig.halfLife,
+        bornAt: now,
+        weight: 1,
+      });
+      this.pulseAt = now;
+      this.pulseColor = sig.color;
+    },
+
+    tick(dt, now) {
+      for (const s of this.signals) {
+        const elapsed = now - s.bornAt;
+        s.weight = Math.exp(-elapsed * Math.LN2 / s.halfLife);
+      }
+      this.signals = this.signals.filter(s => s.weight > 0.04);
+
+      const idleBias = 0.25;
+      let wArousal = IDLE.arousal * idleBias;
+      let wValence = IDLE.valence * idleBias;
+      let wEnergy  = IDLE.energy  * idleBias;
+      let wTotal   = idleBias;
+      const colorEntries = [{ color: IDLE.color, weight: idleBias }];
+
+      for (const s of this.signals) {
+        wArousal += s.arousal * s.weight;
+        wValence += s.valence * s.weight;
+        wEnergy  += s.energy  * s.weight;
+        wTotal   += s.weight;
+        colorEntries.push({ color: s.color, weight: s.weight });
+      }
+
+      this.current.arousal = clamp01(wArousal / wTotal);
+      this.current.valence = clampBi(wValence / wTotal);
+      this.current.energy  = clamp01(wEnergy  / wTotal);
+      this.current.color   = blendColors(colorEntries, IDLE.color);
+    },
+
+    reset() {
+      this.signals = [];
+      this.current = { ...IDLE };
+      this.pulseAt = -Infinity;
+    },
+  };
+
+  // ---------- direction C: personality-shaping neurons ----------
+  const PERSONAS = {
+    jarvis: {
+      baseColor: '#7dd8ff',
+      shape: (s) => ({
+        ...s,
+        arousal:  clamp01(s.arousal * 0.7),
+        valence:  clampBi(s.valence * 0.5),
+        energy:   clamp01(s.energy * 0.8),
+        halfLife: s.halfLife * 1.8,
+      }),
+    },
+    luna: {
+      baseColor: '#ff7dd8',
+      shape: (s) => ({
+        ...s,
+        arousal:  clamp01(s.arousal * 1.3),
+        valence:  clampBi(s.valence * 1.5),
+        energy:   clamp01(s.energy * 1.1),
+        halfLife: s.halfLife * 1.0,
+      }),
+    },
+    coach: {
+      baseColor: '#ffb87d',
+      shape: (s) => ({
+        ...s,
+        arousal:  clamp01(s.arousal * 1.6),
+        valence:  clampBi(s.valence * 1.0),
+        energy:   clamp01(s.energy * 1.25),
+        halfLife: s.halfLife * 0.6,
+      }),
+    },
+  };
+
+  const engineC = {
+    personas: {},
+
+    init() {
+      for (const key of Object.keys(PERSONAS)) {
+        this.personas[key] = {
+          signals: [],
+          current: { ...IDLE, color: PERSONAS[key].baseColor },
+          idleColor: PERSONAS[key].baseColor,
+          pulseAt: -Infinity,
+        };
+      }
+    },
+
+    onSignal(sig, now) {
+      for (const key of Object.keys(this.personas)) {
+        const shaped = PERSONAS[key].shape(sig);
+        this.personas[key].signals.push({
+          arousal:  shaped.arousal,
+          valence:  shaped.valence,
+          energy:   shaped.energy,
+          color:    sig.color,
+          halfLife: shaped.halfLife,
+          bornAt:   now,
+          weight:   1,
+        });
+        this.personas[key].pulseAt = now;
+      }
+    },
+
+    tick(dt, now) {
+      for (const key of Object.keys(this.personas)) {
+        const p = this.personas[key];
+        for (const s of p.signals) {
+          const elapsed = now - s.bornAt;
+          s.weight = Math.exp(-elapsed * Math.LN2 / s.halfLife);
+        }
+        p.signals = p.signals.filter(s => s.weight > 0.04);
+
+        const idleBias = 0.25;
+        let wA = IDLE.arousal * idleBias;
+        let wV = IDLE.valence * idleBias;
+        let wE = IDLE.energy  * idleBias;
+        let wT = idleBias;
+        const colorEntries = [{ color: p.idleColor, weight: idleBias * 1.5 }];
+        for (const s of p.signals) {
+          wA += s.arousal * s.weight;
+          wV += s.valence * s.weight;
+          wE += s.energy  * s.weight;
+          wT += s.weight;
+          colorEntries.push({ color: s.color, weight: s.weight });
+        }
+        p.current.arousal = clamp01(wA / wT);
+        p.current.valence = clampBi(wV / wT);
+        p.current.energy  = clamp01(wE / wT);
+        p.current.color   = blendColors(colorEntries, p.idleColor);
+      }
+    },
+
+    reset() {
+      for (const key of Object.keys(this.personas)) {
+        this.personas[key].signals = [];
+        this.personas[key].current = { ...IDLE, color: PERSONAS[key].baseColor };
+        this.personas[key].pulseAt = -Infinity;
+      }
+    },
+  };
+  engineC.init();
+
+  // ---------- shared orb renderer ----------
+  function drawOrb(ctx, w, h, state, time, opts = {}) {
+    const cx = w / 2, cy = h / 2;
+    const baseR = Math.min(w, h) * (opts.scale || 0.28);
+    const energy = state.energy;
+    const arousal = state.arousal;
+    const valence = state.valence;
+
+    const speed = 0.7 + energy * 2.5 + arousal * 1.5;
+    const phase = (time / 1000) * speed * Math.PI * 0.6;
+    const heartbeat = Math.sin(phase * 0.6) * 0.025;
+    const morphAmp = arousal * 0.22 + 0.03;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // ambient wash
+    const wash = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.7);
+    wash.addColorStop(0, rgba(state.color, 0.05 + arousal * 0.03));
+    wash.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = wash;
+    ctx.fillRect(0, 0, w, h);
+
+    // pulse ring on recent signal
+    if (opts.pulseAt !== undefined && time - opts.pulseAt < 900) {
+      const pulseT = (time - opts.pulseAt) / 900;
+      const ringR = baseR * (1 + pulseT * 1.3);
+      const ringAlpha = (1 - pulseT) * 0.7;
+      ctx.strokeStyle = rgba(opts.pulseColor || state.color, ringAlpha);
+      ctx.lineWidth = 2 - pulseT * 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // outer glow
+    const glowR = baseR * (1.45 + heartbeat + arousal * 0.25);
+    const glow = ctx.createRadialGradient(cx, cy, baseR * 0.35, cx, cy, glowR);
+    glow.addColorStop(0, rgba(state.color, 0.55 + arousal * 0.25));
+    glow.addColorStop(1, rgba(state.color, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // morphing body
+    ctx.beginPath();
+    const segs = 72;
+    for (let i = 0; i <= segs; i++) {
+      const angle = (i / segs) * Math.PI * 2;
+      const def = 1.0
+        + morphAmp * Math.sin(3 * angle + phase)
+        + morphAmp * 0.5 * Math.sin(5 * angle - phase * 1.3)
+        + valence * 0.04 * Math.sin(2 * angle + phase * 0.5);
+      const r = baseR * def * (1 + heartbeat);
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = state.color;
+    ctx.fill();
+
+    // inner highlight
+    const hiGrad = ctx.createRadialGradient(
+      cx, cy - baseR * 0.2, 0,
+      cx, cy - baseR * 0.2, baseR * 0.6
+    );
+    hiGrad.addColorStop(0, 'rgba(255,255,255,0.22)');
+    hiGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = hiGrad;
+    ctx.fill();
+
+    // synapse ring
+    ctx.strokeStyle = rgba(state.color, 0.35 + arousal * 0.4);
+    ctx.lineWidth = 1.5 + arousal * 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, baseR * (1.17 + heartbeat), 0, Math.PI * 2);
+    ctx.stroke();
+
+    // orbiting dots
+    const dotCount = Math.round(3 + energy * 7);
+    const orbitR = baseR * 1.55;
+    const dotSpeed = 1 + arousal * 1.8 + energy * 0.5;
+    for (let i = 0; i < dotCount; i++) {
+      const a = (Math.PI * 2 * i / dotCount) + phase * dotSpeed;
+      const dx = cx + orbitR * Math.cos(a);
+      const dy = cy + orbitR * Math.sin(a);
+      const dotR = 2.2 + arousal * 1.2;
+      ctx.beginPath();
+      ctx.arc(dx, dy, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(state.color, 0.75);
+      ctx.fill();
+
+      // trailing ghost
+      const ta = a - 0.35;
+      ctx.beginPath();
+      ctx.arc(cx + orbitR * Math.cos(ta), cy + orbitR * Math.sin(ta), dotR * 0.6, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(state.color, 0.25);
+      ctx.fill();
+    }
+  }
+
+  // ---------- DOM refs ----------
+  const canvasA = document.getElementById('canvas-a');
+  const ctxA = canvasA.getContext('2d');
+  const canvasB = document.getElementById('canvas-b');
+  const ctxB = canvasB.getContext('2d');
+  const subCanvases = {};
+  const subCtxs = {};
+  for (const key of Object.keys(PERSONAS)) {
+    const c = document.querySelector(`canvas.sub-orb[data-persona="${key}"]`);
+    subCanvases[key] = c;
+    subCtxs[key] = c.getContext('2d');
+  }
+
+  // ---------- meter updaters ----------
+  const meterEls = {};
+  document.querySelectorAll('[data-fill], [data-val]').forEach(el => {
+    const k = el.dataset.fill || el.dataset.val;
+    if (!meterEls[k]) meterEls[k] = {};
+    if (el.dataset.fill) meterEls[k].fill = el;
+    if (el.dataset.val)  meterEls[k].val  = el;
+  });
+
+  function updateMeter(prefix, state) {
+    const setFill = (key, v, bidir=false) => {
+      const e = meterEls[`${prefix}-${key}`];
+      if (!e) return;
+      if (bidir) {
+        const mag = Math.abs(v) * 50;
+        const neg = v < 0;
+        e.fill.style.left = neg ? `${50 - mag}%` : '50%';
+        e.fill.style.width = `${mag}%`;
+        e.fill.classList.toggle('bidir-neg', neg);
+      } else {
+        e.fill.style.left = '0%';
+        e.fill.style.width = `${clamp01(v) * 100}%`;
+      }
+      const fmt = bidir
+        ? (v >= 0 ? `+${v.toFixed(2)}` : v.toFixed(2))
+        : v.toFixed(2);
+      if (e.val) e.val.textContent = fmt;
+    };
+    setFill('arousal', state.arousal);
+    setFill('valence', state.valence, true);
+    setFill('energy',  state.energy);
+  }
+
+  // ---------- direction B signal log (safe DOM, no innerHTML) ----------
+  const logEl = document.getElementById('signal-log-b');
+  const countEl = document.querySelector('[data-val="b-count"]');
+
+  function makeEmptyLogNode() {
+    const empty = document.createElement('div');
+    empty.className = 'signal-log-empty';
+    empty.textContent = 'no signals · orb at rest';
+    return empty;
+  }
+
+  function makeSignalEntryNode(verb, weightPct, ageSec) {
+    const entry = document.createElement('div');
+    entry.className = 'signal-entry';
+
+    const verbEl = document.createElement('span');
+    verbEl.className = 'signal-verb';
+    verbEl.textContent = verb;
+
+    const bar = document.createElement('div');
+    bar.className = 'signal-decay-bar';
+    const fill = document.createElement('div');
+    fill.className = 'signal-decay-fill';
+    fill.style.width = `${weightPct.toFixed(1)}%`;
+    bar.appendChild(fill);
+
+    const age = document.createElement('span');
+    age.className = 'signal-age';
+    age.textContent = `${ageSec.toFixed(1)}s`;
+
+    entry.appendChild(verbEl);
+    entry.appendChild(bar);
+    entry.appendChild(age);
+    return entry;
+  }
+
+  function renderSignalLog(now) {
+    const signals = engineB.signals;
+    countEl.textContent = `${signals.length} active`;
+
+    // clear current children
+    while (logEl.firstChild) logEl.removeChild(logEl.firstChild);
+
+    if (!signals.length) {
+      logEl.appendChild(makeEmptyLogNode());
+      return;
+    }
+
+    const sorted = [...signals].sort((a, b) => b.bornAt - a.bornAt);
+    for (const s of sorted) {
+      const ageSec = (now - s.bornAt) / 1000;
+      const pct = clamp01(s.weight) * 100;
+      logEl.appendChild(makeSignalEntryNode(s.verb, pct, ageSec));
+    }
+  }
+
+  // ---------- main loop ----------
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(64, now - last);
+    last = now;
+
+    engineA.tick(dt, now);
+    engineB.tick(dt, now);
+    engineC.tick(dt, now);
+
+    drawOrb(ctxA, canvasA.width, canvasA.height, engineA.current, now, {
+      pulseAt: engineA.pulseAt, pulseColor: engineA.pulseColor, scale: 0.3,
+    });
+    drawOrb(ctxB, canvasB.width, canvasB.height, engineB.current, now, {
+      pulseAt: engineB.pulseAt, pulseColor: engineB.pulseColor, scale: 0.3,
+    });
+    for (const key of Object.keys(PERSONAS)) {
+      const p = engineC.personas[key];
+      drawOrb(subCtxs[key], subCanvases[key].width, subCanvases[key].height, p.current, now, {
+        pulseAt: p.pulseAt, pulseColor: p.current.color, scale: 0.32,
+      });
+    }
+
+    updateMeter('a', engineA.current);
+    updateMeter('b', engineB.current);
+
+    renderSignalLog(now);
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  // ---------- signal dispatcher ----------
+  function fireSignal(key) {
+    const sig = SIGNALS[key];
+    if (!sig) return;
+    const now = performance.now();
+    engineA.onSignal(sig, now);
+    engineB.onSignal(sig, now);
+    engineC.onSignal(sig, now);
+  }
+
+  function fireBurst() {
+    let i = 0;
+    const interval = setInterval(() => {
+      const key = SIGNAL_KEYS[Math.floor(Math.random() * SIGNAL_KEYS.length)];
+      fireSignal(key);
+      const btn = document.querySelector(`button[data-signal="${key}"]`);
+      if (btn) {
+        btn.classList.remove('fired');
+        void btn.offsetWidth;
+        btn.classList.add('fired');
+      }
+      i++;
+      if (i >= 5) clearInterval(interval);
+    }, 180);
+  }
+
+  function resetAll() {
+    engineA.reset();
+    engineB.reset();
+    engineC.reset();
+  }
+
+  // ---------- button wiring ----------
+  document.querySelectorAll('button[data-signal]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sig = btn.dataset.signal;
+      btn.classList.remove('fired');
+      void btn.offsetWidth;
+      btn.classList.add('fired');
+
+      if (sig === 'burst') return fireBurst();
+      if (sig === 'reset') return resetAll();
+      fireSignal(sig);
+    });
+  });
+
+  // ---------- keyboard shortcuts ----------
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    const map = {
+      '1': 'tool', '2': 'llm', '3': 'user.typing',
+      '4': 'error', '5': 'task.done', '6': 'skill.new',
+      'b': 'burst', 'r': 'reset',
+    };
+    const sig = map[e.key.toLowerCase()];
+    if (!sig) return;
+    const btn = document.querySelector(`button[data-signal="${sig}"]`);
+    if (btn) btn.click();
+  });
+
+})();
+</script>
+
+</body>
+</html>

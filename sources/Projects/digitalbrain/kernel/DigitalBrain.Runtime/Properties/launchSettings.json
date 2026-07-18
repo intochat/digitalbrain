@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "DigitalBrain.Runtime": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:62792;http://localhost:62793"
+    }
+  }
+}

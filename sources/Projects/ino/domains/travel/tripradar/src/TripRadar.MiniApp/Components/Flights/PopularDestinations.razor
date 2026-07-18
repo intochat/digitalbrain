@@ -1,0 +1,56 @@
+@using TripRadar.MiniApp.Client.Infrastructure.Contracts
+@using TripRadar.MiniApp.Client.Infrastructure.Localization
+@inject IFlightExploreManager ExploreService
+@inject IStringLocalizer<SharedResource> L
+
+@if (_isLoading || _destinations.Count > 0)
+{
+    <div class="mt-6 space-y-3">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-base font-bold">@L["PopularTitle"]</h2>
+                @if (!string.IsNullOrEmpty(DepartureName))
+                {
+                    <p class="text-xs text-slate-500">@string.Format(L["PopularFrom"], DepartureName)</p>
+                }
+            </div>
+        </div>
+
+        <div class="miniapp-horizontal-scroll flex gap-3 pb-2 snap-x snap-mandatory scrollbar-hide">
+            @if (_isLoading)
+            {
+                @for (var i = 0; i < 3; i++)
+                {
+                    <div class="flex-shrink-0 w-40 h-[200px] rounded-xl bg-slate-200 dark:bg-slate-800 animate-pulse"></div>
+                }
+            }
+            else
+            {
+                @foreach (var dest in _destinations)
+                {
+                    <div class="flex-shrink-0 w-40 h-[200px] rounded-xl overflow-hidden relative cursor-pointer snap-start hover:scale-[1.02] transition-transform active:scale-[0.98]"
+                         @onclick="() => OnDestinationClicked.InvokeAsync(dest)">
+                        @if (!string.IsNullOrEmpty(dest.Thumbnail))
+                        {
+                            <img src="@dest.Thumbnail" alt="@dest.Name" class="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                        }
+                        else
+                        {
+                            <div class="absolute inset-0 bg-gradient-to-br from-blue-400 to-indigo-600"></div>
+                        }
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
+                        <div class="absolute bottom-0 left-0 right-0 p-3 text-white">
+                            <p class="font-bold text-sm leading-tight">@dest.Name</p>
+                            @if (dest.FlightPrice.HasValue)
+                            {
+                                <p class="text-xs font-semibold mt-1 text-blue-200">@string.Format(L["PopularFromPrice"], CurrencyFormat.FormatPrice(dest.FlightPrice.Value, Currency))</p>
+                            }
+                            <p class="text-[10px] text-white/70 mt-0.5">@L["PopularRoundTrip"]</p>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+}
+

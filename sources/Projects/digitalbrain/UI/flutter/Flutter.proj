@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.Build.NoTargets">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <RunFlutterBuild Condition="'$(RunFlutterBuild)' == ''">true</RunFlutterBuild>
+    <FlutterCli Condition="'$(FlutterCli)' == ''">flutter</FlutterCli>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="pubspec.yaml" />
+    <None Include="analysis_options.yaml" />
+    <None Include="lib\**\*" />
+    <None Include="web\**\*" />
+    <None Include="test\**\*" />
+    <None Include="android\**\*" Exclude="android\.gradle\**;android\build\**" />
+    <None Include="ios\**\*" Exclude="ios\Pods\**;ios\.symlinks\**" />
+    <None Include="macos\**\*" Exclude="macos\Pods\**" />
+    <None Include="linux\**\*" />
+    <None Include="windows\**\*" Exclude="windows\flutter\ephemeral\**;windows\runner\Debug\**;windows\runner\Release\**" />
+  </ItemGroup>
+
+  <Target Name="FlutterPubGet"
+          BeforeTargets="Build"
+          Condition="'$(RunFlutterBuild)' == 'true'"
+          Inputs="pubspec.yaml"
+          Outputs="pubspec.lock">
+    <Exec Command="$(FlutterCli) pub get"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="_FlutterPubGetExitCode" />
+    </Exec>
+    <Warning Condition="'$(_FlutterPubGetExitCode)' != '0'"
+             Text="flutter pub get failed (exit $(_FlutterPubGetExitCode)). Is the flutter CLI on PATH?" />
+  </Target>
+
+  <Target Name="FlutterBuildWeb"
+          AfterTargets="FlutterPubGet"
+          BeforeTargets="Build"
+          Condition="'$(RunFlutterBuild)' == 'true'">
+    <Exec Command="$(FlutterCli) build web --no-tree-shake-icons"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="_FlutterBuildWebExitCode" />
+    </Exec>
+    <Warning Condition="'$(_FlutterBuildWebExitCode)' != '0'"
+             Text="flutter build web failed (exit $(_FlutterBuildWebExitCode)). The kernel will fall back to the previous bundle in wwwroot/." />
+  </Target>
+
+</Project>

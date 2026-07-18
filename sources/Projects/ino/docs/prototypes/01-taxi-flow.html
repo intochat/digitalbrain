@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ino · Taxi neuron flow</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #05030f;
+    color: #e8e4ff;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
+    font-feature-settings: "cv11", "ss01", "tnum";
+    min-height: 100vh;
+  }
+  .page {
+    max-width: 1480px;
+    margin: 0 auto;
+    padding: 40px 56px 96px;
+  }
+  h1 {
+    font-size: 28px; font-weight: 700; letter-spacing: -0.02em;
+    margin: 0 0 6px;
+  }
+  .crumb { font-size: 12px; color: #7a7396; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 26px; font-weight: 600; }
+  .grid {
+    display: grid;
+    grid-template-columns: 360px 1fr 380px;
+    gap: 36px;
+    margin-top: 28px;
+  }
+  .panel {
+    background: linear-gradient(180deg, #120b2b 0%, #0a061f 100%);
+    border: 1px solid #241a48;
+    border-radius: 18px;
+    padding: 22px 20px;
+  }
+  .panel h3 {
+    margin: 0 0 16px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #9a93c2;
+    font-weight: 700;
+  }
+
+  /* ===== Phone ===== */
+  .phone {
+    width: 390px;
+    height: 800px;
+    margin: 0 auto;
+    background: #000;
+    border-radius: 50px;
+    padding: 14px;
+    position: relative;
+    box-shadow: 0 40px 100px rgba(108, 99, 255, 0.25), 0 0 0 1px #221a46;
+  }
+  .phone-screen {
+    width: 100%; height: 100%;
+    background: linear-gradient(180deg, #0a051f 0%, #1a0d3d 60%, #0a051f 100%);
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    display: flex; flex-direction: column;
+  }
+  .notch {
+    position: absolute;
+    top: 8px; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 28px;
+    background: #000;
+    border-radius: 18px;
+    z-index: 100;
+  }
+  .status-bar {
+    padding: 16px 28px 8px;
+    display: flex; justify-content: space-between;
+    font-size: 14px; font-weight: 600;
+    color: #fff;
+  }
+  .status-bar .time { font-weight: 700; }
+
+  /* ===== Persona zone ===== */
+  .persona-zone {
+    position: relative;
+    padding: 24px 20px 16px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .persona-orb {
+    width: 180px; height: 180px;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .persona-glow {
+    position: absolute; inset: -40px;
+    background: radial-gradient(circle, rgba(255, 159, 67, 0.25) 0%, transparent 60%);
+    animation: pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.12); opacity: 1; } }
+
+  .persona-label {
+    margin-top: 14px;
+    font-size: 15px; font-weight: 600;
+    color: #fff;
+  }
+  .persona-status {
+    margin-top: 2px;
+    font-size: 12px; color: #bfb5e8;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #ff9f43;
+    box-shadow: 0 0 8px #ff9f43;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  /* ===== iOS-style notification banner ===== */
+  .notif-banner {
+    position: absolute;
+    top: 50px; left: 12px; right: 12px;
+    background: rgba(30, 22, 62, 0.92);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-radius: 18px;
+    padding: 12px 14px;
+    display: flex; gap: 12px; align-items: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(108, 99, 255, 0.2);
+    z-index: 50;
+  }
+  .notif-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: linear-gradient(135deg, #ff9f43, #ff6b35);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .notif-body { flex: 1; min-width: 0; }
+  .notif-title { font-size: 13px; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
+  .notif-text { font-size: 13px; color: #d0c8f0; margin-top: 1px; letter-spacing: -0.01em; }
+  .notif-time { font-size: 11px; color: #8178b8; align-self: flex-start; }
+
+  /* ===== Live RFW card (taxi) ===== */
+  .card-zone {
+    flex: 1;
+    padding: 12px 16px 20px;
+    overflow: hidden;
+  }
+  .rfw-card {
+    background: linear-gradient(180deg, rgba(108, 99, 255, 0.08), rgba(108, 99, 255, 0.02));
+    border: 1px solid rgba(108, 99, 255, 0.25);
+    border-radius: 22px;
+    padding: 18px;
+    margin-bottom: 12px;
+  }
+  .card-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 14px;
+  }
+  .card-title {
+    font-size: 14px; font-weight: 700; color: #fff;
+    display: flex; align-items: center; gap: 8px;
+    letter-spacing: -0.01em;
+  }
+  .card-title .emoji { font-size: 18px; }
+  .card-eta {
+    background: rgba(46, 204, 113, 0.18);
+    color: #7fe9a8;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .driver-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid rgba(108, 99, 255, 0.15);
+  }
+  .driver-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, #ffd7a8, #d9874d);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700;
+    color: #3a1a0a;
+    border: 2px solid rgba(108, 99, 255, 0.3);
+  }
+  .driver-name { font-size: 14px; font-weight: 600; color: #fff; }
+  .driver-meta { font-size: 11px; color: #9a93c2; margin-top: 2px; }
+  .driver-rate {
+    margin-left: auto;
+    font-size: 12px; color: #ffd700;
+    display: flex; align-items: center; gap: 3px;
+  }
+
+  .car-row {
+    display: flex; align-items: center; gap: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(108, 99, 255, 0.15);
+    margin-top: 10px;
+    font-size: 12px;
+    color: #bfb5e8;
+  }
+  .plate {
+    background: #1a1033;
+    color: #fff;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    border: 1px solid #3a2a6a;
+  }
+
+  /* ===== Mini map ===== */
+  .mini-map {
+    height: 130px;
+    background: linear-gradient(135deg, #1e1248, #2a1860);
+    border-radius: 14px;
+    position: relative;
+    overflow: hidden;
+    margin-top: 12px;
+  }
+  .map-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(to right, rgba(108, 99, 255, 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(108, 99, 255, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  .map-road {
+    position: absolute;
+    left: 0; right: 0;
+    top: 55%;
+    height: 3px;
+    background: rgba(255, 159, 67, 0.7);
+    box-shadow: 0 0 8px rgba(255, 159, 67, 0.4);
+  }
+  .map-pickup, .map-car, .map-dest {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    top: 55%; transform: translate(-50%, -50%);
+  }
+  .map-pickup { left: 14%; background: #2ecc71; box-shadow: 0 0 10px #2ecc71; }
+  .map-dest   { left: 86%; background: #e74c3c; box-shadow: 0 0 10px #e74c3c; }
+  .map-car {
+    left: 32%; background: #ff9f43;
+    box-shadow: 0 0 14px #ff9f43;
+    animation: drive 4s ease-in-out infinite alternate;
+  }
+  @keyframes drive { from { left: 32%; } to { left: 70%; } }
+
+  /* ===== Action bar ===== */
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    padding: 0 16px 20px;
+  }
+  .action-btn {
+    background: rgba(108, 99, 255, 0.12);
+    border: 1px solid rgba(108, 99, 255, 0.3);
+    color: #d0c8f0;
+    padding: 14px 8px;
+    border-radius: 14px;
+    font-size: 12px; font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+  }
+  .action-btn.danger {
+    border-color: rgba(231, 76, 60, 0.4);
+    color: #ff9483;
+    background: rgba(231, 76, 60, 0.1);
+  }
+  .action-btn .emoji { font-size: 18px; display: block; margin-bottom: 4px; }
+
+  /* ===== Left panel: persona state timeline ===== */
+  .timeline-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 10px 0;
+    position: relative;
+  }
+  .timeline-item:not(:last-child)::after {
+    content: ""; position: absolute;
+    left: 11px; top: 28px; bottom: -10px;
+    width: 2px; background: #2a1f5a;
+  }
+  .tl-dot {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: #1a1033; border: 2px solid #2a1f5a;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 12px;
+  }
+  .tl-item.active .tl-dot {
+    background: rgba(255, 159, 67, 0.2);
+    border-color: #ff9f43;
+    box-shadow: 0 0 12px rgba(255, 159, 67, 0.5);
+  }
+  .tl-item.done .tl-dot {
+    background: rgba(46, 204, 113, 0.15);
+    border-color: #2ecc71;
+  }
+  .tl-body { flex: 1; padding-top: 2px; }
+  .tl-title { font-size: 13px; font-weight: 600; color: #e8e4ff; }
+  .tl-sub { font-size: 11px; color: #9a93c2; margin-top: 2px; }
+  .tl-sig {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 10px;
+    color: #ff9f43;
+    margin-top: 4px;
+    padding: 2px 6px;
+    background: rgba(255, 159, 67, 0.08);
+    border-radius: 4px;
+    display: inline-block;
+  }
+
+  /* ===== Right panel: verb mapping ===== */
+  .verb-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .verb-table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid #1a1240;
+    vertical-align: top;
+  }
+  .verb-name {
+    color: #ff9f43;
+    font-weight: 600;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .persona-mime {
+    color: #e8e4ff;
+    font-weight: 500;
+  }
+  .persona-mime small { color: #9a93c2; display: block; font-weight: 400; font-family: -apple-system, sans-serif; margin-top: 2px; }
+
+  .notif-example {
+    background: rgba(10, 5, 31, 0.8);
+    border: 1px solid #241a48;
+    border-radius: 10px;
+    padding: 10px;
+    margin-top: 8px;
+    display: flex; gap: 10px; align-items: center;
+  }
+  .notif-example .mini-icon {
+    width: 26px; height: 26px; border-radius: 6px;
+    background: linear-gradient(135deg, #ff9f43, #ff6b35);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+  .ne-title { font-size: 11px; font-weight: 700; color: #fff; }
+  .ne-body { font-size: 11px; color: #bfb5e8; }
+
+  .callout {
+    background: linear-gradient(135deg, rgba(255, 159, 67, 0.1), rgba(108, 99, 255, 0.1));
+    border: 1px solid rgba(255, 159, 67, 0.3);
+    border-radius: 12px;
+    padding: 14px;
+    margin-top: 16px;
+    font-size: 12px;
+    line-height: 1.55;
+    color: #d0c8f0;
+  }
+  .callout strong { color: #ff9f43; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="crumb">Prototype 01 · Neuron flow</div>
+  <h1>"ino, get me to the airport"</h1>
+  <p style="color:#9a93c2;font-size:14px;max-width:680px;margin:6px 0 0;">The user speaks one verb. ino picks the <strong>transport neuron</strong>, fires the canonical <code style="color:#ff9f43">CallRide</code> synapse, the persona mimes the verb in real-time, the RFW card streams live data, and iOS-style notifications carry async status as the ride progresses.</p>
+
+  <div class="grid">
+    <!-- LEFT: Persona state timeline -->
+    <div class="panel">
+      <h3>Persona activity trace</h3>
+      <div class="timeline-item tl-item done">
+        <div class="tl-dot">✓</div>
+        <div class="tl-body">
+          <div class="tl-title">Listening</div>
+          <div class="tl-sub">"get me to the airport"</div>
+          <div class="tl-sig">speech.captured</div>
+        </div>
+      </div>
+      <div class="timeline-item tl-item done">
+        <div class="tl-dot">✓</div>
+        <div class="tl-body">
+          <div class="tl-title">Thinking</div>
+          <div class="tl-sub">Picked Uber neuron</div>
+          <div class="tl-sig">intent → transport.call</div>
+        </div>
+      </div>
+      <div class="timeline-item tl-item done">
+        <div class="tl-dot">✓</div>
+        <div class="tl-body">
+          <div class="tl-title">Reach_phone</div>
+          <div class="tl-sub">Hand raises, phone animates in</div>
+          <div class="tl-sig">mime: reach_out</div>
+        </div>
+      </div>
+      <div class="timeline-item tl-item active">
+        <div class="tl-dot">●</div>
+        <div class="tl-body">
+          <div class="tl-title">Tracking</div>
+          <div class="tl-sub">Head turns slightly; eyes watch the map</div>
+          <div class="tl-sig">mime: watch · pulse=0.3</div>
+        </div>
+      </div>
+      <div class="timeline-item tl-item">
+        <div class="tl-dot">○</div>
+        <div class="tl-body">
+          <div class="tl-title">Wave_hello</div>
+          <div class="tl-sub">When the driver arrives</div>
+          <div class="tl-sig">mime: wave</div>
+        </div>
+      </div>
+      <div class="timeline-item tl-item">
+        <div class="tl-dot">○</div>
+        <div class="tl-body">
+          <div class="tl-title">Point_forward</div>
+          <div class="tl-sub">During the drive</div>
+          <div class="tl-sig">mime: point</div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Why this is ino-native.</strong> Every timeline row is a real neuron/synapse event. The persona's motion is not scripted cinema — it's the telemetry given a body. Same loop: <em>signal → parameter → Rive state machine</em>.
+      </div>
+    </div>
+
+    <!-- CENTER: Phone prototype -->
+    <div>
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="notch"></div>
+          <div class="status-bar">
+            <span class="time">10:42</span>
+            <span>●●● ⏶ 91</span>
+          </div>
+
+          <!-- iOS-style notification pill -->
+          <div class="notif-banner">
+            <div class="notif-icon">🚕</div>
+            <div class="notif-body">
+              <div class="notif-title">ino · your ride</div>
+              <div class="notif-text">Ali is 5 min away · silver Camry</div>
+            </div>
+            <div class="notif-time">now</div>
+          </div>
+
+          <!-- Persona zone (pushed down to clear banner) -->
+          <div class="persona-zone" style="margin-top: 74px;">
+            <div class="persona-orb">
+              <div class="persona-glow"></div>
+              <svg viewBox="0 0 200 200" style="width:100%;height:100%;position:relative;z-index:2;">
+                <defs>
+                  <radialGradient id="skin" cx="50%" cy="40%">
+                    <stop offset="0%" stop-color="#ffe3b0"/>
+                    <stop offset="100%" stop-color="#d9874d"/>
+                  </radialGradient>
+                </defs>
+                <ellipse cx="100" cy="175" rx="38" ry="6" fill="#000" opacity="0.4"/>
+                <!-- body -->
+                <ellipse cx="100" cy="110" rx="52" ry="58" fill="url(#skin)"/>
+                <!-- eyes looking at the map -->
+                <ellipse cx="82" cy="100" rx="5.5" ry="8" fill="#1a0f06"/>
+                <ellipse cx="118" cy="100" rx="5.5" ry="8" fill="#1a0f06"/>
+                <circle cx="84" cy="99" r="1.5" fill="#fff"/>
+                <circle cx="120" cy="99" r="1.5" fill="#fff"/>
+                <!-- slight smile, confident -->
+                <path d="M 83 128 Q 100 135 117 128" stroke="#1a0f06" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                <!-- hair / top tuft -->
+                <path d="M 62 65 Q 90 35 110 58" stroke="#6a4226" stroke-width="7" fill="none" stroke-linecap="round"/>
+                <path d="M 148 65 Q 125 38 108 56" stroke="#6a4226" stroke-width="7" fill="none" stroke-linecap="round"/>
+                <!-- phone held to ear (mime: reach_phone, now transitioning to watch) -->
+                <rect x="155" y="62" width="14" height="24" rx="3" fill="#2a2a2e" transform="rotate(18 162 74)"/>
+                <rect x="157" y="66" width="10" height="14" fill="#6c63ff" transform="rotate(18 162 74)"/>
+                <!-- arm reaching up -->
+                <path d="M 148 108 Q 162 90 162 72" stroke="url(#skin)" stroke-width="13" fill="none" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="persona-label">Tracking your ride</div>
+            <div class="persona-status"><span class="live-dot"></span>Live · Uber</div>
+          </div>
+
+          <!-- Live RFW taxi card -->
+          <div class="card-zone">
+            <div class="rfw-card">
+              <div class="card-head">
+                <div class="card-title"><span class="emoji">🚕</span>Uber · ride in progress</div>
+                <div class="card-eta">5 MIN</div>
+              </div>
+              <div class="driver-row">
+                <div class="driver-avatar">A</div>
+                <div>
+                  <div class="driver-name">Ali Khan</div>
+                  <div class="driver-meta">Uber · 2,148 trips</div>
+                </div>
+                <div class="driver-rate">★ 4.95</div>
+              </div>
+              <div class="car-row">
+                <span>Silver Toyota Camry</span>
+                <span class="plate">SFO·7AB·219</span>
+              </div>
+              <div class="mini-map">
+                <div class="map-grid"></div>
+                <div class="map-road"></div>
+                <div class="map-pickup" title="Pickup"></div>
+                <div class="map-car" title="Car"></div>
+                <div class="map-dest" title="SFO"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <div class="action-btn"><span class="emoji">📍</span>Add stop</div>
+            <div class="action-btn"><span class="emoji">🔗</span>Share ETA</div>
+            <div class="action-btn danger"><span class="emoji">✕</span>Cancel</div>
+          </div>
+        </div>
+      </div>
+      <p style="text-align:center;color:#7a7396;font-size:12px;margin-top:14px;">Notification banner fades after 3s · persona continues tracking · card stays pinned</p>
+    </div>
+
+    <!-- RIGHT: verb → persona mapping -->
+    <div class="panel">
+      <h3>Transport neuron · verb map</h3>
+      <table class="verb-table">
+        <tr>
+          <td class="verb-name">CallRide</td>
+          <td class="persona-mime">Reach phone
+            <small>arm raises, phone fades in, body leans slightly</small>
+          </td>
+        </tr>
+        <tr>
+          <td class="verb-name">AddStop</td>
+          <td class="persona-mime">Tap map
+            <small>finger pokes at midair point, a pin appears and settles</small>
+          </td>
+        </tr>
+        <tr>
+          <td class="verb-name">ChangeDestination</td>
+          <td class="persona-mime">Swipe
+            <small>hand sweep left, map pin flies out, new one drops in</small>
+          </td>
+        </tr>
+        <tr>
+          <td class="verb-name">CancelRide</td>
+          <td class="persona-mime">Wave off
+            <small>palm up, small head shake, mild regret expression</small>
+          </td>
+        </tr>
+        <tr>
+          <td class="verb-name">RateDriver</td>
+          <td class="persona-mime">Thumbs up / stars bloom
+            <small>five stars arc out, celebrating micro-hop</small>
+          </td>
+        </tr>
+        <tr>
+          <td class="verb-name">ShareETA</td>
+          <td class="persona-mime">Tap + send
+            <small>two-finger gesture, speech bubble flies to corner</small>
+          </td>
+        </tr>
+      </table>
+
+      <h3 style="margin-top:28px;">Async status → iOS notification</h3>
+      <div class="notif-example">
+        <div class="mini-icon">🚕</div>
+        <div>
+          <div class="ne-title">ino · your ride</div>
+          <div class="ne-body">Ali is 5 min away</div>
+        </div>
+      </div>
+      <div class="notif-example">
+        <div class="mini-icon">🚕</div>
+        <div>
+          <div class="ne-title">ino · your ride</div>
+          <div class="ne-body">Ali has arrived at Market St.</div>
+        </div>
+      </div>
+      <div class="notif-example">
+        <div class="mini-icon">🚕</div>
+        <div>
+          <div class="ne-title">ino · your ride</div>
+          <div class="ne-body">Dropped off · SFO T3 · $38.20</div>
+        </div>
+      </div>
+
+      <div class="callout">
+        Each status message is a <strong>reactive synapse</strong>. The Uber neuron fires <code style="color:#ff9f43">RideStatusChanged</code>, a system-side <code style="color:#ff9f43">Notifier</code> neuron listens, renders the OS-native notification. No per-neuron plumbing — notifications are a cross-cutting capability.
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

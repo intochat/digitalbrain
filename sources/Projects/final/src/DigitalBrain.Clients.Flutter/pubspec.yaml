@@ -1,0 +1,41 @@
+name: digitalbrain_flutter_client
+description: DigitalBrain surface renderer client (Flutter web + future mobile/desktop). Renders UiWidget trees streamed from the kernel over gRPC SurfaceStream and sends interaction events back as synapses / client events. Controlled by the IFlutter neuron exactly like IAspire controls app resources.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # gRPC + protobuf for SurfaceStream (UiSurfaceMessage) and back-channel.
+  # In a full setup run: dart pub global activate protoc_plugin && protoc ... --dart_out=...
+  # For the initial proper bring-up the client builds and the IFlutter resource can launch it;
+  # the Dart side can later use grpc/grpc_web or a generated client matching Kernel/Protos/Surfaces.proto.
+  grpc: ^4.0.1
+  protobuf: ^3.1.0
+  # For rendering Markdown surfaces exactly like the hex1b SurfaceRenderer does with ctx.Markdown.
+  flutter_markdown: ^0.7.7+1
+  # Ready-to-go chat component from pub (flutter_chat_ui + peers for high-perf customizable bubbles, composer, theming, AI/agent friendly).
+  # Latest verified via pub_dev_search (2.11.1 + 3.6.2 + 2.9.0). Used in _buildChatTab for text while preserving surface injection, voice, telemetry, onFire for all synapses (market/creator/etc).
+  record: ^6.2.1
+  path_provider: ^2.1.5
+  http: ^1.6.0
+  permission_handler: ^12.0.3
+  modular_ui: ^0.0.5
+  getwidget: ^7.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  # Add rive/ or other assets when enriching the client (see ino/clients/ino.flutter for the full reference).
+  # assets:
+  #   - assets/

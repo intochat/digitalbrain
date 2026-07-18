@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:17140;http://localhost:15208",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21298",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22125",
+        // For 2 separate aspire sessions (different users, clusters, dashboards, flutter ports):
+        // DIGITALBRAIN_SESSION=u1 ; DIGITALBRAIN_PORT_OFFSET=0  (first)
+        // DIGITALBRAIN_SESSION=u2 ; DIGITALBRAIN_PORT_OFFSET=20 + override ASPIRE_DASHBOARD_* to other ports (second)
+        // Then two `cd src/DigitalBrain.AppHost; aspire start --non-interactive` yield 2 dashboards + 2 full isolated roots with flutter each.
+        "DIGITALBRAIN_SESSION": "default"
+      }
+    },
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:15208",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19010",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20254",
+        // For 2 separate aspire sessions (different users, clusters, dashboards, flutter ports):
+        // DIGITALBRAIN_SESSION=u1 ; DIGITALBRAIN_PORT_OFFSET=0  (first)
+        // DIGITALBRAIN_SESSION=u2 ; DIGITALBRAIN_PORT_OFFSET=20 + override ASPIRE_DASHBOARD_* to other ports (second)
+        // Then two `cd src/DigitalBrain.AppHost; aspire start --non-interactive` yield 2 dashboards + 2 full isolated roots with flutter each.
+        "DIGITALBRAIN_SESSION": "default"
+      }
+    }
+  }
+}

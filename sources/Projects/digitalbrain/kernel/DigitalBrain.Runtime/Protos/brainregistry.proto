@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+option csharp_namespace = "DigitalBrain.Runtime.Grpc";
+
+package digitalbrain;
+
+import "google/protobuf/timestamp.proto";
+
+service BrainRegistry {
+  rpc ListBrains(ListBrainsRequest) returns (BrainsResult);
+  rpc WatchActivity(WatchActivityRequest) returns (stream BrainActivityDelta);
+  rpc CreateBrain(CreateBrainCommand) returns (BrainCreated);
+  rpc RenameBrain(RenameBrainCommand) returns (BrainRenamed);
+  rpc DeleteBrain(DeleteBrainCommand) returns (BrainDeleted);
+}
+
+message ListBrainsRequest {}
+
+message BrainsResult {
+  repeated BrainSummary brains = 1;
+}
+
+message WatchActivityRequest {}
+
+message BrainActivityDelta {
+  string brain_id = 1;
+  double synapses_per_second = 2;
+  int32 neuron_count_delta = 3;
+  string version_bump = 4;
+}
+
+message CreateBrainCommand {
+  string name = 1;
+  string seed_template = 2;
+}
+
+message BrainCreated {
+  string brain_id = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+message RenameBrainCommand {
+  string brain_id = 1;
+  string new_name = 2;
+}
+
+message BrainRenamed {
+  string brain_id = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+message DeleteBrainCommand {
+  string brain_id = 1;
+}
+
+message BrainDeleted {
+  string brain_id = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+message BrainSummary {
+  string id = 1;
+  string name = 2;
+  string version = 3;
+  string brand_color = 4;
+  int32 neuron_count = 5;
+  google.protobuf.Timestamp last_activity_at = 6;
+  int32 installed_bundle_count = 7;
+  repeated string capability_tags = 8;
+}

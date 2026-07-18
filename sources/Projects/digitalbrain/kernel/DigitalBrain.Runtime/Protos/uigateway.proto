@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+option csharp_namespace = "DigitalBrain.Runtime.Grpc";
+
+package digitalbrain.ui;
+
+import "google/protobuf/timestamp.proto";
+
+service UiGateway {
+  // Bidirectional stream mapping all UI updates and user actions
+  rpc EngageUiSession(stream UiInputSynapse) returns (stream UiStateSignal);
+}
+
+message UiInputSynapse {
+  string brain_id = 1;
+  string element_id = 2;
+  string target_neuron_id = 3;
+  
+  enum InteractionType {
+    CLICK = 0;
+    HOVER_ENTER = 1;
+    HOVER_EXIT = 2;
+    DOUBLE_CLICK = 3;
+    TEXT_INPUT = 4;
+    KEY_PRESS = 5;
+    DRAG_NODE = 6;
+  }
+  InteractionType interaction = 4;
+  
+  string input_payload = 5; // Serialized input (e.g. text, coordinates, keys)
+  Point3D coordinates = 6;
+  google.protobuf.Timestamp client_time = 7;
+}
+
+message Point3D {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+message UiStateSignal {
+  oneof payload {
+    RfwCardProto rfw_card = 1;
+    UiViewportSignal viewport = 2;
+    UiSoundSignal sound = 3;
+  }
+}
+
+message RfwCardProto {
+  string brain_id = 1;
+  string neuron_id = 2;
+  string surface_id = 3;
+  string library_uri = 4;
+  string root_widget = 5;
+  bytes data_json = 6;
+  
+  enum RfwLayoutProto {
+    CARD = 0;
+    PANEL = 1;
+    MODAL = 2;
+    INLINE = 3;
+    CANVAS = 4;
+  }
+  RfwLayoutProto layout = 7;
+  
+  enum RfwLockProto {
+    IDLE = 0;
+    BUSY = 1;
+    MODAL_LOCK = 2;
+  }
+  RfwLockProto lock_state = 8;
+  
+  string required_action_id = 9;
+  google.protobuf.Timestamp at = 10;
+}
+
+message UiViewportSignal {
+  Point3D camera_target = 1;
+  Point3D camera_rotation = 2;
+  float zoom_depth = 3;
+  
+  message SpringConfig {
+    float damping_ratio = 1;   // default: 0.72
+    float natural_freq = 2;    // default: 14.0
+  }
+  SpringConfig camera_spring = 4;
+  
+  float ambient_glow = 5;      // particle glow scale
+  float depth_of_field = 6;    // bokeh sigma blur scale
+}
+
+message UiSoundSignal {
+  string sound_effect_id = 1;  // sound triggered by synapse impact
+  float volume = 2;
+}

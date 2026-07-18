@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <PackageId>DigitalBrain.Sdk.Testing</PackageId>
+    <Description>Testing and simulation infrastructure for DigitalBrain (separate from prod SDK to keep prod packages clean per distribution plan). Includes ISimulationBackend, harness, Reqnroll adapters, doubles for v2-style capsule tests and .ino scenarios.</Description>
+    <PackageTags>digitalbrain;testing;simulation;reqnroll;ino</PackageTags>
+  </PropertyGroup>
+
+  <!-- Test runner packages provided via DigitalBrain.Testing.Reqnroll ref (or consumer test projects); this project provides simulation abstractions only for clean packaging -->
+  <ItemGroup>
+  </ItemGroup>
+
+</Project>

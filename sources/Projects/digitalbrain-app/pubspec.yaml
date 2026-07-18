@@ -1,0 +1,63 @@
+name: digitalbrain_flutter
+description: DigitalBrain Flutter client
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.11.0
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  grpc: ^5.1.0
+  protobuf: ^6.0.0
+  flutter_bloc: ^9.1.1
+  go_router: ^17.2.0
+  fixnum: ^1.1.1
+  vector_math: ^2.2.0
+  opentelemetry: ^0.18.11
+  http: ^1.3.0
+  clock: ^1.1.2
+  record: ^6.1.2
+  path_provider: ^2.1.5
+  google_fonts: ^6.2.1
+  url_launcher: ^6.3.0
+  # Server-driven UI: render Creator-emitted widget documents at runtime
+  # over a fixed, DigitalBrain-themed widget dictionary (no client rebuild).
+  rfw: ^1.0.0
+  # Widget-canvas redesign palette + window manager (docs/redesign).
+  # Panel chrome is hand-rolled (generic Dart shell, 01-ARCHITECTURE Decision 3)
+  # rather than a low-trust floating-panel package; persistence via prefs.
+  lottie: ^3.3.3
+  flutter_earth_globe: ^2.2.1
+  shared_preferences: ^2.5.5
+  flutter_web_plugins:
+    sdk: flutter
+  media_kit: ^1.2.6
+  media_kit_video: ^2.0.1
+  media_kit_libs_video: ^1.0.7
+  youtube_player_iframe: ^6.0.0
+  markdraw: ^0.2.0
+  simple_icons: ^14.6.1
+  digital_brain_sdk_flutter:
+    path: packages/digital_brain_sdk_flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  bloc_test: ^10.0.0
+  # Design-time catalog of the Tier-1 RFW palette (docs/redesign 01: "Widgetbook
+  # catalogs the palette"). Manual directories — no build_runner codegen.
+  widgetbook: ^3.23.0
+
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/rfw/
+    - assets/ino-catalog.json
+    - assets/lottie/
+  shaders:
+    - assets/shaders/glass_refract.frag

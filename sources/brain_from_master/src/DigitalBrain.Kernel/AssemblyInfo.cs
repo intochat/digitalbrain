@@ -1,0 +1,9 @@
+using System.Runtime.CompilerServices;
+[assembly: InternalsVisibleTo("DigitalBrain.AppHost")]
+[assembly: InternalsVisibleTo("DigitalBrain.AppHostTests")]
+[assembly: InternalsVisibleTo("DigitalBrain.E2ETests")]
+[assembly: InternalsVisibleTo("DigitalBrain.IntegrationContractTests")]
+[assembly: InternalsVisibleTo("DigitalBrain.Mcp")]
+[assembly: InternalsVisibleTo("DigitalBrain.OrleansTests")]
+[assembly: InternalsVisibleTo("DigitalBrain.RuntimeHost")]
+[assembly: InternalsVisibleTo("DigitalBrain.UnitTests")]
