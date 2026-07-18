@@ -66,5 +66,6 @@ public static class NeuronTypeCatalogBuilder
         type.IsInterface
         && (type.IsPublic || type.IsNestedPublic)
         && type != typeof(INeuron)
-        && typeof(INeuron).IsAssignableFrom(type);
+        && typeof(INeuron).IsAssignableFrom(type)
+        && !typeof(IConversationNeuron).IsAssignableFrom(type);
 }

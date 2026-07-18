@@ -1,4 +1,3 @@
-using DigitalBrain;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain;
@@ -8,6 +7,7 @@ public static class DigitalBrainClientExtensions
     public static IClientBuilder AddDigitalBrainClient(this IClientBuilder clientBuilder)
     {
         clientBuilder.Services.AddSingleton<BrainOwnerContext>();
+        clientBuilder.Services.AddSingleton<DigitalBrainSessionFactory>();
         clientBuilder.Services.AddScoped(static services =>
         {
             var owner = services.GetRequiredService<BrainOwnerContext>().Current

@@ -128,10 +128,14 @@ dotnet build .\Brain.slnx -c Release
 
 - `kernel/DigitalBrain.Abstractions/AI/**`
 - `kernel/DigitalBrain.Abstractions/Conversations/**`
+- `kernel/DigitalBrain.Client/DigitalBrainClient.cs`
+- `kernel/DigitalBrain.Client/DigitalBrainClientExtensions.cs`
+- `kernel/DigitalBrain.Client/DigitalBrainSessionFactory.cs`
 - `kernel/DigitalBrain.Client/AI/**`
 - `kernel/DigitalBrain.Client/Conversations/**`
 - `kernel/DigitalBrain.Kernel/BrainOwnerIncomingCallFilter.cs`
 - `kernel/DigitalBrain.Kernel/Conversations/**`
+- `kernel/DigitalBrain.Kernel/NeuronTypeCatalogBuilder.cs`
 - `tests/DigitalBrain.Tests/AI/**`
 - `tests/DigitalBrain.Tests/Conversations/**`
 - `tests/DigitalBrain.Tests/Security/**`
@@ -152,16 +156,16 @@ dotnet build .\Brain.slnx -c Release
 
 **Implementation:**
 
-- [ ] Add provider-neutral model descriptor contracts.
-- [ ] Add role marker and typed client abstractions.
-- [ ] Add immutable configuration snapshots.
-- [ ] Add the typed durable conversation contracts.
-- [ ] Add an owner-scoped conversation client facade over Orleans.
-- [ ] Add the canonical base64url composite key encoder/parser and the internal typed conversation-grain marker.
-- [ ] Update `BrainOwnerIncomingCallFilter` to parse the canonical key only for that typed marker; never use prefix matching.
-- [ ] Add `DigitalBrainSessionFactory` so applications create a DI scope only after authentication produces a validated `BrainOwnerId`.
-- [ ] Specify optional streamed progress as non-authoritative and final committed results as repairable through `ReadAsync`.
-- [ ] Keep provider SDK types out of public contracts and out of `DigitalBrain.Aspire`.
+- [x] Add provider-neutral model descriptor contracts.
+- [x] Add role marker and typed client abstractions.
+- [x] Add immutable configuration snapshots.
+- [x] Add the typed durable conversation contracts.
+- [x] Add an owner-scoped conversation client facade over Orleans.
+- [x] Add the canonical base64url composite key encoder/parser and the internal typed conversation-grain marker.
+- [x] Update `BrainOwnerIncomingCallFilter` to parse the canonical key only for that typed marker; never use prefix matching.
+- [x] Add `DigitalBrainSessionFactory` so applications create a DI scope only after authentication produces a validated `BrainOwnerId`.
+- [x] Specify optional streamed progress as non-authoritative and final committed results as repairable through `ReadAsync`.
+- [x] Keep provider SDK types out of public contracts and out of `DigitalBrain.Aspire`.
 
 **Gate:**
 
@@ -170,6 +174,8 @@ dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 ```
 
 **Commit:** `feat: define durable DigitalBrain conversations`
+
+**Execution record (2026-07-18):** Baseline HEAD was `e67c2031a0554a9f4137835082ec982fda0baac6` on `master`; the starting 19 dirty paths matched the approved Task 2 handoff, and the assigned-path amendment above accounts for the client/session/catalog files required by the approved design. Official Microsoft Learn guidance confirmed generated Orleans grain references, incoming call filters, `RequestContext` propagation, serializer aliases, memory streams, and direct client subscriptions; exact `10.2.2-rc.2` inspection confirmed `IIncomingGrainCallContext`, `IIncomingGrainCallFilter`, `IGrainFactory`, `IStreamPubSub`, `QualifiedStreamId`, `StreamId`, and `AliasAttribute` signatures. Official OpenAI and Anthropic model references confirmed the approved `gpt-5`, `gpt-5-mini`, `text-embedding-3-small`, and `claude-sonnet-4-5` identifiers. The inherited red build exposed 32 compile errors; the first corrective run then failed 8 of 126 tests for default turn identity, invalid owner canonicalization, and public marker visibility. The first fresh review produced three reproduced failures out of 129 tests: cross-owner direct stream subscription, lossy UTF-8 identity collisions, and overlapping ambient sessions. The real Orleans pub/sub boundary was identified as `IPubSubRendezvousGrain` after the narrower `IStreamPubSub` declaring-type hypothesis failed; the incoming filter now authorizes the exact notification provider/namespace and canonical stream key. Strict UTF-8 prevents surrogate replacement collisions, the complete `IConversationNeuron` hierarchy is excluded from one-per-owner discovery, and session creation rejects overlap. Orleans analyzer evidence drove a further red method-alias contract test. A focused re-review then reproduced stale-session redisposal as 1 failed / 130 passed; disposal is now atomic, idempotent, owner-aware, and clears synchronously. The final focused review reported no critical, important, or minor findings and assessed the task ready. The final owning gate passed 131 / 131; exact root `dotnet test --logger "console;verbosity=minimal"` passed DigitalBrain.Tests 131 / 131, DigitalBrain.PackageTests 11 / 11, and Brain.FeasibilityTests 11 / 11. `aspire doctor --non-interactive` passed 5 / 5 with no warnings or failures; resource inspection correctly reported no running AppHost. CodeGraph confirmed the final owner-to-client-to-canonical-key-to-filter path and the three `DigitalBrainClient` consumers. Scope, provider-type, role-routing, comment, untracked-file, non-authoritative-progress/final-`ReadAsync` repair, and `git diff --check` guards passed.
 
 ## Task 3: Bind real OpenAI, Anthropic, and embedding clients
 
