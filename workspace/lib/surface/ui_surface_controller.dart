@@ -25,6 +25,9 @@ class UiSurfaceController extends ChangeNotifier {
   String? _closedFailure;
   String? _sanitizedFailure;
   bool _started = false;
+  bool _disposed = false;
+  bool _suppressReconnect = false;
+  bool _reconnectInFlight = false;
 
   int get feedCursor => _feedCursor;
   String? get closedFailure => _closedFailure;
@@ -35,12 +38,19 @@ class UiSurfaceController extends ChangeNotifier {
   UiSurface? surface(String surfaceId) => _surfaces[surfaceId];
 
   Future<void> start() async {
-    if (_started) {
+    if (_started || _disposed) {
       return;
     }
     _started = true;
     final cursor = cursorStore.read() ?? 0;
     _feedCursor = cursor;
+    _attachWatch(cursor);
+  }
+
+  void _attachWatch(int cursor) {
+    if (_disposed) {
+      return;
+    }
     _subscription = client
         .watch(cursor: cursor)
         .listen(
@@ -94,7 +104,10 @@ class UiSurfaceController extends ChangeNotifier {
     }
 
     if (expectedRevision != current.revision) {
-      final recovered = await _recoverSnapshot(surfaceId);
+      final recovered = await _recoverSnapshot(
+        surfaceId,
+        minimumRevision: expectedRevision,
+      );
       if (!recovered) {
         return;
       }
@@ -117,21 +130,31 @@ class UiSurfaceController extends ChangeNotifier {
   }
 
   Future<void> _onMessage(UiFeedMessage message) async {
-    if (_closedFailure != null) {
+    if (_closedFailure != null || _disposed) {
       return;
     }
     if (message.sequence <= _feedCursor) {
       return;
     }
+    if (message.sequence > _feedCursor + 1) {
+      await _reconnectFromDurableCursor();
+      return;
+    }
 
     switch (message) {
       case UiSnapshotMessage(:final snapshot):
-        _applySnapshot(snapshot.surface);
+        final next = snapshot.surface;
+        final current = _surfaces[next.surfaceId];
+        if (current != null && next.revision < current.revision) {
+          _closeProtocol('connection failure');
+          return;
+        }
+        _applySnapshot(next);
         _commitCursor(message.sequence);
       case UiPatchMessage(:final patch):
         await _applyPatch(patch, message.sequence);
-      case UiFailureMessage(:final text):
-        _sanitizedFailure = text;
+      case UiFailureMessage(:final sanitizedText):
+        _sanitizedFailure = sanitizedText;
         _commitCursor(message.sequence);
         notifyListeners();
     }
@@ -160,20 +183,40 @@ class UiSurfaceController extends ChangeNotifier {
       }
     }
 
-    final recovered = await _recoverSnapshot(patch.surfaceId);
+    final recovered = await _recoverSnapshot(
+      patch.surfaceId,
+      minimumRevision: patch.toRevision,
+    );
     if (recovered) {
       _commitCursor(sequence);
     }
   }
 
-  Future<bool> _recoverSnapshot(String surfaceId) async {
+  Future<bool> _recoverSnapshot(
+    String surfaceId, {
+    int? minimumRevision,
+  }) async {
     if (_snapshotInFlight.contains(surfaceId)) {
       return false;
     }
     _snapshotInFlight.add(surfaceId);
     try {
       final snapshot = await client.fetchSnapshot(surfaceId);
-      _applySnapshot(snapshot.surface);
+      final recovered = snapshot.surface;
+      if (recovered.surfaceId != surfaceId) {
+        _closeProtocol('connection failure');
+        return false;
+      }
+      if (minimumRevision != null && recovered.revision < minimumRevision) {
+        _closeProtocol('connection failure');
+        return false;
+      }
+      final current = _surfaces[surfaceId];
+      if (current != null && recovered.revision < current.revision) {
+        _closeProtocol('connection failure');
+        return false;
+      }
+      _applySnapshot(recovered);
       return true;
     } catch (_) {
       _closeProtocol('connection failure');
@@ -183,8 +226,31 @@ class UiSurfaceController extends ChangeNotifier {
     }
   }
 
+  Future<void> _reconnectFromDurableCursor() async {
+    if (_disposed || _reconnectInFlight || _closedFailure != null) {
+      return;
+    }
+    _reconnectInFlight = true;
+    _suppressReconnect = true;
+    try {
+      await _subscription?.cancel();
+      _subscription = null;
+      if (_disposed) {
+        return;
+      }
+      final cursor = cursorStore.read() ?? _feedCursor;
+      _feedCursor = cursor;
+      _attachWatch(cursor);
+    } catch (_) {
+      _closeProtocol('connection failure');
+    } finally {
+      _suppressReconnect = false;
+      _reconnectInFlight = false;
+    }
+  }
+
   void _commitCursor(int sequence) {
-    if (sequence <= _feedCursor) {
+    if (sequence != _feedCursor + 1) {
       return;
     }
     _feedCursor = sequence;
@@ -192,6 +258,9 @@ class UiSurfaceController extends ChangeNotifier {
   }
 
   void _onTransportError(Object error, StackTrace stackTrace) {
+    if (_disposed || _suppressReconnect) {
+      return;
+    }
     if (error is GatewayException) {
       _closeProtocol(_sanitizedMessage(error.code));
       return;
@@ -199,7 +268,12 @@ class UiSurfaceController extends ChangeNotifier {
     _closeProtocol('connection failure');
   }
 
-  void _onDone() {}
+  void _onDone() {
+    if (_disposed || _suppressReconnect || _closedFailure != null) {
+      return;
+    }
+    unawaited(_reconnectFromDurableCursor());
+  }
 
   void _closeProtocol(String message) {
     _closedFailure = message;
@@ -222,6 +296,8 @@ class UiSurfaceController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _suppressReconnect = true;
     unawaited(_subscription?.cancel());
     _subscription = null;
     super.dispose();

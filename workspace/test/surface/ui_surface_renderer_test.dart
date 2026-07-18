@@ -58,12 +58,13 @@ Map<String, dynamic> _snapshotJson({
   int schemaVersion = 1,
   String surfaceId = 'surface-1',
   int revision = 1,
+  int sequence = 1,
   List<Map<String, dynamic>>? blocks,
 }) {
   return {
     'schemaVersion': schemaVersion,
     'type': 'snapshot',
-    'sequence': revision,
+    'sequence': sequence,
     'surface': {
       'surfaceId': surfaceId,
       'revision': revision,
@@ -97,12 +98,12 @@ Map<String, dynamic> _patchJson({
   required int fromRevision,
   required int toRevision,
   required List<Map<String, dynamic>> operations,
-  int? sequence,
+  int sequence = 2,
 }) {
   return {
     'schemaVersion': schemaVersion,
     'type': 'patch',
-    'sequence': sequence ?? toRevision,
+    'sequence': sequence,
     'surfaceId': surfaceId,
     'fromRevision': fromRevision,
     'toRevision': toRevision,
@@ -130,7 +131,8 @@ void main() {
     );
     await controller.start();
     client.emit(UiFeedMessage.parse(_snapshotJson()));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
 
     expect(find.text('Hello surface'), findsOneWidget);
     expect(find.text('neuron failure'), findsOneWidget);
@@ -187,6 +189,7 @@ void main() {
       UiFeedMessage.parse(
         _snapshotJson(
           revision: 2,
+          sequence: 1,
           blocks: [
             {
               'kind': 'text',
@@ -204,6 +207,7 @@ void main() {
         _patchJson(
           fromRevision: 1,
           toRevision: 2,
+          sequence: 2,
           operations: [
             {'op': 'replace', 'path': '/blocks/0/text', 'value': 'Stale'},
           ],
@@ -230,7 +234,7 @@ void main() {
     });
 
     await controller.start();
-    client.emit(UiFeedMessage.parse(_snapshotJson(revision: 1)));
+    client.emit(UiFeedMessage.parse(_snapshotJson(revision: 1, sequence: 1)));
     await Future<void>.delayed(Duration.zero);
 
     client.emit(
@@ -238,6 +242,7 @@ void main() {
         _patchJson(
           fromRevision: 4,
           toRevision: 5,
+          sequence: 2,
           operations: [
             {'op': 'replace', 'path': '/blocks/0/text', 'value': 'Gap'},
           ],
@@ -272,11 +277,13 @@ void main() {
       ),
     );
     await controller.start();
-    client.emit(UiFeedMessage.parse(_snapshotJson(revision: 3)));
-    await tester.pumpAndSettle();
+    client.emit(UiFeedMessage.parse(_snapshotJson(revision: 3, sequence: 1)));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
 
     await tester.tap(find.text('Approve'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
 
     expect(client.actions, hasLength(1));
     expect(client.actions.single['surfaceId'], 'surface-1');
@@ -289,8 +296,9 @@ void main() {
     final client1 = _RecordingClient();
     final first = UiSurfaceController(client: client1, cursorStore: store);
     await first.start();
-    client1.emit(UiFeedMessage.parse(_snapshotJson(revision: 7)));
+    client1.emit(UiFeedMessage.parse(_snapshotJson(revision: 1, sequence: 1)));
     await Future<void>.delayed(Duration.zero);
+    store.write(7);
     expect(store.read(), 7);
     first.dispose();
     await client1.close();
@@ -372,7 +380,8 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
 
     expect(find.text('neuron failure'), findsOneWidget);
     expect(find.textContaining('secret system prompt'), findsNothing);

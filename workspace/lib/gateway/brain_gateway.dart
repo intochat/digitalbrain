@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../surface/ui_surface_client.dart';
 import '../surface/ui_surface_models.dart';
+import 'ui_watch_channel.dart';
 
 class GatewayException implements Exception {
   GatewayException(this.code, this.detail);
@@ -22,11 +22,15 @@ class BrainGateway implements UiSurfaceClient {
     required this.httpBase,
     required this.wsBase,
     http.Client? client,
-  }) : _client = client ?? http.Client();
+    UiWatchChannelFactory? watchChannelFactory,
+  }) : _client = client ?? http.Client(),
+       _watchChannelFactory =
+           watchChannelFactory ?? defaultWatchChannelFactory;
 
   final String httpBase;
   final String wsBase;
   final http.Client _client;
+  final UiWatchChannelFactory _watchChannelFactory;
 
   int lastSequence = 0;
 
@@ -62,52 +66,82 @@ class BrainGateway implements UiSurfaceClient {
   @override
   Stream<UiFeedMessage> watch({required int cursor}) {
     final controller = StreamController<UiFeedMessage>();
-    WebSocketChannel? channel;
+    UiWatchChannel? channel;
     StreamSubscription<dynamic>? subscription;
+    var failingClosed = false;
+
+    Future<void> failClosed(Object error, [StackTrace? stackTrace]) async {
+      if (failingClosed || controller.isClosed) {
+        return;
+      }
+      failingClosed = true;
+      final sanitized = _sanitizeError(error);
+      final activeSubscription = subscription;
+      subscription = null;
+      final activeChannel = channel;
+      channel = null;
+      if (activeSubscription != null) {
+        await activeSubscription.cancel();
+      }
+      Object? closeError;
+      StackTrace? closeStack;
+      if (activeChannel != null) {
+        try {
+          await activeChannel.close();
+        } catch (error, stack) {
+          closeError = error;
+          closeStack = stack;
+        }
+      }
+      if (!controller.isClosed) {
+        controller.addError(sanitized, stackTrace);
+        await controller.close();
+      }
+      if (closeError != null) {
+        Error.throwWithStackTrace(closeError, closeStack ?? StackTrace.current);
+      }
+    }
 
     Future<void> open() async {
       try {
         final uri = Uri.parse('$wsBase/ui/watch').replace(
           queryParameters: {'cursor': '$cursor'},
         );
-        channel = WebSocketChannel.connect(uri);
+        channel = await _watchChannelFactory(uri);
         await channel!.ready;
         subscription = channel!.stream.listen(
           (message) {
-            if (controller.isClosed) {
+            if (controller.isClosed || failingClosed) {
               return;
             }
             if (message is! String) {
+              unawaited(
+                failClosed(
+                  GatewayException('frame.invalid', 'feed frame rejected'),
+                ),
+              );
               return;
             }
             try {
               final frame = mapFrame(message);
-              if (frame == null) {
-                return;
-              }
               lastSequence = frame.sequence;
               controller.add(frame);
             } catch (error, stackTrace) {
-              controller.addError(_sanitizeError(error), stackTrace);
+              unawaited(failClosed(error, stackTrace));
             }
           },
           onError: (Object error, StackTrace stackTrace) {
-            if (!controller.isClosed) {
-              controller.addError(_sanitizeError(error), stackTrace);
-            }
+            unawaited(failClosed(error, stackTrace));
           },
           onDone: () {
-            if (!controller.isClosed) {
+            if (!controller.isClosed && !failingClosed) {
               unawaited(controller.close());
             }
           },
           cancelOnError: false,
         );
       } catch (error, stackTrace) {
-        if (!controller.isClosed) {
-          controller.addError(_sanitizeError(error), stackTrace);
-          unawaited(controller.close());
-        }
+        unawaited(failClosed(error, stackTrace));
       }
     }
 
@@ -115,19 +149,23 @@ class BrainGateway implements UiSurfaceClient {
       unawaited(open());
     };
     controller.onCancel = () async {
-      await subscription?.cancel();
+      failingClosed = true;
+      final activeSubscription = subscription;
       subscription = null;
-      final active = channel;
+      final activeChannel = channel;
       channel = null;
-      if (active != null) {
-        await active.sink.close().catchError((_) {});
+      if (activeSubscription != null) {
+        await activeSubscription.cancel();
+      }
+      if (activeChannel != null) {
+        await activeChannel.close();
       }
     };
 
     return controller.stream;
   }
 
-  static UiFeedMessage? mapFrame(String text) {
+  static UiFeedMessage mapFrame(String text) {
     Map<String, dynamic> decoded;
     try {
       final value = jsonDecode(text);
@@ -141,10 +179,6 @@ class BrainGateway implements UiSurfaceClient {
       throw GatewayException('frame.invalid', 'feed frame is not valid json');
     }
 
-    if (decoded['ping'] == true) {
-      return null;
-    }
-
     final schemaVersion = decoded['schemaVersion'];
     if (schemaVersion is! int ||
         schemaVersion != UiFeedMessage.supportedSchemaVersion) {
@@ -155,7 +189,7 @@ class BrainGateway implements UiSurfaceClient {
     }
 
     final sequence = decoded['sequence'];
-    if (sequence is! int || sequence < 0) {
+    if (sequence is! int || sequence < 1) {
       throw GatewayException('sequence.invalid', 'invalid feed sequence');
     }
 
@@ -164,7 +198,10 @@ class BrainGateway implements UiSurfaceClient {
     } on FormatException catch (error) {
       final message = error.message;
       if (message.contains('schema')) {
-        throw GatewayException('schema.unsupported', 'unsupported schema version');
+        throw GatewayException(
+          'schema.unsupported',
+          'unsupported schema version',
+        );
       }
       if (message.contains('sequence')) {
         throw GatewayException('sequence.invalid', 'invalid feed sequence');

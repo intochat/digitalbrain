@@ -95,8 +95,17 @@ void main() {
   });
 
   group('BrainGateway.mapFrame', () {
-    test('skips ping frames', () {
-      expect(BrainGateway.mapFrame(jsonEncode({'ping': true})), isNull);
+    test('rejects unversioned ping frames', () {
+      expect(
+        () => BrainGateway.mapFrame(jsonEncode({'ping': true})),
+        throwsA(
+          isA<GatewayException>().having(
+            (e) => e.code,
+            'code',
+            'schema.unsupported',
+          ),
+        ),
+      );
     });
 
     test('throws for non-JSON text', () {
@@ -126,8 +135,7 @@ void main() {
         }),
       );
 
-      expect(frame, isNotNull);
-      expect(frame!.sequence, 1);
+      expect(frame.sequence, 1);
     });
 
     test('throws for unknown schema version', () {

@@ -36,7 +36,14 @@ class UiBlock {
     required this.actions,
   });
 
-  static const Set<String> supportedKinds = {'text', 'failure'};
+  static const Set<String> supportedKinds = {
+    'text',
+    'failure',
+    'topic',
+    'status',
+    'message',
+    'checkpoint',
+  };
 
   final String kind;
   final String text;
@@ -226,7 +233,7 @@ sealed class UiFeedMessage {
       throw const FormatException('feed frame missing type');
     }
     final sequence = json['sequence'];
-    if (sequence is! int || sequence < 0) {
+    if (sequence is! int || sequence < 1) {
       throw const FormatException('invalid feed sequence');
     }
     switch (type) {
@@ -243,25 +250,17 @@ sealed class UiFeedMessage {
           patch: UiSurfacePatch.fromJson(json),
         );
       case 'failure':
-        final text = json['text'];
-        if (text is! String) {
-          throw const FormatException('failure frame missing text');
+        final code = json['code'];
+        if (code is! String || code.isEmpty) {
+          throw const FormatException('failure frame missing code');
         }
         return UiFailureMessage(
           schemaVersion: schemaVersion,
           sequence: sequence,
-          text: text,
+          code: code,
         );
       default:
         throw FormatException('unsupported feed type $type');
-    }
-  }
-
-  static UiFeedMessage? tryParse(Map<String, dynamic> json) {
-    try {
-      return parse(json);
-    } on FormatException {
-      return null;
     }
   }
 }
@@ -290,8 +289,19 @@ class UiFailureMessage extends UiFeedMessage {
   const UiFailureMessage({
     required super.schemaVersion,
     required super.sequence,
-    required this.text,
+    required this.code,
   });
 
-  final String text;
+  final String code;
+
+  String get sanitizedText => sanitizeFailureCode(code);
+
+  static String sanitizeFailureCode(String code) {
+    switch (code) {
+      case 'neuron.failure':
+        return 'neuron failure';
+      default:
+        return 'operation failed';
+    }
+  }
 }

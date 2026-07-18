@@ -76,7 +76,7 @@ Map<String, dynamic> _snapshotJson({
   final json = <String, dynamic>{
     'schemaVersion': ?schemaVersion,
     'type': 'snapshot',
-    if (!omitSequence) 'sequence': sequence ?? revision,
+    if (!omitSequence) 'sequence': sequence ?? 1,
     'surface': {
       'surfaceId': surfaceId,
       'revision': revision,
@@ -298,12 +298,14 @@ void main() {
     expect(store.read(), isNull);
     expect(controller.feedCursor, 0);
 
-    client.emit(UiFeedMessage.parse(_snapshotJson(revision: 5)));
+    client.emit(
+      UiFeedMessage.parse(_snapshotJson(revision: 5, sequence: 1)),
+    );
     await Future<void>.delayed(Duration.zero);
 
     expect(controller.surface('surface-1'), isNotNull);
-    expect(store.read(), 5);
-    expect(controller.feedCursor, 5);
+    expect(store.read(), 1);
+    expect(controller.feedCursor, 1);
   });
 
   test('gap_recovery_persists_triggering_sequence_after_snapshot', () async {
@@ -328,7 +330,7 @@ void main() {
         _patchJson(
           fromRevision: 4,
           toRevision: 5,
-          sequence: 9,
+          sequence: 2,
           operations: [
             {'op': 'replace', 'path': '/blocks/0/text', 'value': 'Gap'},
           ],
@@ -339,8 +341,8 @@ void main() {
 
     expect(client.snapshotRequests, contains('surface-1'));
     expect(controller.surface('surface-1')!.revision, 10);
-    expect(store.read(), 9);
-    expect(controller.feedCursor, 9);
+    expect(store.read(), 2);
+    expect(controller.feedCursor, 2);
   });
 
   test('gap_recovery_failure_keeps_old_cursor_and_closes', () async {
@@ -357,9 +359,9 @@ void main() {
 
     await controller.start();
     client.failSnapshot = false;
-    client.emit(UiFeedMessage.parse(_snapshotJson(revision: 1, sequence: 3)));
+    client.emit(UiFeedMessage.parse(_snapshotJson(revision: 1, sequence: 1)));
     await Future<void>.delayed(Duration.zero);
-    expect(store.read(), 3);
+    expect(store.read(), 1);
 
     client.failSnapshot = true;
     client.emit(
@@ -367,7 +369,7 @@ void main() {
         _patchJson(
           fromRevision: 8,
           toRevision: 9,
-          sequence: 12,
+          sequence: 2,
           operations: [
             {'op': 'replace', 'path': '/blocks/0/text', 'value': 'Gap'},
           ],
@@ -376,8 +378,8 @@ void main() {
     );
     await Future<void>.delayed(const Duration(milliseconds: 20));
 
-    expect(store.read(), 3);
-    expect(controller.feedCursor, 3);
+    expect(store.read(), 1);
+    expect(controller.feedCursor, 1);
     expect(controller.closedFailure, isNotNull);
     expect(controller.surface('surface-1')!.revision, 1);
   });
@@ -399,7 +401,7 @@ void main() {
       UiFeedMessage.parse(
         _snapshotJson(
           revision: 2,
-          sequence: 2,
+          sequence: 1,
           blocks: [
             {
               'kind': 'text',
@@ -416,7 +418,7 @@ void main() {
       UiFeedMessage.parse(
         _snapshotJson(
           revision: 99,
-          sequence: 2,
+          sequence: 1,
           blocks: [
             {
               'kind': 'text',
@@ -431,7 +433,7 @@ void main() {
 
     expect(controller.surface('surface-1')!.textOrFirst, 'Current');
     expect(controller.surface('surface-1')!.revision, 2);
-    expect(store.read(), 2);
+    expect(store.read(), 1);
   });
 
   testWidgets('stale_action_expected_revision_fails_closed_or_refreshes', (
@@ -458,7 +460,7 @@ void main() {
       UiFeedMessage.parse(
         _snapshotJson(
           revision: 5,
-          sequence: 5,
+          sequence: 1,
           blocks: [
             {
               'kind': 'text',
@@ -475,10 +477,12 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
 
     await tester.tap(find.text('Approve'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
 
     expect(client.actions, isEmpty);
     expect(
@@ -512,7 +516,7 @@ void main() {
       UiFeedMessage.parse(
         _snapshotJson(
           revision: 7,
-          sequence: 7,
+          sequence: 1,
           blocks: [
             {
               'kind': 'text',
@@ -529,10 +533,12 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
 
     await tester.tap(find.text('Approve'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
 
     expect(client.actions, hasLength(1));
     expect(client.actions.single['expectedRevision'], 7);
