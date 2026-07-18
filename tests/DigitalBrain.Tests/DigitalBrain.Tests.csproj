@@ -6,6 +6,7 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../kernel/Brain.Client/Brain.Client.csproj" />
     <ProjectReference Include="../../kernel/Brain.Contracts/Brain.Contracts.csproj" />
     <ProjectReference Include="../../kernel/Brain.Kernel/Brain.Kernel.csproj" />
     <ProjectReference Include="../../hosts/Brain.Kernel.Host/Brain.Kernel.Host.csproj" />

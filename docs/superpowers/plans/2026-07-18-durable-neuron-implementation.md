@@ -324,6 +324,7 @@ Execution record (2026-07-18): the exact scan had zero matches in the active Tas
 - Modify: `Brain.slnx`
 - Modify: `tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj`
 - Modify: `tests/DigitalBrain.Tests/Architecture/ProjectTopologyTests.cs`
+- Modify: `tests/DigitalBrain.Tests/Kernel/NeuronDurableStateTests.cs`
 - Delete: `tests/DigitalBrain.Tests/BrainClusterCallerKeyTests.cs`
 - Delete: `tests/DigitalBrain.Tests/Kernel/TypedProxyTests.cs`
 - Create: `tests/DigitalBrain.Tests/Client/DigitalBrainClientTests.cs`
@@ -340,20 +341,22 @@ public sealed class DigitalBrainClient
 
 `Get<TNeuron>()` is exactly an owner-bound convenience over `IClusterClient.GetGrain<TNeuron>(owner.Value)`. It returns the real Orleans reference and never accepts a grain key.
 
-- [ ] Add a test that constructs a client for `new BrainOwnerId("owner-a")`, calls `Get<ITestNeuron>()`, and asserts the reference key is exactly `owner-a`.
-- [ ] Add a source guard proving the client contains no `DispatchProxy`, reflection invocation, JSON serializer, address parser, or string provider prefix.
-- [ ] Add an outgoing-call-filter test proving the authenticated owner travels in Orleans `RequestContext` under a key derived with `nameof(BrainOwnerId)`.
-- [ ] Add an incoming-call-filter test proving owner A can call owner A's neuron and is rejected when directly obtaining owner B's grain through raw `IClusterClient`.
-- [ ] Run the owning test project and observe red because the owner-bound client and filters do not exist.
-- [ ] Delete `NeuronProxy` and the old caller-key/address client.
-- [ ] Implement a singleton `BrainOwnerContext` backed by `AsyncLocal<BrainOwnerId?>`.
-- [ ] Register a scoped `DigitalBrainClient` from the authenticated owner accessor and a client outgoing call filter which reads the current typed owner context.
-- [ ] Register a server incoming call filter which applies only to `Neuron` instances and compares the typed request owner with `GetPrimaryKeyString()`.
-- [ ] Represent denial with a typed exception/failure enum, not an error-code string switch.
-- [ ] Map unauthenticated and cross-owner calls to `NeuronFailureKind.AuthenticationRequired` and `NeuronFailureKind.AuthorizationDenied`.
-- [ ] Run the owning test project; require green.
-- [ ] Run the root checkpoint; require green.
-- [ ] Codex commits as `feat: add owner-bound digital brain client`.
+- [x] Add a test that constructs a client for `new BrainOwnerId("owner-a")`, calls `Get<ITestNeuron>()`, and asserts the reference key is exactly `owner-a`.
+- [x] Add a source guard proving the client contains no `DispatchProxy`, reflection invocation, JSON serializer, address parser, or string provider prefix.
+- [x] Add an outgoing-call-filter test proving the authenticated owner travels in Orleans `RequestContext` under a key derived with `nameof(BrainOwnerId)`.
+- [x] Add an incoming-call-filter test proving owner A can call owner A's neuron and is rejected when directly obtaining owner B's grain through raw `IClusterClient`.
+- [x] Run the owning test project and observe red because the owner-bound client and filters do not exist.
+- [x] Delete `NeuronProxy` and the old caller-key/address client.
+- [x] Implement a singleton `BrainOwnerContext` backed by `AsyncLocal<BrainOwnerId?>`.
+- [x] Register a scoped `DigitalBrainClient` from the authenticated owner accessor and a client outgoing call filter which reads the current typed owner context.
+- [x] Register a server incoming call filter which applies only to `Neuron` instances and compares the typed request owner with `GetPrimaryKeyString()`.
+- [x] Represent denial with a typed exception/failure enum, not an error-code string switch.
+- [x] Map unauthenticated and cross-owner calls to `NeuronFailureKind.AuthenticationRequired` and `NeuronFailureKind.AuthorizationDenied`.
+- [x] Run the owning test project; require green.
+- [x] Run the root checkpoint; require green.
+- [x] Codex commits as `feat: add owner-bound digital brain client`.
+
+Execution record (2026-07-18): Task 3's incoming owner filter intentionally makes the Task 2 durable-state integration test require an authenticated request context. The user directed Codex to keep operating Grok CLI, so that directly affected test is included in Task 3's correction scope; it must set and remove the typed owner in a `finally` block.
 
 ---
 

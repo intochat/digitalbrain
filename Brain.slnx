@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/kernel/">
+    <Project Path="kernel/Brain.Client/Brain.Client.csproj" />
     <Project Path="kernel/Brain.Contracts/Brain.Contracts.csproj" />
     <Project Path="kernel/Brain.Kernel/Brain.Kernel.csproj" />
   </Folder>

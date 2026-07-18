@@ -26,6 +26,7 @@ public sealed class ProjectTopologyTests
             [
                 "hosts/Brain.Kernel.Host/Brain.Kernel.Host.csproj",
                 "hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj",
+                "kernel/Brain.Client/Brain.Client.csproj",
                 "kernel/Brain.Contracts/Brain.Contracts.csproj",
                 "kernel/Brain.Kernel/Brain.Kernel.csproj",
                 "tests/Brain.FeasibilityTests/Brain.FeasibilityTests.csproj",
@@ -37,6 +38,7 @@ public sealed class ProjectTopologyTests
             .Select(path => Path.GetFileNameWithoutExtension(path)!)
             .ToArray();
 
+        Assert.Contains(projectNames, name => name.Equals("Brain.Client", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(projectNames, name => name.Equals("AI", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(projectNames, name => name.Equals("AI.Contracts", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(projectNames, name => name.Equals("Flutter", StringComparison.OrdinalIgnoreCase));
@@ -44,7 +46,6 @@ public sealed class ProjectTopologyTests
         Assert.DoesNotContain(projectNames, name => name.Equals("Google", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(projectNames, name => name.Equals("Google.Contracts", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(projectNames, name => name.Equals("Brain.Mcp", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(projectNames, name => name.Equals("Brain.Client", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
