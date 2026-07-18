@@ -4,9 +4,20 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import 'envelope.dart';
+import '../surface/ui_surface_client.dart';
+import '../surface/ui_surface_models.dart';
 
-class BrainGateway {
+class GatewayException implements Exception {
+  GatewayException(this.code, this.detail);
+
+  final String code;
+  final String detail;
+
+  @override
+  String toString() => 'GatewayException($code, $detail)';
+}
+
+class BrainGateway implements UiSurfaceClient {
   BrainGateway({
     required this.httpBase,
     required this.wsBase,
@@ -19,76 +30,63 @@ class BrainGateway {
 
   int lastSequence = 0;
 
-  Future<Map<String, dynamic>> invoke(
-    String address,
-    String contract,
-    String inputJson,
-    String commandId, {
-    int? expectedRevision,
+  @override
+  Future<UiSurfaceSnapshot> fetchSnapshot(String surfaceId) async {
+    final uri = Uri.parse('$httpBase/ui/surface').replace(
+      queryParameters: {'surfaceId': surfaceId},
+    );
+    final response = await _client.get(uri);
+    final body = _decodeBody(response);
+    final schemaVersion = body['schemaVersion'];
+    if (schemaVersion is int &&
+        schemaVersion != UiFeedMessage.supportedSchemaVersion) {
+      throw GatewayException(
+        'schema.unsupported',
+        'unsupported schema version $schemaVersion',
+      );
+    }
+    return UiSurfaceSnapshot.fromJson(body);
+  }
+
+  @override
+  Future<void> sendSurfaceAction({
+    required String surfaceId,
+    required String actionId,
+    required int expectedRevision,
   }) async {
     final response = await _client.post(
-      Uri.parse('$httpBase/ui/invoke'),
+      Uri.parse('$httpBase/ui/surface/action'),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'address': address,
-        'contract': contract,
-        'inputJson': inputJson,
-        'commandId': commandId,
-        'expectedRevision': ?expectedRevision,
+        'surfaceId': surfaceId,
+        'actionId': actionId,
+        'expectedRevision': expectedRevision,
       }),
     );
-
-    return _decodeBody(response);
+    _decodeBody(response);
   }
 
-  Future<NeuronSnapshot> read(
-    String address, {
-    String projection = 'default',
-  }) async {
-    final uri = Uri.parse(
-      '$httpBase/ui/read',
-    ).replace(queryParameters: {'address': address, 'projection': projection});
-    final response = await _client.get(uri);
-    return NeuronSnapshot.fromJson(_decodeBody(response));
-  }
-
-  Future<NeuronDescription> describe(String address) async {
-    final uri = Uri.parse(
-      '$httpBase/ui/describe',
-    ).replace(queryParameters: {'address': address});
-    final response = await _client.get(uri);
-    return NeuronDescription.fromJson(_decodeBody(response));
-  }
-
-  Map<String, dynamic> _decodeBody(http.Response response) {
-    if (response.statusCode == 409) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw GatewayException(body['code'] as String, body['detail'] as String);
-    }
-    if (response.statusCode != 200) {
-      throw GatewayException('http.error', 'status ${response.statusCode}');
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
-  }
-
-  Stream<FeedFrame> watch({
-    int cursor = 0,
-    String space = 'actor/ui-dev',
-  }) async* {
-    final uri = Uri.parse(
-      '$wsBase/ui/watch',
-    ).replace(queryParameters: {'cursor': '$cursor', 'space': space});
+  @override
+  Stream<UiFeedMessage> watch({required int cursor}) async* {
+    final uri = Uri.parse('$wsBase/ui/watch').replace(
+      queryParameters: {'cursor': '$cursor'},
+    );
     final channel = WebSocketChannel.connect(uri);
     await channel.ready;
     await for (final message in channel.stream) {
-      final frame = mapFrame(message as String);
-      if (frame == null) continue;
+      if (message is! String) {
+        continue;
+      }
+      final frame = mapFrame(message);
+      if (frame == null) {
+        continue;
+      }
       lastSequence = frame.sequence;
       yield frame;
     }
   }
 
-  static FeedFrame? mapFrame(String text) {
+  static UiFeedMessage? mapFrame(String text) {
     try {
       final decoded = jsonDecode(text);
       if (decoded is! Map<String, dynamic>) {
@@ -97,11 +95,25 @@ class BrainGateway {
       if (decoded['ping'] == true) {
         return null;
       }
-      return FeedFrame.fromJson(decoded);
+      return UiFeedMessage.parse(decoded);
     } on FormatException {
       return null;
     } on TypeError {
       return null;
     }
+  }
+
+  Map<String, dynamic> _decodeBody(http.Response response) {
+    if (response.statusCode == 409) {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      throw GatewayException(
+        body['code'] as String? ?? 'conflict',
+        body['detail'] as String? ?? 'conflict',
+      );
+    }
+    if (response.statusCode != 200) {
+      throw GatewayException('http.error', 'status ${response.statusCode}');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 }
