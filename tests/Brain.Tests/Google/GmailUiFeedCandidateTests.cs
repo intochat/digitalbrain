@@ -216,6 +216,37 @@ public sealed class GmailUiFeedCandidateTests
     }
 
     [Fact]
+    public async Task Candidate_less_outcome_fails_closed_before_vertical_publish()
+    {
+        var instance = "ui-candidate-missing";
+        var (gmail, control) = Grain(instance);
+        await control.SetAutoDrainAsync(false);
+        var vertical = await SubscribeVerticalFeedAsync(instance);
+        _fixture.Mcp.ListResult = new GmailMessageListResult(1, "one");
+
+        await gmail.ListMessagesAsync(
+            new CommandSynapse<GmailListRequest>(
+                Meta(Guid.NewGuid(), instance),
+                new GmailListRequest("is:inbox", 5)));
+
+        var pending = await control.PeekOutboxAsync();
+        Assert.NotNull(pending);
+        var malformed = pending! with
+        {
+            Event = pending.Event with
+            {
+                Payload = pending.Event.Payload with { UiCandidate = null }
+            }
+        };
+
+        var exception = await Assert.ThrowsAsync<BrainException>(
+            () => control.ReplayOutboxIntentAsync(malformed));
+        Assert.Equal(BrainErrors.FailureSanitized, exception.Code);
+        Assert.Empty(await vertical.GetEventsAsync());
+        Assert.True(await control.GetOutboxCountAsync() >= 1);
+    }
+
+    [Fact]
     public async Task Provider_failure_enqueues_sanitized_ui_failure_candidate_without_secrets()
     {
         var instance = "ui-candidate-fail";
@@ -253,4 +284,3 @@ public sealed class GmailUiFeedCandidateTests
         Assert.DoesNotContain("secret@example.com", frame.FailureCode ?? string.Empty, StringComparison.Ordinal);
     }
 }
-

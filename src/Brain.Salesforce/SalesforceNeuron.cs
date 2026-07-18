@@ -233,6 +233,11 @@ public sealed class SalesforceNeuron(
 
     private async Task PublishOutcomeWithSeamAsync(OutboxIntent<SalesforceFeedEvent> intent)
     {
+        var candidate = intent.Event.Payload.UiCandidate
+            ?? throw new BrainException(
+                BrainErrors.FailureSanitized,
+                ReactiveNeuronPipeline<SalesforceFeedEvent>.UnknownFailureMessage);
+
         if (Flags.TryGetValue(SalesforceConstants.FailNextOutcomePublishFlag, out var raw)
             && int.TryParse(raw, out var remaining)
             && remaining > 0)
@@ -242,8 +247,7 @@ public sealed class SalesforceNeuron(
             throw new InvalidOperationException("outcome publish failed");
         }
 
-        if (intent.Event.Payload.UiCandidate is { } candidate)
-            await PublishUiFeedCandidateAsync(intent.Event.Metadata, candidate);
+        await PublishUiFeedCandidateAsync(intent.Event.Metadata, candidate);
 
         var vertical = intent.Event with
         {

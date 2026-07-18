@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Brain.Contracts;
 using Brain.Kernel;
 using DigitalBrain.AI;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -31,6 +32,7 @@ public sealed class AiClusterFixture : IDisposable
         var builder = new TestClusterBuilder();
         builder.Options.InitialSilosCount = 1;
         builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        builder.AddClientBuilderConfigurator<ClientConfigurator>();
         Cluster = builder.Build();
         Cluster.Deploy();
     }
@@ -67,6 +69,15 @@ public sealed class AiClusterFixture : IDisposable
             siloBuilder.Services.AddKeyedSingleton<Microsoft.Extensions.AI.IChatClient>(
                 AiServiceKeys.Grok45ChatClient,
                 (_, _) => SharedAiTestClients.Grok ?? new ScriptedChatClient("grok-reply"));
+        }
+    }
+
+    private sealed class ClientConfigurator : IClientBuilderConfigurator
+    {
+        public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+        {
+            clientBuilder.AddMemoryStreams(
+                ReactiveNeuron<GroupChatStepEvent>.DefaultStreamProviderName);
         }
     }
 }

@@ -1,7 +1,11 @@
+using System.Security.Cryptography;
+using System.Text;
 using Brain.Client;
 using Brain.Contracts;
+using Brain.Kernel;
 using DigitalBrain.AI;
 using Orleans.Runtime;
+using Orleans.Streams;
 using Xunit;
 
 namespace Brain.Tests.AI;
@@ -22,15 +26,21 @@ public sealed class GroupChatUiFeedCandidateTests
     private static SpaceId Space(string scope) => new($"space-{scope}");
 
     private static SynapseMetadata Meta(Guid commandId, string scope) =>
+        Meta(commandId, Org(scope), Space(scope));
+
+    private static SynapseMetadata Meta(
+        Guid commandId,
+        OrganizationId organization,
+        SpaceId space) =>
         new(
             CommandId: commandId,
             EventId: commandId,
             CausationId: commandId,
             CorrelationId: commandId,
-            OrganizationId: Org(scope),
+            OrganizationId: organization,
             PrincipalId: new PrincipalId("principal-1"),
-            SpaceId: Space(scope),
-            Source: new NeuronAddress(Org(scope), Space(scope), "chat.group.v1", "source"),
+            SpaceId: space,
+            Source: new NeuronAddress(organization, space, "chat.group.v1", "source"),
             SourceSequence: 0,
             CausalDepth: 0,
             OccurredAt: DateTimeOffset.UtcNow);
@@ -44,15 +54,24 @@ public sealed class GroupChatUiFeedCandidateTests
             NeuronIdentity.Derive(typeof(IGrok45), Org(scope), Space(scope), name));
 
     private IGroupChatControl Chat(string scope) =>
+        Chat(Org(scope), Space(scope), scope);
+
+    private IGroupChatControl Chat(
+        OrganizationId organization,
+        SpaceId space,
+        string instance) =>
         _fixture.Cluster.GrainFactory.GetGrain<IGroupChatControl>(
-            NeuronIdentity.Derive(typeof(IGroupChat), Org(scope), Space(scope), scope));
+            NeuronIdentity.Derive(typeof(IGroupChat), organization, space, instance));
 
     private static string ChatKey(string scope) =>
         NeuronIdentity.Derive(typeof(IGroupChat), Org(scope), Space(scope), scope);
 
     private IUiFeed Feed(string scope) =>
+        Feed(Org(scope), Space(scope));
+
+    private IUiFeed Feed(OrganizationId organization, SpaceId space) =>
         _fixture.Cluster.GrainFactory.GetGrain<IUiFeed>(
-            UiFeedStreams.FeedKey(Org(scope), Space(scope)));
+            UiFeedStreams.FeedKey(organization, space));
 
     private static async Task WaitForStepCountAsync(IGroupChatControl chat, int minimumSteps, TimeSpan timeout)
     {
@@ -259,14 +278,122 @@ public sealed class GroupChatUiFeedCandidateTests
         var page = await WaitForFeedFramesAsync(feed, 2);
         Assert.Contains(page.Frames, frame => frame.EventId == uiHead.Metadata.EventId);
 
-        await chat.PublishStepEventAsync(uiHead);
+        var invalidIntent = await Assert.ThrowsAsync<BrainException>(
+            () => chat.PublishStepEventAsync(uiHead));
+        Assert.Equal(BrainErrors.FailureSanitized, invalidIntent.Code);
         await Task.Delay(200);
         Assert.Equal(2, (await chat.GetDiagnosticsAsync()).StepCount);
+    }
 
-        var framesBefore = (await feed.ReadAsync(0, 100)).Frames.Count;
-        await chat.PublishUiCandidateEventAsync(uiHead);
-        await Task.Delay(200);
-        Assert.Equal(framesBefore, (await feed.ReadAsync(0, 100)).Frames.Count);
+    [Fact]
+    public void Step_event_shapes_are_exact_and_fail_closed()
+    {
+        var discussionId = Guid.NewGuid();
+        var candidate = UiFeedCandidate.CreateFailure(BrainErrors.FailureSanitized);
+
+        Assert.True(new GroupChatStepEvent(0, discussionId, GroupChatStepEvent.StepKind).IsStepIntent);
+        Assert.True(new GroupChatStepEvent(0, discussionId, GroupChatStepEvent.UiKind, candidate).IsUiIntent);
+
+        var mixedStep = new GroupChatStepEvent(0, discussionId, GroupChatStepEvent.StepKind, candidate);
+        Assert.False(mixedStep.IsStepIntent);
+        Assert.False(mixedStep.IsUiIntent);
+
+        var missingCandidate = new GroupChatStepEvent(0, discussionId, GroupChatStepEvent.UiKind);
+        Assert.False(missingCandidate.IsStepIntent);
+        Assert.False(missingCandidate.IsUiIntent);
+
+        var unknown = new GroupChatStepEvent(0, discussionId, "unknown");
+        Assert.False(unknown.IsStepIntent);
+        Assert.False(unknown.IsUiIntent);
+    }
+
+    [Fact]
+    public async Task Ui_only_event_on_step_stream_does_not_mutate_chat()
+    {
+        const string scope = "gc-ui-wrong-stream";
+        var commandId = Guid.NewGuid();
+        var chat = Chat(scope);
+        await chat.SetAutoDrainAsync(false);
+        var gpt = Gpt(scope, "gpt");
+        var grok = Grok(scope, "grok");
+
+        await chat.StartDiscussionAsync(new CommandSynapse<StartDiscussion>(
+            Meta(commandId, scope),
+            new StartDiscussion(
+                "topic-ui-wrong-stream",
+                ((IAddressable)gpt).GetGrainId().Key.ToString()!,
+                ((IAddressable)grok).GetGrainId().Key.ToString()!)));
+
+        var before = await chat.GetDiagnosticsAsync();
+        var uiEvent = await chat.PeekOutboxEventAsync();
+        Assert.NotNull(uiEvent);
+        Assert.True(uiEvent!.Payload.IsUiIntent);
+
+        var streamBytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{ChatKey(scope)}:{commandId:N}"));
+        var streamId = new Guid(streamBytes.AsSpan(0, 16));
+        var stream = _fixture.Cluster.Client
+            .GetStreamProvider(ReactiveNeuron<GroupChatStepEvent>.DefaultStreamProviderName)
+            .GetStream<EventSynapse<GroupChatStepEvent>>(
+                StreamId.Create(GroupChatNeuron.EventStreamNamespace, streamId));
+
+        var rawUiEvent = uiEvent with
+        {
+            Metadata = uiEvent.Metadata with
+            {
+                EventId = Guid.NewGuid(),
+                CausationId = Guid.NewGuid()
+            }
+        };
+        await stream.OnNextAsync(rawUiEvent);
+        await Task.Delay(250);
+
+        var after = await chat.GetDiagnosticsAsync();
+        Assert.Equal(before.Revision, after.Revision);
+        Assert.Equal(before.UiRevision, after.UiRevision);
+        Assert.Equal(before.TranscriptCount, after.TranscriptCount);
+        Assert.Equal(before.StepCount, after.StepCount);
+        Assert.Equal(before.OutboxCount, after.OutboxCount);
+    }
+
+    [Fact]
+    public async Task Same_discussion_id_on_two_surfaces_produces_distinct_feed_events()
+    {
+        var organization = new OrganizationId("org-gc-shared");
+        var space = new SpaceId("space-gc-shared");
+        var commandId = Guid.NewGuid();
+        var feed = Feed(organization, space);
+        await feed.EnsureSubscribedAsync();
+        var first = Chat(organization, space, "first");
+        var second = Chat(organization, space, "second");
+        await first.SetAutoDrainAsync(false);
+        await second.SetAutoDrainAsync(false);
+        var gpt = _fixture.Cluster.GrainFactory.GetGrain<IGpt56Turn>(
+            NeuronIdentity.Derive(typeof(IGpt56), organization, space, "gpt"));
+        var grok = _fixture.Cluster.GrainFactory.GetGrain<IGrok45Turn>(
+            NeuronIdentity.Derive(typeof(IGrok45), organization, space, "grok"));
+        var start = new StartDiscussion(
+            "shared-discussion-id",
+            ((IAddressable)gpt).GetGrainId().Key.ToString()!,
+            ((IAddressable)grok).GetGrainId().Key.ToString()!);
+
+        await first.StartDiscussionAsync(new CommandSynapse<StartDiscussion>(
+            Meta(commandId, organization, space),
+            start));
+        await second.StartDiscussionAsync(new CommandSynapse<StartDiscussion>(
+            Meta(commandId, organization, space),
+            start));
+
+        var firstUi = await first.PeekOutboxEventAsync();
+        var secondUi = await second.PeekOutboxEventAsync();
+        Assert.NotNull(firstUi);
+        Assert.NotNull(secondUi);
+        Assert.NotEqual(firstUi!.Metadata.EventId, secondUi!.Metadata.EventId);
+
+        await first.DrainOutboxAsync();
+        await second.DrainOutboxAsync();
+        var page = await WaitForFeedFramesAsync(feed, 2);
+        Assert.Contains(page.Frames, frame => frame.EventId == firstUi.Metadata.EventId);
+        Assert.Contains(page.Frames, frame => frame.EventId == secondUi.Metadata.EventId);
     }
 
     [Fact]
@@ -381,8 +508,6 @@ public sealed class GroupChatUiFeedCandidateTests
         var page = await WaitForFeedFramesAsync(feed, 1);
         Assert.Contains(page.Frames, frame => frame.EventId == pendingEventId);
 
-        await reloaded.PublishUiCandidateEventAsync(pendingUi);
-        await Task.Delay(200);
         Assert.Equal(1, (await feed.ReadAsync(0, 100)).Frames.Count(frame => frame.EventId == pendingEventId));
     }
 }

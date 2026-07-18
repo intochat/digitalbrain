@@ -223,6 +223,37 @@ public sealed class SalesforceUiFeedCandidateTests
     }
 
     [Fact]
+    public async Task Candidate_less_outcome_fails_closed_before_vertical_publish()
+    {
+        var instance = "sf-ui-candidate-missing";
+        var (salesforce, control) = Grain(instance);
+        await control.SetAutoDrainAsync(false);
+        var vertical = await SubscribeVerticalFeedAsync(instance);
+        _fixture.Mcp.QueryResult = new SalesforceQueryResult(1, "one");
+
+        await salesforce.QueryRecordsAsync(
+            new CommandSynapse<SalesforceQueryRequest>(
+                Meta(Guid.NewGuid(), instance),
+                new SalesforceQueryRequest("SELECT Id FROM Account")));
+
+        var pending = await control.PeekOutboxAsync();
+        Assert.NotNull(pending);
+        var malformed = pending! with
+        {
+            Event = pending.Event with
+            {
+                Payload = pending.Event.Payload with { UiCandidate = null }
+            }
+        };
+
+        var exception = await Assert.ThrowsAsync<BrainException>(
+            () => control.ReplayOutboxIntentAsync(malformed));
+        Assert.Equal(BrainErrors.FailureSanitized, exception.Code);
+        Assert.Empty(await vertical.GetEventsAsync());
+        Assert.True(await control.GetOutboxCountAsync() >= 1);
+    }
+
+    [Fact]
     public async Task Provider_failure_enqueues_sanitized_ui_failure_candidate_without_secrets()
     {
         var instance = "sf-ui-candidate-fail";

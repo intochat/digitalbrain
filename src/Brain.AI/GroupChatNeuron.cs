@@ -205,53 +205,39 @@ public sealed class GroupChatNeuron(
 
     public Task PublishStepEventAsync(EventSynapse<GroupChatStepEvent> @event)
     {
-        var stepPayload = @event.Payload with
-        {
-            IntentKind = GroupChatStepEvent.StepKind,
-            Candidate = null
-        };
-        var stepEvent = @event with { Payload = stepPayload };
+        if (!@event.Payload.IsStepIntent)
+            throw InvalidIntent();
+
         var streamId = ReadStreamId();
-        return PublishEventAsync(stepEvent, DefaultStreamProviderName, EventStreamNamespace, streamId);
-    }
-
-    public Task PublishUiCandidateEventAsync(EventSynapse<GroupChatStepEvent> @event)
-    {
-        if (@event.Payload.Candidate is null)
-            throw new BrainException(BrainErrors.FailureSanitized, ReactiveNeuronPipeline<GroupChatStepEvent>.UnknownFailureMessage);
-
-        return PublishUiFeedCandidateAsync(@event.Metadata, @event.Payload.Candidate);
+        return PublishEventAsync(@event, DefaultStreamProviderName, EventStreamNamespace, streamId);
     }
 
     protected override async Task PublishOutboxIntentAsync(OutboxIntent<GroupChatStepEvent> intent)
     {
         if (intent.Event.Payload.IsUiIntent)
         {
-            var candidate = intent.Event.Payload.Candidate
-                ?? throw new BrainException(BrainErrors.FailureSanitized, ReactiveNeuronPipeline<GroupChatStepEvent>.UnknownFailureMessage);
+            var candidate = intent.Event.Payload.Candidate!;
             await PublishUiFeedCandidateAsync(intent.Event.Metadata, candidate);
             return;
         }
 
-        var stepPayload = intent.Event.Payload with
-        {
-            IntentKind = GroupChatStepEvent.StepKind,
-            Candidate = null
-        };
-        var stepEvent = intent.Event with { Payload = stepPayload };
-        await PublishEventAsync(stepEvent, DefaultStreamProviderName, intent.StreamNamespace, intent.StreamId);
+        if (!intent.Event.Payload.IsStepIntent)
+            throw InvalidIntent();
+
+        await PublishEventAsync(
+            intent.Event,
+            DefaultStreamProviderName,
+            intent.StreamNamespace,
+            intent.StreamId);
     }
 
     private async Task OnStreamEventAsync(EventSynapse<GroupChatStepEvent> item, StreamSequenceToken? token)
     {
+        if (!item.Payload.IsStepIntent)
+            return;
+
         await HandleEventCoreAsync(item, async (payload, commit) =>
         {
-            if (payload.IsUiIntent)
-            {
-                await commit(new ReactiveCommit<GroupChatStepEvent>(DomainState, UiRevision, Outbox: []));
-                return;
-            }
-
             var state = ReadState();
             if (state is null)
             {
@@ -439,7 +425,10 @@ public sealed class GroupChatNeuron(
         long uiRevision,
         UiFeedCandidate candidate)
     {
-        var eventId = CreateCandidateEventId(state.DiscussionId, uiRevision);
+        var eventId = CreateCandidateEventId(
+            this.GetPrimaryKeyString(),
+            state.DiscussionId,
+            uiRevision);
         var self = NeuronAddress.Parse(this.GetPrimaryKeyString());
         var metadata = new SynapseMetadata(
             CommandId: source.CommandId,
@@ -586,11 +575,20 @@ public sealed class GroupChatNeuron(
         return new Guid(bytes.AsSpan(0, 16));
     }
 
-    private static Guid CreateCandidateEventId(Guid discussionId, long uiRevision)
+    private static Guid CreateCandidateEventId(
+        string grainKey,
+        Guid discussionId,
+        long uiRevision)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"groupchat.ui\n{discussionId:N}\n{uiRevision}"));
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(
+            $"groupchat.ui\n{grainKey}\n{discussionId:N}\n{uiRevision}"));
         return new Guid(bytes.AsSpan(0, 16));
     }
+
+    private static BrainException InvalidIntent() =>
+        new(
+            BrainErrors.FailureSanitized,
+            ReactiveNeuronPipeline<GroupChatStepEvent>.UnknownFailureMessage);
 
     private sealed record GroupChatDomainState(
         string Topic,

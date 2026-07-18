@@ -52,9 +52,11 @@ public sealed record GroupChatStepEvent(
 
     public bool IsUiIntent =>
         string.Equals(IntentKind, UiKind, StringComparison.Ordinal)
-        || Candidate is not null && !string.Equals(IntentKind, StepKind, StringComparison.Ordinal);
+        && Candidate is not null;
 
-    public bool IsStepIntent => !IsUiIntent;
+    public bool IsStepIntent =>
+        string.Equals(IntentKind, StepKind, StringComparison.Ordinal)
+        && Candidate is null;
 }
 
 [GenerateSerializer, Alias("digitalbrain.ai.group-chat-diagnostics.v1")]
@@ -103,6 +105,4 @@ public interface IGroupChatControl : IGroupChat
     [Alias("PublishStepEventAsync")]
     Task PublishStepEventAsync(EventSynapse<GroupChatStepEvent> @event);
 
-    [Alias("PublishUiCandidateEventAsync")]
-    Task PublishUiCandidateEventAsync(EventSynapse<GroupChatStepEvent> @event);
 }
