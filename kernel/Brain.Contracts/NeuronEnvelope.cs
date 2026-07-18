@@ -1,5 +1,7 @@
 namespace Brain.Contracts;
 
+public sealed record NeuronReply<T>(T Value, long Revision, string? EffectKey);
+
 [GenerateSerializer, Alias("brain.invocation.v2")]
 public sealed record NeuronInvocation(
     [property: Id(0)] string Contract,

@@ -9,7 +9,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\kernel\Brain.Client\Brain.Client.csproj" />
     <ProjectReference Include="..\..\kernel\Brain.Contracts\Brain.Contracts.csproj" />
-    <ProjectReference Include="..\..\hosts\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>

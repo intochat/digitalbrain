@@ -8,6 +8,8 @@ public class NeuronProxy : DispatchProxy
 {
     private static readonly MethodInfo InvokeContractAsyncMethod =
         typeof(NeuronProxy).GetMethod(nameof(InvokeContractAsync), BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly MethodInfo InvokeReplyContractAsyncMethod =
+        typeof(NeuronProxy).GetMethod(nameof(InvokeReplyContractAsync), BindingFlags.Instance | BindingFlags.NonPublic)!;
     private static readonly JsonSerializerOptions JsonOptions = JsonSerializerOptions.Web;
 
     private IClusterClient _client = null!;
@@ -37,16 +39,32 @@ public class NeuronProxy : DispatchProxy
             ?? throw new NotSupportedException($"{targetMethod.Name} is missing [NeuronContract].");
 
         var resultType = returnType.GetGenericArguments()[0];
-        return InvokeContractAsyncMethod.MakeGenericMethod(resultType).Invoke(this, [contract.Contract, argument]);
+        var method = resultType.IsGenericType &&
+            resultType.GetGenericTypeDefinition() == typeof(NeuronReply<>)
+                ? InvokeReplyContractAsyncMethod.MakeGenericMethod(resultType.GetGenericArguments()[0])
+                : InvokeContractAsyncMethod.MakeGenericMethod(resultType);
+        return method.Invoke(this, [contract.Contract, argument]);
     }
 
     private async Task<TResult> InvokeContractAsync<TResult>(string contract, object? argument)
+    {
+        var receipt = await InvokeAsync(contract, argument);
+        return JsonSerializer.Deserialize<TResult>(receipt.OutputJson, JsonOptions)!;
+    }
+
+    private async Task<NeuronReply<TResult>> InvokeReplyContractAsync<TResult>(string contract, object? argument)
+    {
+        var receipt = await InvokeAsync(contract, argument);
+        var value = JsonSerializer.Deserialize<TResult>(receipt.OutputJson, JsonOptions)!;
+        return new NeuronReply<TResult>(value, receipt.Revision, receipt.EffectKey);
+    }
+
+    private async Task<NeuronReceipt> InvokeAsync(string contract, object? argument)
     {
         var inputJson = argument is IRawJson rawJson
             ? rawJson.Json
             : JsonSerializer.Serialize(argument, JsonOptions);
         var invocation = new NeuronInvocation(contract, inputJson, Guid.NewGuid().ToString("N"), _callerKey);
-        var receipt = await _client.GetGrain<INeuron>(_addressKey).InvokeAsync(invocation);
-        return JsonSerializer.Deserialize<TResult>(receipt.OutputJson, JsonOptions)!;
+        return await _client.GetGrain<INeuron>(_addressKey).InvokeAsync(invocation);
     }
 }
