@@ -5,6 +5,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using Orleans.Streams;
 
 namespace DigitalBrain.Google;
 
@@ -60,11 +61,13 @@ public sealed class GmailNeuron(
             var result = await _mcpClient.ListMessagesAsync(payload.Query, payload.MaxResults);
             var surfaceText = $"messages:{result.MessageCount}";
             Flags[GmailConstants.SurfaceTextFlag] = surfaceText;
+            var nextUi = UiRevision + 1;
+            var candidate = CreateSnapshotCandidate(surfaceText, nextUi);
             var intent = CreateFeedIntent(
                 command.Metadata,
-                GmailFeedEvent.UiSurface(surfaceText),
+                GmailFeedEvent.UiSurface(surfaceText, candidate),
                 GmailConstants.OutcomeEventId(command.Metadata.CommandId, GmailFeedEvent.UiSurfaceKind));
-            await commit(new ReactiveCommit<GmailFeedEvent>(surfaceText, UiRevision + 1, [intent]));
+            await commit(new ReactiveCommit<GmailFeedEvent>(surfaceText, nextUi, [intent]));
             return CommandReceiptStatus.Accepted;
         });
 
@@ -193,9 +196,10 @@ public sealed class GmailNeuron(
         Flags[ReactiveNeuronPipeline<GmailFeedEvent>.UiRevisionKey] = nextUi.ToString();
         Flags[ReactiveNeuronPipeline<GmailFeedEvent>.RevisionKey] = (CurrentRevision + 1).ToString();
 
+        var candidate = CreateSnapshotCandidate(completedSurface, nextUi);
         var outcome = CreateFeedIntent(
             intent.Event.Metadata,
-            GmailFeedEvent.SendCompleted(payload.EffectId, payload.IdempotencyKey, completedSurface),
+            GmailFeedEvent.SendCompleted(payload.EffectId, payload.IdempotencyKey, completedSurface, candidate),
             GmailConstants.OutcomeEventId(payload.EffectId, GmailFeedEvent.SendCompletedKind));
         Outbox.Add(outcome);
         await WriteStateAsync(CancellationToken.None);
@@ -224,9 +228,10 @@ public sealed class GmailNeuron(
             intent.Event.Metadata.CommandId,
             intent.Event.Metadata.EventId));
 
+        var candidate = UiFeedCandidate.CreateFailure(BrainErrors.FailureSanitized);
         var failedOutcome = CreateFeedIntent(
             intent.Event.Metadata,
-            GmailFeedEvent.SendFailed(payload.EffectId, payload.IdempotencyKey, failedSurface),
+            GmailFeedEvent.SendFailed(payload.EffectId, payload.IdempotencyKey, failedSurface, candidate),
             GmailConstants.OutcomeEventId(payload.EffectId, GmailFeedEvent.SendFailedKind));
         Outbox.Add(failedOutcome);
         await WriteStateAsync(CancellationToken.None);
@@ -243,8 +248,31 @@ public sealed class GmailNeuron(
             throw new InvalidOperationException("outcome publish failed");
         }
 
-        await base.PublishOutboxIntentAsync(intent);
+        if (intent.Event.Payload.UiCandidate is { } candidate)
+            await PublishUiFeedCandidateAsync(intent.Event.Metadata, candidate);
+
+        var vertical = intent.Event with
+        {
+            Payload = intent.Event.Payload with { UiCandidate = null }
+        };
+        await PublishEventAsync(vertical, DefaultStreamProviderName, intent.StreamNamespace, intent.StreamId);
     }
+
+    private async Task PublishUiFeedCandidateAsync(SynapseMetadata metadata, UiFeedCandidate candidate)
+    {
+        var synapse = new EventSynapse<UiFeedCandidate>(metadata, candidate);
+        var stream = this.GetStreamProvider(DefaultStreamProviderName)
+            .GetStream<EventSynapse<UiFeedCandidate>>(StreamId.Create(
+                UiFeedStreams.CandidateNamespace,
+                UiFeedStreams.StreamId(metadata.OrganizationId, metadata.SpaceId)));
+        await stream.OnNextAsync(synapse);
+    }
+
+    private UiFeedCandidate CreateSnapshotCandidate(string surfaceText, long uiRevision) =>
+        UiFeedCandidate.CreateSnapshot(new UiSurfaceSnapshot(new UiSurface(
+            NeuronSurfaceId,
+            uiRevision,
+            [new UiBlock("text", surfaceText, [])])));
 
     private bool IsTerminal(string idempotencyKey) =>
         Flags.ContainsKey(GmailConstants.EffectDoneFlagPrefix + idempotencyKey)

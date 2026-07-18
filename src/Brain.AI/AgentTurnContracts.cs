@@ -43,7 +43,19 @@ public interface IGrok45Turn : IGrok45
 [GenerateSerializer, Alias("digitalbrain.ai.group-chat-step.v1")]
 public sealed record GroupChatStepEvent(
     [property: Id(0)] int StepIndex,
-    [property: Id(1)] Guid DiscussionId);
+    [property: Id(1)] Guid DiscussionId,
+    [property: Id(2)] string IntentKind = "step",
+    [property: Id(3)] UiFeedCandidate? Candidate = null)
+{
+    public const string StepKind = "step";
+    public const string UiKind = "ui";
+
+    public bool IsUiIntent =>
+        string.Equals(IntentKind, UiKind, StringComparison.Ordinal)
+        || Candidate is not null && !string.Equals(IntentKind, StepKind, StringComparison.Ordinal);
+
+    public bool IsStepIntent => !IsUiIntent;
+}
 
 [GenerateSerializer, Alias("digitalbrain.ai.group-chat-diagnostics.v1")]
 public sealed record GroupChatDiagnosticsSnapshot(
@@ -85,6 +97,12 @@ public interface IGroupChatControl : IGroupChat
     [Alias("PeekOutboxEventAsync")]
     Task<EventSynapse<GroupChatStepEvent>?> PeekOutboxEventAsync();
 
+    [Alias("PeekStepOutboxEventAsync")]
+    Task<EventSynapse<GroupChatStepEvent>?> PeekStepOutboxEventAsync();
+
     [Alias("PublishStepEventAsync")]
     Task PublishStepEventAsync(EventSynapse<GroupChatStepEvent> @event);
+
+    [Alias("PublishUiCandidateEventAsync")]
+    Task PublishUiCandidateEventAsync(EventSynapse<GroupChatStepEvent> @event);
 }

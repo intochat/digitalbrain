@@ -185,7 +185,7 @@ public sealed class GroupChatNeuronTests
         Assert.Contains(diagnostics.TranscriptTexts, text => text.Contains("gpt-reply", StringComparison.Ordinal));
         Assert.Equal(gptBefore + 1, _fixture.GptClient.InvocationCount);
         Assert.Equal(grokBefore, _fixture.GrokClient.InvocationCount);
-        Assert.Equal(1, diagnostics.OutboxCount);
+        Assert.True(diagnostics.OutboxCount >= 2);
     }
 
     [Fact]
@@ -268,7 +268,7 @@ public sealed class GroupChatNeuronTests
         Assert.Equal(1, afterFirst.StepCount);
         Assert.Equal(gptBefore + 1, _fixture.GptClient.InvocationCount);
         Assert.Equal(grokBefore, _fixture.GrokClient.InvocationCount);
-        Assert.Equal(1, afterFirst.OutboxCount);
+        Assert.True(afterFirst.OutboxCount >= 2);
 
         await chat.DrainOutboxAsync();
         await WaitForStepCountAsync(chat, 2, TimeSpan.FromSeconds(15));
@@ -295,8 +295,9 @@ public sealed class GroupChatNeuronTests
                 ((IAddressable)gpt).GetGrainId().Key.ToString()!,
                 ((IAddressable)grok).GetGrainId().Key.ToString()!)));
 
-        var pending = await chat.PeekOutboxEventAsync();
+        var pending = await chat.PeekStepOutboxEventAsync();
         Assert.NotNull(pending);
+        Assert.True(pending!.Payload.IsStepIntent);
 
         await chat.DrainOutboxAsync();
         await WaitForStepCountAsync(chat, 1, TimeSpan.FromSeconds(15));
@@ -345,7 +346,7 @@ public sealed class GroupChatNeuronTests
         Assert.Equal(before.TranscriptTexts, next.TranscriptTexts);
         Assert.True(next.HasCheckpointJson);
         Assert.Equal(before.CheckpointJsonLength, next.CheckpointJsonLength);
-        Assert.Equal(1, next.OutboxCount);
+        Assert.True(next.OutboxCount >= 2);
 
         var grokBeforeSecond = _fixture.GrokClient.InvocationCount;
         await reloaded.SetAutoDrainAsync(false);

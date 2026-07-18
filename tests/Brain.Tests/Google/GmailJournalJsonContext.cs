@@ -25,4 +25,12 @@ namespace Brain.Tests.Google;
 [JsonSerializable(typeof(GmailFeedEvent))]
 [JsonSerializable(typeof(EventSynapse<GmailFeedEvent>))]
 [JsonSerializable(typeof(OutboxIntent<GmailFeedEvent>))]
+[JsonSerializable(typeof(UiFeedCandidate))]
+[JsonSerializable(typeof(EventSynapse<UiFeedCandidate>))]
+[JsonSerializable(typeof(UiFeedFrame))]
+[JsonSerializable(typeof(UiFeedPage))]
+[JsonSerializable(typeof(UiSurface))]
+[JsonSerializable(typeof(UiSurfaceSnapshot))]
+[JsonSerializable(typeof(UiBlock))]
+[JsonSerializable(typeof(UiAction))]
 public sealed partial class GmailJournalJsonContext : JsonSerializerContext;

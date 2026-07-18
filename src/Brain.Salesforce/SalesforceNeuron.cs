@@ -3,6 +3,7 @@ using Brain.Contracts;
 using Brain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using Orleans.Streams;
 
 namespace DigitalBrain.Salesforce;
 
@@ -55,11 +56,13 @@ public sealed class SalesforceNeuron(
             var result = await _mcpClient.QueryRecordsAsync(payload.Soql);
             var surfaceText = $"records:{result.RecordCount}";
             Flags[SalesforceConstants.SurfaceTextFlag] = surfaceText;
+            var nextUi = UiRevision + 1;
+            var candidate = CreateSnapshotCandidate(surfaceText, nextUi);
             var intent = CreateFeedIntent(
                 command.Metadata,
-                SalesforceFeedEvent.UiSurface(surfaceText),
+                SalesforceFeedEvent.UiSurface(surfaceText, candidate),
                 SalesforceConstants.OutcomeEventId(command.Metadata.CommandId, SalesforceFeedEvent.UiSurfaceKind));
-            await commit(new ReactiveCommit<SalesforceFeedEvent>(surfaceText, UiRevision + 1, [intent]));
+            await commit(new ReactiveCommit<SalesforceFeedEvent>(surfaceText, nextUi, [intent]));
             return CommandReceiptStatus.Accepted;
         });
 
@@ -187,9 +190,10 @@ public sealed class SalesforceNeuron(
         Flags[ReactiveNeuronPipeline<SalesforceFeedEvent>.UiRevisionKey] = nextUi.ToString();
         Flags[ReactiveNeuronPipeline<SalesforceFeedEvent>.RevisionKey] = (CurrentRevision + 1).ToString();
 
+        var candidate = CreateSnapshotCandidate(completedSurface, nextUi);
         var outcome = CreateFeedIntent(
             intent.Event.Metadata,
-            SalesforceFeedEvent.UpdateCompleted(payload.EffectId, payload.IdempotencyKey, completedSurface),
+            SalesforceFeedEvent.UpdateCompleted(payload.EffectId, payload.IdempotencyKey, completedSurface, candidate),
             SalesforceConstants.OutcomeEventId(payload.EffectId, SalesforceFeedEvent.UpdateCompletedKind));
         Outbox.Add(outcome);
         await WriteStateAsync(CancellationToken.None);
@@ -218,9 +222,10 @@ public sealed class SalesforceNeuron(
             intent.Event.Metadata.CommandId,
             intent.Event.Metadata.EventId));
 
+        var candidate = UiFeedCandidate.CreateFailure(BrainErrors.FailureSanitized);
         var failedOutcome = CreateFeedIntent(
             intent.Event.Metadata,
-            SalesforceFeedEvent.UpdateFailed(payload.EffectId, payload.IdempotencyKey, failedSurface),
+            SalesforceFeedEvent.UpdateFailed(payload.EffectId, payload.IdempotencyKey, failedSurface, candidate),
             SalesforceConstants.OutcomeEventId(payload.EffectId, SalesforceFeedEvent.UpdateFailedKind));
         Outbox.Add(failedOutcome);
         await WriteStateAsync(CancellationToken.None);
@@ -237,8 +242,31 @@ public sealed class SalesforceNeuron(
             throw new InvalidOperationException("outcome publish failed");
         }
 
-        await base.PublishOutboxIntentAsync(intent);
+        if (intent.Event.Payload.UiCandidate is { } candidate)
+            await PublishUiFeedCandidateAsync(intent.Event.Metadata, candidate);
+
+        var vertical = intent.Event with
+        {
+            Payload = intent.Event.Payload with { UiCandidate = null }
+        };
+        await PublishEventAsync(vertical, DefaultStreamProviderName, intent.StreamNamespace, intent.StreamId);
     }
+
+    private async Task PublishUiFeedCandidateAsync(SynapseMetadata metadata, UiFeedCandidate candidate)
+    {
+        var synapse = new EventSynapse<UiFeedCandidate>(metadata, candidate);
+        var stream = this.GetStreamProvider(DefaultStreamProviderName)
+            .GetStream<EventSynapse<UiFeedCandidate>>(StreamId.Create(
+                UiFeedStreams.CandidateNamespace,
+                UiFeedStreams.StreamId(metadata.OrganizationId, metadata.SpaceId)));
+        await stream.OnNextAsync(synapse);
+    }
+
+    private UiFeedCandidate CreateSnapshotCandidate(string surfaceText, long uiRevision) =>
+        UiFeedCandidate.CreateSnapshot(new UiSurfaceSnapshot(new UiSurface(
+            NeuronSurfaceId,
+            uiRevision,
+            [new UiBlock("text", surfaceText, [])])));
 
     private bool IsTerminal(string idempotencyKey) =>
         Flags.ContainsKey(SalesforceConstants.EffectDoneFlagPrefix + idempotencyKey)
