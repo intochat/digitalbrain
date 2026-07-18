@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:workspace/kinds/decision_card.dart';
 import 'package:workspace/theme/brain_theme.dart';
 
 void main() {
@@ -38,16 +37,14 @@ void main() {
     );
   });
 
-  testWidgets('DecisionCard Approve button renders a non-indigo background', (
+  testWidgets('surface action button renders a non-indigo background', (
     tester,
   ) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: BrainTheme.dark,
         home: Scaffold(
-          body: DecisionCard(
-            data: const {'title': 'Ship it?', 'summary': 'Deploy to prod'},
-          ),
+          body: FilledButton(onPressed: () {}, child: const Text('Approve')),
         ),
       ),
     );
