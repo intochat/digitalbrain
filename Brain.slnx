@@ -27,6 +27,7 @@
     <Project Path="behaviors/smoke/smoke.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Brain.FeasibilityTests/Brain.FeasibilityTests.csproj" />
     <Project Path="tests/Brain.KernelTests/Brain.KernelTests.csproj" />
     <Project Path="tests/Brain.ConformanceTests/Brain.ConformanceTests.csproj" />
   </Folder>
