@@ -175,29 +175,29 @@ No commit is created.
 
 **Required API:** `ISiloBuilder.AddJournalStorage()` plus `ISiloBuilder.AddAzureBlobJournalStorage(options => options.ConfigureBlobServiceClient(connectionString))`.
 
-- [ ] Add a recovery test whose test grain derives directly from `DurableGrain` and receives one `IDurableValue<int>`, one `IDurableDictionary<Guid, string>`, one `IDurableQueue<Guid>`, and one `IDurableList<string>`.
-- [ ] Add a complete-restart test that writes all four structures, stops and disposes the first `TestCluster`, starts a new cluster against the same Azurite container, verifies exact recovery, writes again, restarts again, and verifies the continued sequence.
-- [ ] Add a failed-intent test in which the test grain awaits `WriteStateAsync()` before incrementing a test-only external-effect probe.
-- [ ] Stop Azurite before that write and assert the grain call fails and the external-effect probe remains zero.
-- [ ] Run `dotnet test tests/Brain.FeasibilityTests/Brain.FeasibilityTests.csproj --logger "console;verbosity=minimal"` and observe red because the official Azure Journaling package/configuration is not yet present.
-- [ ] Pin every Orleans Core-family entry in `Directory.Packages.props` to `10.2.2-rc.2`.
-- [ ] Pin both Journaling packages to `10.2.2-rc.2.alpha.1`.
-- [ ] Pin the AppHost SDK and every active Aspire package to stable `13.4.6`.
-- [ ] Add `Microsoft.Orleans.Journaling.AzureStorage` to the feasibility project.
-- [ ] Remove the compile link and every reference to the tracked custom provider.
-- [ ] Add `tests/Brain.FeasibilityTests/Brain.FeasibilityTests.csproj` to `Brain.slnx`.
-- [ ] Update the active solution topology test to include the feasibility project.
-- [ ] Replace the active host's `VolatileJournalStorageProvider` with `AddJournalStorage()` and official `AddAzureBlobJournalStorage(options => options.ConfigureBlobServiceClient(connectionString))`.
-- [ ] In the minimal AppHost, add Azure Storage with Azurite, add a journal blob resource, reference it from the kernel project, wait for storage, and name the kernel resource `kernel`.
-- [ ] Keep the existing non-durable localhost clustering only as an interim cluster-membership choice; no neuron state may use volatile journal storage.
-- [ ] Configure the test silo only with the official Journaling package and official Azure Blob provider.
-- [ ] Let one `AzuriteContainer` remain alive for the complete test; obtain its connection string with `GetConnectionString()`, create a unique journal container, build two separately disposed `TestCluster` instances against that same connection/container, then dispose Azurite in the fixture teardown.
-- [ ] Run the feasibility project; require all Journaling tests pass with no skips.
-- [ ] Run the root checkpoint; require 0 failures and 0 skips.
-- [ ] Run `aspire start --non-interactive`, `aspire wait kernel --non-interactive`, inspect `aspire describe kernel --non-interactive` and kernel logs, run `aspire resource kernel stop --non-interactive`, then stop the AppHost with `aspire stop --non-interactive`.
-- [ ] Run `rg -n "AzureBlobJournalStorageProvider|VolatileJournalStorageProvider" kernel hosts modules edge -g '*.cs' -g '*.csproj'`; require no active production match.
-- [ ] Require `Test-Path src/Brain.Kernel.Host/JournalStorage/AzureBlobJournalStorageProvider.cs` to be false. The custom provider existed only in the excluded `src/**` tree; the active `hosts/**` tree used the volatile provider. Both are removed by this task.
-- [ ] Codex commits as `test: prove official journal recovery`.
+- [x] Add a recovery test whose test grain derives directly from `DurableGrain` and receives one `IDurableValue<int>`, one `IDurableDictionary<Guid, string>`, one `IDurableQueue<Guid>`, and one `IDurableList<string>`.
+- [x] Add a complete-restart test that writes all four structures, stops and disposes the first `TestCluster`, starts a new cluster against the same Azurite container, verifies exact recovery, writes again, restarts again, and verifies the continued sequence.
+- [x] Add a failed-intent test in which the test grain awaits `WriteStateAsync()` before incrementing a test-only external-effect probe.
+- [x] Stop Azurite before that write and assert the grain call fails and the external-effect probe remains zero.
+- [x] Run `dotnet test tests/Brain.FeasibilityTests/Brain.FeasibilityTests.csproj --logger "console;verbosity=minimal"` and observe red because the official Azure Journaling package/configuration is not yet present.
+- [x] Pin every Orleans Core-family entry in `Directory.Packages.props` to `10.2.2-rc.2`.
+- [x] Pin both Journaling packages to `10.2.2-rc.2.alpha.1`.
+- [x] Pin the AppHost SDK and every active Aspire package to stable `13.4.6`.
+- [x] Add `Microsoft.Orleans.Journaling.AzureStorage` to the feasibility project.
+- [x] Remove the compile link and every reference to the tracked custom provider.
+- [x] Add `tests/Brain.FeasibilityTests/Brain.FeasibilityTests.csproj` to `Brain.slnx`.
+- [x] Update the active solution topology test to include the feasibility project.
+- [x] Replace the active host's `VolatileJournalStorageProvider` with `AddJournalStorage()` and official `AddAzureBlobJournalStorage(options => options.ConfigureBlobServiceClient(connectionString))`.
+- [x] In the minimal AppHost, add Azure Storage with Azurite, add a journal blob resource, reference it from the kernel project, wait for storage, and name the kernel resource `kernel`.
+- [x] Keep the existing non-durable localhost clustering only as an interim cluster-membership choice; no neuron state may use volatile journal storage.
+- [x] Configure the test silo only with the official Journaling package and official Azure Blob provider.
+- [x] Let one `AzuriteContainer` remain alive for the complete test; obtain its connection string with `GetConnectionString()`, create a unique journal container, build two separately disposed `TestCluster` instances against that same connection/container, then dispose Azurite in the fixture teardown.
+- [x] Run the feasibility project; require all Journaling tests pass with no skips.
+- [x] Run the root checkpoint; require 0 failures and 0 skips.
+- [x] Run `aspire start --non-interactive`, `aspire wait kernel --non-interactive`, inspect `aspire describe kernel --non-interactive` and kernel logs, run `aspire resource kernel stop --non-interactive`, then stop the AppHost with `aspire stop --non-interactive`.
+- [x] Run `rg -n "AzureBlobJournalStorageProvider|VolatileJournalStorageProvider" kernel hosts modules edge -g '*.cs' -g '*.csproj'`; require no active production match.
+- [x] Require `Test-Path src/Brain.Kernel.Host/JournalStorage/AzureBlobJournalStorageProvider.cs` to be false. The custom provider existed only in the excluded `src/**` tree; the active `hosts/**` tree used the volatile provider. Both are removed by this task.
+- [x] Codex commits as `test: prove official journal recovery`.
 
 **Kill condition:** If the official provider cannot recover all four official durable structures across a complete silo restart, or a failed journal write does not prevent the probe effect, stop implementation. Do not write a replacement provider and do not fall back to volatile storage.
 

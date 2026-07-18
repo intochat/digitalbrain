@@ -34,7 +34,7 @@ public sealed class ProjectTopologyTests
             ["Flutter", "Flutter.Contracts"],
             ProductProjects(projectNames, "Flutter"));
         Assert.Equal(
-            ["DigitalBrain.Tests"],
+            ["Brain.FeasibilityTests", "DigitalBrain.Tests"],
             projectPaths
                 .Where(path => path.StartsWith("tests/", StringComparison.OrdinalIgnoreCase))
                 .Select(path => Path.GetFileNameWithoutExtension(path)!)

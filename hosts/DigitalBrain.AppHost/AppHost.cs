@@ -5,11 +5,16 @@ using Brain.Modules.Google;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var brainKernel = builder.AddProject<Projects.Brain_Kernel_Host>("brain-kernel")
+var storage = builder.AddAzureStorage("storage").RunAsEmulator();
+var journal = storage.AddBlobs("journal");
+
+var brainKernel = builder.AddProject<Projects.Brain_Kernel_Host>("kernel")
     .WithHttpEndpoint(port: 5311, name: "google-oauth")
     .WithDigitalBrainGoogle()
     .WithDigitalBrainAI()
-    .WithDigitalBrainFlutter();
+    .WithDigitalBrainFlutter()
+    .WithReference(journal)
+    .WaitFor(storage);
 
 builder.AddProject<Projects.Brain_Mcp>("brain-mcp").WaitFor(brainKernel);
 builder.AddViteApp("brain-docs", "../../website")

@@ -20,6 +20,7 @@
     <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Brain.FeasibilityTests/Brain.FeasibilityTests.csproj" />
     <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
   </Folder>
 </Solution>

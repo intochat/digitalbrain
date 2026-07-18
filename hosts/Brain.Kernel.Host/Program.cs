@@ -11,7 +11,13 @@ builder.UseOrleans(silo =>
 {
     silo.UseLocalhostClustering();
     silo.AddJournalStorage();
-    silo.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
+    var journalConnectionString = builder.Configuration.GetConnectionString("journal")
+        ?? throw new InvalidOperationException("Connection string 'journal' is required for durable journal storage.");
+    silo.AddAzureBlobJournalStorage(options =>
+    {
+        options.ConfigureBlobServiceClient(journalConnectionString);
+        options.ContainerName = "journals";
+    });
     silo.AddBrainKernel();
     silo.AddDigitalBrainAI(builder.Configuration);
     silo.AddDigitalBrainFlutter();

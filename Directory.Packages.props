@@ -12,32 +12,33 @@
 
     <PackageVersion Include="Aspire.Hosting" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.JavaScript" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.5.0-preview.1.26363.3" />
+    <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.5.0-preview.1.26363.3" />
-    <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.5.0-preview.1.26363.3" />
-    <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.5.0-preview.1.26363.3" />
-    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.5.0-preview.1.26363.3" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.4.6" />
+    <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.4.6" />
 
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.4.0" />
     <PackageVersion Include="CommunityToolkit.Aspire.OllamaSharp" Version="13.4.0" />
 
-    <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.2.1" />
-    <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.1" />
-    <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.1" />
-    <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.1" />
-    <PackageVersion Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.1" />
-    <PackageVersion Include="Microsoft.Orleans.Core" Version="10.2.1" />
-    <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.2.1" />
-    <PackageVersion Include="Microsoft.Orleans.Persistence.Memory" Version="10.2.1" />
-    <PackageVersion Include="Microsoft.Orleans.Serialization" Version="10.2.1" />
-    <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.1" />
-    <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.2.1" />
-    <PackageVersion Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.2.1" />
-    <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.2.1" />
-    <PackageVersion Include="Microsoft.Orleans.Streaming.AzureStorage" Version="10.2.1" />
-    <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.2.1" />
+    <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Core" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Persistence.Memory" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Serialization" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Streaming.AzureStorage" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Journaling" Version="10.2.2-rc.2.alpha.1" />
+    <PackageVersion Include="Microsoft.Orleans.Journaling.AzureStorage" Version="10.2.2-rc.2.alpha.1" />
 
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
