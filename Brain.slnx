@@ -8,6 +8,12 @@
     <Project Path="src/Brain.Contracts/Brain.Contracts.csproj" />
     <Project Path="src/Brain.Client/Brain.Client.csproj" />
     <Project Path="src/Brain.Kernel/Brain.Kernel.csproj" />
+    <Project Path="src/Brain.AI/Brain.AI.csproj" />
+    <Project Path="src/Brain.Google/Brain.Google.csproj" />
+    <Project Path="src/Brain.Salesforce/Brain.Salesforce.csproj" />
+    <Project Path="src/Brain.Gateway/Brain.Gateway.csproj" />
+    <Project Path="src/Brain.Mcp/Brain.Mcp.csproj" />
+    <Project Path="src/Brain.AgentGateway/Brain.AgentGateway.csproj" />
   </Folder>
   <Folder Name="/modules/">
     <Project Path="modules/Brain.Modules.Sdk/Brain.Modules.Sdk.csproj" />
