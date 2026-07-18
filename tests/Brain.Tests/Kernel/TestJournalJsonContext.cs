@@ -1,7 +1,8 @@
 using System.Text.Json.Serialization;
 using Brain.Contracts;
+using Brain.Kernel;
 
-namespace Brain.Kernel;
+namespace Brain.Tests.Kernel;
 
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(byte))]
@@ -20,6 +21,9 @@ namespace Brain.Kernel;
 [JsonSerializable(typeof(SpaceId))]
 [JsonSerializable(typeof(NeuronAddress))]
 [JsonSerializable(typeof(SynapseMetadata))]
+[JsonSerializable(typeof(ProbeDomainEvent))]
+[JsonSerializable(typeof(EventSynapse<ProbeDomainEvent>))]
+[JsonSerializable(typeof(OutboxIntent<ProbeDomainEvent>))]
 [JsonSerializable(typeof(EventSynapse<string>))]
 [JsonSerializable(typeof(OutboxIntent<string>))]
-public sealed partial class ReactiveJournalJsonContext : JsonSerializerContext;
+public sealed partial class TestJournalJsonContext : JsonSerializerContext;

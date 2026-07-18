@@ -5,35 +5,46 @@ using Orleans.Streams;
 
 namespace Brain.Kernel;
 
-public abstract class ReactiveNeuron : DurableGrain, IRemindable
+public abstract class ReactiveNeuron<TOutboxEvent> : DurableGrain, IRemindable
 {
     public const string OutboxReminderName = "reactive-outbox-retry";
     public const string DefaultStreamProviderName = "ReactiveStreamProvider";
     public const int DefaultMaxCausalDepth = 8;
 
     private readonly IDurableDictionary<string, CommandReceipt> _receipts;
-    private readonly IDurableList<OutboxIntent> _outbox;
+    private readonly IDurableList<OutboxIntent<TOutboxEvent>> _outbox;
     private readonly IDurableList<SanitizedFailure> _failures;
     private readonly DurableReactiveStore _store;
-    private readonly ReactiveNeuronPipeline _pipeline;
-    private readonly List<StreamSubscriptionHandle<EventSynapse<string>>> _subscriptions = [];
+    private readonly ReactiveNeuronPipeline<TOutboxEvent> _pipeline;
+    private readonly List<object> _subscriptions = [];
 
     protected ReactiveNeuron(
         IDurableDictionary<string, CommandReceipt> receipts,
         IDurableDictionary<string, byte> processedEvents,
         IDurableDictionary<string, long> sourceSequences,
-        IDurableList<OutboxIntent> outbox,
+        IDurableList<OutboxIntent<TOutboxEvent>> outbox,
         IDurableDictionary<string, string> domain,
         IDurableDictionary<string, string> flags,
         IDurableList<SanitizedFailure> failures,
+        IDurableDictionary<string, byte> acceptedCausation,
         IDurableDictionary<string, byte> rejectedCausation,
         int maxCausalDepth = DefaultMaxCausalDepth)
     {
         _receipts = receipts;
         _outbox = outbox;
         _failures = failures;
-        _store = new DurableReactiveStore(this, receipts, processedEvents, sourceSequences, outbox, domain, flags, failures, rejectedCausation);
-        _pipeline = new ReactiveNeuronPipeline(_store, maxCausalDepth);
+        _store = new DurableReactiveStore(
+            this,
+            receipts,
+            processedEvents,
+            sourceSequences,
+            outbox,
+            domain,
+            flags,
+            failures,
+            acceptedCausation,
+            rejectedCausation);
+        _pipeline = new ReactiveNeuronPipeline<TOutboxEvent>(_store, maxCausalDepth);
     }
 
     protected bool FailNextCommit
@@ -43,7 +54,8 @@ public abstract class ReactiveNeuron : DurableGrain, IRemindable
     }
 
     protected IDurableDictionary<string, CommandReceipt> Receipts => _receipts;
-    protected IDurableList<OutboxIntent> Outbox => _outbox;
+    protected IDurableList<OutboxIntent<TOutboxEvent>> Outbox => _outbox;
+    protected IList<SanitizedFailure> Failures => _store.Failures;
     protected IDictionary<string, string> Flags => _store.Flags;
     protected long CurrentRevision => _pipeline.CurrentRevision;
     protected long UiRevision => _pipeline.UiRevision;
@@ -53,9 +65,9 @@ public abstract class ReactiveNeuron : DurableGrain, IRemindable
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
+        await OnReactiveActivateAsync(cancellationToken);
         if (AutoDrainAfterCommit)
             await DrainOutboxCoreAsync(throwOnPublishFailure: false);
-        await OnReactiveActivateAsync(cancellationToken);
     }
 
     protected virtual Task OnReactiveActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -63,9 +75,9 @@ public abstract class ReactiveNeuron : DurableGrain, IRemindable
     protected virtual bool AutoDrainAfterCommit =>
         !_store.Flags.TryGetValue("auto-drain", out var value) || value != "0";
 
-    protected async Task<CommandReceipt> ExecuteCommandCoreAsync<T>(
-        CommandSynapse<T> command,
-        CommandHandlerAsync<T> handler)
+    protected async Task<CommandReceipt> ExecuteCommandCoreAsync<TCommand>(
+        CommandSynapse<TCommand> command,
+        CommandHandlerAsync<TCommand, TOutboxEvent> handler)
     {
         var receipt = await _pipeline.ExecuteCommandAsync(command, handler);
         if (AutoDrainAfterCommit)
@@ -73,9 +85,9 @@ public abstract class ReactiveNeuron : DurableGrain, IRemindable
         return receipt;
     }
 
-    protected async Task HandleEventCoreAsync<T>(
-        EventSynapse<T> @event,
-        EventHandlerAsync<T> handler)
+    protected async Task HandleEventCoreAsync<TEvent>(
+        EventSynapse<TEvent> @event,
+        EventHandlerAsync<TEvent, TOutboxEvent> handler)
     {
         await _pipeline.HandleEventAsync(@event, handler);
         if (AutoDrainAfterCommit)
@@ -85,16 +97,14 @@ public abstract class ReactiveNeuron : DurableGrain, IRemindable
     protected void EnsureExpectedUiRevision(long expectedRevision) =>
         _pipeline.EnsureExpectedUiRevision(expectedRevision);
 
-    protected void IncrementReaction() => _pipeline.IncrementReaction();
-
     protected async Task RegisterEventSubscriptionAsync(
         string streamProviderName,
         string streamNamespace,
         Guid streamId,
-        Func<EventSynapse<string>, StreamSequenceToken?, Task> onEvent)
+        Func<EventSynapse<TOutboxEvent>, StreamSequenceToken?, Task> onEvent)
     {
         var provider = this.GetStreamProvider(streamProviderName);
-        var stream = provider.GetStream<EventSynapse<string>>(StreamId.Create(streamNamespace, streamId));
+        var stream = provider.GetStream<EventSynapse<TOutboxEvent>>(StreamId.Create(streamNamespace, streamId));
         var handles = await stream.GetAllSubscriptionHandles();
         if (handles.Count > 0)
         {
@@ -106,10 +116,18 @@ public abstract class ReactiveNeuron : DurableGrain, IRemindable
         _subscriptions.Add(await stream.SubscribeAsync((item, token) => onEvent(item, token)));
     }
 
-    protected async Task PublishEventAsync<T>(EventSynapse<T> @event, string streamProviderName, string streamNamespace, Guid streamId)
+    protected int ActiveSubscriptionCount => _subscriptions.Count;
+
+    protected void TrackSubscription(object subscriptionHandle) => _subscriptions.Add(subscriptionHandle);
+
+    protected async Task PublishEventAsync(
+        EventSynapse<TOutboxEvent> @event,
+        string streamProviderName,
+        string streamNamespace,
+        Guid streamId)
     {
         var provider = this.GetStreamProvider(streamProviderName);
-        var stream = provider.GetStream<EventSynapse<T>>(StreamId.Create(streamNamespace, streamId));
+        var stream = provider.GetStream<EventSynapse<TOutboxEvent>>(StreamId.Create(streamNamespace, streamId));
         await stream.OnNextAsync(@event);
     }
 
@@ -129,20 +147,20 @@ public abstract class ReactiveNeuron : DurableGrain, IRemindable
                 await PublishOutboxIntentAsync(intent);
                 _outbox.RemoveAt(0);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 _outbox[0] = intent.WithAttempt(intent.AttemptCount + 1);
                 _failures.Add(new SanitizedFailure(
                     Guid.NewGuid(),
                     BrainErrors.FailureSanitized,
-                    Sanitize(ex.Message),
+                    ReactiveNeuronPipeline<TOutboxEvent>.UnknownFailureMessage,
                     DateTimeOffset.UtcNow,
-                    intent.CommandId,
-                    intent.EventId));
+                    intent.Event.Metadata.CommandId,
+                    intent.Event.Metadata.EventId));
                 await WriteStateAsync();
                 await RegisterOutboxReminderAsync();
                 if (throwOnPublishFailure)
-                    throw new BrainException(BrainErrors.FailureSanitized, Sanitize(ex.Message));
+                    throw new BrainException(BrainErrors.FailureSanitized, ReactiveNeuronPipeline<TOutboxEvent>.UnknownFailureMessage);
                 return;
             }
         }
@@ -151,12 +169,8 @@ public abstract class ReactiveNeuron : DurableGrain, IRemindable
         await UnregisterOutboxReminderAsync();
     }
 
-    protected virtual Task PublishOutboxIntentAsync(OutboxIntent intent)
-    {
-        var publisher = NeuronAddress.Parse(this.GetPrimaryKeyString());
-        var @event = intent.ToEventSynapse(publisher);
-        return PublishEventAsync(@event, DefaultStreamProviderName, intent.StreamNamespace, intent.EventId);
-    }
+    protected virtual Task PublishOutboxIntentAsync(OutboxIntent<TOutboxEvent> intent) =>
+        PublishEventAsync(intent.Event, DefaultStreamProviderName, intent.StreamNamespace, intent.StreamId);
 
     public async Task ReceiveReminder(string reminderName, TickStatus status)
     {
@@ -166,49 +180,43 @@ public abstract class ReactiveNeuron : DurableGrain, IRemindable
         await DrainOutboxCoreAsync(throwOnPublishFailure: false);
     }
 
-    private async Task RegisterOutboxReminderAsync()
-    {
-        await this.RegisterOrUpdateReminder(
+    protected Task RegisterOutboxReminderAsync() =>
+        this.RegisterOrUpdateReminder(
             OutboxReminderName,
             TimeSpan.FromSeconds(1),
             TimeSpan.FromMinutes(1));
-    }
 
-    private async Task UnregisterOutboxReminderAsync()
+    protected async Task UnregisterOutboxReminderAsync()
     {
         var reminder = await this.GetReminder(OutboxReminderName);
         if (reminder is not null)
             await this.UnregisterReminder(reminder);
     }
 
-    private static string Sanitize(string message)
-    {
-        if (string.IsNullOrWhiteSpace(message))
-            return "failure";
-        var trimmed = message.Trim();
-        return trimmed.Length <= 200 ? trimmed : trimmed[..200];
-    }
+    protected Task<IGrainReminder?> GetOutboxReminderAsync() => this.GetReminder(OutboxReminderName);
 
     private sealed class DurableReactiveStore(
-        ReactiveNeuron grain,
+        ReactiveNeuron<TOutboxEvent> grain,
         IDurableDictionary<string, CommandReceipt> receipts,
         IDurableDictionary<string, byte> processedEvents,
         IDurableDictionary<string, long> sourceSequences,
-        IDurableList<OutboxIntent> outbox,
+        IDurableList<OutboxIntent<TOutboxEvent>> outbox,
         IDurableDictionary<string, string> domain,
         IDurableDictionary<string, string> flags,
         IDurableList<SanitizedFailure> failures,
-        IDurableDictionary<string, byte> rejectedCausation) : IReactiveStore
+        IDurableDictionary<string, byte> acceptedCausation,
+        IDurableDictionary<string, byte> rejectedCausation) : IReactiveStore<TOutboxEvent>
     {
         public bool FailNextCommit { get; set; }
 
         public IDictionary<string, CommandReceipt> Receipts { get; } = new DurableDictionaryAdapter<CommandReceipt>(receipts);
         public IDictionary<string, byte> ProcessedEvents { get; } = new DurableDictionaryAdapter<byte>(processedEvents);
         public IDictionary<string, long> SourceSequences { get; } = new DurableDictionaryAdapter<long>(sourceSequences);
-        public IList<OutboxIntent> Outbox { get; } = new DurableListAdapter<OutboxIntent>(outbox);
+        public IList<OutboxIntent<TOutboxEvent>> Outbox { get; } = new DurableListAdapter<OutboxIntent<TOutboxEvent>>(outbox);
         public IDictionary<string, string> Domain { get; } = new DurableDictionaryAdapter<string>(domain);
         public IDictionary<string, string> Flags { get; } = new DurableDictionaryAdapter<string>(flags);
         public IList<SanitizedFailure> Failures { get; } = new DurableListAdapter<SanitizedFailure>(failures);
+        public IDictionary<string, byte> AcceptedCausation { get; } = new DurableDictionaryAdapter<byte>(acceptedCausation);
         public IDictionary<string, byte> RejectedCausation { get; } = new DurableDictionaryAdapter<byte>(rejectedCausation);
 
         public async Task CommitAsync()

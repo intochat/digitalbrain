@@ -6,6 +6,25 @@ namespace Brain.Client;
 
 public static class GroupChatExtensions
 {
+    public static readonly PrincipalId DevelopmentPrincipalId = new("dev-principal");
+
+    public static Task<CommandReceipt> StartDiscussion(
+        this IGroupChat chat,
+        string topic,
+        IGpt56 gpt,
+        IGrok45 grok)
+    {
+        var source = NeuronAddress.Parse(((IAddressable)chat).GetGrainId().Key.ToString()!);
+        return StartDiscussion(
+            chat,
+            topic,
+            gpt,
+            grok,
+            source.OrganizationId,
+            DevelopmentPrincipalId,
+            source.SpaceId);
+    }
+
     public static Task<CommandReceipt> StartDiscussion(
         this IGroupChat chat,
         string topic,

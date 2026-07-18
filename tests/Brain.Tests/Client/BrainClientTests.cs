@@ -137,6 +137,15 @@ public interface IGroupChatTestProbe : IGroupChat
 
     [Alias("GetLastGrokKeyAsync")]
     Task<string?> GetLastGrokKeyAsync();
+
+    [Alias("GetLastOrganizationIdAsync")]
+    Task<string?> GetLastOrganizationIdAsync();
+
+    [Alias("GetLastSpaceIdAsync")]
+    Task<string?> GetLastSpaceIdAsync();
+
+    [Alias("GetLastPrincipalIdAsync")]
+    Task<string?> GetLastPrincipalIdAsync();
 }
 
 public sealed class GroupChatTestGrain : Grain, IGroupChatTestProbe
@@ -144,12 +153,18 @@ public sealed class GroupChatTestGrain : Grain, IGroupChatTestProbe
     private string? _topic;
     private string? _gptKey;
     private string? _grokKey;
+    private string? _organizationId;
+    private string? _spaceId;
+    private string? _principalId;
 
     public Task<CommandReceipt> StartDiscussionAsync(CommandSynapse<StartDiscussion> command)
     {
         _topic = command.Payload.Topic;
         _gptKey = command.Payload.GptKey;
         _grokKey = command.Payload.GrokKey;
+        _organizationId = command.Metadata.OrganizationId.Value;
+        _spaceId = command.Metadata.SpaceId.Value;
+        _principalId = command.Metadata.PrincipalId.Value;
         return Task.FromResult(new CommandReceipt(command.Metadata.CommandId, CommandReceiptStatus.Accepted, 1, null, null));
     }
 
@@ -162,4 +177,7 @@ public sealed class GroupChatTestGrain : Grain, IGroupChatTestProbe
     public Task<string?> GetLastTopicAsync() => Task.FromResult(_topic);
     public Task<string?> GetLastGptKeyAsync() => Task.FromResult(_gptKey);
     public Task<string?> GetLastGrokKeyAsync() => Task.FromResult(_grokKey);
+    public Task<string?> GetLastOrganizationIdAsync() => Task.FromResult(_organizationId);
+    public Task<string?> GetLastSpaceIdAsync() => Task.FromResult(_spaceId);
+    public Task<string?> GetLastPrincipalIdAsync() => Task.FromResult(_principalId);
 }

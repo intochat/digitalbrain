@@ -2,12 +2,13 @@ using Brain.Contracts;
 
 namespace Brain.Kernel;
 
-public sealed class ReactiveNeuronPipeline(IReactiveStore store, int maxCausalDepth = 8)
+public sealed class ReactiveNeuronPipeline<TOutboxEvent>(IReactiveStore<TOutboxEvent> store, int maxCausalDepth = 8)
 {
     public const string DomainStateKey = "domain-state";
     public const string UiRevisionKey = "ui-revision";
     public const string RevisionKey = "revision";
     public const string ReactionCountKey = "reaction-count";
+    public const string UnknownFailureMessage = "neuron failure";
 
     public long CurrentRevision =>
         store.Flags.TryGetValue(RevisionKey, out var value) && long.TryParse(value, out var revision) ? revision : 0;
@@ -21,9 +22,9 @@ public sealed class ReactiveNeuronPipeline(IReactiveStore store, int maxCausalDe
     public int ReactionCount =>
         store.Flags.TryGetValue(ReactionCountKey, out var value) && int.TryParse(value, out var count) ? count : 0;
 
-    public async Task<CommandReceipt> ExecuteCommandAsync<T>(
-        CommandSynapse<T> command,
-        CommandHandlerAsync<T> handler)
+    public async Task<CommandReceipt> ExecuteCommandAsync<TCommand>(
+        CommandSynapse<TCommand> command,
+        CommandHandlerAsync<TCommand, TOutboxEvent> handler)
     {
         var commandKey = command.Metadata.CommandId.ToString("N");
         if (store.Receipts.TryGetValue(commandKey, out var existing))
@@ -40,6 +41,7 @@ public sealed class ReactiveNeuronPipeline(IReactiveStore store, int maxCausalDe
                     throw new InvalidOperationException("command already committed");
 
                 ApplyCommit(commit);
+                RecordAcceptedCausation(command.Metadata.CausationId);
                 IncrementReaction();
                 committedReceipt = new CommandReceipt(
                     command.Metadata.CommandId,
@@ -62,7 +64,7 @@ public sealed class ReactiveNeuronPipeline(IReactiveStore store, int maxCausalDe
         }
         catch (BrainException ex)
         {
-            RecordFailure(ex.Code, Sanitize(ex.Message), command.Metadata.CommandId, null);
+            RecordFailure(ex.Code, SanitizeBrainDetail(ex), command.Metadata.CommandId, null);
             try
             {
                 await store.CommitAsync();
@@ -76,7 +78,7 @@ public sealed class ReactiveNeuronPipeline(IReactiveStore store, int maxCausalDe
         }
         catch (Exception ex) when (ex is not BrainException)
         {
-            RecordFailure(BrainErrors.FailureSanitized, Sanitize(ex.Message), command.Metadata.CommandId, null);
+            RecordFailure(BrainErrors.FailureSanitized, UnknownFailureMessage, command.Metadata.CommandId, null);
             try
             {
                 await store.CommitAsync();
@@ -86,11 +88,13 @@ public sealed class ReactiveNeuronPipeline(IReactiveStore store, int maxCausalDe
                 throw;
             }
 
-            throw new BrainException(BrainErrors.FailureSanitized, Sanitize(ex.Message));
+            throw new BrainException(BrainErrors.FailureSanitized, UnknownFailureMessage);
         }
     }
 
-    public async Task HandleEventAsync<T>(EventSynapse<T> @event, EventHandlerAsync<T> handler)
+    public async Task HandleEventAsync<TEvent>(
+        EventSynapse<TEvent> @event,
+        EventHandlerAsync<TEvent, TOutboxEvent> handler)
     {
         var eventKey = @event.Metadata.EventId.ToString("N");
         if (store.ProcessedEvents.ContainsKey(eventKey))
@@ -110,6 +114,7 @@ public sealed class ReactiveNeuronPipeline(IReactiveStore store, int maxCausalDe
                 store.ProcessedEvents[eventKey] = 1;
                 ApplySourceSequence(@event.Metadata);
                 ApplyCommit(commit);
+                RecordAcceptedCausation(@event.Metadata.CausationId);
                 IncrementReaction();
                 committed = true;
                 await store.CommitAsync();
@@ -124,10 +129,10 @@ public sealed class ReactiveNeuronPipeline(IReactiveStore store, int maxCausalDe
         }
         catch (BrainException ex)
         {
-            if (ex.Code is BrainErrors.CausalLoop or BrainErrors.CausalDepthExceeded)
+            if (ex.Code is BrainErrors.CausalLoop or BrainErrors.CausalDepthExceeded or BrainErrors.OutOfOrderSource)
                 store.RejectedCausation[@event.Metadata.CausationId.ToString("N")] = 1;
 
-            RecordFailure(ex.Code, Sanitize(ex.Message), @event.Metadata.CommandId, @event.Metadata.EventId);
+            RecordFailure(ex.Code, SanitizeBrainDetail(ex), @event.Metadata.CommandId, @event.Metadata.EventId);
             try
             {
                 await store.CommitAsync();
@@ -141,7 +146,7 @@ public sealed class ReactiveNeuronPipeline(IReactiveStore store, int maxCausalDe
         }
         catch (Exception ex) when (ex is not BrainException)
         {
-            RecordFailure(BrainErrors.FailureSanitized, Sanitize(ex.Message), @event.Metadata.CommandId, @event.Metadata.EventId);
+            RecordFailure(BrainErrors.FailureSanitized, UnknownFailureMessage, @event.Metadata.CommandId, @event.Metadata.EventId);
             try
             {
                 await store.CommitAsync();
@@ -151,7 +156,7 @@ public sealed class ReactiveNeuronPipeline(IReactiveStore store, int maxCausalDe
                 throw;
             }
 
-            throw new BrainException(BrainErrors.FailureSanitized, Sanitize(ex.Message));
+            throw new BrainException(BrainErrors.FailureSanitized, UnknownFailureMessage);
         }
     }
 
@@ -174,15 +179,23 @@ public sealed class ReactiveNeuronPipeline(IReactiveStore store, int maxCausalDe
         if (metadata.CausalDepth > 0 && metadata.EventId == metadata.CausationId)
             throw new BrainException(BrainErrors.CausalLoop, "event id equals causation id");
 
-        if (store.RejectedCausation.ContainsKey(metadata.CausationId.ToString("N")))
+        var causationKey = metadata.CausationId.ToString("N");
+        if (store.RejectedCausation.ContainsKey(causationKey))
             throw new BrainException(BrainErrors.CausalLoop, "causation previously rejected");
+
+        if (store.AcceptedCausation.ContainsKey(causationKey))
+            throw new BrainException(BrainErrors.CausalLoop, "causation already accepted");
     }
 
     private void EnsureSourceSequence(SynapseMetadata metadata)
     {
         var sourceKey = metadata.Source.ToGrainKey();
         if (!store.SourceSequences.TryGetValue(sourceKey, out var last))
+        {
+            if (metadata.SourceSequence != 1)
+                throw new BrainException(BrainErrors.OutOfOrderSource, $"expected 1, received {metadata.SourceSequence}");
             return;
+        }
 
         if (metadata.SourceSequence != last + 1)
             throw new BrainException(BrainErrors.OutOfOrderSource, $"expected {last + 1}, received {metadata.SourceSequence}");
@@ -193,7 +206,7 @@ public sealed class ReactiveNeuronPipeline(IReactiveStore store, int maxCausalDe
         store.SourceSequences[metadata.Source.ToGrainKey()] = metadata.SourceSequence;
     }
 
-    private void ApplyCommit(ReactiveCommit commit)
+    private void ApplyCommit(ReactiveCommit<TOutboxEvent> commit)
     {
         store.Domain[DomainStateKey] = commit.DomainState;
         store.Flags[UiRevisionKey] = commit.UiRevision.ToString();
@@ -201,6 +214,11 @@ public sealed class ReactiveNeuronPipeline(IReactiveStore store, int maxCausalDe
 
         foreach (var intent in commit.Outbox)
             store.Outbox.Add(intent);
+    }
+
+    private void RecordAcceptedCausation(Guid causationId)
+    {
+        store.AcceptedCausation[causationId.ToString("N")] = 1;
     }
 
     private void RecordFailure(string code, string message, Guid? commandId, Guid? eventId)
@@ -214,12 +232,16 @@ public sealed class ReactiveNeuronPipeline(IReactiveStore store, int maxCausalDe
             EventId: eventId));
     }
 
-    private static string Sanitize(string message)
+    private static string SanitizeBrainDetail(BrainException exception)
     {
-        if (string.IsNullOrWhiteSpace(message))
-            return "failure";
+        if (exception.Code == BrainErrors.FailureSanitized)
+            return UnknownFailureMessage;
 
-        var trimmed = message.Trim();
+        var detail = exception.Message;
+        if (string.IsNullOrWhiteSpace(detail))
+            return exception.Code;
+
+        var trimmed = detail.Trim();
         return trimmed.Length <= 200 ? trimmed : trimmed[..200];
     }
 }

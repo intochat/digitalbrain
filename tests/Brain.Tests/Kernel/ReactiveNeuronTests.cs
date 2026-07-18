@@ -4,7 +4,11 @@ using Brain.Contracts;
 using Brain.Kernel;
 using DigitalBrain.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Journaling;
+using Orleans.Journaling.Json;
+using Orleans.Runtime;
+using Orleans.Streams;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -76,15 +80,18 @@ public sealed class ReactiveNeuronTests : IClassFixture<ReactiveNeuronClusterFix
     public async Task Committed_pending_event_survives_reactivation()
     {
         var probe = Probe("outbox-survive");
-        await probe.SetAutoDrainAsync(false);
         var commandId = Guid.NewGuid();
         var receipt = await probe.ExecuteCommandAsync(new CommandSynapse<string>(Meta(commandId, commandId, commandId), "emit"));
         Assert.Equal(CommandReceiptStatus.Accepted, receipt.Status);
         Assert.True(await probe.GetOutboxCountAsync() >= 1);
+        Assert.Equal(1, await probe.GetRevisionAsync());
 
         await probe.DeactivateAsync();
+        await Task.Delay(200);
         var reactivated = Probe("outbox-survive");
+        Assert.Equal(1, await reactivated.GetRevisionAsync());
         Assert.True(await reactivated.GetOutboxCountAsync() >= 1);
+        Assert.NotNull(await reactivated.PeekOutboxEventAsync());
 
         await reactivated.SetAutoDrainAsync(true);
         await reactivated.DrainOutboxAsync();
@@ -172,26 +179,23 @@ public sealed class ReactiveNeuronTests : IClassFixture<ReactiveNeuronClusterFix
             {
                 var body = match.Groups["body"].Value;
                 var rethrows = body.Contains("throw", StringComparison.Ordinal)
-                    || body.Contains("RecordFailure", StringComparison.Ordinal);
+                    || body.Contains("RecordFailure", StringComparison.Ordinal)
+                    || body.Contains("UnknownFailureMessage", StringComparison.Ordinal);
                 Assert.True(rethrows, $"Catch without failure handling in {file}: {body.Trim()}");
             }
         }
 
-        foreach (var type in typeof(ReactiveNeuron).Assembly.GetTypes().Where(t => t.Namespace == "Brain.Kernel"))
-        {
-            foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
-            {
-                Assert.DoesNotContain("Ignore", method.Name, StringComparison.OrdinalIgnoreCase);
-                Assert.DoesNotContain("Swallow", method.Name, StringComparison.OrdinalIgnoreCase);
-            }
-        }
+        Assert.Null(typeof(InMemoryReactiveStore<>).Assembly.GetType("Brain.Kernel.InMemoryReactiveStore`1"));
+        Assert.DoesNotContain(
+            typeof(ReactiveNeuron<>).Assembly.GetTypes().Select(t => t.Name),
+            name => name.Contains("InMemory", StringComparison.Ordinal));
     }
 
     [Fact]
     public async Task Durable_fake_pipeline_deduplicates_without_orleans()
     {
-        var store = new InMemoryReactiveStore();
-        var pipeline = new ReactiveNeuronPipeline(store, maxCausalDepth: 8);
+        var store = new InMemoryReactiveStore<string>();
+        var pipeline = new ReactiveNeuronPipeline<string>(store, maxCausalDepth: 8);
         var commandId = Guid.NewGuid();
         var meta = Meta(commandId, commandId, commandId);
         var reactions = 0;
@@ -201,7 +205,7 @@ public sealed class ReactiveNeuronTests : IClassFixture<ReactiveNeuronClusterFix
             async (_, commit) =>
             {
                 reactions++;
-                await commit(new ReactiveCommit("state", UiRevision: 1, Outbox: []));
+                await commit(new ReactiveCommit<string>("state", UiRevision: 1, Outbox: []));
                 return CommandReceiptStatus.Accepted;
             });
         var second = await pipeline.ExecuteCommandAsync(
@@ -209,7 +213,7 @@ public sealed class ReactiveNeuronTests : IClassFixture<ReactiveNeuronClusterFix
             async (_, commit) =>
             {
                 reactions++;
-                await commit(new ReactiveCommit("state", UiRevision: 1, Outbox: []));
+                await commit(new ReactiveCommit<string>("state", UiRevision: 1, Outbox: []));
                 return CommandReceiptStatus.Accepted;
             });
 
@@ -227,6 +231,9 @@ public interface IProbeNeuron : IGrainWithStringKey
     [Alias("ExecuteCommandAsync")]
     Task<CommandReceipt> ExecuteCommandAsync(CommandSynapse<string> command);
 
+    [Alias("ExecuteTypedEmitAsync")]
+    Task<CommandReceipt> ExecuteTypedEmitAsync(CommandSynapse<ProbeDomainEvent> command, Guid streamId);
+
     [Alias("HandleEventAsync")]
     Task HandleEventAsync(EventSynapse<string> @event);
 
@@ -241,6 +248,9 @@ public interface IProbeNeuron : IGrainWithStringKey
 
     [Alias("GetOutboxCountAsync")]
     Task<int> GetOutboxCountAsync();
+
+    [Alias("GetOutboxAttemptCountAsync")]
+    Task<int> GetOutboxAttemptCountAsync();
 
     [Alias("GetPublishedCountAsync")]
     Task<int> GetPublishedCountAsync();
@@ -257,8 +267,32 @@ public interface IProbeNeuron : IGrainWithStringKey
     [Alias("SetAutoDrainAsync")]
     Task SetAutoDrainAsync(bool enabled);
 
+    [Alias("SetThrowRawMessageAsync")]
+    Task SetThrowRawMessageAsync(string message);
+
+    [Alias("GetLastFailureAsync")]
+    Task<SanitizedFailure?> GetLastFailureAsync();
+
+    [Alias("HasOutboxReminderAsync")]
+    Task<bool> HasOutboxReminderAsync();
+
+    [Alias("ReceiveOutboxReminderAsync")]
+    Task ReceiveOutboxReminderAsync();
+
     [Alias("DrainOutboxAsync")]
     Task DrainOutboxAsync();
+
+    [Alias("DrainOutboxStrictAsync")]
+    Task DrainOutboxStrictAsync();
+
+    [Alias("PublishDirectAsync")]
+    Task PublishDirectAsync(Guid streamId, ProbeDomainEvent payload);
+
+    [Alias("GetLastPublishedIntentTypeWitnessAsync")]
+    Task<object?> GetLastPublishedIntentTypeWitnessAsync();
+
+    [Alias("PeekOutboxEventAsync")]
+    Task<EventSynapse<ProbeDomainEvent>?> PeekOutboxEventAsync();
 
     [Alias("DeactivateAsync")]
     Task DeactivateAsync();
@@ -268,11 +302,12 @@ public sealed class ProbeNeuron(
     [FromKeyedServices("probe-receipts")] IDurableDictionary<string, CommandReceipt> receipts,
     [FromKeyedServices("probe-events")] IDurableDictionary<string, byte> processedEvents,
     [FromKeyedServices("probe-sequences")] IDurableDictionary<string, long> sourceSequences,
-    [FromKeyedServices("probe-outbox")] IDurableList<OutboxIntent> outbox,
+    [FromKeyedServices("probe-outbox")] IDurableList<OutboxIntent<ProbeDomainEvent>> outbox,
     [FromKeyedServices("probe-domain")] IDurableDictionary<string, string> domain,
     [FromKeyedServices("probe-flags")] IDurableDictionary<string, string> flags,
     [FromKeyedServices("probe-failures")] IDurableList<SanitizedFailure> failures,
-    [FromKeyedServices("probe-causation")] IDurableDictionary<string, byte> rejectedCausation) : ReactiveNeuron(
+    [FromKeyedServices("probe-accepted-causation")] IDurableDictionary<string, byte> acceptedCausation,
+    [FromKeyedServices("probe-causation")] IDurableDictionary<string, byte> rejectedCausation) : ReactiveNeuron<ProbeDomainEvent>(
         receipts,
         processedEvents,
         sourceSequences,
@@ -280,41 +315,82 @@ public sealed class ProbeNeuron(
         domain,
         flags,
         failures,
+        acceptedCausation,
         rejectedCausation), IProbeNeuron
 {
+    public const string EventStreamNamespace = "probe.events";
     private int _published;
+    private object? _lastPublishedIntent;
+    private string? _throwRawMessage;
+
+    protected override bool AutoDrainAfterCommit =>
+        Flags.TryGetValue("auto-drain", out var value) && value == "1";
 
     public Task<CommandReceipt> ExecuteCommandAsync(CommandSynapse<string> command) =>
         ExecuteCommandCoreAsync(command, async (payload, commit) =>
         {
+            if (_throwRawMessage is not null)
+                throw new InvalidOperationException(_throwRawMessage);
+
             var intents = payload == "emit"
-                ? new[] { OutboxIntent.Create(command.Metadata, "probe.events", payload) }
-                : Array.Empty<OutboxIntent>();
+                ? new[]
+                {
+                    OutboxIntent<ProbeDomainEvent>.Create(
+                        EventStreamNamespace,
+                        command.Metadata.CommandId,
+                        new EventSynapse<ProbeDomainEvent>(
+                            command.Metadata with
+                            {
+                                EventId = Guid.NewGuid(),
+                                CausalDepth = command.Metadata.CausalDepth + 1,
+                                Source = NeuronAddress.Parse(this.GetPrimaryKeyString()),
+                            },
+                            new ProbeDomainEvent(payload, 0))),
+                }
+                : Array.Empty<OutboxIntent<ProbeDomainEvent>>();
             var revision = CurrentRevision + 1;
-            await commit(new ReactiveCommit(payload, UiRevision: revision, Outbox: intents));
+            await commit(new ReactiveCommit<ProbeDomainEvent>(payload, UiRevision: revision, Outbox: intents));
+            return CommandReceiptStatus.Accepted;
+        });
+
+    public Task<CommandReceipt> ExecuteTypedEmitAsync(CommandSynapse<ProbeDomainEvent> command, Guid streamId) =>
+        ExecuteCommandCoreAsync(command, async (payload, commit) =>
+        {
+            var @event = new EventSynapse<ProbeDomainEvent>(
+                command.Metadata with
+                {
+                    EventId = Guid.NewGuid(),
+                    CausalDepth = command.Metadata.CausalDepth + 1,
+                    Source = NeuronAddress.Parse(this.GetPrimaryKeyString()),
+                },
+                payload);
+            var intent = OutboxIntent<ProbeDomainEvent>.Create(EventStreamNamespace, streamId, @event);
+            await commit(new ReactiveCommit<ProbeDomainEvent>(
+                DomainState,
+                UiRevision: CurrentRevision + 1,
+                Outbox: [intent]));
             return CommandReceiptStatus.Accepted;
         });
 
     public Task HandleEventAsync(EventSynapse<string> @event) =>
         HandleEventCoreAsync(@event, async (_, commit) =>
         {
-            await commit(new ReactiveCommit(DomainState, UiRevision: UiRevision, Outbox: []));
+            await commit(new ReactiveCommit<ProbeDomainEvent>(DomainState, UiRevision: UiRevision, Outbox: []));
         });
 
     public Task<CommandReceipt> ApplyUiActionAsync(CommandSynapse<UiActionRequest> command) =>
         ExecuteCommandCoreAsync(command, async (payload, commit) =>
         {
             EnsureExpectedUiRevision(payload.ExpectedRevision);
-            await commit(new ReactiveCommit(DomainState, UiRevision: UiRevision + 1, Outbox: []));
+            await commit(new ReactiveCommit<ProbeDomainEvent>(DomainState, UiRevision: UiRevision + 1, Outbox: []));
             return CommandReceiptStatus.Accepted;
         });
 
     public Task<int> GetReactionCountAsync() => Task.FromResult(ReactionCount);
-
     public Task<long> GetRevisionAsync() => Task.FromResult(CurrentRevision);
-
     public Task<int> GetOutboxCountAsync() => Task.FromResult(Outbox.Count);
-
+    public Task<int> GetOutboxAttemptCountAsync() =>
+        Task.FromResult(Outbox.Count == 0 ? 0 : Outbox[0].AttemptCount);
     public Task<int> GetPublishedCountAsync() => Task.FromResult(_published);
 
     public Task<CommandReceipt?> TryGetReceiptAsync(Guid commandId) =>
@@ -326,10 +402,10 @@ public sealed class ProbeNeuron(
         return Task.CompletedTask;
     }
 
-    public Task SetPublishFailuresAsync(int failures)
+    public async Task SetPublishFailuresAsync(int failures)
     {
         Flags["publish-failures"] = failures.ToString();
-        return Task.CompletedTask;
+        await WriteStateAsync(CancellationToken.None);
     }
 
     public async Task SetAutoDrainAsync(bool enabled)
@@ -338,7 +414,49 @@ public sealed class ProbeNeuron(
         await WriteStateAsync();
     }
 
+    public Task SetThrowRawMessageAsync(string message)
+    {
+        _throwRawMessage = message;
+        return Task.CompletedTask;
+    }
+
+    public Task<SanitizedFailure?> GetLastFailureAsync() =>
+        Task.FromResult(Failures.Count == 0 ? null : Failures[^1]);
+
+    public async Task<bool> HasOutboxReminderAsync()
+    {
+        var reminder = await GetOutboxReminderAsync();
+        return reminder is not null;
+    }
+
+    public Task ReceiveOutboxReminderAsync() =>
+        ReceiveReminder(OutboxReminderName, new TickStatus(DateTime.UtcNow, TimeSpan.FromMinutes(1), DateTime.UtcNow));
+
     public Task DrainOutboxAsync() => DrainOutboxCoreAsync(throwOnPublishFailure: false);
+
+    public Task DrainOutboxStrictAsync() => DrainOutboxCoreAsync(throwOnPublishFailure: true);
+
+    public Task PublishDirectAsync(Guid streamId, ProbeDomainEvent payload)
+    {
+        var meta = new SynapseMetadata(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new OrganizationId("org-1"),
+            new PrincipalId("principal-1"),
+            new SpaceId("space-1"),
+            NeuronAddress.Parse(this.GetPrimaryKeyString()),
+            1,
+            0,
+            DateTimeOffset.UtcNow);
+        return PublishEventAsync(new EventSynapse<ProbeDomainEvent>(meta, payload), DefaultStreamProviderName, EventStreamNamespace, streamId);
+    }
+
+    public Task<object?> GetLastPublishedIntentTypeWitnessAsync() => Task.FromResult(_lastPublishedIntent);
+
+    public Task<EventSynapse<ProbeDomainEvent>?> PeekOutboxEventAsync() =>
+        Task.FromResult(Outbox.Count == 0 ? null : Outbox[0].Event);
 
     public Task DeactivateAsync()
     {
@@ -346,7 +464,7 @@ public sealed class ProbeNeuron(
         return Task.CompletedTask;
     }
 
-    protected override Task PublishOutboxIntentAsync(OutboxIntent intent)
+    protected override async Task PublishOutboxIntentAsync(OutboxIntent<ProbeDomainEvent> intent)
     {
         if (Flags.TryGetValue("publish-failures", out var raw) && int.TryParse(raw, out var remaining) && remaining > 0)
         {
@@ -354,8 +472,145 @@ public sealed class ProbeNeuron(
             throw new InvalidOperationException("publish failed");
         }
 
+        await base.PublishOutboxIntentAsync(intent);
+        _lastPublishedIntent = intent;
         _published++;
+    }
+}
+
+public sealed class TypedEventConsumerNeuron(
+    [FromKeyedServices("consumer-receipts")] IDurableDictionary<string, CommandReceipt> receipts,
+    [FromKeyedServices("consumer-events")] IDurableDictionary<string, byte> processedEvents,
+    [FromKeyedServices("consumer-sequences")] IDurableDictionary<string, long> sourceSequences,
+    [FromKeyedServices("consumer-outbox")] IDurableList<OutboxIntent<ProbeDomainEvent>> outbox,
+    [FromKeyedServices("consumer-domain")] IDurableDictionary<string, string> domain,
+    [FromKeyedServices("consumer-flags")] IDurableDictionary<string, string> flags,
+    [FromKeyedServices("consumer-failures")] IDurableList<SanitizedFailure> failures,
+    [FromKeyedServices("consumer-accepted-causation")] IDurableDictionary<string, byte> acceptedCausation,
+    [FromKeyedServices("consumer-causation")] IDurableDictionary<string, byte> rejectedCausation) : ReactiveNeuron<ProbeDomainEvent>(
+        receipts,
+        processedEvents,
+        sourceSequences,
+        outbox,
+        domain,
+        flags,
+        failures,
+        acceptedCausation,
+        rejectedCausation), ITypedEventConsumer, IAsyncObserver<EventSynapse<ProbeDomainEvent>>
+{
+    private ProbeDomainEvent? _lastPayload;
+    private Guid _streamId;
+
+    protected override async Task OnReactiveActivateAsync(CancellationToken cancellationToken)
+    {
+        _streamId = ResolveStreamId();
+        if (Flags.TryGetValue("subscribed", out var subscribed) && subscribed == "1" && _streamId != Guid.Empty)
+            await AttachSubscriptionAsync();
+    }
+
+    public async Task SubscribeAsync(Guid streamId)
+    {
+        _streamId = streamId;
+        Flags["subscribed"] = "1";
+        Flags["stream-id"] = streamId.ToString("D");
+        await WriteStateAsync(CancellationToken.None);
+        await AttachSubscriptionAsync();
+    }
+
+    private Guid ResolveStreamId()
+    {
+        if (Flags.TryGetValue("stream-id", out var raw) && Guid.TryParse(raw, out var fromFlags))
+            return fromFlags;
+
+        var address = NeuronAddress.Parse(this.GetPrimaryKeyString());
+        var slash = address.InstanceId.IndexOf('/');
+        if (slash > 0 && Guid.TryParse(address.InstanceId[(slash + 1)..], out var fromKey))
+            return fromKey;
+
+        return Guid.Empty;
+    }
+
+    public async Task<ProbeDomainEvent?> WaitForPayloadAsync(TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (_lastPayload is not null)
+                return _lastPayload;
+            if (Flags.TryGetValue("last-payload-name", out var name)
+                && Flags.TryGetValue("last-payload-value", out var valueRaw)
+                && int.TryParse(valueRaw, out var value))
+            {
+                return new ProbeDomainEvent(name, value);
+            }
+
+            await Task.Delay(50);
+        }
+
+        return _lastPayload;
+    }
+
+    public Task<bool> HasActiveSubscriptionAsync() => Task.FromResult(ActiveSubscriptionCount > 0);
+
+    public Task<Guid> GetStreamIdAsync() => Task.FromResult(_streamId);
+
+    public async Task<int> GetSubscriptionHandleCountAsync()
+    {
+        var provider = this.GetStreamProvider(DefaultStreamProviderName);
+        var stream = provider.GetStream<EventSynapse<ProbeDomainEvent>>(
+            StreamId.Create(ProbeNeuron.EventStreamNamespace, _streamId));
+        var handles = await stream.GetAllSubscriptionHandles();
+        return handles.Count;
+    }
+
+    public Task ObservePublishedAsync(ProbeDomainEvent payload) =>
+        OnNextAsync(new EventSynapse<ProbeDomainEvent>(
+            new SynapseMetadata(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                new OrganizationId("org-1"),
+                new PrincipalId("principal-1"),
+                new SpaceId("space-1"),
+                NeuronAddress.Parse(this.GetPrimaryKeyString()),
+                1,
+                0,
+                DateTimeOffset.UtcNow),
+            payload));
+
+    public Task DeactivateAsync()
+    {
+        DeactivateOnIdle();
         return Task.CompletedTask;
+    }
+
+    public async Task OnNextAsync(EventSynapse<ProbeDomainEvent> item, StreamSequenceToken? token = null)
+    {
+        _lastPayload = item.Payload;
+        Flags["last-payload-name"] = item.Payload.Name;
+        Flags["last-payload-value"] = item.Payload.Value.ToString();
+        await WriteStateAsync(CancellationToken.None);
+    }
+
+    public Task OnCompletedAsync() => Task.CompletedTask;
+
+    public Task OnErrorAsync(Exception ex) => Task.FromException(ex);
+
+    private async Task AttachSubscriptionAsync()
+    {
+        var provider = this.GetStreamProvider(DefaultStreamProviderName);
+        var stream = provider.GetStream<EventSynapse<ProbeDomainEvent>>(
+            StreamId.Create(ProbeNeuron.EventStreamNamespace, _streamId));
+        var handles = await stream.GetAllSubscriptionHandles();
+        if (handles.Count > 0)
+        {
+            foreach (var handle in handles)
+                TrackSubscription(await handle.ResumeAsync(this));
+            return;
+        }
+
+        TrackSubscription(await stream.SubscribeAsync(this));
     }
 }
 
@@ -381,11 +636,13 @@ public sealed class ReactiveNeuronClusterFixture : IDisposable
     {
         public void Configure(ISiloBuilder siloBuilder)
         {
-            siloBuilder.AddReactiveNeuronJournaling();
+            siloBuilder.UseJsonJournalFormat(TestJournalJsonContext.Default);
+            siloBuilder.AddJournalStorage();
             siloBuilder.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
             siloBuilder.UseInMemoryReminderService();
-            siloBuilder.AddMemoryStreams("ReactiveStreamProvider");
+            siloBuilder.AddMemoryGrainStorageAsDefault();
             siloBuilder.AddMemoryGrainStorage("PubSubStore");
+            siloBuilder.AddMemoryStreams("ReactiveStreamProvider");
         }
     }
 }
