@@ -9,6 +9,9 @@ public sealed class BrainOwnerIncomingCallFilter : IIncomingGrainCallFilter
     {
         if (context.Grain is Neuron)
         {
+            if (IsOrleansSystemReminder(context))
+                return context.Invoke();
+
             if (RequestContext.Get(nameof(BrainOwnerId)) is not BrainOwnerId owner)
                 throw new BrainException(
                     NeuronFailureKind.AuthenticationRequired,
@@ -23,4 +26,10 @@ public sealed class BrainOwnerIncomingCallFilter : IIncomingGrainCallFilter
 
         return context.Invoke();
     }
+
+    private static bool IsOrleansSystemReminder(IIncomingGrainCallContext context) =>
+        context.SourceId is { } sourceId
+        && sourceId.IsSystemTarget()
+        && context.InterfaceMethod.DeclaringType == typeof(IRemindable)
+        && context.InterfaceMethod.Name == nameof(IRemindable.ReceiveReminder);
 }

@@ -482,6 +482,10 @@ MCP connectivity remains deliberately absent. This task establishes durable owne
 - Create: `tests/DigitalBrain.Tests/Kernel/ExternalOperationRecoveryTests.cs`
 - Create: `tests/DigitalBrain.Tests/Kernel/NeuronOutboxTests.cs`
 
+Execution scope record (2026-07-18): `kernel/Brain.Kernel/Brain.Kernel.csproj` is included because the kernel now directly compiles against the official Orleans Streaming and Reminders APIs. `kernel/Brain.Kernel/BrainOwnerIncomingCallFilter.cs` and `tests/DigitalBrain.Tests/Security/BrainOwnerCallFilterTests.cs` are included because Task 3's owner filter otherwise rejects Orleans' system-target `IRemindable.ReceiveReminder` callback; the exemption requires the Neuron target, a system-target source, the exact `IRemindable` declaring type, and the exact `ReceiveReminder` method, while unauthenticated and cross-owner business calls remain denied.
+
+Grok execution record (2026-07-18): implementation session `019f7587-b14d-7d13-86f5-6d83f0396be5` became non-resumable in Grok CLI `0.2.101` after the reminder correction. Repeated direct resume and supported `--fork-session` probes stalled before prompt submission even though an isolated `grok-4.5` health request succeeded. `grok mcp doctor` identified the unavailable local `digitalbrain` MCP endpoint as the repository bootstrap failure; Codex temporarily removed only that entry, launched bounded recovery session `019f75b1-5b02-7731-b975-94c57a4fa99a` with the exact correction order, and restored `.mcp.json` with no resulting diff.
+
 **Required state machine:**
 
 ```text
@@ -490,25 +494,25 @@ Pending -> Succeeded
         -> Unknown
 ```
 
-- [ ] Add a test proving a pending operation is durable before a test-only external function is invoked.
-- [ ] Add a crash-window test which persists `Pending`, records the test effect, prevents outcome persistence, reactivates the grain, and observes `Unknown` unless a typed reconciler proves success.
-- [ ] Add an idempotent reconciliation test which transitions `Unknown` to `Succeeded` from a provider receipt.
-- [ ] Add an outbox test proving state and typed notification are committed before publishing.
-- [ ] Add a stream-failure test proving the outbox record remains pending and is published after retry.
-- [ ] Add an at-least-once test proving a consumer deduplicates by operation ID.
-- [ ] Add a recovery test proving deleting or losing stream messages cannot delete or contradict durable neuron state.
-- [ ] Configure the test silo and client with `AddMemoryStreams(nameof(NeuronNotification), ...)`; this is the explicitly test-only transport and uses the same provider name as production.
-- [ ] Run the owning test project and observe red because recovery and draining behavior are absent.
-- [ ] Implement transition validation as enum/record logic with no string event switch.
-- [ ] Keep the base free of a generic provider invocation method; test neurons call their test function directly around explicit durable writes.
-- [ ] Do not add a fourth universal durable member. Task 2's three-member state-shape test remains authoritative.
-- [ ] Map journal/storage write failures to `NeuronFailureKind.StorageUnavailable`, ambiguous outcomes to `OperationUnknown`, and provider failures to `ProviderUnavailable` or `OperationFailed` as appropriate.
-- [ ] Use a durable reminder only to wake outbox recovery. The outbox remains the source of delivery truth.
-- [ ] Publish `NeuronNotification` through one named Orleans stream provider whose provider name is derived with `nameof(NeuronNotification)`.
-- [ ] Record delivery attempt and completion durably.
-- [ ] Run the owning test project; require green.
-- [ ] Run the root checkpoint; require green.
-- [ ] Codex commits as `feat: add durable operation and notification recovery`.
+- [x] Add a test proving a pending operation is durable before a test-only external function is invoked.
+- [x] Add a crash-window test which persists `Pending`, records the test effect, prevents outcome persistence, reactivates the grain, and observes `Unknown` unless a typed reconciler proves success.
+- [x] Add an idempotent reconciliation test which transitions `Unknown` to `Succeeded` from a provider receipt.
+- [x] Add an outbox test proving state and typed notification are committed before publishing.
+- [x] Add a stream-failure test proving the outbox record remains pending and is published after retry.
+- [x] Add an at-least-once test proving a consumer deduplicates by operation ID.
+- [x] Add a recovery test proving deleting or losing stream messages cannot delete or contradict durable neuron state.
+- [x] Configure the test silo and client with `AddMemoryStreams(nameof(NeuronNotification), ...)`; this is the explicitly test-only transport and uses the same provider name as production.
+- [x] Run the owning test project and observe red because recovery and draining behavior are absent.
+- [x] Implement transition validation as enum/record logic with no string event switch.
+- [x] Keep the base free of a generic provider invocation method; test neurons call their test function directly around explicit durable writes.
+- [x] Do not add a fourth universal durable member. Task 2's three-member state-shape test remains authoritative.
+- [x] Map journal/storage write failures to `NeuronFailureKind.StorageUnavailable`, ambiguous outcomes to `OperationUnknown`, and provider failures to `ProviderUnavailable` or `OperationFailed` as appropriate.
+- [x] Use a durable reminder only to wake outbox recovery. The outbox remains the source of delivery truth.
+- [x] Publish `NeuronNotification` through one named Orleans stream provider whose provider name is derived with `nameof(NeuronNotification)`.
+- [x] Record delivery attempt and completion durably.
+- [x] Run the owning test project; require green.
+- [x] Run the root checkpoint; require green.
+- [x] Codex commits as `feat: add durable operation and notification recovery`.
 
 ---
 

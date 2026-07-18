@@ -14,6 +14,7 @@ namespace Brain.Kernel;
 [JsonSerializable(typeof(NeuronStatus))]
 [JsonSerializable(typeof(ExternalOperationStatus))]
 [JsonSerializable(typeof(NeuronFailureKind))]
+[JsonSerializable(typeof(NotificationDeliveryStatus))]
 [JsonSerializable(typeof(ExternalOperation))]
 [JsonSerializable(typeof(NeuronNotification))]
 public sealed partial class NeuronJournalJsonContext : JsonSerializerContext;

@@ -36,7 +36,9 @@ public sealed class NeuronDurableStateTests
             var notificationId = Guid.Parse("22222222-2222-2222-2222-222222222222");
             var notification = new NeuronNotification(
                 notificationId,
-                operationId);
+                operationId,
+                NotificationDeliveryStatus.Pending,
+                AttemptCount: 0);
             await neuron.WriteNotificationAsync(notificationId, notification);
 
             Assert.Equal(NeuronStatus.Active, await neuron.ReadStatusAsync());
@@ -60,6 +62,7 @@ file static class UnitTestVolatileJournalCluster
     public static async Task<TestCluster> CreateAsync()
     {
         var builder = new TestClusterBuilder();
+        builder.Options.InitialSilosCount = 1;
         builder.AddSiloBuilderConfigurator<UnitTestVolatileJournalSiloConfigurator>();
         var cluster = builder.Build();
         await cluster.DeployAsync();
@@ -73,6 +76,9 @@ file static class UnitTestVolatileJournalCluster
             siloBuilder.AddJournalStorage();
             siloBuilder.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
             siloBuilder.AddBrainKernel();
+            siloBuilder.UseInMemoryReminderService();
+            siloBuilder.AddMemoryGrainStorage("PubSubStore");
+            siloBuilder.AddMemoryStreams(nameof(NeuronNotification), _ => { });
         }
     }
 }

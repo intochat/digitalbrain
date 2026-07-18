@@ -11,5 +11,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Server" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
+    <PackageReference Include="Microsoft.Orleans.Streaming" />
+    <PackageReference Include="Microsoft.Orleans.Reminders" />
   </ItemGroup>
 </Project>

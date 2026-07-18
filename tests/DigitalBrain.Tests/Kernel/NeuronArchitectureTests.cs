@@ -3,6 +3,7 @@ using Brain.Contracts;
 using Brain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using Orleans.Runtime;
 using Xunit;
 
 namespace DigitalBrain.Tests.Kernel;
@@ -59,6 +60,8 @@ public sealed class NeuronArchitectureTests
         var publicMethods = typeof(Neuron)
             .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Where(method => !method.IsSpecialName)
+            .Where(method => method.Name is not nameof(Grain.OnActivateAsync)
+                and not nameof(IRemindable.ReceiveReminder))
             .ToArray();
         Assert.Empty(publicMethods);
 
@@ -66,6 +69,23 @@ public sealed class NeuronArchitectureTests
             .GetProperties(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Single(property => property.PropertyType == typeof(NeuronDurableState));
         Assert.True(durableState.GetMethod!.IsFamily);
+    }
+
+    [Fact]
+    public void Neuron_implements_IRemindable_and_has_no_generic_provider_invocation()
+    {
+        Assert.Contains(typeof(IRemindable), typeof(Neuron).GetInterfaces());
+
+        var publicNames = typeof(Neuron)
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static)
+            .Select(method => method.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Contains(nameof(IRemindable.ReceiveReminder), publicNames);
+        Assert.DoesNotContain("Invoke", publicNames);
+        Assert.DoesNotContain("Ask", publicNames);
+        Assert.DoesNotContain("InvokeMcpTool", publicNames);
+        Assert.DoesNotContain("Dispatch", publicNames);
     }
 
     [Fact]
@@ -81,6 +101,25 @@ public sealed class NeuronArchitectureTests
         var id = value.GetCustomAttribute<IdAttribute>();
         Assert.NotNull(id);
         Assert.Equal(0u, id.Id);
+    }
+
+    [Fact]
+    public void External_operation_transition_types_are_records_not_string_events()
+    {
+        Assert.True(typeof(ExternalOperationTransition).IsAbstract);
+        Assert.True(typeof(ExternalOperationTransition).IsClass);
+        Assert.Contains(
+            typeof(ExternalOperationTransition.Succeeded),
+            typeof(ExternalOperationTransition).GetNestedTypes());
+        Assert.Contains(
+            typeof(ExternalOperationTransition.Failed),
+            typeof(ExternalOperationTransition).GetNestedTypes());
+        Assert.Contains(
+            typeof(ExternalOperationTransition.Unknown),
+            typeof(ExternalOperationTransition).GetNestedTypes());
+        Assert.Contains(
+            typeof(ExternalOperationTransition.ReconcileSucceeded),
+            typeof(ExternalOperationTransition).GetNestedTypes());
     }
 
     private static void AssertKeyedDurable(ParameterInfo parameter, string expectedKey, Type expectedType)
