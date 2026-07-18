@@ -10,6 +10,8 @@ public sealed class ScriptedChatClient : IChatClient
     private readonly string _fallbackReply;
     private int _invocationCount;
     private string? _failWithMessage;
+    private bool _hangUntilCancelled;
+    private int _cancellationObservedCount;
 
     public ScriptedChatClient(params string[] replies)
     {
@@ -19,22 +21,39 @@ public sealed class ScriptedChatClient : IChatClient
 
     public int InvocationCount => Volatile.Read(ref _invocationCount);
 
-    public IReadOnlyList<string> SeenPromptFragments { get; } = new List<string>();
+    public int CancellationObservedCount => Volatile.Read(ref _cancellationObservedCount);
 
     public void FailNextWith(string message) => _failWithMessage = message;
+
+    public void HangUntilCancelled() => _hangUntilCancelled = true;
 
     public void Reset()
     {
         Volatile.Write(ref _invocationCount, 0);
+        Volatile.Write(ref _cancellationObservedCount, 0);
         _failWithMessage = null;
+        _hangUntilCancelled = false;
     }
 
-    public Task<ChatResponse> GetResponseAsync(
+    public async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _invocationCount);
+        if (_hangUntilCancelled)
+        {
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                Interlocked.Increment(ref _cancellationObservedCount);
+                throw;
+            }
+        }
+
         if (_failWithMessage is not null)
         {
             var message = _failWithMessage;
@@ -45,7 +64,7 @@ public sealed class ScriptedChatClient : IChatClient
         if (!_replies.TryDequeue(out var reply))
             reply = _fallbackReply;
 
-        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, reply)));
+        return new ChatResponse(new ChatMessage(ChatRole.Assistant, reply));
     }
 
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(

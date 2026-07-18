@@ -2,6 +2,7 @@ namespace DigitalBrain.AI;
 
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Brain.Contracts;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Agents.AI.Workflows.Checkpointing;
@@ -22,23 +23,18 @@ public sealed class OneStepGroupChatEngine
             ? new[] { first, second }
             : new[] { second, first };
 
-        if (!string.IsNullOrWhiteSpace(checkpointSessionId)
-            && !string.IsNullOrWhiteSpace(checkpointId)
-            && !string.IsNullOrWhiteSpace(checkpointJson))
+        var resume = await TryOpenResumeRunAsync(
+            ordered,
+            checkpointSessionId,
+            checkpointId,
+            checkpointJson).ConfigureAwait(false);
+
+        if (resume is not null)
         {
-            var resumeStore = new BufferedJsonCheckpointStore();
-            resumeStore.Seed(
-                checkpointSessionId,
-                checkpointId,
-                JsonSerializer.Deserialize<JsonElement>(checkpointJson));
-            var resumeManager = CheckpointManager.CreateJson(resumeStore);
-            var resume = await TryResumeOrNullAsync(
-                ordered,
-                resumeManager,
-                resumeStore,
-                new CheckpointInfo(checkpointSessionId, checkpointId)).ConfigureAwait(false);
-            if (resume is not null)
-                return resume;
+            await using (resume.Run)
+            {
+                return await ExecuteResumedStepAsync(resume.Run, resume.Store).ConfigureAwait(false);
+            }
         }
 
         var freshStore = new BufferedJsonCheckpointStore();
@@ -46,40 +42,77 @@ public sealed class OneStepGroupChatEngine
         return await ExecuteFreshAsync(transcript, ordered, freshManager, freshStore).ConfigureAwait(false);
     }
 
-    private async Task<OneStepResult?> TryResumeOrNullAsync(
+    private static async Task<ResumeHandle?> TryOpenResumeRunAsync(
         AIAgent[] ordered,
-        CheckpointManager checkpointManager,
-        BufferedJsonCheckpointStore store,
-        CheckpointInfo checkpoint)
+        string? checkpointSessionId,
+        string? checkpointId,
+        string? checkpointJson)
     {
+        if (string.IsNullOrWhiteSpace(checkpointSessionId)
+            || string.IsNullOrWhiteSpace(checkpointId)
+            || string.IsNullOrWhiteSpace(checkpointJson))
+        {
+            return null;
+        }
+
+        JsonElement seeded;
         try
         {
-            var workflow = BuildWorkflow(ordered, maximumIterationCount: 2);
-            var environment = InProcessExecution.Lockstep.WithCheckpointing(checkpointManager);
-            await using StreamingRun run = await environment
-                .ResumeStreamingAsync(workflow, checkpoint)
+            seeded = JsonSerializer.Deserialize<JsonElement>(checkpointJson);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+
+        var resumeStore = new BufferedJsonCheckpointStore();
+        resumeStore.Seed(checkpointSessionId, checkpointId, seeded);
+        if (!resumeStore.Has(checkpointSessionId, checkpointId))
+            return null;
+
+        var workflow = BuildWorkflow(ordered, maximumIterationCount: 2);
+        var environment = InProcessExecution.Lockstep.WithCheckpointing(CheckpointManager.CreateJson(resumeStore));
+        try
+        {
+            var run = await environment
+                .ResumeStreamingAsync(workflow, new CheckpointInfo(checkpointSessionId, checkpointId))
                 .ConfigureAwait(false);
-
-            var accepted = await run.TrySendMessageAsync(new TurnToken(emitEvents: true)).ConfigureAwait(false);
-            if (!accepted)
-                return null;
-
-            var drained = await DrainOneParticipantStepAsync(run).ConfigureAwait(false);
-            if (drained.ParticipantResponses.Count != 1 || drained.Checkpoint is null)
-                return null;
-
-            var json = store.TryGetJson(drained.Checkpoint.SessionId, drained.Checkpoint.CheckpointId);
-            return new OneStepResult(
-                drained.ParticipantResponses,
-                drained.Checkpoint,
-                json,
-                drained.TerminalTranscript,
-                UsedCheckpointResume: true);
+            return new ResumeHandle(run, resumeStore);
         }
         catch (Exception)
         {
             return null;
         }
+    }
+
+    private static async Task<OneStepResult> ExecuteResumedStepAsync(
+        StreamingRun run,
+        BufferedJsonCheckpointStore store)
+    {
+        var accepted = await run.TrySendMessageAsync(new TurnToken(emitEvents: true)).ConfigureAwait(false);
+        if (!accepted)
+        {
+            throw new BrainException(BrainErrors.FailureSanitized, "neuron failure");
+        }
+
+        var drained = await DrainOneParticipantStepAsync(run).ConfigureAwait(false);
+        if (drained.ParticipantResponses.Count != 1 || drained.Checkpoint is null)
+        {
+            throw new BrainException(BrainErrors.FailureSanitized, "neuron failure");
+        }
+
+        var json = store.TryGetJson(drained.Checkpoint.SessionId, drained.Checkpoint.CheckpointId);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            throw new BrainException(BrainErrors.FailureSanitized, "neuron failure");
+        }
+
+        return new OneStepResult(
+            drained.ParticipantResponses,
+            drained.Checkpoint,
+            json,
+            drained.TerminalTranscript,
+            UsedCheckpointResume: true);
     }
 
     private async Task<OneStepResult> ExecuteFreshAsync(
@@ -101,19 +134,20 @@ public sealed class OneStepGroupChatEngine
 
         if (drained.ParticipantResponses.Count != 1)
         {
-            throw new Brain.Contracts.BrainException(
-                Brain.Contracts.BrainErrors.FailureSanitized,
-                "neuron failure");
+            throw new BrainException(BrainErrors.FailureSanitized, "neuron failure");
         }
 
         if (drained.Checkpoint is null)
         {
-            throw new Brain.Contracts.BrainException(
-                Brain.Contracts.BrainErrors.FailureSanitized,
-                "neuron failure");
+            throw new BrainException(BrainErrors.FailureSanitized, "neuron failure");
         }
 
         var json = store.TryGetJson(drained.Checkpoint.SessionId, drained.Checkpoint.CheckpointId);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            throw new BrainException(BrainErrors.FailureSanitized, "neuron failure");
+        }
+
         return new OneStepResult(
             drained.ParticipantResponses,
             drained.Checkpoint,
@@ -205,6 +239,8 @@ public sealed class OneStepGroupChatEngine
             AuthorName = message.AuthorName
         };
 
+    private sealed record ResumeHandle(StreamingRun Run, BufferedJsonCheckpointStore Store);
+
     private sealed record DrainedStep(
         IReadOnlyList<ChatMessage> ParticipantResponses,
         CheckpointInfo? Checkpoint,
@@ -214,7 +250,7 @@ public sealed class OneStepGroupChatEngine
 public sealed record OneStepResult(
     IReadOnlyList<ChatMessage> ParticipantResponses,
     CheckpointInfo Checkpoint,
-    string? CheckpointJson,
+    string CheckpointJson,
     List<ChatMessage>? TerminalTranscript,
     bool UsedCheckpointResume);
 
