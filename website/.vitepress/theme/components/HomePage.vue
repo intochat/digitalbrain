@@ -25,12 +25,30 @@ onUnmounted(() => {
   observer?.disconnect()
 })
 
-const layers = [
-  { name: 'Experiences', detail: 'Workspace · MCP · behaviors', tone: 'violet' },
-  { name: 'Modules', detail: 'AI · memory · Stripe · community', tone: 'blue' },
-  { name: 'Kernel', detail: 'Identity · scheduling · policy · effects', tone: 'cyan' },
-  { name: 'Runtime', detail: 'Orleans · Aspire · durable state', tone: 'slate' }
+const evidence = [
+  {
+    name: 'Universal grain',
+    symbol: 'NeuronGrain / INeuron',
+    detail: 'One Orleans grain hosts every addressable capability.'
+  },
+  {
+    name: 'Kind strategy',
+    symbol: 'INeuronKind',
+    detail: 'Registered kinds own deterministic domain behavior.'
+  },
+  {
+    name: 'Typed client façade',
+    symbol: 'INeuronContract / NeuronProxy',
+    detail: 'Typed contracts translate to the universal invocation envelope.'
+  },
+  {
+    name: 'Governed effects',
+    symbol: 'Propose → decide → claim',
+    detail: 'External mutations pass through the kernel effect gate.'
+  }
 ]
+
+const modules = ['Workspace', 'AI', 'Web', 'Connections', 'Google', 'Salesforce', 'Behaviors']
 </script>
 
 <template>
@@ -72,142 +90,115 @@ const layers = [
       </svg>
 
       <div class="hero-content">
-        <div class="eyebrow">Open-source neuron operating system</div>
+        <div class="eyebrow">Open-source capability operating system</div>
         <h1>Digital<span>Brain</span></h1>
-        <p class="hero-headline">An operating system built from neurons and synapses.</p>
+        <p class="hero-headline">A small kernel for durable, addressable capabilities.</p>
         <p class="hero-copy">
-          Everything addressable is a neuron. Typed connections let software,
-          people, and agents grow one coherent brain.
+          One address space, typed contracts, and an explicit effect gate for software,
+          people, and agents working in the same system.
         </p>
         <div class="hero-actions">
-          <a :href="withBase('/guide/')" class="button button-primary">Start exploring</a>
-          <a :href="withBase('/guide/architecture')" class="button button-secondary">Explore the architecture <span>→</span></a>
+          <a :href="withBase('/getting-started/first-call')" class="button button-primary">First MCP call</a>
+          <a :href="withBase('/reference/status')" class="button button-secondary">View implementation status <span>→</span></a>
         </div>
       </div>
 
       <div class="hero-status">
         <span class="status-pulse"></span>
-        <span>Kernel online</span>
+        <span>Local-first development stack</span>
         <span class="status-divider"></span>
         <span>.NET · Orleans · Aspire</span>
       </div>
     </section>
 
-    <section class="home-section primitives">
+    <section class="home-section evidence-section">
       <div class="section-inner">
-        <div class="section-kicker reveal">The model</div>
-        <h2 class="reveal">Two primitives. One living system.</h2>
+        <div class="section-kicker reveal">Implemented</div>
+        <h2 class="reveal">What runs today</h2>
         <p class="section-lead reveal">
-          DigitalBrain treats identity and connection as the foundation,
-          then builds everything else as modules.
+          These claims map to code in the repository. The status reference records the gaps without disguising targets as shipped behavior.
         </p>
-        <div class="primitive-grid">
-          <article class="primitive-card reveal">
-            <div class="primitive-visual neuron-visual" aria-hidden="true">
-              <span class="neuron-halo halo-three"></span>
-              <span class="neuron-halo halo-two"></span>
-              <span class="neuron-halo halo-one"></span>
-              <span class="neuron-dot"></span>
-            </div>
-            <div class="primitive-number">01</div>
-            <h3>Neurons</h3>
-            <p>Durable, addressable capabilities with typed contracts and explicit ownership.</p>
-            <a :href="withBase('/guide/neurons')">Understand neurons <span>→</span></a>
-          </article>
-          <article class="primitive-card reveal">
-            <div class="primitive-visual synapse-visual" aria-hidden="true">
-              <span class="synapse-node node-left"></span>
-              <span class="synapse-line"></span>
-              <span class="synapse-signal"></span>
-              <span class="synapse-node node-right"></span>
-            </div>
-            <div class="primitive-number">02</div>
-            <h3>Synapses</h3>
-            <p>Typed facts and governed relationships that connect neurons without becoming a second command bus.</p>
-            <a :href="withBase('/guide/synapses')">Understand synapses <span>→</span></a>
+        <div class="evidence-grid">
+          <article v-for="item in evidence" :key="item.name" class="evidence-card reveal">
+            <span class="evidence-state">Implemented</span>
+            <h3>{{ item.name }}</h3>
+            <code>{{ item.symbol }}</code>
+            <p>{{ item.detail }}</p>
           </article>
         </div>
       </div>
     </section>
 
-    <section class="home-section system-section">
+    <section class="home-section pipeline-section">
       <div class="section-inner system-layout">
         <div class="system-copy">
-          <div class="section-kicker reveal">The system</div>
-          <h2 class="reveal">Small kernel.<br>Infinite surface.</h2>
+          <div class="section-kicker reveal">One execution path</div>
+          <h2 class="reveal">Typed at the client.<br>Universal in the kernel.</h2>
           <p class="section-lead reveal">
-            The kernel owns the invariants. Modules add product capability.
-            Experiences remain replaceable views over the same brain.
+            Module contracts stay discoverable while the kernel keeps one invocation, persistence, and policy path.
           </p>
-          <a :href="withBase('/guide/modules')" class="text-link reveal">Build a module <span>→</span></a>
+          <a :href="withBase('/guide/programming-model')" class="text-link reveal">See the programming model <span>→</span></a>
         </div>
-        <div class="layer-stack reveal">
-          <div v-for="layer in layers" :key="layer.name" class="layer" :class="`layer-${layer.tone}`">
-            <div>
-              <strong>{{ layer.name }}</strong>
-              <span>{{ layer.detail }}</span>
-            </div>
-            <span class="layer-light"></span>
-          </div>
+        <div class="pipeline-panel reveal" aria-label="Current invocation pipeline">
+          <div class="pipeline-step"><strong>INeuronContract</strong><span>Module API</span></div>
+          <span class="pipeline-arrow">→</span>
+          <div class="pipeline-step"><strong>NeuronProxy</strong><span>Typed façade</span></div>
+          <span class="pipeline-arrow">→</span>
+          <div class="pipeline-step"><strong>INeuron.InvokeAsync</strong><span>Kernel envelope</span></div>
+          <span class="pipeline-arrow">→</span>
+          <div class="pipeline-step"><strong>INeuronKind</strong><span>Domain strategy</span></div>
         </div>
+      </div>
+    </section>
+
+    <section class="home-section status-section">
+      <div class="section-inner">
+        <div class="section-kicker reveal">Evidence before aspiration</div>
+        <h2 class="reveal">Know what each claim means.</h2>
+        <div class="status-grid">
+          <article class="status-card status-implemented reveal">
+            <span>Implemented</span>
+            <h3>Backed by code and tests</h3>
+            <p>Safe to evaluate in the current repository.</p>
+          </article>
+          <article class="status-card status-target reveal">
+            <span>Target</span>
+            <h3>Accepted direction</h3>
+            <p>Intended architecture that is not fully delivered yet.</p>
+          </article>
+          <article class="status-card status-decision reveal">
+            <span>Decision</span>
+            <h3>Still deliberately open</h3>
+            <p>A boundary that needs evidence before it becomes contract.</p>
+          </article>
+        </div>
+        <a :href="withBase('/reference/status')" class="text-link reveal">Read the complete implementation ledger <span>→</span></a>
       </div>
     </section>
 
     <section class="home-section module-section">
       <div class="section-inner">
-        <div class="section-kicker reveal">Made to extend</div>
-        <h2 class="reveal">A module ships a complete capability.</h2>
-        <div class="module-flow reveal">
-          <div class="module-node">
-            <span>01</span>
-            <strong>Contracts</strong>
-            <small>Typed public surface</small>
-          </div>
-          <div class="module-connector"></div>
-          <div class="module-node">
-            <span>02</span>
-            <strong>Runtime</strong>
-            <small>Neuron implementation</small>
-          </div>
-          <div class="module-connector"></div>
-          <div class="module-node">
-            <span>03</span>
-            <strong>Connector</strong>
-            <small>External systems</small>
-          </div>
-          <div class="module-connector"></div>
-          <div class="module-node">
-            <span>04</span>
-            <strong>UI</strong>
-            <small>Native projections</small>
-          </div>
-          <div class="module-connector"></div>
-          <div class="module-node">
-            <span>05</span>
-            <strong>Hosting</strong>
-            <small>Aspire composition</small>
-          </div>
+        <div class="section-kicker reveal">Current composition</div>
+        <h2 class="reveal">Modules already wired into the host.</h2>
+        <p class="section-lead reveal">
+          Today, modules use explicit host composition. Packaging, manifests, and community isolation remain future decisions.
+        </p>
+        <div class="module-catalog reveal">
+          <span v-for="module in modules" :key="module" class="module-pill">{{ module }}</span>
         </div>
-        <div class="example-strip reveal">
-          <span class="example-label">Examples</span>
-          <span>Memory</span>
-          <span>Stripe</span>
-          <span>Google</span>
-          <span>Salesforce</span>
-          <span>Community</span>
-        </div>
+        <a :href="withBase('/build/first-module')" class="text-link reveal">Build a module against the current model <span>→</span></a>
       </div>
     </section>
 
     <section class="home-cta">
       <div class="cta-glow" aria-hidden="true"></div>
       <div class="section-inner reveal">
-        <div class="section-kicker">Begin with the kernel</div>
-        <h2>Build software that can grow.</h2>
-        <p>Read the architecture, follow the decisions, and help shape the neuron ecosystem.</p>
+        <div class="section-kicker">Start from running code</div>
+        <h2>Make the first call, then trace it to the kernel.</h2>
+        <p>Run the Aspire topology, invoke a neuron through MCP, and add a tested kind without inventing a parallel runtime.</p>
         <div class="hero-actions">
-          <a :href="withBase('/guide/')" class="button button-primary">Read the guide</a>
-          <a :href="withBase('/contributing/')" class="button button-secondary">Contribute <span>→</span></a>
+          <a :href="withBase('/getting-started/first-call')" class="button button-primary">First MCP call</a>
+          <a :href="withBase('/build/first-module')" class="button button-secondary">Build a module <span>→</span></a>
         </div>
       </div>
     </section>

@@ -1,65 +1,56 @@
 # Architecture
 
-DigitalBrain separates a small trusted kernel from an extensible module ecosystem.
+The implemented architecture is one universal execution path with module behavior supplied by strategies.
 
 <NeuronGraph />
 
-## Layers
+## Implemented layers
 
-| Layer | Responsibility |
+| Layer | Current responsibility |
 | --- | --- |
-| Experiences | Workspace, MCP, behavior tooling, and future clients |
-| Modules | Typed capabilities such as AI, memory, Stripe, Google, and Salesforce |
-| Kernel | Identity, authorization, scheduling, durable effects, and module boundaries |
-| Runtime | Orleans activation and persistence, Aspire composition, telemetry |
+| Experiences | Flutter workspace, MCP tools, UI gateway, behavior tooling |
+| Modules | Workspace, AI, Web, Connections, Google, Salesforce, Behaviors |
+| Kernel | `NeuronGrain`, kind dispatch, invocation replay, journal updates, effect approval proof |
+| Runtime | Orleans activation, Aspire composition, telemetry defaults |
 
-## The kernel owns invariants
-
-The kernel should remain small enough to reason about. It owns:
-
-- Durable neuron addresses.
-- Authenticated actor context.
-- Command identity and replay protection.
-- Authorization and grants.
-- Revision and persistence rules.
-- Effect proposal, decision, execution, and reconciliation.
-- Module registration and compatibility checks.
-
-Provider SDKs, product-specific workflows, UI projections, and external-system details stay outside the kernel.
+`NeuronGrain` resolves the address kind, selects an `INeuronKind`, replays a prior receipt when the same command identifier returns, invokes domain behavior, and appends returned events.
 
 ## One address space
 
-A neuron address identifies the logical capability, not its current process or transport:
+The current grain key is:
 
 ```text
-owner/{ownerId}/space/{spaceId}/neuron/{neuronId}
+owner|space|kind/instance
 ```
 
-MCP, the workspace, another neuron, or a behavior that resolves the same address reaches the same logical state.
-
-## Commands and facts
-
-The programming model draws a hard line:
+For example:
 
 ```text
-typed call       = request work
-fact synapse     = announce what became true
-topology synapse = describe a governed relationship
-effect link      = bind proposal, decision, and outcome
+local-owner|main|chat/main
 ```
 
-This prevents a generic event bus from quietly becoming a second command runtime.
+`NeuronAddress.Parse` divides the key into owner, space, and neuron identifier. The text before the first slash in the neuron identifier selects the registered kind.
 
-## External effects
+## Typed outside, universal inside
 
-External mutation follows one rail:
+Module contracts implement `INeuronContract`. `NeuronProxy` translates a one-argument `Task<TResult>` method bearing `[NeuronContract]` into `INeuron.InvokeAsync`. MCP and HTTP construct the same envelope directly.
+
+The universal envelope is therefore current kernel behavior, not merely a transport detail. Restricting it to edges is a **Target**.
+
+## Persistence today
+
+The kernel journals neuron events through Orleans Journaling. The local kernel host registers `VolatileJournalStorageProvider`, so a process restart loses that journal. Durable production storage is a **Target**.
+
+## Effects today
+
+The kernel implements:
 
 ```text
-propose → decide → claim → execute → reconcile
+propose → approve or decline → claim approval proof
 ```
 
-Every connector supplies a deterministic provider idempotency key. Execution ends in `Succeeded`, `Failed`, `Declined`, or `OutcomeUnknown`; an unknown provider outcome is never blindly retried.
+Google and Salesforce kinds can propose effects and require a matching approval proof before their connector path proceeds. A complete executor lifecycle with deterministic provider idempotency keys, reconciliation, and `OutcomeUnknown` handling is a **Target**.
 
-## Current and target architecture
+## Trust boundaries today
 
-The repository is being rebuilt from the kernel outward. Some current code still uses a universal invocation envelope internally. The target public programming model is typed neuron contracts, with generic JSON limited to edge codecs such as MCP and HTTP.
+MCP and UI edges inject hard-coded development caller identities. Owner checks and effect-state checks exist, but end-user authentication and a complete grant model do not. Treat authenticated identity and production authorization as **Targets**.

@@ -1,50 +1,47 @@
 # Modules
 
-A module adds a coherent capability to DigitalBrain without changing the kernel.
+A module adds one or more neuron kinds and their supporting services without creating another execution runtime.
 
-## Package anatomy
+## Implemented composition
 
-| Package | Contains |
-| --- | --- |
-| `*.Contracts` | Typed neuron interfaces, commands, results, and fact schemas |
-| `*.Runtime` | Neuron implementations and deterministic domain logic |
-| `*.Connector` | Provider clients, authentication, webhook verification, and effect execution |
-| `*.UI` | Governed projections and native block producers |
-| `*.Hosting` | Aspire and dependency-injection registration |
+Modules use **explicit host composition**. `Brain.Kernel.Host/Program.cs` registers the kernel with Workspace kinds and calls the hosting extensions for AI, Web, Connections, Google, Salesforce, and Behaviors.
 
-A convenience package may reference the pieces needed for the common installation path.
+There is no runtime module marketplace or manifest loader. A module is present because the host references and registers it.
 
-## Example: long-term memory
+## Current module ingredients
 
-A memory module can wrap a library such as `agent-memory-dotnet` without making that dependency part of the kernel:
+Repository modules commonly contain:
 
-```text
-DigitalBrain.Memory.Contracts
-DigitalBrain.Memory.Runtime
-DigitalBrain.Memory.Connector.AgentMemory
-DigitalBrain.Memory.UI
-DigitalBrain.Memory.Hosting
+- An `INeuronContract` typed façade when clients need one.
+- An `INeuronKind` implementation with accepted contract names.
+- Commands, results, and deterministic domain logic.
+- Dependency-injection registration for required services.
+- Connector code when the capability reaches an external system.
+- Conformance coverage for shared invariants.
+
+The repository does not enforce a five-package anatomy. Contracts, runtime, connector, UI, and hosting packages remain a possible future packaging convention, not current fact.
+
+## Registration
+
+Workspace kinds are registered with the kernel:
+
+```csharp
+silo.AddBrainKernel(new ChatKind(), new WindowKind(), new FeedKind());
 ```
 
-The module owns its storage vocabulary, retrieval contracts, connector adaptation, and workspace projections. The kernel sees registered neuron contracts and governed effects.
+Other modules expose hosting extensions:
 
-## Manifest
-
-Every module declares:
-
-- Stable module identifier and semantic version.
-- Supported kernel contract range.
-- Exported neuron contracts.
-- Fact and topology schemas.
-- Required grants.
-- External effect kinds.
-- UI projection kinds.
-- Hosting dependencies.
-
-The manifest is build-time metadata. Runtime reflection is not the primary discovery mechanism.
+```csharp
+silo.AddBrainAi(configuration);
+silo.AddBrainWeb();
+silo.AddBrainConnections(configuration);
+silo.AddBrainGoogle(configuration);
+silo.AddBrainSalesforce(configuration);
+silo.AddBrainBehaviors();
+```
 
 ## Trust boundary
 
-First-party modules may run in process. Community modules need an explicit trust policy, compatibility gates, and isolation strategy before arbitrary code is loaded into the kernel silo.
+All current modules are first-party and run in process. Semantic compatibility rules, manifests, dynamic loading, and community-code isolation are **Decisions** still to be made.
 
-The initial ecosystem can be conservative: contracts and connector processes are extensible first; in-silo runtime loading remains governed.
+Use the [first module tutorial](/build/first-module) to extend the implemented path.
