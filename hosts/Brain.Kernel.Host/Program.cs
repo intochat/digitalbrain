@@ -1,4 +1,4 @@
-using Brain.Kernel;
+using DigitalBrain.Kernel;
 using Brain.Kernel.Host;
 using Google;
 using Orleans.Journaling;

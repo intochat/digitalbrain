@@ -100,14 +100,16 @@ After every task:
 
 **Implementation:**
 
-- [ ] Rename the active durable foundation projects and namespaces under test.
-- [ ] Preserve all existing durable behavior and public contract typing.
-- [ ] Add centralized pack metadata and package-specific descriptions.
-- [ ] Keep old `src/**`, `edge/**`, and historical trees outside every public package graph until their explicit deletion task.
-- [ ] Add package README/icon/license inclusion and symbols.
-- [ ] Add deterministic local pack scripts.
-- [ ] Pack and inspect each `.nupkg` and `.snupkg`.
-- [ ] Verify the packages from an empty local feed.
+- [x] Rename the active durable foundation projects and namespaces under test.
+- [x] Preserve all existing durable behavior and public contract typing.
+- [x] Add centralized pack metadata and package-specific descriptions.
+- [x] Keep old `src/**`, `edge/**`, and historical trees outside every public package graph until their explicit deletion task.
+- [x] Add package README/icon/license inclusion and symbols.
+- [x] Add deterministic local pack scripts.
+- [x] Pack and inspect each `.nupkg` and `.snupkg`.
+- [x] Verify the packages from an empty local feed.
+
+**Execution record (2026-07-18):** Namespaces are `DigitalBrain` for Abstractions/Client and `DigitalBrain.Kernel` for the kernel. The review checkpoint confirmed and this task resolved: the unused `Microsoft.Extensions.Hosting` dependency was removed from `DigitalBrain.Client`; grain-interface identities are pinned with `[Alias(nameof(...))]` on `INeuron`, `IGmail`, and `ISalesforce`; the package-boundary tests forbid provider, journaling, and dev-tool dependency markers per package instead of whitelisting all `Microsoft.*`; the pack fixture and `eng/pack.ps1` discover packable projects and derive the package version from MSBuild instead of duplicating constants; `eng/pack.ps1` always rebuilds the feed directory. The tracked `behaviors/smoke` and `behaviors/inbox-brief` scripts reference `BrainCluster` and modules deleted by the approved durable-neuron demolition and were already dead at this task's start; their deletion belongs to Task 10. The empty-feed restore gate requires nuget.org access by design.
 
 **Gates:**
 

@@ -1,6 +1,5 @@
 using System.Reflection;
-using Brain.Client;
-using Brain.Contracts;
+using DigitalBrain;
 using Google.Contracts;
 using Salesforce.Contracts;
 using Xunit;

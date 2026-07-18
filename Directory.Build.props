@@ -1,18 +1,23 @@
 <Project>
   <PropertyGroup>
-
-
-
-
-
-
-
-
-
-
-
     <SkipFlutterBuild Condition="'$(SkipFlutterBuild)' == ''">true</SkipFlutterBuild>
     <SkipDeployBuild Condition="'$(SkipDeployBuild)' == ''">true</SkipDeployBuild>
     <EnforceCodeStyleInBuild Condition="'$(EnforceCodeStyleInBuild)' == ''">true</EnforceCodeStyleInBuild>
+    <IsPackable>false</IsPackable>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionSuffix>alpha.1</VersionSuffix>
+    <Authors>Digital Brain Tech</Authors>
+    <Company>Digital Brain Tech</Company>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/digitalbraintech/brain</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/digitalbraintech/brain</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>digitalbrain;orleans;aspire;durable;agents;ai</PackageTags>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 </Project>

@@ -1,8 +1,8 @@
 <Solution>
   <Folder Name="/kernel/">
-    <Project Path="kernel/Brain.Client/Brain.Client.csproj" />
-    <Project Path="kernel/Brain.Contracts/Brain.Contracts.csproj" />
-    <Project Path="kernel/Brain.Kernel/Brain.Kernel.csproj" />
+    <Project Path="kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+    <Project Path="kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
+    <Project Path="kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   </Folder>
   <Folder Name="/modules/">
     <Project Path="modules/Google.Contracts/Google.Contracts.csproj" />
@@ -16,6 +16,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Brain.FeasibilityTests/Brain.FeasibilityTests.csproj" />
+    <Project Path="tests/DigitalBrain.PackageTests/DigitalBrain.PackageTests.csproj" />
     <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
   </Folder>
 </Solution>

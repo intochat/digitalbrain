@@ -1,4 +1,4 @@
-using Brain.Kernel;
+using DigitalBrain.Kernel;
 using Google.Contracts;
 
 namespace Google;

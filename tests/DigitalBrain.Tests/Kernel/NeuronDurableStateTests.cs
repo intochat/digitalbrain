@@ -1,5 +1,5 @@
-using Brain.Contracts;
-using Brain.Kernel;
+using DigitalBrain;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Journaling;

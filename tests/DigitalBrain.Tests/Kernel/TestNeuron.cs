@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
-using Brain.Contracts;
-using Brain.Kernel;
+using DigitalBrain;
+using DigitalBrain.Kernel;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Tests.Kernel;

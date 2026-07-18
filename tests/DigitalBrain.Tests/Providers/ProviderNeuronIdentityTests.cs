@@ -1,7 +1,6 @@
 using System.Reflection;
-using Brain.Client;
-using Brain.Contracts;
-using Brain.Kernel;
+using DigitalBrain;
+using DigitalBrain.Kernel;
 using Google;
 using Google.Contracts;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,7 +39,7 @@ public sealed class ProviderNeuronIdentityTests
         var salesforce = Assert.Single(registrations, registration => registration.Contract == typeof(ISalesforce));
         Assert.Equal(typeof(SalesforceNeuron), salesforce.Implementation);
 
-        var quadrant = new Brain.Kernel.Quadrant();
+        var quadrant = new DigitalBrain.Kernel.Quadrant();
         quadrant.Load(registrations);
 
         Assert.Equal(typeof(GmailNeuron), quadrant.GetImplementation<IGmail>());

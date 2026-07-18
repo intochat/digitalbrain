@@ -1,6 +1,5 @@
-using Brain.Client;
-using Brain.Contracts;
-using Brain.Kernel;
+using DigitalBrain;
+using DigitalBrain.Kernel;
 using DigitalBrain.Tests.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
@@ -26,7 +25,7 @@ public sealed class DigitalBrainClientTests
     [Fact]
     public void Client_source_contains_no_proxy_reflection_json_or_address_routing()
     {
-        var clientDirectory = FindRepositoryDirectory("kernel", "Brain.Client");
+        var clientDirectory = FindRepositoryDirectory("kernel", "DigitalBrain.Client");
         var sources = Directory.GetFiles(clientDirectory, "*.cs", SearchOption.AllDirectories)
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
                 && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))

@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
-using Brain.Contracts;
-using Brain.Kernel;
+using DigitalBrain;
+using DigitalBrain.Kernel;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Xunit;
@@ -20,7 +20,7 @@ public sealed class QuadrantStartupTests
     [Fact]
     public async Task Startup_task_loads_quadrant_from_explicit_types_and_validates_manifest()
     {
-        var quadrant = new Brain.Kernel.Quadrant();
+        var quadrant = new DigitalBrain.Kernel.Quadrant();
         var grainType = GrainType.Create("startup-leaf");
         var interfaceType = GrainInterfaceType.Create("istartup-leaf");
         var manifest = CreateManifest(
@@ -46,7 +46,7 @@ public sealed class QuadrantStartupTests
     [Fact]
     public async Task Startup_task_lets_validation_exceptions_escape()
     {
-        var quadrant = new Brain.Kernel.Quadrant();
+        var quadrant = new DigitalBrain.Kernel.Quadrant();
         var emptyManifest = new GrainManifest(
             ImmutableDictionary<GrainType, GrainProperties>.Empty,
             ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
@@ -189,7 +189,7 @@ public sealed class QuadrantStartupTests
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {
-            var candidate = Path.Combine(directory.FullName, "kernel", "Brain.Kernel", fileName);
+            var candidate = Path.Combine(directory.FullName, "kernel", "DigitalBrain.Kernel", fileName);
             if (File.Exists(candidate))
                 return File.ReadAllText(candidate);
 

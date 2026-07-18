@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
-using Brain.Contracts;
-using Brain.Kernel;
+using DigitalBrain;
+using DigitalBrain.Kernel;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Xunit;
@@ -24,7 +24,7 @@ public sealed class QuadrantDiscoveryTests
         Assert.Equal(typeof(ILeafNeuron), registration.Contract);
         Assert.Equal(typeof(LeafNeuron), registration.Implementation);
 
-        var quadrant = new Brain.Kernel.Quadrant();
+        var quadrant = new DigitalBrain.Kernel.Quadrant();
         quadrant.Load(registrations);
 
         Assert.Equal(typeof(LeafNeuron), quadrant.GetImplementation<ILeafNeuron>());
@@ -148,7 +148,7 @@ public sealed class QuadrantDiscoveryTests
             typeof(LeafNeuron),
         ]);
 
-        var quadrant = new Brain.Kernel.Quadrant();
+        var quadrant = new DigitalBrain.Kernel.Quadrant();
         quadrant.Load(registrations);
 
         Assert.True(quadrant.Neurons.ContainsKey(typeof(ILeafNeuron)));

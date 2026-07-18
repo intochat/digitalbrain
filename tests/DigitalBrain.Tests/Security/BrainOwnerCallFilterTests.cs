@@ -1,8 +1,7 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using Brain.Client;
-using Brain.Contracts;
-using Brain.Kernel;
+using DigitalBrain;
+using DigitalBrain.Kernel;
 using DigitalBrain.Tests.Kernel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
