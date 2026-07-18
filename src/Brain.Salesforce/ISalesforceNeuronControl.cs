@@ -24,12 +24,6 @@ public interface ISalesforceNeuronControl : IGrainWithStringKey
     [Alias("ReplayOutboxIntentAsync")]
     Task ReplayOutboxIntentAsync(OutboxIntent<SalesforceFeedEvent> intent);
 
-    [Alias("GetTelemetryAsync")]
-    Task<IReadOnlyList<string>> GetTelemetryAsync();
-
-    [Alias("GetLifecycleOrderAsync")]
-    Task<IReadOnlyList<string>> GetLifecycleOrderAsync();
-
     [Alias("GetLastFailureAsync")]
     Task<SanitizedFailure?> GetLastFailureAsync();
 
@@ -39,9 +33,12 @@ public interface ISalesforceNeuronControl : IGrainWithStringKey
     [Alias("RequestDeactivationAsync")]
     Task RequestDeactivationAsync();
 
-    [Alias("GetProviderUpdateCallsAsync")]
-    Task<int> GetProviderUpdateCallsAsync();
-
     [Alias("GetFeedStreamIdAsync")]
     Task<Guid> GetFeedStreamIdAsync();
+
+    [Alias("SetFailNextOutcomePublishAsync")]
+    Task SetFailNextOutcomePublishAsync(int count);
+
+    [Alias("HasEffectTerminalAsync")]
+    Task<bool> HasEffectTerminalAsync(string idempotencyKey);
 }

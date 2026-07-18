@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using Brain.Contracts;
 using Brain.Kernel;
@@ -13,6 +14,11 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
     private readonly GmailNeuronClusterFixture _fixture;
 
     public GmailNeuronTests(GmailNeuronClusterFixture fixture) => _fixture = fixture;
+
+    private static readonly Guid KnownEffectId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid ExpectedUiSurfaceEventId = Guid.Parse("56587ed9-00c9-a457-765f-f16788af91e1");
+    private static readonly Guid ExpectedSendCompletedEventId = Guid.Parse("38033696-6732-1561-a158-f13c36206684");
+    private static readonly Guid ExpectedSendFailedEventId = Guid.Parse("70836d5b-349a-46bb-2ebf-07e97d535e71");
 
     private static NeuronAddress Address(string instance) =>
         new(new OrganizationId("org-1"), new SpaceId("space-1"), "google.gmail.v1", instance);
@@ -63,8 +69,7 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
 
     private async Task<(IGmail Gmail, IGmailNeuronControl Control)> ReactivateAsync(string instance, Guid previousToken)
     {
-        var control = Grain(instance).Control;
-        await control.RequestDeactivationAsync();
+        await Grain(instance).Control.RequestDeactivationAsync();
         var management = _fixture.Cluster.GrainFactory.GetGrain<IManagementGrain>(0);
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
         while (DateTime.UtcNow < deadline)
@@ -77,6 +82,58 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         }
 
         throw new TimeoutException($"gmail {instance} did not reactivate");
+    }
+
+    private static ActivityListener CaptureActivities(List<Activity> sink)
+    {
+        var listener = new ActivityListener
+        {
+            ShouldListenTo = static _ => true,
+            Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = sink.Add,
+        };
+        ActivitySource.AddActivityListener(listener);
+        return listener;
+    }
+
+    private static void AssertNoSecrets(IEnumerable<Activity> activities, params string[] secrets)
+    {
+        foreach (var activity in activities)
+        {
+            foreach (var secret in secrets)
+            {
+                Assert.DoesNotContain(secret, activity.DisplayName ?? string.Empty, StringComparison.Ordinal);
+                Assert.DoesNotContain(secret, activity.OperationName ?? string.Empty, StringComparison.Ordinal);
+                Assert.DoesNotContain(secret, activity.StatusDescription ?? string.Empty, StringComparison.Ordinal);
+                foreach (var tag in activity.Tags)
+                {
+                    Assert.DoesNotContain(secret, tag.Key, StringComparison.Ordinal);
+                    Assert.DoesNotContain(secret, tag.Value ?? string.Empty, StringComparison.Ordinal);
+                }
+
+                foreach (var tag in activity.TagObjects)
+                {
+                    Assert.DoesNotContain(secret, tag.Key, StringComparison.Ordinal);
+                    Assert.DoesNotContain(secret, tag.Value?.ToString() ?? string.Empty, StringComparison.Ordinal);
+                }
+
+                foreach (var baggage in activity.Baggage)
+                {
+                    Assert.DoesNotContain(secret, baggage.Key, StringComparison.Ordinal);
+                    Assert.DoesNotContain(secret, baggage.Value ?? string.Empty, StringComparison.Ordinal);
+                }
+
+                foreach (var evt in activity.Events)
+                {
+                    Assert.DoesNotContain(secret, evt.Name, StringComparison.Ordinal);
+                    foreach (var tag in evt.Tags)
+                    {
+                        Assert.DoesNotContain(secret, tag.Key, StringComparison.Ordinal);
+                        Assert.DoesNotContain(secret, tag.Value?.ToString() ?? string.Empty, StringComparison.Ordinal);
+                    }
+                }
+            }
+        }
     }
 
     [Fact]
@@ -105,6 +162,20 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         Assert.False(method!.GetParameters()[1].HasDefaultValue);
         Assert.Throws<ArgumentNullException>(() =>
             GmailHosting.AddBrainGmail(null!, _ => new FakeGmailMcpClient()));
+    }
+
+    [Fact]
+    public void OutcomeEventId_is_cryptographically_deterministic_across_kinds()
+    {
+        Assert.Equal(ExpectedUiSurfaceEventId, GmailConstants.OutcomeEventId(KnownEffectId, GmailFeedEvent.UiSurfaceKind));
+        Assert.Equal(ExpectedSendCompletedEventId, GmailConstants.OutcomeEventId(KnownEffectId, GmailFeedEvent.SendCompletedKind));
+        Assert.Equal(ExpectedSendFailedEventId, GmailConstants.OutcomeEventId(KnownEffectId, GmailFeedEvent.SendFailedKind));
+        Assert.NotEqual(
+            GmailConstants.OutcomeEventId(KnownEffectId, GmailFeedEvent.SendCompletedKind),
+            GmailConstants.OutcomeEventId(KnownEffectId, GmailFeedEvent.SendFailedKind));
+        Assert.Equal(
+            GmailConstants.OutcomeEventId(KnownEffectId, GmailFeedEvent.SendCompletedKind),
+            GmailConstants.OutcomeEventId(KnownEffectId, GmailFeedEvent.SendCompletedKind));
     }
 
     [Fact]
@@ -225,23 +296,40 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         var observer = await SubscribeFeedAsync(instance);
         _fixture.Mcp.Reset();
         var commandId = Guid.NewGuid();
+        var expectedEventId = GmailConstants.OutcomeEventId(commandId, GmailFeedEvent.SendCompletedKind);
 
         await gmail.SendMessageAsync(
             new CommandSynapse<GmailSendRequest>(
                 Meta(commandId, instance),
                 new GmailSendRequest("a@example.com", "Subject", "body")));
-        await control.DrainOutboxAsync();
+        await control.SetFailNextOutcomePublishAsync(1);
 
-        var lifecycle = await control.GetLifecycleOrderAsync();
-        var journalIndex = lifecycle.ToList().IndexOf(GmailConstants.LifecycleJournalResult);
-        var publishIndex = lifecycle.ToList().IndexOf(GmailConstants.LifecyclePublishOutcome);
-        Assert.True(journalIndex >= 0, "missing journal-result lifecycle mark");
-        Assert.True(publishIndex >= 0, "missing publish-outcome lifecycle mark");
-        Assert.True(journalIndex < publishIndex, "result must be journaled before outcome publish");
+        var ex = await Assert.ThrowsAsync<BrainException>(() => control.DrainOutboxStrictAsync());
+        Assert.Equal(BrainErrors.FailureSanitized, ex.Code);
 
-        await WaitForAsync(async () =>
-            (await observer.GetEventsAsync()).Any(e => e.Kind == GmailFeedEvent.SendCompletedKind));
         Assert.Equal("send-completed", (await gmail.GetSurfaceAsync()).Surface.Blocks[0].Text);
+        Assert.True(await control.HasEffectTerminalAsync(commandId.ToString("N")));
+        Assert.True(await control.GetOutboxCountAsync() >= 1);
+        var pending = await control.PeekOutboxAsync();
+        Assert.NotNull(pending);
+        Assert.Equal(GmailFeedEvent.SendCompletedKind, pending!.Event.Payload.Kind);
+        Assert.Equal(expectedEventId, pending.Event.Metadata.EventId);
+        Assert.Equal(1, _fixture.Mcp.SendCalls);
+
+        var reloaded = await ReactivateAsync(instance, await control.GetActivationTokenAsync());
+        Assert.Equal("send-completed", (await reloaded.Gmail.GetSurfaceAsync()).Surface.Blocks[0].Text);
+        Assert.True(await reloaded.Control.HasEffectTerminalAsync(commandId.ToString("N")));
+        var pendingAfter = await reloaded.Control.PeekOutboxAsync();
+        Assert.NotNull(pendingAfter);
+        Assert.Equal(expectedEventId, pendingAfter!.Event.Metadata.EventId);
+        Assert.Equal(1, _fixture.Mcp.SendCalls);
+
+        await observer.ReadyAsync(GmailConstants.FeedStreamNamespace, GmailConstants.FeedStreamIdFor(Address(instance).ToGrainKey()));
+        await reloaded.Control.DrainOutboxAsync();
+        Assert.Equal(0, await reloaded.Control.GetOutboxCountAsync());
+        await WaitForAsync(async () =>
+            (await observer.GetEventsAsync()).Any(e => e.Kind == GmailFeedEvent.SendCompletedKind && e.EffectId == commandId));
+        Assert.Equal(1, _fixture.Mcp.SendCalls);
     }
 
     [Fact]
@@ -307,33 +395,48 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         _fixture.Mcp.Reset();
         _fixture.Mcp.SendException = new InvalidOperationException("provider down with token=abc body=secret");
         var commandId = Guid.NewGuid();
+        var expectedEventId = GmailConstants.OutcomeEventId(commandId, GmailFeedEvent.SendFailedKind);
         await gmail.SendMessageAsync(
             new CommandSynapse<GmailSendRequest>(
                 Meta(commandId, instance),
                 new GmailSendRequest("a@example.com", "Subject", "body")));
 
+        await control.SetFailNextOutcomePublishAsync(1);
         var ex = await Assert.ThrowsAsync<BrainException>(() => control.DrainOutboxStrictAsync());
         Assert.Equal(BrainErrors.FailureSanitized, ex.Code);
-        Assert.DoesNotContain("token=abc", ex.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("secret", ex.Message, StringComparison.Ordinal);
 
+        Assert.Equal("send-failed", (await gmail.GetSurfaceAsync()).Surface.Blocks[0].Text);
+        Assert.True(await control.HasEffectTerminalAsync(commandId.ToString("N")));
         var failure = await control.GetLastFailureAsync();
         Assert.NotNull(failure);
         Assert.Equal(BrainErrors.FailureSanitized, failure!.Code);
-        Assert.Equal("send-failed", (await gmail.GetSurfaceAsync()).Surface.Blocks[0].Text);
+        Assert.DoesNotContain("token=abc", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", failure.Message, StringComparison.Ordinal);
+
         Assert.True(await control.GetOutboxCountAsync() >= 1);
-
-        await WaitForAsync(async () =>
-            (await observer.GetEventsAsync()).Any(e => e.Kind == GmailFeedEvent.SendFailedKind));
-
-        var lifecycle = await control.GetLifecycleOrderAsync();
-        var journalIndex = lifecycle.ToList().IndexOf(GmailConstants.LifecycleJournalResult);
-        var publishIndex = lifecycle.ToList().IndexOf(GmailConstants.LifecyclePublishOutcome);
-        Assert.True(journalIndex >= 0 && publishIndex > journalIndex);
+        var pending = await control.PeekOutboxAsync();
+        Assert.NotNull(pending);
+        Assert.Equal(GmailFeedEvent.SendFailedKind, pending!.Event.Payload.Kind);
+        Assert.Equal(expectedEventId, pending.Event.Metadata.EventId);
+        Assert.Equal(1, _fixture.Mcp.SendCalls);
 
         var reloaded = await ReactivateAsync(instance, await control.GetActivationTokenAsync());
         Assert.Equal("send-failed", (await reloaded.Gmail.GetSurfaceAsync()).Surface.Blocks[0].Text);
+        Assert.True(await reloaded.Control.HasEffectTerminalAsync(commandId.ToString("N")));
         Assert.NotNull(await reloaded.Control.GetLastFailureAsync());
+        var pendingAfter = await reloaded.Control.PeekOutboxAsync();
+        Assert.Equal(expectedEventId, pendingAfter!.Event.Metadata.EventId);
+        Assert.Equal(1, _fixture.Mcp.SendCalls);
+
+        await reloaded.Control.ReplayOutboxIntentAsync(pendingAfter);
+        Assert.Equal(1, _fixture.Mcp.SendCalls);
+
+        await observer.ReadyAsync(GmailConstants.FeedStreamNamespace, GmailConstants.FeedStreamIdFor(Address(instance).ToGrainKey()));
+        await reloaded.Control.DrainOutboxAsync();
+        Assert.Equal(0, await reloaded.Control.GetOutboxCountAsync());
+        await WaitForAsync(async () =>
+            (await observer.GetEventsAsync()).Any(e => e.Kind == GmailFeedEvent.SendFailedKind && e.EffectId == commandId));
+        Assert.Equal(1, _fixture.Mcp.SendCalls);
     }
 
     [Fact]
@@ -345,22 +448,20 @@ public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
         _fixture.Mcp.Reset();
         _fixture.Mcp.ListResult = new GmailMessageListResult(1, "one");
         const string body = "CONFIDENTIAL_MESSAGE_BODY";
+        const string recipient = "a@example.com";
+        const string subject = "HelloSecretSubject";
+        const string query = "from:boss SECRET_QUERY";
+        var activities = new List<Activity>();
+        using var listener = CaptureActivities(activities);
 
         await gmail.ListMessagesAsync(
-            new CommandSynapse<GmailListRequest>(Meta(Guid.NewGuid(), instance), new GmailListRequest("from:boss", 5)));
+            new CommandSynapse<GmailListRequest>(Meta(Guid.NewGuid(), instance), new GmailListRequest(query, 5)));
         await gmail.SendMessageAsync(
             new CommandSynapse<GmailSendRequest>(
                 Meta(Guid.NewGuid(), instance),
-                new GmailSendRequest("a@example.com", "Hello", body)));
+                new GmailSendRequest(recipient, subject, body)));
         await control.DrainOutboxAsync();
 
-        var blob = string.Join('\n', await control.GetTelemetryAsync());
-        Assert.DoesNotContain(body, blob, StringComparison.Ordinal);
-        Assert.DoesNotContain("CONFIDENTIAL", blob, StringComparison.Ordinal);
-        Assert.DoesNotContain("a@example.com", blob, StringComparison.Ordinal);
-        Assert.DoesNotContain("Hello", blob, StringComparison.Ordinal);
-        Assert.DoesNotContain("from:boss", blob, StringComparison.Ordinal);
-        Assert.DoesNotContain("token", blob, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("password", blob, StringComparison.OrdinalIgnoreCase);
+        AssertNoSecrets(activities, body, recipient, subject, query, "token=abc", "oauth", "password");
     }
 }

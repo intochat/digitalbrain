@@ -24,12 +24,6 @@ public interface IGmailNeuronControl : IGrainWithStringKey
     [Alias("ReplayOutboxIntentAsync")]
     Task ReplayOutboxIntentAsync(OutboxIntent<GmailFeedEvent> intent);
 
-    [Alias("GetTelemetryAsync")]
-    Task<IReadOnlyList<string>> GetTelemetryAsync();
-
-    [Alias("GetLifecycleOrderAsync")]
-    Task<IReadOnlyList<string>> GetLifecycleOrderAsync();
-
     [Alias("GetLastFailureAsync")]
     Task<SanitizedFailure?> GetLastFailureAsync();
 
@@ -39,9 +33,12 @@ public interface IGmailNeuronControl : IGrainWithStringKey
     [Alias("RequestDeactivationAsync")]
     Task RequestDeactivationAsync();
 
-    [Alias("GetProviderSendCallsAsync")]
-    Task<int> GetProviderSendCallsAsync();
-
     [Alias("GetFeedStreamIdAsync")]
     Task<Guid> GetFeedStreamIdAsync();
+
+    [Alias("SetFailNextOutcomePublishAsync")]
+    Task SetFailNextOutcomePublishAsync(int count);
+
+    [Alias("HasEffectTerminalAsync")]
+    Task<bool> HasEffectTerminalAsync(string idempotencyKey);
 }

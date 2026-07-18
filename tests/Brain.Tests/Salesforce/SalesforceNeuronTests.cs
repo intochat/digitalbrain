@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using Brain.Contracts;
 using Brain.Kernel;
@@ -12,6 +13,11 @@ public sealed class SalesforceNeuronTests : IClassFixture<SalesforceNeuronCluste
     private readonly SalesforceNeuronClusterFixture _fixture;
 
     public SalesforceNeuronTests(SalesforceNeuronClusterFixture fixture) => _fixture = fixture;
+
+    private static readonly Guid KnownEffectId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid ExpectedUiSurfaceEventId = Guid.Parse("56587ed9-00c9-a457-765f-f16788af91e1");
+    private static readonly Guid ExpectedUpdateCompletedEventId = Guid.Parse("eefe4a84-dde9-ad35-c906-ce15ef471f7c");
+    private static readonly Guid ExpectedUpdateFailedEventId = Guid.Parse("f607ccb0-6510-2f11-6e9e-3e73e319bb92");
 
     private static NeuronAddress Address(string instance) =>
         new(new OrganizationId("org-1"), new SpaceId("space-1"), "salesforce.v1", instance);
@@ -64,8 +70,7 @@ public sealed class SalesforceNeuronTests : IClassFixture<SalesforceNeuronCluste
         string instance,
         Guid previousToken)
     {
-        var control = Grain(instance).Control;
-        await control.RequestDeactivationAsync();
+        await Grain(instance).Control.RequestDeactivationAsync();
         var management = _fixture.Cluster.GrainFactory.GetGrain<IManagementGrain>(0);
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
         while (DateTime.UtcNow < deadline)
@@ -78,6 +83,58 @@ public sealed class SalesforceNeuronTests : IClassFixture<SalesforceNeuronCluste
         }
 
         throw new TimeoutException($"salesforce {instance} did not reactivate");
+    }
+
+    private static ActivityListener CaptureActivities(List<Activity> sink)
+    {
+        var listener = new ActivityListener
+        {
+            ShouldListenTo = static _ => true,
+            Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = sink.Add,
+        };
+        ActivitySource.AddActivityListener(listener);
+        return listener;
+    }
+
+    private static void AssertNoSecrets(IEnumerable<Activity> activities, params string[] secrets)
+    {
+        foreach (var activity in activities)
+        {
+            foreach (var secret in secrets)
+            {
+                Assert.DoesNotContain(secret, activity.DisplayName ?? string.Empty, StringComparison.Ordinal);
+                Assert.DoesNotContain(secret, activity.OperationName ?? string.Empty, StringComparison.Ordinal);
+                Assert.DoesNotContain(secret, activity.StatusDescription ?? string.Empty, StringComparison.Ordinal);
+                foreach (var tag in activity.Tags)
+                {
+                    Assert.DoesNotContain(secret, tag.Key, StringComparison.Ordinal);
+                    Assert.DoesNotContain(secret, tag.Value ?? string.Empty, StringComparison.Ordinal);
+                }
+
+                foreach (var tag in activity.TagObjects)
+                {
+                    Assert.DoesNotContain(secret, tag.Key, StringComparison.Ordinal);
+                    Assert.DoesNotContain(secret, tag.Value?.ToString() ?? string.Empty, StringComparison.Ordinal);
+                }
+
+                foreach (var baggage in activity.Baggage)
+                {
+                    Assert.DoesNotContain(secret, baggage.Key, StringComparison.Ordinal);
+                    Assert.DoesNotContain(secret, baggage.Value ?? string.Empty, StringComparison.Ordinal);
+                }
+
+                foreach (var evt in activity.Events)
+                {
+                    Assert.DoesNotContain(secret, evt.Name, StringComparison.Ordinal);
+                    foreach (var tag in evt.Tags)
+                    {
+                        Assert.DoesNotContain(secret, tag.Key, StringComparison.Ordinal);
+                        Assert.DoesNotContain(secret, tag.Value?.ToString() ?? string.Empty, StringComparison.Ordinal);
+                    }
+                }
+            }
+        }
     }
 
     [Fact]
@@ -100,6 +157,20 @@ public sealed class SalesforceNeuronTests : IClassFixture<SalesforceNeuronCluste
         Assert.False(method!.GetParameters()[1].HasDefaultValue);
         Assert.Throws<ArgumentNullException>(() =>
             SalesforceHosting.AddBrainSalesforce(null!, _ => new FakeSalesforceMcpClient()));
+    }
+
+    [Fact]
+    public void OutcomeEventId_is_cryptographically_deterministic_across_kinds()
+    {
+        Assert.Equal(ExpectedUiSurfaceEventId, SalesforceConstants.OutcomeEventId(KnownEffectId, SalesforceFeedEvent.UiSurfaceKind));
+        Assert.Equal(ExpectedUpdateCompletedEventId, SalesforceConstants.OutcomeEventId(KnownEffectId, SalesforceFeedEvent.UpdateCompletedKind));
+        Assert.Equal(ExpectedUpdateFailedEventId, SalesforceConstants.OutcomeEventId(KnownEffectId, SalesforceFeedEvent.UpdateFailedKind));
+        Assert.NotEqual(
+            SalesforceConstants.OutcomeEventId(KnownEffectId, SalesforceFeedEvent.UpdateCompletedKind),
+            SalesforceConstants.OutcomeEventId(KnownEffectId, SalesforceFeedEvent.UpdateFailedKind));
+        Assert.Equal(
+            SalesforceConstants.OutcomeEventId(KnownEffectId, SalesforceFeedEvent.UpdateCompletedKind),
+            SalesforceConstants.OutcomeEventId(KnownEffectId, SalesforceFeedEvent.UpdateCompletedKind));
     }
 
     [Fact]
@@ -181,23 +252,39 @@ public sealed class SalesforceNeuronTests : IClassFixture<SalesforceNeuronCluste
         var observer = await SubscribeFeedAsync(instance);
         _fixture.Mcp.Reset();
         var commandId = Guid.NewGuid();
+        var expectedEventId = SalesforceConstants.OutcomeEventId(commandId, SalesforceFeedEvent.UpdateCompletedKind);
 
         await salesforce.UpdateRecordAsync(
             new CommandSynapse<SalesforceUpdateRequest>(
                 Meta(commandId, instance),
                 new SalesforceUpdateRequest("Account", "001xx", new Dictionary<string, string> { ["Name"] = "Acme" })));
-        await control.DrainOutboxAsync();
+        await control.SetFailNextOutcomePublishAsync(1);
 
-        var lifecycle = await control.GetLifecycleOrderAsync();
-        var journalIndex = lifecycle.ToList().IndexOf(SalesforceConstants.LifecycleJournalResult);
-        var publishIndex = lifecycle.ToList().IndexOf(SalesforceConstants.LifecyclePublishOutcome);
-        Assert.True(journalIndex >= 0, "missing journal-result lifecycle mark");
-        Assert.True(publishIndex >= 0, "missing publish-outcome lifecycle mark");
-        Assert.True(journalIndex < publishIndex, "result must be journaled before outcome publish");
+        var ex = await Assert.ThrowsAsync<BrainException>(() => control.DrainOutboxStrictAsync());
+        Assert.Equal(BrainErrors.FailureSanitized, ex.Code);
 
-        await WaitForAsync(async () =>
-            (await observer.GetEventsAsync()).Any(e => e.Kind == SalesforceFeedEvent.UpdateCompletedKind));
         Assert.Equal("update-completed", (await salesforce.GetSurfaceAsync()).Surface.Blocks[0].Text);
+        Assert.True(await control.HasEffectTerminalAsync(commandId.ToString("N")));
+        Assert.True(await control.GetOutboxCountAsync() >= 1);
+        var pending = await control.PeekOutboxAsync();
+        Assert.Equal(SalesforceFeedEvent.UpdateCompletedKind, pending!.Event.Payload.Kind);
+        Assert.Equal(expectedEventId, pending.Event.Metadata.EventId);
+        Assert.Equal(1, _fixture.Mcp.UpdateCalls);
+
+        var reloaded = await ReactivateAsync(instance, await control.GetActivationTokenAsync());
+        Assert.Equal("update-completed", (await reloaded.Salesforce.GetSurfaceAsync()).Surface.Blocks[0].Text);
+        Assert.True(await reloaded.Control.HasEffectTerminalAsync(commandId.ToString("N")));
+        Assert.Equal(expectedEventId, (await reloaded.Control.PeekOutboxAsync())!.Event.Metadata.EventId);
+        Assert.Equal(1, _fixture.Mcp.UpdateCalls);
+
+        await observer.ReadyAsync(
+            SalesforceConstants.FeedStreamNamespace,
+            SalesforceConstants.FeedStreamIdFor(Address(instance).ToGrainKey()));
+        await reloaded.Control.DrainOutboxAsync();
+        Assert.Equal(0, await reloaded.Control.GetOutboxCountAsync());
+        await WaitForAsync(async () =>
+            (await observer.GetEventsAsync()).Any(e => e.Kind == SalesforceFeedEvent.UpdateCompletedKind && e.EffectId == commandId));
+        Assert.Equal(1, _fixture.Mcp.UpdateCalls);
     }
 
     [Fact]
@@ -263,30 +350,41 @@ public sealed class SalesforceNeuronTests : IClassFixture<SalesforceNeuronCluste
         _fixture.Mcp.Reset();
         _fixture.Mcp.UpdateException = new InvalidOperationException("salesforce failed token=abc record=SECRET");
         var commandId = Guid.NewGuid();
+        var expectedEventId = SalesforceConstants.OutcomeEventId(commandId, SalesforceFeedEvent.UpdateFailedKind);
         await salesforce.UpdateRecordAsync(
             new CommandSynapse<SalesforceUpdateRequest>(
                 Meta(commandId, instance),
                 new SalesforceUpdateRequest("Account", "001xx", new Dictionary<string, string> { ["Name"] = "Acme" })));
 
+        await control.SetFailNextOutcomePublishAsync(1);
         var ex = await Assert.ThrowsAsync<BrainException>(() => control.DrainOutboxStrictAsync());
         Assert.Equal(BrainErrors.FailureSanitized, ex.Code);
-        Assert.DoesNotContain("token=abc", ex.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("SECRET", ex.Message, StringComparison.Ordinal);
-        Assert.NotNull(await control.GetLastFailureAsync());
+
         Assert.Equal("update-failed", (await salesforce.GetSurfaceAsync()).Surface.Blocks[0].Text);
-        Assert.True(await control.GetOutboxCountAsync() >= 1);
-
-        await WaitForAsync(async () =>
-            (await observer.GetEventsAsync()).Any(e => e.Kind == SalesforceFeedEvent.UpdateFailedKind));
-
-        var lifecycle = await control.GetLifecycleOrderAsync();
-        var journalIndex = lifecycle.ToList().IndexOf(SalesforceConstants.LifecycleJournalResult);
-        var publishIndex = lifecycle.ToList().IndexOf(SalesforceConstants.LifecyclePublishOutcome);
-        Assert.True(journalIndex >= 0 && publishIndex > journalIndex);
+        Assert.True(await control.HasEffectTerminalAsync(commandId.ToString("N")));
+        Assert.NotNull(await control.GetLastFailureAsync());
+        var pending = await control.PeekOutboxAsync();
+        Assert.Equal(SalesforceFeedEvent.UpdateFailedKind, pending!.Event.Payload.Kind);
+        Assert.Equal(expectedEventId, pending.Event.Metadata.EventId);
+        Assert.Equal(1, _fixture.Mcp.UpdateCalls);
 
         var reloaded = await ReactivateAsync(instance, await control.GetActivationTokenAsync());
         Assert.Equal("update-failed", (await reloaded.Salesforce.GetSurfaceAsync()).Surface.Blocks[0].Text);
-        Assert.NotNull(await reloaded.Control.GetLastFailureAsync());
+        Assert.True(await reloaded.Control.HasEffectTerminalAsync(commandId.ToString("N")));
+        Assert.Equal(expectedEventId, (await reloaded.Control.PeekOutboxAsync())!.Event.Metadata.EventId);
+        Assert.Equal(1, _fixture.Mcp.UpdateCalls);
+
+        await reloaded.Control.ReplayOutboxIntentAsync((await reloaded.Control.PeekOutboxAsync())!);
+        Assert.Equal(1, _fixture.Mcp.UpdateCalls);
+
+        await observer.ReadyAsync(
+            SalesforceConstants.FeedStreamNamespace,
+            SalesforceConstants.FeedStreamIdFor(Address(instance).ToGrainKey()));
+        await reloaded.Control.DrainOutboxAsync();
+        Assert.Equal(0, await reloaded.Control.GetOutboxCountAsync());
+        await WaitForAsync(async () =>
+            (await observer.GetEventsAsync()).Any(e => e.Kind == SalesforceFeedEvent.UpdateFailedKind && e.EffectId == commandId));
+        Assert.Equal(1, _fixture.Mcp.UpdateCalls);
     }
 
     [Fact]
@@ -299,22 +397,18 @@ public sealed class SalesforceNeuronTests : IClassFixture<SalesforceNeuronCluste
         _fixture.Mcp.QueryResult = new SalesforceQueryResult(2, "two");
         const string fieldValue = "CONFIDENTIAL_RECORD_VALUE";
         const string soql = "SELECT Id, Secret__c FROM Account WHERE Name = 'Acme'";
+        const string recordId = "001xxSECRET";
+        var activities = new List<Activity>();
+        using var listener = CaptureActivities(activities);
 
         await salesforce.QueryRecordsAsync(
             new CommandSynapse<SalesforceQueryRequest>(Meta(Guid.NewGuid(), instance), new SalesforceQueryRequest(soql)));
         await salesforce.UpdateRecordAsync(
             new CommandSynapse<SalesforceUpdateRequest>(
                 Meta(Guid.NewGuid(), instance),
-                new SalesforceUpdateRequest("Account", "001xx", new Dictionary<string, string> { ["Name"] = fieldValue })));
+                new SalesforceUpdateRequest("Account", recordId, new Dictionary<string, string> { ["Name"] = fieldValue })));
         await control.DrainOutboxAsync();
 
-        var blob = string.Join('\n', await control.GetTelemetryAsync());
-        Assert.DoesNotContain(fieldValue, blob, StringComparison.Ordinal);
-        Assert.DoesNotContain(soql, blob, StringComparison.Ordinal);
-        Assert.DoesNotContain("CONFIDENTIAL", blob, StringComparison.Ordinal);
-        Assert.DoesNotContain("Secret__c", blob, StringComparison.Ordinal);
-        Assert.DoesNotContain("001xx", blob, StringComparison.Ordinal);
-        Assert.DoesNotContain("token", blob, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("password", blob, StringComparison.OrdinalIgnoreCase);
+        AssertNoSecrets(activities, fieldValue, soql, recordId, "token=abc", "password", "Secret__c");
     }
 }

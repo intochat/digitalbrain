@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Brain.Contracts;
 using Brain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,11 +27,10 @@ public sealed class SalesforceNeuron(
         acceptedCausation,
         rejectedCausation), ISalesforce, ISalesforceNeuronControl
 {
+    public static readonly ActivitySource ActivitySource = new("DigitalBrain.Salesforce");
+
     private readonly ISalesforceMcpClient _mcpClient = mcpClient;
-    private readonly List<string> _telemetry = [];
-    private readonly List<string> _lifecycleOrder = [];
     private Guid _activationToken;
-    private int _providerUpdateCalls;
 
     private string NeuronSurfaceId => this.GetPrimaryKeyString();
     private Guid NeuronFeedStreamId => SalesforceConstants.FeedStreamIdFor(NeuronSurfaceId);
@@ -49,7 +49,9 @@ public sealed class SalesforceNeuron(
     public Task<CommandReceipt> QueryRecordsAsync(CommandSynapse<SalesforceQueryRequest> command) =>
         ExecuteCommandCoreAsync(command, async (payload, commit) =>
         {
-            RecordTelemetry($"salesforce.query soqlLength={payload.Soql.Length}");
+            using var activity = ActivitySource.StartActivity("salesforce.query");
+            activity?.SetTag("salesforce.soqlLength", payload.Soql.Length);
+
             var result = await _mcpClient.QueryRecordsAsync(payload.Soql);
             var surfaceText = $"records:{result.RecordCount}";
             Flags[SalesforceConstants.SurfaceTextFlag] = surfaceText;
@@ -64,10 +66,12 @@ public sealed class SalesforceNeuron(
     public Task<CommandReceipt> UpdateRecordAsync(CommandSynapse<SalesforceUpdateRequest> command) =>
         ExecuteCommandCoreAsync(command, async (payload, commit) =>
         {
-            RecordTelemetry($"salesforce.update objectTypeLength={payload.ObjectType.Length} fieldCount={payload.Fields.Count}");
+            using var activity = ActivitySource.StartActivity("salesforce.update");
+            activity?.SetTag("salesforce.objectTypeLength", payload.ObjectType.Length);
+            activity?.SetTag("salesforce.fieldCount", payload.Fields.Count);
+
             var idempotencyKey = command.Metadata.CommandId.ToString("N");
-            var doneKey = SalesforceConstants.EffectDoneFlagPrefix + idempotencyKey;
-            if (Flags.ContainsKey(doneKey))
+            if (IsTerminal(idempotencyKey))
             {
                 var existing = ResolveSurfaceText();
                 await commit(new ReactiveCommit<SalesforceFeedEvent>(existing, UiRevision, []));
@@ -117,12 +121,6 @@ public sealed class SalesforceNeuron(
     public Task ReplayOutboxIntentAsync(OutboxIntent<SalesforceFeedEvent> intent) =>
         PublishOutboxIntentAsync(intent);
 
-    public Task<IReadOnlyList<string>> GetTelemetryAsync() =>
-        Task.FromResult<IReadOnlyList<string>>(_telemetry.ToArray());
-
-    public Task<IReadOnlyList<string>> GetLifecycleOrderAsync() =>
-        Task.FromResult<IReadOnlyList<string>>(_lifecycleOrder.ToArray());
-
     public Task<SanitizedFailure?> GetLastFailureAsync() =>
         Task.FromResult(Failures.Count == 0 ? null : Failures[^1]);
 
@@ -134,9 +132,16 @@ public sealed class SalesforceNeuron(
         return Task.CompletedTask;
     }
 
-    public Task<int> GetProviderUpdateCallsAsync() => Task.FromResult(_providerUpdateCalls);
-
     public Task<Guid> GetFeedStreamIdAsync() => Task.FromResult(NeuronFeedStreamId);
+
+    public async Task SetFailNextOutcomePublishAsync(int count)
+    {
+        Flags[SalesforceConstants.FailNextOutcomePublishFlag] = count.ToString();
+        await WriteStateAsync(CancellationToken.None);
+    }
+
+    public Task<bool> HasEffectTerminalAsync(string idempotencyKey) =>
+        Task.FromResult(IsTerminal(idempotencyKey));
 
     protected override async Task PublishOutboxIntentAsync(OutboxIntent<SalesforceFeedEvent> intent)
     {
@@ -145,7 +150,7 @@ public sealed class SalesforceNeuron(
             or SalesforceFeedEvent.UpdateCompletedKind
             or SalesforceFeedEvent.UpdateFailedKind)
         {
-            await base.PublishOutboxIntentAsync(intent);
+            await PublishOutcomeWithSeamAsync(intent);
             return;
         }
 
@@ -156,83 +161,88 @@ public sealed class SalesforceNeuron(
         }
 
         var doneKey = SalesforceConstants.EffectDoneFlagPrefix + payload.IdempotencyKey;
-        if (Flags.ContainsKey(doneKey))
+        var failedKey = SalesforceConstants.EffectFailedFlagPrefix + payload.IdempotencyKey;
+        if (Flags.ContainsKey(doneKey) || Flags.ContainsKey(failedKey))
             return;
 
+        SalesforceUpdateResult result;
         try
         {
-            _providerUpdateCalls++;
-            var result = await _mcpClient.UpdateRecordAsync(
+            result = await _mcpClient.UpdateRecordAsync(
                 payload.ObjectType,
                 payload.RecordId,
                 payload.Fields,
                 payload.IdempotencyKey);
-
-            const string completedSurface = "update-completed";
-            Flags[doneKey] = "1";
-            Flags[SalesforceConstants.SurfaceTextFlag] = completedSurface;
-            var nextUi = UiRevision + 1;
-            Flags[ReactiveNeuronPipeline<SalesforceFeedEvent>.UiRevisionKey] = nextUi.ToString();
-            Flags[ReactiveNeuronPipeline<SalesforceFeedEvent>.RevisionKey] = (CurrentRevision + 1).ToString();
-
-            var outcome = CreateFeedIntent(
-                intent.Event.Metadata,
-                SalesforceFeedEvent.UpdateCompleted(payload.EffectId, payload.IdempotencyKey, completedSurface),
-                SalesforceConstants.OutcomeEventId(payload.EffectId, SalesforceFeedEvent.UpdateCompletedKind));
-            Outbox.Add(outcome);
-            _lifecycleOrder.Add(SalesforceConstants.LifecycleJournalResult);
-            await WriteStateAsync(CancellationToken.None);
-
-            _lifecycleOrder.Add(SalesforceConstants.LifecyclePublishOutcome);
-            await base.PublishOutboxIntentAsync(outcome);
-            RemoveOutboxMatching(outcome.Event.Metadata.EventId);
-
-            RecordTelemetry($"salesforce.update.completed providerRecordIdLength={result.ProviderRecordId.Length}");
         }
         catch (Exception)
         {
-            const string failedSurface = "update-failed";
-            Flags[SalesforceConstants.SurfaceTextFlag] = failedSurface;
-            var nextUi = UiRevision + 1;
-            Flags[ReactiveNeuronPipeline<SalesforceFeedEvent>.UiRevisionKey] = nextUi.ToString();
-            Flags[ReactiveNeuronPipeline<SalesforceFeedEvent>.RevisionKey] = (CurrentRevision + 1).ToString();
-            Failures.Add(new SanitizedFailure(
-                Guid.NewGuid(),
-                BrainErrors.FailureSanitized,
-                ReactiveNeuronPipeline<SalesforceFeedEvent>.UnknownFailureMessage,
-                DateTimeOffset.UtcNow,
-                intent.Event.Metadata.CommandId,
-                intent.Event.Metadata.EventId));
-
-            var failedOutcome = CreateFeedIntent(
-                intent.Event.Metadata,
-                SalesforceFeedEvent.UpdateFailed(payload.EffectId, payload.IdempotencyKey, failedSurface),
-                SalesforceConstants.OutcomeEventId(payload.EffectId, SalesforceFeedEvent.UpdateFailedKind));
-
-            _lifecycleOrder.Add(SalesforceConstants.LifecycleJournalResult);
-            await WriteStateAsync(CancellationToken.None);
-
-            _lifecycleOrder.Add(SalesforceConstants.LifecyclePublishOutcome);
-            await base.PublishOutboxIntentAsync(failedOutcome);
-
-            RecordTelemetry("salesforce.update.failed");
-            throw new BrainException(
-                BrainErrors.FailureSanitized,
-                ReactiveNeuronPipeline<SalesforceFeedEvent>.UnknownFailureMessage);
+            await JournalTerminalFailureAsync(intent, payload);
+            return;
         }
+
+        const string completedSurface = "update-completed";
+        Flags[doneKey] = "1";
+        Flags[SalesforceConstants.SurfaceTextFlag] = completedSurface;
+        var nextUi = UiRevision + 1;
+        Flags[ReactiveNeuronPipeline<SalesforceFeedEvent>.UiRevisionKey] = nextUi.ToString();
+        Flags[ReactiveNeuronPipeline<SalesforceFeedEvent>.RevisionKey] = (CurrentRevision + 1).ToString();
+
+        var outcome = CreateFeedIntent(
+            intent.Event.Metadata,
+            SalesforceFeedEvent.UpdateCompleted(payload.EffectId, payload.IdempotencyKey, completedSurface),
+            SalesforceConstants.OutcomeEventId(payload.EffectId, SalesforceFeedEvent.UpdateCompletedKind));
+        Outbox.Add(outcome);
+        await WriteStateAsync(CancellationToken.None);
+
+        using var activity = ActivitySource.StartActivity("salesforce.update.completed");
+        activity?.SetTag("salesforce.providerRecordIdLength", result.ProviderRecordId.Length);
     }
 
-    private void RemoveOutboxMatching(Guid eventId)
+    private async Task JournalTerminalFailureAsync(OutboxIntent<SalesforceFeedEvent> intent, SalesforceFeedEvent payload)
     {
-        for (var i = Outbox.Count - 1; i >= 0; i--)
-        {
-            if (Outbox[i].Event.Metadata.EventId == eventId)
-            {
-                Outbox.RemoveAt(i);
-                return;
-            }
-        }
+        using var activity = ActivitySource.StartActivity("salesforce.update.failed");
+        activity?.SetTag("salesforce.failure", "sanitized");
+
+        var failedKey = SalesforceConstants.EffectFailedFlagPrefix + payload.IdempotencyKey;
+        Flags[failedKey] = "1";
+        const string failedSurface = "update-failed";
+        Flags[SalesforceConstants.SurfaceTextFlag] = failedSurface;
+        var nextUi = UiRevision + 1;
+        Flags[ReactiveNeuronPipeline<SalesforceFeedEvent>.UiRevisionKey] = nextUi.ToString();
+        Flags[ReactiveNeuronPipeline<SalesforceFeedEvent>.RevisionKey] = (CurrentRevision + 1).ToString();
+        Failures.Add(new SanitizedFailure(
+            Guid.NewGuid(),
+            BrainErrors.FailureSanitized,
+            ReactiveNeuronPipeline<SalesforceFeedEvent>.UnknownFailureMessage,
+            DateTimeOffset.UtcNow,
+            intent.Event.Metadata.CommandId,
+            intent.Event.Metadata.EventId));
+
+        var failedOutcome = CreateFeedIntent(
+            intent.Event.Metadata,
+            SalesforceFeedEvent.UpdateFailed(payload.EffectId, payload.IdempotencyKey, failedSurface),
+            SalesforceConstants.OutcomeEventId(payload.EffectId, SalesforceFeedEvent.UpdateFailedKind));
+        Outbox.Add(failedOutcome);
+        await WriteStateAsync(CancellationToken.None);
     }
+
+    private async Task PublishOutcomeWithSeamAsync(OutboxIntent<SalesforceFeedEvent> intent)
+    {
+        if (Flags.TryGetValue(SalesforceConstants.FailNextOutcomePublishFlag, out var raw)
+            && int.TryParse(raw, out var remaining)
+            && remaining > 0)
+        {
+            Flags[SalesforceConstants.FailNextOutcomePublishFlag] = (remaining - 1).ToString();
+            await WriteStateAsync(CancellationToken.None);
+            throw new InvalidOperationException("outcome publish failed");
+        }
+
+        await base.PublishOutboxIntentAsync(intent);
+    }
+
+    private bool IsTerminal(string idempotencyKey) =>
+        Flags.ContainsKey(SalesforceConstants.EffectDoneFlagPrefix + idempotencyKey)
+        || Flags.ContainsKey(SalesforceConstants.EffectFailedFlagPrefix + idempotencyKey);
 
     private string ResolveSurfaceText()
     {
@@ -259,18 +269,5 @@ public sealed class SalesforceNeuron(
             SalesforceConstants.FeedStreamNamespace,
             NeuronFeedStreamId,
             @event);
-    }
-
-    private void RecordTelemetry(string entry)
-    {
-        if (entry.Contains("password", StringComparison.OrdinalIgnoreCase)
-            || entry.Contains("token", StringComparison.OrdinalIgnoreCase)
-            || entry.Contains("secret", StringComparison.OrdinalIgnoreCase)
-            || entry.Contains("credential", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("telemetry rejected sensitive keyword");
-        }
-
-        _telemetry.Add(entry);
     }
 }

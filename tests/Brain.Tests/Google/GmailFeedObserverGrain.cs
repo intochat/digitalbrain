@@ -25,17 +25,18 @@ public sealed class GmailFeedObserverGrain : Grain, IGmailFeedObserver
 
     public async Task ReadyAsync(string streamNamespace, Guid streamId)
     {
+        var provider = this.GetStreamProvider(ReactiveNeuron<GmailFeedEvent>.DefaultStreamProviderName);
+        var stream = provider.GetStream<EventSynapse<GmailFeedEvent>>(StreamId.Create(streamNamespace, streamId));
         if (_handle is not null)
             return;
 
-        var provider = this.GetStreamProvider(ReactiveNeuron<GmailFeedEvent>.DefaultStreamProviderName);
-        var stream = provider.GetStream<EventSynapse<GmailFeedEvent>>(StreamId.Create(streamNamespace, streamId));
         var existing = await stream.GetAllSubscriptionHandles();
         if (existing.Count > 0)
         {
             foreach (var handle in existing)
                 _handle = await handle.ResumeAsync(OnNextAsync);
-            return;
+            if (_handle is not null)
+                return;
         }
 
         _handle = await stream.SubscribeAsync(OnNextAsync);

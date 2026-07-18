@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Brain.Contracts;
 using Brain.Kernel;
 using Microsoft.Agents.AI;
@@ -29,12 +30,11 @@ public sealed class GmailNeuron(
         acceptedCausation,
         rejectedCausation), IGmail, IGmailNeuronControl
 {
+    public static readonly ActivitySource ActivitySource = new("DigitalBrain.Google.Gmail");
+
     private readonly IGmailMcpClient _mcpClient = mcpClient;
     private readonly IChatClient _chatClient = chatClient;
-    private readonly List<string> _telemetry = [];
-    private readonly List<string> _lifecycleOrder = [];
     private Guid _activationToken;
-    private int _providerSendCalls;
 
     private string NeuronSurfaceId => this.GetPrimaryKeyString();
     private Guid NeuronFeedStreamId => GmailConstants.FeedStreamIdFor(NeuronSurfaceId);
@@ -53,7 +53,10 @@ public sealed class GmailNeuron(
     public Task<CommandReceipt> ListMessagesAsync(CommandSynapse<GmailListRequest> command) =>
         ExecuteCommandCoreAsync(command, async (payload, commit) =>
         {
-            RecordTelemetry($"gmail.list maxResults={payload.MaxResults} queryLength={payload.Query.Length}");
+            using var activity = ActivitySource.StartActivity("gmail.list");
+            activity?.SetTag("gmail.maxResults", payload.MaxResults);
+            activity?.SetTag("gmail.queryLength", payload.Query.Length);
+
             var result = await _mcpClient.ListMessagesAsync(payload.Query, payload.MaxResults);
             var surfaceText = $"messages:{result.MessageCount}";
             Flags[GmailConstants.SurfaceTextFlag] = surfaceText;
@@ -68,10 +71,12 @@ public sealed class GmailNeuron(
     public Task<CommandReceipt> SendMessageAsync(CommandSynapse<GmailSendRequest> command) =>
         ExecuteCommandCoreAsync(command, async (payload, commit) =>
         {
-            RecordTelemetry($"gmail.send subjectLength={payload.Subject.Length} toLength={payload.To.Length}");
+            using var activity = ActivitySource.StartActivity("gmail.send");
+            activity?.SetTag("gmail.subjectLength", payload.Subject.Length);
+            activity?.SetTag("gmail.toLength", payload.To.Length);
+
             var idempotencyKey = command.Metadata.CommandId.ToString("N");
-            var doneKey = GmailConstants.EffectDoneFlagPrefix + idempotencyKey;
-            if (Flags.ContainsKey(doneKey))
+            if (IsTerminal(idempotencyKey))
             {
                 var existing = ResolveSurfaceText();
                 await commit(new ReactiveCommit<GmailFeedEvent>(existing, UiRevision, []));
@@ -122,12 +127,6 @@ public sealed class GmailNeuron(
     public Task ReplayOutboxIntentAsync(OutboxIntent<GmailFeedEvent> intent) =>
         PublishOutboxIntentAsync(intent);
 
-    public Task<IReadOnlyList<string>> GetTelemetryAsync() =>
-        Task.FromResult<IReadOnlyList<string>>(_telemetry.ToArray());
-
-    public Task<IReadOnlyList<string>> GetLifecycleOrderAsync() =>
-        Task.FromResult<IReadOnlyList<string>>(_lifecycleOrder.ToArray());
-
     public Task<SanitizedFailure?> GetLastFailureAsync() =>
         Task.FromResult(Failures.Count == 0 ? null : Failures[^1]);
 
@@ -139,9 +138,16 @@ public sealed class GmailNeuron(
         return Task.CompletedTask;
     }
 
-    public Task<int> GetProviderSendCallsAsync() => Task.FromResult(_providerSendCalls);
-
     public Task<Guid> GetFeedStreamIdAsync() => Task.FromResult(NeuronFeedStreamId);
+
+    public async Task SetFailNextOutcomePublishAsync(int count)
+    {
+        Flags[GmailConstants.FailNextOutcomePublishFlag] = count.ToString();
+        await WriteStateAsync(CancellationToken.None);
+    }
+
+    public Task<bool> HasEffectTerminalAsync(string idempotencyKey) =>
+        Task.FromResult(IsTerminal(idempotencyKey));
 
     protected override async Task PublishOutboxIntentAsync(OutboxIntent<GmailFeedEvent> intent)
     {
@@ -150,7 +156,7 @@ public sealed class GmailNeuron(
             or GmailFeedEvent.SendCompletedKind
             or GmailFeedEvent.SendFailedKind)
         {
-            await base.PublishOutboxIntentAsync(intent);
+            await PublishOutcomeWithSeamAsync(intent);
             return;
         }
 
@@ -161,83 +167,88 @@ public sealed class GmailNeuron(
         }
 
         var doneKey = GmailConstants.EffectDoneFlagPrefix + payload.IdempotencyKey;
-        if (Flags.ContainsKey(doneKey))
+        var failedKey = GmailConstants.EffectFailedFlagPrefix + payload.IdempotencyKey;
+        if (Flags.ContainsKey(doneKey) || Flags.ContainsKey(failedKey))
             return;
 
+        GmailSendResult result;
         try
         {
-            _providerSendCalls++;
-            var result = await _mcpClient.SendMessageAsync(
+            result = await _mcpClient.SendMessageAsync(
                 payload.To,
                 payload.Subject,
                 payload.Body,
                 payload.IdempotencyKey);
-
-            const string completedSurface = "send-completed";
-            Flags[doneKey] = "1";
-            Flags[GmailConstants.SurfaceTextFlag] = completedSurface;
-            var nextUi = UiRevision + 1;
-            Flags[ReactiveNeuronPipeline<GmailFeedEvent>.UiRevisionKey] = nextUi.ToString();
-            Flags[ReactiveNeuronPipeline<GmailFeedEvent>.RevisionKey] = (CurrentRevision + 1).ToString();
-
-            var outcome = CreateFeedIntent(
-                intent.Event.Metadata,
-                GmailFeedEvent.SendCompleted(payload.EffectId, payload.IdempotencyKey, completedSurface),
-                GmailConstants.OutcomeEventId(payload.EffectId, GmailFeedEvent.SendCompletedKind));
-            Outbox.Add(outcome);
-            _lifecycleOrder.Add(GmailConstants.LifecycleJournalResult);
-            await WriteStateAsync(CancellationToken.None);
-
-            _lifecycleOrder.Add(GmailConstants.LifecyclePublishOutcome);
-            await base.PublishOutboxIntentAsync(outcome);
-            RemoveOutboxMatching(outcome.Event.Metadata.EventId);
-
-            RecordTelemetry($"gmail.send.completed providerMessageIdLength={result.ProviderMessageId.Length}");
         }
         catch (Exception)
         {
-            const string failedSurface = "send-failed";
-            Flags[GmailConstants.SurfaceTextFlag] = failedSurface;
-            var nextUi = UiRevision + 1;
-            Flags[ReactiveNeuronPipeline<GmailFeedEvent>.UiRevisionKey] = nextUi.ToString();
-            Flags[ReactiveNeuronPipeline<GmailFeedEvent>.RevisionKey] = (CurrentRevision + 1).ToString();
-            Failures.Add(new SanitizedFailure(
-                Guid.NewGuid(),
-                BrainErrors.FailureSanitized,
-                ReactiveNeuronPipeline<GmailFeedEvent>.UnknownFailureMessage,
-                DateTimeOffset.UtcNow,
-                intent.Event.Metadata.CommandId,
-                intent.Event.Metadata.EventId));
-
-            var failedOutcome = CreateFeedIntent(
-                intent.Event.Metadata,
-                GmailFeedEvent.SendFailed(payload.EffectId, payload.IdempotencyKey, failedSurface),
-                GmailConstants.OutcomeEventId(payload.EffectId, GmailFeedEvent.SendFailedKind));
-
-            _lifecycleOrder.Add(GmailConstants.LifecycleJournalResult);
-            await WriteStateAsync(CancellationToken.None);
-
-            _lifecycleOrder.Add(GmailConstants.LifecyclePublishOutcome);
-            await base.PublishOutboxIntentAsync(failedOutcome);
-
-            RecordTelemetry("gmail.send.failed");
-            throw new BrainException(
-                BrainErrors.FailureSanitized,
-                ReactiveNeuronPipeline<GmailFeedEvent>.UnknownFailureMessage);
+            await JournalTerminalFailureAsync(intent, payload);
+            return;
         }
+
+        const string completedSurface = "send-completed";
+        Flags[doneKey] = "1";
+        Flags[GmailConstants.SurfaceTextFlag] = completedSurface;
+        var nextUi = UiRevision + 1;
+        Flags[ReactiveNeuronPipeline<GmailFeedEvent>.UiRevisionKey] = nextUi.ToString();
+        Flags[ReactiveNeuronPipeline<GmailFeedEvent>.RevisionKey] = (CurrentRevision + 1).ToString();
+
+        var outcome = CreateFeedIntent(
+            intent.Event.Metadata,
+            GmailFeedEvent.SendCompleted(payload.EffectId, payload.IdempotencyKey, completedSurface),
+            GmailConstants.OutcomeEventId(payload.EffectId, GmailFeedEvent.SendCompletedKind));
+        Outbox.Add(outcome);
+        await WriteStateAsync(CancellationToken.None);
+
+        using var activity = ActivitySource.StartActivity("gmail.send.completed");
+        activity?.SetTag("gmail.providerMessageIdLength", result.ProviderMessageId.Length);
     }
 
-    private void RemoveOutboxMatching(Guid eventId)
+    private async Task JournalTerminalFailureAsync(OutboxIntent<GmailFeedEvent> intent, GmailFeedEvent payload)
     {
-        for (var i = Outbox.Count - 1; i >= 0; i--)
-        {
-            if (Outbox[i].Event.Metadata.EventId == eventId)
-            {
-                Outbox.RemoveAt(i);
-                return;
-            }
-        }
+        using var activity = ActivitySource.StartActivity("gmail.send.failed");
+        activity?.SetTag("gmail.failure", "sanitized");
+
+        var failedKey = GmailConstants.EffectFailedFlagPrefix + payload.IdempotencyKey;
+        Flags[failedKey] = "1";
+        const string failedSurface = "send-failed";
+        Flags[GmailConstants.SurfaceTextFlag] = failedSurface;
+        var nextUi = UiRevision + 1;
+        Flags[ReactiveNeuronPipeline<GmailFeedEvent>.UiRevisionKey] = nextUi.ToString();
+        Flags[ReactiveNeuronPipeline<GmailFeedEvent>.RevisionKey] = (CurrentRevision + 1).ToString();
+        Failures.Add(new SanitizedFailure(
+            Guid.NewGuid(),
+            BrainErrors.FailureSanitized,
+            ReactiveNeuronPipeline<GmailFeedEvent>.UnknownFailureMessage,
+            DateTimeOffset.UtcNow,
+            intent.Event.Metadata.CommandId,
+            intent.Event.Metadata.EventId));
+
+        var failedOutcome = CreateFeedIntent(
+            intent.Event.Metadata,
+            GmailFeedEvent.SendFailed(payload.EffectId, payload.IdempotencyKey, failedSurface),
+            GmailConstants.OutcomeEventId(payload.EffectId, GmailFeedEvent.SendFailedKind));
+        Outbox.Add(failedOutcome);
+        await WriteStateAsync(CancellationToken.None);
     }
+
+    private async Task PublishOutcomeWithSeamAsync(OutboxIntent<GmailFeedEvent> intent)
+    {
+        if (Flags.TryGetValue(GmailConstants.FailNextOutcomePublishFlag, out var raw)
+            && int.TryParse(raw, out var remaining)
+            && remaining > 0)
+        {
+            Flags[GmailConstants.FailNextOutcomePublishFlag] = (remaining - 1).ToString();
+            await WriteStateAsync(CancellationToken.None);
+            throw new InvalidOperationException("outcome publish failed");
+        }
+
+        await base.PublishOutboxIntentAsync(intent);
+    }
+
+    private bool IsTerminal(string idempotencyKey) =>
+        Flags.ContainsKey(GmailConstants.EffectDoneFlagPrefix + idempotencyKey)
+        || Flags.ContainsKey(GmailConstants.EffectFailedFlagPrefix + idempotencyKey);
 
     private string ResolveSurfaceText()
     {
@@ -264,18 +275,5 @@ public sealed class GmailNeuron(
             GmailConstants.FeedStreamNamespace,
             NeuronFeedStreamId,
             @event);
-    }
-
-    private void RecordTelemetry(string entry)
-    {
-        if (entry.Contains("password", StringComparison.OrdinalIgnoreCase)
-            || entry.Contains("token", StringComparison.OrdinalIgnoreCase)
-            || entry.Contains("secret", StringComparison.OrdinalIgnoreCase)
-            || entry.Contains("credential", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("telemetry rejected sensitive keyword");
-        }
-
-        _telemetry.Add(entry);
     }
 }
