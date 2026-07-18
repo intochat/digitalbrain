@@ -2,7 +2,7 @@ using Brain.Contracts;
 
 namespace Brain.Kernel;
 
-[GenerateSerializer]
+[GenerateSerializer, Alias("brain.outbox-intent`1")]
 public sealed record OutboxIntent<T>(
     [property: Id(0)] Guid IntentId,
     [property: Id(1)] string StreamNamespace,

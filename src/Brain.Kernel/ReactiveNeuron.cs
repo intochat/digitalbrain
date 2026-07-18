@@ -118,8 +118,6 @@ public abstract class ReactiveNeuron<TOutboxEvent> : DurableGrain, IRemindable
 
     protected int ActiveSubscriptionCount => _subscriptions.Count;
 
-    protected void TrackSubscription(object subscriptionHandle) => _subscriptions.Add(subscriptionHandle);
-
     protected async Task PublishEventAsync(
         EventSynapse<TOutboxEvent> @event,
         string streamProviderName,

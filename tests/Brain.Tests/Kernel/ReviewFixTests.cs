@@ -3,7 +3,6 @@ using Brain.Contracts;
 using Brain.Kernel;
 using DigitalBrain.AI;
 using Orleans.Runtime;
-using Orleans.Streams;
 using Xunit;
 
 namespace Brain.Tests.Kernel;
@@ -38,18 +37,35 @@ public sealed class ReviewFixTests : IClassFixture<ReactiveNeuronClusterFixture>
         _fixture.Cluster.GrainFactory.GetGrain<IProbeNeuron>(
             new NeuronAddress(new OrganizationId("org-1"), new SpaceId("space-1"), "probe.neuron.v1", instance).ToGrainKey());
 
-    private ITypedEventConsumer Consumer(string instance) =>
-        _fixture.Cluster.GrainFactory.GetGrain<ITypedEventConsumer>(
-            new NeuronAddress(new OrganizationId("org-1"), new SpaceId("space-1"), "probe.consumer.v1", instance).ToGrainKey());
+    private ITypedEventConsumer Consumer(Guid streamId) =>
+        _fixture.Cluster.GrainFactory.GetGrain<ITypedEventConsumer>(streamId);
+
+    private static async Task<ProbeDomainEvent> WaitForPayloadOnClientAsync(
+        ITypedEventConsumer consumer,
+        TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var payload = await consumer.GetLastPayloadAsync();
+            if (payload is not null)
+                return payload;
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException("Timed out waiting for stream payload delivery on the consumer grain.");
+    }
 
     [Fact]
     public async Task Typed_outbox_preserves_payload_type_and_publishes_EventSynapse_T()
     {
-        var probe = Probe("typed-outbox");
-        var consumer = Consumer("typed-outbox-consumer");
         var streamId = Guid.NewGuid();
-        await consumer.SubscribeAsync(streamId);
+        var consumer = Consumer(streamId);
+        await consumer.ReadyAsync();
+        Assert.True(await consumer.GetActiveSubscriptionCountAsync() >= 1);
+        Assert.True(await consumer.HasActiveSubscriptionAsync());
 
+        var probe = Probe("typed-outbox");
         var commandId = Guid.NewGuid();
         var payload = new ProbeDomainEvent("typed-hello", 42);
         await probe.SetAutoDrainAsync(false);
@@ -63,11 +79,10 @@ public sealed class ReviewFixTests : IClassFixture<ReactiveNeuronClusterFixture>
         Assert.Equal(42, pending.Payload.Value);
 
         await probe.DrainOutboxStrictAsync();
-        var published = Assert.IsType<OutboxIntent<ProbeDomainEvent>>(await probe.GetLastPublishedIntentTypeWitnessAsync());
-        Assert.IsType<EventSynapse<ProbeDomainEvent>>(published.Event);
-        Assert.Equal("typed-hello", published.Event.Payload.Name);
-        Assert.Equal(42, published.Event.Payload.Value);
-        Assert.True(await consumer.GetSubscriptionHandleCountAsync() >= 1);
+
+        var received = await WaitForPayloadOnClientAsync(consumer, TimeSpan.FromSeconds(15));
+        Assert.Equal("typed-hello", received.Name);
+        Assert.Equal(42, received.Value);
     }
 
     [Fact]
@@ -127,7 +142,7 @@ public sealed class ReviewFixTests : IClassFixture<ReactiveNeuronClusterFixture>
         var secondId = Guid.NewGuid();
 
         await probe.HandleEventAsync(new EventSynapse<string>(Meta(firstId, firstId, causation, sourceSequence: 1), "a"));
-        await probe.DeactivateAsync();
+        await WaitForGrainDeactivationAsync(probe);
 
         var reloaded = Probe("dup-causation");
         var ex = await Assert.ThrowsAsync<BrainException>(() =>
@@ -152,7 +167,7 @@ public sealed class ReviewFixTests : IClassFixture<ReactiveNeuronClusterFixture>
         Assert.DoesNotContain(secret, ex.Message, StringComparison.Ordinal);
         Assert.Contains(ReactiveNeuronPipeline<ProbeDomainEvent>.UnknownFailureMessage, ex.Message, StringComparison.Ordinal);
 
-        await probe.DeactivateAsync();
+        await WaitForGrainDeactivationAsync(probe);
         var failure = await Probe("sanitize").GetLastFailureAsync();
         Assert.NotNull(failure);
         Assert.Equal(BrainErrors.FailureSanitized, failure!.Code);
@@ -164,22 +179,45 @@ public sealed class ReviewFixTests : IClassFixture<ReactiveNeuronClusterFixture>
     public async Task Typed_subscription_resumes_after_reactivation()
     {
         var streamId = Guid.NewGuid();
-        var consumer = Consumer($"resume-sub/{streamId:N}");
-        await consumer.SubscribeAsync(streamId);
-        Assert.True(await consumer.GetSubscriptionHandleCountAsync() >= 1);
+        var consumer = Consumer(streamId);
+        await consumer.ReadyAsync();
+        Assert.True(await consumer.GetActiveSubscriptionCountAsync() >= 1);
         Assert.True(await consumer.HasActiveSubscriptionAsync());
+        var activationBefore = await consumer.GetActivationTokenAsync();
 
-        await consumer.DeactivateAsync();
-        var reactivated = Consumer($"resume-sub/{streamId:N}");
-        Assert.Equal(streamId, await reactivated.GetStreamIdAsync());
-        Assert.True(await reactivated.GetSubscriptionHandleCountAsync() >= 1);
+        await WaitForGrainDeactivationAsync(consumer);
+        var reactivated = Consumer(streamId);
+        var activationAfter = await reactivated.GetActivationTokenAsync();
+        Assert.NotEqual(activationBefore, activationAfter);
+        Assert.True(await reactivated.GetActiveSubscriptionCountAsync() >= 1);
         Assert.True(await reactivated.HasActiveSubscriptionAsync());
 
-        await reactivated.ObservePublishedAsync(new ProbeDomainEvent("after-resume", 9));
-        var received = await reactivated.WaitForPayloadAsync(TimeSpan.FromSeconds(2));
-        Assert.NotNull(received);
-        Assert.Equal("after-resume", received!.Name);
+        var publisher = Probe("resume-publisher");
+        await publisher.PublishDirectAsync(streamId, new ProbeDomainEvent("after-resume", 9));
+
+        var received = await WaitForPayloadOnClientAsync(reactivated, TimeSpan.FromSeconds(15));
+        Assert.Equal("after-resume", received.Name);
         Assert.Equal(9, received.Value);
+        Assert.True(await reactivated.HasActiveSubscriptionAsync());
+    }
+
+    private async Task WaitForGrainDeactivationAsync(IDeactivatableGrain grain)
+    {
+        var tokenBefore = await grain.GetActivationTokenAsync();
+        await grain.RequestDeactivationAsync();
+
+        var management = _fixture.Cluster.GrainFactory.GetGrain<IManagementGrain>(0);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            await management.ForceActivationCollection(TimeSpan.Zero);
+            var token = await grain.GetActivationTokenAsync();
+            if (token != tokenBefore)
+                return;
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException("Grain did not deactivate and reactivate within the allotted time.");
     }
 }
 
@@ -219,28 +257,28 @@ public sealed record ProbeDomainEvent(
     [property: Id(0)] string Name,
     [property: Id(1)] int Value);
 
-[Alias("brain.tests.ITypedEventConsumer")]
-[NeuronContract("probe.consumer.v1")]
-public interface ITypedEventConsumer : IGrainWithStringKey
+[Alias("brain.tests.IDeactivatableGrain")]
+public interface IDeactivatableGrain : IAddressable
 {
-    [Alias("SubscribeAsync")]
-    Task SubscribeAsync(Guid streamId);
+    [Alias("GetActivationTokenAsync")]
+    Task<Guid> GetActivationTokenAsync();
 
-    [Alias("WaitForPayloadAsync")]
-    Task<ProbeDomainEvent?> WaitForPayloadAsync(TimeSpan timeout);
+    [Alias("RequestDeactivationAsync")]
+    Task RequestDeactivationAsync();
+}
+
+[Alias("brain.tests.ITypedEventConsumer")]
+public interface ITypedEventConsumer : IGrainWithGuidKey, IDeactivatableGrain
+{
+    [Alias("ReadyAsync")]
+    Task ReadyAsync();
+
+    [Alias("GetLastPayloadAsync")]
+    Task<ProbeDomainEvent?> GetLastPayloadAsync();
 
     [Alias("HasActiveSubscriptionAsync")]
     Task<bool> HasActiveSubscriptionAsync();
 
-    [Alias("GetStreamIdAsync")]
-    Task<Guid> GetStreamIdAsync();
-
-    [Alias("GetSubscriptionHandleCountAsync")]
-    Task<int> GetSubscriptionHandleCountAsync();
-
-    [Alias("ObservePublishedAsync")]
-    Task ObservePublishedAsync(ProbeDomainEvent payload);
-
-    [Alias("DeactivateAsync")]
-    Task DeactivateAsync();
+    [Alias("GetActiveSubscriptionCountAsync")]
+    Task<int> GetActiveSubscriptionCountAsync();
 }

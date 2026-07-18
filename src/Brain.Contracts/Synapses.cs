@@ -14,12 +14,12 @@ public sealed record SynapseMetadata(
     [property: Id(9)] int CausalDepth,
     [property: Id(10)] DateTimeOffset OccurredAt);
 
-[GenerateSerializer]
+[GenerateSerializer, Alias("brain.command-synapse`1")]
 public sealed record CommandSynapse<T>(
     [property: Id(0)] SynapseMetadata Metadata,
     [property: Id(1)] T Payload);
 
-[GenerateSerializer]
+[GenerateSerializer, Alias("brain.event-synapse`1")]
 public sealed record EventSynapse<T>(
     [property: Id(0)] SynapseMetadata Metadata,
     [property: Id(1)] T Payload);
