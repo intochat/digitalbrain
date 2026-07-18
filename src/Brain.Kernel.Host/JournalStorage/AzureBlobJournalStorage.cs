@@ -63,7 +63,10 @@ public sealed class AzureBlobJournalStorage : IJournalStorage
                     properties: properties);
                 return true;
             }
-            catch (RequestFailedException ex) when (ex.Status == 409 || ex.ErrorCode == BlobErrorCode.BlobAlreadyExists)
+            catch (RequestFailedException ex) when (
+                ex.Status == 409
+                || ex.ErrorCode == BlobErrorCode.BlobAlreadyExists
+                || IsPreconditionFailure(ex))
             {
                 await RefreshFromServerAsync(cancellationToken).ConfigureAwait(false);
                 return false;

@@ -169,6 +169,10 @@ public sealed class AzureBlobJournalStorageTests : IAsyncLifetime
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await owner.AppendAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("owner-stale-write")), CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await owner.ReplaceAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("owner-stale-replace")), CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await owner.DeleteAsync(CancellationToken.None));
 
         var captured = new CapturingConsumer();
         await CreateProvider().CreateStorage(journalId).ReadAsync(captured, CancellationToken.None);
