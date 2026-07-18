@@ -6,8 +6,15 @@ using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Xunit;
 
 namespace Brain.Tests.Google;
+
+[CollectionDefinition(GmailTestCollection.Name, DisableParallelization = true)]
+public sealed class GmailTestCollection : ICollectionFixture<GmailNeuronClusterFixture>
+{
+    public const string Name = "gmail-neurons";
+}
 
 public sealed class GmailNeuronClusterFixture : IDisposable
 {

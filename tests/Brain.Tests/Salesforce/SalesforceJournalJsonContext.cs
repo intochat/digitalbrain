@@ -27,4 +27,12 @@ namespace Brain.Tests.Salesforce;
 [JsonSerializable(typeof(SalesforceFeedEvent))]
 [JsonSerializable(typeof(EventSynapse<SalesforceFeedEvent>))]
 [JsonSerializable(typeof(OutboxIntent<SalesforceFeedEvent>))]
+[JsonSerializable(typeof(UiFeedCandidate))]
+[JsonSerializable(typeof(EventSynapse<UiFeedCandidate>))]
+[JsonSerializable(typeof(UiFeedFrame))]
+[JsonSerializable(typeof(UiFeedPage))]
+[JsonSerializable(typeof(UiSurface))]
+[JsonSerializable(typeof(UiSurfaceSnapshot))]
+[JsonSerializable(typeof(UiBlock))]
+[JsonSerializable(typeof(UiAction))]
 public sealed partial class SalesforceJournalJsonContext : JsonSerializerContext;

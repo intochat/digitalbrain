@@ -1,5 +1,7 @@
 namespace DigitalBrain.AI;
 
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Brain.Contracts;
@@ -93,20 +95,26 @@ public sealed class GroupChatNeuron(
                 Status: "active",
                 FailureMessage: null);
 
+            const long uiRevision = 1;
+            var uiIntent = CreateUiCandidateIntent(
+                command.Metadata,
+                state,
+                uiRevision,
+                UiFeedCandidate.CreateSnapshot(new UiSurfaceSnapshot(
+                    BuildSurface(ResolveSurfaceId(), state, uiRevision))));
             var stepEvent = CreateStepEventSynapse(
                 command.Metadata,
-                new GroupChatStepEvent(0, discussionId),
+                new GroupChatStepEvent(0, discussionId, GroupChatStepEvent.StepKind),
                 sourceSequence: 1);
-
-            var intent = OutboxIntent<GroupChatStepEvent>.Create(
+            var stepIntent = OutboxIntent<GroupChatStepEvent>.Create(
                 EventStreamNamespace,
                 streamId,
                 stepEvent);
 
             await commit(new ReactiveCommit<GroupChatStepEvent>(
                 JsonSerializer.Serialize(state, JsonOptions),
-                UiRevision: 1,
-                Outbox: [intent]));
+                UiRevision: uiRevision,
+                Outbox: [uiIntent, stepIntent]));
             return CommandReceiptStatus.Accepted;
         });
 
@@ -119,10 +127,17 @@ public sealed class GroupChatNeuron(
 
             var state = ReadState() ?? throw new BrainException(BrainErrors.FailureSanitized, ReactiveNeuronPipeline<GroupChatStepEvent>.UnknownFailureMessage);
             var cancelled = state with { IsCancelled = true, Status = "cancelled" };
+            var nextUi = UiRevision + 1;
+            var uiIntent = CreateUiCandidateIntent(
+                command.Metadata,
+                cancelled,
+                nextUi,
+                UiFeedCandidate.CreateSnapshot(new UiSurfaceSnapshot(
+                    BuildSurface(ResolveSurfaceId(), cancelled, nextUi))));
             await commit(new ReactiveCommit<GroupChatStepEvent>(
                 JsonSerializer.Serialize(cancelled, JsonOptions),
-                UiRevision: UiRevision + 1,
-                Outbox: []));
+                UiRevision: nextUi,
+                Outbox: [uiIntent]));
             return CommandReceiptStatus.Accepted;
         });
 
@@ -176,14 +191,51 @@ public sealed class GroupChatNeuron(
     public Task<EventSynapse<GroupChatStepEvent>?> PeekOutboxEventAsync() =>
         Task.FromResult(Outbox.Count == 0 ? null : Outbox[0].Event);
 
+    public Task<EventSynapse<GroupChatStepEvent>?> PeekStepOutboxEventAsync()
+    {
+        for (var index = 0; index < Outbox.Count; index++)
+        {
+            var item = Outbox[index].Event;
+            if (item.Payload.IsStepIntent)
+                return Task.FromResult<EventSynapse<GroupChatStepEvent>?>(item);
+        }
+
+        return Task.FromResult<EventSynapse<GroupChatStepEvent>?>(null);
+    }
+
     public Task PublishStepEventAsync(EventSynapse<GroupChatStepEvent> @event)
     {
+        if (!@event.Payload.IsStepIntent)
+            throw InvalidIntent();
+
         var streamId = ReadStreamId();
         return PublishEventAsync(@event, DefaultStreamProviderName, EventStreamNamespace, streamId);
     }
 
+    protected override async Task PublishOutboxIntentAsync(OutboxIntent<GroupChatStepEvent> intent)
+    {
+        if (intent.Event.Payload.IsUiIntent)
+        {
+            var candidate = intent.Event.Payload.Candidate!;
+            await PublishUiFeedCandidateAsync(intent.Event.Metadata, candidate);
+            return;
+        }
+
+        if (!intent.Event.Payload.IsStepIntent)
+            throw InvalidIntent();
+
+        await PublishEventAsync(
+            intent.Event,
+            DefaultStreamProviderName,
+            intent.StreamNamespace,
+            intent.StreamId);
+    }
+
     private async Task OnStreamEventAsync(EventSynapse<GroupChatStepEvent> item, StreamSequenceToken? token)
     {
+        if (!item.Payload.IsStepIntent)
+            return;
+
         await HandleEventCoreAsync(item, async (payload, commit) =>
         {
             var state = ReadState();
@@ -205,10 +257,17 @@ public sealed class GroupChatNeuron(
             if (state.StepCount >= _options.MaximumDiscussionSteps)
             {
                 var completed = state with { Status = "completed" };
+                var nextUi = UiRevision + 1;
+                var completeIntent = CreateUiCandidateIntent(
+                    item.Metadata,
+                    completed,
+                    nextUi,
+                    UiFeedCandidate.CreateSnapshot(new UiSurfaceSnapshot(
+                        BuildSurface(ResolveSurfaceId(), completed, nextUi))));
                 await commit(new ReactiveCommit<GroupChatStepEvent>(
                     JsonSerializer.Serialize(completed, JsonOptions),
-                    UiRevision,
-                    Outbox: []));
+                    nextUi,
+                    Outbox: [completeIntent]));
                 return;
             }
 
@@ -235,11 +294,25 @@ public sealed class GroupChatNeuron(
                     CheckpointSessionId = step.Checkpoint.SessionId,
                     CheckpointId = step.Checkpoint.CheckpointId,
                     CheckpointJson = step.CheckpointJson,
-                    Status = "active",
+                    Status = nextTranscript.Count > 0 && state.StepCount + 1 >= _options.MaximumDiscussionSteps
+                        ? "completed"
+                        : "active",
                     FailureMessage = null
                 };
+                if (next.StepCount >= _options.MaximumDiscussionSteps)
+                    next = next with { Status = "completed" };
 
-                var intents = new List<OutboxIntent<GroupChatStepEvent>>();
+                var nextUi = UiRevision + 1;
+                var intents = new List<OutboxIntent<GroupChatStepEvent>>
+                {
+                    CreateUiCandidateIntent(
+                        item.Metadata,
+                        next,
+                        nextUi,
+                        UiFeedCandidate.CreateSnapshot(new UiSurfaceSnapshot(
+                            BuildSurface(ResolveSurfaceId(), next, nextUi))))
+                };
+
                 if (!next.IsCancelled && next.StepCount < _options.MaximumDiscussionSteps)
                 {
                     var nextSequence = ReadSourceSequence() + 1;
@@ -247,7 +320,7 @@ public sealed class GroupChatNeuron(
                     var streamId = ReadStreamId();
                     var stepEvent = CreateStepEventSynapse(
                         item.Metadata,
-                        new GroupChatStepEvent(next.StepCount, next.DiscussionId),
+                        new GroupChatStepEvent(next.StepCount, next.DiscussionId, GroupChatStepEvent.StepKind),
                         nextSequence);
                     intents.Add(OutboxIntent<GroupChatStepEvent>.Create(
                         EventStreamNamespace,
@@ -257,46 +330,44 @@ public sealed class GroupChatNeuron(
 
                 await commit(new ReactiveCommit<GroupChatStepEvent>(
                     JsonSerializer.Serialize(next, JsonOptions),
-                    UiRevision: UiRevision + 1,
+                    UiRevision: nextUi,
                     Outbox: intents));
             }
             catch (BrainException ex) when (ex.Code == BrainErrors.FailureSanitized)
             {
-                var failed = state with
-                {
-                    Status = "failed",
-                    FailureMessage = ReactiveNeuronPipeline<GroupChatStepEvent>.UnknownFailureMessage
-                };
-                await commit(new ReactiveCommit<GroupChatStepEvent>(
-                    JsonSerializer.Serialize(failed, JsonOptions),
-                    UiRevision: UiRevision + 1,
-                    Outbox: []));
+                await CommitFailureAsync(state, item.Metadata, commit);
             }
             catch (OperationCanceledException)
             {
-                var failed = state with
-                {
-                    Status = "failed",
-                    FailureMessage = ReactiveNeuronPipeline<GroupChatStepEvent>.UnknownFailureMessage
-                };
-                await commit(new ReactiveCommit<GroupChatStepEvent>(
-                    JsonSerializer.Serialize(failed, JsonOptions),
-                    UiRevision: UiRevision + 1,
-                    Outbox: []));
+                await CommitFailureAsync(state, item.Metadata, commit);
             }
             catch (Exception)
             {
-                var failed = state with
-                {
-                    Status = "failed",
-                    FailureMessage = ReactiveNeuronPipeline<GroupChatStepEvent>.UnknownFailureMessage
-                };
-                await commit(new ReactiveCommit<GroupChatStepEvent>(
-                    JsonSerializer.Serialize(failed, JsonOptions),
-                    UiRevision: UiRevision + 1,
-                    Outbox: []));
+                await CommitFailureAsync(state, item.Metadata, commit);
             }
         });
+    }
+
+    private async Task CommitFailureAsync(
+        GroupChatDomainState state,
+        SynapseMetadata metadata,
+        CommitReactionAsync<GroupChatStepEvent> commit)
+    {
+        var failed = state with
+        {
+            Status = "failed",
+            FailureMessage = ReactiveNeuronPipeline<GroupChatStepEvent>.UnknownFailureMessage
+        };
+        var nextUi = UiRevision + 1;
+        var uiIntent = CreateUiCandidateIntent(
+            metadata,
+            failed,
+            nextUi,
+            UiFeedCandidate.CreateFailure(BrainErrors.FailureSanitized));
+        await commit(new ReactiveCommit<GroupChatStepEvent>(
+            JsonSerializer.Serialize(failed, JsonOptions),
+            UiRevision: nextUi,
+            Outbox: [uiIntent]));
     }
 
     private (AIAgent Gpt, AIAgent Grok) CreateParticipantAgents(GroupChatDomainState state)
@@ -348,6 +419,47 @@ public sealed class GroupChatNeuron(
             OnStreamEventAsync);
     }
 
+    private OutboxIntent<GroupChatStepEvent> CreateUiCandidateIntent(
+        SynapseMetadata source,
+        GroupChatDomainState state,
+        long uiRevision,
+        UiFeedCandidate candidate)
+    {
+        var eventId = CreateCandidateEventId(
+            this.GetPrimaryKeyString(),
+            state.DiscussionId,
+            uiRevision);
+        var self = NeuronAddress.Parse(this.GetPrimaryKeyString());
+        var metadata = new SynapseMetadata(
+            CommandId: source.CommandId,
+            EventId: eventId,
+            CausationId: source.EventId == Guid.Empty ? source.CommandId : source.EventId,
+            CorrelationId: source.CorrelationId,
+            OrganizationId: source.OrganizationId,
+            PrincipalId: source.PrincipalId,
+            SpaceId: source.SpaceId,
+            Source: self,
+            SourceSequence: uiRevision,
+            CausalDepth: 0,
+            OccurredAt: DateTimeOffset.UtcNow);
+        var payload = new GroupChatStepEvent(0, state.DiscussionId, GroupChatStepEvent.UiKind, candidate);
+        var @event = new EventSynapse<GroupChatStepEvent>(metadata, payload);
+        return OutboxIntent<GroupChatStepEvent>.Create(
+            UiFeedStreams.CandidateNamespace,
+            UiFeedStreams.StreamId(source.OrganizationId, source.SpaceId),
+            @event);
+    }
+
+    private async Task PublishUiFeedCandidateAsync(SynapseMetadata metadata, UiFeedCandidate candidate)
+    {
+        var synapse = new EventSynapse<UiFeedCandidate>(metadata, candidate);
+        var stream = this.GetStreamProvider(DefaultStreamProviderName)
+            .GetStream<EventSynapse<UiFeedCandidate>>(StreamId.Create(
+                UiFeedStreams.CandidateNamespace,
+                UiFeedStreams.StreamId(metadata.OrganizationId, metadata.SpaceId)));
+        await stream.OnNextAsync(synapse);
+    }
+
     private EventSynapse<GroupChatStepEvent> CreateStepEventSynapse(
         SynapseMetadata source,
         GroupChatStepEvent payload,
@@ -367,7 +479,11 @@ public sealed class GroupChatNeuron(
             SourceSequence: sourceSequence,
             CausalDepth: 0,
             OccurredAt: DateTimeOffset.UtcNow);
-        return new EventSynapse<GroupChatStepEvent>(metadata, payload);
+        return new EventSynapse<GroupChatStepEvent>(metadata, payload with
+        {
+            IntentKind = GroupChatStepEvent.StepKind,
+            Candidate = null
+        });
     }
 
     private GroupChatDomainState? ReadState()
@@ -455,10 +571,24 @@ public sealed class GroupChatNeuron(
 
     private static Guid CreateDeterministicStreamId(string grainKey, Guid discussionId)
     {
-        var bytes = System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes($"{grainKey}:{discussionId:N}"));
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{grainKey}:{discussionId:N}"));
         return new Guid(bytes.AsSpan(0, 16));
     }
+
+    private static Guid CreateCandidateEventId(
+        string grainKey,
+        Guid discussionId,
+        long uiRevision)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(
+            $"groupchat.ui\n{grainKey}\n{discussionId:N}\n{uiRevision}"));
+        return new Guid(bytes.AsSpan(0, 16));
+    }
+
+    private static BrainException InvalidIntent() =>
+        new(
+            BrainErrors.FailureSanitized,
+            ReactiveNeuronPipeline<GroupChatStepEvent>.UnknownFailureMessage);
 
     private sealed record GroupChatDomainState(
         string Topic,

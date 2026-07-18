@@ -10,7 +10,8 @@ using Xunit;
 
 namespace Brain.Tests.Google;
 
-public sealed class GmailNeuronTests : IClassFixture<GmailNeuronClusterFixture>
+[Collection(GmailTestCollection.Name)]
+public sealed class GmailNeuronTests
 {
     private readonly GmailNeuronClusterFixture _fixture;
 

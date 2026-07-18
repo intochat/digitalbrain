@@ -5,8 +5,15 @@ using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Xunit;
 
 namespace Brain.Tests.Salesforce;
+
+[CollectionDefinition(SalesforceTestCollection.Name, DisableParallelization = true)]
+public sealed class SalesforceTestCollection : ICollectionFixture<SalesforceNeuronClusterFixture>
+{
+    public const string Name = "salesforce-neurons";
+}
 
 public sealed class SalesforceNeuronClusterFixture : IDisposable
 {

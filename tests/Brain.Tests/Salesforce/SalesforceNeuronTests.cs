@@ -9,7 +9,8 @@ using Xunit;
 
 namespace Brain.Tests.Salesforce;
 
-public sealed class SalesforceNeuronTests : IClassFixture<SalesforceNeuronClusterFixture>
+[Collection(SalesforceTestCollection.Name)]
+public sealed class SalesforceNeuronTests
 {
     private readonly SalesforceNeuronClusterFixture _fixture;
 

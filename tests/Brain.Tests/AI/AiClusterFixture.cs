@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Brain.Contracts;
 using Brain.Kernel;
 using DigitalBrain.AI;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -31,6 +32,7 @@ public sealed class AiClusterFixture : IDisposable
         var builder = new TestClusterBuilder();
         builder.Options.InitialSilosCount = 1;
         builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        builder.AddClientBuilderConfigurator<ClientConfigurator>();
         Cluster = builder.Build();
         Cluster.Deploy();
     }
@@ -69,6 +71,15 @@ public sealed class AiClusterFixture : IDisposable
                 (_, _) => SharedAiTestClients.Grok ?? new ScriptedChatClient("grok-reply"));
         }
     }
+
+    private sealed class ClientConfigurator : IClientBuilderConfigurator
+    {
+        public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+        {
+            clientBuilder.AddMemoryStreams(
+                ReactiveNeuron<GroupChatStepEvent>.DefaultStreamProviderName);
+        }
+    }
 }
 
 internal static class SharedAiTestClients
@@ -99,6 +110,14 @@ internal static class SharedAiTestClients
 [JsonSerializable(typeof(GroupChatStepEvent))]
 [JsonSerializable(typeof(EventSynapse<GroupChatStepEvent>))]
 [JsonSerializable(typeof(OutboxIntent<GroupChatStepEvent>))]
+[JsonSerializable(typeof(UiFeedCandidate))]
+[JsonSerializable(typeof(EventSynapse<UiFeedCandidate>))]
+[JsonSerializable(typeof(UiFeedFrame))]
+[JsonSerializable(typeof(UiFeedPage))]
+[JsonSerializable(typeof(UiSurface))]
+[JsonSerializable(typeof(UiSurfaceSnapshot))]
+[JsonSerializable(typeof(UiBlock))]
+[JsonSerializable(typeof(UiAction))]
 [JsonSerializable(typeof(AgentTurnRequest))]
 [JsonSerializable(typeof(AgentTurnResult))]
 internal sealed partial class AiTestJournalJsonContext : JsonSerializerContext;
