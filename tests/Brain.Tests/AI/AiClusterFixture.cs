@@ -58,7 +58,7 @@ public sealed class AiClusterFixture : IDisposable
             siloBuilder.Services.AddOptions<AiProviderOptions>();
             siloBuilder.Services.Configure<AiProviderOptions>(options =>
             {
-                options.ProviderTimeout = TimeSpan.FromSeconds(5);
+                options.ProviderTimeout = TimeSpan.FromMilliseconds(250);
                 options.MaximumDiscussionSteps = 8;
             });
             siloBuilder.Services.AddKeyedSingleton<Microsoft.Extensions.AI.IChatClient>(

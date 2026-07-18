@@ -58,7 +58,14 @@ public sealed record GroupChatDiagnosticsSnapshot(
     [property: Id(8)] long Revision,
     [property: Id(9)] Guid ActivationToken,
     [property: Id(10)] IReadOnlyList<string> TranscriptTexts,
-    [property: Id(11)] string? LastFailureMessage);
+    [property: Id(11)] string? LastFailureMessage,
+    [property: Id(12)] bool HasCheckpointJson,
+    [property: Id(13)] int CheckpointJsonLength,
+    [property: Id(14)] string SurfaceId,
+    [property: Id(15)] string? Topic,
+    [property: Id(16)] string? GptKey,
+    [property: Id(17)] string? GrokKey,
+    [property: Id(18)] string Status);
 
 [Alias("digitalbrain.ai.IGroupChatControl")]
 public interface IGroupChatControl : IGroupChat

@@ -72,8 +72,7 @@ public sealed class GroupChatNeuron(
             var streamId = CreateDeterministicStreamId(this.GetPrimaryKeyString(), discussionId);
             Flags[StreamIdFlag] = streamId.ToString("N");
             Flags[SubscribedFlag] = "1";
-            Flags[SourceSequenceFlag] = "0";
-            await WriteStateAsync(CancellationToken.None);
+            Flags[SourceSequenceFlag] = "1";
             await RegisterStreamAsync();
 
             var state = new GroupChatDomainState(
@@ -94,12 +93,10 @@ public sealed class GroupChatNeuron(
                 Status: "active",
                 FailureMessage: null);
 
-            var nextSequence = 1L;
-            Flags[SourceSequenceFlag] = nextSequence.ToString();
             var stepEvent = CreateStepEventSynapse(
                 command.Metadata,
                 new GroupChatStepEvent(0, discussionId),
-                nextSequence);
+                sourceSequence: 1);
 
             var intent = OutboxIntent<GroupChatStepEvent>.Create(
                 EventStreamNamespace,
@@ -132,13 +129,14 @@ public sealed class GroupChatNeuron(
     public Task<UiSurfaceSnapshot> GetSurfaceAsync()
     {
         var state = ReadState();
-        var surface = BuildSurface(state, UiRevision);
+        var surface = BuildSurface(ResolveSurfaceId(), state, UiRevision);
         return Task.FromResult(new UiSurfaceSnapshot(surface));
     }
 
     public Task<GroupChatDiagnosticsSnapshot> GetDiagnosticsAsync()
     {
         var state = ReadState();
+        var checkpointJson = state?.CheckpointJson;
         return Task.FromResult(new GroupChatDiagnosticsSnapshot(
             TranscriptCount: state?.Transcript.Count ?? 0,
             ParticipantCursor: state?.ParticipantCursor ?? 0,
@@ -151,7 +149,14 @@ public sealed class GroupChatNeuron(
             Revision: CurrentRevision,
             ActivationToken: _activationToken,
             TranscriptTexts: state?.Transcript.Select(t => t.Text).ToArray() ?? [],
-            LastFailureMessage: state?.FailureMessage));
+            LastFailureMessage: state?.FailureMessage,
+            HasCheckpointJson: !string.IsNullOrWhiteSpace(checkpointJson),
+            CheckpointJsonLength: checkpointJson?.Length ?? 0,
+            SurfaceId: ResolveSurfaceId(),
+            Topic: state?.Topic,
+            GptKey: state?.GptKey,
+            GrokKey: state?.GrokKey,
+            Status: state?.Status ?? string.Empty));
     }
 
     public async Task SetAutoDrainAsync(bool enabled)
@@ -222,14 +227,6 @@ public sealed class GroupChatNeuron(
 
                 var response = step.ParticipantResponses[0];
                 var nextTranscript = MergeTranscript(state.Transcript, step.TerminalTranscript, response);
-                var checkpointJson = step.CheckpointJson;
-                if (checkpointJson is null
-                    && !string.IsNullOrWhiteSpace(step.Checkpoint.SessionId)
-                    && !string.IsNullOrWhiteSpace(step.Checkpoint.CheckpointId))
-                {
-                    checkpointJson = state.CheckpointJson;
-                }
-
                 var next = state with
                 {
                     Transcript = nextTranscript,
@@ -237,7 +234,7 @@ public sealed class GroupChatNeuron(
                     StepCount = state.StepCount + 1,
                     CheckpointSessionId = step.Checkpoint.SessionId,
                     CheckpointId = step.Checkpoint.CheckpointId,
-                    CheckpointJson = checkpointJson,
+                    CheckpointJson = step.CheckpointJson,
                     Status = "active",
                     FailureMessage = null
                 };
@@ -264,6 +261,18 @@ public sealed class GroupChatNeuron(
                     Outbox: intents));
             }
             catch (BrainException ex) when (ex.Code == BrainErrors.FailureSanitized)
+            {
+                var failed = state with
+                {
+                    Status = "failed",
+                    FailureMessage = ReactiveNeuronPipeline<GroupChatStepEvent>.UnknownFailureMessage
+                };
+                await commit(new ReactiveCommit<GroupChatStepEvent>(
+                    JsonSerializer.Serialize(failed, JsonOptions),
+                    UiRevision: UiRevision + 1,
+                    Outbox: []));
+            }
+            catch (OperationCanceledException)
             {
                 var failed = state with
                 {
@@ -386,10 +395,12 @@ public sealed class GroupChatNeuron(
         throw new BrainException(BrainErrors.FailureSanitized, ReactiveNeuronPipeline<GroupChatStepEvent>.UnknownFailureMessage);
     }
 
-    private static UiSurface BuildSurface(GroupChatDomainState? state, long uiRevision)
+    private string ResolveSurfaceId() => this.GetPrimaryKeyString();
+
+    private static UiSurface BuildSurface(string surfaceId, GroupChatDomainState? state, long uiRevision)
     {
         if (state is null)
-            return new UiSurface("group-chat", uiRevision, []);
+            return new UiSurface(surfaceId, uiRevision, []);
 
         var blocks = new List<UiBlock>
         {
@@ -411,7 +422,7 @@ public sealed class GroupChatNeuron(
         if (!string.IsNullOrWhiteSpace(state.FailureMessage))
             blocks.Add(new UiBlock("failure", state.FailureMessage, []));
 
-        return new UiSurface("group-chat", uiRevision, blocks);
+        return new UiSurface(surfaceId, uiRevision, blocks);
     }
 
     private static List<TranscriptEntry> MergeTranscript(
