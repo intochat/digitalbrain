@@ -1,12 +1,14 @@
-namespace DigitalBrain.Google;
+using DigitalBrain.Google;
+
+namespace Brain.Tests.Google;
 
 public sealed class FakeGmailMcpClient : IGmailMcpClient
 {
-    private readonly List<string> _callOrder = [];
     private int _listCalls;
     private int _sendCalls;
+    private readonly List<string> _order = [];
 
-    public IReadOnlyList<string> CallOrder => _callOrder;
+    public IReadOnlyList<string> Order => _order;
     public int ListCalls => _listCalls;
     public int SendCalls => _sendCalls;
     public GmailMessageListResult ListResult { get; set; } = new(0, "empty");
@@ -18,7 +20,7 @@ public sealed class FakeGmailMcpClient : IGmailMcpClient
 
     public Task<GmailMessageListResult> ListMessagesAsync(string query, int maxResults, CancellationToken cancellationToken = default)
     {
-        _callOrder.Add("provider.list");
+        _order.Add("provider.list");
         Interlocked.Increment(ref _listCalls);
         OnList?.Invoke();
         if (ListException is { } exception)
@@ -33,7 +35,7 @@ public sealed class FakeGmailMcpClient : IGmailMcpClient
         string idempotencyKey,
         CancellationToken cancellationToken = default)
     {
-        _callOrder.Add("provider.send");
+        _order.Add("provider.send");
         Interlocked.Increment(ref _sendCalls);
         OnSend?.Invoke();
         if (SendException is { } exception)
@@ -43,9 +45,9 @@ public sealed class FakeGmailMcpClient : IGmailMcpClient
 
     public void Reset()
     {
-        _callOrder.Clear();
         _listCalls = 0;
         _sendCalls = 0;
+        _order.Clear();
         ListResult = new(0, "empty");
         SendResult = new("fake-message-id");
         ListException = null;

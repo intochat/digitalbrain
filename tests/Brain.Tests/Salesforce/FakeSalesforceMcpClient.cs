@@ -1,12 +1,14 @@
-namespace DigitalBrain.Salesforce;
+using DigitalBrain.Salesforce;
+
+namespace Brain.Tests.Salesforce;
 
 public sealed class FakeSalesforceMcpClient : ISalesforceMcpClient
 {
-    private readonly List<string> _callOrder = [];
     private int _queryCalls;
     private int _updateCalls;
+    private readonly List<string> _order = [];
 
-    public IReadOnlyList<string> CallOrder => _callOrder;
+    public IReadOnlyList<string> Order => _order;
     public int QueryCalls => _queryCalls;
     public int UpdateCalls => _updateCalls;
     public SalesforceQueryResult QueryResult { get; set; } = new(0, "empty");
@@ -18,7 +20,7 @@ public sealed class FakeSalesforceMcpClient : ISalesforceMcpClient
 
     public Task<SalesforceQueryResult> QueryRecordsAsync(string soql, CancellationToken cancellationToken = default)
     {
-        _callOrder.Add("provider.query");
+        _order.Add("provider.query");
         Interlocked.Increment(ref _queryCalls);
         OnQuery?.Invoke();
         if (QueryException is { } exception)
@@ -33,7 +35,7 @@ public sealed class FakeSalesforceMcpClient : ISalesforceMcpClient
         string idempotencyKey,
         CancellationToken cancellationToken = default)
     {
-        _callOrder.Add("provider.update");
+        _order.Add("provider.update");
         Interlocked.Increment(ref _updateCalls);
         OnUpdate?.Invoke();
         if (UpdateException is { } exception)
@@ -43,9 +45,9 @@ public sealed class FakeSalesforceMcpClient : ISalesforceMcpClient
 
     public void Reset()
     {
-        _callOrder.Clear();
         _queryCalls = 0;
         _updateCalls = 0;
+        _order.Clear();
         QueryResult = new(0, "empty");
         UpdateResult = new("fake-record-id");
         QueryException = null;
