@@ -15,6 +15,8 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
         "Microsoft.Extensions."
     ];
 
+    private static readonly string[] KernelProviderDependencies = ["Anthropic", "OpenAI"];
+
     private static readonly string[] DevToolMarkers = ["Agents", "DevUI", "Dashboard"];
 
     private static readonly string[] ProviderAndJournalMarkers = ["OpenAI", "Anthropic", "Journaling"];
@@ -120,7 +122,9 @@ public sealed class PackageContentTests(PackedFrameworkFixture fixture)
             {
                 Assert.True(
                     AllowedDependencyPrefixes.Any(prefix =>
-                        dependencyId.StartsWith(prefix, StringComparison.Ordinal)),
+                        dependencyId.StartsWith(prefix, StringComparison.Ordinal)) ||
+                    packageId == "DigitalBrain.Kernel" &&
+                    KernelProviderDependencies.Contains(dependencyId, StringComparer.Ordinal),
                     $"{packageId} depends on unexpected package {dependencyId}.");
                 Assert.All(DevToolMarkers, marker =>
                     Assert.DoesNotContain(marker, dependencyId, StringComparison.OrdinalIgnoreCase));

@@ -18,7 +18,10 @@ public static class NeuronOutboxDrainer
             .ToArray();
 
         if (pendingIds.Length == 0)
+        {
+            await UnregisterRecoveryAsync(neuron, throwOnPublishFailure);
             return;
+        }
 
         foreach (var notificationId in pendingIds)
         {
@@ -39,7 +42,7 @@ public static class NeuronOutboxDrainer
             catch (Exception exception)
             {
                 state.Outbox[notificationId] = prior;
-                await NeuronReminder.RegisterOutboxRecoveryAsync(neuron);
+                await RegisterRecoveryAsync(neuron, throwOnPublishFailure);
                 if (throwOnPublishFailure)
                     throw MapStorageFailure(exception);
                 return;
@@ -51,7 +54,7 @@ public static class NeuronOutboxDrainer
             }
             catch (Exception exception)
             {
-                await NeuronReminder.RegisterOutboxRecoveryAsync(neuron);
+                await RegisterRecoveryAsync(neuron, throwOnPublishFailure);
                 if (throwOnPublishFailure)
                     throw MapPublishFailure(exception);
                 return;
@@ -67,23 +70,57 @@ public static class NeuronOutboxDrainer
             catch (Exception exception)
             {
                 state.Outbox[notificationId] = attempted;
-                await NeuronReminder.RegisterOutboxRecoveryAsync(neuron);
+                await RegisterRecoveryAsync(neuron, throwOnPublishFailure);
                 if (throwOnPublishFailure)
                     throw MapStorageFailure(exception);
                 return;
             }
         }
 
-        await NeuronReminder.UnregisterOutboxRecoveryAsync(neuron);
+        await UnregisterRecoveryAsync(neuron, throwOnPublishFailure);
+    }
+
+    private static async Task RegisterRecoveryAsync(
+        Neuron neuron,
+        bool throwOnFailure)
+    {
+        try
+        {
+            await NeuronReminder.RegisterOutboxRecoveryAsync(neuron);
+        }
+        catch (Exception exception)
+        {
+            if (throwOnFailure)
+                throw MapStorageFailure(exception);
+        }
+    }
+
+    private static async Task UnregisterRecoveryAsync(
+        Neuron neuron,
+        bool throwOnFailure)
+    {
+        try
+        {
+            await NeuronReminder.UnregisterOutboxRecoveryAsync(neuron);
+        }
+        catch (Exception exception)
+        {
+            if (throwOnFailure)
+                throw MapStorageFailure(exception);
+        }
     }
 
     private static Exception MapPublishFailure(Exception exception) =>
-        exception is BrainException
-            ? exception
-            : new BrainException(NeuronFailureKind.ProviderUnavailable, exception.Message);
+        new BrainException(
+            exception is BrainException brainException
+                ? brainException.FailureKind
+                : NeuronFailureKind.ProviderUnavailable,
+            "The notification could not be delivered.");
 
     private static Exception MapStorageFailure(Exception exception) =>
-        exception is BrainException
-            ? exception
-            : new BrainException(NeuronFailureKind.StorageUnavailable, exception.Message);
+        new BrainException(
+            exception is BrainException brainException
+                ? brainException.FailureKind
+                : NeuronFailureKind.StorageUnavailable,
+            "Durable notification state could not be committed.");
 }

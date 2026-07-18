@@ -29,9 +29,17 @@ public abstract class Neuron([NeuronState] NeuronDurableState durableState) : Du
         {
             await PersistDurableStateAsync(cancellationToken);
         }
-        catch (Exception exception) when (exception is not BrainException)
+        catch (BrainException exception)
         {
-            throw new BrainException(NeuronFailureKind.StorageUnavailable, exception.Message);
+            throw new BrainException(
+                exception.FailureKind,
+                "Durable neuron state could not be committed.");
+        }
+        catch (Exception)
+        {
+            throw new BrainException(
+                NeuronFailureKind.StorageUnavailable,
+                "Durable neuron state could not be committed.");
         }
     }
 

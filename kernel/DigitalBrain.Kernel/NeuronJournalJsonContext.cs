@@ -17,4 +17,8 @@ namespace DigitalBrain.Kernel;
 [JsonSerializable(typeof(NotificationDeliveryStatus))]
 [JsonSerializable(typeof(ExternalOperation))]
 [JsonSerializable(typeof(NeuronNotification))]
+[JsonSerializable(typeof(ConversationRole))]
+[JsonSerializable(typeof(ConversationTurnRequest))]
+[JsonSerializable(typeof(ConversationTurn))]
+[JsonSerializable(typeof(ConversationTurnResult))]
 public sealed partial class NeuronJournalJsonContext : JsonSerializerContext;

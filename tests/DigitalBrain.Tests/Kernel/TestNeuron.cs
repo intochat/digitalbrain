@@ -17,6 +17,7 @@ public interface ITestNeuron : INeuron
     Task ReconcileFromProviderReceiptAsync(Guid operationId);
     Task ConfigurePublishFaultsAsync(int failNextPublishCount);
     Task ConfigureFailCompletionCommitAfterPublishAsync(bool enabled);
+    Task ConfigurePersistFaultsAsync(int failNextPersistCount);
     Task DrainOutboxAsync();
     Task<IReadOnlyList<NeuronNotification>> ListOutboxAsync();
     Task<int> GetPublishedCountAsync();
@@ -24,6 +25,7 @@ public interface ITestNeuron : INeuron
     Task<NeuronNotification?> ReadDeliveredNotificationAsync(Guid notificationId);
     Task<TestExternalProbe?> ReadExternalProbeAsync(Guid operationId);
     Task ForceDeactivateAsync();
+    Task ArmOutboxRecoveryAsync();
     Task<bool> HasOutboxReminderAsync();
 }
 
@@ -152,6 +154,12 @@ public sealed class TestNeuron([NeuronState] NeuronDurableState state) : Neuron(
         return Task.CompletedTask;
     }
 
+    public Task ConfigurePersistFaultsAsync(int failNextPersistCount)
+    {
+        FailNextPersistByKey[this.GetPrimaryKeyString()] = failNextPersistCount;
+        return Task.CompletedTask;
+    }
+
     public Task DrainOutboxAsync() => DrainOutboxCoreAsync(throwOnPublishFailure: true);
 
     public Task<IReadOnlyList<NeuronNotification>> ListOutboxAsync() =>
@@ -195,6 +203,9 @@ public sealed class TestNeuron([NeuronState] NeuronDurableState state) : Neuron(
         return Task.CompletedTask;
     }
 
+    public Task ArmOutboxRecoveryAsync() =>
+        NeuronReminder.RegisterOutboxRecoveryAsync(this);
+
     public async Task<bool> HasOutboxReminderAsync()
     {
         var reminder = await this.GetReminder(NeuronReminder.OutboxRecoveryName);
@@ -207,7 +218,7 @@ public sealed class TestNeuron([NeuronState] NeuronDurableState state) : Neuron(
         if (FailNextPersistByKey.TryGetValue(key, out var remaining) && remaining > 0)
         {
             FailNextPersistByKey[key] = remaining - 1;
-            throw new InvalidOperationException("journal write failed");
+            throw new InvalidOperationException("journal-backend-secret-marker");
         }
 
         return base.PersistDurableStateAsync(cancellationToken);

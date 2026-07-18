@@ -136,6 +136,24 @@ public sealed class NeuronOutboxTests
     }
 
     [Fact]
+    public async Task Base_durable_commit_failure_does_not_expose_journal_backend_details()
+    {
+        await using var cluster = await OutboxCluster.CreateAsync();
+        using var owner = OwnerContext.Push("owner-storage-redaction");
+        var neuron = cluster.GrainFactory.GetGrain<ITestNeuron>("owner-storage-redaction");
+        await neuron.ConfigurePersistFaultsAsync(1);
+
+        var failure = await Assert.ThrowsAsync<BrainException>(() =>
+            neuron.WriteStatusAsync(NeuronStatus.Active));
+
+        Assert.Equal(NeuronFailureKind.StorageUnavailable, failure.FailureKind);
+        Assert.DoesNotContain(
+            "journal-backend-secret-marker",
+            failure.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task At_least_once_consumer_deduplicates_by_operation_id()
     {
         await using var cluster = await OutboxCluster.CreateAsync();
@@ -169,6 +187,21 @@ public sealed class NeuronOutboxTests
         {
             await handle.UnsubscribeAsync();
         }
+    }
+
+    [Fact]
+    public async Task Recovery_reminder_is_removed_when_a_drain_finds_no_pending_work()
+    {
+        await using var cluster = await OutboxCluster.CreateAsync();
+        using var owner = OwnerContext.Push("owner-empty-recovery");
+        var neuron = cluster.GrainFactory.GetGrain<ITestNeuron>("owner-empty-recovery");
+
+        await neuron.ArmOutboxRecoveryAsync();
+        Assert.True(await neuron.HasOutboxReminderAsync());
+
+        await neuron.DrainOutboxAsync();
+
+        Assert.False(await neuron.HasOutboxReminderAsync());
     }
 
     [Fact]

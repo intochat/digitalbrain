@@ -182,10 +182,19 @@ dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 **Assigned paths:**
 
 - `Directory.Packages.props`
+- `kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj`
+- `kernel/DigitalBrain.Kernel/Neuron.cs`
+- `kernel/DigitalBrain.Kernel/NeuronJournalJsonContext.cs`
+- `kernel/DigitalBrain.Kernel/NeuronOutboxDrainer.cs`
 - `kernel/DigitalBrain.Kernel/AI/**`
 - `kernel/DigitalBrain.Kernel/Conversations/**`
 - `tests/DigitalBrain.Tests/AI/**`
 - `tests/DigitalBrain.Tests/Conversations/**`
+- `tests/DigitalBrain.Tests/Kernel/NeuronOutboxTests.cs`
+- `tests/DigitalBrain.Tests/Kernel/TestNeuron.cs`
+- `tests/DigitalBrain.PackageTests/PackageContentTests.cs`
+
+**Assigned-path amendment:** `DigitalBrain.Kernel.csproj` is required because central package management pins versions but does not add the provider, adapter, options-validation, or health-check references needed by the kernel implementation. `NeuronJournalJsonContext.cs` is required because the System.Text.Json source generator rejects `JsonSerializable` attributes split across partial context declarations with duplicate generated hint names; the conversation journal types must be registered on the existing official journal context. `NeuronOutboxDrainer.cs` and its existing kernel test seam are required because red review exposed a hard-crash window between the committed conversation result/outbox and the drainer's first failure-based reminder registration. Conversation execution must pre-arm the inherited recovery reminder, and the generic empty-drain path must remove that reminder after crashes before durable work exists. `Neuron.cs` is required because crash recovery commits during activation, before the conversation coordinator's redaction boundary; the base durable commit mapper must not expose journal backend details. `PackageContentTests.cs` is required because the root package gate must explicitly permit the two approved provider SDKs in `DigitalBrain.Kernel` while continuing to reject them in the application-facing Abstractions and Client packages. The universal neuron state and reminder identity remain unchanged.
 
 **Official preflight:**
 
@@ -205,12 +214,12 @@ dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 
 **Implementation:**
 
-- [ ] Implement internal provider factories.
-- [ ] Register kernel-only role-specific wrappers without keyed DI.
-- [ ] Implement the conversation neuron using the durable operation ledger, journaled result, reminder recovery, and durable final notification delivery.
-- [ ] Add startup options validation.
-- [ ] Add health checks and OpenTelemetry instrumentation.
-- [ ] Keep test transports inside tests.
+- [x] Implement internal provider factories.
+- [x] Register kernel-only role-specific wrappers without keyed DI.
+- [x] Implement the conversation neuron using the durable operation ledger, journaled result, reminder recovery, and durable final notification delivery.
+- [x] Add startup options validation.
+- [x] Add health checks and OpenTelemetry instrumentation.
+- [x] Keep test transports inside tests.
 
 **Gate:**
 
@@ -219,6 +228,8 @@ dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 ```
 
 **Commit:** `feat: bind real DigitalBrain AI providers`
+
+**Execution record (2026-07-18):** Baseline HEAD was `d61b8b665d6d4a212bd3aab9d01e41556a000af9` on `master`. Exact official API inspection confirmed Microsoft.Extensions.AI and its OpenAI adapter at `10.8.0`, OpenAI at `2.12.0`, Anthropic at the deliberately hard-pinned beta `12.36.0`, official client adapters, error types, streaming, cancellation, custom HTTP transport, and System.ClientModel `1.14.0`; the Anthropic beta remains an explicit upgrade-review risk because minor and patch releases may break compatibility. The initial red suite failed only on the absent Task 3 provider and conversation types. Real official clients now back fast, balanced, reasoning, and embedding descriptors; controlled HTTP transports remain test-only and prove endpoint, model, authorization, payload, response, streaming, cancellation, confirmed HTTP errors, and malformed responses. Kernel-only non-keyed role wrappers route conversation work through a durable intent-before-dispatch ledger, committed results and revisions, idempotent turn identities, final notification outbox, and recovery reminder. Review reproduced and closed activation-local uncommitted-state exposure, a hard-crash window before the first reminder, cross-turn reminder removal with an older pending notification, ambiguous SSE/decode/empty-response misclassification, incomplete committed snapshots, plaintext non-loopback endpoints, provider/storage/stream/reminder/cancellation detail leakage, and public serializer-context compatibility. The activation guard now invalidates and deactivates after failed writes; recovery is armed before mutation or provider dispatch; empty drains self-clean; pending notifications retain recovery; only explicit HTTP rejections become `Failed`; all ambiguous outcomes become `Unknown`; and base neuron, coordinator, and outbox boundaries emit stable errors. Three independent final reviews reported no Critical, Important, or Minor findings. Release kernel build passed with zero warnings and errors. The exact owning gate passed 192 / 192. The first exact root gate exposed the stale package dependency allowlist; the amended test now permits only `OpenAI` and `Anthropic` in `DigitalBrain.Kernel` while retaining the application-facing SDK ban. The final exact root gate passed DigitalBrain.Tests 192 / 192, DigitalBrain.PackageTests 11 / 11, and Brain.FeasibilityTests 11 / 11. `aspire doctor` passed 5 / 5 with no warnings or failures; AppHost and resource inspection correctly reported no running AppHost. Exact package graph, zero-comment, provider-keyed-DI, production-test-double, public-SDK-leak, assigned-path, CodeGraph blast-radius, and `git diff --check` guards passed.
 
 ## Task 4: Implement `DigitalBrainResource` and secure reference projections
 

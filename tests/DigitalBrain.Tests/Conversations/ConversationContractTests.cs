@@ -132,8 +132,7 @@ public sealed class ConversationContractTests
         [
             typeof(INeuron),
             typeof(IConversationNeuron),
-            typeof(Tests.Conversations.ITestConversationNeuron),
-            typeof(Tests.Conversations.TestConversationNeuron)
+            typeof(DigitalBrain.Kernel.ConversationNeuron)
         ]);
 
         Assert.Empty(registrations);
