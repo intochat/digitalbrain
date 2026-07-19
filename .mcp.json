@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "codegraph": {
+      "command": "gcf-proxy",
+      "args": ["npx", "-y", "@colbymchenry/codegraph", "serve", "--mcp"]
+    },
+    "aspire": {
+      "command": "gcf-proxy",
+      "args": ["aspire", "agent", "mcp"]
+    },
+    "context7": {
+      "command": "gcf-proxy",
+      "args": ["npx", "-y", "@upstash/context7-mcp@latest"]
+    },
+    "microsoft-learn": {
+      "type": "http",
+      "url": "https://learn.microsoft.com/api/mcp"
+    }
+  }
+}

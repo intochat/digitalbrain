@@ -1,6 +1,18 @@
-# NeuroOS — Build Continuation (fresh, typed-C#, feature-by-feature)
+# NeuroOS — Build Continuation — ARCHIVAL, NOT AN INSTRUCTION
 
-> For the engineer/colleague starting this build. Read `docs/projects-survey-comparison.md` first — it maps
+> **This file has no authority. Do not start the build it describes.**
+>
+> It specifies a from-scratch NeuroOS build in a superseded workspace rooted at
+> `E:\Projects`. That build is not the work in progress; `ARCHITECTURE-REVIEW.md` at the
+> repository root is the plan of record.
+>
+> It is retained as the primary evidence for §1 of `ARCHITECTURE-REVIEW.md`: its nine-step
+> build order and per-concern harvest map named `digitalbrain` twice, and `GOAL.md`'s later
+> harvest map dropped it without recording that a prior map had reached a different
+> conclusion. That is the failure mode §1 exists to name. It is deleted when ledger row L-4
+> closes.
+
+> For the engineer/colleague who was starting that build. Read `docs/projects-survey-comparison.md` first — it maps
 > every feature to the **best-of-breed reference tree** to harvest it from. This repo is a consolidation of
 > several prototypes (`ino`, `final`, `v4`, `v3`, `digitalbrain`, `self-improving`, `IAW`) kept as **reference
 > only**. We are building a clean implementation, one layer at a time, into a fresh `src/`.

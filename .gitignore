@@ -8,6 +8,7 @@ TestResults/
 .vs/
 logs/
 .codegraph/
+.config/.codegraph-initialized
 .digitalbrain/
 .superpowers/
 .worktrees/

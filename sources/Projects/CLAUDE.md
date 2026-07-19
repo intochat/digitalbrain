@@ -1,6 +1,17 @@
-# CLAUDE.md
+# CLAUDE.md — ARCHIVAL, NOT AN INSTRUCTION
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> **This file has no authority. Do not follow anything below it.**
+>
+> It describes a superseded workspace rooted at `E:\Projects`, not this repository. Its
+> instruction that "`final/` is the canonical, current codebase — start there for all new
+> work" is false here: the canonical codebase is this repository's `src/`, and
+> `ARCHITECTURE-REVIEW.md` at the repository root is the plan of record.
+>
+> It is retained as evidence for retirement-ledger row L-4 and is deleted when that row
+> closes. Marked archival in Phase 0.6 because the harness injects it into context on any
+> read beneath this directory.
+
+This file provided guidance to Claude Code (claude.ai/code) when working with code in the `E:\Projects` workspace.
 
 ## What this workspace is
 
