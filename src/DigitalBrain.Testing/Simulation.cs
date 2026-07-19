@@ -1,4 +1,5 @@
 using Orleans;
+using Orleans.Runtime;
 
 namespace DigitalBrain.Testing;
 
@@ -7,6 +8,8 @@ public sealed class Simulation
     private const int SettleProbes = 200;
 
     private static readonly Dictionary<string, string> EmptyValues = new(StringComparer.Ordinal);
+
+    private readonly List<NeuronId> _registered = [];
 
     private OwnerId _owner;
     private Exception? _refusal;
@@ -88,6 +91,41 @@ public sealed class Simulation
         }
 
         return previous;
+    }
+
+    public async Task RegisterManyAsync(int count, string neuronType)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(neuronType);
+
+        _registered.Clear();
+
+        for (var index = 0; index < count; index++)
+        {
+            var name = $"instance-{index}";
+
+            await RegisterAsync(neuronType, name);
+            _registered.Add(NeuronNamed(neuronType, name));
+        }
+    }
+
+    public async Task<int> HostingSiloCountAsync()
+    {
+        var management = SimulationCluster.Grains.GetGrain<IManagementGrain>(0);
+        var hosts = await management.GetDetailedGrainStatistics();
+
+        return hosts
+            .Where(statistic => _registered.Any(neuron => statistic.GrainId == neuron.ToGrainId()))
+            .Select(statistic => statistic.SiloAddress)
+            .Distinct()
+            .Count();
+    }
+
+    public async Task AwaitAllRegisteredHandledAsync(string synapseTypeName)
+    {
+        foreach (var neuron in _registered)
+        {
+            await SimulationCluster.Observed.AwaitHandledAsync(neuron, synapseTypeName);
+        }
     }
 
     public Task<int> SubscriberCountAsync(string synapseTypeName)

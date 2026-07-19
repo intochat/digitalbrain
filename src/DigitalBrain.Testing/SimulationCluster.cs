@@ -1,12 +1,15 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Journaling;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 
 namespace DigitalBrain.Testing;
 
 public static class SimulationCluster
 {
+    private const int SiloCount = 3;
+
     private static InProcessTestCluster? _cluster;
     private static SynapseObserver? _observer;
 
@@ -23,7 +26,7 @@ public static class SimulationCluster
         }
 
         var journalStorage = new VolatileJournalStorageProvider();
-        var builder = new InProcessTestClusterBuilder();
+        var builder = new InProcessTestClusterBuilder(SiloCount);
 
         builder.ConfigureSilo((_, silo) =>
         {
@@ -39,14 +42,17 @@ public static class SimulationCluster
         _cluster = cluster;
     }
 
-    public static async Task RestartAsync()
+    public static async Task RestartHostOfAsync(NeuronId neuron)
     {
         var cluster = Deployed();
+        var management = cluster.Client.GetGrain<IManagementGrain>(0);
+        var hosting = (await management.GetDetailedGrainStatistics())
+            .FirstOrDefault(statistic => statistic.GrainId == neuron.ToGrainId())?.SiloAddress
+            ?? throw new InvalidOperationException($"{neuron} is not activated on any silo, so no host can be restarted.");
 
-        foreach (var silo in cluster.Silos.ToList())
-        {
-            await cluster.RestartSiloAsync(silo);
-        }
+        var host = cluster.Silos.Single(silo => silo.SiloAddress.Equals(hosting));
+
+        await cluster.RestartSiloAsync(host);
     }
 
     public static async Task StopAsync()

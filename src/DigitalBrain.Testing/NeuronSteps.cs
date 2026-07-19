@@ -84,8 +84,28 @@ public sealed class NeuronSteps(Simulation simulation)
         }
     }
 
-    [When("the cluster is restarted")]
-    public static Task WhenTheClusterIsRestarted() => SimulationCluster.RestartAsync();
+    [When("the silo hosting the {word} neuron named {string} is restarted")]
+    public Task WhenTheHostingSiloIsRestarted(string neuronType, string name)
+        => SimulationCluster.RestartHostOfAsync(simulation.NeuronNamed(neuronType, name));
+
+    [Given("{int} {word} neurons are registered")]
+    public Task ManyNeuronsAreRegistered(int count, string neuronType) => simulation.RegisterManyAsync(count, neuronType);
+
+    [Then("those neurons are hosted on more than one silo")]
+    public async Task ThenThoseNeuronsSpanSilos()
+    {
+        var silos = await simulation.HostingSiloCountAsync();
+
+        if (silos <= 1)
+        {
+            throw new SimulationAssertionException(
+                $"Expected the registered neurons to be spread across the cluster, but they are all hosted on {silos} silo.");
+        }
+    }
+
+    [Then("every registered {word} received {word}")]
+    public Task ThenEveryRegisteredNeuronReceived(string neuronType, string synapseType)
+        => simulation.AwaitAllRegisteredHandledAsync(synapseType);
 
     [Then("the subscriber count for {word} has grown by {int}")]
     public async Task ThenTheSubscriberCountHasGrownBy(string synapseType, int expected)
