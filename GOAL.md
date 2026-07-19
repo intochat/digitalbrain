@@ -711,23 +711,26 @@ referencing it.
     durability, so the host refuses to start without durable journal storage" — and otherwise wires
     `AddAzureBlobJournalStorage`. The AppHosts supply it from Azure Storage running as the Azurite
     emulator locally, which is the same code path as a real account.
-24. **2026-07-19 — Tier 2 proves hosted startup, not yet a hosted turn.** `DigitalBrain.HostTests`
-    drives `hosts/DigitalBrain.TestingAppHost` through `Aspire.Hosting.Testing` on the real host:
-    Azurite starts, the brain resource composes, the silo project launches and reaches healthy in
-    about twelve seconds. An HTTP probe of the silo's `/health` endpoint was written and **removed
-    rather than left red**: the endpoint resolves once the host declares a launch profile, but the
-    request times out even though Aspire reports the resource healthy, so the silo is reaching
-    "healthy" without serving. Diagnosis so far, so the next session does not repeat it: running
-    the Testing AppHost directly shows a clean start — DCP, the dashboard, Azurite and the silo all
-    come up with nothing on stderr — and a project resource with no health check reports "healthy"
-    on *running*, not on serving, so the green Tier-2 assertion is weaker than it looks.
-    `ResourceLoggerService.WatchAsync("silo")` returned no lines in twenty seconds, so silo output
-    is not reachable by resource name that way. The leading hypothesis is that Orleans silo startup
-    blocks the host before Kestrel begins listening (a clustering wait would look exactly like
-    this: process alive, port closed). **Open work:** confirm by reading the silo's log stream by
-    resource id or through the dashboard's OTLP endpoint, fix the startup ordering, restore the
-    HTTP assertion, and only then build M9's real Tier-2 proof — a durable turn, a kernel restart,
-    and delivery resuming.
+24. **2026-07-19 — `AddDigitalBrain()` crashed any silo that did not opt into silo metadata.**
+    The M4 placement review asked exactly the right question — whether registering the placement
+    filter unconditionally is safe for a host that sets no silo metadata — and the concrete answer
+    is no. `PinToSiloDirector` takes `ISiloMetadataCache`, which exists only once `UseSiloMetadata`
+    has been called, so a production host died during DI validation before Kestrel ever listened:
+    *"Unable to resolve service for type ISiloMetadataCache while attempting to activate
+    PinToSiloDirector"*. Tier 1 never caught it because its fixture happens to call
+    `UseSiloMetadata` to label silos. `AddDigitalBrain()` now registers empty silo metadata itself,
+    so the cache always exists and an unlabelled silo simply matches no pin.
+25. **2026-07-19 — Tier 2 proves hosted startup and serving, not yet a hosted turn.**
+    `DigitalBrain.HostTests` drives `hosts/DigitalBrain.TestingAppHost` through
+    `Aspire.Hosting.Testing` on the real host: Azurite starts, the brain resource composes, the
+    silo project launches, reaches healthy, and **serves** — the test asserts a real `200` from
+    `/health`. The first version of that probe timed out while the resource still reported
+    "healthy", which is how Decision 24's crash stayed hidden: a project resource with no health
+    check reports healthy on *running*, not on serving. **Open work:** M9's real proof — a durable
+    turn, a kernel restart, delivery resuming, and the dashboard and DevUI verification M9 lists.
+    Environment note worth keeping: a locally-pulled Azurite image rejected the storage SDK's API
+    version (`2026-02-06`) with `InvalidHeaderValue`; Aspire's own `RunAsEmulator()` image is
+    current enough, so this only bites when running Azurite by hand — pass `--skipApiVersionCheck`.
 
 ## Definition of Done
 
