@@ -68,9 +68,28 @@ public sealed class NeuronSteps(Simulation simulation)
         }
     }
 
+    [Given("a {word} neuron named {string} is registered")]
+    [When("a {word} neuron named {string} is registered")]
+    public Task ANeuronIsRegistered(string neuronType, string name) => simulation.RegisterAsync(neuronType, name);
+
+    [Then("the subscriber count for {word} has grown by {int}")]
+    public async Task ThenTheSubscriberCountHasGrownBy(string synapseType, int expected)
+    {
+        var actual = await simulation.SubscriberCountAsync(synapseType);
+
+        if (actual != expected)
+        {
+            throw new SimulationAssertionException(
+                $"Expected the subscriber count for {synapseType} to have grown by {expected}, but it is {actual}.");
+        }
+    }
+
     [Then("the incoming journal of the {word} neuron named {string} contains {word}")]
-    public Task ThenTheIncomingJournalContains(string neuronType, string name, string synapseType)
-        => AssertJournalContains(JournalKind.Incoming, neuronType, name, synapseType);
+    public async Task ThenTheIncomingJournalContains(string neuronType, string name, string synapseType)
+    {
+        await simulation.AwaitHandledAsync(neuronType, name, synapseType);
+        await AssertJournalContains(JournalKind.Incoming, neuronType, name, synapseType);
+    }
 
     [Then("the outgoing journal of the {word} neuron named {string} contains {word}")]
     public Task ThenTheOutgoingJournalContains(string neuronType, string name, string synapseType)

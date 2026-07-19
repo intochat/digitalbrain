@@ -1,13 +1,16 @@
 using Orleans;
+using Orleans.Concurrency;
 
 namespace DigitalBrain.Testing;
 
 [Alias("db.testing.simulation")]
 public interface ISimulationNeuron : INeuron
 {
+    [AlwaysInterleave]
     [Alias("Stimulate")]
     Task StimulateAsync(NeuronId receiver, Synapse synapse);
 
+    [AlwaysInterleave]
     [Alias("StimulateTwice")]
     Task StimulateTwiceAsync(NeuronId receiver, Synapse synapse);
 }

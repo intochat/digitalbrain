@@ -20,6 +20,11 @@ internal sealed class Announcer : Neuron, IHandle<Ping>, IEmit<Noticed>
     public Task HandleAsync(Ping synapse, CancellationToken cancellationToken) => EmitAsync(new Noticed());
 }
 
+internal sealed class Listener : Neuron, IHandle<Noticed>
+{
+    public Task HandleAsync(Noticed synapse, CancellationToken cancellationToken) => Task.CompletedTask;
+}
+
 internal sealed class Relay : Neuron, IHandle<Ping>, IHandle<Pong>, IEmit<Ping>
 {
     public Task HandleAsync(Ping synapse, CancellationToken cancellationToken)

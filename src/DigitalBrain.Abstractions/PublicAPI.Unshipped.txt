@@ -17,6 +17,10 @@ DigitalBrain.IHandle<TSynapse>.HandleAsync(TSynapse! synapse, System.Threading.C
 DigitalBrain.INeuron
 DigitalBrain.INeuron.DeliverAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.INeuron.ReadJournalAsync(DigitalBrain.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
+DigitalBrain.ISubscriptionRegistry
+DigitalBrain.ISubscriptionRegistry.RegisterAsync(string! synapseType, DigitalBrain.NeuronId subscriber) -> System.Threading.Tasks.Task!
+DigitalBrain.ISubscriptionRegistry.SubscriberCountAsync(string! synapseType) -> System.Threading.Tasks.Task<int>!
+DigitalBrain.ISubscriptionRegistry.SubscribersAsync(string! synapseType) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.NeuronId>!>!
 DigitalBrain.JournalKind
 DigitalBrain.JournalKind.Incoming = 0 -> DigitalBrain.JournalKind
 DigitalBrain.JournalKind.Outgoing = 1 -> DigitalBrain.JournalKind
@@ -47,6 +51,10 @@ DigitalBrain.Synapse.Metadata.init -> void
 DigitalBrain.Synapse.Stamped.get -> DigitalBrain.SynapseMetadata!
 DigitalBrain.Synapse.Synapse() -> void
 DigitalBrain.Synapse.Synapse(DigitalBrain.Synapse! original) -> void
+DigitalBrain.SynapseDepthExceededException
+DigitalBrain.SynapseDepthExceededException.SynapseDepthExceededException() -> void
+DigitalBrain.SynapseDepthExceededException.SynapseDepthExceededException(string! message, System.Exception! innerException) -> void
+DigitalBrain.SynapseDepthExceededException.SynapseDepthExceededException(string! message) -> void
 DigitalBrain.SynapseId
 DigitalBrain.SynapseId.Deconstruct(out System.Guid Value) -> void
 DigitalBrain.SynapseId.Equals(DigitalBrain.SynapseId other) -> bool

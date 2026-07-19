@@ -62,6 +62,17 @@ public sealed class Simulation
     public async Task<IReadOnlyList<Synapse>> ReadJournalAsync(JournalKind kind, string neuronType, string name)
         => await Neuron(NeuronNamed(neuronType, name)).ReadJournalAsync(kind);
 
+    public async Task RegisterAsync(string neuronType, string name)
+        => await Neuron(NeuronNamed(neuronType, name)).ReadJournalAsync(JournalKind.Incoming);
+
+    public Task AwaitHandledAsync(string neuronType, string name, string synapseTypeName)
+        => SimulationCluster.Observed.AwaitHandledAsync(NeuronNamed(neuronType, name), synapseTypeName);
+
+    public Task<int> SubscriberCountAsync(string synapseTypeName)
+        => SimulationCluster.Grains
+            .GetGrain<ISubscriptionRegistry>(Owner.Value)
+            .SubscriberCountAsync(NeuronCatalog.SynapseType(synapseTypeName).FullName!);
+
     private Task StimulateAsync(string synapseTypeName, NeuronId receiver, IReadOnlyDictionary<string, string> values)
         => Driver().StimulateAsync(receiver, NeuronCatalog.Create(synapseTypeName, values));
 

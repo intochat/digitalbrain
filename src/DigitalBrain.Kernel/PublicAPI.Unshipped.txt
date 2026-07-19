@@ -1,4 +1,8 @@
 #nullable enable
+const DigitalBrain.SynapseTelemetry.ActivitySourceName = "DigitalBrain" -> string!
+const DigitalBrain.SynapseTelemetry.CorrelationTag = "db.correlation" -> string!
+const DigitalBrain.SynapseTelemetry.ReceiverTag = "db.receiver" -> string!
+const DigitalBrain.SynapseTelemetry.SynapseTag = "db.synapse" -> string!
 DigitalBrain.DigitalBrainSiloBuilderExtensions
 DigitalBrain.DispatchManifest
 DigitalBrain.DispatchManifest.DispatchManifest(System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>! handlers, System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>! emissions) -> void
@@ -14,6 +18,7 @@ DigitalBrain.Neuron.Outgoing.get -> System.Collections.Generic.IReadOnlyList<Dig
 DigitalBrain.Neuron.ReadJournalAsync(DigitalBrain.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
 DigitalBrain.Neuron.ReplyAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron.SendAsync(DigitalBrain.NeuronId receiver, DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.SynapseTelemetry
 DigitalBrain.SynapseWiring
 DigitalBrain.SynapseWiringEntry
 DigitalBrain.SynapseWiringEntry.<Clone>$() -> DigitalBrain.SynapseWiringEntry!
@@ -24,6 +29,7 @@ DigitalBrain.SynapseWiringEntry.Neuron.init -> void
 DigitalBrain.SynapseWiringEntry.Synapse.get -> string!
 DigitalBrain.SynapseWiringEntry.Synapse.init -> void
 DigitalBrain.SynapseWiringEntry.SynapseWiringEntry(string! Neuron, string! Synapse) -> void
+override DigitalBrain.Neuron.OnActivateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 override DigitalBrain.SynapseWiringEntry.Equals(object? obj) -> bool
 override DigitalBrain.SynapseWiringEntry.GetHashCode() -> int
 override DigitalBrain.SynapseWiringEntry.ToString() -> string!
