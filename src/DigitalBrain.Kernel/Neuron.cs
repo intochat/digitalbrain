@@ -21,12 +21,12 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
     private static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(50);
     private static readonly TimeSpan ReminderInterval = TimeSpan.FromMinutes(1);
 
-    private readonly IDurableList<byte[]> _incoming;
-    private readonly IDurableList<byte[]> _outgoing;
+    private readonly NeuronFeed _incoming;
+    private readonly NeuronFeed _outgoing;
     private readonly IDurableList<byte[]> _outbox;
     private readonly IDurableList<Guid> _handled;
     private readonly HashSet<SynapseId> _remembered = [];
-    private readonly Serializer<Synapse> _synapses;
+    private readonly List<Synapse> _firedWhileHandling = [];
     private readonly Serializer<OutboxEntry> _entries;
     private readonly TimeProvider _clock;
 
@@ -37,20 +37,19 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
 
     protected Neuron()
     {
-        _incoming = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(IncomingJournalName);
-        _outgoing = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(OutgoingJournalName);
+        _incoming = new NeuronFeed(ServiceProvider, IncomingJournalName);
+        _outgoing = new NeuronFeed(ServiceProvider, OutgoingJournalName);
         _outbox = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(OutboxName);
         _handled = ServiceProvider.GetRequiredKeyedService<IDurableList<Guid>>(HandledName);
-        _synapses = ServiceProvider.GetRequiredService<Serializer<Synapse>>();
         _entries = ServiceProvider.GetRequiredService<Serializer<OutboxEntry>>();
         _clock = ServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
     }
 
     public NeuronId Id => NeuronId.FromGrainKey(this.GetGrainId().Type.ToString()!, this.GetPrimaryKeyString());
 
-    protected IReadOnlyList<Synapse> Incoming => Read(_incoming);
+    protected IReadOnlyList<Synapse> Incoming => _incoming.Retained;
 
-    protected IReadOnlyList<Synapse> Outgoing => Read(_outgoing);
+    protected IReadOnlyList<Synapse> Outgoing => _outgoing.Retained;
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -95,16 +94,21 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         _handling = synapse.Stamped;
         _handlingDepth = SynapseDelivery.InboundDepth();
 
-        var committedIncoming = _incoming.Count;
-        var committedOutgoing = _outgoing.Count;
         var committedOutbox = _outbox.Count;
         var committedHandled = _handled.Count;
+
+        _firedWhileHandling.Clear();
 
         try
         {
             await DispatchAsync(synapse);
 
-            _incoming.Add(_synapses.SerializeToArray(synapse));
+            foreach (var fired in _firedWhileHandling)
+            {
+                _outgoing.Append(fired);
+            }
+
+            _incoming.Append(synapse);
 
             Remember(synapse.Stamped.SynapseId);
 
@@ -112,8 +116,6 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         }
         catch
         {
-            Discard(_incoming, committedIncoming);
-            Discard(_outgoing, committedOutgoing);
             Discard(_outbox, committedOutbox);
             Discard(_handled, committedHandled);
 
@@ -123,6 +125,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         }
         finally
         {
+            _firedWhileHandling.Clear();
             _handling = null;
             _handlingDepth = 0;
         }
@@ -130,12 +133,18 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         ScheduleDrain();
     }
 
-    public Task<IReadOnlyList<Synapse>> ReadJournalAsync(JournalKind kind) => Task.FromResult(kind switch
+    public Task<IReadOnlyList<Synapse>> ReadJournalAsync(JournalKind kind)
+        => Task.FromResult(FeedFor(kind).Retained);
+
+    public Task<JournalSnapshot> ReadJournalSnapshotAsync(JournalKind kind)
+        => Task.FromResult(FeedFor(kind).Snapshot());
+
+    private NeuronFeed FeedFor(JournalKind kind) => kind switch
     {
-        JournalKind.Incoming => Incoming,
-        JournalKind.Outgoing => Outgoing,
+        JournalKind.Incoming => _incoming,
+        JournalKind.Outgoing => _outgoing,
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
-    });
+    };
 
     protected Task SendAsync(NeuronId receiver, Synapse synapse)
     {
@@ -183,7 +192,14 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
     {
         var fired = synapse with { Metadata = metadata };
 
-        _outgoing.Add(_synapses.SerializeToArray(fired));
+        if (_handling is null)
+        {
+            _outgoing.Append(fired);
+        }
+        else
+        {
+            _firedWhileHandling.Add(fired);
+        }
 
         if (receivers.Length > 0)
         {
@@ -357,9 +373,6 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         recorded?.SetTag(SynapseTelemetry.CorrelationTag, synapse.Stamped.CorrelationId.ToString());
         recorded?.SetStatus(ActivityStatusCode.Error, reason);
     }
-
-    private List<Synapse> Read(IDurableList<byte[]> journal)
-        => journal.Select(_synapses.Deserialize).ToList();
 
     private bool HasAlreadyHandled(Synapse synapse)
         => _remembered.Contains(synapse.Stamped.SynapseId);

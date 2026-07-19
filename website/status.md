@@ -64,10 +64,13 @@ neuron-to-neuron and registry traffic, where the caller's identity is known and 
 constrain a caller already inside the cluster's trust boundary. Authenticate users at the edge and
 never expose an Orleans client endpoint publicly.
 
-**Journals grow without bound.** A neuron's incoming and outgoing journals are never compacted, so a
-long-lived neuron costs progressively more storage and takes progressively longer to read. Delivery
-cost no longer grows with them — dedupe was a scan of the whole incoming journal and is now a lookup
-against a bounded set — but nothing yet prunes, snapshots or ages out the journals themselves.
+**A journal is a summary plus a recent window, so history is lost.** Journals used to grow without
+bound; they are now bounded by both record count and total bytes. What survives compaction is a
+durable tally — how many of each synapse type the neuron has recorded, the last sequence, and the
+window still retained — not the synapses themselves. A consumer can still ask *what has this neuron
+done and how much*, but it cannot read a synapse older than the window. That is the deliberate trade
+of DEC-1: the journal stopped being an audit log, and the audit log it used to pretend to be is
+provided separately by the governance ledger, which is not built yet.
 
 **Effectively-once processing is windowed, not eternal.** A neuron remembers the last 4,096
 `SynapseId`s it has handled, in a durable ring that survives restart. A redelivery of a synapse

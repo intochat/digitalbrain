@@ -1,12 +1,4 @@
 #nullable enable
-~override DigitalBrain.CorrelationId.Equals(object obj) -> bool
-~override DigitalBrain.NeuronId.Equals(object obj) -> bool
-~override DigitalBrain.OwnerId.Equals(object obj) -> bool
-~override DigitalBrain.SynapseId.Equals(object obj) -> bool
-abstract DigitalBrain.Synapse.<Clone>$() -> DigitalBrain.Synapse!
-const DigitalBrain.ISessionNeuron.GrainTypeName = "sessionneuron" -> string!
-const DigitalBrain.ModelProviders.Anthropic = "anthropic" -> string!
-const DigitalBrain.ModelProviders.OpenAi = "openai" -> string!
 DigitalBrain.CorrelationId
 DigitalBrain.CorrelationId.CorrelationId() -> void
 DigitalBrain.CorrelationId.CorrelationId(System.Guid Value) -> void
@@ -22,6 +14,7 @@ DigitalBrain.IHandle<TSynapse>.HandleAsync(TSynapse! synapse, System.Threading.C
 DigitalBrain.INeuron
 DigitalBrain.INeuron.DeliverAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.INeuron.ReadJournalAsync(DigitalBrain.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
+DigitalBrain.INeuron.ReadJournalSnapshotAsync(DigitalBrain.JournalKind kind) -> System.Threading.Tasks.Task<DigitalBrain.JournalSnapshot!>!
 DigitalBrain.ISessionNeuron
 DigitalBrain.ISessionNeuron.FireAsync(DigitalBrain.NeuronId receiver, DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.ISubscriptionRegistry
@@ -31,6 +24,31 @@ DigitalBrain.ISubscriptionRegistry.SubscribersAsync(string! synapseType) -> Syst
 DigitalBrain.JournalKind
 DigitalBrain.JournalKind.Incoming = 0 -> DigitalBrain.JournalKind
 DigitalBrain.JournalKind.Outgoing = 1 -> DigitalBrain.JournalKind
+DigitalBrain.JournalSnapshot
+DigitalBrain.JournalSnapshot.<Clone>$() -> DigitalBrain.JournalSnapshot!
+DigitalBrain.JournalSnapshot.Deconstruct(out long TotalRecorded, out long LastSequence, out long EarliestRetainedSequence, out int RetainedCount, out System.Collections.Generic.IReadOnlyList<DigitalBrain.JournalTally!>! Tallies) -> void
+DigitalBrain.JournalSnapshot.EarliestRetainedSequence.get -> long
+DigitalBrain.JournalSnapshot.EarliestRetainedSequence.init -> void
+DigitalBrain.JournalSnapshot.Equals(DigitalBrain.JournalSnapshot? other) -> bool
+DigitalBrain.JournalSnapshot.JournalSnapshot(long TotalRecorded, long LastSequence, long EarliestRetainedSequence, int RetainedCount, System.Collections.Generic.IReadOnlyList<DigitalBrain.JournalTally!>! Tallies) -> void
+DigitalBrain.JournalSnapshot.LastSequence.get -> long
+DigitalBrain.JournalSnapshot.LastSequence.init -> void
+DigitalBrain.JournalSnapshot.RecordedOf(string! synapseType) -> long
+DigitalBrain.JournalSnapshot.RetainedCount.get -> int
+DigitalBrain.JournalSnapshot.RetainedCount.init -> void
+DigitalBrain.JournalSnapshot.Tallies.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.JournalTally!>!
+DigitalBrain.JournalSnapshot.Tallies.init -> void
+DigitalBrain.JournalSnapshot.TotalRecorded.get -> long
+DigitalBrain.JournalSnapshot.TotalRecorded.init -> void
+DigitalBrain.JournalTally
+DigitalBrain.JournalTally.<Clone>$() -> DigitalBrain.JournalTally!
+DigitalBrain.JournalTally.Deconstruct(out string! SynapseType, out long Recorded) -> void
+DigitalBrain.JournalTally.Equals(DigitalBrain.JournalTally? other) -> bool
+DigitalBrain.JournalTally.JournalTally(string! SynapseType, long Recorded) -> void
+DigitalBrain.JournalTally.Recorded.get -> long
+DigitalBrain.JournalTally.Recorded.init -> void
+DigitalBrain.JournalTally.SynapseType.get -> string!
+DigitalBrain.JournalTally.SynapseType.init -> void
 DigitalBrain.ModelProviders
 DigitalBrain.ModelTier
 DigitalBrain.ModelTier.Balanced = 1 -> DigitalBrain.ModelTier
@@ -39,8 +57,8 @@ DigitalBrain.ModelTier.Fast = 0 -> DigitalBrain.ModelTier
 DigitalBrain.ModelTier.Reasoning = 2 -> DigitalBrain.ModelTier
 DigitalBrain.NeuronAuthorizationException
 DigitalBrain.NeuronAuthorizationException.NeuronAuthorizationException() -> void
-DigitalBrain.NeuronAuthorizationException.NeuronAuthorizationException(string! message, System.Exception! innerException) -> void
 DigitalBrain.NeuronAuthorizationException.NeuronAuthorizationException(string! message) -> void
+DigitalBrain.NeuronAuthorizationException.NeuronAuthorizationException(string! message, System.Exception! innerException) -> void
 DigitalBrain.NeuronId
 DigitalBrain.NeuronId.Equals(DigitalBrain.NeuronId other) -> bool
 DigitalBrain.NeuronId.GrainKey.get -> string!
@@ -90,8 +108,18 @@ DigitalBrain.SynapseMetadata.SynapseId.init -> void
 DigitalBrain.SynapseMetadata.SynapseMetadata(DigitalBrain.SynapseId SynapseId, DigitalBrain.CorrelationId CorrelationId, DigitalBrain.SynapseId? CausationId, DigitalBrain.NeuronId Caller, DigitalBrain.NeuronId? Receiver, DigitalBrain.RoutingMode RoutingMode, System.DateTimeOffset Timestamp) -> void
 DigitalBrain.SynapseMetadata.Timestamp.get -> System.DateTimeOffset
 DigitalBrain.SynapseMetadata.Timestamp.init -> void
+abstract DigitalBrain.Synapse.<Clone>$() -> DigitalBrain.Synapse!
+const DigitalBrain.ISessionNeuron.GrainTypeName = "sessionneuron" -> string!
+const DigitalBrain.ModelProviders.Anthropic = "anthropic" -> string!
+const DigitalBrain.ModelProviders.OpenAi = "openai" -> string!
 override DigitalBrain.CorrelationId.GetHashCode() -> int
 override DigitalBrain.CorrelationId.ToString() -> string!
+override DigitalBrain.JournalSnapshot.Equals(object? obj) -> bool
+override DigitalBrain.JournalSnapshot.GetHashCode() -> int
+override DigitalBrain.JournalSnapshot.ToString() -> string!
+override DigitalBrain.JournalTally.Equals(object? obj) -> bool
+override DigitalBrain.JournalTally.GetHashCode() -> int
+override DigitalBrain.JournalTally.ToString() -> string!
 override DigitalBrain.NeuronId.GetHashCode() -> int
 override DigitalBrain.NeuronId.ToString() -> string!
 override DigitalBrain.OwnerId.GetHashCode() -> int
@@ -107,6 +135,10 @@ override DigitalBrain.SynapseMetadata.ToString() -> string!
 static DigitalBrain.CorrelationId.New() -> DigitalBrain.CorrelationId
 static DigitalBrain.CorrelationId.operator !=(DigitalBrain.CorrelationId left, DigitalBrain.CorrelationId right) -> bool
 static DigitalBrain.CorrelationId.operator ==(DigitalBrain.CorrelationId left, DigitalBrain.CorrelationId right) -> bool
+static DigitalBrain.JournalSnapshot.operator !=(DigitalBrain.JournalSnapshot? left, DigitalBrain.JournalSnapshot? right) -> bool
+static DigitalBrain.JournalSnapshot.operator ==(DigitalBrain.JournalSnapshot? left, DigitalBrain.JournalSnapshot? right) -> bool
+static DigitalBrain.JournalTally.operator !=(DigitalBrain.JournalTally? left, DigitalBrain.JournalTally? right) -> bool
+static DigitalBrain.JournalTally.operator ==(DigitalBrain.JournalTally? left, DigitalBrain.JournalTally? right) -> bool
 static DigitalBrain.NeuronId.For<TNeuron>(DigitalBrain.OwnerId owner, string! name) -> DigitalBrain.NeuronId
 static DigitalBrain.NeuronId.FromGrainKey(string! type, string! grainKey) -> DigitalBrain.NeuronId
 static DigitalBrain.NeuronId.GrainTypeNameOf(System.Type! neuronType) -> string!
@@ -127,3 +159,7 @@ static DigitalBrain.SynapseMetadata.operator ==(DigitalBrain.SynapseMetadata? le
 virtual DigitalBrain.Synapse.EqualityContract.get -> System.Type!
 virtual DigitalBrain.Synapse.Equals(DigitalBrain.Synapse? other) -> bool
 virtual DigitalBrain.Synapse.PrintMembers(System.Text.StringBuilder! builder) -> bool
+~override DigitalBrain.CorrelationId.Equals(object obj) -> bool
+~override DigitalBrain.NeuronId.Equals(object obj) -> bool
+~override DigitalBrain.OwnerId.Equals(object obj) -> bool
+~override DigitalBrain.SynapseId.Equals(object obj) -> bool

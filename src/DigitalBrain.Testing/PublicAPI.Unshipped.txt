@@ -49,6 +49,7 @@ DigitalBrain.Testing.Simulation.NeuronNamed(string! neuronType, string! name) ->
 DigitalBrain.Testing.Simulation.OpenBrain(string! owner) -> void
 DigitalBrain.Testing.Simulation.Owner.get -> DigitalBrain.OwnerId
 DigitalBrain.Testing.Simulation.ReadJournalAsync(DigitalBrain.JournalKind kind, string! neuronType, string! name) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
+DigitalBrain.Testing.Simulation.ReadJournalSnapshotAsync(DigitalBrain.JournalKind kind, string! neuronType, string! name) -> System.Threading.Tasks.Task<DigitalBrain.JournalSnapshot!>!
 DigitalBrain.Testing.Simulation.RegisterAsync(string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.RegisterManyAsync(int count, string! neuronType) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.SendAsync(string! synapseTypeName, string! neuronType, string! name, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! values) -> System.Threading.Tasks.Task!
@@ -61,8 +62,8 @@ DigitalBrain.Testing.Simulation.SubscribeInOwnerExpectingRefusalAsync(string! ne
 DigitalBrain.Testing.Simulation.SubscriberCountAsync(string! synapseTypeName) -> System.Threading.Tasks.Task<int>!
 DigitalBrain.Testing.SimulationAssertionException
 DigitalBrain.Testing.SimulationAssertionException.SimulationAssertionException() -> void
-DigitalBrain.Testing.SimulationAssertionException.SimulationAssertionException(string! message, System.Exception! innerException) -> void
 DigitalBrain.Testing.SimulationAssertionException.SimulationAssertionException(string! message) -> void
+DigitalBrain.Testing.SimulationAssertionException.SimulationAssertionException(string! message, System.Exception! innerException) -> void
 DigitalBrain.Testing.SimulationCluster
 DigitalBrain.Testing.SynapseObserver
 DigitalBrain.Testing.SynapseObserver.AwaitHandledAsync(DigitalBrain.NeuronId receiver, string! synapseTypeName) -> System.Threading.Tasks.Task!
@@ -70,13 +71,13 @@ DigitalBrain.Testing.SynapseObserver.Dispose() -> void
 DigitalBrain.Testing.SynapseObserver.SynapseObserver() -> void
 DigitalBrain.Testing.UnscriptedPromptException
 DigitalBrain.Testing.UnscriptedPromptException.UnscriptedPromptException() -> void
-DigitalBrain.Testing.UnscriptedPromptException.UnscriptedPromptException(string! message, System.Exception! innerException) -> void
 DigitalBrain.Testing.UnscriptedPromptException.UnscriptedPromptException(string! message) -> void
+DigitalBrain.Testing.UnscriptedPromptException.UnscriptedPromptException(string! message, System.Exception! innerException) -> void
 static DigitalBrain.Testing.NeuronSteps.ForgetPreviousScripts() -> void
 static DigitalBrain.Testing.NeuronSteps.GivenTheModelAnswers(string! tier, string! prompt, string! answer) -> void
 static DigitalBrain.Testing.NeuronSteps.StartCluster() -> System.Threading.Tasks.Task!
-static DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalOfAnotherOwnerIsEmpty(string! owner, string! neuronType, string! name) -> System.Threading.Tasks.Task!
 static DigitalBrain.Testing.NeuronSteps.StopCluster() -> System.Threading.Tasks.Task!
+static DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalOfAnotherOwnerIsEmpty(string! owner, string! neuronType, string! name) -> System.Threading.Tasks.Task!
 static DigitalBrain.Testing.Simulation.HostingSiloCountAsync(params DigitalBrain.NeuronId[]! neurons) -> System.Threading.Tasks.Task<int>!
 static DigitalBrain.Testing.Simulation.ReadJournalOfOwnerAsync(DigitalBrain.JournalKind kind, string! owner, string! neuronType, string! name) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
 static DigitalBrain.Testing.SimulationCluster.ForgetScripts() -> void

@@ -93,6 +93,9 @@ public sealed class Simulation
     public async Task<IReadOnlyList<Synapse>> ReadJournalAsync(JournalKind kind, string neuronType, string name)
         => await Neuron(NeuronNamed(neuronType, name)).ReadJournalAsync(kind);
 
+    public async Task<JournalSnapshot> ReadJournalSnapshotAsync(JournalKind kind, string neuronType, string name)
+        => await Neuron(NeuronNamed(neuronType, name)).ReadJournalSnapshotAsync(kind);
+
     public static async Task<IReadOnlyList<Synapse>> ReadJournalOfOwnerAsync(JournalKind kind, string owner, string neuronType, string name)
         => await Neuron(new NeuronId(neuronType, new OwnerId(owner), name)).ReadJournalAsync(kind);
 

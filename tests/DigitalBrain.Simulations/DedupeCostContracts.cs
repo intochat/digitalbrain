@@ -22,9 +22,9 @@ public sealed class DedupeCostContracts
         var intoEmptyJournal = await AllocatedOverBatchAsync(simulation);
         var intoFullJournal = await AllocatedOverBatchAsync(simulation);
 
-        var delivered = await simulation.ReadJournalAsync(JournalKind.Incoming, nameof(Echo), "cost-target");
+        var delivered = await simulation.ReadJournalSnapshotAsync(JournalKind.Incoming, nameof(Echo), "cost-target");
 
-        Assert.Equal(BatchSize * 2, delivered.Count);
+        Assert.Equal(BatchSize * 2, delivered.TotalRecorded);
 
         Assert.True(
             intoFullJournal < intoEmptyJournal * ToleratedGrowth,

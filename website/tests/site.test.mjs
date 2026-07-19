@@ -158,8 +158,11 @@ test('the open debts are disclosed rather than buried', () => {
   assert.match(status, /redelivery/i)
   assert.match(status, /DevUI/)
   assert.match(status, /trusted cluster peer/)
-  assert.match(status, /Journals grow without bound/)
+  assert.match(status, /history is lost/)
+  assert.match(status, /Effectively-once processing is windowed/)
   assert.match(status, /Subscriptions are never removed/)
+  assert.match(status, /never activated does not receive broadcasts/)
+  assert.match(status, /blocks a neuron's whole outbox/)
 
   const changelog = read('CHANGELOG.md')
   assert.match(changelog, /Known limitations/)

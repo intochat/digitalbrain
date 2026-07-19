@@ -40,6 +40,12 @@ depend on prereleases.
 
 ### Changed
 
+- **A journal is a bounded feed, not an unbounded log.** Each journal now keeps a delta log bounded
+  by both record count and total bytes, a durable tally of how many of each synapse type it has
+  recorded, and a monotonic sequence. Compaction evicts from the delta log only, so the tally and
+  the sequence survive it and `ReadJournalSnapshotAsync` still answers "what has this neuron done,
+  and how much" after the records themselves are gone. Storage per neuron is bounded for the first
+  time. The cost, stated plainly: the journal is no longer an audit log.
 - **Dedupe is O(1).** Detecting a redelivered synapse was a linear scan of the whole incoming
   journal, deserialized on every delivery, making delivery O(n) per synapse and O(n²) over a
   neuron's lifetime. A neuron now keeps the last 4,096 handled `SynapseId`s in a bounded durable
@@ -52,8 +58,8 @@ depend on prereleases.
 - An Orleans client is a trusted cluster peer. The owner boundary constrains neuron-to-neuron and
   registry traffic; it cannot constrain a process that already holds an `IGrainFactory`. Authenticate
   at the edge and never expose an Orleans client endpoint publicly.
-- Journals are never compacted, so storage and journal-read cost still grow without bound. Delivery
-  cost no longer does.
+- A journal retains only a recent window of synapses. Older synapses are evicted and survive as
+  counts, not as records, so history older than the window cannot be read back.
 - Effectively-once processing holds within a window of the last 4,096 deliveries per neuron. A
   redelivery older than that window would be handled again.
 - The `Embedding` model tier cannot work. Every tier is registered as an `IChatClient`, and an

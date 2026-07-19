@@ -22,6 +22,8 @@ public sealed class SerializationContracts
             [nameof(OwnerId)] = "db.owner-id",
             [nameof(RoutingMode)] = "db.routing-mode",
             [nameof(JournalKind)] = "db.journal-kind",
+            [nameof(JournalSnapshot)] = "db.journal-snapshot",
+            [nameof(JournalTally)] = "db.journal-tally",
             [nameof(ModelTier)] = "db.model-tier",
             [nameof(INeuron)] = "db.neuron",
             [nameof(ISessionNeuron)] = "db.session",
