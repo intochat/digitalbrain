@@ -183,15 +183,26 @@ referencing it.
   package list), 7 refuted. `sources/**` untouched; a `sources/` ignore line now guards it.
 
 ### M1 — Design decisions (recorded, not prose-heavy)
-- [ ] Decide and record in the Decision Log: exact `SynapseMetadata` shape and `Stamp` semantics;
+- [x] Decide and record in the Decision Log: exact `SynapseMetadata` shape and `Stamp` semantics;
       broadcast delivery guarantee (ordering, at-least-once semantics, late-activation replay policy)
       and how the durable outbox + Orleans streams implement it; subscription registry design (real
       queryable registry, silo-restart behavior, late-type tolerance); neuron identity + owner
       authorization model; package target frameworks; what Gherkin vocabulary `DigitalBrain.Testing`
       ships.
-- [ ] Adversarial multiagent design review: simplicity, API ergonomics, durability soundness,
+- [x] Adversarial multiagent design review: simplicity, API ergonomics, durability soundness,
       framework-not-product discipline. Cut anything speculative.
 - Commit: `docs: record v2 architecture decisions`
+- Execution record: baseline `9eac3ab9`, commit `0ccc228e`. Inputs: a 4-track research workflow
+  (Orleans.Journaling at the pinned tag, stream/broadcast guarantees, prototype harvest, identity
+  and multi-silo) verified against Microsoft Learn, the dotnet/orleans repo, and api.nuget.org.
+  Decisions 5–11 recorded. Review: 4-lens adversarial workflow, 3 refuters per finding, majority
+  rule — 12 confirmed, 22 refuted, every confirmed finding fixed before commit. Load-bearing
+  changes: broadcast delivery set became owner-scoped registered `NeuronId` instances; the stream
+  fast path for handler delivery was cut so ordering has one path; acknowledgment pinned to an
+  after-handler atomic commit; `NeuronId` given a validation rule making its encoding bijective;
+  `NeuronId.None` and `CausationId` deleted; Tier-1 durability fixture moved to a per-cluster
+  volatile journal store (the official per-silo provider dies with its silo host and would make
+  `@durability` scenarios vacuous). Gates: root exit 0 (14 tests), website 9/9.
 
 ### M2 — Neuron kernel **[review]**
 - [ ] First red Tier-1 simulation: a neuron receives a fired synapse and its journals record it.
