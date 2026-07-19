@@ -766,6 +766,24 @@ referencing it.
     steps and Tier 1 correctly uses OTel observation instead; a shipped sample having to poll is
     the clearest possible argument for closing Decision 21.
 
+28. **2026-07-19 — The hosted restart proof is blocked on reaching a proxied silo from outside.**
+    M9 needs a durable turn and a kernel restart on the real host. The attempt drove the Testing
+    AppHost under `Aspire.Hosting.Testing`, took the `orleans-gateway` endpoint from
+    `app.GetEndpoint("silo", "orleans-gateway")`, and built an external Orleans client against it
+    so a `BrainClient` could fire a synapse, restart the silo through
+    `ResourceCommands.ExecuteCommandAsync("silo", "resource-restart")`, and re-read the journal.
+    It fails at connection: *"Unable to connect to any of the 1 available gateways … Connection
+    attempt to endpoint S127.0.0.1:64490:0 timed out after 00:00:05"*. Aspire's Orleans integration
+    registers both silo and gateway endpoints with `isProxied: true` (verified in the 13.4.6
+    source), and an Orleans client negotiates against the address the silo *advertises*, not the
+    proxy it was dialled on — so a client outside the DCP network cannot complete the handshake.
+    The test was **removed rather than left red**. Three routes remain, in preference order:
+    have the Testing AppHost publish an unproxied gateway endpoint; run the driving code *inside*
+    the cluster as a neuron (which is what Tier 1 already does, and would keep the hosted proof
+    free of test hooks in production code); or give the kernel host a real client-facing API and
+    drive the turn over it — the last only if that API is wanted as product surface, since the
+    ratified client path is the Orleans client, not HTTP.
+
 ## Definition of Done
 
 All milestone boxes ticked with execution records; root Release suite, pack, empty-cache quickstart
