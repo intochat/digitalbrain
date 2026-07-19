@@ -4,6 +4,7 @@ DigitalBrain.Testing.ISimulationNeuron.StimulateAsync(DigitalBrain.NeuronId rece
 DigitalBrain.Testing.ISimulationNeuron.StimulateTwiceAsync(DigitalBrain.NeuronId receiver, DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps
 DigitalBrain.Testing.NeuronSteps.ANeuronIsRegistered(string! neuronType, string! name) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.NeuronSteps.FailOnUnassertedRefusal() -> void
 DigitalBrain.Testing.NeuronSteps.GivenABrainForOwner(string! owner) -> void
 DigitalBrain.Testing.NeuronSteps.ManyNeuronsAreRegistered(int count, string! neuronType) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.NeuronSteps(DigitalBrain.Testing.Simulation! simulation) -> void
@@ -12,15 +13,25 @@ DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalContains(string! neuronTy
 DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalIsEmpty(string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalSettlesBelow(string! neuronType, string! name, int limit) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheJournalContainsExactlyOnce(string! journal, string! neuronType, string! name, string! synapseType) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.NeuronSteps.ThenTheNeuronAnswered(string! neuronType, string! name, string! expected) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheOutgoingJournalContains(string! neuronType, string! name, string! synapseType) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheSubscriberCountHasGrownBy(string! synapseType, int expected) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheSynapseIsRefusedAsUnauthorized() -> void
+DigitalBrain.Testing.NeuronSteps.ThenTheSynapseIsRefusedAsUnscripted() -> void
 DigitalBrain.Testing.NeuronSteps.ThenTheTwoNeuronsAreOnDifferentSilos(string! firstType, string! firstName, string! secondType, string! secondName) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenSynapseIsSentClaimingAnotherOwner(string! synapseType, string! neuronType, string! name, string! claimedOwner) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenSynapseIsSentToNeuron(string! synapseType, string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenSynapseIsSentToNeuronWith(string! synapseType, string! neuronType, string! name, Reqnroll.DataTable! values) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenTheHostingSiloIsRestarted(string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenTheSameSynapseIsSentTwice(string! synapseType, string! neuronType, string! name) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.ScriptedModel
+DigitalBrain.Testing.ScriptedModel.Answer(string! prompt, string! answer) -> void
+DigitalBrain.Testing.ScriptedModel.Dispose() -> void
+DigitalBrain.Testing.ScriptedModel.Forget() -> void
+DigitalBrain.Testing.ScriptedModel.GetResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage!>! messages, Microsoft.Extensions.AI.ChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Microsoft.Extensions.AI.ChatResponse!>!
+DigitalBrain.Testing.ScriptedModel.GetService(System.Type! serviceType, object? serviceKey = null) -> object?
+DigitalBrain.Testing.ScriptedModel.GetStreamingResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage!>! messages, Microsoft.Extensions.AI.ChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate!>!
+DigitalBrain.Testing.ScriptedModel.ScriptedModel() -> void
 DigitalBrain.Testing.Simulation
 DigitalBrain.Testing.Simulation.AwaitAllRegisteredHandledAsync(string! synapseTypeName) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.AwaitHandledAsync(string! neuronType, string! name, string! synapseTypeName) -> System.Threading.Tasks.Task!
@@ -32,6 +43,7 @@ DigitalBrain.Testing.Simulation.Owner.get -> DigitalBrain.OwnerId
 DigitalBrain.Testing.Simulation.ReadJournalAsync(DigitalBrain.JournalKind kind, string! neuronType, string! name) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
 DigitalBrain.Testing.Simulation.RegisterAsync(string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.RegisterManyAsync(int count, string! neuronType) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Simulation.RethrowUnassertedRefusal() -> void
 DigitalBrain.Testing.Simulation.SendAsync(string! synapseTypeName, string! neuronType, string! name, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! values) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.SendClaimingOwnerAsync(string! synapseTypeName, string! neuronType, string! name, string! targetOwner) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.SendTwiceAsync(string! synapseTypeName, string! neuronType, string! name) -> System.Threading.Tasks.Task!
@@ -47,10 +59,18 @@ DigitalBrain.Testing.SynapseObserver
 DigitalBrain.Testing.SynapseObserver.AwaitHandledAsync(DigitalBrain.NeuronId receiver, string! synapseTypeName) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.SynapseObserver.Dispose() -> void
 DigitalBrain.Testing.SynapseObserver.SynapseObserver() -> void
+DigitalBrain.Testing.UnscriptedPromptException
+DigitalBrain.Testing.UnscriptedPromptException.UnscriptedPromptException() -> void
+DigitalBrain.Testing.UnscriptedPromptException.UnscriptedPromptException(string! message, System.Exception! innerException) -> void
+DigitalBrain.Testing.UnscriptedPromptException.UnscriptedPromptException(string! message) -> void
+static DigitalBrain.Testing.NeuronSteps.ForgetPreviousScripts() -> void
+static DigitalBrain.Testing.NeuronSteps.GivenTheModelAnswers(string! tier, string! prompt, string! answer) -> void
 static DigitalBrain.Testing.NeuronSteps.StartCluster() -> System.Threading.Tasks.Task!
 static DigitalBrain.Testing.NeuronSteps.StopCluster() -> System.Threading.Tasks.Task!
 static DigitalBrain.Testing.Simulation.HostingSiloCountAsync(params DigitalBrain.NeuronId[]! neurons) -> System.Threading.Tasks.Task<int>!
+static DigitalBrain.Testing.SimulationCluster.ForgetScripts() -> void
 static DigitalBrain.Testing.SimulationCluster.Grains.get -> Orleans.IGrainFactory!
+static DigitalBrain.Testing.SimulationCluster.Model(DigitalBrain.ModelTier tier) -> DigitalBrain.Testing.ScriptedModel!
 static DigitalBrain.Testing.SimulationCluster.Observed.get -> DigitalBrain.Testing.SynapseObserver!
 static DigitalBrain.Testing.SimulationCluster.RestartHostOfAsync(DigitalBrain.NeuronId neuron) -> System.Threading.Tasks.Task!
 static DigitalBrain.Testing.SimulationCluster.StartAsync() -> System.Threading.Tasks.Task!

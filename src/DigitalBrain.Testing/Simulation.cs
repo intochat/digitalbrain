@@ -13,6 +13,7 @@ public sealed class Simulation
 
     private OwnerId _owner;
     private Exception? _refusal;
+    private bool _refusalAsserted;
 
     public NeuronId Id => new(nameof(SimulationNeuron), Owner, "driver");
 
@@ -24,8 +25,31 @@ public sealed class Simulation
 
     public NeuronId NeuronNamed(string neuronType, string name) => new(neuronType, Owner, name);
 
-    public Task SendAsync(string synapseTypeName, string neuronType, string name, IReadOnlyDictionary<string, string> values)
-        => StimulateAsync(synapseTypeName, NeuronNamed(neuronType, name), values);
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "The driver records whatever the cluster refused with so a scenario can report the actual failure; an unasserted refusal is rethrown when the scenario ends.")]
+    public async Task SendAsync(string synapseTypeName, string neuronType, string name, IReadOnlyDictionary<string, string> values)
+    {
+        try
+        {
+            await StimulateAsync(synapseTypeName, NeuronNamed(neuronType, name), values);
+            _refusal = null;
+        }
+        catch (Exception refusal)
+        {
+            _refusal = refusal;
+        }
+    }
+
+    public void RethrowUnassertedRefusal()
+    {
+        if (_refusal is { } unasserted && !_refusalAsserted)
+        {
+            throw new SimulationAssertionException(
+                $"The scenario left a refusal unasserted: {unasserted.GetType().Name}: {unasserted.Message}", unasserted);
+        }
+    }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Design",
@@ -57,6 +81,8 @@ public sealed class Simulation
     public void ExpectRefusal<TRefusal>()
         where TRefusal : Exception
     {
+        _refusalAsserted = true;
+
         if (_refusal is not TRefusal)
         {
             throw new SimulationAssertionException(

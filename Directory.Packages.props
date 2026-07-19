@@ -12,6 +12,10 @@
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>
   <ItemGroup>
+    <PackageVersion Include="Anthropic" Version="12.36.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.8.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.8.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.8.0" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Journaling" Version="10.2.2-rc.2.alpha.1" />

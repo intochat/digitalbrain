@@ -14,6 +14,32 @@ public sealed class NeuronSteps(Simulation simulation)
     [Given("a brain for owner {string}")]
     public void GivenABrainForOwner(string owner) => simulation.OpenBrain(owner);
 
+    [BeforeScenario]
+    public static void ForgetPreviousScripts() => SimulationCluster.ForgetScripts();
+
+    [AfterScenario]
+    public void FailOnUnassertedRefusal() => simulation.RethrowUnassertedRefusal();
+
+    [Given("the {word} model answers {string} with {string}")]
+    public static void GivenTheModelAnswers(string tier, string prompt, string answer)
+        => SimulationCluster.Model(Enum.Parse<ModelTier>(tier, ignoreCase: true)).Answer(prompt, answer);
+
+    [Then("the synapse is refused as unscripted")]
+    public void ThenTheSynapseIsRefusedAsUnscripted() => simulation.ExpectRefusal<UnscriptedPromptException>();
+
+    [Then("the {word} neuron named {string} answered {string}")]
+    public async Task ThenTheNeuronAnswered(string neuronType, string name, string expected)
+    {
+        var emitted = await simulation.ReadJournalAsync(JournalKind.Outgoing, neuronType, name);
+        var answers = emitted.OfType<IAnswer>().Select(answer => answer.Text).ToList();
+
+        if (!answers.Contains(expected, StringComparer.Ordinal))
+        {
+            throw new SimulationAssertionException(
+                $"Expected {neuronType} '{name}' to have answered \"{expected}\", but it emitted {(answers.Count == 0 ? "no answer" : string.Join(", ", answers.Select(answer => $"\"{answer}\"")))}.");
+        }
+    }
+
     [When("{word} is sent to the {word} neuron named {string}")]
     public Task WhenSynapseIsSentToNeuron(string synapseType, string neuronType, string name)
         => simulation.SendAsync(synapseType, neuronType, name, new Dictionary<string, string>(StringComparer.Ordinal));

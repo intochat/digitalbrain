@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Journaling;
@@ -144,6 +145,19 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
             .SubscribersAsync(synapse.GetType().FullName!);
 
         await FireAsync(synapse, SynapseMetadata.ForBroadcast(Id, _handling), [.. subscribers]);
+    }
+
+    protected async Task<string> AskModelAsync(ModelTier tier, string prompt, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
+
+        var model = ServiceProvider.GetKeyedService<IChatClient>(tier)
+            ?? throw new InvalidOperationException(
+                $"{GetType().Name} asked for the {tier} model tier, but no model is bound to it. Tiers are bound in AppHost configuration.");
+
+        var answer = await model.GetResponseAsync([new ChatMessage(ChatRole.User, prompt)], options: null, cancellationToken);
+
+        return answer.Text;
     }
 
     private async Task FireAsync(Synapse synapse, SynapseMetadata metadata, NeuronId[] receivers)

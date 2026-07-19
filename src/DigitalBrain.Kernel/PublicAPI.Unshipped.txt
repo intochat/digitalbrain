@@ -1,4 +1,6 @@
 #nullable enable
+const DigitalBrain.ModelDescriptor.AnthropicProvider = "anthropic" -> string!
+const DigitalBrain.ModelDescriptor.OpenAiProvider = "openai" -> string!
 const DigitalBrain.SynapseTelemetry.ActivitySourceName = "DigitalBrain" -> string!
 const DigitalBrain.SynapseTelemetry.CorrelationTag = "db.correlation" -> string!
 const DigitalBrain.SynapseTelemetry.ReceiverTag = "db.receiver" -> string!
@@ -8,7 +10,28 @@ DigitalBrain.DispatchManifest
 DigitalBrain.DispatchManifest.DispatchManifest(System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>! handlers, System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>! emissions) -> void
 DigitalBrain.DispatchManifest.Emissions.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>!
 DigitalBrain.DispatchManifest.Handlers.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>!
+DigitalBrain.ModelBindingExtensions
+DigitalBrain.ModelCatalog
+DigitalBrain.ModelCatalog.Declare(DigitalBrain.ModelDescriptor! descriptor) -> DigitalBrain.ModelCatalog!
+DigitalBrain.ModelCatalog.Declared.get -> System.Collections.Generic.IReadOnlyCollection<DigitalBrain.ModelDescriptor!>!
+DigitalBrain.ModelCatalog.ModelCatalog() -> void
+DigitalBrain.ModelDescriptor
+DigitalBrain.ModelDescriptor.<Clone>$() -> DigitalBrain.ModelDescriptor!
+DigitalBrain.ModelDescriptor.ApiKey.get -> string?
+DigitalBrain.ModelDescriptor.ApiKey.init -> void
+DigitalBrain.ModelDescriptor.Deconstruct(out DigitalBrain.ModelTier Tier, out string! Provider, out string! ModelId) -> void
+DigitalBrain.ModelDescriptor.Endpoint.get -> System.Uri?
+DigitalBrain.ModelDescriptor.Endpoint.init -> void
+DigitalBrain.ModelDescriptor.Equals(DigitalBrain.ModelDescriptor? other) -> bool
+DigitalBrain.ModelDescriptor.ModelDescriptor(DigitalBrain.ModelTier Tier, string! Provider, string! ModelId) -> void
+DigitalBrain.ModelDescriptor.ModelId.get -> string!
+DigitalBrain.ModelDescriptor.ModelId.init -> void
+DigitalBrain.ModelDescriptor.Provider.get -> string!
+DigitalBrain.ModelDescriptor.Provider.init -> void
+DigitalBrain.ModelDescriptor.Tier.get -> DigitalBrain.ModelTier
+DigitalBrain.ModelDescriptor.Tier.init -> void
 DigitalBrain.Neuron
+DigitalBrain.Neuron.AskModelAsync(DigitalBrain.ModelTier tier, string! prompt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<string!>!
 DigitalBrain.Neuron.DeliverAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron.EmitAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron.Id.get -> DigitalBrain.NeuronId
@@ -38,12 +61,18 @@ DigitalBrain.SynapseWiringEntry.Neuron.init -> void
 DigitalBrain.SynapseWiringEntry.Synapse.get -> string!
 DigitalBrain.SynapseWiringEntry.Synapse.init -> void
 DigitalBrain.SynapseWiringEntry.SynapseWiringEntry(string! Neuron, string! Synapse) -> void
+override DigitalBrain.ModelDescriptor.Equals(object? obj) -> bool
+override DigitalBrain.ModelDescriptor.GetHashCode() -> int
+override DigitalBrain.ModelDescriptor.ToString() -> string!
 override DigitalBrain.Neuron.OnActivateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 override DigitalBrain.PinToSiloStrategy.AdditionalInitialize(Orleans.Metadata.GrainProperties! properties) -> void
 override DigitalBrain.SynapseWiringEntry.Equals(object? obj) -> bool
 override DigitalBrain.SynapseWiringEntry.GetHashCode() -> int
 override DigitalBrain.SynapseWiringEntry.ToString() -> string!
 static DigitalBrain.DigitalBrainSiloBuilderExtensions.AddDigitalBrain(this Orleans.Hosting.ISiloBuilder! builder) -> Orleans.Hosting.ISiloBuilder!
+static DigitalBrain.ModelBindingExtensions.AddDigitalBrainModels(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<DigitalBrain.ModelCatalog!>! declare) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static DigitalBrain.ModelDescriptor.operator !=(DigitalBrain.ModelDescriptor? left, DigitalBrain.ModelDescriptor? right) -> bool
+static DigitalBrain.ModelDescriptor.operator ==(DigitalBrain.ModelDescriptor? left, DigitalBrain.ModelDescriptor? right) -> bool
 static DigitalBrain.PinToSiloExtensions.AddPinToSiloPlacement(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static DigitalBrain.SynapseWiring.HandledSynapseTypes(System.Type! neuronType) -> System.Collections.Generic.IReadOnlyCollection<System.Type!>!
 static DigitalBrain.SynapseWiring.TryGetManifest(System.Reflection.Assembly! assembly, out DigitalBrain.DispatchManifest! manifest) -> bool

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Journaling;
@@ -15,8 +15,21 @@ public static class SimulationCluster
     private static readonly string[] SiloLabels = ["alpha", "beta", "gamma"];
 
 
+    private static readonly Dictionary<ModelTier, ScriptedModel> Models =
+        Enum.GetValues<ModelTier>().ToDictionary(tier => tier, _ => new ScriptedModel());
+
     private static InProcessTestCluster? _cluster;
     private static SynapseObserver? _observer;
+
+    public static ScriptedModel Model(ModelTier tier) => Models[tier];
+
+    public static void ForgetScripts()
+    {
+        foreach (var model in Models.Values)
+        {
+            model.Forget();
+        }
+    }
 
     public static IGrainFactory Grains => Deployed().Client;
 
@@ -42,6 +55,11 @@ public static class SimulationCluster
                 ["db.silo"] = LabelOf(options.SiloName),
             });
             silo.Services.AddSingleton<IJournalStorageProvider>(journalStorage);
+
+            foreach (var (tier, model) in Models)
+            {
+                silo.Services.AddKeyedSingleton<IChatClient>(tier, model);
+            }
         });
 
         var cluster = builder.Build();

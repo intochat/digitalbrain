@@ -11,6 +11,8 @@ DigitalBrain.CorrelationId.Deconstruct(out System.Guid Value) -> void
 DigitalBrain.CorrelationId.Equals(DigitalBrain.CorrelationId other) -> bool
 DigitalBrain.CorrelationId.Value.get -> System.Guid
 DigitalBrain.CorrelationId.Value.init -> void
+DigitalBrain.IAnswer
+DigitalBrain.IAnswer.Text.get -> string!
 DigitalBrain.IEmit<TSynapse>
 DigitalBrain.IHandle<TSynapse>
 DigitalBrain.IHandle<TSynapse>.HandleAsync(TSynapse! synapse, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
@@ -24,6 +26,11 @@ DigitalBrain.ISubscriptionRegistry.SubscribersAsync(string! synapseType) -> Syst
 DigitalBrain.JournalKind
 DigitalBrain.JournalKind.Incoming = 0 -> DigitalBrain.JournalKind
 DigitalBrain.JournalKind.Outgoing = 1 -> DigitalBrain.JournalKind
+DigitalBrain.ModelTier
+DigitalBrain.ModelTier.Balanced = 1 -> DigitalBrain.ModelTier
+DigitalBrain.ModelTier.Embedding = 3 -> DigitalBrain.ModelTier
+DigitalBrain.ModelTier.Fast = 0 -> DigitalBrain.ModelTier
+DigitalBrain.ModelTier.Reasoning = 2 -> DigitalBrain.ModelTier
 DigitalBrain.NeuronAuthorizationException
 DigitalBrain.NeuronAuthorizationException.NeuronAuthorizationException() -> void
 DigitalBrain.NeuronAuthorizationException.NeuronAuthorizationException(string! message, System.Exception! innerException) -> void
