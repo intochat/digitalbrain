@@ -413,6 +413,14 @@ referencing it.
       turn; kernel restart; delivery and journals resume; dashboard and DevUI verified; no orphaned
       processes. Optional real-provider run if keys exist.
 - Commit: `test: prove hosted restart recovery`
+- **In progress, not ticked.** Done: the AppHost runs under `Aspire.Hosting.Testing`; a **durable
+  turn** is fired through a real `BrainClient` inside the cluster; the kernel is **restarted** with
+  `ResourceCommands.ExecuteCommandAsync("probe", "resource-restart")`; and the **journals resume** —
+  the turn is still recorded after the restart, replayed from Azure Blob storage, which is the
+  hosted-restart-proof gate. Not done: the scripted provider is not wired into the hosted run;
+  **delivery** resuming after restart is not asserted (that is Decision 19's open redelivery work);
+  the dashboard and DevUI are not verified because they are not built (Decision 26); and
+  "no orphaned processes" is not checked.
 
 ### M10 — Release engineering **[review]**
 - [ ] Pack scripts, deterministic CI build/test/pack/consumer-restore jobs including website
@@ -766,7 +774,21 @@ referencing it.
     steps and Tier 1 correctly uses OTel observation instead; a shipped sample having to poll is
     the clearest possible argument for closing Decision 21.
 
-28. **2026-07-19 — The hosted restart proof is blocked on reaching a proxied silo from outside.**
+28. **2026-07-19 — The hosted proof is driven from inside the cluster, not by an external client.**
+    The first attempt drove the Testing AppHost under `Aspire.Hosting.Testing`, took the
+    `orleans-gateway` endpoint from `app.GetEndpoint("silo", "orleans-gateway")`, and built an
+    external Orleans client so a `BrainClient` could fire a synapse and re-read the journal after a
+    restart. It fails at connection: *"Unable to connect to any of the 1 available gateways …
+    Connection attempt to endpoint S127.0.0.1:64490:0 timed out after 00:00:05"*. Aspire's Orleans
+    integration registers both silo and gateway endpoints with `isProxied: true` (verified in the
+    13.4.6 source), and an Orleans client negotiates against the address the silo *advertises*, not
+    the proxy it was dialled on, so a client outside the DCP network cannot complete the handshake.
+    That attempt was removed rather than left red. The proof now runs the driving code **inside**
+    the cluster, matching what Tier 1 already does: `hosts/DigitalBrain.ProbeHost` is a distinct
+    test-only silo host — the same structural test posture the contract mandates for AppHosts —
+    carrying the probe neurons and a small HTTP surface the test calls. Production
+    `DigitalBrain.Host` keeps no test hooks and is still started and health-checked by the same
+    AppHost, so packaging and resource wiring stay proven against the real host.
     M9 needs a durable turn and a kernel restart on the real host. The attempt drove the Testing
     AppHost under `Aspire.Hosting.Testing`, took the `orleans-gateway` endpoint from
     `app.GetEndpoint("silo", "orleans-gateway")`, and built an external Orleans client against it
@@ -777,12 +799,6 @@ referencing it.
     registers both silo and gateway endpoints with `isProxied: true` (verified in the 13.4.6
     source), and an Orleans client negotiates against the address the silo *advertises*, not the
     proxy it was dialled on — so a client outside the DCP network cannot complete the handshake.
-    The test was **removed rather than left red**. Three routes remain, in preference order:
-    have the Testing AppHost publish an unproxied gateway endpoint; run the driving code *inside*
-    the cluster as a neuron (which is what Tier 1 already does, and would keep the hosted proof
-    free of test hooks in production code); or give the kernel host a real client-facing API and
-    drive the turn over it — the last only if that API is wanted as product surface, since the
-    ratified client path is the Orleans client, not HTTP.
 
 ## Definition of Done
 

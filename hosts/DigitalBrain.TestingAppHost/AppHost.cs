@@ -16,4 +16,9 @@ builder.AddProject<Projects.DigitalBrain_Host>("silo")
     .WithReference(journal)
     .WaitFor(journal);
 
+builder.AddProject<Projects.DigitalBrain_ProbeHost>("probe")
+    .WithReference(brain)
+    .WithReference(journal)
+    .WaitFor(journal);
+
 builder.Build().Run();
