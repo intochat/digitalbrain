@@ -16,7 +16,7 @@ so.
 | Multi-silo delivery and recovery | done |
 | AI model binding | done |
 | Client package | done |
-| Aspire integration | not started |
+| Aspire integration | done |
 | Hosts, dev tools, quickstart | not started |
 | Hosted restart proof | not started |
 | Release engineering | not started |
