@@ -9,6 +9,7 @@
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
+    <PackageReference Include="Microsoft.Orleans.Journaling.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Reminders" />
     <PackageReference Include="Microsoft.Orleans.Server" />
   </ItemGroup>

@@ -5,6 +5,8 @@
 ~override DigitalBrain.SynapseId.Equals(object obj) -> bool
 abstract DigitalBrain.Synapse.<Clone>$() -> DigitalBrain.Synapse!
 const DigitalBrain.ISessionNeuron.GrainTypeName = "sessionneuron" -> string!
+const DigitalBrain.ModelProviders.Anthropic = "anthropic" -> string!
+const DigitalBrain.ModelProviders.OpenAi = "openai" -> string!
 DigitalBrain.CorrelationId
 DigitalBrain.CorrelationId.CorrelationId() -> void
 DigitalBrain.CorrelationId.CorrelationId(System.Guid Value) -> void
@@ -29,6 +31,7 @@ DigitalBrain.ISubscriptionRegistry.SubscribersAsync(string! synapseType) -> Syst
 DigitalBrain.JournalKind
 DigitalBrain.JournalKind.Incoming = 0 -> DigitalBrain.JournalKind
 DigitalBrain.JournalKind.Outgoing = 1 -> DigitalBrain.JournalKind
+DigitalBrain.ModelProviders
 DigitalBrain.ModelTier
 DigitalBrain.ModelTier.Balanced = 1 -> DigitalBrain.ModelTier
 DigitalBrain.ModelTier.Embedding = 3 -> DigitalBrain.ModelTier

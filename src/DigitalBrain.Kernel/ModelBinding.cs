@@ -8,9 +8,9 @@ namespace DigitalBrain;
 
 public sealed record ModelDescriptor(ModelTier Tier, string Provider, string ModelId)
 {
-    public const string OpenAiProvider = "openai";
+    public const string OpenAiProvider = ModelProviders.OpenAi;
 
-    public const string AnthropicProvider = "anthropic";
+    public const string AnthropicProvider = ModelProviders.Anthropic;
 
     public string? ApiKey { get; init; }
 

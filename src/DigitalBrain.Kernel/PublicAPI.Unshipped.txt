@@ -1,4 +1,5 @@
 #nullable enable
+const DigitalBrain.JournalStorageHosting.ConnectionStringName = "journal" -> string!
 const DigitalBrain.ModelConfiguration.SectionName = "DigitalBrain:Models" -> string!
 const DigitalBrain.ModelDescriptor.AnthropicProvider = "anthropic" -> string!
 const DigitalBrain.ModelDescriptor.OpenAiProvider = "openai" -> string!
@@ -11,6 +12,7 @@ DigitalBrain.DispatchManifest
 DigitalBrain.DispatchManifest.DispatchManifest(System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>! handlers, System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>! emissions) -> void
 DigitalBrain.DispatchManifest.Emissions.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>!
 DigitalBrain.DispatchManifest.Handlers.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>!
+DigitalBrain.JournalStorageHosting
 DigitalBrain.ModelBindingExtensions
 DigitalBrain.ModelCatalog
 DigitalBrain.ModelCatalog.Declare(DigitalBrain.ModelDescriptor! descriptor) -> DigitalBrain.ModelCatalog!
@@ -72,6 +74,7 @@ override DigitalBrain.SynapseWiringEntry.Equals(object? obj) -> bool
 override DigitalBrain.SynapseWiringEntry.GetHashCode() -> int
 override DigitalBrain.SynapseWiringEntry.ToString() -> string!
 static DigitalBrain.DigitalBrainSiloBuilderExtensions.AddDigitalBrain(this Orleans.Hosting.ISiloBuilder! builder) -> Orleans.Hosting.ISiloBuilder!
+static DigitalBrain.JournalStorageHosting.AddDigitalBrainJournalStorage(this Orleans.Hosting.ISiloBuilder! builder, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Orleans.Hosting.ISiloBuilder!
 static DigitalBrain.ModelBindingExtensions.AddDigitalBrainModels(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<DigitalBrain.ModelCatalog!>! declare) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static DigitalBrain.ModelConfiguration.AddDigitalBrainModels(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static DigitalBrain.ModelDescriptor.operator !=(DigitalBrain.ModelDescriptor? left, DigitalBrain.ModelDescriptor? right) -> bool

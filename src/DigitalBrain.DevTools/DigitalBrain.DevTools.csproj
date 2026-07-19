@@ -3,4 +3,7 @@
     <IsPackable>true</IsPackable>
     <Description>Development-time dashboards and diagnostics for DigitalBrain hosts.</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
 </Project>

@@ -9,6 +9,10 @@
     <Project Path="src/DigitalBrain.DevTools/DigitalBrain.DevTools.csproj" />
     <Project Path="src/DigitalBrain.SourceGeneration/DigitalBrain.SourceGeneration.csproj" />
   </Folder>
+  <Folder Name="/hosts/">
+    <Project Path="hosts/DigitalBrain.Host/DigitalBrain.Host.csproj" />
+    <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Simulations/DigitalBrain.Simulations.csproj" />

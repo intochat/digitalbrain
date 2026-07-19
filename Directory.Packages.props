@@ -14,6 +14,7 @@
   <ItemGroup>
     <PackageVersion Include="Anthropic" Version="12.36.0" />
     <PackageVersion Include="Aspire.Hosting" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.8.0" />
@@ -23,6 +24,7 @@
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Journaling" Version="10.2.2-rc.2.alpha.1" />
+    <PackageVersion Include="Microsoft.Orleans.Journaling.AzureStorage" Version="10.2.2-rc.2.alpha.1" />
     <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.2-rc.2" />
