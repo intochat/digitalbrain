@@ -7,6 +7,13 @@ internal static class DotnetCli
     public static (int ExitCode, string Output) Run(
         string workingDirectory,
         IReadOnlyDictionary<string, string>? environment,
+        params string[] arguments) =>
+        Run(workingDirectory, environment, TimeSpan.FromMinutes(10), arguments);
+
+    public static (int ExitCode, string Output) Run(
+        string workingDirectory,
+        IReadOnlyDictionary<string, string>? environment,
+        TimeSpan timeout,
         params string[] arguments)
     {
         var startInfo = new ProcessStartInfo("dotnet")
@@ -27,7 +34,13 @@ internal static class DotnetCli
             ?? throw new InvalidOperationException("Failed to start the dotnet CLI.");
         var standardOutput = process.StandardOutput.ReadToEndAsync();
         var standardError = process.StandardError.ReadToEndAsync();
-        process.WaitForExit();
+        if (!process.WaitForExit((int)timeout.TotalMilliseconds))
+        {
+            process.Kill(entireProcessTree: true);
+            process.WaitForExit();
+            throw new TimeoutException(
+                $"dotnet {string.Join(' ', arguments)} exceeded {timeout}.");
+        }
         return (process.ExitCode, standardOutput.Result + standardError.Result);
     }
 

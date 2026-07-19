@@ -1,0 +1,15 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net11.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="DigitalBrain.Aspire.Hosting" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Quickstart.Console\DigitalBrain.Quickstart.Console.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Quickstart.DevUI\DigitalBrain.Quickstart.DevUI.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Quickstart.Kernel\DigitalBrain.Quickstart.Kernel.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Quickstart.OrleansDashboard\DigitalBrain.Quickstart.OrleansDashboard.csproj" />
+  </ItemGroup>
+</Project>

@@ -440,26 +440,29 @@ dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 
 **Implementation:**
 
-- [ ] Create the five small consumer projects.
-- [ ] Use only `PackageReference` for DigitalBrain.
-- [ ] Add the interactive console loop.
-- [ ] Add the explicit `digitalbrain-owner` Development parameter and owner-session creation; never bypass the owner call filters.
-- [ ] Add development-only dashboard and DevUI projects.
-- [ ] Add a two-command README and troubleshooting.
-- [ ] Add local package feed orchestration.
-- [ ] Ensure the sample never calls provider SDKs directly.
+- [x] Create the five small consumer projects.
+- [x] Use only `PackageReference` for DigitalBrain.
+- [x] Add the interactive console loop.
+- [x] Add the explicit `digitalbrain-owner` Development parameter and owner-session creation; never bypass the owner call filters.
+- [x] Add development-only dashboard and DevUI projects.
+- [x] Add a two-command README and troubleshooting.
+- [x] Add local package feed orchestration.
+- [x] Ensure the sample never calls provider SDKs directly.
 
 **Gates:**
 
 ```powershell
 .\eng\pack.ps1
 .\eng\test-quickstart.ps1
-aspire publish --apphost .\samples\DigitalBrain.Quickstart\DigitalBrain.Quickstart.AppHost\DigitalBrain.Quickstart.AppHost.csproj --output-path .\artifacts\quickstart-publish --non-interactive
 ```
+
+**Operator scope amendment (2026-07-19):** Publishing is deferred. The quickstart remains Development-only, and the `aspire publish` gate was not run.
 
 **Review focus:** true package consumption, setup simplicity, secret flow, and direct provider bypasses.
 
 **Commit:** `samples: add DigitalBrain package quickstart`
+
+**Execution record (2026-07-19):** Baseline HEAD was `5559dd1ffc306b428830af01534a5512058344b1` on `master`. The operator explicitly deferred publishing, so the task was completed as a Development-only package-consumer quickstart and the `aspire publish` gate was removed without publishing or deployment. Five small consumer projects restore only the six locally packed `DigitalBrain.*` packages, keep every framework reference behind `PackageReference`, expose the full typed DigitalBrain AppHost model, create the explicit owner session before restricted client resolution, and provide deterministic interactive console commands plus Development-only Dashboard and DevUI hosts. The two-command runner streams provider prompts, starts the AppHost detached, probes and stops the explicit console resource before launching the real console in the foreground, restores the caller environment, and tears down partial starts by normalized AppHost path; an executable shim matrix verifies command order, environment forwarding and restoration, visible prompts, start failures, cleanup-probe failures, stop failures, combined error propagation, and orphan prevention. Restore and build are proven from a copied sample, an isolated NuGet cache, and the local package feed with package-source provenance checks. Three independent final reviews covered Aspire lifecycle behavior, package isolation, and security/secret boundaries; all actionable P0-P2 findings were fixed, and all final reviews reported no remaining P0-P2 findings. `eng/pack.ps1` produced six validated packages and six symbol packages, `eng/test-quickstart.ps1` passed 30 / 30, the documented real flow reached the kernel, exercised the explicit console probe, connected the foreground console through Orleans, accepted `/exit`, and stopped cleanly with synthetic credentials, the Release solution build completed with zero warnings or errors, and the exact root checkpoint passed DigitalBrain.Tests 245 / 245, DigitalBrain.PackageTests 30 / 30, and Brain.FeasibilityTests 13 / 13. `aspire doctor` passed 5 / 5, Aspire inspection confirmed no running AppHost, and comment, generated-artifact, and `git diff --check` scans passed.
 
 ## Task 9: Prove live framework behavior and restart recovery
 
