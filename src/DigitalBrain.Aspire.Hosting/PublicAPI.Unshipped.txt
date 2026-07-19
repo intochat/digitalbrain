@@ -1,1 +1,13 @@
 #nullable enable
+const DigitalBrain.BrainHostingExtensions.ModelConfigurationPrefix = "DigitalBrain__Models" -> string!
+DigitalBrain.BrainClientService
+DigitalBrain.BrainHostingExtensions
+DigitalBrain.BrainService
+DigitalBrain.BrainService.AsClient() -> DigitalBrain.BrainClientService!
+DigitalBrain.BrainService.Builder.get -> Aspire.Hosting.IDistributedApplicationBuilder!
+DigitalBrain.BrainService.Name.get -> string!
+DigitalBrain.BrainService.WithModel(DigitalBrain.ModelTier tier, string! provider, string! modelId, Aspire.Hosting.ApplicationModel.IResourceBuilder<Aspire.Hosting.ApplicationModel.ParameterResource!>! apiKey) -> DigitalBrain.BrainService!
+static DigitalBrain.BrainHostingExtensions.AddBrain(this Aspire.Hosting.IDistributedApplicationBuilder! builder, string! name) -> DigitalBrain.BrainService!
+static DigitalBrain.BrainHostingExtensions.WithDevelopmentStores(this DigitalBrain.BrainService! brain) -> DigitalBrain.BrainService!
+static DigitalBrain.BrainHostingExtensions.WithReference<T>(this Aspire.Hosting.ApplicationModel.IResourceBuilder<T>! builder, DigitalBrain.BrainClientService! client) -> Aspire.Hosting.ApplicationModel.IResourceBuilder<T>!
+static DigitalBrain.BrainHostingExtensions.WithReference<T>(this Aspire.Hosting.ApplicationModel.IResourceBuilder<T>! builder, DigitalBrain.BrainService! brain) -> Aspire.Hosting.ApplicationModel.IResourceBuilder<T>!

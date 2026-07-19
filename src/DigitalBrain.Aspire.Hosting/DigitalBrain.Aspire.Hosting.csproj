@@ -3,4 +3,11 @@
     <IsPackable>true</IsPackable>
     <Description>The DigitalBrain brain resource for Aspire AppHosts: Orleans, storage, and model tiers composed as one resource.</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting" />
+    <PackageReference Include="Aspire.Hosting.Orleans" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
+  </ItemGroup>
 </Project>
