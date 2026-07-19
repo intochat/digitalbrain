@@ -707,9 +707,17 @@ referencing it.
     about twelve seconds. An HTTP probe of the silo's `/health` endpoint was written and **removed
     rather than left red**: the endpoint resolves once the host declares a launch profile, but the
     request times out even though Aspire reports the resource healthy, so the silo is reaching
-    "healthy" without serving. **Open work:** diagnose that (read the silo's resource logs through
-    `ResourceLoggerService`), restore the HTTP assertion, and then build M9's real Tier-2 proof —
-    a durable turn, a kernel restart, and delivery resuming.
+    "healthy" without serving. Diagnosis so far, so the next session does not repeat it: running
+    the Testing AppHost directly shows a clean start — DCP, the dashboard, Azurite and the silo all
+    come up with nothing on stderr — and a project resource with no health check reports "healthy"
+    on *running*, not on serving, so the green Tier-2 assertion is weaker than it looks.
+    `ResourceLoggerService.WatchAsync("silo")` returned no lines in twenty seconds, so silo output
+    is not reachable by resource name that way. The leading hypothesis is that Orleans silo startup
+    blocks the host before Kestrel begins listening (a clustering wait would look exactly like
+    this: process alive, port closed). **Open work:** confirm by reading the silo's log stream by
+    resource id or through the dashboard's OTLP endpoint, fix the startup ordering, restore the
+    HTTP assertion, and only then build M9's real Tier-2 proof — a durable turn, a kernel restart,
+    and delivery resuming.
 
 ## Definition of Done
 
