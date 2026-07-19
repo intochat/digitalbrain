@@ -1,1 +1,109 @@
 #nullable enable
+~override DigitalBrain.CorrelationId.Equals(object obj) -> bool
+~override DigitalBrain.NeuronId.Equals(object obj) -> bool
+~override DigitalBrain.OwnerId.Equals(object obj) -> bool
+~override DigitalBrain.SynapseId.Equals(object obj) -> bool
+abstract DigitalBrain.Synapse.<Clone>$() -> DigitalBrain.Synapse!
+DigitalBrain.CorrelationId
+DigitalBrain.CorrelationId.CorrelationId() -> void
+DigitalBrain.CorrelationId.CorrelationId(System.Guid Value) -> void
+DigitalBrain.CorrelationId.Deconstruct(out System.Guid Value) -> void
+DigitalBrain.CorrelationId.Equals(DigitalBrain.CorrelationId other) -> bool
+DigitalBrain.CorrelationId.Value.get -> System.Guid
+DigitalBrain.CorrelationId.Value.init -> void
+DigitalBrain.IEmit<TSynapse>
+DigitalBrain.IHandle<TSynapse>
+DigitalBrain.IHandle<TSynapse>.HandleAsync(TSynapse! synapse, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.INeuron
+DigitalBrain.INeuron.DeliverAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.INeuron.ReadJournalAsync(DigitalBrain.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
+DigitalBrain.JournalKind
+DigitalBrain.JournalKind.Incoming = 0 -> DigitalBrain.JournalKind
+DigitalBrain.JournalKind.Outgoing = 1 -> DigitalBrain.JournalKind
+DigitalBrain.NeuronAuthorizationException
+DigitalBrain.NeuronAuthorizationException.NeuronAuthorizationException() -> void
+DigitalBrain.NeuronAuthorizationException.NeuronAuthorizationException(string! message, System.Exception! innerException) -> void
+DigitalBrain.NeuronAuthorizationException.NeuronAuthorizationException(string! message) -> void
+DigitalBrain.NeuronId
+DigitalBrain.NeuronId.Equals(DigitalBrain.NeuronId other) -> bool
+DigitalBrain.NeuronId.GrainKey.get -> string!
+DigitalBrain.NeuronId.Name.get -> string!
+DigitalBrain.NeuronId.NeuronId() -> void
+DigitalBrain.NeuronId.NeuronId(string! type, DigitalBrain.OwnerId owner, string! name) -> void
+DigitalBrain.NeuronId.Owner.get -> DigitalBrain.OwnerId
+DigitalBrain.NeuronId.Type.get -> string!
+DigitalBrain.OwnerId
+DigitalBrain.OwnerId.Equals(DigitalBrain.OwnerId other) -> bool
+DigitalBrain.OwnerId.OwnerId() -> void
+DigitalBrain.OwnerId.OwnerId(string! value) -> void
+DigitalBrain.OwnerId.Value.get -> string!
+DigitalBrain.RoutingMode
+DigitalBrain.RoutingMode.Broadcast = 1 -> DigitalBrain.RoutingMode
+DigitalBrain.RoutingMode.PointToPoint = 0 -> DigitalBrain.RoutingMode
+DigitalBrain.Synapse
+DigitalBrain.Synapse.Metadata.get -> DigitalBrain.SynapseMetadata?
+DigitalBrain.Synapse.Metadata.init -> void
+DigitalBrain.Synapse.Stamped.get -> DigitalBrain.SynapseMetadata!
+DigitalBrain.Synapse.Synapse() -> void
+DigitalBrain.Synapse.Synapse(DigitalBrain.Synapse! original) -> void
+DigitalBrain.SynapseId
+DigitalBrain.SynapseId.Deconstruct(out System.Guid Value) -> void
+DigitalBrain.SynapseId.Equals(DigitalBrain.SynapseId other) -> bool
+DigitalBrain.SynapseId.SynapseId() -> void
+DigitalBrain.SynapseId.SynapseId(System.Guid Value) -> void
+DigitalBrain.SynapseId.Value.get -> System.Guid
+DigitalBrain.SynapseId.Value.init -> void
+DigitalBrain.SynapseMetadata
+DigitalBrain.SynapseMetadata.<Clone>$() -> DigitalBrain.SynapseMetadata!
+DigitalBrain.SynapseMetadata.Caller.get -> DigitalBrain.NeuronId
+DigitalBrain.SynapseMetadata.Caller.init -> void
+DigitalBrain.SynapseMetadata.CausationId.get -> DigitalBrain.SynapseId?
+DigitalBrain.SynapseMetadata.CausationId.init -> void
+DigitalBrain.SynapseMetadata.CorrelationId.get -> DigitalBrain.CorrelationId
+DigitalBrain.SynapseMetadata.CorrelationId.init -> void
+DigitalBrain.SynapseMetadata.Deconstruct(out DigitalBrain.SynapseId SynapseId, out DigitalBrain.CorrelationId CorrelationId, out DigitalBrain.SynapseId? CausationId, out DigitalBrain.NeuronId Caller, out DigitalBrain.NeuronId? Receiver, out DigitalBrain.RoutingMode RoutingMode, out System.DateTimeOffset Timestamp) -> void
+DigitalBrain.SynapseMetadata.Equals(DigitalBrain.SynapseMetadata? other) -> bool
+DigitalBrain.SynapseMetadata.Receiver.get -> DigitalBrain.NeuronId?
+DigitalBrain.SynapseMetadata.Receiver.init -> void
+DigitalBrain.SynapseMetadata.RoutingMode.get -> DigitalBrain.RoutingMode
+DigitalBrain.SynapseMetadata.RoutingMode.init -> void
+DigitalBrain.SynapseMetadata.SynapseId.get -> DigitalBrain.SynapseId
+DigitalBrain.SynapseMetadata.SynapseId.init -> void
+DigitalBrain.SynapseMetadata.SynapseMetadata(DigitalBrain.SynapseId SynapseId, DigitalBrain.CorrelationId CorrelationId, DigitalBrain.SynapseId? CausationId, DigitalBrain.NeuronId Caller, DigitalBrain.NeuronId? Receiver, DigitalBrain.RoutingMode RoutingMode, System.DateTimeOffset Timestamp) -> void
+DigitalBrain.SynapseMetadata.Timestamp.get -> System.DateTimeOffset
+DigitalBrain.SynapseMetadata.Timestamp.init -> void
+override DigitalBrain.CorrelationId.GetHashCode() -> int
+override DigitalBrain.CorrelationId.ToString() -> string!
+override DigitalBrain.NeuronId.GetHashCode() -> int
+override DigitalBrain.NeuronId.ToString() -> string!
+override DigitalBrain.OwnerId.GetHashCode() -> int
+override DigitalBrain.OwnerId.ToString() -> string!
+override DigitalBrain.Synapse.Equals(object? obj) -> bool
+override DigitalBrain.Synapse.GetHashCode() -> int
+override DigitalBrain.Synapse.ToString() -> string!
+override DigitalBrain.SynapseId.GetHashCode() -> int
+override DigitalBrain.SynapseId.ToString() -> string!
+override DigitalBrain.SynapseMetadata.Equals(object? obj) -> bool
+override DigitalBrain.SynapseMetadata.GetHashCode() -> int
+override DigitalBrain.SynapseMetadata.ToString() -> string!
+static DigitalBrain.CorrelationId.New() -> DigitalBrain.CorrelationId
+static DigitalBrain.CorrelationId.operator !=(DigitalBrain.CorrelationId left, DigitalBrain.CorrelationId right) -> bool
+static DigitalBrain.CorrelationId.operator ==(DigitalBrain.CorrelationId left, DigitalBrain.CorrelationId right) -> bool
+static DigitalBrain.NeuronId.FromGrainKey(string! type, string! grainKey) -> DigitalBrain.NeuronId
+static DigitalBrain.NeuronId.operator !=(DigitalBrain.NeuronId left, DigitalBrain.NeuronId right) -> bool
+static DigitalBrain.NeuronId.operator ==(DigitalBrain.NeuronId left, DigitalBrain.NeuronId right) -> bool
+static DigitalBrain.OwnerId.operator !=(DigitalBrain.OwnerId left, DigitalBrain.OwnerId right) -> bool
+static DigitalBrain.OwnerId.operator ==(DigitalBrain.OwnerId left, DigitalBrain.OwnerId right) -> bool
+static DigitalBrain.Synapse.operator !=(DigitalBrain.Synapse? left, DigitalBrain.Synapse? right) -> bool
+static DigitalBrain.Synapse.operator ==(DigitalBrain.Synapse? left, DigitalBrain.Synapse? right) -> bool
+static DigitalBrain.SynapseId.New() -> DigitalBrain.SynapseId
+static DigitalBrain.SynapseId.operator !=(DigitalBrain.SynapseId left, DigitalBrain.SynapseId right) -> bool
+static DigitalBrain.SynapseId.operator ==(DigitalBrain.SynapseId left, DigitalBrain.SynapseId right) -> bool
+static DigitalBrain.SynapseMetadata.ForBroadcast(DigitalBrain.NeuronId caller, DigitalBrain.SynapseMetadata? cause = null, System.TimeProvider? timeProvider = null) -> DigitalBrain.SynapseMetadata!
+static DigitalBrain.SynapseMetadata.ForReply(DigitalBrain.NeuronId caller, DigitalBrain.SynapseMetadata! cause, System.TimeProvider? timeProvider = null) -> DigitalBrain.SynapseMetadata!
+static DigitalBrain.SynapseMetadata.ForSend(DigitalBrain.NeuronId caller, DigitalBrain.NeuronId receiver, DigitalBrain.SynapseMetadata? cause = null, System.TimeProvider? timeProvider = null) -> DigitalBrain.SynapseMetadata!
+static DigitalBrain.SynapseMetadata.operator !=(DigitalBrain.SynapseMetadata? left, DigitalBrain.SynapseMetadata? right) -> bool
+static DigitalBrain.SynapseMetadata.operator ==(DigitalBrain.SynapseMetadata? left, DigitalBrain.SynapseMetadata? right) -> bool
+virtual DigitalBrain.Synapse.EqualityContract.get -> System.Type!
+virtual DigitalBrain.Synapse.Equals(DigitalBrain.Synapse? other) -> bool
+virtual DigitalBrain.Synapse.PrintMembers(System.Text.StringBuilder! builder) -> bool

@@ -423,6 +423,58 @@ referencing it.
     per-scenario session object via Reqnroll's `IObjectContainer`. v1's chat/card/LLM step
     families are cut as product vocabulary; the deterministic scripted AI provider gets its own
     minimal steps at M5.
+12. **2026-07-19 — Journaling API verified at the pin, and the two suppressions it forces.**
+    `Microsoft.Orleans.Journaling 10.2.2-rc.2.alpha.1` ships from the same commit as the
+    `v10.2.2-rc.2` tag (nuspec repository commit matches the tag SHA), and its Orleans core
+    dependencies are pinned to `10.2.2-rc.2` — they unify with `Microsoft.Orleans.Server`. The M1
+    drift flag was correct: the prototype-era names are gone
+    (`IStateMachineManager`/`IStateMachineStorage`/`IStateMachineStorageProvider` are now
+    `IJournaledStateManager`/`IJournalStorage`/`IJournalStorageProvider`). Consequences recorded
+    here because they change earlier decisions:
+    (a) **`ORLEANSEXP005` is suppressed** in every project touching journaling
+    (`DigitalBrain.Kernel`, `DigitalBrain.Testing`, and the test projects). Justification: the
+    package carries an assembly-wide `[Experimental("ORLEANSEXP005")]`, so every type in it trips
+    the diagnostic; the contract mandates official Orleans journaling and forbids a custom
+    provider, leaving no alternative. Orleans suppresses the same id in its own csproj. This is a
+    project-level `NoWarn`, never a global one (v1's blanket suppression is the anti-pattern).
+    (b) **Journals are `IDurableList<Synapse>`, not `IDurableQueue<Synapse>`.** The verified
+    `IDurableQueue<T>` surface is head-only FIFO with no indexer, `Remove`, or `RemoveAt`, so
+    retiring an acknowledged outbox entry by id would require draining and re-enqueuing the whole
+    queue, journaling a command per operation. `IDurableList<T>` inherits `IList<T>` and supports
+    targeted removal — required by Decision 6's per-subscriber pruning.
+    (c) The shared volatile store Decision 10 requires is exactly the official fixture pattern:
+    `VolatileJournalStorageProvider` is public, sealed, `new`-able, and keeps its journals in an
+    **instance** `ConcurrentDictionary` guarded by per-store locks with no per-silo or thread
+    affinity. One instance registered into every silo of a `TestCluster`
+    (`AddSingleton(instance)` — registering the *type* would silently give each silo its own
+    store) survives in-cluster silo restarts, which is what makes `@durability` scenarios real.
+    (d) `AddJournalStorage()` registers no storage provider; a silo without an explicit
+    `IJournalStorageProvider` fails at first activation, not at startup. Host wiring must always
+    register one.
+    (e) Known blocker for later: every durable type's `DeepCopy()` throws `NotImplementedException`
+    at this pin, so grain migration/rehydration paths are unavailable. Nothing in v2 depends on
+    grain migration; if that changes, this pin must be revisited.
+13. **2026-07-19 — Journal payloads are Orleans-serialized bytes, not JSON-serialized synapses.**
+    Amends Decision 10's "JSON journal format" once the format's real constraint surfaced: the JSON
+    journal resolves types through a source-generated `JsonSerializerContext` only — a framework
+    cannot enumerate consumer-defined synapse types at build time, and System.Text.Json would
+    serialize a `Synapse`-typed value by its declared type, silently losing every derived field.
+    So the journals are `IDurableList<byte[]>` and the synapse itself is encoded by Orleans'
+    `Serializer<Synapse>`, which is exactly what the pinned `[Alias]`es of Decision 5 exist for:
+    polymorphism, versioning, and deliberate wire compatibility all stay on Orleans' serializer.
+    The JSON journal format is retained (it is the supported forward format; OrleansBinary is
+    marked legacy) and `DigitalBrain.Kernel` owns the `JsonSerializerContext` covering the
+    primitives the journaling internals write plus `byte[]`. Silo wiring is a single
+    `siloBuilder.AddDigitalBrain()` so the storage and format are never configured by hand.
+14. **2026-07-19 — Analyzer suppressions, with justification (Quality Bar requires recording).**
+    `CA2007` (ConfigureAwait) is disabled in `DigitalBrain.Kernel`, `DigitalBrain.Testing`, and
+    the simulation project: Orleans runs each activation on its own scheduler, and
+    `ConfigureAwait(false)` would move continuations off the grain context — the rule is actively
+    harmful in grain code. `CA1812` (uninstantiated internal class) is disabled in the simulation
+    project because Orleans activates grain classes reflectively. `CA1040` (empty interface) is
+    suppressed on `IEmit<TSynapse>` alone, at the declaration, because the contract's Mission
+    defines it as a marker the dispatch manifest reads. All are project- or declaration-scoped;
+    none is global.
 
 ## Definition of Done
 

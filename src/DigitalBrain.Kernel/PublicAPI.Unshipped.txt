@@ -1,1 +1,10 @@
 #nullable enable
+DigitalBrain.DigitalBrainSiloBuilderExtensions
+DigitalBrain.Neuron
+DigitalBrain.Neuron.DeliverAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.Neuron.Id.get -> DigitalBrain.NeuronId
+DigitalBrain.Neuron.Incoming.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!
+DigitalBrain.Neuron.Neuron() -> void
+DigitalBrain.Neuron.Outgoing.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!
+DigitalBrain.Neuron.ReadJournalAsync(DigitalBrain.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
+static DigitalBrain.DigitalBrainSiloBuilderExtensions.AddDigitalBrain(this Orleans.Hosting.ISiloBuilder! builder) -> Orleans.Hosting.ISiloBuilder!
