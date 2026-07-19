@@ -362,6 +362,16 @@ referencing it.
       tests, publish-manifest gate. `DigitalBrain.Aspire`: `IHostApplicationBuilder` client
       integration. Structural Testing AppHost for Tier 2.
 - Commit: `feat: add Aspire hosting and client integrations`
+- **In progress, not ticked.** Landed in `5a6ef732`: `DigitalBrain.Aspire.Hosting` with the brain
+  resource composing Orleans plus separate development stores per concern (clustering, a `journal`
+  grain store, reminders), fluent `WithModel(tier, provider, modelId, secretParameter)` tier
+  declarations, a privileged `WithReference(brain)` silo projection, a `brain.AsClient()` client
+  projection, and secret-leakage tests; `DigitalBrain.Aspire` with
+  `AddDigitalBrainClient(owner)` over `IHostApplicationBuilder`; and the configuration bridge that
+  turns the AppHost's projected environment back into kernel `ModelDescriptor`s, proven by a
+  round-trip test. **Remaining:** the publish-manifest gate and the structural Testing AppHost for
+  Tier 2 — the latter needs the silo host that M8 builds, so it lands with M8. Gates at this point:
+  root `dotnet test .\DigitalBrain.slnx -c Release` exit 0, 71 Tier-0 + 22 Tier-1.
 
 ### M8 — Hosts, dev tools, quickstart **[review]**
 - [ ] Public kernel host on official durability (no localhost clustering or in-memory reminders in
@@ -662,6 +672,23 @@ referencing it.
     Testing Architecture's hard rules forbid. **Open work:** publish the Decision 6 timeline as a
     client-consumable stream (or give `FireAsync` a completion), then restore the observe half of
     M6's box. Until then the client's honest surface is fire-and-read, and M6's box says so.
+
+22. **2026-07-19 — Orleans' own `AsClient()` leaks provider connection strings, so the brain builds
+    its own client projection.** Verified in `Aspire.Hosting.Orleans` 13.4.6 at tag `v13.4.6`:
+    `AsClient()` only wraps the same `OrleansService`, and the client path still runs Clustering,
+    Streaming and BroadcastChannel through `ProviderConfiguration.ConfigureResource`, whose last
+    line calls `WithReference(resource)` and injects the provider's **full connection string** as
+    `ConnectionStrings__<provider>` into every client. It withholds only reminders, grain storage,
+    grain directory and the two TCP endpoints. That directly contradicts this contract's security
+    boundary ("`brain.AsClient()` exposes only Orleans client discovery and safe metadata"), so the
+    brain never lets a model binding reach the client projection: tier declarations and their
+    secret parameters are carried only by the privileged `WithReference(brain)`, and Tier-0 tests
+    assert the client projection contains no `DigitalBrain__Models__*` key and no secret literal
+    while still carrying `Orleans__ClusterId`. **Open work:** the development stores are memory
+    providers with non-secret connection strings, so Orleans' own leak is inert today; when M8
+    introduces durable stores with credentialed connection strings, the client projection must stop
+    delegating to `OrleansService.AsClient()` and emit cluster discovery itself, and the
+    secret-leakage test must be extended to assert no `ConnectionStrings__*` reaches a client.
 
 ## Definition of Done
 
