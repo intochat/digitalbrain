@@ -2,8 +2,10 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Development-time dashboards and diagnostics for DigitalBrain hosts.</Description>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Journaling" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 </Project>

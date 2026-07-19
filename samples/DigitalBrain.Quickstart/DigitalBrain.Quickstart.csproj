@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1812</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="DigitalBrain.Abstractions" Version="0.1.0-alpha.1" />
+    <PackageReference Include="DigitalBrain.Client" Version="0.1.0-alpha.1" />
+    <PackageReference Include="DigitalBrain.DevTools" Version="0.1.0-alpha.1" />
+    <PackageReference Include="DigitalBrain.Kernel" Version="0.1.0-alpha.1" />
+    <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.2-rc.2" />
+  </ItemGroup>
+</Project>

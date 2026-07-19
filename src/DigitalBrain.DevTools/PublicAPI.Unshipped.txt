@@ -1,3 +1,5 @@
 #nullable enable
+DigitalBrain.DevelopmentJournalStorage
 DigitalBrain.DevToolsHosting
+static DigitalBrain.DevelopmentJournalStorage.AddDevelopmentJournalStorage(this Orleans.Hosting.ISiloBuilder! builder) -> Orleans.Hosting.ISiloBuilder!
 static DigitalBrain.DevToolsHosting.UseDigitalBrainDevTools(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!

@@ -6,6 +6,7 @@ DigitalBrain.BrainClient.FireAsync(string! neuronType, string! name, DigitalBrai
 DigitalBrain.BrainClient.Neuron(string! neuronType, string! name) -> DigitalBrain.NeuronHandle!
 DigitalBrain.BrainClient.Neuron<TNeuron>(string! name) -> DigitalBrain.NeuronHandle!
 DigitalBrain.BrainClient.Owner.get -> DigitalBrain.OwnerId
+DigitalBrain.BrainClient.Session.get -> DigitalBrain.NeuronHandle!
 DigitalBrain.NeuronHandle
 DigitalBrain.NeuronHandle.Id.get -> DigitalBrain.NeuronId
 DigitalBrain.NeuronHandle.NeuronHandle(Orleans.IGrainFactory! grains, DigitalBrain.NeuronId id) -> void

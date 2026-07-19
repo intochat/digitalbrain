@@ -18,13 +18,16 @@ public sealed class BrainClient(IGrainFactory grains, OwnerId owner)
         where TNeuron : INeuron
         => new(grains, NeuronId.For<TNeuron>(Owner, name));
 
-    public Task FireAsync(NeuronId receiver, Synapse synapse) => Session().FireAsync(receiver, synapse);
+    public NeuronHandle Session => new(grains, SessionId);
+
+    public Task FireAsync(NeuronId receiver, Synapse synapse) => SessionNeuron().FireAsync(receiver, synapse);
 
     public Task FireAsync(string neuronType, string name, Synapse synapse)
         => FireAsync(new NeuronId(neuronType, Owner, name), synapse);
 
-    private ISessionNeuron Session()
-        => grains.GetGrain<ISessionNeuron>(new NeuronId(ISessionNeuron.GrainTypeName, Owner, SessionName).ToGrainId());
+    private NeuronId SessionId => new(ISessionNeuron.GrainTypeName, Owner, SessionName);
+
+    private ISessionNeuron SessionNeuron() => grains.GetGrain<ISessionNeuron>(SessionId.ToGrainId());
 }
 
 public sealed class NeuronHandle(IGrainFactory grains, NeuronId id)
