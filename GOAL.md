@@ -357,12 +357,22 @@ referencing it.
   hardcoded synchronization subject went with it.
 
 ### M7 — Aspire integration **[review]**
-- [ ] `DigitalBrain.Aspire.Hosting`: brain resource composing Orleans + storage (separate stores per
+- [x] `DigitalBrain.Aspire.Hosting`: brain resource composing Orleans + storage (separate stores per
       concern), fluent tier/model declarations, privileged vs `AsClient()` projections, secret-leakage
       tests, publish-manifest gate. `DigitalBrain.Aspire`: `IHostApplicationBuilder` client
       integration. Structural Testing AppHost for Tier 2.
 - Commit: `feat: add Aspire hosting and client integrations`
-- **In progress, not ticked.** Landed in `5a6ef732`: `DigitalBrain.Aspire.Hosting` with the brain
+- Execution record: baseline `76beb4fe`, commits `5a6ef732`, `5724a02d`, `e03da2a5`, `90faa3cb`,
+  `567d167e`. Every Aspire API was verified against the `v13.4.6` tag before code (Decision 22).
+  Red evidence: the AppHost would not compile until the hosting-library reference was marked
+  `IsAspireProjectResource="false"` — the Aspire SDK turns every project reference into a resource
+  reference — and until provider names moved to Abstractions, because an AppHost must never
+  reference the Kernel where the provider SDKs and credentials live; the manifest gate failed with
+  a missing file until the publish pipeline was driven with `RunAsync` rather than `StartAsync`.
+  Gates: root `dotnet test .\DigitalBrain.slnx -c Release` exit 0, 71 Tier-0 + 22 Tier-1 +
+  2 Tier-2. The publish-manifest gate asserts the synthetic key never appears in the manifest and
+  that it is emitted as a `parameter.v0` carrying `secret: true` and no value. Landed in
+  `5a6ef732`: `DigitalBrain.Aspire.Hosting` with the brain
   resource composing Orleans plus separate development stores per concern (clustering, a `journal`
   grain store, reminders), fluent `WithModel(tier, provider, modelId, secretParameter)` tier
   declarations, a privileged `WithReference(brain)` silo projection, a `brain.AsClient()` client
