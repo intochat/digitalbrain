@@ -72,6 +72,9 @@ public sealed class NeuronSteps(Simulation simulation)
     [When("a {word} neuron named {string} is registered")]
     public Task ANeuronIsRegistered(string neuronType, string name) => simulation.RegisterAsync(neuronType, name);
 
+    [When("the cluster is restarted")]
+    public static Task WhenTheClusterIsRestarted() => SimulationCluster.RestartAsync();
+
     [Then("the subscriber count for {word} has grown by {int}")]
     public async Task ThenTheSubscriberCountHasGrownBy(string synapseType, int expected)
     {

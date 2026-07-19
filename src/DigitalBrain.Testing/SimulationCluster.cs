@@ -38,6 +38,16 @@ public static class SimulationCluster
         _cluster = cluster;
     }
 
+    public static async Task RestartAsync()
+    {
+        var cluster = Deployed();
+
+        foreach (var silo in cluster.Silos.ToList())
+        {
+            await cluster.RestartSiloAsync(silo);
+        }
+    }
+
     public static async Task StopAsync()
     {
         if (_cluster is null)

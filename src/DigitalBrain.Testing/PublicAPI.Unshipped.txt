@@ -41,7 +41,9 @@ DigitalBrain.Testing.SynapseObserver.Dispose() -> void
 DigitalBrain.Testing.SynapseObserver.SynapseObserver() -> void
 static DigitalBrain.Testing.NeuronSteps.StartCluster() -> System.Threading.Tasks.Task!
 static DigitalBrain.Testing.NeuronSteps.StopCluster() -> System.Threading.Tasks.Task!
+static DigitalBrain.Testing.NeuronSteps.WhenTheClusterIsRestarted() -> System.Threading.Tasks.Task!
 static DigitalBrain.Testing.SimulationCluster.Grains.get -> Orleans.IGrainFactory!
 static DigitalBrain.Testing.SimulationCluster.Observed.get -> DigitalBrain.Testing.SynapseObserver!
+static DigitalBrain.Testing.SimulationCluster.RestartAsync() -> System.Threading.Tasks.Task!
 static DigitalBrain.Testing.SimulationCluster.StartAsync() -> System.Threading.Tasks.Task!
 static DigitalBrain.Testing.SimulationCluster.StopAsync() -> System.Threading.Tasks.Task!
