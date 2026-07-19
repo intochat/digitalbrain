@@ -10,7 +10,7 @@ so.
 | Milestone | State |
 | --- | --- |
 | Demolition and clean skeleton | done |
-| Recorded architecture decisions | not started |
+| Recorded architecture decisions | done |
 | Neuron kernel | not started |
 | Durable synapse fabric | not started |
 | Multi-silo delivery and recovery | not started |

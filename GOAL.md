@@ -303,6 +303,115 @@ referencing it.
    kept as a one-line pointer to CLAUDE.md; `nuget.config`, `.editorconfig`, `.gitignore`
    rewritten fresh; `README.md` rewritten truthful; untracked `.digitalbrain/keys` left
    untouched.
+5. **2026-07-19 — Synapse and `SynapseMetadata` shape.** `Synapse` is an abstract
+   `[GenerateSerializer]` record with exactly one serialized member,
+   `[Id(0)] SynapseMetadata Metadata`, plus unserialized convenience accessors.
+   `SynapseMetadata` is a sealed record: `[Id(0)] SynapseId SynapseId` (unique per synapse, the
+   dedupe key), `[Id(1)] CorrelationId CorrelationId` (constant across a conversation),
+   `[Id(2)] SynapseId? CausationId` (the parent's `SynapseId`, changes every hop — no separate
+   causation id type), `[Id(3)] NeuronId Caller`, `[Id(4)] NeuronId? Receiver` (null under
+   broadcast — no `None` sentinel exists), `[Id(5)] RoutingMode RoutingMode`
+   (`PointToPoint | Broadcast`), `[Id(6)] DateTimeOffset Timestamp`. `SynapseId` and
+   `CorrelationId` are `readonly record struct`s over `Guid` with pinned `[Alias]`es. The v1
+   prototype's `BrainScope` is cut (federation is a non-goal). Stamping is the runtime's job at
+   fire time — a pure construction, never user-set and never the v1 fill-if-default mutation: new
+   `SynapseId`; `CorrelationId` inherited from the incoming synapse else fresh; `CausationId` =
+   incoming `SynapseId` else null; `Caller` = the firing neuron; `Receiver`+`RoutingMode` per verb
+   (`Emit` → null+`Broadcast`, `Send` → target+`PointToPoint`, `Reply` → incoming
+   `Caller`+`PointToPoint`); `Timestamp` from `TimeProvider`. Every fire originates from a neuron:
+   client sessions (M6) and simulations (the Testing driver) are neurons themselves, so `Caller`
+   is always real and `Reply` always addressable — a neuron-less fire does not exist.
+6. **2026-07-19 — Broadcast delivery guarantee and mechanism.** Broadcast is owner-scoped: the
+   delivery set at emit time is every neuron instance registered in the subscription registry for
+   the synapse type within the emitter's owner scope. The guarantee is at-least-once delivery per
+   registered subscriber with per-(emitter, subscriber) FIFO, effectively-once processing, and no
+   retroactive replay for later registrations (the N+1 rule is "receives the next broadcast", not
+   history). Verified Orleans facts this rests on: grain calls are at-most-once with no
+   configurable runtime retry; memory streams are officially non-durable and drop for late
+   subscribers (the named enemy); `BroadcastChannel` is fire-and-forget. Mechanism: the source of
+   truth is the emitting neuron's durable outbox — each entry holds the synapse, its emit
+   sequence, and per-subscriber delivery state, committed atomically with the neuron's state in
+   its single WAL (`WriteStateAsync` batches all dirty durable states — the transactional-outbox
+   property). Delivery is exclusively ordered, guaranteed typed `DeliverAsync` grain calls drained
+   from the outbox per subscriber in emit order; the drain runs immediately after commit, on
+   activation (covering the crash-after-commit window), and on a grain timer, with a reminder as
+   the durable wake-up for dormant emitters — the reminder is ensured to exist before the first
+   outbox commit, so no committed entry can lack its durable wake-up (floor 1 minute, configurable;
+   tests never wait on it because activation triggers the drain). The timeline stream carries every
+   synapse for observability and fire-and-observe — that is its transport role; it is never the
+   delivery guarantee, and a stream fast-path delivery to handlers is deliberately cut (it bought
+   latency at the price of ordering machinery). Acknowledgment: the receiver runs the handler,
+   then commits the incoming-journal append and any emissions it produced in one atomic
+   `WriteStateAsync` batch, and only then does `DeliverAsync` return — a crash mid-handler leaves
+   the synapse unacknowledged and it is redelivered; receivers dedupe by `SynapseId` (the
+   duplicate horizon is bounded by live outbox entries), making processing effectively-once.
+   Delivery state is pruned on full acknowledgment; an unreachable subscriber stops redelivery
+   after a bounded, configurable horizon (attempts and age) with the failure recorded in the
+   outbox entry and surfaced through OTel — observable, never silent.
+7. **2026-07-19 — Subscription registry.** A journaled cluster-singleton registry grain
+   (`DurableGrain`, well-known key) mapping (owner, synapse type) → the set of registered
+   `NeuronId`s. A neuron instance registers all its `IHandle<>` types on first activation
+   (idempotent upsert — the "updated on neuron activation/registration" M3 requirement);
+   subscriptions persist across deactivation, and redelivery reactivates the subscriber. The
+   source-generated dispatch manifest stays the build-time completeness proof of which neuron
+   types can handle which synapses; the registry tracks which instances do. Late-type tolerance:
+   an instance of a newly present neuron type registers through the same call — no silo surgery,
+   the owner-scoped subscriber count grows by exactly one (the N+1 gate). Queryable: subscriber
+   count and subscriber list per (owner, synapse type). Restart-correct two ways: the registry's
+   own journal replays, and re-registration on activation is a converging no-op. Orleans implicit
+   stream subscriptions are ruled out (unsupported with heterogeneous silos; not documented for
+   late-registered types) — the registry is the framework's own.
+8. **2026-07-19 — Neuron identity and owner authorization.** `NeuronId` is a readonly record
+   struct `(string Type, OwnerId Owner, string Name)` with a canonical string encoding
+   `{owner}/{name}` as the grain key over `IGrainWithStringKey` (Orleans 10 grain identity is
+   string type + string key; no string+string compound marker exists) and the neuron type as the
+   `[GrainType]` name. `OwnerId` and `Name` are validated at construction: non-empty, no `/`, no
+   whitespace — making the encoding provably bijective (Orleans validates no key syntax itself;
+   an ambiguous encoding would let two owners share one grain identity and defeat the owner
+   filter). Owner authorization is an incoming grain call filter in the kernel: grain-to-grain
+   calls are validated by `IGrainCallContext.SourceId` (runtime-provided, not caller-supplied)
+   resolving to a same-owner neuron; client-originated calls (no `SourceId`) reach neurons only
+   through the owner session neuron `DigitalBrain.Client` establishes (M6 pins the mechanism).
+   `RequestContext` is treated as untrusted metadata per official guidance; the cluster network
+   boundary is the trust boundary at this layer, recorded honestly as such. The filter must
+   tolerate grain-extension calls (streams/cancellation are `IGrainExtension`s).
+9. **2026-07-19 — Package target frameworks.** All seven packages single-target `net10.0` (GA,
+   LTS). Verified: every pinned dependency ships a net10.0-compatible asset group (Orleans
+   10.2.2-rc.2 targets net10.0/net8.0; Aspire.Hosting 13.4.6 net8.0; MEAI 10.8.0 and OpenAI
+   2.12.0 net10.0; Anthropic 12.36.0 net9.0/net8.0; Reqnroll 3.3.4 netstandard2.0). No
+   multi-targeting, no netstandard authoring. Anthropic transitively references
+   MEAI.Abstractions 10.5.1; central pinning unifies it at 10.8.0.
+10. **2026-07-19 — Journaling base.** Neurons build on `Microsoft.Orleans.Journaling`'s
+    `DurableGrain` with two keyed durable states — `incoming` and `outgoing` journals — injected
+    at construction (the package forbids post-activation state registration; the journal set per
+    neuron is fixed). One WAL per grain; replay completes before `OnActivateAsync` (SetupState
+    stage); JSON journal format. The package is alpha-suffixed and experimental with Azure Blob as
+    the only durable backend at this pin: accepted deliberately because the contract mandates
+    official Orleans journaling and forbids a custom provider — the production host path (M8)
+    uses `AddAzureBlobJournalStorage` (Azurite locally via Aspire). Tier-1 fixtures register the
+    volatile journal storage, but NOT the official per-silo `new VolatileJournalStorageProvider()`
+    pattern: that store dies with its silo host, which would make `@durability` restart scenarios
+    vacuous. The durability fixture shares one volatile journal store across in-cluster silo
+    restarts (a per-cluster store outliving the silo host), so restart scenarios prove journal
+    replay from surviving storage — exactly what production proves against Blob. Any
+    `ORLEANSEXP*` suppression this forces will be recorded here when it lands (v1's global
+    suppression is the anti-pattern). Durability proofs must rely on journal replay plus outbox
+    redelivery, never on stream transport.
+11. **2026-07-19 — Gherkin vocabulary `DigitalBrain.Testing` ships.** A deliberately small step
+    set over the `Fire`/`Expect`/`ExpectNone` driver (observed through the collector neuron and
+    OTel activities keyed by correlation id). The simulation itself is the firing neuron — there
+    is no fire-on-command of other neurons (that would need a production test hook or forged
+    stamping). Steps: `Given a brain for owner "X"` (scenario isolation = unique owner key inside
+    the shared cluster); `When <SynapseType> is fired` (+ `with <table>`) — broadcast stimulus;
+    `When <SynapseType> is sent to <neuron>` (+ `with <table>`) — point-to-point stimulus;
+    `When a <Type> neuron named "<name>" is created` (registration, the N+1 driver); `When the
+    silo hosting <neuron> is restarted` (`@durability`); `Then <neuron> emitted <SynapseType>` (+
+    `with <table>`); `Then no <SynapseType> was emitted`; `Then the subscriber count for
+    <SynapseType> has grown by <n>` (relative, shared-cluster safe — absolute counts are not);
+    `Then the incoming|outgoing journal of <neuron> contains <SynapseType>`. Steps bind through a
+    per-scenario session object via Reqnroll's `IObjectContainer`. v1's chat/card/LLM step
+    families are cut as product vocabulary; the deterministic scripted AI provider gets its own
+    minimal steps at M5.
 
 ## Definition of Done
 
