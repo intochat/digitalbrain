@@ -1,7 +1,9 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Journaling;
 using Orleans.Runtime;
+using Orleans.Runtime.MembershipService.SiloMetadata;
 using Orleans.TestingHost;
 
 namespace DigitalBrain.Testing;
@@ -9,6 +11,8 @@ namespace DigitalBrain.Testing;
 public static class SimulationCluster
 {
     private const int SiloCount = 3;
+
+    private static readonly string[] SiloLabels = ["alpha", "beta", "gamma"];
 
     private static InProcessTestCluster? _cluster;
     private static SynapseObserver? _observer;
@@ -28,10 +32,16 @@ public static class SimulationCluster
         var journalStorage = new VolatileJournalStorageProvider();
         var builder = new InProcessTestClusterBuilder(SiloCount);
 
-        builder.ConfigureSilo((_, silo) =>
+        var labels = new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
+
+        builder.ConfigureSilo((options, silo) =>
         {
             silo.AddDigitalBrain();
             silo.UseInMemoryReminderService();
+            silo.UseSiloMetadata(new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["db.silo"] = labels.GetOrAdd(options.SiloName, name => SiloLabels[labels.Count % SiloLabels.Length]),
+            });
             silo.Services.AddSingleton<IJournalStorageProvider>(journalStorage);
         });
 

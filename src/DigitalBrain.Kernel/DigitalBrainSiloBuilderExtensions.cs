@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -13,6 +14,7 @@ public static class DigitalBrainSiloBuilderExtensions
         builder.AddJournalStorage();
         builder.UseJsonJournalFormat(JournalJsonContext.Default);
         builder.AddIncomingGrainCallFilter<OwnerBoundCallFilter>();
+        builder.Services.AddPinToSiloPlacement();
 
         return builder;
     }

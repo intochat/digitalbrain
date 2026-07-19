@@ -29,6 +29,19 @@ internal sealed class Listener : Neuron, IHandle<Noticed>
 [Alias("db.test.echoed")]
 internal sealed record Echoed : Synapse;
 
+[PinToSilo("alpha")]
+internal sealed class Alpha : Neuron, IHandle<Ping>, IEmit<Ping>
+{
+    public Task HandleAsync(Ping synapse, CancellationToken cancellationToken)
+        => SendAsync(NeuronId.For<Beta>(Id.Owner, "partner"), new Ping());
+}
+
+[PinToSilo("beta")]
+internal sealed class Beta : Neuron, IHandle<Ping>
+{
+    public Task HandleAsync(Ping synapse, CancellationToken cancellationToken) => Task.CompletedTask;
+}
+
 internal sealed class Chatter : Neuron, IHandle<Echoed>, IEmit<Echoed>
 {
     public Task HandleAsync(Echoed synapse, CancellationToken cancellationToken) => EmitAsync(new Echoed());
