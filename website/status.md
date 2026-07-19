@@ -12,7 +12,7 @@ so.
 | Demolition and clean skeleton | done |
 | Recorded architecture decisions | done |
 | Neuron kernel | done |
-| Durable synapse fabric | not started |
+| Durable synapse fabric | done |
 | Multi-silo delivery and recovery | not started |
 | AI model binding | not started |
 | Client package | not started |

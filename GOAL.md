@@ -232,15 +232,33 @@ referencing it.
   rewritten), ambiguous synapse-name resolution, and untested emit/reply-guard/dedupe paths.
 
 ### M3 — Durable synapse fabric **[review]**
-- [ ] Broadcast that survives late subscription and silo restart: journaled outbox + Orleans streams
-      as transport, redelivery until acknowledged, no synapse ever silently dropped (the v1-prototype
-      memory-stream defect is the named enemy).
-- [ ] Real subscription registry: queryable subscriber counts per synapse type, updated on neuron
+- [x] Broadcast that survives late subscription and silo restart: journaled outbox, redelivery until
+      acknowledged, no synapse ever silently dropped (the v1-prototype memory-stream defect is the
+      named enemy). Orleans streams are deliberately not used as transport — see Decision 6.
+- [x] Real subscription registry: queryable subscriber counts per synapse type, updated on neuron
       activation/registration, correct across restart.
-- [ ] The N+1 gate: a neuron type registered at runtime receives the next broadcast — subscriber count
+- [x] The N+1 gate: a neuron type registered at runtime receives the next broadcast — subscriber count
       grows by exactly one, no restart, proven in a Tier-1 simulation.
-- [ ] Guaranteed typed point-to-point delivery with lineage stamping and reply addressing.
+- [x] Guaranteed typed point-to-point delivery with lineage stamping and reply addressing.
 - Commit: `feat: implement the durable synapse fabric`
+- Execution record: baseline `b60016db`, commits `f24b7d42`, `64efb680`, `327960be`, `448da3fd`.
+  Red evidence: four Fabric scenarios failed on undefined steps and absent delivery; the cycle
+  scenario failed until depth was carried across the outbox hop. Gates: root
+  `dotnet test .\DigitalBrain.slnx -c Release` exit 0, 52 Tier-0 + 14 Tier-1, stable over four
+  consecutive runs. Review: 72-agent adversarial workflow over delivery, registry, and test
+  integrity. Three blockers confirmed and fixed — a committed outbox entry could be delivered zero
+  times (the drain was a one-shot timer that never re-armed and Orleans discards timers on
+  deactivation, so the drain is now a repeating timer plus an Orleans reminder as the durable
+  wake-up); the depth guard was dead code because Orleans suppresses the execution context across
+  timer callbacks, so `RequestContext` depth read back as zero on every hop (depth now lives in
+  `OutboxEntry` and is carried into the receiver's context, proven by a scenario where a neuron
+  that re-emits what it handles settles instead of looping); and a handler that emitted then threw
+  left dirty outbox entries that a later commit would publish as duplicates (turns now roll back
+  uncommitted journal mutations). Also fixed: silent refusal drops (now a `refused` OTel activity),
+  unbounded retries (bounded by attempts and age, with an `abandoned` activity), self-delivery
+  deadlock, and a leaked grain timer per synapse. The full-suite gate additionally exposed a real
+  isolation defect the per-project run hid: `@durability` restarts the shared cluster, so the
+  simulation assembly now runs serially, matching the ratified one-shared-cluster model.
 
 ### M4 — Multi-silo and recovery **[review]**
 - [ ] 3-silo Tier-1 fixture; `@multisilo` scenarios: cross-silo point-to-point, cross-silo broadcast,
