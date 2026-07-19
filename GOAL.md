@@ -156,24 +156,31 @@ referencing it.
 ## Milestones
 
 ### M0 — Demolition and clean skeleton **[review]**
-- [ ] Delete v1 wholesale: `kernel/`, `integrations/`, `hosts/`, `modules/`, `samples/`, `tests/`,
+- [x] Delete v1 wholesale: `kernel/`, `integrations/`, `hosts/`, `modules/`, `samples/`, `tests/`,
       `eng/`, `behaviors/`, `edge/`, `Brain.slnx`, `Directory.Build.props`, `Directory.Packages.props`,
       `.github/workflows/*` (all stale). Keep: `.git*`, `LICENSE`, `CLAUDE.md`, `GOAL.md`, `README.md`,
       `assets/nuget/`, `docs/`, `sources/`, `website/`.
-- [ ] Re-verify all dependency pins live (including Reqnroll + xunit.v3 + Microsoft Testing Platform);
+- [x] Re-verify all dependency pins live (including Reqnroll + xunit.v3 + Microsoft Testing Platform);
       record the resolved set in the Decision Log.
-- [ ] Fresh skeleton: `DigitalBrain.slnx`, central `Directory.Build.props`/`Directory.Packages.props`
+- [x] Fresh skeleton: `DigitalBrain.slnx`, central `Directory.Build.props`/`Directory.Packages.props`
       implementing the Quality Bar, `.editorconfig`, empty packable projects with PublicAPI baselines
       (`DigitalBrain.Abstractions`, `DigitalBrain.Kernel`, `DigitalBrain.Client`,
       `DigitalBrain.Testing`, `DigitalBrain.Aspire`, `DigitalBrain.Aspire.Hosting`,
       `DigitalBrain.DevTools`), test projects (`tests/DigitalBrain.Tests`,
       `tests/DigitalBrain.Simulations`, `tests/DigitalBrain.HostTests`), CI workflow running the root
       gate.
-- [ ] Reset `website/` to a truthful minimal skeleton (home, concepts, status) telling the
+- [x] Reset `website/` to a truthful minimal skeleton (home, concepts, status) telling the
       neurons+synapses+simulations story; rewrite `site.test.mjs` against the v2 skeleton; delete the
       dead Flutter deploy pipeline.
-- [ ] Gate: root gate green on the skeleton; website `npm test` green; `git diff --check`.
+- [x] Gate: root gate green on the skeleton; website `npm test` green; `git diff --check`.
 - Commit: `chore!: demolish v1 and establish v2 skeleton`
+- Execution record: baseline `db85c990`, commit `29eceef8`. No TDD red (skeleton milestone); the
+  site truth-guard caught two of its own regex defects red-first. Gates: root
+  `dotnet test .\DigitalBrain.slnx -c Release` exit 0 (14 Tier-0 tests), website `node --test` 9/9 +
+  `vitepress build` clean (local npm-script indirection is broken in this harness — commands run
+  direct; CI runs the npm scripts). Review: 40-agent adversarial workflow, 12 findings, 5 confirmed
+  and fixed (tracked `.config` sentinel, wrong repo URLs in Build.props and website config, README
+  package list), 7 refuted. `sources/**` untouched; a `sources/` ignore line now guards it.
 
 ### M1 — Design decisions (recorded, not prose-heavy)
 - [ ] Decide and record in the Decision Log: exact `SynapseMetadata` shape and `Stamp` semantics;
