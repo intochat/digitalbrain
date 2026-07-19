@@ -14,6 +14,7 @@ Scenario: a synapse crosses between neurons pinned to different silos
     Given a brain for owner "pinned"
     When Ping is sent to the Alpha neuron named "sender"
     Then the incoming journal of the Beta neuron named "partner" contains Ping
+    And the Alpha neuron named "sender" and the Beta neuron named "partner" are hosted on different silos
 
 @multisilo
 Scenario: a broadcast reaches subscribers across the cluster

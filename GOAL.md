@@ -263,8 +263,9 @@ referencing it.
 ### M4 — Multi-silo and recovery **[review]**
 - [x] 3-silo Tier-1 fixture; `@multisilo` scenarios: cross-silo point-to-point, cross-silo broadcast,
       registry correctness cluster-wide, silo-labeled placement for pinned neurons.
-- [x] `@durability` scenarios: silo restart mid-conversation, journal replay, outbox redelivery,
-      no synapse loss.
+- [x] `@durability` scenarios: silo restart mid-conversation, journal replay, no synapse loss.
+      Outbox **redelivery across a silo outage** is implemented but **not yet proven by a
+      scenario** — see the execution record and Decision 19.
 - Commit: `feat: prove multi-silo delivery and recovery`
 - Execution record: baseline `6af14c75`, commits `e4357cb3`, `35063a70`. The shared Tier-1 cluster
   became 3 silos rather than gaining a second fixture — one shared cluster still satisfies the
@@ -277,7 +278,19 @@ referencing it.
   two runs in three, and the contract forbids flaky tests — deterministic cross-silo proof comes
   from labeled placement instead, where `Alpha` on silo `alpha` sends to `Beta` on silo `beta`.
   Gates: root `dotnet test .\DigitalBrain.slnx -c Release` exit 0, 52 Tier-0 + 17 Tier-1, stable
-  over three consecutive runs.
+  over three consecutive runs. Review: 72-agent adversarial workflow over placement, recovery, and
+  contract. Two blockers confirmed and fixed: `PinToSiloStrategy` was registered as a **singleton**
+  while Orleans mutates the strategy instance per grain type and caches it, so a second pinned
+  neuron type would silently steal the first one's label on any later activation (Orleans registers
+  its own stateful filters as transient — now so does this one); and the test cluster's silo labels
+  were assigned from `labels.Count` inside a `ConcurrentDictionary.GetOrAdd` factory while
+  `InProcessTestCluster` starts all silos concurrently, so all three could race to the same label
+  and collapse the topology (labels now derive from the silo's own `InstanceNumber`). Two
+  should-fixes also fixed: the pinned scenario asserted only delivery, so it would have passed on a
+  single-silo cluster — it now asserts the two neurons resolve to different `SiloAddress`es, which
+  is what makes it a placement proof and turns the singleton defect into a caught regression; and
+  the silo-inspection API orphaned by the deleted spread scenario is now the mechanism behind that
+  assertion instead of dead public surface.
 
 ### M5 — AI model binding **[review]**
 - [ ] Typed model descriptors and role tiers (fast/balanced/reasoning/embedding); per-provider
@@ -562,6 +575,17 @@ referencing it.
     open from that review: no bounded retry horizon and no attempt/age record in `OutboxEntry`
     (refusals are now surfaced as a `refused` OTel activity, but transient failures retry
     forever).
+
+19. **2026-07-19 — Outbox redelivery across a silo outage is implemented but unproven.** M4's
+    review correctly found that no scenario exercises the path where a receiver is unreachable at
+    fire time and the entry is redelivered after the receiver returns. An attempt to prove it by
+    stopping the labelled silo hosting a pinned receiver, firing, and restarting the silo did not
+    converge deterministically, so it was **removed rather than committed flaky** — the contract
+    forbids flaky gates, and a test that is retried until it passes proves nothing. The retry
+    ceiling was raised from 8 attempts to 1000 while writing it, because 8 attempts at the 50 ms
+    drain interval abandons an entry after 400 ms, far below any real silo restart; the meaningful
+    bound is the 30-minute age horizon. **Open work:** a deterministic outage-and-return scenario,
+    and with it the last unproven quarter of M4's durability box.
 
 ## Definition of Done
 

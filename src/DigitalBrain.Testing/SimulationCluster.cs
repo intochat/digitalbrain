@@ -14,6 +14,7 @@ public static class SimulationCluster
 
     private static readonly string[] SiloLabels = ["alpha", "beta", "gamma"];
 
+
     private static InProcessTestCluster? _cluster;
     private static SynapseObserver? _observer;
 
@@ -32,15 +33,13 @@ public static class SimulationCluster
         var journalStorage = new VolatileJournalStorageProvider();
         var builder = new InProcessTestClusterBuilder(SiloCount);
 
-        var labels = new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
-
         builder.ConfigureSilo((options, silo) =>
         {
             silo.AddDigitalBrain();
             silo.UseInMemoryReminderService();
             silo.UseSiloMetadata(new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["db.silo"] = labels.GetOrAdd(options.SiloName, name => SiloLabels[labels.Count % SiloLabels.Length]),
+                ["db.silo"] = LabelOf(options.SiloName),
             });
             silo.Services.AddSingleton<IJournalStorageProvider>(journalStorage);
         });
@@ -79,6 +78,13 @@ public static class SimulationCluster
         await _cluster.DisposeAsync();
         _cluster = null;
     }
+
+    internal static string LabelOf(string siloName)
+        => LabelOfInstance(short.Parse(
+            siloName.AsSpan(siloName.LastIndexOf('_') + 1),
+            System.Globalization.CultureInfo.InvariantCulture));
+
+    private static string LabelOfInstance(short instance) => SiloLabels[instance % SiloLabels.Length];
 
     private static InProcessTestCluster Deployed() => _cluster
         ?? throw new InvalidOperationException($"The simulation cluster is not running. Call {nameof(SimulationCluster)}.{nameof(StartAsync)} before a scenario runs.");

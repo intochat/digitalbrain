@@ -108,13 +108,13 @@ public sealed class Simulation
         }
     }
 
-    public async Task<int> HostingSiloCountAsync()
+    public static async Task<int> HostingSiloCountAsync(params NeuronId[] neurons)
     {
         var management = SimulationCluster.Grains.GetGrain<IManagementGrain>(0);
         var hosts = await management.GetDetailedGrainStatistics();
 
         return hosts
-            .Where(statistic => _registered.Any(neuron => statistic.GrainId == neuron.ToGrainId()))
+            .Where(statistic => neurons.Any(neuron => statistic.GrainId == neuron.ToGrainId()))
             .Select(statistic => statistic.SiloAddress)
             .Distinct()
             .Count();

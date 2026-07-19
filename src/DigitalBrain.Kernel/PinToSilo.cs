@@ -64,6 +64,6 @@ public static class PinToSiloExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        return services.AddPlacementFilter<PinToSiloStrategy, PinToSiloDirector>(ServiceLifetime.Singleton);
+        return services.AddPlacementFilter<PinToSiloStrategy, PinToSiloDirector>(ServiceLifetime.Transient);
     }
 }

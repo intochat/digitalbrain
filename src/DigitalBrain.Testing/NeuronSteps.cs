@@ -91,15 +91,17 @@ public sealed class NeuronSteps(Simulation simulation)
     [Given("{int} {word} neurons are registered")]
     public Task ManyNeuronsAreRegistered(int count, string neuronType) => simulation.RegisterManyAsync(count, neuronType);
 
-    [Then("those neurons are hosted on more than one silo")]
-    public async Task ThenThoseNeuronsSpanSilos()
+    [Then("the {word} neuron named {string} and the {word} neuron named {string} are hosted on different silos")]
+    public async Task ThenTheTwoNeuronsAreOnDifferentSilos(string firstType, string firstName, string secondType, string secondName)
     {
-        var silos = await simulation.HostingSiloCountAsync();
+        var first = simulation.NeuronNamed(firstType, firstName);
+        var second = simulation.NeuronNamed(secondType, secondName);
+        var silos = await Simulation.HostingSiloCountAsync(first, second);
 
-        if (silos <= 1)
+        if (silos != 2)
         {
             throw new SimulationAssertionException(
-                $"Expected the registered neurons to be spread across the cluster, but they are all hosted on {silos} silo.");
+                $"Expected {first} and {second} to be pinned to different silos, but they resolve to {silos} distinct silo(s).");
         }
     }
 

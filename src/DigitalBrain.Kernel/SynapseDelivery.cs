@@ -8,7 +8,7 @@ internal static class SynapseDelivery
 
     internal const int MaximumDepth = 16;
 
-    internal const int MaximumAttempts = 8;
+    internal const int MaximumAttempts = 1000;
 
     internal static readonly TimeSpan RetryHorizon = TimeSpan.FromMinutes(30);
 
