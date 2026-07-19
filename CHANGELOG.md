@@ -38,14 +38,24 @@ depend on prereleases.
   `DigitalBrain.Client` and `DigitalBrain.Aspire` — the packages a consumer of a brain needs. It
   deliberately excludes `DigitalBrain.Kernel`, which is where provider SDKs and credentials live.
 
+### Changed
+
+- **Dedupe is O(1).** Detecting a redelivered synapse was a linear scan of the whole incoming
+  journal, deserialized on every delivery, making delivery O(n) per synapse and O(n²) over a
+  neuron's lifetime. A neuron now keeps the last 4,096 handled `SynapseId`s in a bounded durable
+  ring, mirrored in memory and rebuilt on activation, so delivery cost is flat with respect to
+  journal length. Measured over 1,000 deliveries into a journal already holding 1,000: allocation
+  fell from 2.9× the baseline batch to parity, and a test fails if that regresses.
+
 ### Known limitations
 
 - An Orleans client is a trusted cluster peer. The owner boundary constrains neuron-to-neuron and
   registry traffic; it cannot constrain a process that already holds an `IGrainFactory`. Authenticate
   at the edge and never expose an Orleans client endpoint publicly.
-- Journals are never compacted, and every delivery deserializes the whole incoming journal to dedupe
-  by `SynapseId`. The cost is O(n) per synapse and O(n²) over a neuron's lifetime: delivering 1,000
-  synapses into a journal already holding 1,000 allocates 2.9× what the first 1,000 allocate.
+- Journals are never compacted, so storage and journal-read cost still grow without bound. Delivery
+  cost no longer does.
+- Effectively-once processing holds within a window of the last 4,096 deliveries per neuron. A
+  redelivery older than that window would be handled again.
 - The `Embedding` model tier cannot work. Every tier is registered as an `IChatClient`, and an
   embedding model is an `IEmbeddingGenerator<string, Embedding<float>>`.
 - One unreachable receiver blocks a neuron's entire outbox. The outbox drains in order and stops at

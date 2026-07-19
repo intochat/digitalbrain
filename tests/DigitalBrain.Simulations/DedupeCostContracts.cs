@@ -11,7 +11,7 @@ public sealed class DedupeCostContracts
 
     private static readonly Dictionary<string, string> NoValues = new(StringComparer.Ordinal);
 
-    [Fact(Explicit = true, DisplayName = "R-1 gate for Phase 2.2: dedupe cost per delivery does not grow with journal length")]
+    [Fact(DisplayName = "dedupe cost per delivery does not grow with journal length")]
     public async Task DedupeCostPerDeliveryDoesNotGrowWithJournalLength()
     {
         await SimulationCluster.StartAsync();

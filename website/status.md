@@ -64,11 +64,15 @@ neuron-to-neuron and registry traffic, where the caller's identity is known and 
 constrain a caller already inside the cluster's trust boundary. Authenticate users at the edge and
 never expose an Orleans client endpoint publicly.
 
-**Journals grow without bound, and dedupe is quadratic.** A neuron's incoming and outgoing journals
-are never compacted, and every delivery deserializes the whole incoming journal to check for a
-duplicate `SynapseId`. The cost is O(n) per synapse and O(n²) over a neuron's lifetime — this is a
-CPU and allocation debt first and a storage debt second. Measured: delivering 1,000 synapses into a
-journal already holding 1,000 allocates 2.9× what the first 1,000 allocate.
+**Journals grow without bound.** A neuron's incoming and outgoing journals are never compacted, so a
+long-lived neuron costs progressively more storage and takes progressively longer to read. Delivery
+cost no longer grows with them — dedupe was a scan of the whole incoming journal and is now a lookup
+against a bounded set — but nothing yet prunes, snapshots or ages out the journals themselves.
+
+**Effectively-once processing is windowed, not eternal.** A neuron remembers the last 4,096
+`SynapseId`s it has handled, in a durable ring that survives restart. A redelivery of a synapse
+older than that window would be handled a second time. This is a deliberate trade: the previous
+design remembered every synapse forever and paid a whole-journal scan on every delivery to do it.
 
 **The `Embedding` model tier cannot work.** Every declared tier is registered as an `IChatClient`. An
 embedding model is not an `IChatClient` but an `IEmbeddingGenerator<string, Embedding<float>>`, so
@@ -105,7 +109,6 @@ nothing unless its existence and its state are both public.
 | Proof | Asserts | Goes green when |
 | --- | --- | --- |
 | `the kernel assembly reaches no vendor model SDK` | `DigitalBrain.Kernel` has no transitive reference to Anthropic, OpenAI or `Microsoft.Extensions.AI` | AI becomes an ordinary module and leaves the kernel |
-| `dedupe cost per delivery does not grow with journal length` | Allocation per delivery is flat as the journal grows | Dedupe moves to a bounded set of recent `SynapseId`s |
 | `an unreachable receiver does not block traffic to reachable ones` | Outbox progress is per-entry, not head-first | The outbox stops draining strictly in order |
 | `a neuron that has never activated still receives a broadcast` | Subscription does not depend on prior activation | Broadcast addressing is decided — see below |
 

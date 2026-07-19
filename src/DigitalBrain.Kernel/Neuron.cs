@@ -13,7 +13,10 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
     private const string IncomingJournalName = "incoming";
     private const string OutgoingJournalName = "outgoing";
     private const string OutboxName = "outbox";
+    private const string HandledName = "handled";
     private const string OutboxReminderName = "db.outbox";
+
+    private const int RememberedDeliveries = 4096;
 
     private static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(50);
     private static readonly TimeSpan ReminderInterval = TimeSpan.FromMinutes(1);
@@ -21,6 +24,8 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
     private readonly IDurableList<byte[]> _incoming;
     private readonly IDurableList<byte[]> _outgoing;
     private readonly IDurableList<byte[]> _outbox;
+    private readonly IDurableList<Guid> _handled;
+    private readonly HashSet<SynapseId> _remembered = [];
     private readonly Serializer<Synapse> _synapses;
     private readonly Serializer<OutboxEntry> _entries;
     private readonly TimeProvider _clock;
@@ -35,6 +40,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         _incoming = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(IncomingJournalName);
         _outgoing = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(OutgoingJournalName);
         _outbox = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(OutboxName);
+        _handled = ServiceProvider.GetRequiredKeyedService<IDurableList<Guid>>(HandledName);
         _synapses = ServiceProvider.GetRequiredService<Serializer<Synapse>>();
         _entries = ServiceProvider.GetRequiredService<Serializer<OutboxEntry>>();
         _clock = ServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
@@ -51,6 +57,8 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         await base.OnActivateAsync(cancellationToken);
 
         _wakeUpRegistered = await this.GetReminder(OutboxReminderName) is not null;
+
+        RecallHandledDeliveries();
 
         var registry = SubscriptionRegistry.For(GrainFactory, Id.Owner);
 
@@ -90,12 +98,15 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         var committedIncoming = _incoming.Count;
         var committedOutgoing = _outgoing.Count;
         var committedOutbox = _outbox.Count;
+        var committedHandled = _handled.Count;
 
         try
         {
             await DispatchAsync(synapse);
 
             _incoming.Add(_synapses.SerializeToArray(synapse));
+
+            Remember(synapse.Stamped.SynapseId);
 
             await CommitAsync(CancellationToken.None);
         }
@@ -104,6 +115,9 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
             Discard(_incoming, committedIncoming);
             Discard(_outgoing, committedOutgoing);
             Discard(_outbox, committedOutbox);
+            Discard(_handled, committedHandled);
+
+            RecallHandledDeliveries();
 
             throw;
         }
@@ -212,7 +226,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         _wakeUpRegistered = false;
     }
 
-    private static void Discard(IDurableList<byte[]> journal, int committed)
+    private static void Discard<TEntry>(IDurableList<TEntry> journal, int committed)
     {
         while (journal.Count > committed)
         {
@@ -348,7 +362,29 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         => journal.Select(_synapses.Deserialize).ToList();
 
     private bool HasAlreadyHandled(Synapse synapse)
-        => Incoming.Any(recorded => recorded.Stamped.SynapseId == synapse.Stamped.SynapseId);
+        => _remembered.Contains(synapse.Stamped.SynapseId);
+
+    private void Remember(SynapseId delivered)
+    {
+        _handled.Add(delivered.Value);
+        _remembered.Add(delivered);
+
+        while (_handled.Count > RememberedDeliveries)
+        {
+            _remembered.Remove(new SynapseId(_handled[0]));
+            _handled.RemoveAt(0);
+        }
+    }
+
+    private void RecallHandledDeliveries()
+    {
+        _remembered.Clear();
+
+        foreach (var delivered in _handled)
+        {
+            _remembered.Add(new SynapseId(delivered));
+        }
+    }
 
     private Task DispatchAsync(Synapse synapse)
         => SynapseDispatch.HandlersFor(GetType()).TryGetValue(synapse.GetType(), out var handler)
