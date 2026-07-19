@@ -31,6 +31,7 @@ DigitalBrain.NeuronId.Name.get -> string!
 DigitalBrain.NeuronId.NeuronId() -> void
 DigitalBrain.NeuronId.NeuronId(string! type, DigitalBrain.OwnerId owner, string! name) -> void
 DigitalBrain.NeuronId.Owner.get -> DigitalBrain.OwnerId
+DigitalBrain.NeuronId.ToGrainId() -> Orleans.Runtime.GrainId
 DigitalBrain.NeuronId.Type.get -> string!
 DigitalBrain.OwnerId
 DigitalBrain.OwnerId.Equals(DigitalBrain.OwnerId other) -> bool

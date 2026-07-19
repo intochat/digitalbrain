@@ -32,6 +32,5 @@ public sealed class Simulation
     public async Task<IReadOnlyList<Synapse>> ReadJournalAsync(JournalKind kind, string neuronType, string name)
         => await Neuron(NeuronNamed(neuronType, name)).ReadJournalAsync(kind);
 
-    private static INeuron Neuron(NeuronId id)
-        => SimulationCluster.Grains.GetGrain<INeuron>(id.GrainKey, grainClassNamePrefix: null);
+    private static INeuron Neuron(NeuronId id) => SimulationCluster.Grains.GetGrain<INeuron>(id.ToGrainId());
 }

@@ -1,4 +1,5 @@
 using Orleans;
+using Orleans.Runtime;
 
 namespace DigitalBrain;
 
@@ -6,9 +7,13 @@ namespace DigitalBrain;
 [Alias("db.neuron-id")]
 public readonly record struct NeuronId
 {
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Globalization",
+        "CA1308:Normalize strings to uppercase",
+        Justification = "Neuron type names are Orleans grain type names, which Orleans itself normalizes to lowercase.")]
     public NeuronId(string type, OwnerId owner, string name)
     {
-        Type = IdentityPart.Validated(type, nameof(type));
+        Type = IdentityPart.Validated(type, nameof(type)).ToLowerInvariant();
         Owner = owner;
         Name = IdentityPart.Validated(name, nameof(name));
     }
@@ -23,6 +28,8 @@ public readonly record struct NeuronId
     public string Name { get; }
 
     public string GrainKey => $"{Owner.Value}{IdentityPart.OwnerNameSeparator}{Name}";
+
+    public GrainId ToGrainId() => GrainId.Create(Type, GrainKey);
 
     public static NeuronId FromGrainKey(string type, string grainKey)
     {
