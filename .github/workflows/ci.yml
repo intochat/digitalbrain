@@ -6,15 +6,44 @@ on:
   pull_request:
     branches: [master]
 
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+
 jobs:
   framework:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '10.0.x'
-      - run: dotnet test DigitalBrain.slnx -c Release
+          global-json-file: global.json
+      - name: test
+        run: dotnet test DigitalBrain.slnx -c Release
+      - name: pack
+        shell: pwsh
+        run: ./eng/pack.ps1
+      - name: consumer restore and run from an empty package cache
+        shell: pwsh
+        run: ./eng/verify-consumer.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: packages
+          path: artifacts/packages
+
+  dependency-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: no vulnerable, deprecated or floating dependencies
+        shell: pwsh
+        run: ./eng/verify-dependencies.ps1
 
   website:
     runs-on: ubuntu-latest
@@ -22,8 +51,8 @@ jobs:
       run:
         working-directory: website
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - run: npm ci --no-audit --no-fund
