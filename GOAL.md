@@ -328,8 +328,9 @@ referencing it.
   unmet. Both adapters are now proven against a loopback server.
 
 ### M6 — Client package **[review]**
-- [x] `DigitalBrain.Client`: owner sessions, typed neuron access, fire-and-observe from outside the
+- [x] `DigitalBrain.Client`: owner sessions, typed neuron access, fire-and-**read** from outside the
       cluster, outgoing owner filter. Orleans client only; no provider SDKs; no reflection routing.
+      The **observe** half is **not delivered** — see Decision 21.
 - Commit: `feat: implement the owner-bound client`
 - Execution record: baseline `4ba0cccd`, commit `c53718aa`. Red evidence: the client scenarios
   failed on undefined steps, then `BrainClient` did not exist, then the cross-owner scenario failed
@@ -343,7 +344,17 @@ referencing it.
   `dotnet list package --include-transitive` and pinned by a Tier-0 contract test asserting that
   Abstractions, Client, Testing and both Aspire packages reference no provider SDK, and that the
   client never references the runtime. Gates: root `dotnet test .\DigitalBrain.slnx -c Release`
-  exit 0, 65 Tier-0 + 22 Tier-1, stable over two consecutive runs.
+  exit 0, 65 Tier-0 + 22 Tier-1, stable over two consecutive runs. Review: 38-agent adversarial
+  workflow over the owner boundary and contract compliance; 3 confirmed, 9 refuted. Fixed:
+  `[AlwaysInterleave]` had been copied from the simulation driver onto `ISessionNeuron.FireAsync`,
+  which unlike the driver commits the WAL — the reviewer traced a concrete interleaving in
+  `CommitAsync`'s check-then-await that leaves a committed outbox entry with no durable wake-up,
+  the exact guarantee Decision 6 makes. Nothing in the client path needed the attribute; it is
+  removed. Also fixed: a scenario that appeared to prove "observe" was green only because its step
+  first awaited `SynapseObserver`, an in-process `ActivityListener` that exists solely in
+  `DigitalBrain.Testing` and cannot work from outside the cluster — the scenario and its step are
+  replaced with one that claims only what the client can actually do, and the misleading step's
+  hardcoded synchronization subject went with it.
 
 ### M7 — Aspire integration **[review]**
 - [ ] `DigitalBrain.Aspire.Hosting`: brain resource composing Orleans + storage (separate stores per
@@ -639,6 +650,18 @@ referencing it.
     Two packaging notes: `Anthropic 12.36.0` ships no `net10.0` asset and resolves via its `net9.0`
     group, and its declared `Microsoft.Extensions.AI.Abstractions 10.5.1` is a minimum bound, not a
     pin, so it unifies cleanly with 10.8.0 on .NET 10.
+
+21. **2026-07-19 — There is no timeline stream, so "fire-and-observe" is fire-and-read.** M3
+    deliberately cut Orleans streams from the delivery path (Decision 6 keeps them as transport and
+    observability only), but the observability half was never built — no stream is published at
+    all. The consequence surfaced at M6: `BrainClient` can fire a synapse and read a neuron's
+    journal, but has no way to await or subscribe to what the brain emits, and because delivery is
+    a detached drain a naive fire-then-read races the drain. The only awaiting mechanism in the
+    repo is `DigitalBrain.Testing`'s `SynapseObserver`, an in-process `ActivityListener` that
+    cannot serve a client outside the cluster, and polling `ReadJournalAsync` is exactly what the
+    Testing Architecture's hard rules forbid. **Open work:** publish the Decision 6 timeline as a
+    client-consumable stream (or give `FireAsync` a completion), then restore the observe half of
+    M6's box. Until then the client's honest surface is fire-and-read, and M6's box says so.
 
 ## Definition of Done
 

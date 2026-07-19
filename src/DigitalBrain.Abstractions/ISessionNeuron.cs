@@ -8,7 +8,6 @@ public interface ISessionNeuron : INeuron
     const string GrainTypeName = "sessionneuron";
 
     [Alias("Fire")]
-    [Orleans.Concurrency.AlwaysInterleave]
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Design",
         "CA1030:Use events where appropriate",

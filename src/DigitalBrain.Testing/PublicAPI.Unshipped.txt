@@ -8,7 +8,7 @@ DigitalBrain.Testing.NeuronSteps.GivenABrainForOwner(string! owner) -> void
 DigitalBrain.Testing.NeuronSteps.ManyNeuronsAreRegistered(int count, string! neuronType) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.NeuronSteps(DigitalBrain.Testing.Simulation! simulation) -> void
 DigitalBrain.Testing.NeuronSteps.ThenEveryRegisteredNeuronReceived(string! neuronType, string! synapseType) -> System.Threading.Tasks.Task!
-DigitalBrain.Testing.NeuronSteps.ThenTheClientSees(string! synapseType, string! journal, string! neuronType, string! name) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.NeuronSteps.ThenTheClientReadsTheJournal(string! journal, string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalContains(string! neuronType, string! name, string! synapseType) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalIsEmpty(string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalSettlesBelow(string! neuronType, string! name, int limit) -> System.Threading.Tasks.Task!
