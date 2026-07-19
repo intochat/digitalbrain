@@ -1,3 +1,0 @@
-config:
-  tripradar:environment: development
-  tripradar:useFrontDoorForApi: false

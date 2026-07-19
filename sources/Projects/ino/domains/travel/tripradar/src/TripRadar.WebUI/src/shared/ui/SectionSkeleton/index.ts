@@ -1,1 +1,0 @@
-export { SectionSkeleton } from './SectionSkeleton';

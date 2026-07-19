@@ -1,6 +1,0 @@
-encryptionsalt: v1:1mTrpGijTVE=:v1:AvipetckTQKaHa+L:NbyRQ4eNUUDLr1Yu7UywG1VqnUlyWg==
-config:
-  digitalbrain-deploy:dockerHubUsername: vhorbachov
-  digitalbrain-deploy:imageTag: v4
-  digitalbrain-deploy:mcpAudience: digitalbrain-v2
-  digitalbrain-deploy:uiAudience: digitalbrain-v2-ui

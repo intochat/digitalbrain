@@ -1,8 +1,0 @@
-<Project>
-  <!--
-    Shields v2 from the repo-root Directory.Build.targets production-package guard.
-    v2 is a from-scratch prototype with its own (small) project set; its simulation
-    projects legitimately reference xUnit. The nearest Directory.Build.targets wins,
-    so this empty file isolates v2 from the parent guard without disabling it for v1.
-  -->
-</Project>

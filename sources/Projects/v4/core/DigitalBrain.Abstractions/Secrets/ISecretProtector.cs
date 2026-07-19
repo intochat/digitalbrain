@@ -1,9 +1,0 @@
-namespace DigitalBrain.Abstractions.Secrets;
-
-public interface ISecretProtector
-{
-    byte[] Protect(byte[] plaintext);
-
-    byte[] Unprotect(byte[] ciphertext);
-}
-

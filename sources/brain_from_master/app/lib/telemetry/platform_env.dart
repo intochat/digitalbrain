@@ -1,3 +1,0 @@
-export 'platform_env_stub.dart'
-    if (dart.library.io) 'platform_env_io.dart'
-    if (dart.library.html) 'platform_env_web.dart';

@@ -1,8 +1,0 @@
-- match: "hello.*world"
-  text: "hi there!"
-
-- match: "what is 2\\+2"
-  text: "4"
-
-- match: "resolve airport code for Tokyo"
-  text: "NRT"

@@ -1,4 +1,0 @@
-name: tripradar-infrastructure
-runtime: dotnet
-description: TripRadar infrastructure deployment using Pulumi and Azure
-

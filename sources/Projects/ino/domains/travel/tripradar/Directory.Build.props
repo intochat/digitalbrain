@@ -1,4 +1,0 @@
-<Project>
-  <!-- Stops MSBuild from inheriting ino's root Directory.Build.props.
-       TripRadar projects set their own TargetFramework/Nullable/ImplicitUsings per-csproj. -->
-</Project>
