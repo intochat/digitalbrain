@@ -1,21 +1,39 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Orleans.Dashboard;
+using Orleans.Hosting;
 
 namespace DigitalBrain;
 
 public static class DevToolsHosting
 {
-    public static IApplicationBuilder UseDigitalBrainDevTools(this IApplicationBuilder app)
+    public const string DashboardPath = "/dashboard";
+
+    public static ISiloBuilder AddDigitalBrainDevTools(this ISiloBuilder builder, IHostEnvironment environment)
     {
-        ArgumentNullException.ThrowIfNull(app);
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(environment);
 
-        var environment = app.ApplicationServices.GetService(typeof(IHostEnvironment)) as IHostEnvironment;
-
-        if (environment?.IsDevelopment() != true)
+        if (environment.IsDevelopment())
         {
-            return app;
+            builder.AddDashboard();
         }
 
-        return app;
+        return builder;
+    }
+
+    public static IEndpointRouteBuilder MapDigitalBrainDevTools(this IEndpointRouteBuilder endpoints, IHostEnvironment environment)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentNullException.ThrowIfNull(environment);
+
+        if (environment.IsDevelopment())
+        {
+            endpoints.MapOrleansDashboard(DashboardPath);
+        }
+
+        return endpoints;
     }
 }

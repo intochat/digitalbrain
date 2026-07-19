@@ -10,10 +10,14 @@ var scripted = new ScriptedModel();
 scripted.Answer("is the kernel awake?", "the kernel is awake");
 
 builder.Services.AddKeyedSingleton<IChatClient>(ModelTier.Balanced, scripted);
-builder.UseOrleans(silo => silo.AddDigitalBrain().AddDigitalBrainJournalStorage(builder.Configuration));
+builder.UseOrleans(silo => silo
+    .AddDigitalBrain()
+    .AddDigitalBrainJournalStorage(builder.Configuration)
+    .AddDigitalBrainDevTools(builder.Environment));
 
 var app = builder.Build();
 
+app.MapDigitalBrainDevTools(app.Environment);
 app.MapGet("/health", () => Results.Ok("healthy"));
 
 app.MapPost("/probe/turn", async (IGrainFactory grains) =>

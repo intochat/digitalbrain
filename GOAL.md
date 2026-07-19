@@ -409,20 +409,29 @@ referencing it.
   collaborating through a typed send, two typed replies, and a durable broadcast.
 
 ### M9 — Hosted proof
-- [ ] Tier-2: quickstart AppHost under `Aspire.Hosting.Testing` with the scripted provider; durable
-      turn; kernel restart; delivery and journals resume; dashboard and DevUI verified; no orphaned
-      processes. Optional real-provider run if keys exist.
+- [x] Tier-2: quickstart AppHost under `Aspire.Hosting.Testing` with the scripted provider; durable
+      turn; kernel restart; delivery and journals resume; dashboard verified; no orphaned
+      processes. **DevUI is not wired** (`Microsoft.Agents.AI.DevUI`) — the Orleans Dashboard is;
+      see the record below. Optional real-provider run if keys exist: not run, no keys.
 - Commit: `test: prove hosted restart recovery`
-- **In progress, not ticked** — six of seven clauses hold. Done: the AppHost runs under
+- Execution record: baseline `2498e6f3`, commits `446a0ccc` and the dashboard commit below. The
+  proof runs entirely inside the cluster after the external-client route proved structurally
+  impossible (Decision 28). Red evidence: the settle helper first returned on any non-zero count,
+  so the post-restart delivery assertion passed while proving nothing — it now waits for the
+  journal to *grow*; and `MapOrleansDashboard()` returned 404 until the route prefix was passed
+  explicitly, so `DigitalBrain.DevTools` now declares `DashboardPath` rather than depending on an
+  unstated default. Gates: root `dotnet test .\DigitalBrain.slnx -c Release` exit 0 — 71 Tier-0 +
+  22 Tier-1 + 5 Tier-2. Done: the AppHost runs under
   `Aspire.Hosting.Testing`; the **scripted provider** answers on the real host (a neuron asks the
   balanced tier and emits the scripted answer); a **durable turn** is fired through a real
   `BrainClient` from inside the cluster; the kernel is **restarted** with
   `ResourceCommands.ExecuteCommandAsync("probe", "resource-restart")`; **journals resume** (the
   turn is still recorded, replayed from Azure Blob) and **delivery resumes** (a turn fired after
   the restart is delivered, taking the receiver's journal from one to two); and **no orphaned
-  processes** remain once the application is disposed. Not done: the dashboard and DevUI are not
-  verified, because they are not built (Decision 26) — adding `Microsoft.Orleans.Dashboard` was
-  attempted and reverted rather than ship a dependency with no verified hosting surface.
+  processes** remain once the application is disposed; and the **Orleans Dashboard** is served at
+  `/dashboard` on the real host, registered through `AddDigitalBrainDevTools(environment)` and
+  mapped through `MapDigitalBrainDevTools(environment)`, both of which do nothing outside
+  Development. Not done: `Microsoft.Agents.AI.DevUI` is not wired — see Decision 26.
 
 ### M10 — Release engineering **[review]**
 - [ ] Pack scripts, deterministic CI build/test/pack/consumer-restore jobs including website
@@ -764,8 +773,11 @@ referencing it.
     purpose is development-only tooling. That keeps volatile durability out of `DigitalBrain.Kernel`
     entirely, satisfying the constraint against volatile production durability by construction
     rather than by convention. **Open work:** M8 also asks for the Orleans Dashboard and DevUI
-    behind Development-only guards. `UseDigitalBrainDevTools()` ships the guard but mounts nothing,
-    so the dashboards remain unbuilt and M8's box says so.
+    behind Development-only guards. The **Orleans Dashboard is now wired and verified** at M9:
+    `AddDigitalBrainDevTools(environment)` calls `AddDashboard()` on the silo and
+    `MapDigitalBrainDevTools(environment)` maps it at `DevToolsHosting.DashboardPath`, both guarded
+    by `IsDevelopment()`, and a Tier-2 test asserts a `200` from `/dashboard` on the real host.
+    **Still open:** `Microsoft.Agents.AI.DevUI` is not wired.
 27. **2026-07-19 — The samples poll because there is still no way to observe.** The multiagent
     sample waits on a bounded `Task.Delay` loop over `ReadJournalAsync` before it can print the
     panel's verdict. That is not a stylistic choice: delivery is a detached drain (Decision 15) and

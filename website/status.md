@@ -18,7 +18,7 @@ so.
 | Client package | done |
 | Aspire integration | done |
 | Hosts, dev tools, quickstart | done |
-| Hosted restart proof | not started |
+| Hosted restart proof | done |
 | Release engineering | not started |
 | Final verification and docs | not started |
 

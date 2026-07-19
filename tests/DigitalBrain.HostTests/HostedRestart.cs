@@ -87,6 +87,24 @@ public sealed class HostedRestart
         Assert.Fail("the scripted model never answered on the real host");
     }
 
+    [Fact]
+    public async Task TheOrleansDashboardIsServedInDevelopment()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var appHost = await DistributedApplicationTestingBuilder
+            .CreateAsync<Projects.DigitalBrain_TestingAppHost>(cancellationToken);
+
+        await using var app = await appHost.BuildAsync(cancellationToken).WaitAsync(StartupLimit, cancellationToken);
+
+        await app.StartAsync(cancellationToken).WaitAsync(StartupLimit, cancellationToken);
+        await Healthy(app, cancellationToken);
+
+        using var kernel = app.CreateHttpClient("probe");
+        using var dashboard = await kernel.GetAsync(new Uri("/dashboard", UriKind.Relative), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, dashboard.StatusCode);
+    }
+
     private static Task<Aspire.Hosting.ApplicationModel.ResourceEvent> Healthy(DistributedApplication app, CancellationToken cancellationToken)
         => app.ResourceNotifications.WaitForResourceHealthyAsync("probe", cancellationToken).WaitAsync(StartupLimit, cancellationToken);
 
