@@ -1,11 +1,8 @@
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Dashboard;
-using Orleans.Hosting;
 
-namespace DigitalBrain;
+namespace DigitalBrain.DevTools;
 
 public static class DevToolsHosting
 {

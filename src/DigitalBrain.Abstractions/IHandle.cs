@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Abstractions;
 
 public interface IHandle<in TSynapse>
     where TSynapse : Synapse

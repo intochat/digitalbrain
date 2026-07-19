@@ -1,8 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
 using Orleans.Journaling;
 
-namespace DigitalBrain;
+namespace DigitalBrain.DevTools;
 
 public static class DevelopmentJournalStorage
 {

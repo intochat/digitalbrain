@@ -1,7 +1,6 @@
-using Orleans;
-using Orleans.Runtime;
+using DigitalBrain.Abstractions;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 internal sealed class OwnerBoundCallFilter : IIncomingGrainCallFilter
 {

@@ -1,6 +1,6 @@
-using Orleans;
+using DigitalBrain.Abstractions;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 [GenerateSerializer]
 [Alias("db.outbox-entry")]

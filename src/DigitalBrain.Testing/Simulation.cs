@@ -1,5 +1,5 @@
-using Orleans;
-using Orleans.Runtime;
+using DigitalBrain.Abstractions;
+using DigitalBrain.Client;
 
 namespace DigitalBrain.Testing;
 

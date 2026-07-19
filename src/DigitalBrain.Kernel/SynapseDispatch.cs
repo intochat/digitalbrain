@@ -1,7 +1,8 @@
 using System.Collections.Concurrent;
 using System.Reflection;
+using DigitalBrain.Abstractions;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 internal static class SynapseDispatch
 {

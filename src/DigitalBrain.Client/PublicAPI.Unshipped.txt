@@ -1,12 +1,12 @@
 #nullable enable
-DigitalBrain.BrainClient
-DigitalBrain.BrainClient.BrainClient(Orleans.IGrainFactory! grains, DigitalBrain.OwnerId owner) -> void
-DigitalBrain.BrainClient.FireAsync(DigitalBrain.NeuronId receiver, DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
-DigitalBrain.BrainClient.FireAsync(string! neuronType, string! name, DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
-DigitalBrain.BrainClient.Neuron(string! neuronType, string! name) -> DigitalBrain.NeuronHandle!
-DigitalBrain.BrainClient.Neuron<TNeuron>(string! name) -> DigitalBrain.NeuronHandle!
-DigitalBrain.BrainClient.Owner.get -> DigitalBrain.OwnerId
-DigitalBrain.BrainClient.Session.get -> DigitalBrain.NeuronHandle!
-DigitalBrain.NeuronHandle
-DigitalBrain.NeuronHandle.Id.get -> DigitalBrain.NeuronId
-DigitalBrain.NeuronHandle.ReadJournalAsync(DigitalBrain.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
+DigitalBrain.Client.BrainClient
+DigitalBrain.Client.BrainClient.BrainClient(Orleans.IGrainFactory! grains, DigitalBrain.Abstractions.OwnerId owner) -> void
+DigitalBrain.Client.BrainClient.FireAsync(DigitalBrain.Abstractions.NeuronId receiver, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.Client.BrainClient.FireAsync(string! neuronType, string! name, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.Client.BrainClient.Neuron(string! neuronType, string! name) -> DigitalBrain.Client.NeuronHandle!
+DigitalBrain.Client.BrainClient.Neuron<TNeuron>(string! name) -> DigitalBrain.Client.NeuronHandle!
+DigitalBrain.Client.BrainClient.Owner.get -> DigitalBrain.Abstractions.OwnerId
+DigitalBrain.Client.BrainClient.Session.get -> DigitalBrain.Client.NeuronHandle!
+DigitalBrain.Client.NeuronHandle
+DigitalBrain.Client.NeuronHandle.Id.get -> DigitalBrain.Abstractions.NeuronId
+DigitalBrain.Client.NeuronHandle.ReadJournalAsync(DigitalBrain.Abstractions.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>!>!

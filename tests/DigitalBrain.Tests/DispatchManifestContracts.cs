@@ -1,5 +1,6 @@
 using System.Reflection;
-using DigitalBrain;
+using DigitalBrain.Abstractions;
+using DigitalBrain.Kernel;
 using Xunit;
 
 namespace DigitalBrain.Tests;

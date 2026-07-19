@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 public static class SynapseTelemetry
 {

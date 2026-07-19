@@ -1,7 +1,8 @@
+using DigitalBrain.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 public static class ModelConfiguration
 {

@@ -1,4 +1,6 @@
-namespace DigitalBrain;
+using DigitalBrain.Abstractions;
+
+namespace DigitalBrain.Kernel;
 
 internal sealed class SessionNeuron : Neuron, ISessionNeuron
 {

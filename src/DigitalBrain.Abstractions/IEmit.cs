@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Abstractions;
 
 [SuppressMessage(
     "Design",

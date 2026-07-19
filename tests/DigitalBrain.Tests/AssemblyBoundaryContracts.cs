@@ -1,4 +1,9 @@
 using System.Reflection;
+using DigitalBrain.Abstractions;
+using DigitalBrain.Aspire;
+using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Client;
+using DigitalBrain.Kernel;
 using Xunit;
 
 namespace DigitalBrain.Tests;

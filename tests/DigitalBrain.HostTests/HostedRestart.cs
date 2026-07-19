@@ -105,7 +105,7 @@ public sealed class HostedRestart
         Assert.Equal(HttpStatusCode.OK, dashboard.StatusCode);
     }
 
-    private static Task<Aspire.Hosting.ApplicationModel.ResourceEvent> Healthy(DistributedApplication app, CancellationToken cancellationToken)
+    private static Task<global::Aspire.Hosting.ApplicationModel.ResourceEvent> Healthy(DistributedApplication app, CancellationToken cancellationToken)
         => app.ResourceNotifications.WaitForResourceHealthyAsync("probe", cancellationToken).WaitAsync(StartupLimit, cancellationToken);
 
     private static int[] Kernels() => Process.GetProcessesByName("DigitalBrain.ProbeHost").Select(process => process.Id).ToArray();

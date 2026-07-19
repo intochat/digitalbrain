@@ -1,12 +1,11 @@
 using System.Diagnostics;
+using DigitalBrain.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Journaling;
-using Orleans.Runtime;
 using Orleans.Serialization;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 public abstract class Neuron : DurableGrain, INeuron, IRemindable
 {

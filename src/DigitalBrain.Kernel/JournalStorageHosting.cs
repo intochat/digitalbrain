@@ -1,8 +1,7 @@
 using Microsoft.Extensions.Configuration;
-using Orleans.Hosting;
 using Orleans.Journaling;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 public static class JournalStorageHosting
 {

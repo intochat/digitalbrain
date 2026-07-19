@@ -1,8 +1,10 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Orleans;
+using DigitalBrain.Abstractions;
+using DigitalBrain.Aspire.Hosting;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Aspire.Hosting;
 
 public sealed class BrainService
 {

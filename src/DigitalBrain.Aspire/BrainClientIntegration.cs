@@ -1,8 +1,9 @@
+using DigitalBrain.Abstractions;
+using DigitalBrain.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orleans;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Aspire;
 
 public static class BrainClientIntegration
 {

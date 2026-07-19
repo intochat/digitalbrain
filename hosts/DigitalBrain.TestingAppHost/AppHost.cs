@@ -1,4 +1,5 @@
-using DigitalBrain;
+using DigitalBrain.Abstractions;
+using DigitalBrain.Aspire.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 

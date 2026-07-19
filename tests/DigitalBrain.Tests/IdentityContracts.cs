@@ -1,4 +1,4 @@
-using DigitalBrain;
+using DigitalBrain.Abstractions;
 using Xunit;
 
 namespace DigitalBrain.Tests;

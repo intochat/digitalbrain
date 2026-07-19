@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
-using DigitalBrain;
+using DigitalBrain.Abstractions;
+using DigitalBrain.Kernel;
 using Xunit;
 
 namespace DigitalBrain.Tests;

@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Aspire.Hosting;
 using Aspire.Hosting.Testing;
 using Xunit;
 

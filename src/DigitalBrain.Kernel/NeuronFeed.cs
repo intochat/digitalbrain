@@ -1,9 +1,9 @@
+using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 [GenerateSerializer]
 [Alias("db.journal-entry")]

@@ -1,6 +1,4 @@
-using Orleans.Runtime;
-
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 internal static class SynapseDelivery
 {

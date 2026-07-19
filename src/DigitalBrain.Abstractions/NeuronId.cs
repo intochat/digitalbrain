@@ -1,8 +1,4 @@
-using System.Reflection;
-using Orleans;
-using Orleans.Runtime;
-
-namespace DigitalBrain;
+namespace DigitalBrain.Abstractions;
 
 [GenerateSerializer]
 [Alias("db.neuron-id")]

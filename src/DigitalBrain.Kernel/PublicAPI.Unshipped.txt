@@ -1,88 +1,88 @@
 #nullable enable
-DigitalBrain.DigitalBrainSiloBuilderExtensions
-DigitalBrain.DispatchManifest
-DigitalBrain.DispatchManifest.DispatchManifest(System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>! handlers, System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>! emissions) -> void
-DigitalBrain.DispatchManifest.Emissions.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>!
-DigitalBrain.DispatchManifest.Handlers.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>!
-DigitalBrain.JournalStorageHosting
-DigitalBrain.ModelBindingExtensions
-DigitalBrain.ModelCatalog
-DigitalBrain.ModelCatalog.Declare(DigitalBrain.ModelDescriptor! descriptor) -> DigitalBrain.ModelCatalog!
-DigitalBrain.ModelCatalog.Declared.get -> System.Collections.Generic.IReadOnlyCollection<DigitalBrain.ModelDescriptor!>!
-DigitalBrain.ModelCatalog.ModelCatalog() -> void
-DigitalBrain.ModelConfiguration
-DigitalBrain.ModelDescriptor
-DigitalBrain.ModelDescriptor.<Clone>$() -> DigitalBrain.ModelDescriptor!
-DigitalBrain.ModelDescriptor.ApiKey.get -> string?
-DigitalBrain.ModelDescriptor.ApiKey.init -> void
-DigitalBrain.ModelDescriptor.Deconstruct(out DigitalBrain.ModelTier Tier, out string! Provider, out string! ModelId) -> void
-DigitalBrain.ModelDescriptor.Endpoint.get -> System.Uri?
-DigitalBrain.ModelDescriptor.Endpoint.init -> void
-DigitalBrain.ModelDescriptor.Equals(DigitalBrain.ModelDescriptor? other) -> bool
-DigitalBrain.ModelDescriptor.ModelDescriptor(DigitalBrain.ModelTier Tier, string! Provider, string! ModelId) -> void
-DigitalBrain.ModelDescriptor.ModelId.get -> string!
-DigitalBrain.ModelDescriptor.ModelId.init -> void
-DigitalBrain.ModelDescriptor.Provider.get -> string!
-DigitalBrain.ModelDescriptor.Provider.init -> void
-DigitalBrain.ModelDescriptor.Tier.get -> DigitalBrain.ModelTier
-DigitalBrain.ModelDescriptor.Tier.init -> void
-DigitalBrain.Neuron
-DigitalBrain.Neuron.AskModelAsync(DigitalBrain.ModelTier tier, string! prompt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<string!>!
-DigitalBrain.Neuron.DeliverAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
-DigitalBrain.Neuron.EmitAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
-DigitalBrain.Neuron.Id.get -> DigitalBrain.NeuronId
-DigitalBrain.Neuron.Incoming.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!
-DigitalBrain.Neuron.Neuron() -> void
-DigitalBrain.Neuron.Outgoing.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!
-DigitalBrain.Neuron.ReadJournalAsync(DigitalBrain.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
-DigitalBrain.Neuron.ReadJournalSnapshotAsync(DigitalBrain.JournalKind kind) -> System.Threading.Tasks.Task<DigitalBrain.JournalSnapshot!>!
-DigitalBrain.Neuron.ReceiveReminder(string! reminderName, Orleans.Runtime.TickStatus status) -> System.Threading.Tasks.Task!
-DigitalBrain.Neuron.ReplyAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
-DigitalBrain.Neuron.SendAsync(DigitalBrain.NeuronId receiver, DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
-DigitalBrain.PinToSiloAttribute
-DigitalBrain.PinToSiloAttribute.Label.get -> string!
-DigitalBrain.PinToSiloAttribute.PinToSiloAttribute(string! label) -> void
-DigitalBrain.PinToSiloExtensions
-DigitalBrain.PinToSiloStrategy
-DigitalBrain.PinToSiloStrategy.Label.get -> string!
-DigitalBrain.PinToSiloStrategy.PinToSiloStrategy() -> void
-DigitalBrain.PinToSiloStrategy.PinToSiloStrategy(string! label) -> void
-DigitalBrain.SynapseTelemetry
-DigitalBrain.SynapseWiring
-DigitalBrain.SynapseWiringEntry
-DigitalBrain.SynapseWiringEntry.<Clone>$() -> DigitalBrain.SynapseWiringEntry!
-DigitalBrain.SynapseWiringEntry.Deconstruct(out string! Neuron, out string! Synapse) -> void
-DigitalBrain.SynapseWiringEntry.Equals(DigitalBrain.SynapseWiringEntry? other) -> bool
-DigitalBrain.SynapseWiringEntry.Neuron.get -> string!
-DigitalBrain.SynapseWiringEntry.Neuron.init -> void
-DigitalBrain.SynapseWiringEntry.Synapse.get -> string!
-DigitalBrain.SynapseWiringEntry.Synapse.init -> void
-DigitalBrain.SynapseWiringEntry.SynapseWiringEntry(string! Neuron, string! Synapse) -> void
-const DigitalBrain.JournalStorageHosting.ConnectionStringName = "journal" -> string!
-const DigitalBrain.ModelConfiguration.SectionName = "DigitalBrain:Models" -> string!
-const DigitalBrain.ModelDescriptor.AnthropicProvider = "anthropic" -> string!
-const DigitalBrain.ModelDescriptor.OpenAiProvider = "openai" -> string!
-const DigitalBrain.SynapseTelemetry.ActivitySourceName = "DigitalBrain" -> string!
-const DigitalBrain.SynapseTelemetry.CorrelationTag = "db.correlation" -> string!
-const DigitalBrain.SynapseTelemetry.ReceiverTag = "db.receiver" -> string!
-const DigitalBrain.SynapseTelemetry.SynapseTag = "db.synapse" -> string!
-override DigitalBrain.ModelDescriptor.Equals(object? obj) -> bool
-override DigitalBrain.ModelDescriptor.GetHashCode() -> int
-override DigitalBrain.ModelDescriptor.ToString() -> string!
-override DigitalBrain.Neuron.OnActivateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
-override DigitalBrain.PinToSiloStrategy.AdditionalInitialize(Orleans.Metadata.GrainProperties! properties) -> void
-override DigitalBrain.SynapseWiringEntry.Equals(object? obj) -> bool
-override DigitalBrain.SynapseWiringEntry.GetHashCode() -> int
-override DigitalBrain.SynapseWiringEntry.ToString() -> string!
-static DigitalBrain.DigitalBrainSiloBuilderExtensions.AddDigitalBrain(this Orleans.Hosting.ISiloBuilder! builder) -> Orleans.Hosting.ISiloBuilder!
-static DigitalBrain.DigitalBrainSiloBuilderExtensions.AddDigitalBrain(this Orleans.Hosting.ISiloBuilder! builder, string? siloLabel) -> Orleans.Hosting.ISiloBuilder!
-static DigitalBrain.JournalStorageHosting.AddDigitalBrainJournalStorage(this Orleans.Hosting.ISiloBuilder! builder, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Orleans.Hosting.ISiloBuilder!
-static DigitalBrain.ModelBindingExtensions.AddDigitalBrainModels(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<DigitalBrain.ModelCatalog!>! declare) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static DigitalBrain.ModelConfiguration.AddDigitalBrainModels(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static DigitalBrain.ModelDescriptor.operator !=(DigitalBrain.ModelDescriptor? left, DigitalBrain.ModelDescriptor? right) -> bool
-static DigitalBrain.ModelDescriptor.operator ==(DigitalBrain.ModelDescriptor? left, DigitalBrain.ModelDescriptor? right) -> bool
-static DigitalBrain.PinToSiloExtensions.AddPinToSiloPlacement(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static DigitalBrain.SynapseWiring.HandledSynapseTypes(System.Type! neuronType) -> System.Collections.Generic.IReadOnlyCollection<System.Type!>!
-static DigitalBrain.SynapseWiring.TryGetManifest(System.Reflection.Assembly! assembly, out DigitalBrain.DispatchManifest! manifest) -> bool
-static DigitalBrain.SynapseWiringEntry.operator !=(DigitalBrain.SynapseWiringEntry? left, DigitalBrain.SynapseWiringEntry? right) -> bool
-static DigitalBrain.SynapseWiringEntry.operator ==(DigitalBrain.SynapseWiringEntry? left, DigitalBrain.SynapseWiringEntry? right) -> bool
+DigitalBrain.Kernel.DigitalBrainSiloBuilderExtensions
+DigitalBrain.Kernel.DispatchManifest
+DigitalBrain.Kernel.DispatchManifest.DispatchManifest(System.Collections.Generic.IReadOnlyList<DigitalBrain.Kernel.SynapseWiringEntry!>! handlers, System.Collections.Generic.IReadOnlyList<DigitalBrain.Kernel.SynapseWiringEntry!>! emissions) -> void
+DigitalBrain.Kernel.DispatchManifest.Emissions.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Kernel.SynapseWiringEntry!>!
+DigitalBrain.Kernel.DispatchManifest.Handlers.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Kernel.SynapseWiringEntry!>!
+DigitalBrain.Kernel.JournalStorageHosting
+DigitalBrain.Kernel.ModelBindingExtensions
+DigitalBrain.Kernel.ModelCatalog
+DigitalBrain.Kernel.ModelCatalog.Declare(DigitalBrain.Kernel.ModelDescriptor! descriptor) -> DigitalBrain.Kernel.ModelCatalog!
+DigitalBrain.Kernel.ModelCatalog.Declared.get -> System.Collections.Generic.IReadOnlyCollection<DigitalBrain.Kernel.ModelDescriptor!>!
+DigitalBrain.Kernel.ModelCatalog.ModelCatalog() -> void
+DigitalBrain.Kernel.ModelConfiguration
+DigitalBrain.Kernel.ModelDescriptor
+DigitalBrain.Kernel.ModelDescriptor.<Clone>$() -> DigitalBrain.Kernel.ModelDescriptor!
+DigitalBrain.Kernel.ModelDescriptor.ApiKey.get -> string?
+DigitalBrain.Kernel.ModelDescriptor.ApiKey.init -> void
+DigitalBrain.Kernel.ModelDescriptor.Deconstruct(out DigitalBrain.Abstractions.ModelTier Tier, out string! Provider, out string! ModelId) -> void
+DigitalBrain.Kernel.ModelDescriptor.Endpoint.get -> System.Uri?
+DigitalBrain.Kernel.ModelDescriptor.Endpoint.init -> void
+DigitalBrain.Kernel.ModelDescriptor.Equals(DigitalBrain.Kernel.ModelDescriptor? other) -> bool
+DigitalBrain.Kernel.ModelDescriptor.ModelDescriptor(DigitalBrain.Abstractions.ModelTier Tier, string! Provider, string! ModelId) -> void
+DigitalBrain.Kernel.ModelDescriptor.ModelId.get -> string!
+DigitalBrain.Kernel.ModelDescriptor.ModelId.init -> void
+DigitalBrain.Kernel.ModelDescriptor.Provider.get -> string!
+DigitalBrain.Kernel.ModelDescriptor.Provider.init -> void
+DigitalBrain.Kernel.ModelDescriptor.Tier.get -> DigitalBrain.Abstractions.ModelTier
+DigitalBrain.Kernel.ModelDescriptor.Tier.init -> void
+DigitalBrain.Kernel.Neuron
+DigitalBrain.Kernel.Neuron.AskModelAsync(DigitalBrain.Abstractions.ModelTier tier, string! prompt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<string!>!
+DigitalBrain.Kernel.Neuron.DeliverAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.Kernel.Neuron.EmitAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.Kernel.Neuron.Id.get -> DigitalBrain.Abstractions.NeuronId
+DigitalBrain.Kernel.Neuron.Incoming.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>!
+DigitalBrain.Kernel.Neuron.Neuron() -> void
+DigitalBrain.Kernel.Neuron.Outgoing.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>!
+DigitalBrain.Kernel.Neuron.ReadJournalAsync(DigitalBrain.Abstractions.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>!>!
+DigitalBrain.Kernel.Neuron.ReadJournalSnapshotAsync(DigitalBrain.Abstractions.JournalKind kind) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.JournalSnapshot!>!
+DigitalBrain.Kernel.Neuron.ReceiveReminder(string! reminderName, Orleans.Runtime.TickStatus status) -> System.Threading.Tasks.Task!
+DigitalBrain.Kernel.Neuron.ReplyAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.Kernel.Neuron.SendAsync(DigitalBrain.Abstractions.NeuronId receiver, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.Kernel.PinToSiloAttribute
+DigitalBrain.Kernel.PinToSiloAttribute.Label.get -> string!
+DigitalBrain.Kernel.PinToSiloAttribute.PinToSiloAttribute(string! label) -> void
+DigitalBrain.Kernel.PinToSiloExtensions
+DigitalBrain.Kernel.PinToSiloStrategy
+DigitalBrain.Kernel.PinToSiloStrategy.Label.get -> string!
+DigitalBrain.Kernel.PinToSiloStrategy.PinToSiloStrategy() -> void
+DigitalBrain.Kernel.PinToSiloStrategy.PinToSiloStrategy(string! label) -> void
+DigitalBrain.Kernel.SynapseTelemetry
+DigitalBrain.Kernel.SynapseWiring
+DigitalBrain.Kernel.SynapseWiringEntry
+DigitalBrain.Kernel.SynapseWiringEntry.<Clone>$() -> DigitalBrain.Kernel.SynapseWiringEntry!
+DigitalBrain.Kernel.SynapseWiringEntry.Deconstruct(out string! Neuron, out string! Synapse) -> void
+DigitalBrain.Kernel.SynapseWiringEntry.Equals(DigitalBrain.Kernel.SynapseWiringEntry? other) -> bool
+DigitalBrain.Kernel.SynapseWiringEntry.Neuron.get -> string!
+DigitalBrain.Kernel.SynapseWiringEntry.Neuron.init -> void
+DigitalBrain.Kernel.SynapseWiringEntry.Synapse.get -> string!
+DigitalBrain.Kernel.SynapseWiringEntry.Synapse.init -> void
+DigitalBrain.Kernel.SynapseWiringEntry.SynapseWiringEntry(string! Neuron, string! Synapse) -> void
+const DigitalBrain.Kernel.JournalStorageHosting.ConnectionStringName = "journal" -> string!
+const DigitalBrain.Kernel.ModelConfiguration.SectionName = "DigitalBrain:Models" -> string!
+const DigitalBrain.Kernel.ModelDescriptor.AnthropicProvider = "anthropic" -> string!
+const DigitalBrain.Kernel.ModelDescriptor.OpenAiProvider = "openai" -> string!
+const DigitalBrain.Kernel.SynapseTelemetry.ActivitySourceName = "DigitalBrain" -> string!
+const DigitalBrain.Kernel.SynapseTelemetry.CorrelationTag = "db.correlation" -> string!
+const DigitalBrain.Kernel.SynapseTelemetry.ReceiverTag = "db.receiver" -> string!
+const DigitalBrain.Kernel.SynapseTelemetry.SynapseTag = "db.synapse" -> string!
+override DigitalBrain.Kernel.ModelDescriptor.Equals(object? obj) -> bool
+override DigitalBrain.Kernel.ModelDescriptor.GetHashCode() -> int
+override DigitalBrain.Kernel.ModelDescriptor.ToString() -> string!
+override DigitalBrain.Kernel.Neuron.OnActivateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+override DigitalBrain.Kernel.PinToSiloStrategy.AdditionalInitialize(Orleans.Metadata.GrainProperties! properties) -> void
+override DigitalBrain.Kernel.SynapseWiringEntry.Equals(object? obj) -> bool
+override DigitalBrain.Kernel.SynapseWiringEntry.GetHashCode() -> int
+override DigitalBrain.Kernel.SynapseWiringEntry.ToString() -> string!
+static DigitalBrain.Kernel.DigitalBrainSiloBuilderExtensions.AddDigitalBrain(this Orleans.Hosting.ISiloBuilder! builder) -> Orleans.Hosting.ISiloBuilder!
+static DigitalBrain.Kernel.DigitalBrainSiloBuilderExtensions.AddDigitalBrain(this Orleans.Hosting.ISiloBuilder! builder, string? siloLabel) -> Orleans.Hosting.ISiloBuilder!
+static DigitalBrain.Kernel.JournalStorageHosting.AddDigitalBrainJournalStorage(this Orleans.Hosting.ISiloBuilder! builder, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Orleans.Hosting.ISiloBuilder!
+static DigitalBrain.Kernel.ModelBindingExtensions.AddDigitalBrainModels(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<DigitalBrain.Kernel.ModelCatalog!>! declare) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static DigitalBrain.Kernel.ModelConfiguration.AddDigitalBrainModels(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static DigitalBrain.Kernel.ModelDescriptor.operator !=(DigitalBrain.Kernel.ModelDescriptor? left, DigitalBrain.Kernel.ModelDescriptor? right) -> bool
+static DigitalBrain.Kernel.ModelDescriptor.operator ==(DigitalBrain.Kernel.ModelDescriptor? left, DigitalBrain.Kernel.ModelDescriptor? right) -> bool
+static DigitalBrain.Kernel.PinToSiloExtensions.AddPinToSiloPlacement(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static DigitalBrain.Kernel.SynapseWiring.HandledSynapseTypes(System.Type! neuronType) -> System.Collections.Generic.IReadOnlyCollection<System.Type!>!
+static DigitalBrain.Kernel.SynapseWiring.TryGetManifest(System.Reflection.Assembly! assembly, out DigitalBrain.Kernel.DispatchManifest! manifest) -> bool
+static DigitalBrain.Kernel.SynapseWiringEntry.operator !=(DigitalBrain.Kernel.SynapseWiringEntry? left, DigitalBrain.Kernel.SynapseWiringEntry? right) -> bool
+static DigitalBrain.Kernel.SynapseWiringEntry.operator ==(DigitalBrain.Kernel.SynapseWiringEntry? left, DigitalBrain.Kernel.SynapseWiringEntry? right) -> bool

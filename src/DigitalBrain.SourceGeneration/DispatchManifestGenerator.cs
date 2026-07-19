@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,8 +8,8 @@ namespace DigitalBrain.SourceGeneration;
 [Generator]
 public sealed class DispatchManifestGenerator : IIncrementalGenerator
 {
-    private const string HandleInterface = "DigitalBrain.IHandle<TSynapse>";
-    private const string EmitInterface = "DigitalBrain.IEmit<TSynapse>";
+    private const string HandleInterface = "DigitalBrain.Abstractions.IHandle<TSynapse>";
+    private const string EmitInterface = "DigitalBrain.Abstractions.IEmit<TSynapse>";
 
     private static readonly SymbolDisplayFormat FullName =
         SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Omitted);

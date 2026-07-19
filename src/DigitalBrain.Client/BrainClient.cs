@@ -1,6 +1,6 @@
-using Orleans;
+using DigitalBrain.Abstractions;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Client;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage(
     "Design",

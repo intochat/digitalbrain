@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Abstractions;
 
 public interface IAnswer
 {

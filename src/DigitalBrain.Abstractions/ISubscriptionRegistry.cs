@@ -1,6 +1,4 @@
-using Orleans;
-
-namespace DigitalBrain;
+namespace DigitalBrain.Abstractions;
 
 [Alias("db.subscription-registry")]
 public interface ISubscriptionRegistry : IGrainWithStringKey

@@ -1,4 +1,5 @@
-using DigitalBrain;
+using DigitalBrain.DevTools;
+using DigitalBrain.Kernel;
 
 var builder = WebApplication.CreateBuilder(args);
 

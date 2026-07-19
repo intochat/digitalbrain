@@ -1,10 +1,11 @@
 using System.ClientModel;
 using Anthropic;
+using DigitalBrain.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using OpenAI;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 public sealed record ModelDescriptor(ModelTier Tier, string Provider, string ModelId)
 {

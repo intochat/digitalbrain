@@ -1,11 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Metadata;
 using Orleans.Placement;
-using Orleans.Runtime;
 using Orleans.Runtime.MembershipService.SiloMetadata;
 using Orleans.Runtime.Placement;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 [AttributeUsage(AttributeTargets.Class)]
 public sealed class PinToSiloAttribute(string label) : PlacementFilterAttribute(new PinToSiloStrategy(label))

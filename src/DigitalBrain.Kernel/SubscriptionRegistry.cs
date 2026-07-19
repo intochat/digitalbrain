@@ -1,9 +1,9 @@
+using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
-using Orleans.Runtime;
 using Orleans.Serialization;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 internal sealed class SubscriptionRegistry : DurableGrain, ISubscriptionRegistry
 {

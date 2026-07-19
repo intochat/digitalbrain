@@ -1,9 +1,8 @@
+using DigitalBrain.Abstractions;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Journaling;
-using Orleans.Runtime;
-using Orleans.Runtime.MembershipService.SiloMetadata;
 using Orleans.TestingHost;
 
 namespace DigitalBrain.Testing;

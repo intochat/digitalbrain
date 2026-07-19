@@ -1,10 +1,8 @@
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using Orleans.Runtime.MembershipService.SiloMetadata;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 public static class DigitalBrainSiloBuilderExtensions
 {

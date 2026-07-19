@@ -1,4 +1,7 @@
-using DigitalBrain;
+using DigitalBrain.Abstractions;
+using DigitalBrain.Client;
+using DigitalBrain.DevTools;
+using DigitalBrain.Kernel;
 using DigitalBrain.ProbeHost;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.AI;

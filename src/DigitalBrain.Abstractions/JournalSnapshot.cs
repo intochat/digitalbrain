@@ -1,6 +1,4 @@
-using Orleans;
-
-namespace DigitalBrain;
+namespace DigitalBrain.Abstractions;
 
 [GenerateSerializer]
 [Alias("db.journal-tally")]
