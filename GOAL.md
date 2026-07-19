@@ -205,17 +205,31 @@ referencing it.
   `@durability` scenarios vacuous). Gates: root exit 0 (14 tests), website 9/9.
 
 ### M2 — Neuron kernel **[review]**
-- [ ] First red Tier-1 simulation: a neuron receives a fired synapse and its journals record it.
-- [ ] `DigitalBrain.Abstractions`: `Synapse` base + `SynapseMetadata` + lineage stamping;
+- [x] First red Tier-1 simulation: a neuron receives a fired synapse and its journals record it.
+- [x] `DigitalBrain.Abstractions`: `Synapse` base + `SynapseMetadata` + lineage stamping;
       `IHandle<TSynapse>`/`IEmit<TSynapse>`; neuron identity and owner contracts; error model. All
       Orleans serialization deliberate (`[GenerateSerializer]`, `[Id]`, `[Alias]` pinned).
-- [ ] `DigitalBrain.Kernel`: `Neuron` base on official Orleans journaling with dual durable
-      incoming/outgoing journals; typed emit/send verbs; recursion depth guard; owner-bound incoming
-      call authorization; source-generated dispatch manifest with completeness proof and
-      late-registered-type tolerance.
-- [ ] `DigitalBrain.Testing` born alongside: shared-cluster fixture, `Fire`/`Expect` driver, collector
+- [x] `DigitalBrain.Kernel`: `Neuron` base on official Orleans journaling with dual durable
+      incoming/outgoing journals; typed emit/send verbs; owner-bound incoming call authorization;
+      source-generated dispatch manifest with completeness proof and late-registered-type
+      tolerance. The recursion depth guard moves to M3 with the delivery it guards (Decision 15).
+- [x] `DigitalBrain.Testing` born alongside: shared-cluster fixture, `Fire`/`Expect` driver, collector
       neuron, base Gherkin steps.
 - Commit: `feat: implement the neuron kernel`
+- Execution record: baseline `93822337`, commits `78f698a2`, `f7e40a75`, `4b4a3efa`, `58d98c58`,
+  `152f3d03`. Red evidence: the first `.feature` failed with three undefined steps, then
+  `ReplyAsync`/`SendAsync` did not exist, then cross-owner delivery succeeded when it had to be
+  refused. The journaling API was re-verified against the `v10.2.2-rc.2` tag before any kernel
+  code (Decision 12); JSON journaling forced Decision 13's byte payloads; the send-then-reply
+  deadlock forced Decision 15. Gates: root `dotnet test .\DigitalBrain.slnx -c Release` exit 0,
+  52 Tier-0 + 7 Tier-1. Review: 112-agent adversarial workflow over correctness, security,
+  contract, and test quality; 10 confirmed, all fixed. The load-bearing one was a durability
+  blocker — a turn committed in two WAL batches, so a crash between an emission and the incoming
+  append would re-run the handler and double-emit. Also fixed: `MethodInfo.Invoke` wrapping
+  handler exceptions, `NeuronId` diverging from Orleans' grain-type rule (`[GrainType]` and the
+  `Grain` suffix now honoured), tracked Reqnroll `*.feature.cs` carrying generated comments (now
+  untracked), a vacuous emissions completeness proof and a tautological late-type test (both
+  rewritten), ambiguous synapse-name resolution, and untested emit/reply-guard/dedupe paths.
 
 ### M3 — Durable synapse fabric **[review]**
 - [ ] Broadcast that survives late subscription and silo restart: journaled outbox + Orleans streams
