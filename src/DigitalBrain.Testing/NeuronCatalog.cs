@@ -8,11 +8,21 @@ internal static class NeuronCatalog
     private static readonly ConcurrentDictionary<string, Type> SynapseTypes = new(StringComparer.Ordinal);
 
     internal static Type SynapseType(string name) => SynapseTypes.GetOrAdd(name, static requested =>
-        AppDomain.CurrentDomain.GetAssemblies()
+    {
+        var matches = AppDomain.CurrentDomain.GetAssemblies()
             .SelectMany(SafeTypes)
             .Where(type => type.IsSubclassOf(typeof(Synapse)) && !type.IsAbstract)
-            .FirstOrDefault(type => string.Equals(type.Name, requested, StringComparison.Ordinal))
-        ?? throw new InvalidOperationException($"No synapse type named '{requested}' is loaded."));
+            .Where(type => string.Equals(type.Name, requested, StringComparison.Ordinal))
+            .ToList();
+
+        return matches.Count switch
+        {
+            1 => matches[0],
+            0 => throw new InvalidOperationException($"No synapse type named '{requested}' is loaded."),
+            _ => throw new InvalidOperationException(
+                $"'{requested}' is ambiguous across {string.Join(", ", matches.Select(type => type.FullName))}. Rename one so scenarios address exactly one synapse."),
+        };
+    });
 
     internal static Synapse Create(string synapseTypeName, IReadOnlyDictionary<string, string> values)
     {

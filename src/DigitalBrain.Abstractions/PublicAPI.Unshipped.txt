@@ -90,7 +90,9 @@ override DigitalBrain.SynapseMetadata.ToString() -> string!
 static DigitalBrain.CorrelationId.New() -> DigitalBrain.CorrelationId
 static DigitalBrain.CorrelationId.operator !=(DigitalBrain.CorrelationId left, DigitalBrain.CorrelationId right) -> bool
 static DigitalBrain.CorrelationId.operator ==(DigitalBrain.CorrelationId left, DigitalBrain.CorrelationId right) -> bool
+static DigitalBrain.NeuronId.For<TNeuron>(DigitalBrain.OwnerId owner, string! name) -> DigitalBrain.NeuronId
 static DigitalBrain.NeuronId.FromGrainKey(string! type, string! grainKey) -> DigitalBrain.NeuronId
+static DigitalBrain.NeuronId.GrainTypeNameOf(System.Type! neuronType) -> string!
 static DigitalBrain.NeuronId.operator !=(DigitalBrain.NeuronId left, DigitalBrain.NeuronId right) -> bool
 static DigitalBrain.NeuronId.operator ==(DigitalBrain.NeuronId left, DigitalBrain.NeuronId right) -> bool
 static DigitalBrain.OwnerId.operator !=(DigitalBrain.OwnerId left, DigitalBrain.OwnerId right) -> bool

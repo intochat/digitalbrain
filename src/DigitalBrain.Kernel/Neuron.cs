@@ -89,7 +89,11 @@ public abstract class Neuron : DurableGrain, INeuron
         var fired = synapse with { Metadata = metadata };
 
         _outgoing.Add(_synapses.SerializeToArray(fired));
-        await WriteStateAsync();
+
+        if (_handling is null)
+        {
+            await WriteStateAsync();
+        }
     }
 
     private List<Synapse> Read(IDurableList<byte[]> journal)

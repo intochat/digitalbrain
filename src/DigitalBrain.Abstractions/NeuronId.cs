@@ -1,3 +1,4 @@
+using System.Reflection;
 using Orleans;
 using Orleans.Runtime;
 
@@ -30,6 +31,31 @@ public readonly record struct NeuronId
     public string GrainKey => $"{Owner.Value}{IdentityPart.OwnerNameSeparator}{Name}";
 
     public GrainId ToGrainId() => GrainId.Create(Type, GrainKey);
+
+    public static NeuronId For<TNeuron>(OwnerId owner, string name)
+        where TNeuron : INeuron
+        => new(GrainTypeNameOf(typeof(TNeuron)), owner, name);
+
+    public static string GrainTypeNameOf(Type neuronType)
+    {
+        ArgumentNullException.ThrowIfNull(neuronType);
+
+        var declared = neuronType.GetCustomAttributesData()
+            .FirstOrDefault(attribute => attribute.AttributeType == typeof(GrainTypeAttribute))?
+            .ConstructorArguments[0].Value as string;
+
+        if (declared is not null)
+        {
+            return declared;
+        }
+
+        const string OrleansGrainSuffix = "Grain";
+        var name = neuronType.Name;
+
+        return name.Length > OrleansGrainSuffix.Length && name.EndsWith(OrleansGrainSuffix, StringComparison.Ordinal)
+            ? name[..^OrleansGrainSuffix.Length]
+            : name;
+    }
 
     public static NeuronId FromGrainKey(string type, string grainKey)
     {

@@ -23,8 +23,12 @@ internal static class SynapseDispatch
             var handleMethod = handled.GetMethod(nameof(IHandle<Synapse>.HandleAsync))
                 ?? throw new MissingMethodException(handled.FullName, nameof(IHandle<Synapse>.HandleAsync));
 
-            handlers[synapseType] = (neuron, synapse, cancellationToken)
-                => (Task)handleMethod.Invoke(neuron, [synapse, cancellationToken])!;
+            handlers[synapseType] = (neuron, synapse, cancellationToken) => (Task)handleMethod.Invoke(
+                neuron,
+                BindingFlags.DoNotWrapExceptions,
+                binder: null,
+                [synapse, cancellationToken],
+                culture: null)!;
         }
 
         return handlers;

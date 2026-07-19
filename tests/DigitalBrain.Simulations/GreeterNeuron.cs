@@ -11,10 +11,19 @@ internal sealed class Greeter : Neuron, IHandle<Ping>, IEmit<Pong>
     public Task HandleAsync(Ping synapse, CancellationToken cancellationToken) => ReplyAsync(new Pong());
 }
 
+[GenerateSerializer]
+[Alias("db.test.noticed")]
+internal sealed record Noticed : Synapse;
+
+internal sealed class Announcer : Neuron, IHandle<Ping>, IEmit<Noticed>
+{
+    public Task HandleAsync(Ping synapse, CancellationToken cancellationToken) => EmitAsync(new Noticed());
+}
+
 internal sealed class Relay : Neuron, IHandle<Ping>, IHandle<Pong>, IEmit<Ping>
 {
     public Task HandleAsync(Ping synapse, CancellationToken cancellationToken)
-        => SendAsync(new NeuronId(nameof(Greeter), Id.Owner, "helper"), new Ping());
+        => SendAsync(NeuronId.For<Greeter>(Id.Owner, "helper"), new Ping());
 
     public Task HandleAsync(Pong synapse, CancellationToken cancellationToken) => Task.CompletedTask;
 }

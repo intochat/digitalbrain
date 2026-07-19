@@ -41,6 +41,14 @@ public sealed class Simulation
         }
     }
 
+    public async Task SendTwiceAsync(string synapseTypeName, string neuronType, string name)
+    {
+        var receiver = NeuronNamed(neuronType, name);
+        var synapse = NeuronCatalog.Create(synapseTypeName, EmptyValues);
+
+        await Driver().StimulateTwiceAsync(receiver, synapse);
+    }
+
     public void ExpectRefusal<TRefusal>()
         where TRefusal : Exception
     {

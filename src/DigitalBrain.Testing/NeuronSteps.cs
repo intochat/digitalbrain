@@ -30,6 +30,25 @@ public sealed class NeuronSteps(Simulation simulation)
             values.Rows.ToDictionary(row => row[0], row => row[1], StringComparer.Ordinal));
     }
 
+    [When("{word} is sent twice to the {word} neuron named {string}")]
+    public Task WhenTheSameSynapseIsSentTwice(string synapseType, string neuronType, string name)
+        => simulation.SendTwiceAsync(synapseType, neuronType, name);
+
+    [Then("the {word} journal of the {word} neuron named {string} contains {word} exactly once")]
+    public async Task ThenTheJournalContainsExactlyOnce(string journal, string neuronType, string name, string synapseType)
+    {
+        var kind = Enum.Parse<JournalKind>(journal, ignoreCase: true);
+        var recorded = await simulation.ReadJournalAsync(kind, neuronType, name);
+        var expected = NeuronCatalog.SynapseType(synapseType);
+        var occurrences = recorded.Count(expected.IsInstanceOfType);
+
+        if (occurrences != 1)
+        {
+            throw new SimulationAssertionException(
+                $"Expected exactly one {synapseType} in the {kind} journal of {neuronType} '{name}', but found {occurrences}.");
+        }
+    }
+
     [When("{word} is sent to the {word} neuron named {string} claiming owner {string}")]
     public Task WhenSynapseIsSentClaimingAnotherOwner(string synapseType, string neuronType, string name, string claimedOwner)
         => simulation.SendClaimingOwnerAsync(synapseType, neuronType, name, claimedOwner);

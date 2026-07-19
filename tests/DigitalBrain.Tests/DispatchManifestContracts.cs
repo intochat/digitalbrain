@@ -17,15 +17,10 @@ public sealed class DispatchManifestContracts
     {
         Assert.True(SynapseWiring.TryGetManifest(Probed, out var manifest));
 
-        var reflected = Probed.GetTypes()
-            .SelectMany(neuron => neuron.GetInterfaces()
-                .Where(contract => contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IHandle<>))
-                .Select(contract => (Neuron: DisplayName(neuron), Synapse: DisplayName(contract.GetGenericArguments()[0]))))
-            .ToHashSet();
-
         var declared = manifest.Handlers.Select(entry => (entry.Neuron, entry.Synapse)).ToHashSet();
 
-        Assert.Equal(reflected, declared);
+        Assert.NotEmpty(declared);
+        Assert.Equal(Reflected(typeof(IHandle<>)), declared);
     }
 
     [Fact]
@@ -33,31 +28,39 @@ public sealed class DispatchManifestContracts
     {
         Assert.True(SynapseWiring.TryGetManifest(Probed, out var manifest));
 
-        var reflected = Probed.GetTypes()
-            .SelectMany(neuron => neuron.GetInterfaces()
-                .Where(contract => contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IEmit<>))
-                .Select(contract => (Neuron: DisplayName(neuron), Synapse: DisplayName(contract.GetGenericArguments()[0]))))
-            .ToHashSet();
-
         var declared = manifest.Emissions.Select(entry => (entry.Neuron, entry.Synapse)).ToHashSet();
 
-        Assert.Equal(reflected, declared);
+        Assert.NotEmpty(declared);
+        Assert.Equal(Reflected(typeof(IEmit<>)), declared);
     }
 
     [Fact]
-    public void HandlerLookupFallsBackToReflectionForTypesNoManifestDeclares()
+    public void HandlerLookupWorksForAssembliesThatCarryNoManifest()
     {
-        var handled = SynapseWiring.HandledSynapseTypes(typeof(LateRegisteredNeuron));
+        Assert.False(SynapseWiring.TryGetManifest(typeof(Neuron).Assembly, out _));
 
-        Assert.Contains(typeof(LateSynapse), handled);
+        var handled = SynapseWiring.HandledSynapseTypes(typeof(ProbeNeuron));
+
+        Assert.Equal([typeof(ProbeSynapse)], handled);
     }
+
+    [Fact]
+    public void HandlerLookupIsEmptyForATypeThatHandlesNothing()
+        => Assert.Empty(SynapseWiring.HandledSynapseTypes(typeof(DispatchManifestContracts)));
+
+    private static HashSet<(string Neuron, string Synapse)> Reflected(Type contractDefinition)
+        => Probed.GetTypes()
+            .SelectMany(neuron => neuron.GetInterfaces()
+                .Where(contract => contract.IsGenericType && contract.GetGenericTypeDefinition() == contractDefinition)
+                .Select(contract => (Neuron: DisplayName(neuron), Synapse: DisplayName(contract.GetGenericArguments()[0]))))
+            .ToHashSet();
 
     private static string DisplayName(Type type) => type.FullName!.Replace('+', '.');
 
-    private sealed record LateSynapse : Synapse;
+    private sealed record ProbeSynapse : Synapse;
 
-    private sealed class LateRegisteredNeuron : IHandle<LateSynapse>
+    private sealed class ProbeNeuron : IHandle<ProbeSynapse>, IEmit<ProbeSynapse>
     {
-        public Task HandleAsync(LateSynapse synapse, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task HandleAsync(ProbeSynapse synapse, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }
