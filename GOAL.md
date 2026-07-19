@@ -331,7 +331,7 @@ referencing it.
 - [x] `DigitalBrain.Client`: owner sessions, typed neuron access, fire-and-observe from outside the
       cluster, outgoing owner filter. Orleans client only; no provider SDKs; no reflection routing.
 - Commit: `feat: implement the owner-bound client`
-- Execution record: baseline `4ba0cccd`, commit pending below. Red evidence: the client scenarios
+- Execution record: baseline `4ba0cccd`, commit `c53718aa`. Red evidence: the client scenarios
   failed on undefined steps, then `BrainClient` did not exist, then the cross-owner scenario failed
   with "expected a refusal, but the synapse was accepted" — because `SendAsync` only enqueues and
   delivery is a detached drain (Decision 15), so the client would have learned about an
