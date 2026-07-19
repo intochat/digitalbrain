@@ -261,11 +261,23 @@ referencing it.
   simulation assembly now runs serially, matching the ratified one-shared-cluster model.
 
 ### M4 — Multi-silo and recovery **[review]**
-- [ ] 3-silo Tier-1 fixture; `@multisilo` scenarios: cross-silo point-to-point, cross-silo broadcast,
+- [x] 3-silo Tier-1 fixture; `@multisilo` scenarios: cross-silo point-to-point, cross-silo broadcast,
       registry correctness cluster-wide, silo-labeled placement for pinned neurons.
-- [ ] `@durability` scenarios: silo restart mid-conversation, journal replay, outbox redelivery,
+- [x] `@durability` scenarios: silo restart mid-conversation, journal replay, outbox redelivery,
       no synapse loss.
 - Commit: `feat: prove multi-silo delivery and recovery`
+- Execution record: baseline `6af14c75`, commits `e4357cb3`, `35063a70`. The shared Tier-1 cluster
+  became 3 silos rather than gaining a second fixture — one shared cluster still satisfies the
+  ratified model and every scenario now runs against a real multi-silo topology. Red evidence: the
+  first restart step failed with `ConnectionFailedException` because restarting all three silos
+  stranded the client's directory cache, which is what drove the move to Decision 11's ratified
+  "the silo hosting <neuron> is restarted" vocabulary; the pinned-placement scenario failed until
+  `PinToSiloDirector` and silo metadata existed. A scenario asserting that 12 neurons spread over
+  more than one silo was **deleted, not retried**: default placement is probabilistic, it failed
+  two runs in three, and the contract forbids flaky tests — deterministic cross-silo proof comes
+  from labeled placement instead, where `Alpha` on silo `alpha` sends to `Beta` on silo `beta`.
+  Gates: root `dotnet test .\DigitalBrain.slnx -c Release` exit 0, 52 Tier-0 + 17 Tier-1, stable
+  over three consecutive runs.
 
 ### M5 — AI model binding **[review]**
 - [ ] Typed model descriptors and role tiers (fast/balanced/reasoning/embedding); per-provider

@@ -13,7 +13,7 @@ so.
 | Recorded architecture decisions | done |
 | Neuron kernel | done |
 | Durable synapse fabric | done |
-| Multi-silo delivery and recovery | not started |
+| Multi-silo delivery and recovery | done |
 | AI model binding | not started |
 | Client package | not started |
 | Aspire integration | not started |
