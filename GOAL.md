@@ -369,9 +369,12 @@ referencing it.
   projection, and secret-leakage tests; `DigitalBrain.Aspire` with
   `AddDigitalBrainClient(owner)` over `IHostApplicationBuilder`; and the configuration bridge that
   turns the AppHost's projected environment back into kernel `ModelDescriptor`s, proven by a
-  round-trip test. **Remaining:** the publish-manifest gate and the structural Testing AppHost for
-  Tier 2 — the latter needs the silo host that M8 builds, so it lands with M8. Gates at this point:
-  root `dotnet test .\DigitalBrain.slnx -c Release` exit 0, 71 Tier-0 + 22 Tier-1.
+  round-trip test. The **structural Testing AppHost is now landed** (`5724a02d`, and the AppHosts in
+  the commit after it): `hosts/DigitalBrain.TestingAppHost` is a distinct AppHost project — test
+  posture is structural, never env-var mutation — declaring a synthetic key and a stub model id
+  against the same brain resource the production AppHost uses. **Remaining: the publish-manifest
+  gate.** Gates at this point: root `dotnet test .\DigitalBrain.slnx -c Release` exit 0, 71 Tier-0
+  + 22 Tier-1 + 1 Tier-2.
 
 ### M8 — Hosts, dev tools, quickstart **[review]**
 - [ ] Public kernel host on official durability (no localhost clustering or in-memory reminders in
@@ -689,6 +692,24 @@ referencing it.
     introduces durable stores with credentialed connection strings, the client projection must stop
     delegating to `OrleansService.AsClient()` and emit cluster discovery itself, and the
     secret-leakage test must be extended to assert no `ConnectionStrings__*` reaches a client.
+
+23. **2026-07-19 — The host refuses to start without durable journal storage.** M8's box forbids
+    volatile durability in production paths, and Decision 12(d) records that
+    `AddJournalStorage()` registers no provider, failing at first activation rather than at
+    startup. `AddDigitalBrainJournalStorage(configuration)` therefore reads the `journal`
+    connection string and throws at startup when it is absent — "a neuron's journals are its
+    durability, so the host refuses to start without durable journal storage" — and otherwise wires
+    `AddAzureBlobJournalStorage`. The AppHosts supply it from Azure Storage running as the Azurite
+    emulator locally, which is the same code path as a real account.
+24. **2026-07-19 — Tier 2 proves hosted startup, not yet a hosted turn.** `DigitalBrain.HostTests`
+    drives `hosts/DigitalBrain.TestingAppHost` through `Aspire.Hosting.Testing` on the real host:
+    Azurite starts, the brain resource composes, the silo project launches and reaches healthy in
+    about twelve seconds. An HTTP probe of the silo's `/health` endpoint was written and **removed
+    rather than left red**: the endpoint resolves once the host declares a launch profile, but the
+    request times out even though Aspire reports the resource healthy, so the silo is reaching
+    "healthy" without serving. **Open work:** diagnose that (read the silo's resource logs through
+    `ResourceLoggerService`), restore the HTTP assertion, and then build M9's real Tier-2 proof —
+    a durable turn, a kernel restart, and delivery resuming.
 
 ## Definition of Done
 
