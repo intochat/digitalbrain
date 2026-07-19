@@ -18,10 +18,13 @@ public sealed class HostedBrain
         await using var app = await appHost.BuildAsync(cancellationToken).WaitAsync(StartupLimit, cancellationToken);
         await app.StartAsync(cancellationToken).WaitAsync(StartupLimit, cancellationToken);
 
-        var silo = await app.ResourceNotifications
+        await app.ResourceNotifications
             .WaitForResourceHealthyAsync("silo", cancellationToken)
             .WaitAsync(StartupLimit, cancellationToken);
 
-        Assert.Equal("silo", silo.Resource.Name);
+        using var silo = app.CreateHttpClient("silo");
+        using var health = await silo.GetAsync(new Uri("/health", UriKind.Relative), cancellationToken);
+
+        Assert.Equal(System.Net.HttpStatusCode.OK, health.StatusCode);
     }
 }
