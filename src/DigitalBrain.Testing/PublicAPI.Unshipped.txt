@@ -8,6 +8,7 @@ DigitalBrain.Testing.NeuronSteps.GivenABrainForOwner(string! owner) -> void
 DigitalBrain.Testing.NeuronSteps.NeuronSteps(DigitalBrain.Testing.Simulation! simulation) -> void
 DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalContains(string! neuronType, string! name, string! synapseType) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalIsEmpty(string! neuronType, string! name) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalSettlesBelow(string! neuronType, string! name, int limit) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheJournalContainsExactlyOnce(string! journal, string! neuronType, string! name, string! synapseType) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheOutgoingJournalContains(string! neuronType, string! name, string! synapseType) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheSubscriberCountHasGrownBy(string! synapseType, int expected) -> System.Threading.Tasks.Task!
@@ -28,6 +29,7 @@ DigitalBrain.Testing.Simulation.RegisterAsync(string! neuronType, string! name) 
 DigitalBrain.Testing.Simulation.SendAsync(string! synapseTypeName, string! neuronType, string! name, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! values) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.SendClaimingOwnerAsync(string! synapseTypeName, string! neuronType, string! name, string! targetOwner) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.SendTwiceAsync(string! synapseTypeName, string! neuronType, string! name) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Simulation.SettleAsync(DigitalBrain.JournalKind kind, string! neuronType, string! name) -> System.Threading.Tasks.Task<int>!
 DigitalBrain.Testing.Simulation.Simulation() -> void
 DigitalBrain.Testing.Simulation.SubscriberCountAsync(string! synapseTypeName) -> System.Threading.Tasks.Task<int>!
 DigitalBrain.Testing.SimulationAssertionException

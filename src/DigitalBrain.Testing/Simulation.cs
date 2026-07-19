@@ -4,6 +4,8 @@ namespace DigitalBrain.Testing;
 
 public sealed class Simulation
 {
+    private const int SettleProbes = 200;
+
     private static readonly Dictionary<string, string> EmptyValues = new(StringComparer.Ordinal);
 
     private OwnerId _owner;
@@ -67,6 +69,26 @@ public sealed class Simulation
 
     public Task AwaitHandledAsync(string neuronType, string name, string synapseTypeName)
         => SimulationCluster.Observed.AwaitHandledAsync(NeuronNamed(neuronType, name), synapseTypeName);
+
+    public async Task<int> SettleAsync(JournalKind kind, string neuronType, string name)
+    {
+        var neuron = Neuron(NeuronNamed(neuronType, name));
+        var previous = -1;
+
+        for (var probe = 0; probe < SettleProbes; probe++)
+        {
+            var current = (await neuron.ReadJournalAsync(kind)).Count;
+
+            if (current == previous)
+            {
+                return current;
+            }
+
+            previous = current;
+        }
+
+        return previous;
+    }
 
     public Task<int> SubscriberCountAsync(string synapseTypeName)
         => SimulationCluster.Grains

@@ -25,6 +25,15 @@ internal sealed class Listener : Neuron, IHandle<Noticed>
     public Task HandleAsync(Noticed synapse, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
+[GenerateSerializer]
+[Alias("db.test.echoed")]
+internal sealed record Echoed : Synapse;
+
+internal sealed class Chatter : Neuron, IHandle<Echoed>, IEmit<Echoed>
+{
+    public Task HandleAsync(Echoed synapse, CancellationToken cancellationToken) => EmitAsync(new Echoed());
+}
+
 internal sealed class Relay : Neuron, IHandle<Ping>, IHandle<Pong>, IEmit<Ping>
 {
     public Task HandleAsync(Ping synapse, CancellationToken cancellationToken)

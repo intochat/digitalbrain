@@ -28,6 +28,7 @@ public static class SimulationCluster
         builder.ConfigureSilo((_, silo) =>
         {
             silo.AddDigitalBrain();
+            silo.UseInMemoryReminderService();
             silo.Services.AddSingleton<IJournalStorageProvider>(journalStorage);
         });
 

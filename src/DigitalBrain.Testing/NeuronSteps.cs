@@ -72,6 +72,18 @@ public sealed class NeuronSteps(Simulation simulation)
     [When("a {word} neuron named {string} is registered")]
     public Task ANeuronIsRegistered(string neuronType, string name) => simulation.RegisterAsync(neuronType, name);
 
+    [Then("the incoming journal of the {word} neuron named {string} settles below {int} synapses")]
+    public async Task ThenTheIncomingJournalSettlesBelow(string neuronType, string name, int limit)
+    {
+        var settled = await simulation.SettleAsync(JournalKind.Incoming, neuronType, name);
+
+        if (settled >= limit)
+        {
+            throw new SimulationAssertionException(
+                $"Expected the incoming journal of {neuronType} '{name}' to settle below {limit} synapses, but it reached {settled}.");
+        }
+    }
+
     [When("the cluster is restarted")]
     public static Task WhenTheClusterIsRestarted() => SimulationCluster.RestartAsync();
 

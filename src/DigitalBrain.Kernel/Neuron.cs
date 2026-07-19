@@ -1,27 +1,33 @@
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
 namespace DigitalBrain;
 
-public abstract class Neuron : DurableGrain, INeuron
+public abstract class Neuron : DurableGrain, INeuron, IRemindable
 {
     private const string IncomingJournalName = "incoming";
     private const string OutgoingJournalName = "outgoing";
     private const string OutboxName = "outbox";
+    private const string OutboxReminderName = "db.outbox";
+
+    private static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(50);
+    private static readonly TimeSpan ReminderInterval = TimeSpan.FromMinutes(1);
 
     private readonly IDurableList<byte[]> _incoming;
     private readonly IDurableList<byte[]> _outgoing;
     private readonly IDurableList<byte[]> _outbox;
     private readonly Serializer<Synapse> _synapses;
     private readonly Serializer<OutboxEntry> _entries;
-
-    private static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(50);
+    private readonly TimeProvider _clock;
 
     private SynapseMetadata? _handling;
+    private int _handlingDepth;
     private IGrainTimer? _draining;
+    private bool _wakeUpRegistered;
 
     protected Neuron()
     {
@@ -30,6 +36,7 @@ public abstract class Neuron : DurableGrain, INeuron
         _outbox = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(OutboxName);
         _synapses = ServiceProvider.GetRequiredService<Serializer<Synapse>>();
         _entries = ServiceProvider.GetRequiredService<Serializer<OutboxEntry>>();
+        _clock = ServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
     }
 
     public NeuronId Id => NeuronId.FromGrainKey(this.GetGrainId().Type.ToString()!, this.GetPrimaryKeyString());
@@ -52,6 +59,13 @@ public abstract class Neuron : DurableGrain, INeuron
         ScheduleDrain();
     }
 
+    public Task ReceiveReminder(string reminderName, TickStatus status)
+    {
+        ScheduleDrain();
+
+        return Task.CompletedTask;
+    }
+
     public async Task DeliverAsync(Synapse synapse)
     {
         ArgumentNullException.ThrowIfNull(synapse);
@@ -68,6 +82,7 @@ public abstract class Neuron : DurableGrain, INeuron
         handling?.SetTag(SynapseTelemetry.CorrelationTag, synapse.Stamped.CorrelationId.ToString());
 
         _handling = synapse.Stamped;
+        _handlingDepth = SynapseDelivery.InboundDepth();
 
         var committedOutgoing = _outgoing.Count;
         var committedOutbox = _outbox.Count;
@@ -86,10 +101,11 @@ public abstract class Neuron : DurableGrain, INeuron
         finally
         {
             _handling = null;
+            _handlingDepth = 0;
         }
 
         _incoming.Add(_synapses.SerializeToArray(synapse));
-        await WriteStateAsync();
+        await CommitAsync(CancellationToken.None);
 
         ScheduleDrain();
     }
@@ -138,13 +154,41 @@ public abstract class Neuron : DurableGrain, INeuron
 
         if (receivers.Length > 0)
         {
-            _outbox.Add(_entries.SerializeToArray(new OutboxEntry(fired, receivers)));
+            _outbox.Add(_entries.SerializeToArray(
+                new OutboxEntry(fired, receivers, _handlingDepth + 1, Attempts: 0, _clock.GetUtcNow())));
         }
 
         if (_handling is null)
         {
-            await WriteStateAsync();
+            await CommitAsync(CancellationToken.None);
             ScheduleDrain();
+        }
+    }
+
+    private async Task CommitAsync(CancellationToken cancellationToken)
+    {
+        await WriteStateAsync(cancellationToken);
+
+        var pending = _outbox.Count > 0;
+
+        if (pending == _wakeUpRegistered)
+        {
+            return;
+        }
+
+        if (pending)
+        {
+            await this.RegisterOrUpdateReminder(OutboxReminderName, ReminderInterval, ReminderInterval);
+            _wakeUpRegistered = true;
+        }
+        else if (await this.GetReminder(OutboxReminderName) is { } registered)
+        {
+            await this.UnregisterReminder(registered);
+            _wakeUpRegistered = false;
+        }
+        else
+        {
+            _wakeUpRegistered = false;
         }
     }
 
@@ -181,12 +225,22 @@ public abstract class Neuron : DurableGrain, INeuron
     {
         while (_outbox.Count > 0)
         {
-            var entry = _entries.Deserialize(_outbox[0]);
+            var committed = _entries.Deserialize(_outbox[0]);
+            var entry = committed with { Attempts = committed.Attempts + 1 };
+
+            if (entry.Depth > SynapseDelivery.MaximumDepth)
+            {
+                Abandon(entry, $"exceeded the maximum synapse depth of {SynapseDelivery.MaximumDepth}");
+                _outbox.RemoveAt(0);
+
+                continue;
+            }
+
             var undelivered = new List<NeuronId>();
 
             foreach (var receiver in entry.Pending)
             {
-                if (!await TryDeliverAsync(entry.Synapse, receiver))
+                if (!await TryDeliverAsync(entry, receiver))
                 {
                     undelivered.Add(receiver);
                 }
@@ -194,40 +248,55 @@ public abstract class Neuron : DurableGrain, INeuron
 
             if (undelivered.Count > 0)
             {
+                if (Exhausted(entry))
+                {
+                    Abandon(entry, $"undeliverable to {string.Join(", ", undelivered)} after {entry.Attempts} attempts");
+                    _outbox.RemoveAt(0);
+
+                    continue;
+                }
+
                 _outbox[0] = _entries.SerializeToArray(entry with { Pending = [.. undelivered] });
+
                 break;
             }
 
             _outbox.RemoveAt(0);
         }
 
-        await WriteStateAsync(cancellationToken);
+        await CommitAsync(cancellationToken);
 
         StopDrainingWhenOutboxIsEmpty();
     }
+
+    private bool Exhausted(OutboxEntry entry)
+        => entry.Attempts >= SynapseDelivery.MaximumAttempts
+        || _clock.GetUtcNow() - entry.FirstAttempted > SynapseDelivery.RetryHorizon;
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
         Justification = "Any failure other than a permanent refusal keeps the receiver pending so the outbox redelivers it; letting it escape would abandon the delivery guarantee.")]
-    private async Task<bool> TryDeliverAsync(Synapse synapse, NeuronId receiver)
+    private async Task<bool> TryDeliverAsync(OutboxEntry entry, NeuronId receiver)
     {
+        SynapseDelivery.CarryDepth(entry.Depth);
+
         try
         {
             if (receiver == Id)
             {
-                await DeliverAsync(synapse);
+                await DeliverAsync(entry.Synapse);
             }
             else
             {
-                await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).DeliverAsync(synapse);
+                await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).DeliverAsync(entry.Synapse);
             }
 
             return true;
         }
         catch (NeuronAuthorizationException refusal)
         {
-            RecordRefusal(synapse, receiver, refusal);
+            Record("refused", entry.Synapse, receiver, refusal.Message);
 
             return true;
         }
@@ -237,14 +306,22 @@ public abstract class Neuron : DurableGrain, INeuron
         }
     }
 
-    private static void RecordRefusal(Synapse synapse, NeuronId receiver, Exception refusal)
+    private static void Abandon(OutboxEntry entry, string reason)
     {
-        using var refused = SynapseTelemetry.Source.StartActivity("refused");
+        foreach (var receiver in entry.Pending)
+        {
+            Record("abandoned", entry.Synapse, receiver, reason);
+        }
+    }
 
-        refused?.SetTag(SynapseTelemetry.ReceiverTag, receiver.ToString());
-        refused?.SetTag(SynapseTelemetry.SynapseTag, synapse.GetType().Name);
-        refused?.SetTag(SynapseTelemetry.CorrelationTag, synapse.Stamped.CorrelationId.ToString());
-        refused?.SetStatus(ActivityStatusCode.Error, refusal.Message);
+    private static void Record(string outcome, Synapse synapse, NeuronId receiver, string reason)
+    {
+        using var recorded = SynapseTelemetry.Source.StartActivity(outcome);
+
+        recorded?.SetTag(SynapseTelemetry.ReceiverTag, receiver.ToString());
+        recorded?.SetTag(SynapseTelemetry.SynapseTag, synapse.GetType().Name);
+        recorded?.SetTag(SynapseTelemetry.CorrelationTag, synapse.Stamped.CorrelationId.ToString());
+        recorded?.SetStatus(ActivityStatusCode.Error, reason);
     }
 
     private List<Synapse> Read(IDurableList<byte[]> journal)

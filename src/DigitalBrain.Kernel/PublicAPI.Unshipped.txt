@@ -16,6 +16,7 @@ DigitalBrain.Neuron.Incoming.get -> System.Collections.Generic.IReadOnlyList<Dig
 DigitalBrain.Neuron.Neuron() -> void
 DigitalBrain.Neuron.Outgoing.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!
 DigitalBrain.Neuron.ReadJournalAsync(DigitalBrain.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
+DigitalBrain.Neuron.ReceiveReminder(string! reminderName, Orleans.Runtime.TickStatus status) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron.ReplyAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron.SendAsync(DigitalBrain.NeuronId receiver, DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.SynapseTelemetry
