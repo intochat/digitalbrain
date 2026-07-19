@@ -31,7 +31,7 @@ public sealed class NeuronSteps(Simulation simulation)
     {
         var kind = Enum.Parse<JournalKind>(journal, ignoreCase: true);
 
-        _ = await simulation.ClientReadJournalAsync(kind, neuronType, name);
+        _ = await simulation.ClientReadJournalAsync(kind, neuronType, name, afterSequence: 0);
     }
 
     [When("{word} is refused by the {word} neuron named {string}")]
@@ -48,8 +48,19 @@ public sealed class NeuronSteps(Simulation simulation)
     [Then("the {word} neuron named {string} answered {string}")]
     public async Task ThenTheNeuronAnswered(string neuronType, string name, string expected)
     {
-        var emitted = await simulation.ReadJournalAsync(JournalKind.Outgoing, neuronType, name);
-        var answers = emitted.OfType<IAnswer>().Select(answer => answer.Text).ToList();
+        var emitted = await simulation.ReadJournalAsync(
+            JournalKind.Outgoing,
+            neuronType,
+            name,
+            afterSequence: 0);
+
+        if (emitted.ResetSnapshot is not null)
+        {
+            throw new SimulationAssertionException(
+                $"The outgoing journal of {neuronType} '{name}' compacted before its answer payloads were asserted.");
+        }
+
+        var answers = emitted.Delta.OfType<IAnswer>().Select(answer => answer.Text).ToList();
 
         if (!answers.Contains(expected, StringComparer.Ordinal))
         {
@@ -82,9 +93,11 @@ public sealed class NeuronSteps(Simulation simulation)
     public async Task ThenTheJournalContainsExactlyOnce(string journal, string neuronType, string name, string synapseType)
     {
         var kind = Enum.Parse<JournalKind>(journal, ignoreCase: true);
-        var recorded = await simulation.ReadJournalAsync(kind, neuronType, name);
+        var recorded = await simulation.ReadJournalAsync(kind, neuronType, name, afterSequence: 0);
         var expected = NeuronCatalog.SynapseType(synapseType);
-        var occurrences = recorded.Count(expected.IsInstanceOfType);
+        var occurrences = recorded.ResetSnapshot is { } reset
+            ? reset.RecordedOf(expected.FullName!)
+            : recorded.Delta.Count(expected.IsInstanceOfType);
 
         if (occurrences != 1)
         {
@@ -103,12 +116,17 @@ public sealed class NeuronSteps(Simulation simulation)
     [Then("the incoming journal of the {word} neuron named {string} is empty")]
     public async Task ThenTheIncomingJournalIsEmpty(string neuronType, string name)
     {
-        var journal = await simulation.ReadJournalAsync(JournalKind.Incoming, neuronType, name);
+        var journal = await simulation.ReadJournalAsync(
+            JournalKind.Incoming,
+            neuronType,
+            name,
+            afterSequence: 0);
+        var recorded = journal.ResetSnapshot?.TotalRecorded ?? journal.Delta.Count;
 
-        if (journal.Count > 0)
+        if (recorded > 0)
         {
             throw new SimulationAssertionException(
-                $"Expected the incoming journal of {neuronType} '{name}' to be empty, but it recorded {string.Join(", ", journal.Select(synapse => synapse.GetType().Name))}.");
+                $"Expected the incoming journal of {neuronType} '{name}' to be empty, but it recorded {recorded} synapse(s).");
         }
     }
 
@@ -119,12 +137,18 @@ public sealed class NeuronSteps(Simulation simulation)
     [Then("the incoming journal of owner {string}'s {word} neuron named {string} is empty")]
     public static async Task ThenTheIncomingJournalOfAnotherOwnerIsEmpty(string owner, string neuronType, string name)
     {
-        var journal = await Simulation.ReadJournalOfOwnerAsync(JournalKind.Incoming, owner, neuronType, name);
+        var journal = await Simulation.ReadJournalOfOwnerAsync(
+            JournalKind.Incoming,
+            owner,
+            neuronType,
+            name,
+            afterSequence: 0);
+        var recorded = journal.ResetSnapshot?.TotalRecorded ?? journal.Delta.Count;
 
-        if (journal.Count > 0)
+        if (recorded > 0)
         {
             throw new SimulationAssertionException(
-                $"Expected the incoming journal of owner '{owner}' {neuronType} '{name}' to be empty, but it recorded {string.Join(", ", journal.Select(synapse => synapse.GetType().Name))}.");
+                $"Expected the incoming journal of owner '{owner}' {neuronType} '{name}' to be empty, but it recorded {recorded} synapse(s).");
         }
     }
 
@@ -194,12 +218,25 @@ public sealed class NeuronSteps(Simulation simulation)
 
     private async Task AssertJournalContains(JournalKind kind, string neuronType, string name, string synapseType)
     {
-        var journal = await simulation.ReadJournalAsync(kind, neuronType, name);
+        var journal = await simulation.ReadJournalAsync(kind, neuronType, name, afterSequence: 0);
         var expected = NeuronCatalog.SynapseType(synapseType);
 
-        if (!journal.Any(expected.IsInstanceOfType))
+        if (journal.ResetSnapshot is { } reset)
         {
-            var recorded = journal.Count == 0 ? "nothing" : string.Join(", ", journal.Select(synapse => synapse.GetType().Name));
+            if (reset.RecordedOf(expected.FullName!) > 0)
+            {
+                return;
+            }
+
+            throw new SimulationAssertionException(
+                $"Expected the {kind} journal of {neuronType} '{name}' to contain {synapseType}, but its snapshot recorded no such synapse.");
+        }
+
+        if (!journal.Delta.Any(expected.IsInstanceOfType))
+        {
+            var recorded = journal.Delta.Count == 0
+                ? "nothing"
+                : string.Join(", ", journal.Delta.Select(synapse => synapse.GetType().Name));
 
             throw new SimulationAssertionException(
                 $"Expected the {kind} journal of {neuronType} '{name}' to contain {synapseType}, but it recorded {recorded}.");

@@ -46,10 +46,6 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
 
     public NeuronId Id => NeuronId.FromGrainKey(this.GetGrainId().Type.ToString()!, this.GetPrimaryKeyString());
 
-    protected IReadOnlyList<Synapse> Incoming => _incoming.Retained;
-
-    protected IReadOnlyList<Synapse> Outgoing => _outgoing.Retained;
-
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         await base.OnActivateAsync(cancellationToken);
@@ -132,11 +128,8 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         ScheduleDrain();
     }
 
-    public Task<IReadOnlyList<Synapse>> ReadJournalAsync(JournalKind kind)
-        => Task.FromResult(FeedFor(kind).Retained);
-
-    public Task<JournalSnapshot> ReadJournalSnapshotAsync(JournalKind kind)
-        => Task.FromResult(FeedFor(kind).Snapshot());
+    public Task<JournalRead> ReadJournalAsync(JournalKind kind, long afterSequence)
+        => Task.FromResult(FeedFor(kind).Read(afterSequence));
 
     private NeuronFeed FeedFor(JournalKind kind) => kind switch
     {

@@ -13,8 +13,7 @@ DigitalBrain.Abstractions.IHandle<TSynapse>
 DigitalBrain.Abstractions.IHandle<TSynapse>.HandleAsync(TSynapse! synapse, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 DigitalBrain.Abstractions.INeuron
 DigitalBrain.Abstractions.INeuron.DeliverAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
-DigitalBrain.Abstractions.INeuron.ReadJournalAsync(DigitalBrain.Abstractions.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>!>!
-DigitalBrain.Abstractions.INeuron.ReadJournalSnapshotAsync(DigitalBrain.Abstractions.JournalKind kind) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.JournalSnapshot!>!
+DigitalBrain.Abstractions.INeuron.ReadJournalAsync(DigitalBrain.Abstractions.JournalKind kind, long afterSequence) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.JournalRead!>!
 DigitalBrain.Abstractions.ISessionNeuron
 DigitalBrain.Abstractions.ISessionNeuron.FireAsync(DigitalBrain.Abstractions.NeuronId receiver, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Abstractions.ISubscriptionRegistry
@@ -24,6 +23,17 @@ DigitalBrain.Abstractions.ISubscriptionRegistry.SubscribersAsync(string! synapse
 DigitalBrain.Abstractions.JournalKind
 DigitalBrain.Abstractions.JournalKind.Incoming = 0 -> DigitalBrain.Abstractions.JournalKind
 DigitalBrain.Abstractions.JournalKind.Outgoing = 1 -> DigitalBrain.Abstractions.JournalKind
+DigitalBrain.Abstractions.JournalRead
+DigitalBrain.Abstractions.JournalRead.<Clone>$() -> DigitalBrain.Abstractions.JournalRead!
+DigitalBrain.Abstractions.JournalRead.Deconstruct(out long ResumeSequence, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>! Delta, out DigitalBrain.Abstractions.JournalSnapshot? ResetSnapshot) -> void
+DigitalBrain.Abstractions.JournalRead.Delta.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>!
+DigitalBrain.Abstractions.JournalRead.Delta.init -> void
+DigitalBrain.Abstractions.JournalRead.Equals(DigitalBrain.Abstractions.JournalRead? other) -> bool
+DigitalBrain.Abstractions.JournalRead.JournalRead(long ResumeSequence, System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>! Delta, DigitalBrain.Abstractions.JournalSnapshot? ResetSnapshot) -> void
+DigitalBrain.Abstractions.JournalRead.ResetSnapshot.get -> DigitalBrain.Abstractions.JournalSnapshot?
+DigitalBrain.Abstractions.JournalRead.ResetSnapshot.init -> void
+DigitalBrain.Abstractions.JournalRead.ResumeSequence.get -> long
+DigitalBrain.Abstractions.JournalRead.ResumeSequence.init -> void
 DigitalBrain.Abstractions.JournalSnapshot
 DigitalBrain.Abstractions.JournalSnapshot.<Clone>$() -> DigitalBrain.Abstractions.JournalSnapshot!
 DigitalBrain.Abstractions.JournalSnapshot.Deconstruct(out long TotalRecorded, out long LastSequence, out long EarliestRetainedSequence, out int RetainedCount, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.JournalTally!>! Tallies) -> void
@@ -114,6 +124,9 @@ const DigitalBrain.Abstractions.ModelProviders.Anthropic = "anthropic" -> string
 const DigitalBrain.Abstractions.ModelProviders.OpenAi = "openai" -> string!
 override DigitalBrain.Abstractions.CorrelationId.GetHashCode() -> int
 override DigitalBrain.Abstractions.CorrelationId.ToString() -> string!
+override DigitalBrain.Abstractions.JournalRead.Equals(object? obj) -> bool
+override DigitalBrain.Abstractions.JournalRead.GetHashCode() -> int
+override DigitalBrain.Abstractions.JournalRead.ToString() -> string!
 override DigitalBrain.Abstractions.JournalSnapshot.Equals(object? obj) -> bool
 override DigitalBrain.Abstractions.JournalSnapshot.GetHashCode() -> int
 override DigitalBrain.Abstractions.JournalSnapshot.ToString() -> string!
@@ -135,6 +148,8 @@ override DigitalBrain.Abstractions.SynapseMetadata.ToString() -> string!
 static DigitalBrain.Abstractions.CorrelationId.New() -> DigitalBrain.Abstractions.CorrelationId
 static DigitalBrain.Abstractions.CorrelationId.operator !=(DigitalBrain.Abstractions.CorrelationId left, DigitalBrain.Abstractions.CorrelationId right) -> bool
 static DigitalBrain.Abstractions.CorrelationId.operator ==(DigitalBrain.Abstractions.CorrelationId left, DigitalBrain.Abstractions.CorrelationId right) -> bool
+static DigitalBrain.Abstractions.JournalRead.operator !=(DigitalBrain.Abstractions.JournalRead? left, DigitalBrain.Abstractions.JournalRead? right) -> bool
+static DigitalBrain.Abstractions.JournalRead.operator ==(DigitalBrain.Abstractions.JournalRead? left, DigitalBrain.Abstractions.JournalRead? right) -> bool
 static DigitalBrain.Abstractions.JournalSnapshot.operator !=(DigitalBrain.Abstractions.JournalSnapshot? left, DigitalBrain.Abstractions.JournalSnapshot? right) -> bool
 static DigitalBrain.Abstractions.JournalSnapshot.operator ==(DigitalBrain.Abstractions.JournalSnapshot? left, DigitalBrain.Abstractions.JournalSnapshot? right) -> bool
 static DigitalBrain.Abstractions.JournalTally.operator !=(DigitalBrain.Abstractions.JournalTally? left, DigitalBrain.Abstractions.JournalTally? right) -> bool

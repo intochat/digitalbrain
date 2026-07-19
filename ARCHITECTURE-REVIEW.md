@@ -250,6 +250,15 @@ record count and total payload bytes, and a monotonic cursor with the invariant
 A reader whose cursor has fallen off the log receives a **reset carrying a full snapshot and a
 resume sequence** — never a gap, never silence.
 
+**Scope correction, 2026-07-20.** Phase 2.1 proved that an incoming or outgoing synapse journal has
+no stable state key. Keying by synapse type collapses distinct facts and their counts; keying by
+`SynapseId` makes every fact unique and prevents compaction. For those journals, the snapshot is the
+complete durable summary: total recorded, tally by synapse type, retained window bounds, and last
+sequence. A reset carries that summary and its resume sequence; it does not pretend evicted payload
+history still exists. The literal latest-per-key snapshot remains a requirement on B-1's keyed
+per-identity feed in Phase 2.6. This records the scope distinction implemented in Phase 2.1 instead
+of leaving it only in that commit's message.
+
 **Rejected: unbounded log of record.** v2 pays quadratic dedupe (§2.4) and unbounded storage
 for a replay-from-genesis capability that no code path uses. Nothing in v2 replays journals to
 rebuild state; state *is* the journal. The cost is real and the benefit is unrealised.
@@ -1337,7 +1346,7 @@ records as its failure mode. Nothing client-facing ships before it.
 |---|---|
 | 2.1 | Feed state machine: snapshot, bounded delta log, cursor, invariant validation (R-1) — *done* |
 | 2.2 | Bounded dedupe set replacing the journal scan — turns 1.2 green — *done* |
-| 2.3 | Cursor-based read replacing `ReadJournalAsync` across every consumer |
+| 2.3 | Cursor-based read replacing `ReadJournalAsync` across every consumer — *done* |
 | 2.4 | DEC-10 — synapse becomes a thin record; metadata moves to the delivery envelope. Absorbs D-3 |
 
 **Phase 2b — the boundary and the rail.**
@@ -1608,10 +1617,9 @@ Recorded in one place so it cannot be silently reversed.
 
 ## 13. First action
 
-**Phase 0 is complete and `sources/` is retired (§10).** Phases 2.1 and 2.2 are committed.
+**Phase 0 is complete and `sources/` is retired (§10).** Phases 2.1 through 2.3 are committed.
 
-The next action is **Phase 2.3** — cursor-based read replacing `ReadJournalAsync` across every
-consumer — followed by **2.4** (DEC-10) to close Phase 2a green.
+The next action is **Phase 2.4** (DEC-10) to close Phase 2a green.
 
 Then **2.5, R-3, the owner boundary.** It is the gate on everything client-facing, and under
 DEC-8 that means it is the gate on the product. Nothing in Phase 4 may start before it.

@@ -31,11 +31,8 @@ DigitalBrain.Kernel.Neuron.AskModelAsync(DigitalBrain.Abstractions.ModelTier tie
 DigitalBrain.Kernel.Neuron.DeliverAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.Neuron.EmitAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.Neuron.Id.get -> DigitalBrain.Abstractions.NeuronId
-DigitalBrain.Kernel.Neuron.Incoming.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>!
 DigitalBrain.Kernel.Neuron.Neuron() -> void
-DigitalBrain.Kernel.Neuron.Outgoing.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>!
-DigitalBrain.Kernel.Neuron.ReadJournalAsync(DigitalBrain.Abstractions.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>!>!
-DigitalBrain.Kernel.Neuron.ReadJournalSnapshotAsync(DigitalBrain.Abstractions.JournalKind kind) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.JournalSnapshot!>!
+DigitalBrain.Kernel.Neuron.ReadJournalAsync(DigitalBrain.Abstractions.JournalKind kind, long afterSequence) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.JournalRead!>!
 DigitalBrain.Kernel.Neuron.ReceiveReminder(string! reminderName, Orleans.Runtime.TickStatus status) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.Neuron.ReplyAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.Neuron.SendAsync(DigitalBrain.Abstractions.NeuronId receiver, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!

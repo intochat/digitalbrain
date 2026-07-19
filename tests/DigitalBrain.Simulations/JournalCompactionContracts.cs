@@ -43,6 +43,13 @@ public sealed class JournalCompactionContracts
             await simulation.SendAsync("Ping", nameof(Echo), "target", NoValues);
         }
 
-        return await simulation.ReadJournalSnapshotAsync(JournalKind.Incoming, nameof(Echo), "target");
+        var read = await simulation.ReadJournalAsync(
+            JournalKind.Incoming,
+            nameof(Echo),
+            "target",
+            afterSequence: 0);
+
+        return read.ResetSnapshot
+            ?? throw new InvalidOperationException("The journal did not compact past cursor zero.");
     }
 }

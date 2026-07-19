@@ -23,7 +23,12 @@ public sealed class DedupeCostContracts
         var intoEmptyJournal = await AllocatedOverBatchAsync(simulation);
         var intoFullJournal = await AllocatedOverBatchAsync(simulation);
 
-        var delivered = await simulation.ReadJournalSnapshotAsync(JournalKind.Incoming, nameof(Echo), "cost-target");
+        var delivered = (await simulation.ReadJournalAsync(
+            JournalKind.Incoming,
+            nameof(Echo),
+            "cost-target",
+            afterSequence: 0)).ResetSnapshot
+            ?? throw new InvalidOperationException("The journal did not compact past cursor zero.");
 
         Assert.Equal(BatchSize * 2, delivered.TotalRecorded);
 

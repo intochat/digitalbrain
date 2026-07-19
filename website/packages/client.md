@@ -11,8 +11,11 @@ var brain = new BrainClient(grainFactory, new OwnerId("acme"));
 
 await brain.FireAsync(nameof(Greeter), "first", new Hello());
 
-var handled = await brain.Neuron<Greeter>("first").ReadJournalAsync(JournalKind.Incoming);
-var fired = await brain.Session.ReadJournalAsync(JournalKind.Outgoing);
+var handled = await brain.Neuron<Greeter>("first").ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
+var fired = await brain.Session.ReadJournalAsync(JournalKind.Outgoing, afterSequence: 0);
+
+var cursor = handled.ResumeSequence;
+var later = await brain.Neuron<Greeter>("first").ReadJournalAsync(JournalKind.Incoming, cursor);
 ```
 
 ## Everything happens as an owner
@@ -43,7 +46,9 @@ any other neuron's journal is.
 ## `NeuronHandle`
 
 `brain.Neuron<TNeuron>(name)` and `brain.Neuron(type, name)` return a handle exposing `Id` and
-`ReadJournalAsync(kind)`. Reading a journal is how a client learns what happened.
+`ReadJournalAsync(kind, afterSequence)`. A valid cursor receives only the later synapses in `Delta`
+and advances through `ResumeSequence`. If compaction has overtaken the cursor, `Delta` is empty and
+`ResetSnapshot` carries the full durable summary plus the sequence from which reading can resume.
 
 ::: warning Open debt
 There is no timeline stream yet, so a client can fire and read but cannot **observe**. Code that wants

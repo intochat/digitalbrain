@@ -7,8 +7,5 @@ public interface INeuron : IGrainWithStringKey
     Task DeliverAsync(Synapse synapse);
 
     [Alias("ReadJournal")]
-    Task<IReadOnlyList<Synapse>> ReadJournalAsync(JournalKind kind);
-
-    [Alias("ReadJournalSnapshot")]
-    Task<JournalSnapshot> ReadJournalSnapshotAsync(JournalKind kind);
+    Task<JournalRead> ReadJournalAsync(JournalKind kind, long afterSequence);
 }

@@ -43,9 +43,10 @@ depend on prereleases.
 - **A journal is a bounded feed, not an unbounded log.** Each journal now keeps a delta log bounded
   by both record count and total bytes, a durable tally of how many of each synapse type it has
   recorded, and a monotonic sequence. Compaction evicts from the delta log only, so the tally and
-  the sequence survive it and `ReadJournalSnapshotAsync` still answers "what has this neuron done,
-  and how much" after the records themselves are gone. Storage per neuron is bounded for the first
-  time. The cost, stated plainly: the journal is no longer an audit log.
+  the sequence survive it. Journal reads now take a cursor and return only later synapses; a cursor
+  overtaken by compaction receives the complete tally summary and a resume sequence instead of a
+  gap. Storage per neuron is bounded for the first time. The cost, stated plainly: the journal is no
+  longer an audit log.
 - **Dedupe is O(1).** Detecting a redelivered synapse was a linear scan of the whole incoming
   journal, deserialized on every delivery, making delivery O(n) per synapse and O(n²) over a
   neuron's lifetime. A neuron now keeps the last 4,096 handled `SynapseId`s in a bounded durable

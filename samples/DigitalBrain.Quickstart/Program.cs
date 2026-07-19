@@ -1,4 +1,7 @@
-using DigitalBrain;
+using DigitalBrain.Abstractions;
+using DigitalBrain.Client;
+using DigitalBrain.DevTools;
+using DigitalBrain.Kernel;
 using DigitalBrain.Quickstart;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -20,8 +23,12 @@ var brain = new BrainClient(host.Services.GetRequiredService<IGrainFactory>(), n
 
 await brain.FireAsync(nameof(Greeter), "first", new Hello());
 
-var fired = await brain.Session.ReadJournalAsync(JournalKind.Outgoing);
+var fired = await brain.Session.ReadJournalAsync(JournalKind.Outgoing, afterSequence: 0);
+var firedCount = fired.ResetSnapshot?.TotalRecorded ?? fired.Delta.Count;
+var firedTypes = fired.ResetSnapshot is { } reset
+    ? reset.Tallies.Select(tally => tally.SynapseType)
+    : fired.Delta.Select(synapse => synapse.GetType().Name);
 
-Console.WriteLine($"the session durably recorded {fired.Count} fired synapse(s): {string.Join(", ", fired.Select(synapse => synapse.GetType().Name))}");
+Console.WriteLine($"the session durably recorded {firedCount} fired synapse(s): {string.Join(", ", firedTypes)}");
 
 await host.StopAsync();

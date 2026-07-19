@@ -9,4 +9,4 @@ DigitalBrain.Client.BrainClient.Owner.get -> DigitalBrain.Abstractions.OwnerId
 DigitalBrain.Client.BrainClient.Session.get -> DigitalBrain.Client.NeuronHandle!
 DigitalBrain.Client.NeuronHandle
 DigitalBrain.Client.NeuronHandle.Id.get -> DigitalBrain.Abstractions.NeuronId
-DigitalBrain.Client.NeuronHandle.ReadJournalAsync(DigitalBrain.Abstractions.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>!>!
+DigitalBrain.Client.NeuronHandle.ReadJournalAsync(DigitalBrain.Abstractions.JournalKind kind, long afterSequence) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.JournalRead!>!

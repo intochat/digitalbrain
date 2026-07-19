@@ -42,6 +42,6 @@ public sealed class NeuronHandle
 
     public NeuronId Id { get; }
 
-    public Task<IReadOnlyList<Synapse>> ReadJournalAsync(JournalKind kind)
-        => _grains.GetGrain<INeuron>(Id.ToGrainId()).ReadJournalAsync(kind);
+    public Task<JournalRead> ReadJournalAsync(JournalKind kind, long afterSequence)
+        => _grains.GetGrain<INeuron>(Id.ToGrainId()).ReadJournalAsync(kind, afterSequence);
 }

@@ -29,9 +29,25 @@ internal sealed class NeuronFeed
         _entries = services.GetRequiredService<Serializer<JournalEntry>>();
     }
 
-    internal long LastSequence => _lastSequence.Value;
+    internal JournalRead Read(long afterSequence)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-    internal IReadOnlyList<Synapse> Retained => [.. Entries().Select(entry => entry.Synapse)];
+        var lastSequence = _lastSequence.Value;
+
+        if (afterSequence > lastSequence
+            || (afterSequence < lastSequence && afterSequence < EarliestRetainedSequence() - 1))
+        {
+            return new(lastSequence, [], Snapshot());
+        }
+
+        var firstIndex = (int)(afterSequence - EarliestRetainedSequence() + 1);
+
+        return new(
+            ResumeSequence: lastSequence,
+            Delta: [.. _retained.Skip(firstIndex).Select(_entries.Deserialize).Select(entry => entry.Synapse)],
+            ResetSnapshot: null);
+    }
 
     internal void Append(Synapse synapse)
     {
@@ -57,8 +73,6 @@ internal sealed class NeuronFeed
 
     private long RecordedOf(string synapseType)
         => _tallies.TryGetValue(synapseType, out var recorded) ? recorded : 0;
-
-    private IEnumerable<JournalEntry> Entries() => _retained.Select(_entries.Deserialize);
 
     private void Compact()
     {

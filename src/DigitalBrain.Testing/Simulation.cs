@@ -40,8 +40,8 @@ public sealed class Simulation
             new NeuronId(neuronType, new OwnerId(targetOwner), name),
             NeuronCatalog.Create(synapseTypeName, EmptyValues)));
 
-    public Task<IReadOnlyList<Synapse>> ClientReadJournalAsync(JournalKind kind, string neuronType, string name)
-        => Client.Neuron(neuronType, name).ReadJournalAsync(kind);
+    public Task<JournalRead> ClientReadJournalAsync(JournalKind kind, string neuronType, string name, long afterSequence)
+        => Client.Neuron(neuronType, name).ReadJournalAsync(kind, afterSequence);
 
     public Task SendExpectingRefusalAsync(string synapseTypeName, string neuronType, string name)
         => CaptureRefusalAsync(() => StimulateAsync(synapseTypeName, NeuronNamed(neuronType, name), EmptyValues));
@@ -90,17 +90,19 @@ public sealed class Simulation
         }
     }
 
-    public async Task<IReadOnlyList<Synapse>> ReadJournalAsync(JournalKind kind, string neuronType, string name)
-        => await Neuron(NeuronNamed(neuronType, name)).ReadJournalAsync(kind);
+    public async Task<JournalRead> ReadJournalAsync(JournalKind kind, string neuronType, string name, long afterSequence)
+        => await Neuron(NeuronNamed(neuronType, name)).ReadJournalAsync(kind, afterSequence);
 
-    public async Task<JournalSnapshot> ReadJournalSnapshotAsync(JournalKind kind, string neuronType, string name)
-        => await Neuron(NeuronNamed(neuronType, name)).ReadJournalSnapshotAsync(kind);
-
-    public static async Task<IReadOnlyList<Synapse>> ReadJournalOfOwnerAsync(JournalKind kind, string owner, string neuronType, string name)
-        => await Neuron(new NeuronId(neuronType, new OwnerId(owner), name)).ReadJournalAsync(kind);
+    public static async Task<JournalRead> ReadJournalOfOwnerAsync(
+        JournalKind kind,
+        string owner,
+        string neuronType,
+        string name,
+        long afterSequence)
+        => await Neuron(new NeuronId(neuronType, new OwnerId(owner), name)).ReadJournalAsync(kind, afterSequence);
 
     public async Task RegisterAsync(string neuronType, string name)
-        => await Neuron(NeuronNamed(neuronType, name)).ReadJournalAsync(JournalKind.Incoming);
+        => _ = await Neuron(NeuronNamed(neuronType, name)).ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
 
     public Task AwaitHandledAsync(string neuronType, string name, string synapseTypeName)
         => SimulationCluster.Observed.AwaitHandledAsync(NeuronNamed(neuronType, name), synapseTypeName);
@@ -108,27 +110,29 @@ public sealed class Simulation
     public async Task<int> SettleAsync(JournalKind kind, string neuronType, string name)
     {
         var neuron = Neuron(NeuronNamed(neuronType, name));
-        var previous = -1;
+        long previousSequence = -1;
         var unchanged = 0;
+        var retained = 0;
 
         for (var probe = 0; probe < SettleProbes; probe++)
         {
             await Task.Delay(SettleProbeInterval);
 
-            var current = (await neuron.ReadJournalAsync(kind)).Count;
+            var current = await neuron.ReadJournalAsync(kind, afterSequence: 0);
+            retained = current.ResetSnapshot?.RetainedCount ?? current.Delta.Count;
 
-            unchanged = current == previous ? unchanged + 1 : 0;
+            unchanged = current.ResumeSequence == previousSequence ? unchanged + 1 : 0;
 
             if (unchanged >= SettleProbesWithoutChange)
             {
-                return current;
+                return retained;
             }
 
-            previous = current;
+            previousSequence = current.ResumeSequence;
         }
 
         throw new SimulationAssertionException(
-            $"The {kind} journal of {neuronType} '{name}' never stopped changing: it still reached {previous} entries after {SettleProbes} probes.");
+            $"The {kind} journal of {neuronType} '{name}' never stopped changing: it reached sequence {previousSequence} with {retained} retained entries after {SettleProbes} probes.");
     }
 
     public async Task RegisterManyAsync(int count, string neuronType)

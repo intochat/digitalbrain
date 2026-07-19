@@ -43,23 +43,33 @@ app.MapPost("/probe/ask", async (IGrainFactory grains) =>
 
 app.MapGet("/probe/fired", async (IGrainFactory grains) =>
 {
-    var fired = await Brain(grains).Session.ReadJournalAsync(JournalKind.Outgoing);
+    var fired = await Brain(grains).Session.ReadJournalAsync(JournalKind.Outgoing, afterSequence: 0);
+    var recorded = fired.ResetSnapshot?.TotalRecorded ?? fired.Delta.Count;
 
-    return Results.Ok(fired.Count);
+    return Results.Ok(recorded);
 });
 
 app.MapGet("/probe/delivered/{neuron}", async (string neuron, IGrainFactory grains) =>
 {
-    var delivered = await Brain(grains).Neuron(neuron, "one").ReadJournalAsync(JournalKind.Incoming);
+    var delivered = await Brain(grains).Neuron(neuron, "one").ReadJournalAsync(
+        JournalKind.Incoming,
+        afterSequence: 0);
+    var recorded = delivered.ResetSnapshot?.TotalRecorded ?? delivered.Delta.Count;
 
-    return Results.Ok(delivered.Count);
+    return Results.Ok(recorded);
 });
 
 app.MapGet("/probe/answers", async (IGrainFactory grains) =>
 {
-    var answered = await Brain(grains).Neuron(nameof(Asker), "one").ReadJournalAsync(JournalKind.Outgoing);
+    var answered = await Brain(grains).Neuron(nameof(Asker), "one").ReadJournalAsync(
+        JournalKind.Outgoing,
+        afterSequence: 0);
 
-    return Results.Ok(string.Join("|", answered.OfType<IAnswer>().Select(answer => answer.Text)));
+    return answered.ResetSnapshot is not null
+        ? Results.Problem(
+            "The answer journal compacted before its payloads were read.",
+            statusCode: StatusCodes.Status409Conflict)
+        : Results.Ok(string.Join("|", answered.Delta.OfType<IAnswer>().Select(answer => answer.Text)));
 });
 
 app.Run();

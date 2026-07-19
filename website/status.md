@@ -42,8 +42,9 @@ Every commit keeps all of these green:
 
 These are real gaps in the foundation. They are tracked, not hidden.
 
-**No timeline stream.** A client can fire synapses and read journals, but cannot observe a brain as it
-works. Code that needs to react must poll a journal. This is the most visible missing primitive.
+**No timeline stream.** A client can fire synapses and catch up through cursor-based journal reads,
+but cannot observe a brain as it works. Code that needs to react must poll a journal. This is the most
+visible missing primitive.
 
 The kernel does emit an OpenTelemetry activity on every delivery, and the testing package listens to
 it, so in-process observation exists and the simulation suite uses it. What is missing is the durable,
@@ -72,9 +73,10 @@ never expose an Orleans client endpoint publicly.
 bound; they are now bounded by both record count and total bytes. What survives compaction is a
 durable tally — how many of each synapse type the neuron has recorded, the last sequence, and the
 window still retained — not the synapses themselves. A consumer can still ask *what has this neuron
-done and how much*, but it cannot read a synapse older than the window. That is the deliberate trade
-of DEC-1: the journal stopped being an audit log, and the audit log it used to pretend to be is
-provided separately by the governance ledger, which is not built yet.
+done and how much*, but it cannot read a synapse older than the window. Reads carry a resume sequence;
+a stale cursor receives the complete summary as a reset rather than a silently gapped tail. That is
+the deliberate trade of DEC-1: the journal stopped being an audit log, and the audit log it used to
+pretend to be is provided separately by the governance ledger, which is not built yet.
 
 **Effectively-once processing is windowed, not eternal.** A neuron remembers the last 4,096
 `SynapseId`s it has handled, in a durable ring that survives restart. A redelivery of a synapse

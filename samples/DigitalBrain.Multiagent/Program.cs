@@ -1,4 +1,7 @@
-using DigitalBrain;
+using DigitalBrain.Abstractions;
+using DigitalBrain.Client;
+using DigitalBrain.DevTools;
+using DigitalBrain.Kernel;
 using DigitalBrain.Multiagent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -20,7 +23,7 @@ var brain = new BrainClient(host.Services.GetRequiredService<IGrainFactory>(), n
 
 foreach (var panellist in (string[])[nameof(Optimist), nameof(Skeptic), nameof(Scribe)])
 {
-    await brain.Neuron(panellist, "one").ReadJournalAsync(JournalKind.Incoming);
+    await brain.Neuron(panellist, "one").ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
 }
 
 await brain.FireAsync(nameof(Moderator), "chair", new QuestionAsked("should we ship it?"));
@@ -35,17 +38,34 @@ await host.StopAsync();
 
 static async Task<IReadOnlyList<Synapse>> Settled(NeuronHandle neuron)
 {
+    long cursor = 0;
+
     for (var probe = 0; probe < 100; probe++)
     {
-        var journal = await neuron.ReadJournalAsync(JournalKind.Incoming);
+        var journal = await neuron.ReadJournalAsync(JournalKind.Incoming, cursor);
+        var delta = DeltaOrThrow(journal);
+        cursor = journal.ResumeSequence;
 
-        if (journal.Count > 0)
+        if (delta.Count > 0)
         {
-            return journal;
+            return delta;
         }
 
         await Task.Delay(TimeSpan.FromMilliseconds(100));
     }
 
-    return await neuron.ReadJournalAsync(JournalKind.Incoming);
+    var final = await neuron.ReadJournalAsync(JournalKind.Incoming, cursor);
+
+    return DeltaOrThrow(final);
+}
+
+static IReadOnlyList<Synapse> DeltaOrThrow(JournalRead journal)
+{
+    if (journal.ResetSnapshot is not null)
+    {
+        throw new InvalidOperationException(
+            $"The panel journal compacted before sequence {journal.ResumeSequence}; its verdict payload is no longer available.");
+    }
+
+    return journal.Delta;
 }

@@ -97,14 +97,16 @@ var brain = new BrainClient(host.Services.GetRequiredService<IGrainFactory>(), n
 
 await brain.FireAsync(nameof(Greeter), "first", new Hello());
 
-var fired = await brain.Session.ReadJournalAsync(JournalKind.Outgoing);
+var fired = await brain.Session.ReadJournalAsync(JournalKind.Outgoing, afterSequence: 0);
+var firedCount = fired.ResetSnapshot?.TotalRecorded ?? fired.Delta.Count;
 
-Console.WriteLine($"the session durably recorded {fired.Count} fired synapse(s)");
+Console.WriteLine($"the session durably recorded {firedCount} fired synapse(s)");
 ```
 
 Every client acts as an owner. `BrainClient` fires through an owner-bound session neuron, so the
 session's own outgoing journal is a durable record of what that owner asked for, and an attempt to
-address another owner's neuron is refused rather than quietly routed.
+address another owner's neuron is refused rather than quietly routed. Journal reads carry a cursor;
+pass the returned `ResumeSequence` to the next read to receive only later synapses.
 
 ## 5. Run it
 
