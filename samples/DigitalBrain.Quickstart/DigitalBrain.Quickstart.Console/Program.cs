@@ -2,6 +2,12 @@ using DigitalBrain;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
+if (args.Contains("--live-driver", StringComparer.Ordinal))
+{
+    await QuickstartLiveDriver.RunAsync(args);
+    return;
+}
+
 if (args.Contains("--command-contract", StringComparer.Ordinal))
 {
     var generated = new Queue<ConversationId>(

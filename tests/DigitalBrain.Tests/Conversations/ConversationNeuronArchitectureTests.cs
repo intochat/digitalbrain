@@ -3,6 +3,7 @@ using DigitalBrain.Kernel;
 using Microsoft.Extensions.AI;
 using Orleans.Journaling;
 using System.Reflection;
+using System.Text.Json;
 using Xunit;
 
 namespace DigitalBrain.Tests.Conversations;
@@ -57,6 +58,31 @@ public sealed class ConversationNeuronArchitectureTests
         Assert.NotNull(NeuronJournalJsonContext.Default.GetTypeInfo(typeof(ConversationTurnRequest)));
         Assert.NotNull(NeuronJournalJsonContext.Default.GetTypeInfo(typeof(ConversationTurn)));
         Assert.NotNull(NeuronJournalJsonContext.Default.GetTypeInfo(typeof(ConversationTurnResult)));
+    }
+
+    [Fact]
+    public void Conversation_turn_request_round_trips_through_the_official_json_journal_context()
+    {
+        var request = new ConversationTurnRequest(
+            new ConversationTurnId(Guid.Parse("8b842fc5-ae58-4592-b5cb-d311160037ec")),
+            ConversationRole.Balanced,
+            "recover this turn");
+
+        var json = JsonSerializer.Serialize(
+            request,
+            typeof(ConversationTurnRequest),
+            NeuronJournalJsonContext.Default);
+        Assert.Contains(
+            request.TurnId.Value.ToString(),
+            json,
+            StringComparison.OrdinalIgnoreCase);
+        var recovered = Assert.IsType<ConversationTurnRequest>(
+            JsonSerializer.Deserialize(
+                json,
+                typeof(ConversationTurnRequest),
+                NeuronJournalJsonContext.Default));
+
+        Assert.Equal(request, recovered);
     }
 
     [Fact]

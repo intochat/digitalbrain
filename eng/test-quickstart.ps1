@@ -59,5 +59,8 @@ finally {
 }
 
 if ($Live) {
-    Write-Host 'Live quickstart behavior is verified by the Task 9 controlled-provider gate.'
+    $liveQuickstartGate = Join-Path `
+        $repositoryRoot `
+        'samples/DigitalBrain.Quickstart/Test-LiveQuickstart.ps1'
+    & $liveQuickstartGate
 }

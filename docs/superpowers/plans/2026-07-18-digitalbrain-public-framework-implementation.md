@@ -469,22 +469,24 @@ dotnet test .\tests\DigitalBrain.Tests\DigitalBrain.Tests.csproj -c Release
 **Assigned paths:**
 
 - `tests/DigitalBrain.PackageTests/**`
+- `tests/DigitalBrain.Tests/Conversations/ConversationNeuronArchitectureTests.cs`
 - `eng/test-quickstart.ps1`
+- `kernel/DigitalBrain.Abstractions/Conversations/ConversationContracts.cs`
 - `samples/DigitalBrain.Quickstart/**`
 
 **Automated proof:**
 
-- [ ] Start the quickstart AppHost with a test-only HTTP provider resource, explicit OpenAI/Anthropic endpoint overrides, and synthetic secret parameters.
-- [ ] Prove that the normal privileged kernel provider factories and official SDK adapters call that HTTP resource; do not replace `IChatClient` or use ambient credentials.
-- [ ] Wait for Azurite, Orleans, kernel, console test driver, dashboard, and DevUI to become healthy.
-- [ ] Send a durable turn through `DigitalBrain.Client`.
-- [ ] Verify the selected role reached the correct provider adapter.
-- [ ] Restart the kernel.
-- [ ] Resume the same conversation and verify durable state.
-- [ ] Verify Orleans Dashboard endpoint.
-- [ ] Verify DevUI entity discovery and one role-backed turn.
-- [ ] Capture Aspire resource states, traces, and logs.
-- [ ] Stop all resources and prove no orphaned processes.
+- [x] Start the quickstart AppHost with a test-only HTTP provider resource, explicit OpenAI/Anthropic endpoint overrides, and synthetic secret parameters.
+- [x] Prove that the normal privileged kernel provider factories and official SDK adapters call that HTTP resource; do not replace `IChatClient` or use ambient credentials.
+- [x] Wait for Azurite, Orleans, kernel, console test driver, dashboard, and DevUI to become healthy.
+- [x] Send a durable turn through `DigitalBrain.Client`.
+- [x] Verify the selected role reached the correct provider adapter.
+- [x] Restart the kernel.
+- [x] Resume the same conversation and verify durable state.
+- [x] Verify Orleans Dashboard endpoint.
+- [x] Verify DevUI entity discovery and one role-backed turn.
+- [x] Capture Aspire resource states, traces, and logs.
+- [x] Stop all resources and prove no orphaned processes.
 
 **Optional real-provider proof:**
 
@@ -500,6 +502,8 @@ aspire ps --non-interactive
 ```
 
 **Commit:** `test: prove DigitalBrain package quickstart recovery`
+
+**Execution record (2026-07-19):** Baseline HEAD was `2579665890201fa88c12acf61147e4c293354e70` on `master`. The assigned paths were amended before commit to include the public turn-identity contract and its journal-context regression test after the real restart proof exposed a framework recovery defect. Static TDD began with three failing package tests for the absent live AppHost model, controlled provider/driver path, and supported live entry gate. The Development-only controlled provider accepts exact synthetic OpenAI and Anthropic credentials, records only hashes and non-secret routing facts, and is reached through the normal privileged kernel factories and official SDK adapters. The fixed-port console test driver uses the restricted Aspire client, an explicit owner session, typed balanced role facade, durable turn identity, health checks, and OTLP export; Dashboard, DevUI, and kernel telemetry remain on their normal package paths. The live gate restores through a fresh isolated NuGet cache, forces a non-incremental package-consumer build, waits for all dependencies, commits one balanced turn, restarts only the kernel, reads the same conversation, proves replay idempotence, continues with a second turn, invokes the fast DevUI agent, captures redacted resource/log/trace evidence, and verifies process, port, container, AppHost, environment, cache, and `aspire.config.json` cleanup. Systematic debugging fixed the harness's PowerShell automatic-variable hash collision, process-stop timing, non-enumerated `Invoke-RestMethod` array shape, optional Aspire resource fields, and same-version local package-cache reuse. The restart itself reproduced `ArgumentException: A non-empty turn id is required` during official JSON journal replay; Microsoft Learn confirmed that immutable structs require `[JsonConstructor]` to select a parameterized constructor, and the minimum validated-constructor annotation made the new round-trip regression and real restart pass without weakening the public boundary. The exact owning gate passed DigitalBrain.Tests 246 / 246; package tests passed 33 / 33. `.\eng\test-quickstart.ps1 -Live` passed all 33 package tests plus controlled-provider, restart, Dashboard, DevUI, log, trace, secret-redaction, and teardown proofs; optional real OpenAI and Anthropic turns were explicitly skipped because credentials were absent. The final exact root checkpoint passed DigitalBrain.Tests 246 / 246, DigitalBrain.PackageTests 33 / 33, and Brain.FeasibilityTests 13 / 13 after one unchanged timing-sensitive OpenAI cancellation-test timeout passed both in isolation and on the exact rerun. The Release solution build completed with zero warnings and errors; `aspire doctor` passed 5 / 5; `aspire ps` reported no running AppHost; evidence contained 31 resources with 15 token-free URLs, three authorized provider requests, one `chat claude-sonnet-4-5` kernel trace carrying `gen_ai.operation.name=chat`, and three `digitalbrain.conversation.submit` driver traces; no isolated cache or added source comment remained. CodeGraph inspection bounded the journal fix to the turn identity, official source-generated JSON context, durable intent dictionary, coordinator, and architecture tests. The initial C# review reported no actionable P0-P2 findings. The complete-diff review found three P2 gaps in URL redaction, restart-exit proof, and telemetry relevance; all were fixed under new failing static assertions, and the focused re-review reported no actionable P0-P2 findings. `git diff --check` passed. No package was published, deployed, or pushed.
 
 ## Task 10: Remove superseded active architecture
 

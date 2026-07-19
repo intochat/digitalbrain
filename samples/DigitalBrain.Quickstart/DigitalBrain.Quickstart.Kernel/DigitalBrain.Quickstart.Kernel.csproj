@@ -7,5 +7,6 @@
     <PackageReference Include="DigitalBrain.DevTools" />
     <PackageReference Include="DigitalBrain.Kernel" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
   </ItemGroup>
 </Project>

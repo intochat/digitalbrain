@@ -34,6 +34,7 @@ public readonly record struct ConversationId
 [Alias(nameof(ConversationTurnId))]
 public readonly record struct ConversationTurnId
 {
+    [System.Text.Json.Serialization.JsonConstructor]
     public ConversationTurnId(Guid value)
     {
         if (value == Guid.Empty)

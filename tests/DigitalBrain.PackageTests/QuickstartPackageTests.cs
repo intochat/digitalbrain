@@ -18,6 +18,12 @@ public sealed class QuickstartPackageTests(PackedFrameworkFixture fixture)
             ["DigitalBrain.Quickstart.DevUI"] = "DigitalBrain.DevTools"
         };
 
+    private static readonly string[] ExpectedProjects =
+    [
+        .. ExpectedPackages.Keys,
+        "DigitalBrain.Quickstart.TestProvider"
+    ];
+
     [Fact]
     public void Quickstart_projects_consume_framework_packages_without_framework_project_references()
     {
@@ -28,7 +34,7 @@ public sealed class QuickstartPackageTests(PackedFrameworkFixture fixture)
             .ToArray();
 
         Assert.Equal(
-            ExpectedPackages.Keys.Order(StringComparer.Ordinal),
+            ExpectedProjects.Order(StringComparer.Ordinal),
             projectFiles
                 .Select(Path.GetFileNameWithoutExtension)
                 .Order(StringComparer.Ordinal));
@@ -43,7 +49,10 @@ public sealed class QuickstartPackageTests(PackedFrameworkFixture fixture)
                 .Where(value => value is not null)
                 .Cast<string>()
                 .ToArray();
-            Assert.Contains(ExpectedPackages[projectName], packageReferences);
+            if (ExpectedPackages.TryGetValue(projectName, out var expectedPackage))
+                Assert.Contains(expectedPackage, packageReferences);
+            else
+                Assert.Empty(packageReferences);
 
             foreach (var projectReference in project.Descendants("ProjectReference"))
             {
@@ -236,6 +245,214 @@ public sealed class QuickstartPackageTests(PackedFrameworkFixture fixture)
                  })
             Assert.Contains(expected, resources);
         Assert.DoesNotContain("quickstart-compose", resources);
+    }
+
+    [Fact]
+    public void Live_AppHost_model_adds_controlled_provider_and_console_driver()
+    {
+        var quickstart = fixture.PrepareQuickstart();
+        var environment = new Dictionary<string, string>(
+            DevelopmentEnvironment(quickstart),
+            StringComparer.Ordinal)
+        {
+            ["DigitalBrain__Quickstart__Live"] = "true",
+            ["DigitalBrain__Quickstart__ProviderEndpoint"] =
+                "http://127.0.0.1:5188",
+            ["DigitalBrain__Quickstart__ProviderPort"] = "5188",
+            ["DigitalBrain__Quickstart__DriverPort"] = "5189"
+        };
+        var result = Run(
+            quickstart,
+            "DigitalBrain.Quickstart.AppHost",
+            "net11.0",
+            environment,
+            "--model-contract");
+
+        Assert.Equal(0, result.ExitCode);
+        var contract = ContractLines(result.Output);
+        var resources = contract
+            .Select(line => line["resource:".Length..])
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.Contains("test-provider", resources);
+        Assert.Contains("console-test-driver", resources);
+        Assert.Contains(
+            "endpoint:openai:http://127.0.0.1:5188/v1",
+            contract);
+        Assert.Contains(
+            "endpoint:anthropic:http://127.0.0.1:5188/",
+            contract);
+    }
+
+    [Fact]
+    public void Live_quickstart_uses_normal_clients_and_a_provider_neutral_test_resource()
+    {
+        var providerRoot = Path.Combine(
+            QuickstartRoot(),
+            "DigitalBrain.Quickstart.TestProvider");
+        var providerProject = Path.Combine(
+            providerRoot,
+            "DigitalBrain.Quickstart.TestProvider.csproj");
+        Assert.True(File.Exists(providerProject), providerProject);
+        var references = XDocument
+            .Load(providerProject)
+            .Descendants("PackageReference")
+            .Select(element => element.Attribute("Include")?.Value)
+            .Where(value => value is not null)
+            .Cast<string>()
+            .ToArray();
+        Assert.DoesNotContain(
+            references,
+            reference =>
+                reference.StartsWith("DigitalBrain", StringComparison.Ordinal) ||
+                reference.Contains("OpenAI", StringComparison.OrdinalIgnoreCase) ||
+                reference.Contains("Anthropic", StringComparison.OrdinalIgnoreCase));
+
+        var appHost = File.ReadAllText(Path.Combine(
+            QuickstartRoot(),
+            "DigitalBrain.Quickstart.AppHost",
+            "AppHost.cs"));
+        Assert.Contains("ControlledGptFast", appHost, StringComparison.Ordinal);
+        Assert.Contains("ControlledClaudeBalanced", appHost, StringComparison.Ordinal);
+        Assert.Contains("ControlledGptReasoning", appHost, StringComparison.Ordinal);
+        Assert.Contains("ControlledTextEmbedding", appHost, StringComparison.Ordinal);
+        Assert.Contains("test-provider", appHost, StringComparison.Ordinal);
+        Assert.Contains("console-test-driver", appHost, StringComparison.Ordinal);
+        Assert.Contains(
+            "DigitalBrain__Quickstart__OpenAISecret",
+            appHost,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "DigitalBrain__Quickstart__AnthropicSecret",
+            appHost,
+            StringComparison.Ordinal);
+        Assert.Contains("ParameterResource", appHost, StringComparison.Ordinal);
+        Assert.Contains(
+            "brain-openai-openai-apikey",
+            appHost,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "brain-anthropic-api-key",
+            appHost,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("IChatClient", appHost, StringComparison.Ordinal);
+
+        var driver = File.ReadAllText(Path.Combine(
+            QuickstartRoot(),
+            "DigitalBrain.Quickstart.Console",
+            "QuickstartLiveDriver.cs"));
+        Assert.Contains("DigitalBrainSessionFactory", driver, StringComparison.Ordinal);
+        Assert.Contains("SubmitTurnAsync", driver, StringComparison.Ordinal);
+        Assert.Contains("ReadAsync", driver, StringComparison.Ordinal);
+        Assert.Contains("UseOtlpExporter", driver, StringComparison.Ordinal);
+        Assert.DoesNotContain("Enum.TryParse", driver, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "request.Role",
+            driver,
+            StringComparison.Ordinal);
+
+        var provider = File.ReadAllText(Path.Combine(
+            providerRoot,
+            "Program.cs"));
+        Assert.Contains(
+            "DigitalBrain:Quickstart:OpenAISecret",
+            provider,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "DigitalBrain:Quickstart:AnthropicSecret",
+            provider,
+            StringComparison.Ordinal);
+
+        var kernel = File.ReadAllText(Path.Combine(
+            QuickstartRoot(),
+            "DigitalBrain.Quickstart.Kernel",
+            "Program.cs"));
+        Assert.Contains("UseOtlpExporter", kernel, StringComparison.Ordinal);
+
+        foreach (var project in new[]
+                 {
+                     "DigitalBrain.Quickstart.Console",
+                     "DigitalBrain.Quickstart.Kernel"
+                 })
+        {
+            var projectSource = File.ReadAllText(Path.Combine(
+                QuickstartRoot(),
+                project,
+                $"{project}.csproj"));
+            Assert.Contains(
+                "OpenTelemetry.Exporter.OpenTelemetryProtocol",
+                projectSource,
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void Live_gate_covers_recovery_devtools_telemetry_and_teardown()
+    {
+        var liveGatePath = Path.Combine(
+            QuickstartRoot(),
+            "Test-LiveQuickstart.ps1");
+        Assert.True(File.Exists(liveGatePath), liveGatePath);
+        var liveGate = File.ReadAllText(liveGatePath);
+
+        foreach (var required in new[]
+                 {
+                     "aspire wait test-provider",
+                     "aspire wait brain-storage",
+                     "aspire wait kernel",
+                     "aspire wait console-test-driver",
+                     "aspire wait orleans-dashboard",
+                     "aspire wait devui",
+                     "NUGET_PACKAGES",
+                     "dotnet restore",
+                     "--force-evaluate",
+                     "dotnet build",
+                     "--no-incremental",
+                     "aspire start",
+                     "--no-build",
+                     "aspire resource kernel restart",
+                     "/dashboard",
+                     "/v1/entities",
+                     "/v1/responses",
+                     "aspire describe",
+                     "aspire logs kernel",
+                     "aspire otel traces kernel",
+                     "gen_ai.operation.name",
+                     "chat claude-sonnet-4-5",
+                     "digitalbrain.conversation.submit",
+                     "aspire stop",
+                     "aspire ps"
+                 })
+            Assert.Contains(required, liveGate, StringComparison.Ordinal);
+
+        foreach (var redactionRequirement in new[]
+                 {
+                     "Get-RedactedUri",
+                     "$builder.Query = [string]::Empty",
+                     "$builder.Fragment = [string]::Empty",
+                     "$builder.UserName = [string]::Empty",
+                     "$builder.Password = [string]::Empty"
+                 })
+            Assert.Contains(
+                redactionRequirement,
+                liveGate,
+                StringComparison.Ordinal);
+
+        var oldKernelExit = liveGate.IndexOf(
+            "Assert-ProcessStopped $kernelProcessId",
+            StringComparison.Ordinal);
+        var recoveryRead = liveGate.IndexOf(
+            "$snapshot = Invoke-JsonGetWithRetry $snapshotUri",
+            StringComparison.Ordinal);
+        Assert.InRange(oldKernelExit, 0, recoveryRead - 1);
+
+        var entryGate = File.ReadAllText(Path.Combine(
+            fixture.RepositoryRoot,
+            "eng",
+            "test-quickstart.ps1"));
+        Assert.Contains(
+            "Test-LiveQuickstart.ps1",
+            entryGate,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -562,7 +779,8 @@ public sealed class QuickstartPackageTests(PackedFrameworkFixture fixture)
                 line.StartsWith("conversation:", StringComparison.Ordinal) ||
                 line.StartsWith("commands:", StringComparison.Ordinal) ||
                 line == "exit" ||
-                line.StartsWith("resource:", StringComparison.Ordinal))
+                line.StartsWith("resource:", StringComparison.Ordinal) ||
+                line.StartsWith("endpoint:", StringComparison.Ordinal))
             .ToArray();
 
     private static async Task<(int ExitCode, string Output)> RunPowerShellAsync(

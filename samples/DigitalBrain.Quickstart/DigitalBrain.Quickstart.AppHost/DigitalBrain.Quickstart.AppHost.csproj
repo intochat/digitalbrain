@@ -11,5 +11,6 @@
     <ProjectReference Include="..\DigitalBrain.Quickstart.DevUI\DigitalBrain.Quickstart.DevUI.csproj" />
     <ProjectReference Include="..\DigitalBrain.Quickstart.Kernel\DigitalBrain.Quickstart.Kernel.csproj" />
     <ProjectReference Include="..\DigitalBrain.Quickstart.OrleansDashboard\DigitalBrain.Quickstart.OrleansDashboard.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Quickstart.TestProvider\DigitalBrain.Quickstart.TestProvider.csproj" />
   </ItemGroup>
 </Project>
