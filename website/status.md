@@ -17,7 +17,7 @@ so.
 | AI model binding | done |
 | Client package | done |
 | Aspire integration | done |
-| Hosts, dev tools, quickstart | not started |
+| Hosts, dev tools, quickstart | done |
 | Hosted restart proof | not started |
 | Release engineering | not started |
 | Final verification and docs | not started |

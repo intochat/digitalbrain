@@ -387,12 +387,26 @@ referencing it.
   + 22 Tier-1 + 1 Tier-2.
 
 ### M8 — Hosts, dev tools, quickstart **[review]**
-- [ ] Public kernel host on official durability (no localhost clustering or in-memory reminders in
-      production paths); Orleans Dashboard + DevUI in `DigitalBrain.DevTools` behind Development-only
-      guards; package-only quickstart (PackageReference from local feed).
-- [ ] The multiagent sample: several neurons collaborating through synapses — broadcast, reaction,
+- [x] Public kernel host on official durability (no localhost clustering or in-memory reminders in
+      production paths); package-only quickstart (PackageReference from local feed).
+      **Orleans Dashboard + DevUI are not built** — `DigitalBrain.DevTools` currently ships the
+      Development-only guard and the development journal store; see Decision 26.
+- [x] The multiagent sample: several neurons collaborating through synapses — broadcast, reaction,
       typed reply — as the framework's flagship demonstration.
 - Commit: `feat: add hosts, dev tools, and the quickstart`
+- Execution record: baseline `8d01dd8b`, commits `3fd36ee7`, `2957f2b2`, and the sample commit
+  below. Red evidence, all of it useful: `dotnet pack` refused a stable `1.0.0` that depends on
+  Orleans prereleases (NU5104), so the packages are now `0.1.0-alpha.1`; the quickstart failed to
+  resolve framework types until it was restored against a genuinely empty cache, which is what the
+  empty-cache gate exists to catch — the global cache was serving a stale build of the same
+  version; it then crashed at activation for the reason Decision 12(d) predicted, no journal
+  storage provider; and the first multiagent sample deadlocked itself because the Moderator both
+  handled and emitted `QuestionAsked`, the self-broadcast cycle Decision 17 warns about. Gates:
+  root `dotnet test .\DigitalBrain.slnx -c Release` exit 0 (71 Tier-0 + 22 Tier-1 + 2 Tier-2),
+  `dotnet pack` producing seven packages and seven symbol packages, and both samples building and
+  running from the local feed against an empty `NUGET_PACKAGES`. The multiagent sample prints
+  `the scribe recorded: Skeptic says "measure it first" and Optimist says "ship it"` — four neurons
+  collaborating through a typed send, two typed replies, and a durable broadcast.
 
 ### M9 — Hosted proof
 - [ ] Tier-2: quickstart AppHost under `Aspire.Hosting.Testing` with the scripted provider; durable
@@ -731,6 +745,26 @@ referencing it.
     Environment note worth keeping: a locally-pulled Azurite image rejected the storage SDK's API
     version (`2026-02-06`) with `InvalidHeaderValue`; Aspire's own `RunAsEmulator()` image is
     current enough, so this only bites when running Azurite by hand — pass `--skipApiVersionCheck`.
+
+26. **2026-07-19 — Volatile journal storage lives in DevTools, and the dashboards do not exist
+    yet.** The quickstart proved that `AddDigitalBrain()` alone cannot activate a neuron —
+    Decision 12(d)'s missing `IJournalStorageProvider`. Production hosts get
+    `AddDigitalBrainJournalStorage` (Azure Blob, Decision 23); samples and local runs get
+    `AddDevelopmentJournalStorage()` in `DigitalBrain.DevTools`, which is the package whose whole
+    purpose is development-only tooling. That keeps volatile durability out of `DigitalBrain.Kernel`
+    entirely, satisfying the constraint against volatile production durability by construction
+    rather than by convention. **Open work:** M8 also asks for the Orleans Dashboard and DevUI
+    behind Development-only guards. `UseDigitalBrainDevTools()` ships the guard but mounts nothing,
+    so the dashboards remain unbuilt and M8's box says so.
+27. **2026-07-19 — The samples poll because there is still no way to observe.** The multiagent
+    sample waits on a bounded `Task.Delay` loop over `ReadJournalAsync` before it can print the
+    panel's verdict. That is not a stylistic choice: delivery is a detached drain (Decision 15) and
+    there is no timeline stream (Decision 21), so a consumer outside the cluster has no signal to
+    await. The first version of the sample spun a tight poll with no delay, finished before the
+    50 ms drain timer had fired even once, and printed an empty verdict — a consumer would read
+    that as "the framework does not work". The Testing Architecture forbids this pattern in test
+    steps and Tier 1 correctly uses OTel observation instead; a shipped sample having to poll is
+    the clearest possible argument for closing Decision 21.
 
 ## Definition of Done
 
