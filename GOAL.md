@@ -470,11 +470,28 @@ referencing it.
     `CA2007` (ConfigureAwait) is disabled in `DigitalBrain.Kernel`, `DigitalBrain.Testing`, and
     the simulation project: Orleans runs each activation on its own scheduler, and
     `ConfigureAwait(false)` would move continuations off the grain context — the rule is actively
-    harmful in grain code. `CA1812` (uninstantiated internal class) is disabled in the simulation
-    project because Orleans activates grain classes reflectively. `CA1040` (empty interface) is
-    suppressed on `IEmit<TSynapse>` alone, at the declaration, because the contract's Mission
-    defines it as a marker the dispatch manifest reads. All are project- or declaration-scoped;
-    none is global.
+    harmful in grain code. `CA1812` (uninstantiated internal class) is disabled in the same three
+    projects because Orleans activates grain classes and DI-registered call filters reflectively.
+    Declaration-scoped, each with its justification on the symbol: `CA1040` on `IEmit<TSynapse>`
+    (the contract's Mission defines it as a marker the dispatch manifest reads), `CA1308` on the
+    `NeuronId` constructor (neuron type names are Orleans grain type names, which Orleans itself
+    lowercases), and `CA1031` on the simulation driver's refusal capture (it must record whatever
+    the cluster threw so a scenario reports the actual failure). All are project- or
+    declaration-scoped; none is global.
+15. **2026-07-19 — Delivery is deferred to M3, and M2's verbs are outbox appends.** Proven by
+    construction during M2: a neuron that sends while handling, awaiting the target's
+    `DeliverAsync`, deadlocks itself the moment the target replies — Orleans grains are
+    non-reentrant, and the reply re-enters the still-executing sender. Making `DeliverAsync`
+    `[AlwaysInterleave]` would "fix" it by abandoning the ordering and journal-consistency the
+    guarantee rests on. This is exactly why Decision 6 makes delivery a detached drain rather than
+    a synchronous call, and it is M3's box. So in M2 `EmitAsync`/`SendAsync`/`ReplyAsync` stamp the
+    synapse and append it to the durable outbox — the source of truth — and nothing else.
+    Consequences: the recursion depth guard listed under M2 is deferred to M3 with the delivery it
+    guards, rather than shipped as unexercised code; scenarios asserting that a synapse *arrives*
+    are M3's. The simulation driver stimulates the cluster through a real `SimulationNeuron` grain
+    (Decision 11's "the simulation itself is the firing neuron"), which is also what gives the
+    owner filter a trustworthy `SourceId` — client-originated calls carry none, so client-path
+    authorization stays with M6.
 
 ## Definition of Done
 

@@ -30,6 +30,25 @@ public sealed class NeuronSteps(Simulation simulation)
             values.Rows.ToDictionary(row => row[0], row => row[1], StringComparer.Ordinal));
     }
 
+    [When("{word} is sent to the {word} neuron named {string} claiming owner {string}")]
+    public Task WhenSynapseIsSentClaimingAnotherOwner(string synapseType, string neuronType, string name, string claimedOwner)
+        => simulation.SendClaimingOwnerAsync(synapseType, neuronType, name, claimedOwner);
+
+    [Then("the synapse is refused as unauthorized")]
+    public void ThenTheSynapseIsRefusedAsUnauthorized() => simulation.ExpectRefusal<NeuronAuthorizationException>();
+
+    [Then("the incoming journal of the {word} neuron named {string} is empty")]
+    public async Task ThenTheIncomingJournalIsEmpty(string neuronType, string name)
+    {
+        var journal = await simulation.ReadJournalAsync(JournalKind.Incoming, neuronType, name);
+
+        if (journal.Count > 0)
+        {
+            throw new SimulationAssertionException(
+                $"Expected the incoming journal of {neuronType} '{name}' to be empty, but it recorded {string.Join(", ", journal.Select(synapse => synapse.GetType().Name))}.");
+        }
+    }
+
     [Then("the incoming journal of the {word} neuron named {string} contains {word}")]
     public Task ThenTheIncomingJournalContains(string neuronType, string name, string synapseType)
         => AssertJournalContains(JournalKind.Incoming, neuronType, name, synapseType);

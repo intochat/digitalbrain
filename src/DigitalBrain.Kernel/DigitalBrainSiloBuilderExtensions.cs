@@ -12,6 +12,7 @@ public static class DigitalBrainSiloBuilderExtensions
 
         builder.AddJournalStorage();
         builder.UseJsonJournalFormat(JournalJsonContext.Default);
+        builder.AddIncomingGrainCallFilter<OwnerBoundCallFilter>();
 
         return builder;
     }

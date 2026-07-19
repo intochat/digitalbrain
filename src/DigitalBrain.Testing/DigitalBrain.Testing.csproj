@@ -2,7 +2,7 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>The DigitalBrain simulation machine: fire synapses into a real in-process cluster and expect synapses on the timeline. Development-only.</Description>
-    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007</NoWarn>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.TestingHost" />
