@@ -17,8 +17,9 @@ public sealed class NeuronSteps(Simulation simulation)
     [BeforeScenario]
     public static void ForgetPreviousScripts() => SimulationCluster.ForgetScripts();
 
-    [AfterScenario]
-    public void FailOnUnassertedRefusal() => simulation.RethrowUnassertedRefusal();
+    [When("{word} is refused by the {word} neuron named {string}")]
+    public Task WhenSynapseIsRefused(string synapseType, string neuronType, string name)
+        => simulation.SendExpectingRefusalAsync(synapseType, neuronType, name);
 
     [Given("the {word} model answers {string} with {string}")]
     public static void GivenTheModelAnswers(string tier, string prompt, string answer)

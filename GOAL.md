@@ -313,7 +313,19 @@ referencing it.
   a synthetic key and an `Endpoint` override, and the test asserts both the answer text and that the
   request carried `Bearer synthetic-key` to `/chat/completions`. Provider SDKs and credentials stay
   inside `DigitalBrain.Kernel`; `DigitalBrain.Testing` ships only the scripted model, which fails
-  loudly on an unscripted prompt rather than inventing an answer.
+  loudly on an unscripted prompt rather than inventing an answer. Review: 57-agent adversarial
+  workflow over the security boundary, binding correctness, and test integrity. One blocker
+  confirmed and fixed, and it was self-inflicted: to let a scenario assert a refusal, `SendAsync`
+  had been changed to swallow every send failure and clear the record on the next success, so a
+  scenario that sends twice could go green on a broken first send — the N+1 broadcast scenario was
+  live proof. Refusal capture is now explicit (`When <Synapse> is refused by ...`), ordinary sends
+  propagate again, and the latching guard that made it appear safe is deleted. Also fixed:
+  `ModelDescriptor.ToString()` printed the provider API key through the compiler-generated
+  `PrintMembers` (now overridden to omit it, with a Tier-0 test that is the seed of M7's
+  secret-leakage suite); `AddDigitalBrainModels` — the whole shipped binding entry point — had no
+  test, so the enum-as-service-key claim Decision 20 rests on was unproven; and the Anthropic
+  adapter had zero executable coverage, leaving half of the "real adapters proven over HTTP" box
+  unmet. Both adapters are now proven against a loopback server.
 
 ### M6 — Client package **[review]**
 - [ ] `DigitalBrain.Client`: owner sessions, typed neuron access, fire-and-observe from outside the

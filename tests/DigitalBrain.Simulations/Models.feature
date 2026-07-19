@@ -9,5 +9,5 @@ Scenario: a neuron answers using the model tier it declares
 
 Scenario: an unscripted prompt fails loudly instead of inventing an answer
     Given a brain for owner "unscripted"
-    When Asked is sent to the Thinker neuron named "silent"
+    When Asked is refused by the Thinker neuron named "silent"
     Then the synapse is refused as unscripted

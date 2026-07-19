@@ -45,6 +45,76 @@ public sealed class ProviderAdapterContracts
     }
 
     [Fact]
+    public async Task AnthropicAdapterTalksToTheDeclaredEndpoint()
+    {
+        const string Body = """
+        {
+          "id": "msg_probe",
+          "type": "message",
+          "role": "assistant",
+          "model": "probe-model",
+          "content": [ { "type": "text", "text": "answered over http" } ],
+          "stop_reason": "end_turn",
+          "usage": { "input_tokens": 1, "output_tokens": 1 }
+        }
+        """;
+
+        using var server = new CannedHttpServer(Body);
+
+        var model = ProviderFactory.Create(new ModelDescriptor(ModelTier.Fast, ModelDescriptor.AnthropicProvider, "probe-model")
+        {
+            ApiKey = "synthetic-key",
+            Endpoint = server.Address,
+        });
+
+        using (model)
+        {
+            var answer = await model.GetResponseAsync(
+                [new Microsoft.Extensions.AI.ChatMessage(Microsoft.Extensions.AI.ChatRole.User, "ping")],
+                options: null,
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal("answered over http", answer.Text);
+        }
+
+        Assert.Contains("/messages", server.LastPath, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ADescriptorNeverPrintsItsCredential()
+    {
+        var descriptor = new ModelDescriptor(ModelTier.Fast, ModelDescriptor.OpenAiProvider, "small")
+        {
+            ApiKey = "sk-live-should-never-be-printed",
+        };
+
+        var printed = descriptor.ToString();
+
+        Assert.DoesNotContain("sk-live-should-never-be-printed", printed, StringComparison.Ordinal);
+        Assert.Contains("small", printed, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DeclaredTiersResolveByTierKeyAndUndeclaredOnesDoNot()
+    {
+        var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
+
+        services.AddDigitalBrainModels(catalog => catalog.Declare(
+            new ModelDescriptor(ModelTier.Fast, ModelDescriptor.OpenAiProvider, "small")
+            {
+                ApiKey = "synthetic-key",
+                Endpoint = new Uri("http://127.0.0.1:1/v1"),
+            }));
+
+        using var provider = Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(services);
+
+        Assert.NotNull(Microsoft.Extensions.DependencyInjection.ServiceProviderKeyedServiceExtensions
+            .GetKeyedService<Microsoft.Extensions.AI.IChatClient>(provider, ModelTier.Fast));
+        Assert.Null(Microsoft.Extensions.DependencyInjection.ServiceProviderKeyedServiceExtensions
+            .GetKeyedService<Microsoft.Extensions.AI.IChatClient>(provider, ModelTier.Reasoning));
+    }
+
+    [Fact]
     public void EachTierBindsToExactlyOneModel()
     {
         var catalog = new ModelCatalog()
@@ -72,7 +142,7 @@ public sealed class ProviderAdapterContracts
         {
             var port = FreePort();
 
-            Address = new Uri($"http://127.0.0.1:{port}/v1");
+            Address = new Uri($"http://127.0.0.1:{port}");
             _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
             _listener.Start();
 

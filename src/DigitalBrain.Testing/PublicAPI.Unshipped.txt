@@ -4,7 +4,6 @@ DigitalBrain.Testing.ISimulationNeuron.StimulateAsync(DigitalBrain.NeuronId rece
 DigitalBrain.Testing.ISimulationNeuron.StimulateTwiceAsync(DigitalBrain.NeuronId receiver, DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps
 DigitalBrain.Testing.NeuronSteps.ANeuronIsRegistered(string! neuronType, string! name) -> System.Threading.Tasks.Task!
-DigitalBrain.Testing.NeuronSteps.FailOnUnassertedRefusal() -> void
 DigitalBrain.Testing.NeuronSteps.GivenABrainForOwner(string! owner) -> void
 DigitalBrain.Testing.NeuronSteps.ManyNeuronsAreRegistered(int count, string! neuronType) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.NeuronSteps(DigitalBrain.Testing.Simulation! simulation) -> void
@@ -19,6 +18,7 @@ DigitalBrain.Testing.NeuronSteps.ThenTheSubscriberCountHasGrownBy(string! synaps
 DigitalBrain.Testing.NeuronSteps.ThenTheSynapseIsRefusedAsUnauthorized() -> void
 DigitalBrain.Testing.NeuronSteps.ThenTheSynapseIsRefusedAsUnscripted() -> void
 DigitalBrain.Testing.NeuronSteps.ThenTheTwoNeuronsAreOnDifferentSilos(string! firstType, string! firstName, string! secondType, string! secondName) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.NeuronSteps.WhenSynapseIsRefused(string! synapseType, string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenSynapseIsSentClaimingAnotherOwner(string! synapseType, string! neuronType, string! name, string! claimedOwner) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenSynapseIsSentToNeuron(string! synapseType, string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenSynapseIsSentToNeuronWith(string! synapseType, string! neuronType, string! name, Reqnroll.DataTable! values) -> System.Threading.Tasks.Task!
@@ -43,9 +43,9 @@ DigitalBrain.Testing.Simulation.Owner.get -> DigitalBrain.OwnerId
 DigitalBrain.Testing.Simulation.ReadJournalAsync(DigitalBrain.JournalKind kind, string! neuronType, string! name) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
 DigitalBrain.Testing.Simulation.RegisterAsync(string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.RegisterManyAsync(int count, string! neuronType) -> System.Threading.Tasks.Task!
-DigitalBrain.Testing.Simulation.RethrowUnassertedRefusal() -> void
 DigitalBrain.Testing.Simulation.SendAsync(string! synapseTypeName, string! neuronType, string! name, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! values) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.SendClaimingOwnerAsync(string! synapseTypeName, string! neuronType, string! name, string! targetOwner) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Simulation.SendExpectingRefusalAsync(string! synapseTypeName, string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.SendTwiceAsync(string! synapseTypeName, string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.SettleAsync(DigitalBrain.JournalKind kind, string! neuronType, string! name) -> System.Threading.Tasks.Task<int>!
 DigitalBrain.Testing.Simulation.Simulation() -> void

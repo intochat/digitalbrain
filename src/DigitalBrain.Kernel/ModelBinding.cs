@@ -15,6 +15,15 @@ public sealed record ModelDescriptor(ModelTier Tier, string Provider, string Mod
     public string? ApiKey { get; init; }
 
     public Uri? Endpoint { get; init; }
+
+    private bool PrintMembers(System.Text.StringBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.Append(System.Globalization.CultureInfo.InvariantCulture, $"Tier = {Tier}, Provider = {Provider}, ModelId = {ModelId}, Endpoint = {Endpoint}");
+
+        return true;
+    }
 }
 
 public sealed class ModelCatalog

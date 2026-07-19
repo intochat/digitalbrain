@@ -13,7 +13,6 @@ public sealed class Simulation
 
     private OwnerId _owner;
     private Exception? _refusal;
-    private bool _refusalAsserted;
 
     public NeuronId Id => new(nameof(SimulationNeuron), Owner, "driver");
 
@@ -25,44 +24,31 @@ public sealed class Simulation
 
     public NeuronId NeuronNamed(string neuronType, string name) => new(neuronType, Owner, name);
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "The driver records whatever the cluster refused with so a scenario can report the actual failure; an unasserted refusal is rethrown when the scenario ends.")]
-    public async Task SendAsync(string synapseTypeName, string neuronType, string name, IReadOnlyDictionary<string, string> values)
-    {
-        try
-        {
-            await StimulateAsync(synapseTypeName, NeuronNamed(neuronType, name), values);
-            _refusal = null;
-        }
-        catch (Exception refusal)
-        {
-            _refusal = refusal;
-        }
-    }
+    public Task SendAsync(string synapseTypeName, string neuronType, string name, IReadOnlyDictionary<string, string> values)
+        => StimulateAsync(synapseTypeName, NeuronNamed(neuronType, name), values);
 
-    public void RethrowUnassertedRefusal()
-    {
-        if (_refusal is { } unasserted && !_refusalAsserted)
-        {
-            throw new SimulationAssertionException(
-                $"The scenario left a refusal unasserted: {unasserted.GetType().Name}: {unasserted.Message}", unasserted);
-        }
-    }
+    public Task SendExpectingRefusalAsync(string synapseTypeName, string neuronType, string name)
+        => CaptureRefusalAsync(() => StimulateAsync(synapseTypeName, NeuronNamed(neuronType, name), EmptyValues));
+
+    public Task SendClaimingOwnerAsync(string synapseTypeName, string neuronType, string name, string targetOwner)
+        => CaptureRefusalAsync(
+            () => StimulateAsync(synapseTypeName, new NeuronId(neuronType, new OwnerId(targetOwner), name), EmptyValues));
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
-        Justification = "The driver records whatever the cluster refused with so a scenario can report the actual failure instead of letting an unexpected type escape unexplained.")]
-    public async Task SendClaimingOwnerAsync(string synapseTypeName, string neuronType, string name, string targetOwner)
+        Justification = "A step that declares the cluster will refuse records whatever it threw so the assertion can report the actual failure instead of letting an unexpected type escape unexplained.")]
+    private async Task CaptureRefusalAsync(Func<Task> stimulus)
     {
-        var receiver = new NeuronId(neuronType, new OwnerId(targetOwner), name);
-
         try
         {
-            await StimulateAsync(synapseTypeName, receiver, EmptyValues);
-            _refusal = null;
+            await stimulus();
+
+            throw new SimulationAssertionException("The scenario expected a refusal, but the synapse was accepted.");
+        }
+        catch (SimulationAssertionException)
+        {
+            throw;
         }
         catch (Exception refusal)
         {
@@ -81,8 +67,6 @@ public sealed class Simulation
     public void ExpectRefusal<TRefusal>()
         where TRefusal : Exception
     {
-        _refusalAsserted = true;
-
         if (_refusal is not TRefusal)
         {
             throw new SimulationAssertionException(
