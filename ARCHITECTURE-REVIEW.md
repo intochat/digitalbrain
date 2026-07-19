@@ -292,13 +292,38 @@ the second kind by never creating it.
 Runtime-created neurons are deferred, not rejected. Revisit only with a resident isolated host
 design, which nothing in this lineage has built.
 
-### DEC-3 — A module ships as three packages
+**Scope correction, 2026-07-19.** DEC-2's rationale is verified and stands. Its *scope* was too
+broad: it forbade runtime code because it assumed runtime code means new grain **types**. A
+behavior (DEC-8) contributes no grain type — it is an instance of one type registered at startup,
+carrying a script as durable state. The Orleans manifest never changes and no peer silo needs to
+learn anything. The rationale does not reach behaviors, so the prohibition does not either.
+
+The line DEC-2 actually draws, stated correctly:
+
+| | Contributes | When | Requires |
+|---|---|---|---|
+| **Module** | Vocabulary — synapse records, neuron interfaces | Compile time | Rebuild |
+| **Behavior** | Logic over existing vocabulary | Runtime | Approval only |
+
+New nouns need a rebuild. New verbs do not. Behaviour is the common case; vocabulary is rare.
+
+### DEC-3 — A module ships as two packages, and `.Contracts` is the capability surface
 
 ```
 Brain.Modules.<Name>.Contracts   leaf; zero dependencies; synapse records + neuron interfaces
 Brain.Modules.<Name>             grains, vendor SDKs, provider adapters
-Brain.Modules.<Name>.Testing     consumer fakes + implementor conformance suite
 ```
+
+**Amended 2026-07-19: two packages, not three.** `.Testing` is deferred until a second
+implementation exists to conform against — a conformance harness validated by nothing is a
+template, and §12 already records what this lineage does with those. It returns with the second
+provider adapter, which is the first moment it can be proved real.
+
+**`.Contracts` gained a second, larger job than package hygiene.** Under DEC-8 a behavior script
+compiles against a reference set, and that reference set *is* its capability surface: a script
+that cannot name `IGmail` cannot reach Gmail. So `.Contracts` is no longer only "the leaf that
+keeps vendor SDKs out of consumers" — it is the unit in which capability is granted. That makes
+the split load-bearing on day one rather than aspirational.
 
 `IHandle<T>` and `IEmit<T>` are declared **on the interface**, in `.Contracts` — the pattern
 `v3` used so the wiring graph is reflectable without loading or executing the implementation
@@ -313,6 +338,10 @@ Three independent generations converged on the split: `ino`
 bundles that still grew subscriber counts with no implementation payload).
 
 ### DEC-4 — `.Testing` serves consumers and implementors, and references `.Contracts` only
+
+**Deferred by DEC-3's amendment.** The design below is ratified and unbuilt. It lands with the
+second provider adapter, which is the first thing that can prove a conformance suite conforms
+anything. Recorded here so it is not re-derived.
 
 Consumer fakes so a dependent's tests never hit Google. A conformance suite so an alternative
 implementation can prove it behaves.
@@ -382,6 +411,36 @@ affordable.
 activations and ten journal writes. If that proves too costly, the fallback is a raw client
 plus explicit tracing — not the synapse hop.
 
+**Resolved 2026-07-19 — §14.1's concurrency hole is closed, and DEC-6 stands.**
+
+§14.1 rejected all three escapes from single-threaded activation. Every rejection assumed
+observability comes from the **callee's** journal — which is why key-per-call was dismissed with
+*"the journal holds one entry per activation and means nothing."*
+
+That assumption is wrong under B-1. Reification records the call on the **caller's** feed. The
+callee's journal is not the evidence and does not need to be meaningful. So the escape ino
+shipped becomes available:
+
+> **A model neuron is keyed by the ambient correlation id.** Each call gets its own activation, so
+> nothing serialises across callers, and the traffic is fully observable because the caller
+> recorded it.
+
+`[Reentrant]` is not needed, so `History[^1].Sequence == LastSequence` is never at risk. The
+"N feeds rather than one model's traffic" objection dissolves for the same reason: one model's
+traffic is a query over the timeline, not a property of one grain's journal.
+
+**Second correction: the pendulum table's evidence is weaker than stated.** It records
+`digitalbrain`'s `[Llm<Models.Gpt5>]` as *"Built; never invoked."* `digitalbrain/docs/v6plan/
+MULTI_AGENT_LOCAL_LLM.md` describes `GroupChatNeuron` carrying `[Llm<Gpt5>] IChatClient chat` on a
+live path. The document is marked *"Phase 1 in progress"*, so it describes intent rather than a
+verified state — but DEC-6's "the ergonomics lost decisively" argument leans on the
+never-invoked claim and should not lean on it alone.
+
+**Third: what actually differs this time.** The typed model interface is on the call path *and*
+the call path is journaled. In `digitalbrain` the typed neurons existed and every real call
+bypassed them, invisibly. Here a bypass is visible, because a call that is not on the feed is a
+call that did not go through the rail — which is a testable property, not a hope.
+
 **Note on the pendulum.** This is the fourth attempt at typed model selection in this lineage:
 
 | Generation | Design | Fate |
@@ -434,6 +493,148 @@ implementation can drift. Mitigated by making the C# declaration the source of t
 failing the build from the module's `.Testing` package when the Dart package does not implement
 what the contract declares.
 
+**Amended 2026-07-19 — a UI component is a capability, not a catalog.**
+
+DEC-7 as written builds a component catalog, a vocabulary negotiation, and a surface protocol.
+Under DEC-8 none of that is a separate mechanism. A UI component is a **neuron interface in a UI
+module's `.Contracts`**, resolved like any other capability:
+
+```csharp
+var calendar = brain.Get<ICalendar>();
+var chosen   = await calendar.PickDateAsync("When shall we meet?");
+```
+
+Both of DEC-7's rules survive, and get cheaper:
+
+1. **Unknown component is a hard error** — free. A script that does not reference the contract
+   does not compile; `Get<T>()` throws when the owner's surface does not declare it. No bespoke
+   negotiation protocol.
+2. **Component-local state never round-trips** — unchanged, and now load-bearing for a second
+   reason: only committed intent crosses the boundary, which is what keeps UI traffic off the
+   feed (§14.3).
+
+A UI interaction is an **unbounded wait for a human**, so it is the canonical case for DEC-9's
+durable request — the UI validates that mechanism rather than straining it.
+
+What is deleted: the component catalog as a distinct registry, vocabulary negotiation as a
+distinct handshake, and the surface protocol as a distinct wire format. What remains: a module
+whose contracts happen to render, and the drift guard above.
+
+### DEC-8 — The client API is the programming model, and a behavior is a neuron carrying a script
+
+This is the core feature. Everything above serves it.
+
+A behavior is an ordinary C# file using the client API. No globals, no attributes, no base class,
+no framework vocabulary:
+
+```csharp
+var brain = DigitalBrainClient.Connect();
+var gpt   = brain.Get<IGpt56>();
+
+await brain.On<NewMail>(async mail =>
+{
+    var verdict = await gpt.AskAsync($"Is this urgent? {mail.Body}");
+    if (verdict.IsUrgent) await brain.Emit(new Escalation(mail.From));
+});
+```
+
+**The same file is a client script and a behavior.** Only the hosting differs:
+
+| | Outside the cluster | Inside, as `IBehavior` |
+|---|---|---|
+| `Connect()` | Opens a cluster connection | Ambient context bound to this behavior's identity |
+| `Get<T>()` | Typed proxy over the wire | Typed proxy over the local grain factory |
+| `On<T>()` | Subscription | Handler registration |
+| Lifetime | The process | Durable — journal, state, survives restart |
+
+**`IBehavior : INeuron` is one grain type, registered at startup.** The script is durable state,
+not a type. A new behavior is a new *instance*, and Orleans grains are virtual, so every instance
+name already exists. This is why DEC-2's constraint is untouched, and it is why every prior
+generation's second neuron kind (`DynamicNeuronGrain`, Genesis, the collectible ALC) is not
+recreated here: there is no second kind.
+
+**Addressing.** `Get<T>()` resolves `(T, ambient owner, "default")`; `Get<T>(name)` reaches a named
+sibling. **Owner is always ambient and never a parameter**, so a script cannot address another
+owner's neuron — the boundary becomes unstateable rather than merely enforced.
+
+**Install is a recording pass.** The script is run once with a context in which `On<T>` and
+`Get<T>` record instead of acting. What comes back is the manifest — handled facts, requested
+capabilities, emitted facts — and *that* is the approval screen. It is derived from the code, so
+it cannot drift from it, and a script cannot hold a capability it did not ask for, because asking
+is how it gets recorded.
+
+**Every install is a human-approved proposal**, including a behavior authoring or modifying a
+behavior. The script is the state, so approval is a journal entry and rollback is reverting one.
+This is the rail `CLAUDE.md` calls the product, and B-6 is its ledger.
+
+**Capability is enforced at `Get<T>()`, and only for behaviors.** Compiled module code is
+in-process C# and DEC-5 already concedes that gating it is theatre; `final` proved it by shipping
+`BundleHasGrant` as a hardcoded `return false` whose own audit found grants evaluated after the
+privileged call had fired. The boundary is **script versus compiled code**, and this plan says so
+plainly so it cannot decay into the same fake enforcement.
+
+**Behaviors provide capabilities, not only consume them.** A script may implement a contract
+interface, and other scripts resolve it with `Get<T>()`. Consistent with the split: the interface
+is vocabulary (module, compile time, in the manifest); the implementation is behavior (script,
+runtime, instance state). This is how the brain composes itself out of its own parts.
+
+**Both hosting modes ship together, gated on R-3.** Running a script as an external cluster client
+is precisely the configuration this lineage records as its failure mode — IAW's raw
+unauthenticated `IClusterClient` with full host authority, which is §2.6. Nothing scriptable ships
+before that hole is closed.
+
+**Recorded risk — the generation benchmark.** This design assumes an LLM can reliably emit these
+scripts. §11 records `final`'s Gate-0 as the method for such a claim, and the harvest found that
+instance failed in both halves (see §10). Before the scripting rail is load-bearing, it needs a
+benchmark **run against a real model**, with a pre-committed numeric threshold, and demotion
+enforced against the codebase rather than the spec.
+
+### DEC-9 — A synapse is a fact; an interface method is a request
+
+The rule that stops the typed path and the message path from competing. Every prior generation
+had both and let one silently win.
+
+| | Shape | Direction | Reply | Journaled |
+|---|---|---|---|---|
+| **Fact** | thin record — `NewMail` | broadcast, undirected | none | yes |
+| **Request** | interface method — `gmail.SendAsync` | directed at a capability | yes | yes, by reification |
+
+Every behavior reads the same way: **facts in, requests out to capabilities, facts out.**
+
+**A request may also be a trigger.** A behavior implementing a contract interface is invoked
+directly, not only by a fact arriving. This is what makes behaviors composable as capabilities.
+The cost is accepted knowingly: a behavior can run with no fact on the rail explaining why, so the
+reification record is the *only* evidence — which is a further reason B-1 layer 1 is not optional.
+
+**Both verbs are journaled. Neither is privileged.** DEC-6 rejected the synapse hop because
+hand-written correlation splits logic across two handlers — `digitalbrain` built exactly that and
+`new LlmRequest(...)` appears **zero times** in that tree. That objection is entirely about
+hand-writing it. A generated proxy gives the author one `await` and the rail both records.
+
+**MCP is a provider adapter, behind `.Contracts`.** `IGmail` may be implemented over Google's REST
+API, an MCP server, or a model with tools. A script cannot tell and must not care. §4.1's phrase
+"external MCP-style caller" means the *opposite* direction — something outside calling in. Two
+different things; the plan previously conflated them.
+
+### DEC-10 — A synapse is a thin record; delivery metadata lives on the envelope
+
+`Synapse.Stamped` is a property that throws when unset — metadata welded onto the payload, so a
+payload can never be a plain record. It is not renamed. It stops existing.
+
+```csharp
+public sealed record NewMail(string From, string Subject, string Body);
+```
+
+Id, correlation, sequence and timestamps ride on a delivery envelope the kernel owns and the
+author never constructs. Authors — and models generating behaviors — write exactly the record they
+mean, and the kernel cannot be handed an unstamped delivery because stamping is no longer the
+payload's job.
+
+This merges what were three separate items: §7's `Stamped` rename, D-3's `RoutingMode` removal
+(also metadata nothing reads), and part of R-1.
+
+**Breaks:** the serialization surface, `StampingContracts`, `SerializationContracts`.
+
 ---
 
 ## 4. Target architecture
@@ -456,13 +657,48 @@ Three layers:
 **Do not reproduce the server-side poll.** `brain_from_master` presents a streaming API over
 `WaitForChangeAsync`, which is a 250 ms `Task.Delay` loop reading a grain, per connected client,
 forever. That is better than v2 (which pushes polling to N clients over the network) and is
-still not an observation primitive. The correct source is `digitalbrain`'s pattern: an
-unconditional write to a global timeline stream on every emission, plus a relay grain with an
-implicit stream subscription that requires no registration.
+still not an observation primitive.
 
-**Take `brain_from_master`'s client contract and `digitalbrain`'s backend.** The client
-contract is already written and has 36 test files against a fake transport; it works unchanged
-the day the server stops polling.
+**Correction, 2026-07-19 — this section cited `TimelineRelayGrain` for something it does not do.**
+It was described here as *"a relay grain with an implicit stream subscription that requires no
+registration"*, offered as the model for broadcast. It is a **fan-in observer**: `Guid.Empty`-keyed,
+*"one activation per cluster"* by its own comment, reading the whole timeline and pushing onto a
+silo-local UI bus. The implicit subscription buys *"the observer needs no registration and no prior
+activation"* — genuinely valuable, and nothing whatever about enumerating recipients. Recipient
+enumeration in that tree is catalog-driven, in `NavigatorRouter.ResolveSubscribersAsync`, which
+filters a catalog by handled type. B-1 must not be written as though the relay solves addressing.
+
+**Amended shape — the feed is a neuron, not a subsystem.**
+
+R-1 already builds snapshot + bounded delta log + monotonic cursor **inside every neuron**. A
+per-identity feed with those three properties is therefore one neuron type, not new machinery:
+
+- **Layer 2 becomes `FeedNeuron : Neuron`** at `(Feed, owner, "feed")`, inheriting the state
+  machine R-1 must build regardless.
+- **Layer 3 becomes one verb.** `ReadJournalAsync(cursor)` is R-1's work; `WatchAsync` is added to
+  `INeuron` generally, so **every** neuron is watchable for the same cost. There is no bespoke
+  wire protocol.
+- **Feed subscription is the broadcast decision.** A feed subscribes to everything in its owner
+  scope, which makes it an ordinary broadcast subscriber. B-1 layer 2, R-4, and broadcast
+  addressing are one mechanism, decided once — the plan previously had them as three items and
+  never noticed.
+
+**Layer 1 is the bridge, and is not optional.** Under DEC-9 a typed request carries real work and
+leaves no trace unless reified. Its justification is not the external MCP caller this section
+originally gave — it is that **every behavior script's typed calls must land on the rail without
+the script cooperating.** A behavior triggered by a request rather than a fact has no other
+evidence that it ran.
+
+**§14.3 is answered by the code, not by a new policy.** `SynapseObserver` already observes via
+`ActivityListener` over `SynapseTelemetry`, push-based, no polling. Everything is *already*
+traced. The line is therefore: **domain facts are feed-worthy; call traffic is traced and reified,
+not accumulated.** Two further discriminators come from ino, which asked this and left it open —
+self-grain calls versus cross-grain calls, and hard caps (it used a 1 s emit timeout and a
+4096-byte payload cap, with the note *"the per-call overhead is real. Profile before scaling
+neuron counts up."*).
+
+**Take `brain_from_master`'s client contract.** It is already written, has 36 test files against a
+fake transport, and works unchanged the day the server stops polling.
 
 ### 4.2 The module
 
@@ -481,9 +717,26 @@ the module's descriptor declares its contributions. Assembly scanning was used b
 its own swallow-and-continue error handling. Explicit registration costs one line per module
 and removes an entire class of "why isn't my neuron registered" failure.
 
+**§14.6 resolved, 2026-07-19 — the descriptor does not restate the wiring graph.**
+
+The tension was invented by listing neurons in the descriptor. Two prior generations converged on
+not doing that. `brain_from_master`'s `ModuleDescriptor` — the only finished descriptor design in
+the lineage — carries `(ModuleId, Version, DisplayName, Icon, Publisher, ConfigurationSchema,
+SecretRequirement[], CapabilityDescriptor[], EffectDescriptor[], OAuthDescriptor?)` and **declares
+no neurons and no synapse types at all**. `digitalbrain`'s v5 domain manifest is the same shape.
+And ino states the rule outright: *"No manifest file. No custom descriptor. The `.csproj` metadata
++ attribute-driven source generation is the manifest."*
+
+So: **wiring stays on the interfaces and is generated from them** (R-6's contract-manifest work);
+the descriptor carries only what interfaces cannot express — configuration, secrets, capabilities,
+effects, OAuth. There is no second declaration, therefore nothing to drift. `IEmit<T>` is not
+redundant with the descriptor; it is the canonical source the descriptor's wiring half is
+generated *from*, which also closes §11's open question about its future.
+
 A module descriptor declares:
 
-- **Neurons** — grain types it contributes, with their handled and emitted synapse types.
+- ~~**Neurons** — grain types it contributes, with their handled and emitted synapse types.~~
+  Struck: generated from the interfaces, never hand-declared.
 - **Connections** — provider descriptors (DEC-5), including required app credentials, OAuth
   scopes, and callback shape.
 - **Capabilities** — grants it will request, each carrying a user-facing reason string.
@@ -529,6 +782,48 @@ slash paths, dotted CLR FQNs, and raw GUIDs.
 Adopt the path form as a **display and grouping convention** on module descriptors. It reads
 well and groups for free. It is documentation, and this plan says so rather than pretending it
 is routing.
+
+### 4.5 The programming model
+
+DEC-8 in one page, because it is what the rest of the architecture exists to serve.
+
+**One surface.** The client API is the programming model. There is exactly one thing to learn, and
+it is the same whether the code runs on a laptop or inside the cluster.
+
+```
+Connect()      bind to a brain; identity is ambient thereafter
+Get<T>()       resolve a capability          -> a request, replies       (DEC-9)
+Get<T>(name)   resolve a named instance
+On<T>()        react to a fact                                           (DEC-9)
+Emit(fact)     announce a fact; broadcast, no reply                      (DEC-9)
+```
+
+**Two subscription regimes, and the split is principled.**
+
+| | Handled set known | Registered | Cost |
+|---|---|---|---|
+| Compiled neuron | Composition time, from the interfaces | Startup | Zero — the kernel can skip emitting a fact nothing handles |
+| Behavior | Install time, from the recording pass | Once, at install | Small — behaviors are few and explicitly created |
+
+The zero-cost property is only available because compiled subscription is static: the kernel knows
+at startup whether anything handles a type, so an unhandled lifecycle fact is never constructed. A
+dynamic registry could never do this, because someone might subscribe later. **This is what makes
+"everything is a fact" affordable rather than ruinous**, and it is the structural half of §14.3's
+answer.
+
+The dynamic half is bounded and is *not* §2.7's defect. That defect is a registry write on the
+activation path of every neuron. This is a registry write at install, for behaviors only.
+
+**Lifecycle facts, and what is deliberately not one.** `Activated` and `Deactivated` are Orleans
+placement events — they fire on silo restart, rebalance, and idle-timeout expiry, so a behavior
+handling one is coupled to cluster topology rather than to the domain. `final` put them on the bus
+as first-class synapses and no document in any tree records anything handling one. What authors
+actually reach for is a domain fact — *created*, or *first fact received* — and those are
+deterministic and replayable. Runtime activation is traced, not fed.
+
+**The script's top level is its activation path.** Handler closures do not survive deactivation, so
+the top level re-runs on activation to rebuild them. This falls out of the shape rather than being
+designed, and it is why the surface has no separate initialization concept.
 
 ---
 
@@ -799,22 +1094,32 @@ clean clone.
 Naming is mostly good. `Neuron`, `Synapse`, `NeuronId`, `OwnerId`, `CorrelationId` all carry
 their meaning. The following do not.
 
-| Current | Problem | Proposed |
+**Reduced 2026-07-19. Churn is not progress.** A rename earns its place only if a new reader
+stumbles over the current name. Rows that were matters of taste are struck, with the reasoning
+kept so they are not silently reinstated.
+
+| Current | Problem | Resolution |
 |---|---|---|
-| `IEmit<T>` | An empty marker interface whose only consumer is a source generator. It reads like a capability and is a declaration. | Keep the name; document it as a declaration, or fold it into the module descriptor (§4.2) where declarations belong. |
-| `Synapse.Stamped` | A property that throws when unset. Reads like a boolean or a past-tense flag; is actually "metadata, or explode". | `RequireMetadata()` — a method, so the throw is expected at the call site. |
-| `SynapseWiring` / `DispatchManifest` | Two names for the same knowledge, in the same file, neither of which says "what handles what". | One name after R-6 resolves which mechanism survives. |
-| `SimulationCluster` | A static class holding a shared cluster and a static model table. The name says "a cluster"; it is a process-wide singleton with static mutable state. | `SharedSimulationHost`, and the model table leaves with D-1. |
-| `ScriptedModel` | Names the mechanism, not the role. | `DeterministicModel` — it exists so an unscripted prompt fails loudly rather than inventing an answer. |
-| `BrainService` / `BrainClientService` (Aspire.Hosting) | `BrainClientService` is not a service; it is a projection of `BrainService` for referencing consumers. | `BrainResource` / `BrainClientReference`. |
-| `hosts/DigitalBrain.ProbeHost` | "Probe" describes why it was built, not what it is: an in-cluster host used because an external client cannot complete a handshake through the Aspire proxy. | Keep, and document the reason inline in the plan rather than in the name. |
-| `JournalKind.Incoming` / `Outgoing` | Survives R-1 only if both still exist after the feed redesign. Re-examine then. | Deferred to R-1. |
+| `Synapse.Stamped` | A property that throws when unset — metadata welded onto the payload, so a synapse can never be a plain record. | **Deleted, not renamed.** DEC-10: the synapse is a thin record and metadata rides on the delivery envelope. Lands in Phase 2.4. |
+| `BrainService` / `BrainClientService` (Aspire.Hosting) | `BrainClientService` is not a service; it is a projection of `BrainService` for referencing consumers. The Aspire hosting model has a name for this and the code does not use it. | `BrainResource` / `BrainClientReference`, **and adopt the Aspire resource model properly** — a resource is a resource, a reference is a reference. This is the one rename that fixes a reader actively misled by the hosting integration. |
+| ~~`IEmit<T>`~~ | — | Struck. §4.2 resolves it: `IEmit<T>` is the canonical declaration the descriptor's wiring half is generated *from*. The name is correct; it was the role that was unclear. |
+| ~~`SynapseWiring` / `DispatchManifest`~~ | — | Struck as a rename. R-6 (Phase 3.3) resolves it by making one of them generated from the other; whatever survives keeps its name. |
+| ~~`SimulationCluster`~~ | — | Struck. The static model table leaves with D-1, which removes the actual defect. The remaining name is accurate enough. |
+| ~~`ScriptedModel`~~ | — | Struck as taste. `DeterministicModel` is marginally better and not worth a public-surface change. |
+| ~~`hosts/DigitalBrain.ProbeHost`~~ | — | Struck; the original row already said keep. The reason it exists is recorded in R-3. |
+| ~~`JournalKind.Incoming` / `Outgoing`~~ | — | Struck as a rename. Re-examined during R-1 as that row said; both survive. |
 
 ---
 
 ## 8. BUILD NEW
 
 ### B-1 — The observation primitive
+
+**Reduced 2026-07-19 — see §4.1.** Layer 2 is a neuron (`FeedNeuron`) reusing R-1's state machine,
+not a subsystem. Layer 3 is one verb (`WatchAsync` on `INeuron`), not a wire protocol. Layer 1
+stays and is the load-bearing one: it is the bridge that puts DEC-9's typed requests on the rail
+without the caller cooperating, and under DEC-9 a behavior triggered by a request has **no other
+evidence that it ran.** Its justification is behaviors, not the external MCP caller named below.
 
 **What:** §4.1's three layers — call-filter reification, the per-identity feed, and the wire
 protocol.
@@ -919,6 +1224,12 @@ or it rots identically.
 
 ### B-5 — The Flutter module
 
+**Reduced 2026-07-19 — see DEC-7 as amended.** A UI component is a neuron interface in a UI
+module's `.Contracts`, resolved by `Get<ICalendar>()` like any other capability. The component
+catalog as a distinct registry, vocabulary negotiation as a distinct handshake, and the surface
+protocol as a distinct wire format are all deleted — they are the generic mechanism, applied.
+What remains is a module whose contracts happen to render, plus the drift guard.
+
 **What:** DEC-7. The surface neuron, the component catalog and vocabulary negotiation, and the
 Dart package contributed alongside the C# module.
 
@@ -945,12 +1256,26 @@ both prototypes' pubspecs with **zero usages** in either `lib/` tree. `ChangeNot
 
 ### B-6 — The governance ledger
 
-**What:** DEC-1a. An append-only sink for proposals, approvals, module installs, rollbacks, and
-connection grants.
+**Promoted 2026-07-19 into Phase 4, from Phase 5.** This item was challenged as *"a table with no
+rows"* — self-evolution named as the product with nothing performing it. That challenge was correct
+when it was made and is no longer. **Under DEC-8 every behavior install is a row**, and the
+approval gate is the only thing standing between a self-modifying script and an unattended loop at
+machine speed. B-6 is not a phase after the scripting rail; it is that rail's safety property and
+ships with it.
+
+**What:** DEC-1a. An append-only sink for proposals, approvals, behavior installs, module installs,
+rollbacks, and connection grants.
 
 **Why:** `CLAUDE.md` calls self-evolution "the product" and requires mutations to be durable,
 replayable, and rollback-capable. DEC-1 removes that property from the neuron journal, so it is
-provided here, deliberately, for the small set of events that actually need it.
+provided here, deliberately, for the small set of events that actually need it. Under DEC-8 the
+script *is* the behavior's state, so this requirement is satisfied literally: an approval is a
+journal entry and a rollback is reverting one.
+
+**The approval payload is derived, not declared.** DEC-8's recording pass runs the script once with
+`On<T>` and `Get<T>` recording instead of acting; its output — handled facts, requested
+capabilities, emitted facts — is what a human approves. A script cannot hold a capability it did
+not ask for, because asking is how it gets recorded.
 
 **Sources:** `final`'s propose/approve handshake — a closed `IsPrivilegedAction` allowlist gating
 a two-synapse exchange, entirely inside normal handler dispatch, with no separate approval
@@ -995,106 +1320,187 @@ Each phase ends green on the root gate. Phases are ordered by dependency, not by
 Phase 1 writes failing tests for defects that exist. Nothing is fixed. This is the phase that
 makes the rest verifiable, and skipping it is how a plan becomes a narrative.
 
-### Phase 2 — The feed. R-1, then B-1.
+### Phase 2 — The feed and the boundary. Split at 2.4, green at both ends.
+
+**Re-ordered 2026-07-19.** R-3 is promoted into this phase. §14.2 filed the owner boundary as a
+mitigation to be scheduled later; DEC-8 makes it the gate on the entire scripting rail, because an
+external script *is* the unattributed Orleans client of §2.6 — the configuration this lineage
+records as its failure mode. Nothing client-facing ships before it.
+
+**Phase 2a — the feed.** Ends green; this is the rollback point §14.4 asked for.
 
 | Step | Action |
 |---|---|
-| 2.1 | Feed state machine: snapshot, bounded delta log, cursor, invariant validation (R-1) |
-| 2.2 | Bounded dedupe set replacing the journal scan — turns 1.2 green |
+| 2.1 | Feed state machine: snapshot, bounded delta log, cursor, invariant validation (R-1) — *done* |
+| 2.2 | Bounded dedupe set replacing the journal scan — turns 1.2 green — *done* |
 | 2.3 | Cursor-based read replacing `ReadJournalAsync` across every consumer |
-| 2.4 | Call-filter reification (B-1 layer 1) |
-| 2.5 | Wire protocol: snapshot / read-since / watch, with reset (B-1 layer 3) |
-| 2.6 | `BrainClient` gains observation |
-| 2.7 | R-2 and R-4 — turns 1.3 and 1.4 green |
-| 2.8 | D-6 — remove the sample's activation workaround and polling loop |
+| 2.4 | DEC-10 — synapse becomes a thin record; metadata moves to the delivery envelope. Absorbs D-3 |
 
-Ends with: an external caller mutating a neuron by direct grain call, and an observing client
-seeing it, with no polling anywhere and no cooperation from the caller.
+**Phase 2b — the boundary and the rail.**
+
+| Step | Action |
+|---|---|
+| 2.5 | **R-3 — the owner boundary.** Blocks everything client-facing. `OwnerOf` must not fall through for unattributed callers |
+| 2.6 | `WatchAsync` on `INeuron`, and `FeedNeuron` — §4.1's collapse. Deletes both polling loops |
+| 2.7 | Call-filter reification (B-1 layer 1) — the bridge that puts typed requests on the rail |
+| 2.8 | R-4 and broadcast addressing as **one** change: composition-time type-level registration, instance minted per DEC-6's correlation keying. Turns 1.4 green |
+| 2.9 | R-2 — per-receiver outbox progress. **State the ordering guarantee first**; no prior generation documents one. Turns 1.3 green |
+| 2.10 | D-6 — remove the sample's activation workaround and polling loop |
+
+Ends with: a typed request appearing on the feed with no cooperation from the caller, no
+`Task.Delay` in any wait path, and an owner boundary that holds against a client.
 
 ### Phase 3 — Modules. B-2, then B-4, which proves B-2.
 
 | Step | Action |
 |---|---|
-| 3.1 | `IModule`, descriptor, `AddModule<T>()`, composition-time validation |
-| 3.2 | Three-package template with both guard tests baked in |
-| 3.3 | Conformance harness in `.Testing` |
-| 3.4 | B-3 — connections, health union, provider-adapter contract |
-| 3.5 | B-4 — the AI module. **Turns 1.1 green.** D-1 lands here as its consequence |
+| 3.1 | `IModule`, descriptor, `AddModule<T>()`, composition-time validation. Descriptor carries no wiring (§4.2) |
+| 3.2 | **Two**-package template with the contracts guard test baked in (DEC-3 as amended) |
+| 3.3 | R-6 — generate the contract manifest from the interfaces. This is what makes 3.1's descriptor derivable rather than hand-written |
+| 3.4 | B-3 — connections, health union, provider-adapter contract. Unblocked by 2.5 |
+| 3.5 | B-4 — the AI module, model neurons keyed by correlation (DEC-6 as resolved). **Turns 1.1 green.** D-1 lands here as its consequence |
 | 3.6 | R-5 — re-justify or delete the metapackage now that the kernel is clean |
-| 3.7 | A second module against the same template — the real proof of 3.1–3.3 |
+| 3.7 | A second provider adapter against the same template — the real proof of 3.1–3.3, and the first thing `.Testing` could conform. DEC-4 returns here or not at all |
 
-### Phase 4 — UI. B-5.
+### Phase 4 — The scripting rail. DEC-8, and B-6 as its gate.
 
-Depends on Phase 2 for observation and Phase 3 for module contribution. Nothing in B-5 can
-start before both.
+**Moved ahead of UI and merged with governance.** B-6 was scheduled at Phase 5 and NEXT.md
+challenged it as *"a table with no rows"*. Under DEC-8 every behavior install is a row, and the
+approval gate is the only thing standing between a self-modifying script and an unattended loop.
+It is not a separate phase; it is this one's safety property.
 
-### Phase 5 — Governance. B-6.
+| Step | Action |
+|---|---|
+| 4.1 | The client API surface: `Connect`, `Get<T>`, `Get<T>(name)`, `On<T>`, `Emit` |
+| 4.2 | Roslyn compilation of a script against a `.Contracts` reference set |
+| 4.3 | `IBehavior : INeuron` — one grain type, script as durable state, top level as activation path |
+| 4.4 | The recording pass — `On<T>` and `Get<T>` record instead of act; output is the approval manifest |
+| 4.5 | B-6 — the governance ledger. Propose → approve → install, journaled and reversible |
+| 4.6 | Capability enforcement at `Get<T>()`, for behaviors only, with the script/compiled boundary stated |
+| 4.7 | External hosting mode — the same script as a cluster client. Gated on 2.5 |
+| 4.8 | **The generation benchmark.** A pre-committed numeric threshold, run against a real model, demotion enforced against the codebase. §11's standard, applied with the correction in §10 |
+
+### Phase 5 — UI. B-5, reduced.
+
+Under DEC-7 as amended this is a module whose contracts happen to render — not a catalog, not a
+negotiation, not a surface protocol. Depends on Phase 4: the reason a UI exists here is that a
+behavior resolves `Get<ICalendar>()` and asks a human something.
+
+| Step | Action |
+|---|---|
+| 5.1 | Durable request/response for unbounded waits — the human-input case (DEC-9) |
+| 5.2 | UI module `.Contracts` with component interfaces |
+| 5.3 | The Dart implementation, plus the drift guard failing the build when it does not implement the contract |
 
 ### Phase 6 — Cleanup.
 
-D-2, D-3, D-4, R-6, and §7's renames. Deliberately last: they are the cheapest items and the
-most tempting to start with, and starting with them produces motion without progress.
+D-2, D-4, R-7, and §7's surviving renames. Deliberately last: they are the cheapest items and the
+most tempting to start with, and starting with them produces motion without progress. D-3 and the
+`Stamped` rename are gone from this phase — DEC-10 absorbed both into 2.4.
 
 ---
 
-## 10. SOURCES RETIREMENT LEDGER
+## 10. SOURCES — RETIRED, AND WHAT THE HARVEST FOUND
 
-`sources/` is dead weight that slows every search and every architecture pass. It is retired
-logically and incrementally, never wholesale.
+**Closed 2026-07-19. `sources/` is deleted from the working tree.**
 
-**A row closes only when every item in its "valuable content" column has either landed in
-DigitalBrain covered by a passing test, or been rejected in writing with a reason. Silence is
-not rejection.**
+This section was a ten-row retirement ledger with rows *"expected to remain open for months."*
+It rested on a premise that Phase 0.1 destroyed: that deleting `sources/` would destroy
+information. It no longer would.
 
-**Reversibility, corrected.** Git history preserves what git tracks. §2.14 establishes that 20
-source files under `sources/` are **not tracked**. Step 0.1 fixes this and is a prerequisite for
-every row below. Until 0.1 is done, no row may close.
+| Checked directly | Result |
+|---|---|
+| Files under `sources/` in HEAD | **8,471** — committed, not merely staged |
+| The Flutter SDK package that gated every row | 15 files, in HEAD |
+| `ino/docs` — L-8's "~13 design docs" | 156 files, in HEAD |
+| `brain_from_master` markdown — L-10, "retires last" | 41 files, in HEAD |
+| Untracked non-`node_modules` files repo-wide | 38 — every one generated (`.feature.cs`, `.razor.css`), user-local (`.csproj.user`, `daemon.pid`), build output (`.nupkg`), or public reference data |
+| The two "seed databases" (78 MB + 62 MB) | `locations.json`, `airports.json` — world airport/location reference data. Not artifacts of this lineage. Re-downloadable. 140 MB of the 374 MB |
 
-**A row that stays open for a long time is a correct outcome.** L-8 and L-9 are expected to
-remain open for months.
+**Not one untracked hand-written design artifact existed anywhere under `sources/`.** Every row's
+"safe to delete when" condition was therefore satisfiable immediately, and the tree is recoverable
+in full via `git show <sha>:sources/…` forever.
 
-| # | Directory | Valuable content | Where it must land | Proof it landed | Safe to delete when |
-|---|---|---|---|---|---|
-| **L-0** | *(absent generation)* | `DigitalBrain.Core`, `DigitalBrain.Silo`, `IPackBehavior`, `PackAlcEmbodier`, `GeneratedNeuron` — cited by `Projects/docs`, present nowhere on disk | Located, or declared lost in writing | A written finding: recovered, or lost with the reason it cannot be recovered | N/A — this row must be answered before L-4 closes |
-| **L-1** | `self-improving` (79 C#, 79 md) | `[LLM<TModel>]` attribute injection — nothing else. `IDigitalBrain` is an admitted stub whose `GetFullJournalAsync` returns empty unconditionally; docs byte-identical to `final`'s | Nowhere. Rejected: the attribute form was superseded in `final` by hosting-layer selection, recorded in `final/docs/DELETED.md`; DEC-6 supersedes both | This ledger row, as the written rejection | **After Phase 0.1.** No migration required |
-| **L-2** | `v4` (54 C#) | `BundleId`/`BundleVersion`/`IBundleSource`/`IBundleInstaller` type shapes; install-as-observable-event | B-2's descriptor design. Types only — the tree does not compile; it references a `DigitalBrain.Core` that exists nowhere; `Sdk`, `Sdk.Testing`, and `Ino` contain zero `.cs`; the consumer sample's entire demonstration is `_ = new BundleId("demo-from-new-structure");` | B-2 descriptor exists and a duplicate-id test fails startup naming both contributors — explicitly **not** `v4`'s silent `.First()` | After Phase 3.1 |
-| **L-3** | `v3` (38 C#) | `IHandle`/`IEmit` **on the interface** so the graph is reflectable without loading the impl; capsule triplet shape; routing-as-metadata argument; the one-`Simulation`-class `Fire`/`Expect`/`ExpectNone` collapse | DEC-3 (contracts leaf), D-3's caveat (routing argument preserved in writing), §11's test-tier question | DEC-3 landed with the contracts guard test green; D-3's caveat present in this document | After Phase 3.2 |
-| **L-4** | `Projects/docs` (7 md) | The prior 7-way harvest matrix; the migration assessment; the "do not let it become a second architecture" conclusion; the harvest map that `GOAL.md` contradicted | §1 of this document, verbatim in substance | §1 exists and L-0 is answered | After L-0 is answered. **Not before** — this is the paper trail that explains why the rest is being deleted |
-| **L-5** | `IAW` (339 C#, 119 md) | `static virtual` interface metadata; registry-grain shape; DevUI wiring (complete and working); `ToolApprovalMiddleware`; architecture-guard tests; the `Aspire`/`Aspire.Hosting` split validation; `orleans_scheduling.md` and `durable-tasks-research-for-iaw.md` (primary research) | B-2 (metadata + registry); R-5 (split validated); Phase 1.1 (guard tests); the two research docs copied into this repo's docs | B-2 conformance green; guard tests present; research docs present. DevUI: wired, **or** rejected in writing | After Phase 3.7 |
-| **L-6** | `final` (109 C#, 106 md) | `.brain` capsule format; **contract-only bundles**; the four-rung trust ladder; **leaf-assembly architecture tests**; `SynapseIncoming`/`SynapseOutgoing`/`Activated`/`Deactivated` as first-class synapses; the InoLang Gate-0 method (a 20-prompt benchmark with a pre-committed numeric kill threshold, executed, 12/20 against an 80% bar); the propose/approve handshake; `DISTRIBUTION.md`; `multirepo-distribution-design.md` | DEC-3 (contract-only → contracts package); Phase 1.1 (leaf tests); B-1 (lifecycle as observable); B-6 (handshake); Gate-0 method recorded in §11 as the standard for any future DSL proposal | Leaf tests green; B-1 emits lifecycle events; B-6 proof green; Gate-0 method recorded. **Explicit rejections required in writing:** grant enforcement (stub returning `false`, checked after the fact), name-prefix bundle activation (never real registration), the documented fake-green test infrastructure | After Phase 5 |
-| **L-7** | `digitalbrain-app` + `brain_from_master/app` (318 Dart) | `RuntimeController` reconnect/cursor/generation machine; `FeedController.accept`; forbidden-payload-key guard; component-registry dispatch shape; `ui_layout_bridge.dart`; `uigateway.proto`'s `UiInputSynapse`; the perf-tier closed loop; the fake-transport reactivity test suite | B-1 (client contract), B-5 (component catalog, surface neuron) | B-5 proofs green, including "no network traffic on local interaction" and "unknown component is a hard error". **Explicit rejections in writing:** RFW interpreter, `flutter_bloc`, `default: SizedBox.shrink()` | After Phase 4 |
-| **L-8** | `ino` (2942 C#, 101 Dart, 1248 md, 15 `.feature`) | `INeuron<T>`/`IReactsTo<T>` interface-only dispatch; `IDomain` verb manifest; `Capability` discriminated union; `BrainTraceFilter`; the L1 propose→gate→approve→hot-register pipeline; BDD-Gherkin-as-LLM-mock with provenance; the E2E harness with OTel-`Activity`-based assertions; ephemeral-port test isolation; **~13 design docs carrying rationale that exists nowhere else** — the decay model, the L1/L2/L3 constraints, the graph-DB rejection, the UI-patch-as-synapse argument, the C#-interface-as-canonical-schema decision | B-2 (manifest, capability); B-1 (trace filter); B-6 (proposal pipeline); B-4 `.Testing` (BDD mock); the ~13 docs → decision records in this repository | Each of the ~13 docs is either transcribed as a decision record or rejected in writing with a reason | **Expected to remain open for months.** Transcribing 13 design documents into decision records is real work and marking this row done early is exactly how the good designs get lost. Delete `tripradar/` (2,162 files, a vendored external product) and the 841 vendored `node_modules` markdown **immediately** — those are separable and require no analysis |
-| **L-9** | `digitalbrain` + `sdk` (683 C#, 107 Dart, 696 md) | `QuerySynapseSynthesizingIncomingFilter` — **the highest value-per-line artifact in `sources/`**; `BrainTimelineRelayGrain` cursor ring buffer; `TimelineRelayGrain` implicit subscription; `LlmModel` descriptor + derived service key; the single-flag local-provider override; uniform `ChatClientBuilder` middleware with GenAI semantic conventions; mocks keyed identically to real clients; fingerprint priming bound to the real system-prompt constant; `IconPlan` deterministic icon derivation; `docs/ABI.md`'s two-interlocking-guards freeze pattern; `docs/DIGITALBRAIN_RESEARCH.md` (52 KB ADR corpus); `docs/redesign/01-ARCHITECTURE.md` (the palette/layout rebuild seam with a rejected-alternatives table) | B-1 (filter, relay, ring buffer); B-4 (descriptor, override, middleware, mocks); B-5 (icons, seam); ADR corpus → decision records | B-1 and B-4 proofs green; ABI freeze pattern adopted or rejected in writing; the four named documents transcribed or rejected | **Expected to remain open for months.** 568 of its 696 markdown files are agent session scratch and are deletable immediately with this one-line justification. The `.agents - Copy/` directory (~120 session directories) likewise |
-| **L-10** | `brain_from_master` (284 C#, 210 Dart, 41 md) | `SurfaceFeedNeuron` — the complete feed state machine, two-axis compaction, gap detection, reset protocol; the six-check revision-bound action model; the timer-plus-reminder outbox with self-unregistering reminders; the five-scope ownership table; the error taxonomy with mandated client behaviours; the failure-behaviour matrix; `.mcp.json`, `.lsp.json`, and the MSBuild auto-init; `EVERYTHING-IS-A-NEURON.md` (626 lines); the module SDK spec | R-1 and B-1 (feed); §4.3 (scopes); B-2 (module SDK); Phase 0.5 (`.mcp.json`) | R-1 and B-1 proofs green including reset-on-gap; five-scope table present in §4.3; B-2 conformance green. **Explicit rejections in writing:** the 250 ms server-side poll, JSON-in-proto, RFW | **Retires last.** It is not an earlier generation (§2.15) — it is contemporaneous and ahead of v2 in three dimensions. Its two design documents answer questions this plan has not yet asked. Do not delete while any part of §8 remains unbuilt |
+**The ledger's real defect was its scoring column.** "Valuable content" cannot close a row,
+because everything in a 374 MB quarry looks valuable. The replacement rule, used for the harvest
+below: **a document earns transcription only if it changes a decision that is currently open.**
+Everything else is either already captured in §§1–4 and §12, or dead.
 
-### Immediate deletions requiring no analysis
+### The harvest, executed once and closed
 
-These are separable from their rows and can go in Phase 0:
+Three readers scored every design document in `ino`, `digitalbrain`, `brain_from_master`, `v3`,
+`final` and `IAW` against the seven then-open decisions. Findings that changed the plan are folded
+into the sections they change; recorded here so they cannot be silently reversed.
 
-- `sources/Projects/ino/domains/travel/tripradar/` — 2,162 files, a wholly vendored external
-  SaaS product with its own stack, integrated over HTTP. Not part of the architecture.
-- 841 markdown files under `tripradar/**/node_modules/` — third-party package READMEs.
-- 568 files under `sources/Projects/digitalbrain/.agents - Copy/` — multi-agent session scratch
-  from ~120 runs.
-- All duplicated vendored skill directories (~89 files in `digitalbrain` alone across
-  `.claude`, `.github`, `.agents - Copy`).
-- `sources/Projects/ino/website/` — verified byte-identical to `ino/IAW/website/`, and `ino`'s
-  own `CLAUDE.md` already calls the root copy "legacy and purged".
+**Four factual errors in this plan, found by the harvest:**
 
-### Fate of `sources/Projects/CLAUDE.md`, `CONTINUATION.md`, and the skills directories
+1. **§11's Gate-0 endorsement was false in both halves.** This document called `final`'s Gate-0
+   *"the standard"* — 20 prompts, 80% bar, scored 60%, language formally demoted. The source:
+   *"Execution used deterministic stub returning 'first attempt' JSON for the prompt set"*
+   (`INOLANG-RFC.md` L232) and *"its 60% is simulated, not measured"* (`UNIFICATION-PLAN.md` L44).
+   The demotion also did not hold — *"`RuleHostNeuron` + parser + interpreter + BDD landed
+   afterward and are green."* **A method that failed in both halves cannot be cited as a standard
+   without its corrections**: the benchmark must run against a real model, and demotion must be
+   enforced against the codebase, not the spec. DEC-8 depends on this.
+2. **§11's other pillar — ino rejecting multi-tier test ladders — is contested inside ino.** The
+   *"Just e2e"* line sits under a heading reading *"The user has explicitly rejected:"* with no
+   reasoning, in a file that leaves a tier question *"Decision pending"*, while
+   `2026-04-16-ino-poc-phase-2-cross-silo-runtime-design.md` §12.1 specifies a **five-layer ladder
+   with per-layer speed budgets**. ino did not settle this.
+3. **L-5 mischaracterised two of its three headline artifacts.** `IAW/docs/orleans_scheduling.md`,
+   cited as primary research bearing on grain scheduling, is a timers/reminders/durable-jobs
+   matrix with nothing on `[Reentrant]` or serialising expensive calls. IAW's `static virtual`
+   metadata is `AgentDisplayName`/`AgentDescription`/`AgentInstructions` — **display identity, not
+   `IHandle`/`IEmit` wiring.** B-2 listed it as a design input for the wrong reason.
+4. **§4.1 cited `TimelineRelayGrain` for something it does not do.** Corrected in place.
 
-`CLAUDE.md` instructs any agent in that tree that *"`final/` is the canonical, current
-codebase. Start there for all new work"* and describes a workspace rooted at `E:\Projects`.
-`CONTINUATION.md` instructs a from-scratch NeuroOS build with a nine-step order and a
-typed-C#-only constraint. Both are live-voiced instructions for a repository that is not this
-one, and the harness injects `CLAUDE.md` into context on any read beneath it.
+**Findings that resolved open decisions:**
 
-**Both are retained until L-4 closes** — `CONTINUATION.md` is the primary evidence for §1 — and
-**both are marked archival in Phase 0.6**, with a header stating they describe a superseded
-workspace.
+- **Broadcast addressing.** ino: startup reflection populates a Discovery registry with handler
+  **types**; the grain key comes from the ambient correlation id. `digitalbrain`'s
+  `NavigatorRouter.ResolveSubscribersAsync` independently confirms catalog-driven enumeration by
+  handled type. Both remove the *activation* prerequisite, which is §2.7's actual bug. → Phase 2.8.
+- **§14.6, descriptor vs interface.** `brain_from_master`'s `ModuleDescriptor` declares **no
+  neurons and no synapse types**; `digitalbrain`'s v5 domain manifest is the same shape; ino states
+  *"No manifest file. No custom descriptor."* → §4.2.
+- **§14.1, DEC-6's concurrency hole.** ino shipped the raw-injected-client alternative
+  (`TripPlanner(IChatClient)`), and `digitalbrain`'s `MULTI_AGENT_LOCAL_LLM.md` observes that with
+  a shared inference server the serialisation point is the provider, not the activation — so
+  fan-out across caller grains buys no parallelism. → DEC-6, resolved.
+- **§14.3, feed-worthy vs traced.** ino asked the same question and left it open, with two useful
+  artifacts: the self-grain-versus-cross-grain axis, and measured caps (1 s emit timeout,
+  4096-byte payload) with the note *"the per-call overhead is real."* → §4.1.
+- **§14.2, credentials.** Three shapes exist beyond this plan's binary framing: tokens in a
+  non-neuron grain reached through an in-process broker, encrypted at rest with an OS keystore
+  (`digitalbrain`); tokens outside the cluster entirely in a per-brain DPAPI-encrypted file (its
+  own later v5 generation — **a recorded reversal**); and in-cluster with a per-experience consent
+  list (ino). None closes §2.6. → R-3, promoted to Phase 2.5.
 
-The nested skills directories are renamed in Phase 0.3, not deleted, because they belong to
-rows still open. They are deleted with their rows.
+**Named artifacts that bear on nothing open**, contradicting §10's own "valuable content" column:
+ino's decay model (never implemented — *"(implementation pending)"*), the graph-DB rejection
+(scoped to visualization cost), UI-patch-as-synapse (a draft whose argument is circular),
+`digitalbrain`'s ABI two-interlocking-guards pattern (a good technique for Phase 1.1's leaf tests;
+changes no decision), and `brain_from_master`'s failure-behaviour matrix (eleven rows, none on
+ordering, eviction, or fan-out).
+
+**Negative findings, stated because silence is not rejection:**
+
+- **Delivery ordering (R-2) has no prior art.** No document in any tree states an ordering
+  guarantee or addresses an unreachable receiver. `final` forbids asserting order in three separate
+  documents — *"flaky by design"*. §11's instruction to state the guarantee first stands entirely
+  unassisted, which is why Phase 2.9 says so explicitly.
+- **Nothing in the lineage built per-neuron dynamic subscription.** Everything built type-level
+  static enumeration. DEC-8's install-time registry for behaviors is new ground.
+- **`final`'s `VISION.md` treats total observability as an axiom** — *"No side channels."* That is
+  why no generation questioned wrapper-synapse volume: §14.3 is a question the lineage's stated law
+  forbade asking.
+
+### Reversibility
+
+`sources/` is in git history at every commit up to and including the one that removes it. Use
+`git log --diff-filter=D -- sources/` to find the removal commit and `git show <sha>^:<path>` to
+read any file. The tree is not gone; it is no longer on disk, in every grep, and in every
+architecture pass.
 
 ---
 
@@ -1102,34 +1508,72 @@ rows still open. They are deleted with their rows.
 
 Recorded so the next plan cannot mistake silence for a decision.
 
-**The three-tier test split.** v2 runs 84 Tier-0 contract tests, 23 Tier-1 Reqnroll simulations
-on a shared 3-silo in-process cluster, and 5 Tier-2 Aspire hosted tests. `ino` explicitly
-rejected multi-tier ladders (*"Multi-tier test ladders (Tier 0/1/1.5/2/3). Just e2e."*). `IAW`'s
-middle tier was functionally indistinguishable from its first. `v3` collapsed four overlapping
-drivers into a single `Simulation` class on the principle that *"the test framework and the
-safety gate are the same machine."*
+**The three-tier test split.** v2 runs 88 Tier-0 contract tests, 26 Tier-1 Reqnroll simulations
+on a shared 3-silo in-process cluster, and 5 Tier-2 Aspire hosted tests.
 
-Tier-0 and Tier-2 clearly earn their place. **Tier-1 needs a stated reason to exist beyond
-"Gherkin."** The candidate reason is that natural-language scenarios are readable by
-non-engineers — which is only a benefit if non-engineers read them. If they do not, Tier-1 is
-Tier-0 with a parser in front. Decide before Phase 3 adds module conformance, because
-conformance will land in whichever tier is judged to earn it.
+**Corrected 2026-07-19 — this row previously cited `ino` as having settled the question. It did
+not.** The *"Multi-tier test ladders (Tier 0/1/1.5/2/3). Just e2e."* line sits under a heading
+reading *"The user has explicitly rejected:"*, carries no reasoning, and appears in a file that
+leaves a tier question *"Decision pending."* Two months earlier,
+`2026-04-16-ino-poc-phase-2-cross-silo-runtime-design.md` §12.1 specified a **five-layer ladder
+with a numeric speed budget per layer** (L1 <5 s, L2 <30 s, L3 <60 s, L5 ~3 min, suite <5 min).
+`ino` contradicts itself; it is not a precedent either way.
+
+What survives as argument: `IAW`'s middle tier was functionally indistinguishable from its first.
+`v3` collapsed four overlapping drivers into one `Simulation` class on the principle that *"the
+test framework and the safety gate are the same machine"* — and its motive is the one that
+matters here: *"An AI-authored neuron has no human to hand-write its xUnit."* Under DEC-8 that is
+no longer hypothetical, so **the gate must be machine-runnable**, which is a real constraint on
+whether a Gherkin tier can host it.
+
+Two better discriminators than "Gherkin", both from the harvest:
+
+- **A numeric speed budget per tier** (ino). A tier that cannot state its budget is not a tier.
+- **What is real** (`digitalbrain`): mocked model → real model → real everything. A membership
+  criterion about fidelity, not about syntax.
+
+Tier-0 and Tier-2 clearly earn their place. **Tier-1 still needs a stated reason.** Decide before
+Phase 3.7, where the second adapter's conformance lands.
 
 **Dispatch mechanism (R-6).** Promote the generated manifest or delete it. Depends on
-measurement.
+measurement. **Narrowed:** the generator is no longer decorative regardless of the outcome —
+§4.2 makes the contract manifest the thing a module descriptor's wiring half is generated from,
+so the generator becomes load-bearing at Phase 3.3 even if reflection keeps the dispatch path.
 
 **Delivery ordering (R-2).** The code currently promises FIFO by construction; nothing documents
 it. Fixing head-of-line blocking changes an unstated guarantee. State the guarantee first.
+**Confirmed by the harvest: no prior generation states one either.** `final` forbids asserting
+order in three separate documents (*"flaky by design"*); `brain_from_master`'s outbox is
+single-destination and never met the problem. There is nothing to inherit. Two useful fragments:
+ino's vocabulary for the promise it did make elsewhere — *"best-effort ordering within a target,
+at-least-once, idempotency is the handler's responsibility"* — and its split by verb, where a
+broadcast returns `reached_count`/`failed_count`/`failed_grain_types` and *"one listener's failure
+doesn't fail the broadcast."* **A directed request and an undirected fact cannot share an ordering
+guarantee**, which DEC-9 already separates.
 
-**`IEmit<T>`'s future.** Under DEC-2 a module descriptor declares its contributions explicitly.
-`IEmit<T>` may become redundant with the descriptor, or may remain as the compile-time-checked
-form the descriptor is generated from. Resolve during Phase 3.1.
+**~~`IEmit<T>`'s future.~~ Resolved.** §4.2: the descriptor does not restate the wiring graph, so
+`IEmit<T>` is not redundant with it — it is the canonical declaration the wiring half is generated
+*from*. Confirmed independently by `brain_from_master` (`ModuleDescriptor` declares no neurons and
+no synapse types), `digitalbrain`'s v5 domain manifest (same shape), and ino (*"No manifest file.
+No custom descriptor."*).
 
-**Whether any DSL is ever proposed again.** If one is, `final`'s Gate-0 method is the standard:
-a pre-registered benchmark with a numeric kill threshold, executed before an interpreter is
-written. `final` ran 20 prompts against an 80% bar, scored 60%, and formally demoted the
-language. That lineage attempted a full interpreted language three times and abandoned it three
-times. A fourth attempt needs the gate first.
+**Whether any DSL is ever proposed again.** **Corrected 2026-07-19 — this row endorsed a method
+that failed.** It claimed `final` *"ran 20 prompts against an 80% bar, scored 60%, and formally
+demoted the language."* Both halves are contradicted by `final`'s own documents: *"Execution used
+deterministic stub returning 'first attempt' JSON for the prompt set"* and *"its 60% is simulated,
+not measured"* — a benchmark whose failure rate was authored, not observed — and the demotion did
+not hold, because *"`RuleHostNeuron` + parser + interpreter + BDD landed afterward and are green."*
+
+The method is still the right idea and is **the standard for DEC-8's generation benchmark**, but
+only with the two corrections its own failure exposes:
+
+1. **The benchmark runs against the real model, or it does not count.** A stub cannot kill anything.
+2. **Demotion is enforced against the codebase, not the format spec.** A gate that fires while the
+   machinery ships anyway is theatre with a number attached.
+
+That lineage attempted a full interpreted language three times and abandoned it three times. DEC-8
+is deliberately not a fourth attempt — it is C# compiled by Roslyn, so the type checker is the
+gate and there is no interpreter to demote.
 
 **Runtime-created neurons.** Deferred by DEC-2, not rejected. Revisit only with a resident
 isolated host design. Nothing in this lineage has built one — `v3`'s collectible
@@ -1160,87 +1604,122 @@ Recorded in one place so it cannot be silently reversed.
 
 ## 13. First action
 
-Phase 0.1. Twenty source files under `sources/` are not in git, thirteen of them a complete
-Dart SDK package. Until they are committed, this entire ledger rests on a false premise and
-`sources/` cannot be touched.
+**Phase 0 is complete and `sources/` is retired (§10).** Phases 2.1 and 2.2 are committed.
+
+The next action is **Phase 2.3** — cursor-based read replacing `ReadJournalAsync` across every
+consumer — followed by **2.4** (DEC-10) to close Phase 2a green.
+
+Then **2.5, R-3, the owner boundary.** It is the gate on everything client-facing, and under
+DEC-8 that means it is the gate on the product. Nothing in Phase 4 may start before it.
+
+**Standing gate, every phase, no exceptions:** `dotnet test --logger "console;verbosity=minimal"`
+from the root. Never `--filter`. Held-red proofs assert the behaviour the system *should* have and
+are excluded, never left failing — `[Fact(Explicit = true)]` for xUnit, `@ignore` for Gherkin.
 
 ---
 
 ## 14. Known defects in this plan
 
-This document was reviewed adversarially after being written. Six problems survived. Two are
-unresolved decisions and block specific phases; four are drafting gaps that must be closed
-during execution. **None of them is fixed. Do not start the blocked phases without closing the
-blocking item first.**
+This document was reviewed adversarially after being written. Six problems survived. **All six are
+now closed** — five by the decisions of 2026-07-19, one by the harvest. Each is kept with its
+original statement and its resolution, because a defect deleted without a recorded answer is a
+defect that returns.
 
-### 14.1 — BLOCKER for Phase 3.5. DEC-6 has a concurrency hole.
+### 14.1 — CLOSED. DEC-6's concurrency hole.
 
-Orleans grains are single-threaded per activation. If `IGpt5` is a neuron at a stable key,
-**every inference call serializes through one activation per owner.** Four agents asking
-concurrently queue behind each other for the full latency of every call.
+**Was:** Orleans grains are single-threaded per activation, so `IGpt5` at a stable key serialises
+every inference call per owner. All three escapes were judged bad — `[Reentrant]` breaks the
+journal invariant, key-per-call makes the journal meaningless, key-per-caller fragments the
+model's traffic into N feeds.
 
-Every escape is bad in a different way:
+**Resolved.** Every rejection assumed observability comes from the **callee's** journal. Under
+B-1 the call is recorded on the **caller's** feed, so the callee's journal is not the evidence.
+Keying the model neuron by the ambient correlation id therefore costs nothing it was accused of
+costing: each call gets its own activation, nothing serialises across callers, `[Reentrant]` is
+never needed, and one model's traffic is a query over the timeline rather than a property of one
+grain's journal. See DEC-6.
 
-- `[Reentrant]` — journal writes then interleave and `History[^1].Sequence == LastSequence`
-  is no longer safe without locking.
-- Key per call — it is a factory with a grain-shaped API; the journal holds one entry per
-  activation and means nothing.
-- Key per caller — plausible, but then "the GPT-5 neuron" is N neurons and the timeline shows
-  N feeds rather than one model's traffic.
+Supporting evidence from the harvest: ino shipped the raw-injected-client alternative
+(`TripPlanner(IChatClient)`), and `digitalbrain` observed that with a shared inference server the
+serialisation point is **the provider, not the activation** — so fanning out across caller grains
+buys no parallelism against a single local model anyway.
 
-DEC-6 chose the typed grain call over a raw injected client largely on observability grounds.
-**That was mispriced.** A raw client is observable too — `digitalbrain` did it properly with
-OpenTelemetry GenAI semantic conventions. What the grain call uniquely buys is presence on the
-*synapse timeline* specifically, which is worth less than DEC-6 claims, against a concurrency
-cost that is worth more.
+### 14.2 — CLOSED by ordering. Credential storage was scheduled ahead of its boundary.
 
-**Re-decide before Phase 3.5.** The raw-client option and the model-neuron option are much
-closer than DEC-6 states.
+**Was:** DEC-5 places OAuth refresh tokens in cluster-addressable grains while §2.6 establishes
+that an unattributed caller — any Orleans client — passes the owner filter unchecked, with R-3's
+own proof admitted as *"insufficient on its own."*
 
-### 14.2 — BLOCKER for B-3. The plan schedules credential storage ahead of the boundary that protects it.
+**Resolved by promotion, not by mitigation.** R-3 moves to **Phase 2.5**, ahead of everything
+client-facing. This is no longer only a credential concern: DEC-8 makes an external script exactly
+the unattributed Orleans client of §2.6 — the configuration this lineage records as its failure
+mode (IAW's raw unauthenticated `IClusterClient` with full host authority). The boundary now gates
+the product direction, not just B-3.
 
-R-3 states its own proof is "insufficient on its own." DEC-5 then places OAuth refresh tokens
-in cluster-addressable grains, and §2.6 establishes that an unattributed caller — any Orleans
-client — passes the owner filter unchecked.
+The harvest found three storage shapes beyond this plan's binary framing, recorded in §10 and none
+of which closes §2.6 on its own: encrypted-at-rest in a non-neuron grain behind an in-process
+broker; outside the cluster entirely in a per-brain DPAPI-encrypted file; and in-cluster with a
+per-experience consent list. Encryption at rest narrows the blast radius from "all tokens" to
+"ciphertext plus a consent check" and is worth having **in addition to** the boundary.
 
-As written, the plan schedules "put every user's Google credentials in a grain any cluster peer
-can address" and files the mitigation as future work. **That ordering is wrong.** Resolve one
-of two ways before B-3:
+### 14.3 — CLOSED. DEC-1 and B-1 interact badly.
 
-- store credentials outside the cluster-addressable surface, or
-- promote R-3 to a hard prerequisite for B-3 rather than a note beside it.
+**Was:** reification writes every grain call to a bounded feed, so a neuron making ten model calls
+in a turn evicts its own domain events. The bound protects storage and CPU, not signal-to-noise,
+and nothing stated what is feed-worthy.
 
-### 14.3 — DEC-1 and B-1 interact badly, and no section notices.
+**Resolved, and the code had already answered half of it.** `SynapseObserver` observes via
+`ActivityListener` over `SynapseTelemetry` — push-based, no polling. Everything is *already*
+traced. The question was never "traced or not"; it is what additionally deserves to be durable:
 
-Call-filter reification writes every grain call to the caller's feed. The feed is bounded. A
-neuron making ten model calls in a turn fills its own feed with inference traffic and **evicts
-its actual domain events.**
+> **Domain facts are feed-worthy. Call traffic is traced and reified, not accumulated.**
 
-The bound protects storage and CPU. It does not protect signal-to-noise. **Nothing in this plan
-states what is feed-worthy versus merely traced.** Decide during Phase 2.4, before the filter
-ships.
+The structural half is stronger than the rule. Because compiled subscription is composition-time
+(§4.5), the kernel knows at startup whether anything handles a fact type and **never constructs
+one nothing handles.** A dynamic registry could not do this. That is what makes "everything is a
+fact" affordable rather than ruinous.
 
-### 14.4 — Phase 2 is too large to be one phase and silently rewrites the test suite.
+Two discriminators carried over from ino, which asked this and left it open: the self-grain versus
+cross-grain call axis, and hard caps — it used a 1 s emit timeout and a 4096-byte payload cap with
+the note *"the per-call overhead is real. Profile before scaling neuron counts up."*
 
-R-1 changes `ReadJournalAsync`, the entire client read API, and all 23 Reqnroll scenarios go
-through it. §8 says "every consumer changes" in one line and never sizes it. Phase 2 realistically
-touches the kernel, the client, both samples, the probe host, the testing package, and all 23
-feature files, and it has no rollback point. **Split it before starting, with a green gate
-between the feed state machine (2.1–2.3) and the observation rail (2.4–2.6).**
+### 14.4 — CLOSED. Phase 2 was too large and had no rollback point.
 
-### 14.5 — Two explicit questions are unanswered.
+**Was:** R-1 changes `ReadJournalAsync`, the entire client read API, and §8 sized it in one line.
 
-- **Is `LLMNeuron` the right name?** §7's rename table does not cover it.
-- **Does the owner concept belong in the kernel at all?** §4.3 adds scope machinery without
-  questioning the premise. `brain_from_master` proved the feed must be keyed by identity rather
-  than transport, which suggests owner-in-kernel is right — but this plan assumes it rather than
-  arguing it.
+**Resolved by splitting**, as the defect demanded: **Phase 2a** (feed, dedupe, cursor read, DEC-10)
+ends green and is the rollback point; **Phase 2b** (boundary, watch, reification, broadcast,
+ordering) follows.
 
-### 14.6 — DEC-3 and §4.2 are in tension.
+**The blast radius was also overstated.** It is not 26 scenarios rewritten. Every scenario reaches
+the journal through a shared step layer — `NeuronSteps` has 5 call sites and `Simulation` has 6 —
+so the real edit surface is roughly 20 call sites across the Testing package, two samples,
+`ProbeHost`, and `BrainClient`. Verified by direct search.
 
-DEC-3 puts `IHandle<T>`/`IEmit<T>` on the interface *so the wiring graph is reflectable without
-loading the implementation*. §4.2 then says discovery is explicit registration, **not**
-reflection. If the descriptor declares the neurons anyway, the interface declaration is
-redundant — unless the descriptor is *generated from* it, which is exactly R-6's contract-
-manifest work. §11 flags this for `IEmit<T>` and leaves it unresolved for the descriptor.
-**Resolve in Phase 3.1.**
+### 14.5 — CLOSED. Two unanswered questions.
+
+- **Is `LLMNeuron` the right name?** Moot. There is no `LLMNeuron`. Under DEC-6 a model is a
+  typed neuron interface named for the model (`IGpt56`), resolved by `Get<T>()` like any other
+  capability, and §7's reduced table carries no row for it.
+- **Does the owner concept belong in the kernel?** **Yes, and DEC-8 is the argument the plan
+  previously assumed.** `Get<T>()` takes no owner — owner is ambient and never a parameter — which
+  is what makes "a script cannot address another owner's neuron" a property of the API's shape
+  rather than a check that can be forgotten. An owner concept outside the kernel could not do
+  that. `brain_from_master`'s finding that the feed must be keyed by identity rather than
+  transport points the same way.
+
+### 14.6 — CLOSED. DEC-3 and §4.2 were in tension.
+
+**Was:** DEC-3 puts `IHandle<T>`/`IEmit<T>` on the interface so the wiring graph is reflectable
+without loading the implementation; §4.2 then said discovery is explicit registration. If the
+descriptor declares the neurons anyway, the interface declaration is redundant.
+
+**Resolved: the descriptor never declares them.** The tension was invented by listing neurons in
+the descriptor. Three prior generations independently did not — `brain_from_master`'s
+`ModuleDescriptor` carries configuration, secrets, capabilities, effects and OAuth and **no
+neurons or synapse types**; `digitalbrain`'s v5 domain manifest is the same shape; ino states
+*"No manifest file. No custom descriptor."*
+
+So wiring stays on the interfaces and is **generated** from them (R-6, Phase 3.3), while the
+descriptor carries only what interfaces cannot express. There is no second declaration, therefore
+nothing to drift. This also closes §11's `IEmit<T>` question.
