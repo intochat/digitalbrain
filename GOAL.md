@@ -293,14 +293,27 @@ referencing it.
   assertion instead of dead public surface.
 
 ### M5 — AI model binding **[review]**
-- [ ] Typed model descriptors and role tiers (fast/balanced/reasoning/embedding); per-provider
+- [x] Typed model descriptors and role tiers (fast/balanced/reasoning/embedding); per-provider
       factories (OpenAI + Anthropic via official SDKs + MEAI) inside the kernel only; options
-      validation, health checks, OTel.
-- [ ] Neurons consume AI through typed capability injection bound to tiers — provider choice is
+      validation and OTel. **Health checks move to M8**, where a host exists to expose them — a
+      health check with no endpoint to report to would be unexercised speculative code.
+- [x] Neurons consume AI through typed capability injection bound to tiers — provider choice is
       AppHost configuration, never neuron code.
-- [ ] Deterministic scripted provider in `DigitalBrain.Testing`; real adapters proven against it over
+- [x] Deterministic scripted provider in `DigitalBrain.Testing`; real adapters proven against it over
       HTTP endpoint overrides with synthetic secrets.
 - Commit: `feat: bind AI model tiers to neurons`
+- Execution record: baseline `ce6ac149`, commit `628e9a6e`. Every provider API was verified against
+  official sources before any code (Decision 20). Red evidence: the model scenarios failed on
+  undefined steps, then `AskModelAsync` did not exist, then the unscripted-prompt scenario failed
+  with `CodecNotFoundException` because the refusal could not cross a grain boundary until it
+  carried `[GenerateSerializer]`/`[Alias]` — the exact trap the prototype harvest warned about.
+  Gates: root `dotnet test .\DigitalBrain.slnx -c Release` exit 0, 56 Tier-0 + 19 Tier-1, stable
+  over two consecutive runs. The real OpenAI adapter is proven end to end against a loopback
+  `HttpListener` serving a canned completion: the SDK is constructed through `ProviderFactory` with
+  a synthetic key and an `Endpoint` override, and the test asserts both the answer text and that the
+  request carried `Bearer synthetic-key` to `/chat/completions`. Provider SDKs and credentials stay
+  inside `DigitalBrain.Kernel`; `DigitalBrain.Testing` ships only the scripted model, which fails
+  loudly on an unscripted prompt rather than inventing an answer.
 
 ### M6 — Client package **[review]**
 - [ ] `DigitalBrain.Client`: owner sessions, typed neuron access, fire-and-observe from outside the
@@ -586,6 +599,21 @@ referencing it.
     drain interval abandons an entry after 400 ms, far below any real silo restart; the meaningful
     bound is the 30-minute age horizon. **Open work:** a deterministic outage-and-return scenario,
     and with it the last unproven quarter of M4's durability box.
+
+20. **2026-07-19 — Model binding shape, verified against the pinned SDKs.** `ModelTier`
+    (fast/balanced/reasoning/embedding) is the only thing a neuron names; `ModelDescriptor`
+    (tier, provider, model id, optional key and endpoint) is AppHost configuration. Tiers are
+    registered as **keyed** `IChatClient`s using MEAI's `AddKeyedChatClient`, whose `serviceKey` is
+    `object?` — so the enum is the key directly, with no stringly-typed indirection — wrapped in
+    `UseOpenTelemetry()`. A neuron calls `AskModelAsync(tier, prompt, ct)` and never sees a
+    provider. Verified facts this rests on: `IChatClient` lives in namespace
+    `Microsoft.Extensions.AI` and has exactly three members; `ChatResponse.Text` is the answer;
+    the OpenAI adapter extends `OpenAI.Chat.ChatClient` (`GetChatClient(model).AsIChatClient()`)
+    and takes its base URL from `OpenAIClientOptions.Endpoint`; Anthropic's `AsIChatClient` lives in
+    the `Microsoft.Extensions.AI` namespace and its `BaseUrl` is an `init` **string**, not a `Uri`.
+    Two packaging notes: `Anthropic 12.36.0` ships no `net10.0` asset and resolves via its `net9.0`
+    group, and its declared `Microsoft.Extensions.AI.Abstractions 10.5.1` is a minimum bound, not a
+    pin, so it unifies cleanly with 10.8.0 on .NET 10.
 
 ## Definition of Done
 
