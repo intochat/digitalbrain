@@ -413,14 +413,16 @@ referencing it.
       turn; kernel restart; delivery and journals resume; dashboard and DevUI verified; no orphaned
       processes. Optional real-provider run if keys exist.
 - Commit: `test: prove hosted restart recovery`
-- **In progress, not ticked.** Done: the AppHost runs under `Aspire.Hosting.Testing`; a **durable
-  turn** is fired through a real `BrainClient` inside the cluster; the kernel is **restarted** with
-  `ResourceCommands.ExecuteCommandAsync("probe", "resource-restart")`; and the **journals resume** —
-  the turn is still recorded after the restart, replayed from Azure Blob storage, which is the
-  hosted-restart-proof gate. Not done: the scripted provider is not wired into the hosted run;
-  **delivery** resuming after restart is not asserted (that is Decision 19's open redelivery work);
-  the dashboard and DevUI are not verified because they are not built (Decision 26); and
-  "no orphaned processes" is not checked.
+- **In progress, not ticked** — six of seven clauses hold. Done: the AppHost runs under
+  `Aspire.Hosting.Testing`; the **scripted provider** answers on the real host (a neuron asks the
+  balanced tier and emits the scripted answer); a **durable turn** is fired through a real
+  `BrainClient` from inside the cluster; the kernel is **restarted** with
+  `ResourceCommands.ExecuteCommandAsync("probe", "resource-restart")`; **journals resume** (the
+  turn is still recorded, replayed from Azure Blob) and **delivery resumes** (a turn fired after
+  the restart is delivered, taking the receiver's journal from one to two); and **no orphaned
+  processes** remain once the application is disposed. Not done: the dashboard and DevUI are not
+  verified, because they are not built (Decision 26) — adding `Microsoft.Orleans.Dashboard` was
+  attempted and reverted rather than ship a dependency with no verified hosting surface.
 
 ### M10 — Release engineering **[review]**
 - [ ] Pack scripts, deterministic CI build/test/pack/consumer-restore jobs including website
