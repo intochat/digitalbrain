@@ -328,9 +328,22 @@ referencing it.
   unmet. Both adapters are now proven against a loopback server.
 
 ### M6 — Client package **[review]**
-- [ ] `DigitalBrain.Client`: owner sessions, typed neuron access, fire-and-observe from outside the
+- [x] `DigitalBrain.Client`: owner sessions, typed neuron access, fire-and-observe from outside the
       cluster, outgoing owner filter. Orleans client only; no provider SDKs; no reflection routing.
 - Commit: `feat: implement the owner-bound client`
+- Execution record: baseline `4ba0cccd`, commit pending below. Red evidence: the client scenarios
+  failed on undefined steps, then `BrainClient` did not exist, then the cross-owner scenario failed
+  with "expected a refusal, but the synapse was accepted" — because `SendAsync` only enqueues and
+  delivery is a detached drain (Decision 15), so the client would have learned about an
+  authorization failure only as a silently dropped outbox entry. That is precisely what M6's
+  "outgoing owner filter" box is for: `SessionNeuron.FireAsync` now rejects a foreign-owner target
+  synchronously, so a client gets a typed `NeuronAuthorizationException` at the call. This closes
+  the client half of Decision 8, which M2 deferred to M6. `DigitalBrain.Client` references only
+  `Microsoft.Orleans.Client` and `DigitalBrain.Abstractions` — verified by
+  `dotnet list package --include-transitive` and pinned by a Tier-0 contract test asserting that
+  Abstractions, Client, Testing and both Aspire packages reference no provider SDK, and that the
+  client never references the runtime. Gates: root `dotnet test .\DigitalBrain.slnx -c Release`
+  exit 0, 65 Tier-0 + 22 Tier-1, stable over two consecutive runs.
 
 ### M7 — Aspire integration **[review]**
 - [ ] `DigitalBrain.Aspire.Hosting`: brain resource composing Orleans + storage (separate stores per

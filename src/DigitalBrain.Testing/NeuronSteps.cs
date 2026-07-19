@@ -17,6 +17,30 @@ public sealed class NeuronSteps(Simulation simulation)
     [BeforeScenario]
     public static void ForgetPreviousScripts() => SimulationCluster.ForgetScripts();
 
+    [When("the client fires {word} at the {word} neuron named {string}")]
+    public Task WhenTheClientFires(string synapseType, string neuronType, string name)
+        => simulation.ClientFireAsync(synapseType, neuronType, name);
+
+    [When("the client is refused firing {word} at the {word} neuron named {string} owned by {string}")]
+    public Task WhenTheClientIsRefused(string synapseType, string neuronType, string name, string targetOwner)
+        => simulation.ClientFireExpectingRefusalAsync(synapseType, neuronType, name, targetOwner);
+
+    [Then("the client sees {word} in the {word} journal of the {word} neuron named {string}")]
+    public async Task ThenTheClientSees(string synapseType, string journal, string neuronType, string name)
+    {
+        await simulation.AwaitHandledAsync(neuronType, name, "Ping");
+
+        var kind = Enum.Parse<JournalKind>(journal, ignoreCase: true);
+        var seen = await simulation.ClientReadJournalAsync(kind, neuronType, name);
+        var expected = NeuronCatalog.SynapseType(synapseType);
+
+        if (!seen.Any(expected.IsInstanceOfType))
+        {
+            throw new SimulationAssertionException(
+                $"Expected the client to see {synapseType} in the {kind} journal of {neuronType} '{name}', but it saw {(seen.Count == 0 ? "nothing" : string.Join(", ", seen.Select(synapse => synapse.GetType().Name)))}.");
+        }
+    }
+
     [When("{word} is refused by the {word} neuron named {string}")]
     public Task WhenSynapseIsRefused(string synapseType, string neuronType, string name)
         => simulation.SendExpectingRefusalAsync(synapseType, neuronType, name);

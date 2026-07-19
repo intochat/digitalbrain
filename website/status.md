@@ -15,7 +15,7 @@ so.
 | Durable synapse fabric | done |
 | Multi-silo delivery and recovery | done |
 | AI model binding | done |
-| Client package | not started |
+| Client package | done |
 | Aspire integration | not started |
 | Hosts, dev tools, quickstart | not started |
 | Hosted restart proof | not started |

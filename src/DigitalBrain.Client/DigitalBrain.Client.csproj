@@ -3,4 +3,10 @@
     <IsPackable>true</IsPackable>
     <Description>Owner-bound access to a DigitalBrain cluster from outside: typed neuron access and fire-and-observe.</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Client" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
+  </ItemGroup>
 </Project>

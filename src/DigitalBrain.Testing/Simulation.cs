@@ -27,6 +27,19 @@ public sealed class Simulation
     public Task SendAsync(string synapseTypeName, string neuronType, string name, IReadOnlyDictionary<string, string> values)
         => StimulateAsync(synapseTypeName, NeuronNamed(neuronType, name), values);
 
+    public BrainClient Client => new(SimulationCluster.Grains, Owner);
+
+    public Task ClientFireAsync(string synapseTypeName, string neuronType, string name)
+        => Client.FireAsync(neuronType, name, NeuronCatalog.Create(synapseTypeName, EmptyValues));
+
+    public Task ClientFireExpectingRefusalAsync(string synapseTypeName, string neuronType, string name, string targetOwner)
+        => CaptureRefusalAsync(() => Client.FireAsync(
+            new NeuronId(neuronType, new OwnerId(targetOwner), name),
+            NeuronCatalog.Create(synapseTypeName, EmptyValues)));
+
+    public Task<IReadOnlyList<Synapse>> ClientReadJournalAsync(JournalKind kind, string neuronType, string name)
+        => Client.Neuron(neuronType, name).ReadJournalAsync(kind);
+
     public Task SendExpectingRefusalAsync(string synapseTypeName, string neuronType, string name)
         => CaptureRefusalAsync(() => StimulateAsync(synapseTypeName, NeuronNamed(neuronType, name), EmptyValues));
 

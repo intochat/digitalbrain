@@ -24,6 +24,7 @@ public sealed class SerializationContracts
             [nameof(JournalKind)] = "db.journal-kind",
             [nameof(ModelTier)] = "db.model-tier",
             [nameof(INeuron)] = "db.neuron",
+            [nameof(ISessionNeuron)] = "db.session",
             [nameof(NeuronAuthorizationException)] = "db.authorization-error",
             [nameof(ISubscriptionRegistry)] = "db.subscription-registry",
         };

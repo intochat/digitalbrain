@@ -4,6 +4,7 @@
 ~override DigitalBrain.OwnerId.Equals(object obj) -> bool
 ~override DigitalBrain.SynapseId.Equals(object obj) -> bool
 abstract DigitalBrain.Synapse.<Clone>$() -> DigitalBrain.Synapse!
+const DigitalBrain.ISessionNeuron.GrainTypeName = "sessionneuron" -> string!
 DigitalBrain.CorrelationId
 DigitalBrain.CorrelationId.CorrelationId() -> void
 DigitalBrain.CorrelationId.CorrelationId(System.Guid Value) -> void
@@ -19,6 +20,8 @@ DigitalBrain.IHandle<TSynapse>.HandleAsync(TSynapse! synapse, System.Threading.C
 DigitalBrain.INeuron
 DigitalBrain.INeuron.DeliverAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.INeuron.ReadJournalAsync(DigitalBrain.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
+DigitalBrain.ISessionNeuron
+DigitalBrain.ISessionNeuron.FireAsync(DigitalBrain.NeuronId receiver, DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.ISubscriptionRegistry
 DigitalBrain.ISubscriptionRegistry.RegisterAsync(string! synapseType, DigitalBrain.NeuronId subscriber) -> System.Threading.Tasks.Task!
 DigitalBrain.ISubscriptionRegistry.SubscriberCountAsync(string! synapseType) -> System.Threading.Tasks.Task<int>!

@@ -1,1 +1,12 @@
 #nullable enable
+DigitalBrain.BrainClient
+DigitalBrain.BrainClient.BrainClient(Orleans.IGrainFactory! grains, DigitalBrain.OwnerId owner) -> void
+DigitalBrain.BrainClient.FireAsync(DigitalBrain.NeuronId receiver, DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.BrainClient.FireAsync(string! neuronType, string! name, DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.BrainClient.Neuron(string! neuronType, string! name) -> DigitalBrain.NeuronHandle!
+DigitalBrain.BrainClient.Neuron<TNeuron>(string! name) -> DigitalBrain.NeuronHandle!
+DigitalBrain.BrainClient.Owner.get -> DigitalBrain.OwnerId
+DigitalBrain.NeuronHandle
+DigitalBrain.NeuronHandle.Id.get -> DigitalBrain.NeuronId
+DigitalBrain.NeuronHandle.NeuronHandle(Orleans.IGrainFactory! grains, DigitalBrain.NeuronId id) -> void
+DigitalBrain.NeuronHandle.ReadJournalAsync(DigitalBrain.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!

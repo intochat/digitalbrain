@@ -8,6 +8,7 @@ DigitalBrain.Testing.NeuronSteps.GivenABrainForOwner(string! owner) -> void
 DigitalBrain.Testing.NeuronSteps.ManyNeuronsAreRegistered(int count, string! neuronType) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.NeuronSteps(DigitalBrain.Testing.Simulation! simulation) -> void
 DigitalBrain.Testing.NeuronSteps.ThenEveryRegisteredNeuronReceived(string! neuronType, string! synapseType) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.NeuronSteps.ThenTheClientSees(string! synapseType, string! journal, string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalContains(string! neuronType, string! name, string! synapseType) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalIsEmpty(string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalSettlesBelow(string! neuronType, string! name, int limit) -> System.Threading.Tasks.Task!
@@ -22,6 +23,8 @@ DigitalBrain.Testing.NeuronSteps.WhenSynapseIsRefused(string! synapseType, strin
 DigitalBrain.Testing.NeuronSteps.WhenSynapseIsSentClaimingAnotherOwner(string! synapseType, string! neuronType, string! name, string! claimedOwner) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenSynapseIsSentToNeuron(string! synapseType, string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenSynapseIsSentToNeuronWith(string! synapseType, string! neuronType, string! name, Reqnroll.DataTable! values) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.NeuronSteps.WhenTheClientFires(string! synapseType, string! neuronType, string! name) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.NeuronSteps.WhenTheClientIsRefused(string! synapseType, string! neuronType, string! name, string! targetOwner) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenTheHostingSiloIsRestarted(string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenTheSameSynapseIsSentTwice(string! synapseType, string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.ScriptedModel
@@ -35,6 +38,10 @@ DigitalBrain.Testing.ScriptedModel.ScriptedModel() -> void
 DigitalBrain.Testing.Simulation
 DigitalBrain.Testing.Simulation.AwaitAllRegisteredHandledAsync(string! synapseTypeName) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.AwaitHandledAsync(string! neuronType, string! name, string! synapseTypeName) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Simulation.Client.get -> DigitalBrain.BrainClient!
+DigitalBrain.Testing.Simulation.ClientFireAsync(string! synapseTypeName, string! neuronType, string! name) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Simulation.ClientFireExpectingRefusalAsync(string! synapseTypeName, string! neuronType, string! name, string! targetOwner) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Simulation.ClientReadJournalAsync(DigitalBrain.JournalKind kind, string! neuronType, string! name) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
 DigitalBrain.Testing.Simulation.ExpectRefusal<TRefusal>() -> void
 DigitalBrain.Testing.Simulation.Id.get -> DigitalBrain.NeuronId
 DigitalBrain.Testing.Simulation.NeuronNamed(string! neuronType, string! name) -> DigitalBrain.NeuronId
