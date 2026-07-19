@@ -4,7 +4,12 @@ Scenario: a neuron rejects a synapse addressed to a different owner's neuron
     Given a brain for owner "tenant-a"
     When Ping is sent to the Echo neuron named "shared" claiming owner "tenant-b"
     Then the synapse is refused as unauthorized
-    And the incoming journal of the Echo neuron named "shared" is empty
+    And the incoming journal of owner "tenant-b"'s Echo neuron named "shared" is empty
+
+Scenario: a neuron cannot subscribe itself into another owner's registry
+    Given a brain for owner "tenant-d"
+    When the Echo neuron named "listener" subscribes to Ping in owner "tenant-e"'s registry
+    Then the synapse is refused as unauthorized
 
 Scenario: a neuron accepts a synapse from its own owner
     Given a brain for owner "tenant-c"

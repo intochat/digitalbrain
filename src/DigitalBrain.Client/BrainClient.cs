@@ -30,10 +30,18 @@ public sealed class BrainClient(IGrainFactory grains, OwnerId owner)
     private ISessionNeuron SessionNeuron() => grains.GetGrain<ISessionNeuron>(SessionId.ToGrainId());
 }
 
-public sealed class NeuronHandle(IGrainFactory grains, NeuronId id)
+public sealed class NeuronHandle
 {
-    public NeuronId Id { get; } = id;
+    private readonly IGrainFactory _grains;
+
+    internal NeuronHandle(IGrainFactory grains, NeuronId id)
+    {
+        _grains = grains;
+        Id = id;
+    }
+
+    public NeuronId Id { get; }
 
     public Task<IReadOnlyList<Synapse>> ReadJournalAsync(JournalKind kind)
-        => grains.GetGrain<INeuron>(Id.ToGrainId()).ReadJournalAsync(kind);
+        => _grains.GetGrain<INeuron>(Id.ToGrainId()).ReadJournalAsync(kind);
 }

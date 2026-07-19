@@ -111,6 +111,22 @@ public sealed class NeuronSteps(Simulation simulation)
         }
     }
 
+    [When("the {word} neuron named {string} subscribes to {word} in owner {string}'s registry")]
+    public Task WhenANeuronSubscribesInAnotherOwnersRegistry(string neuronType, string name, string synapseType, string registryOwner)
+        => simulation.SubscribeInOwnerExpectingRefusalAsync(neuronType, name, synapseType, registryOwner);
+
+    [Then("the incoming journal of owner {string}'s {word} neuron named {string} is empty")]
+    public static async Task ThenTheIncomingJournalOfAnotherOwnerIsEmpty(string owner, string neuronType, string name)
+    {
+        var journal = await Simulation.ReadJournalOfOwnerAsync(JournalKind.Incoming, owner, neuronType, name);
+
+        if (journal.Count > 0)
+        {
+            throw new SimulationAssertionException(
+                $"Expected the incoming journal of owner '{owner}' {neuronType} '{name}' to be empty, but it recorded {string.Join(", ", journal.Select(synapse => synapse.GetType().Name))}.");
+        }
+    }
+
     [Given("a {word} neuron named {string} is registered")]
     [When("a {word} neuron named {string} is registered")]
     public Task ANeuronIsRegistered(string neuronType, string name) => simulation.RegisterAsync(neuronType, name);

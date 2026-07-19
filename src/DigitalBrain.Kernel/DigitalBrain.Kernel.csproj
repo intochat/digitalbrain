@@ -15,5 +15,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
+    <ProjectReference Include="..\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\DigitalBrain.SourceGeneration\bin\$(Configuration)\netstandard2.0\DigitalBrain.SourceGeneration.dll" Pack="true" PackagePath="analyzers\dotnet\cs" Visible="false" />
   </ItemGroup>
 </Project>

@@ -19,6 +19,7 @@ DigitalBrain.Testing.NeuronSteps.ThenTheSubscriberCountHasGrownBy(string! synaps
 DigitalBrain.Testing.NeuronSteps.ThenTheSynapseIsRefusedAsUnauthorized() -> void
 DigitalBrain.Testing.NeuronSteps.ThenTheSynapseIsRefusedAsUnscripted() -> void
 DigitalBrain.Testing.NeuronSteps.ThenTheTwoNeuronsAreOnDifferentSilos(string! firstType, string! firstName, string! secondType, string! secondName) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.NeuronSteps.WhenANeuronSubscribesInAnotherOwnersRegistry(string! neuronType, string! name, string! synapseType, string! registryOwner) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenSynapseIsRefused(string! synapseType, string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenSynapseIsSentClaimingAnotherOwner(string! synapseType, string! neuronType, string! name, string! claimedOwner) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenSynapseIsSentToNeuron(string! synapseType, string! neuronType, string! name) -> System.Threading.Tasks.Task!
@@ -56,6 +57,7 @@ DigitalBrain.Testing.Simulation.SendExpectingRefusalAsync(string! synapseTypeNam
 DigitalBrain.Testing.Simulation.SendTwiceAsync(string! synapseTypeName, string! neuronType, string! name) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.SettleAsync(DigitalBrain.JournalKind kind, string! neuronType, string! name) -> System.Threading.Tasks.Task<int>!
 DigitalBrain.Testing.Simulation.Simulation() -> void
+DigitalBrain.Testing.Simulation.SubscribeInOwnerExpectingRefusalAsync(string! neuronType, string! name, string! synapseTypeName, string! registryOwner) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.SubscriberCountAsync(string! synapseTypeName) -> System.Threading.Tasks.Task<int>!
 DigitalBrain.Testing.SimulationAssertionException
 DigitalBrain.Testing.SimulationAssertionException.SimulationAssertionException() -> void
@@ -73,8 +75,10 @@ DigitalBrain.Testing.UnscriptedPromptException.UnscriptedPromptException(string!
 static DigitalBrain.Testing.NeuronSteps.ForgetPreviousScripts() -> void
 static DigitalBrain.Testing.NeuronSteps.GivenTheModelAnswers(string! tier, string! prompt, string! answer) -> void
 static DigitalBrain.Testing.NeuronSteps.StartCluster() -> System.Threading.Tasks.Task!
+static DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalOfAnotherOwnerIsEmpty(string! owner, string! neuronType, string! name) -> System.Threading.Tasks.Task!
 static DigitalBrain.Testing.NeuronSteps.StopCluster() -> System.Threading.Tasks.Task!
 static DigitalBrain.Testing.Simulation.HostingSiloCountAsync(params DigitalBrain.NeuronId[]! neurons) -> System.Threading.Tasks.Task<int>!
+static DigitalBrain.Testing.Simulation.ReadJournalOfOwnerAsync(DigitalBrain.JournalKind kind, string! owner, string! neuronType, string! name) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
 static DigitalBrain.Testing.SimulationCluster.ForgetScripts() -> void
 static DigitalBrain.Testing.SimulationCluster.Grains.get -> Orleans.IGrainFactory!
 static DigitalBrain.Testing.SimulationCluster.Model(DigitalBrain.ModelTier tier) -> DigitalBrain.Testing.ScriptedModel!

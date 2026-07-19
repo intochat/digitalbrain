@@ -39,6 +39,12 @@ depend on prereleases.
 
 ### Known limitations
 
+- An Orleans client is a trusted cluster peer. The owner boundary constrains neuron-to-neuron and
+  registry traffic; it cannot constrain a process that already holds an `IGrainFactory`. Authenticate
+  at the edge and never expose an Orleans client endpoint publicly.
+- Journals are never compacted, and every delivery deserializes the whole incoming journal to dedupe
+  by `SynapseId`, so a long-lived chatty neuron costs more per synapse over time.
+- Subscriptions are never removed, so broadcast fan-out grows monotonically.
 - No timeline stream, so a client can fire and read but cannot observe; samples poll.
 - Outbox redelivery after a receiver outage is implemented but not proven by a scenario.
 - The client projection still delegates to Orleans' `AsClient()`, which would leak a credentialed

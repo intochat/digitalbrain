@@ -74,6 +74,7 @@ override DigitalBrain.SynapseWiringEntry.Equals(object? obj) -> bool
 override DigitalBrain.SynapseWiringEntry.GetHashCode() -> int
 override DigitalBrain.SynapseWiringEntry.ToString() -> string!
 static DigitalBrain.DigitalBrainSiloBuilderExtensions.AddDigitalBrain(this Orleans.Hosting.ISiloBuilder! builder) -> Orleans.Hosting.ISiloBuilder!
+static DigitalBrain.DigitalBrainSiloBuilderExtensions.AddDigitalBrain(this Orleans.Hosting.ISiloBuilder! builder, string? siloLabel) -> Orleans.Hosting.ISiloBuilder!
 static DigitalBrain.JournalStorageHosting.AddDigitalBrainJournalStorage(this Orleans.Hosting.ISiloBuilder! builder, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Orleans.Hosting.ISiloBuilder!
 static DigitalBrain.ModelBindingExtensions.AddDigitalBrainModels(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<DigitalBrain.ModelCatalog!>! declare) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static DigitalBrain.ModelConfiguration.AddDigitalBrainModels(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

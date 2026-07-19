@@ -9,10 +9,19 @@ internal sealed class OwnerBoundCallFilter : IIncomingGrainCallFilter
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        if (context.Grain is Neuron target && OwnerOf(context.SourceId) is { } caller && caller != target.Id.Owner)
+        if (OwnerOf(context.SourceId) is { } caller)
         {
-            throw new NeuronAuthorizationException(
-                $"Neuron '{target.Id}' belongs to owner '{target.Id.Owner}' and cannot be reached by owner '{caller}'.");
+            if (context.Grain is Neuron target && caller != target.Id.Owner)
+            {
+                throw new NeuronAuthorizationException(
+                    $"Neuron '{target.Id}' belongs to owner '{target.Id.Owner}' and cannot be reached by owner '{caller}'.");
+            }
+
+            if (context.Grain is SubscriptionRegistry registry && caller != registry.Owner)
+            {
+                throw new NeuronAuthorizationException(
+                    $"The subscription registry of owner '{registry.Owner}' cannot be reached by owner '{caller}'.");
+            }
         }
 
         return context.Invoke();

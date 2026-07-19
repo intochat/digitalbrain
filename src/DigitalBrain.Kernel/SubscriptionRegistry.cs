@@ -18,8 +18,16 @@ internal sealed class SubscriptionRegistry : DurableGrain, ISubscriptionRegistry
         _neurons = ServiceProvider.GetRequiredService<Serializer<NeuronId[]>>();
     }
 
+    internal OwnerId Owner => new(this.GetPrimaryKeyString());
+
     public async Task RegisterAsync(string synapseType, NeuronId subscriber)
     {
+        if (subscriber.Owner != Owner)
+        {
+            throw new NeuronAuthorizationException(
+                $"Neuron '{subscriber}' belongs to owner '{subscriber.Owner}' and cannot subscribe in owner '{Owner}'s registry.");
+        }
+
         var registered = Read(synapseType);
 
         if (registered.Contains(subscriber))

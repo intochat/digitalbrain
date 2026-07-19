@@ -434,21 +434,56 @@ referencing it.
   Development. Not done: `Microsoft.Agents.AI.DevUI` is not wired — see Decision 26.
 
 ### M10 — Release engineering **[review]**
-- [ ] Pack scripts, deterministic CI build/test/pack/consumer-restore jobs including website
+- [x] Pack scripts, deterministic CI build/test/pack/consumer-restore jobs including website
       `npm test` + build, `DigitalBrain` convenience metapackage (Abstractions + Client + Aspire
       only), CI guard that no production package references `DigitalBrain.Testing`, changelog,
       prerelease versioning, dependency hygiene gate, empty-cache consumer proof.
 - Commit: `build: prepare the NuGet release`
+- Execution record: baseline `5c760b27`, commit `f7b6caaf`. Red evidence, both from the milestone
+  review and both reproduced before the fix was accepted: the `DigitalBrain.Testing` guard read
+  `Assembly.GetReferencedAssemblies()`, which the compiler prunes to types actually consumed, so an
+  unused `ProjectReference` would ship into a production nuspec with every gate green — injecting it
+  into the metapackage now fails three assertions and `eng/pack.ps1`; and the provider-SDK denylist
+  matched exact ids while the boundary is `Microsoft.Extensions.AI*`, so the centrally pinned
+  `Microsoft.Extensions.AI.Abstractions` slipped through — injecting it now fails every consumer-path
+  package. See Decision 29. Gates from this HEAD: root `dotnet test .\DigitalBrain.slnx -c Release`
+  exit 0 — 83 Tier-0 + 22 Tier-1 + 5 Tier-2; `eng/pack.ps1` 8 packages + 8 symbol packages with
+  `SHA256SUMS.txt`; `eng/verify-dependencies.ps1` clean; `eng/verify-consumer.ps1` — both samples
+  restore, build and run from an empty `NUGET_PACKAGES` cache; website 15/15 and a clean build.
+  Done: the metapackage packs as a true metapackage (`lib/net10.0/_._` per NuGet's NU5128 guidance
+  rather than suppressing the warning) and declares exactly Abstractions, Client and Aspire; every
+  package ships a readme and symbols; versioning is `0.1.0-alpha.1` because a stable release may not
+  depend on the Orleans `10.2.2-rc.2` prereleases. Not done: **CI has never run.** Pushing requires
+  operator approval, so the workflow is authored against verified facts — `pwsh` 7.6.3 and .NET 10
+  SDKs are preinstalled on `ubuntu-latest`, Docker is available for the Azurite emulator the Tier-2
+  tests need, and `checkout@v7`/`setup-dotnet@v6`/`setup-node@v7`/`upload-artifact@v7` are the
+  current majors — but it is unproven until someone pushes it.
 
 ### M11 — Final verification and docs **[review]**
-- [ ] Website complete and truthful: neurons+synapses+simulations story, runnable 5-minute start,
+- [x] Website complete and truthful: neurons+synapses+simulations story, runnable 5-minute start,
       per-package pages, Tier-1 features rendered as the specification, contributing guide;
       `site.test.mjs` green against final API.
-- [ ] Two independent read-only reviews (architecture; then packaging, secrets, durability, forbidden
+- [x] Two independent read-only reviews (architecture; then packaging, secrets, durability, forbidden
       shortcuts) with every actionable finding fixed.
-- [ ] Full gate sweep from clean state; prerelease packages + checksums staged locally; clean
+- [x] Full gate sweep from clean state; prerelease packages + checksums staged locally; clean
       worktree; delete `docs/superpowers/` v1 planning material.
 - Commit: `docs: complete the DigitalBrain v2 foundation`
+- Execution record: baseline `f7b6caaf`. The two reviews ran as one workflow of 223 agents over twelve
+  dimensions — six architecture, six integrity — each finding refuted by three independent lenses
+  before it was accepted; 70 were raised and 11 survived, plus 6 from the completeness critic. Every
+  actionable one is fixed, and the three most serious were defects the earlier milestone reviews had
+  missed: a failed commit silently losing an entire handled turn, an immortal outbox reminder that
+  resurrected a neuron every minute forever, and a subscription registry with no authorization at all.
+  Two tests that could not fail were repaired — `SettleAsync` had no quiescence check, so the
+  depth-limit scenario asserted against a journal of 1 and now genuinely measures 17. Two shipped
+  claims that were false for consumers were made true: the source generator now ships in the kernel
+  package, and `AddDigitalBrain(siloLabel)` makes `[PinToSilo]` usable. See Decisions 30–32. Gates from
+  this HEAD: root `dotnet test .\DigitalBrain.slnx -c Release` exit 0 — 84 Tier-0 + 23 Tier-1 + 5
+  Tier-2; `eng/pack.ps1` 8 packages + 8 symbol packages with `SHA256SUMS.txt`;
+  `eng/verify-dependencies.ps1` clean; `eng/verify-consumer.ps1` — both samples restore, build and run
+  from an empty cache; website 15/15 and a clean build. Not done: three scale and trust limitations
+  found by the critic are documented rather than fixed — journals never compact, subscriptions are
+  never removed, and an Orleans client is a trusted cluster peer so the owner boundary cannot bind it.
 
 ## Decision Log
 
@@ -813,6 +848,57 @@ referencing it.
     registers both silo and gateway endpoints with `isProxied: true` (verified in the 13.4.6
     source), and an Orleans client negotiates against the address the silo *advertises*, not the
     proxy it was dialled on — so a client outside the DCP network cannot complete the handshake.
+
+29. **2026-07-19 — The package boundary is proven on the dependency graph, not the assembly graph.**
+    The first M10 guard read `Assembly.GetReferencedAssemblies()`, which returns the IL AssemblyRef
+    table the C# compiler prunes to assemblies whose types are actually consumed. NuGet writes
+    nuspec `<dependency>` entries from the MSBuild reference graph regardless of use, so the two
+    disagree — the metapackage declares three `ProjectReference`s and ships three dependencies while
+    its assembly references none of them. A `ProjectReference` to `DigitalBrain.Testing` whose types
+    were never consumed (added ahead of the code, or left behind when a helper was deleted) would
+    therefore ship into a production nuspec, dragging the kernel and both provider SDKs onto every
+    consumer, with every gate green. Both guards now walk the dependency graph transitively — the
+    Tier-0 contract over the project files, `eng/pack.ps1` over the produced nuspecs — and provider
+    SDKs match by prefix (`Microsoft.Extensions.AI*`) instead of an exact list that already omitted
+    the centrally pinned `Microsoft.Extensions.AI.Abstractions`. Both breaches were injected and both
+    gates observed failing before the guards were accepted.
+
+30. **2026-07-19 — The final reviews found three real defects in the core, and two tests that could not
+    fail.** (a) `DeliverAsync` committed *outside* its rollback, so a failed `WriteStateAsync` left the
+    handled synapse in the in-memory `_incoming` list. `HasAlreadyHandled` reads that same list, so the
+    redelivery was answered "already handled", the sender durably dropped its outbox entry, and the
+    entire turn was lost — the one thing a journaled neuron exists to prevent. The commit now sits
+    inside the try, and a failure discards all three journals. (b) `_wakeUpRegistered` was
+    activation-local while the outbox reminder is cluster-durable, so a neuron that recovered a pending
+    outbox and drained it never unregistered the reminder: it was resurrected every minute forever and
+    could never be idle-collected. The flag is now seeded from `GetReminder` on activation, the
+    reminder is registered *before* the state it guards, and `ReceiveReminder` reconciles it. (c) The
+    subscription registry had no authorization at all — the call filter only covered `Neuron` grains,
+    so one owner's neuron could register itself into another owner's registry and receive that
+    tenant's broadcasts. Both the filter and `RegisterAsync` now enforce it, with a scenario. The two
+    vacuous tests: `SettleAsync` polled with no delay, so two identical reads returned before the 50 ms
+    drain timer ever fired and the depth-limit scenario asserted "below 20" against a journal of 1 — it
+    now requires five unchanged probes 50 ms apart and the scenario genuinely measures 17; and the
+    authorization scenario asserted an empty journal on *its own* owner's neuron rather than the one it
+    attacked, so it passed no matter what the filter did.
+31. **2026-07-19 — Two shipped claims were false for consumers and are now true.** The dispatch-manifest
+    source generator was referenced only by projects inside this repository, so a NuGet consumer got no
+    generator and silently fell back to reflection while the docs promised build-time proof; it now
+    ships in `DigitalBrain.Kernel` under `analyzers/dotnet/cs`. `[PinToSilo]` was documented as a
+    feature while `SiloLabelKey` was `internal`, leaving no public way to label a silo — the framework's
+    own test cluster had to hardcode the magic string `"db.silo"`. `AddDigitalBrain(siloLabel)` is now
+    the public wiring point, and `SimulationCluster` uses it, which is what proves it works.
+32. **2026-07-19 — The owner boundary is a correctness boundary, not an authentication boundary.** An
+    Orleans client is a trusted peer of the cluster: any process holding an `IGrainFactory` can address
+    any grain, so no in-cluster filter can stop a hostile client from reaching another owner's neuron.
+    The kernel enforces the boundary where identity is unforgeable — neuron-to-neuron and registry
+    traffic — and `BrainClient` scopes every call it makes to its owner, but the website previously
+    claimed a `BrainClient` "cannot act outside" its owner without qualification, which overstated a
+    guarantee the framework cannot make. `NeuronHandle`'s constructor is now internal so the client API
+    cannot mint a handle for an arbitrary owner, and the trust boundary is stated plainly in
+    `website/packages/client.md`, `website/status.md` and `CHANGELOG.md`. Authentication belongs at the
+    edge; this is a property of Orleans, not a defect introduced here, but documenting it as anything
+    less than it is would have been dishonest.
 
 ## Definition of Done
 

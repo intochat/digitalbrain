@@ -37,12 +37,16 @@ public sealed class DispatchManifestContracts
     [Fact]
     public void HandlerLookupWorksForAssembliesThatCarryNoManifest()
     {
-        Assert.False(SynapseWiring.TryGetManifest(typeof(Neuron).Assembly, out _));
+        Assert.False(SynapseWiring.TryGetManifest(typeof(object).Assembly, out _));
 
         var handled = SynapseWiring.HandledSynapseTypes(typeof(ProbeNeuron));
 
         Assert.Equal([typeof(ProbeSynapse)], handled);
     }
+
+    [Fact]
+    public void TheKernelCarriesAGeneratedManifestSoConsumersInheritTheGenerator()
+        => Assert.True(SynapseWiring.TryGetManifest(typeof(Neuron).Assembly, out _));
 
     [Fact]
     public void HandlerLookupIsEmptyForATypeThatHandlesNothing()

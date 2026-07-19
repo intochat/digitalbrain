@@ -48,12 +48,8 @@ public static class SimulationCluster
 
         builder.ConfigureSilo((options, silo) =>
         {
-            silo.AddDigitalBrain();
+            silo.AddDigitalBrain(LabelOf(options.SiloName));
             silo.UseInMemoryReminderService();
-            silo.UseSiloMetadata(new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["db.silo"] = LabelOf(options.SiloName),
-            });
             silo.Services.AddSingleton<IJournalStorageProvider>(journalStorage);
 
             foreach (var (tier, model) in Models)

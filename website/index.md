@@ -10,11 +10,14 @@ hero:
     alt: DigitalBrain
   actions:
     - theme: brand
+      text: Quickstart
+      link: /quickstart
+    - theme: alt
       text: Concepts
       link: /concepts
     - theme: alt
-      text: Status
-      link: /status
+      text: Specification
+      link: /specification
 
 features:
   - title: Neurons

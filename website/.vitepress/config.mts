@@ -11,14 +11,39 @@ export default defineConfig({
   themeConfig: {
     logo: '/logo.svg',
     nav: [
+      { text: 'Quickstart', link: '/quickstart' },
       { text: 'Concepts', link: '/concepts' },
+      { text: 'Specification', link: '/specification' },
+      { text: 'Packages', link: '/packages/' },
       { text: 'Status', link: '/status' }
     ],
     sidebar: [
       {
-        text: 'DigitalBrain',
+        text: 'Start here',
         items: [
+          { text: 'Quickstart', link: '/quickstart' },
           { text: 'Concepts', link: '/concepts' },
+          { text: 'Specification', link: '/specification' }
+        ]
+      },
+      {
+        text: 'Packages',
+        items: [
+          { text: 'Overview', link: '/packages/' },
+          { text: 'DigitalBrain', link: '/packages/metapackage' },
+          { text: 'DigitalBrain.Abstractions', link: '/packages/abstractions' },
+          { text: 'DigitalBrain.Kernel', link: '/packages/kernel' },
+          { text: 'DigitalBrain.Client', link: '/packages/client' },
+          { text: 'DigitalBrain.Testing', link: '/packages/testing' },
+          { text: 'DigitalBrain.Aspire', link: '/packages/aspire' },
+          { text: 'DigitalBrain.Aspire.Hosting', link: '/packages/aspire-hosting' },
+          { text: 'DigitalBrain.DevTools', link: '/packages/devtools' }
+        ]
+      },
+      {
+        text: 'Project',
+        items: [
+          { text: 'Contributing', link: '/contributing' },
           { text: 'Status', link: '/status' }
         ]
       }

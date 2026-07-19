@@ -9,5 +9,4 @@ DigitalBrain.BrainClient.Owner.get -> DigitalBrain.OwnerId
 DigitalBrain.BrainClient.Session.get -> DigitalBrain.NeuronHandle!
 DigitalBrain.NeuronHandle
 DigitalBrain.NeuronHandle.Id.get -> DigitalBrain.NeuronId
-DigitalBrain.NeuronHandle.NeuronHandle(Orleans.IGrainFactory! grains, DigitalBrain.NeuronId id) -> void
 DigitalBrain.NeuronHandle.ReadJournalAsync(DigitalBrain.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!

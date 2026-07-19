@@ -50,6 +50,8 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
     {
         await base.OnActivateAsync(cancellationToken);
 
+        _wakeUpRegistered = await this.GetReminder(OutboxReminderName) is not null;
+
         var registry = SubscriptionRegistry.For(GrainFactory, Id.Owner);
 
         foreach (var handled in SynapseWiring.HandledSynapseTypes(GetType()))
@@ -60,11 +62,11 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         ScheduleDrain();
     }
 
-    public Task ReceiveReminder(string reminderName, TickStatus status)
+    public async Task ReceiveReminder(string reminderName, TickStatus status)
     {
         ScheduleDrain();
 
-        return Task.CompletedTask;
+        await ForgetWakeUpWhenOutboxIsEmptyAsync();
     }
 
     public async Task DeliverAsync(Synapse synapse)
@@ -85,15 +87,21 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         _handling = synapse.Stamped;
         _handlingDepth = SynapseDelivery.InboundDepth();
 
+        var committedIncoming = _incoming.Count;
         var committedOutgoing = _outgoing.Count;
         var committedOutbox = _outbox.Count;
 
         try
         {
             await DispatchAsync(synapse);
+
+            _incoming.Add(_synapses.SerializeToArray(synapse));
+
+            await CommitAsync(CancellationToken.None);
         }
         catch
         {
+            Discard(_incoming, committedIncoming);
             Discard(_outgoing, committedOutgoing);
             Discard(_outbox, committedOutbox);
 
@@ -104,9 +112,6 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
             _handling = null;
             _handlingDepth = 0;
         }
-
-        _incoming.Add(_synapses.SerializeToArray(synapse));
-        await CommitAsync(CancellationToken.None);
 
         ScheduleDrain();
     }
@@ -181,29 +186,30 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
 
     private async Task CommitAsync(CancellationToken cancellationToken)
     {
-        await WriteStateAsync(cancellationToken);
-
-        var pending = _outbox.Count > 0;
-
-        if (pending == _wakeUpRegistered)
-        {
-            return;
-        }
-
-        if (pending)
+        if (_outbox.Count > 0 && !_wakeUpRegistered)
         {
             await this.RegisterOrUpdateReminder(OutboxReminderName, ReminderInterval, ReminderInterval);
             _wakeUpRegistered = true;
         }
-        else if (await this.GetReminder(OutboxReminderName) is { } registered)
+
+        await WriteStateAsync(cancellationToken);
+
+        await ForgetWakeUpWhenOutboxIsEmptyAsync();
+    }
+
+    private async Task ForgetWakeUpWhenOutboxIsEmptyAsync()
+    {
+        if (_outbox.Count > 0 || !_wakeUpRegistered)
+        {
+            return;
+        }
+
+        if (await this.GetReminder(OutboxReminderName) is { } registered)
         {
             await this.UnregisterReminder(registered);
-            _wakeUpRegistered = false;
         }
-        else
-        {
-            _wakeUpRegistered = false;
-        }
+
+        _wakeUpRegistered = false;
     }
 
     private static void Discard(IDurableList<byte[]> journal, int committed)

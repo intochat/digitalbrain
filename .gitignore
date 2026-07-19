@@ -15,4 +15,5 @@ sources/
 node_modules/
 website/.vitepress/cache/
 website/.vitepress/dist/
+website/specification.md
 *.feature.cs

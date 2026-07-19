@@ -6,6 +6,9 @@ namespace DigitalBrain.Testing;
 public sealed class Simulation
 {
     private const int SettleProbes = 200;
+    private const int SettleProbesWithoutChange = 5;
+
+    private static readonly TimeSpan SettleProbeInterval = TimeSpan.FromMilliseconds(50);
 
     private static readonly Dictionary<string, string> EmptyValues = new(StringComparer.Ordinal);
 
@@ -90,6 +93,9 @@ public sealed class Simulation
     public async Task<IReadOnlyList<Synapse>> ReadJournalAsync(JournalKind kind, string neuronType, string name)
         => await Neuron(NeuronNamed(neuronType, name)).ReadJournalAsync(kind);
 
+    public static async Task<IReadOnlyList<Synapse>> ReadJournalOfOwnerAsync(JournalKind kind, string owner, string neuronType, string name)
+        => await Neuron(new NeuronId(neuronType, new OwnerId(owner), name)).ReadJournalAsync(kind);
+
     public async Task RegisterAsync(string neuronType, string name)
         => await Neuron(NeuronNamed(neuronType, name)).ReadJournalAsync(JournalKind.Incoming);
 
@@ -100,12 +106,17 @@ public sealed class Simulation
     {
         var neuron = Neuron(NeuronNamed(neuronType, name));
         var previous = -1;
+        var unchanged = 0;
 
         for (var probe = 0; probe < SettleProbes; probe++)
         {
+            await Task.Delay(SettleProbeInterval);
+
             var current = (await neuron.ReadJournalAsync(kind)).Count;
 
-            if (current == previous)
+            unchanged = current == previous ? unchanged + 1 : 0;
+
+            if (unchanged >= SettleProbesWithoutChange)
             {
                 return current;
             }
@@ -113,7 +124,8 @@ public sealed class Simulation
             previous = current;
         }
 
-        return previous;
+        throw new SimulationAssertionException(
+            $"The {kind} journal of {neuronType} '{name}' never stopped changing: it still reached {previous} entries after {SettleProbes} probes.");
     }
 
     public async Task RegisterManyAsync(int count, string neuronType)
@@ -150,6 +162,11 @@ public sealed class Simulation
             await SimulationCluster.Observed.AwaitHandledAsync(neuron, synapseTypeName);
         }
     }
+
+    public Task SubscribeInOwnerExpectingRefusalAsync(string neuronType, string name, string synapseTypeName, string registryOwner)
+        => CaptureRefusalAsync(() => SimulationCluster.Grains
+            .GetGrain<ISubscriptionRegistry>(registryOwner)
+            .RegisterAsync(NeuronCatalog.SynapseType(synapseTypeName).FullName!, NeuronNamed(neuronType, name)));
 
     public Task<int> SubscriberCountAsync(string synapseTypeName)
         => SimulationCluster.Grains
