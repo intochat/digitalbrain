@@ -3,9 +3,11 @@
 DigitalBrain v2 is a ground-up rebuild on the `master` branch. The previous implementation was
 rejected wholesale and survives only as git history. No packages are published to NuGet yet.
 
-Everything on this site describes behaviour that is proven by the test suite. Where a guarantee is
-implemented but not proven, or missing entirely, it is listed under [open debts](#open-debts) rather
-than quietly implied.
+Everything on this site describes behaviour that is proven by the test suite, with one class of
+exception that is named rather than hidden: some proofs are written and deliberately held red,
+because they assert behaviour the foundation does not yet have. Those are listed under
+[proofs held red](#proofs-held-red). Where a guarantee is implemented but not proven, or missing
+entirely, it is listed under [open debts](#open-debts) rather than quietly implied.
 
 ## Milestones
 
@@ -16,7 +18,7 @@ than quietly implied.
 | Neuron kernel | done |
 | Durable synapse fabric | done |
 | Multi-silo delivery and recovery | done |
-| AI model binding | done |
+| AI model binding | done, except the `Embedding` tier, which cannot work |
 | Client package | done |
 | Aspire integration | done |
 | Hosts, dev tools, quickstart | done |
@@ -62,19 +64,59 @@ neuron-to-neuron and registry traffic, where the caller's identity is known and 
 constrain a caller already inside the cluster's trust boundary. Authenticate users at the edge and
 never expose an Orleans client endpoint publicly.
 
-**Journals grow without bound.** A neuron's incoming and outgoing journals are never compacted, and
-every delivery deserializes the whole incoming journal to check for a duplicate `SynapseId`. A
-long-lived, chatty neuron therefore costs progressively more per synapse and progressively more
-storage, with no pruning, snapshotting or retention policy yet.
+**Journals grow without bound, and dedupe is quadratic.** A neuron's incoming and outgoing journals
+are never compacted, and every delivery deserializes the whole incoming journal to check for a
+duplicate `SynapseId`. The cost is O(n) per synapse and O(n²) over a neuron's lifetime — this is a
+CPU and allocation debt first and a storage debt second. Measured: delivering 1,000 synapses into a
+journal already holding 1,000 allocates 2.9× what the first 1,000 allocate.
+
+**The `Embedding` model tier cannot work.** Every declared tier is registered as an `IChatClient`. An
+embedding model is not an `IChatClient` but an `IEmbeddingGenerator<string, Embedding<float>>`, so
+the `Embedding` member of `ModelTier` binds to a client type that cannot serve it. It shipped
+documented but never exercised — `Embedding` appears exactly once in the codebase, in the enum that
+declares it — which is how it survived.
+
+**One unreachable receiver blocks a neuron's whole outbox.** The outbox drains strictly in order and
+stops at the first entry with an undelivered receiver. A single unreachable neuron therefore stalls
+*all* outgoing traffic from the sender — including traffic to receivers that are perfectly
+reachable — until that entry exhausts its attempts or the 30-minute retry horizon expires.
 
 **Subscriptions are never removed.** The registry only grows: a neuron that registers for a synapse
 type stays registered forever, even if it is never activated again. Broadcast fan-out therefore grows
 monotonically with every neuron instance that has ever existed.
 
+**A neuron that has never activated does not receive broadcasts.** Subscription is registered during
+`OnActivateAsync`, and `EmitAsync` reads the subscriber set at emit time. A neuron that exists in
+code but has never been activated is not a subscriber and is silently skipped. The multiagent sample
+works around this by reading each neuron's journal purely to force activation before broadcasting.
+
 **Hosted proof is driven from inside the cluster.** An external Orleans client cannot complete a
 handshake through an Aspire-proxied gateway, because the silo advertises its own address. The hosted
 restart proof therefore runs from a probe host inside the cluster rather than from a true external
 client.
+
+## Proofs held red
+
+These proofs are written and checked in, and they fail. They assert the behaviour the foundation is
+meant to have, not the behaviour it has, so each one is excluded from the default run and turns green
+when the debt above it is paid. They are listed here because a proof that nobody runs is worth
+nothing unless its existence and its state are both public.
+
+| Proof | Asserts | Goes green when |
+| --- | --- | --- |
+| `the kernel assembly reaches no vendor model SDK` | `DigitalBrain.Kernel` has no transitive reference to Anthropic, OpenAI or `Microsoft.Extensions.AI` | AI becomes an ordinary module and leaves the kernel |
+| `dedupe cost per delivery does not grow with journal length` | Allocation per delivery is flat as the journal grows | Dedupe moves to a bounded set of recent `SynapseId`s |
+| `an unreachable receiver does not block traffic to reachable ones` | Outbox progress is per-entry, not head-first | The outbox stops draining strictly in order |
+| `a neuron that has never activated still receives a broadcast` | Subscription does not depend on prior activation | Broadcast addressing is decided — see below |
+
+The last of these is not merely unimplemented, it is currently **unsatisfiable**, and that is worth
+stating plainly. The registry maps a synapse type to an array of `NeuronId`s, and each `NeuronId`
+names a specific instance. Orleans grains are virtual, so every possible name of every neuron type
+already exists. There is therefore no set of "all neurons that would handle this synapse" for a
+broadcast to reach — only the set that has registered. Making that proof green requires first
+deciding what a broadcast addresses: registered instances, or every live instance of each handler
+type, which needs a directory that does not exist. Until that is decided, the proof records a
+question rather than a target.
 
 ## Following along
 

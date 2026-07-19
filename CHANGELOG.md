@@ -19,11 +19,12 @@ depend on prereleases.
 - **The synapse fabric.** A durable outbox is the source of truth for delivery: at-least-once per
   registered subscriber, effectively-once processing through `SynapseId` dedupe, and a bounded retry
   horizon. Broadcast is owner-scoped through a journaled subscription registry that tolerates neuron
-  types registered after silo start.
+  types registered after silo start, provided the neuron has activated at least once.
 - **Multi-silo.** Cross-silo point-to-point and broadcast, cluster-wide registry correctness, and
   `[PinToSilo]` placement onto labelled silos.
-- **AI model binding.** Role tiers (fast, balanced, reasoning, embedding) bound to models by AppHost
-  configuration; OpenAI and Anthropic adapters live only in `DigitalBrain.Kernel`.
+- **AI model binding.** Role tiers bound to models by AppHost configuration; OpenAI and Anthropic
+  adapters live only in `DigitalBrain.Kernel`. Three tiers work: fast, balanced and reasoning. The
+  declared `Embedding` tier does not, and is listed under known limitations.
 - **`DigitalBrain.Client`.** Owner sessions, typed neuron access, and fire-and-read from outside the
   cluster, with the owner boundary enforced at the session.
 - **`DigitalBrain.Aspire.Hosting` and `DigitalBrain.Aspire`.** A brain resource composing Orleans and
@@ -43,10 +44,21 @@ depend on prereleases.
   registry traffic; it cannot constrain a process that already holds an `IGrainFactory`. Authenticate
   at the edge and never expose an Orleans client endpoint publicly.
 - Journals are never compacted, and every delivery deserializes the whole incoming journal to dedupe
-  by `SynapseId`, so a long-lived chatty neuron costs more per synapse over time.
+  by `SynapseId`. The cost is O(n) per synapse and O(n²) over a neuron's lifetime: delivering 1,000
+  synapses into a journal already holding 1,000 allocates 2.9× what the first 1,000 allocate.
+- The `Embedding` model tier cannot work. Every tier is registered as an `IChatClient`, and an
+  embedding model is an `IEmbeddingGenerator<string, Embedding<float>>`.
+- One unreachable receiver blocks a neuron's entire outbox. The outbox drains in order and stops at
+  the first entry with an undelivered receiver, stalling traffic to reachable receivers behind it
+  until that entry exhausts its attempts or the 30-minute retry horizon expires.
 - Subscriptions are never removed, so broadcast fan-out grows monotonically.
+- A neuron that has never activated receives no broadcasts: subscription is registered during
+  activation, and `EmitAsync` reads subscribers at emit time.
 - No timeline stream, so a client can fire and read but cannot observe; samples poll.
 - Outbox redelivery after a receiver outage is implemented but not proven by a scenario.
 - The client projection still delegates to Orleans' `AsClient()`, which would leak a credentialed
   provider connection string if the brain were configured with durable stores.
 - `Microsoft.Agents.AI.DevUI` is not wired.
+- The generated dispatch manifest does not dispatch. Runtime dispatch reflects over `IHandle<>`; the
+  manifest encodes the same wiring at compile time but is consumed only by a contract test, so the
+  same knowledge has two sources of truth and the compile-time one is decorative.

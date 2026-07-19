@@ -81,9 +81,13 @@ pin anything to them.
 
 ## Model binding
 
-`ModelTier` (`Fast`, `Balanced`, `Reasoning`, `Embedding`) is an indirection over concrete models, so a
-neuron asks for a *role* and deployment decides the model. `ModelDescriptor` carries the provider, model
-id and key; its `ToString()` is overridden to omit the key, and a contract test holds that line.
+`ModelTier` (`Fast`, `Balanced`, `Reasoning`) is an indirection over concrete models, so a neuron asks
+for a *role* and deployment decides the model. `ModelDescriptor` carries the provider, model id and
+key; its `ToString()` is overridden to omit the key, and a contract test holds that line.
+
+`ModelTier` declares a fourth member, `Embedding`, which does not work: every tier is registered as an
+`IChatClient`, and an embedding model is an `IEmbeddingGenerator<string, Embedding<float>>`. Do not
+declare it. See [open debts](/status#open-debts).
 
 ## Telemetry
 
