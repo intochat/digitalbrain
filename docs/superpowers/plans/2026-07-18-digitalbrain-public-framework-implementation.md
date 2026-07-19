@@ -516,6 +516,8 @@ aspire ps --non-interactive
 - `Brain.slnx`
 - architecture tests
 
+**Assigned-path amendment (2026-07-19):** The controlling durable-neuron demolition inventory also assigns `behaviors/**`, `modules/Brain.Modules.Behaviors/**`, `modules/Brain.Modules.Web/**`, `tests/Brain.Tests/**`, `tests/Brain.FeasibilityTests/AgentFramework/**`, `tests/Brain.FeasibilityTests/TypedReferences/**`, `tests/Brain.FeasibilityTests/Brain.FeasibilityTests.csproj`, and `Directory.Packages.props`. These paths are required to remove the rejected trees and their now-unused dependencies completely.
+
 **Red tests:**
 
 - the active solution contains only the approved DigitalBrain framework, integrations, hosts, modules, tests, and samples.
@@ -526,11 +528,11 @@ aspire ps --non-interactive
 
 **Implementation:**
 
-- [ ] Follow the deletion inventory from the approved durable-neuron plan.
-- [ ] Delete superseded code rather than adapting it.
-- [ ] Confirm the failed `modules/AI` experiment was deleted or its approved contracts were absorbed into the public DigitalBrain packages; never retain both.
-- [ ] Preserve only explicitly approved provider modules and behaviors.
-- [ ] Update topology tests.
+- [x] Follow the deletion inventory from the approved durable-neuron plan.
+- [x] Delete superseded code rather than adapting it.
+- [x] Confirm the failed `modules/AI` experiment was deleted or its approved contracts were absorbed into the public DigitalBrain packages; never retain both.
+- [x] Preserve only explicitly approved provider modules and behaviors.
+- [x] Update topology tests.
 
 **Gates:**
 
@@ -543,6 +545,8 @@ git diff --check
 **Review focus:** deletion completeness, hidden compatibility paths, duplicate package identity, generic routing, and MCP duplication.
 
 **Commit:** `refactor: remove superseded DigitalBrain architecture`
+
+**Execution record (2026-07-19):** Baseline HEAD was `aad78b2f0b28271cef0a2b52a359aa9e0d618582` on `master`. Two topology tests first failed against the orphaned project set and source trees. The approved demolition removed exactly 149 expected files and 12,510 lines, with no missing or extra deletion: the duplicate nine-project `src/**` architecture, both generic MCP edges, rejected behavior/Web modules and scripts, the excluded `Brain.Tests` project, and the Agent Framework and DispatchProxy-era feasibility remnants. No tracked `modules/AI/**` implementation remained; the public kernel AI contracts and provider factories already absorb the approved typed model behavior. The exact 15-project `Brain.slnx` graph and six package-only quickstart projects were preserved, as were the approved Google/Salesforce modules and four durable journaling feasibility tests. New guards enforce the exact repository project set, cross-platform approved project-reference closure, absence of superseded source roots, and no `Compile` or `Import` path into `sources/**` from active project, props, or targets files, including unresolved MSBuild-property paths. They also enforce exact root central-package usage, rejected routing/MCP symbols, provider and client reflection surfaces, aliased/cast/indexed/multiline string-contract selectors without rejecting typed contract enums, and keyed chat/embedding provider services across every active root plus explicit or type-inferred generic helper call sites while allowing only the controlled test-provider `JsonElement` wire boundary and legitimate keyed Azure/Orleans state infrastructure. Removing the obsolete workflow test allowed 37 unused root package versions to be pruned; the remaining 44 central versions match the 44 effective active solution references exactly. `dotnet restore Brain.slnx` passed. The focused architecture gate passed 27 / 27, the full owning suite passed 271 / 271, and the final Release solution gate and exact root checkpoint both passed DigitalBrain.Tests 271 / 271, DigitalBrain.PackageTests 33 / 33, and Brain.FeasibilityTests 4 / 4 with zero skips. The exact documented broad forbidden-surface scan reported seven negative assertions in retained tests plus the two approved `JsonElement` parsers in the Development-only controlled HTTP provider; the active-product-root variant reported only those two approved boundary parsers. The older durable-plan literal scan likewise reported only ten retained test uses or negative assertions for Orleans' volatile journal test provider plus two negative `DispatchProxy` assertions, so those test-only exceptions are recorded explicitly rather than claimed as a no-match. `git diff --check` passed. Read-only audits found the two residual feasibility subtrees and progressively hardened reflection, portability, path-import, keyed-provider, and contract-routing guards; all findings were fixed, and the independent package/topology review plus final focused C# re-review reported no remaining actionable P0-P2 findings. No package was published, deployed, pushed, or otherwise released.
 
 ## Task 11: Complete NuGet release engineering
 
