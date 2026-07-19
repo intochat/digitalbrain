@@ -15,8 +15,8 @@ const packagePages = [
 ]
 
 const contentPages = [
-  'index.md', 'concepts.md', 'quickstart.md', 'contributing.md', 'status.md', 'specification.md',
-  'packages/index.md', ...packagePages.map(page => `packages/${page}.md`),
+  'index.md', 'concepts.md', 'architecture.md', 'quickstart.md', 'contributing.md', 'status.md',
+  'specification.md', 'packages/index.md', ...packagePages.map(page => `packages/${page}.md`),
 ]
 
 test('documentation project exposes the standard VitePress commands', () => {
@@ -59,7 +59,7 @@ test('navigation and sidebar reach every page', () => {
   assert.match(config, /github\.com\/digitalbraintech\/brain/)
   assert.doesNotMatch(config, /InteractiveAgents/)
 
-  for (const link of ['/quickstart', '/concepts', '/specification', '/packages/', '/contributing', '/status']) {
+  for (const link of ['/quickstart', '/concepts', '/architecture', '/specification', '/packages/', '/contributing', '/status']) {
     assert.ok(config.includes(`'${link}'`), `config must link ${link}`)
   }
 
@@ -88,6 +88,23 @@ test('concepts define the three primitives and the scope fence', () => {
   assert.match(concepts, /correlation and causation lineage/)
   assert.match(concepts, /dev-only package/)
   assert.match(concepts, /out of scope/)
+})
+
+test('the architecture page separates what is built from what is designed', () => {
+  const architecture = read('website', 'architecture.md')
+
+  assert.match(architecture, /designed and not yet built/)
+  assert.match(architecture, /Modules own vocabulary|Vocabulary — synapse records/)
+  assert.match(architecture, /Behaviors own logic|Logic over existing vocabulary/)
+  assert.match(architecture, /human-approved proposal/)
+
+  const sections = architecture.split(/^## /m).slice(1)
+  const designSections = sections.filter(section => /Status: /.test(section))
+  assert.ok(designSections.length >= 4, 'each design section must carry an explicit status line')
+
+  const status = read('website', 'status.md')
+  assert.match(status, /Where this is going/)
+  assert.match(status, /load-bearing and unmeasured/)
 })
 
 test('the quickstart matches the sample that CI actually runs', () => {

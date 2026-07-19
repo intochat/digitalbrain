@@ -16,6 +16,9 @@ hero:
       text: Concepts
       link: /concepts
     - theme: alt
+      text: Architecture
+      link: /architecture
+    - theme: alt
       text: Specification
       link: /specification
 
@@ -26,4 +29,6 @@ features:
     details: A synapse is an immutable typed message carrying correlation and causation lineage on every hop. Neurons declare what they consume with IHandle and what they produce with IEmit, provable at build time.
   - title: Simulations
     details: The testing primitive. Fire a synapse into a real in-process cluster and expect synapses on the timeline. The framework's own suite and its consumers' suites use the same machine.
+  - title: Programmable
+    details: The goal is a brain you program by writing ordinary C#, and that can program itself. Modules contribute vocabulary at compile time; behaviors contribute logic as single-file scripts, live. Designed, not yet built — see Architecture.
 ---

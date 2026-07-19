@@ -7,27 +7,39 @@ title: Contributing
 DigitalBrain is rebuilt under a deliberately strict discipline. These are not style preferences; they
 are the rules that keep the framework's promises checkable.
 
+[Architecture](/architecture) describes what is being built and marks each part as built or designed.
+`CLAUDE.md` in the repository is the canonical working discipline for agents and contributors alike,
+and `ARCHITECTURE-REVIEW.md` is the plan of record.
+
 ## The gate
 
-One command decides whether the repository is healthy:
+One command decides whether the repository is healthy. While working, run it from the root:
+
+```powershell
+dotnet test --logger "console;verbosity=minimal"
+```
+
+Before a release, run it across the solution in Release:
 
 ```powershell
 dotnet test .\DigitalBrain.slnx -c Release
 ```
 
-It runs all three tiers. Never narrow it with `--filter` — a green filtered run is not evidence.
+Both run all three tiers. **Never narrow either with `--filter`** — a green filtered run is not
+evidence, and a project-scoped run has already missed a failing contract that the root run caught.
+Run it in the background and poll rather than waiting on it.
 
-The documentation site has its own gate:
+The documentation site has its own gate. Invoke `node` directly rather than through npm, because
+npm's child processes lose the nodejs PATH on Windows here:
 
 ```powershell
 cd website
-npm ci
-npm test
-npm run build
+node tools/render-specification.mjs
+node --test tests/*.test.mjs
 ```
 
-Both are enforced in CI, along with `eng/pack.ps1` and a consumer restore from an **empty** package
-cache. A change is not done until every one of them is green.
+All of these are enforced in CI, along with `eng/pack.ps1` and a consumer restore from an **empty**
+package cache. A change is not done until every one of them is green.
 
 ## Three tiers of test
 
@@ -43,21 +55,42 @@ manifest. Slow, few, and load-bearing.
 
 ## Writing a change
 
-Write the failing test first. Prefer a Tier-1 scenario, because a scenario is simultaneously the test,
-the specification, and the published documentation — every `.feature` file appears on the
-[Specification](/specification) page automatically.
+**Write the failing proof first.** Prefer a Tier-1 scenario, because a scenario is simultaneously the
+test, the specification, and the published documentation — every `.feature` file appears on the
+[Specification](/specification) page automatically. Then make it pass, then run the gate.
 
-Then make it pass, then run the gate.
+When the behaviour is not coming yet, keep the proof and exclude it rather than deleting it:
+`[Fact(Explicit = true)]` for xUnit, `@ignore` for Gherkin. Those proofs are listed publicly on the
+[Status](/status) page, because a proof nobody runs is worth nothing unless its state is visible. The
+root gate is never red.
+
+**Grill your own diff before you commit.** Three questions, answered in the commit message:
+
+- What did I add that has no consumer today?
+- What did I claim without running a command to check?
+- What changed that I did not change?
+
+The third matters more than it sounds. This repository has been modified mid-session by other tools;
+if something moved that you did not move, say so and stop rather than sweeping it into your commit.
+
+**Evidence precedes assertion.** "The tests pass" is not a claim you may make without the output in
+front of you. If a step was skipped, say so. If something failed, say so with the failure.
 
 ## Comments are forbidden
 
-No line comments, block comments, XML documentation comments, commented-out code, or explanatory
-annotations in any tracked C#, PowerShell, YAML, XML, MSBuild or `.feature` file.
+Comments are forbidden as narrative, boilerplate, or commented-out code, in any tracked C#,
+PowerShell, YAML, XML, MSBuild or `.feature` file. No XML documentation comment that restates a
+signature.
 
 This is not minimalism for its own sake. A comment is an assertion nothing checks, and it rots silently
 while the code beside it changes. Put the meaning where it can be verified instead: in a name, a type,
-a test, or a smaller function. If a piece of code needs a paragraph to explain, the paragraph is
-evidence the code is wrong shape.
+a test, or a smaller function — `[Fact(DisplayName = "...")]` is the supported way to make a test
+self-describing. If a piece of code needs a paragraph to explain, the paragraph is evidence the code is
+the wrong shape.
+
+The rule exists to stop narration and rot. It is not an instruction to withhold information that
+genuinely has nowhere else to live; if you reach for that exception, expect a reviewer to ask why a
+name, a type, or a test could not carry it.
 
 Prose belongs in `README.md`, `CLAUDE.md` and this website.
 

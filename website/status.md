@@ -45,6 +45,10 @@ These are real gaps in the foundation. They are tracked, not hidden.
 **No timeline stream.** A client can fire synapses and read journals, but cannot observe a brain as it
 works. Code that needs to react must poll a journal. This is the most visible missing primitive.
 
+The kernel does emit an OpenTelemetry activity on every delivery, and the testing package listens to
+it, so in-process observation exists and the simulation suite uses it. What is missing is the durable,
+per-identity, catch-up-after-disconnect feed that an out-of-process client needs.
+
 **Outbox redelivery is unproven.** Delivery retries across a receiver outage are implemented, but no
 scenario yet drives an outage and asserts the redelivery. It is code without a proof, which is not the
 same as a guarantee.
@@ -115,14 +119,47 @@ nothing unless its existence and its state are both public.
 | `an unreachable receiver does not block traffic to reachable ones` | Outbox progress is per-entry, not head-first | The outbox stops draining strictly in order |
 | `a neuron that has never activated still receives a broadcast` | Subscription does not depend on prior activation | Broadcast addressing is decided — see below |
 
-The last of these is not merely unimplemented, it is currently **unsatisfiable**, and that is worth
-stating plainly. The registry maps a synapse type to an array of `NeuronId`s, and each `NeuronId`
+The last of these was, until recently, not merely unimplemented but **unsatisfiable**, and the reason
+is worth keeping. The registry maps a synapse type to an array of `NeuronId`s, and each `NeuronId`
 names a specific instance. Orleans grains are virtual, so every possible name of every neuron type
 already exists. There is therefore no set of "all neurons that would handle this synapse" for a
-broadcast to reach — only the set that has registered. Making that proof green requires first
-deciding what a broadcast addresses: registered instances, or every live instance of each handler
-type, which needs a directory that does not exist. Until that is decided, the proof records a
-question rather than a target.
+broadcast to reach — only the set that has registered.
+
+**That is now decided, and the proof has a target.** A broadcast addresses handler **types**, not
+instance names. The set of handler types is known at composition time, because the interfaces declare
+it, so the registry is populated at startup rather than learned during activation — which makes late
+subscription impossible rather than merely tolerated, and removes the registry write from the
+activation path. The instance a broadcast reaches is derived from the firing correlation rather than
+enumerated. Two prior generations converged on this shape independently.
+
+Behaviors are the exception, and deliberately so: a script's handled set cannot be known before the
+script exists, so behaviors register when they are installed. That is a small, bounded, explicit
+registry — not the per-activation write that produced the debt above it.
+
+## Where this is going
+
+The foundation exists to carry a programming model that is **designed and not yet built**. Nothing in
+this section is implemented; it is stated here so the gap between the design and the code is public
+rather than implied.
+
+| | Contributes | When | Requires |
+| --- | --- | --- | --- |
+| **Module** | Vocabulary — synapse records, neuron interfaces | Compile time | A rebuild |
+| **Behavior** | Logic over existing vocabulary | Runtime | Approval only |
+
+A **behavior** is a single-file C# script carried as durable state by one registered grain type, so it
+adds no grain type and the Orleans manifest never changes. The client API is the programming model,
+which means the same file runs as a script against a cluster and installs as a behavior inside one.
+Capability is the set of contracts packages a script compiles against, enforced where it resolves one,
+and every install is a human-approved proposal that is journaled and reversible.
+
+[Architecture](/architecture) describes the design and marks each part as built or designed.
+`ARCHITECTURE-REVIEW.md` in the repository is the plan of record.
+
+One assumption underneath it is **load-bearing and unmeasured**: that a language model can reliably
+emit these scripts. It is called out here rather than left implicit, because a prior generation in
+this lineage gated a language on a benchmark whose score came from a deterministic stub rather than a
+model, and shipped the interpreter after formally demoting the language.
 
 ## Following along
 

@@ -1,112 +1,182 @@
-# CLAUDE.md — DigitalBrain / NeuroOS Way of Working
+# CLAUDE.md — how to work in this repository
 
-This is the single source of truth for how to work in this repo. Keep it short, actionable, and ruthless.
-
-## The 5 Steps (Elon's "Algorithm")
-
-Follow **in order** on every task, change, or refactor:
-
-**Prompt template**: "Apply Elon's 5 steps in order: 1. Make reqs less dumb (question, trace to person). 2. Delete first (target >10% reduction). 3. Simplify. 4. Accelerate. 5. Automate last."
-
-1. **Make your requirements less dumb**
-   - Question every requirement. Trace to a specific person.
-   - Challenge assumptions. Your requirements (even from smart people or management) are probably dumb in parts.
-   - Example: "Do we really need full AppHost for every MCP debug? Delete that req."
-
-2. **Delete the part or process (try very hard)**
-   - Target >10% net reduction.
-   - If you're not adding things back ~10% of the time, you didn't delete enough.
-   - Ruthlessly cut "just in case", hedges, unnecessary steps/components.
-   - Example: Delete old plans, dead code, full restarts.
-
-3. **Simplify or optimize (what remains)**
-   - Only after 1-2. Don't polish something that should have been deleted.
-   - Example: Simplify WoW to 5 steps + MCP tools.
-
-4. **Accelerate cycle time**
-   - Speed up feedback loops — only after prior steps.
-   - Example: Use MCP resource restart + bg test poll instead of full run.
-
-5. **Automate**
-   - Last. Never automate a bad (undeleted, un-simplified) process.
-   - Example: Add script only after deleting waste.
-
-Key: Order matters. Jumping to optimize/automate locks in waste.
-
-## Pre-Change Ritual (Non-Negotiable)
-
-Before every edit, brainstorm, or code change:
-1. Use Context7 to query docs for ALL package/framework APIs involved (Orleans, Aspire, MCP, .NET, etc.). No exceptions.
-2. Use the `codegraph` MCP server (from .mcp.json) to explore architecture, symbols, call paths, and relationships. Run `codegraph init` (or rely on auto-init via build) after `git clean -fdx`.
-3. Run `aspire doctor` (CLI or `aspire__doctor` MCP) + `aspire__list_resources`.
-4. If task has >2 steps, `todo_write` first.
-5. Follow Elon's 5 steps in order.
-
-Prefix all prompts with the ritual. Rely on CodeGraph for architecture understanding instead of manual file reads or grep.
-
-## Core Principles for Fast Iteration (Local Dev)
-
-- **Use Context7 for EVERY package/framework API** before writing code that touches it (Orleans, Aspire, .NET, Google.Apis, etc.). No exceptions. Never use local NuGet cache or C:\ paths.
-- **Use CodeGraph MCP for architecture understanding**: The `codegraph` server (configured in .mcp.json) provides the pre-indexed knowledge graph. Use it (via `codegraph_explore`, status, etc.) for symbols, call graphs, impact analysis, and architecture instead of raw file exploration. Auto-rebuilds on build after cleans.
-- **Parallel tools**: Always call Context7 + multiple Aspire MCP tools (`aspire__*`) in parallel at start of responses.
-- **Use Aspire MCP tools + `aspire` CLI for speed**:
-  - `aspire__doctor`, `aspire__list_resources`, `aspire__list_console_logs`, `aspire__list_traces`, `aspire__list_structured_logs`, `aspire__execute_resource_command` (restart specific kernel/flutter-ui without full stop).
-  - Prefer targeted resource commands + logs/traces over `aspire run` every time.
-  - `aspire doctor` before/after changes.
-- **Pre-build for MCP**: Before MCP tasks or starting digitalbrain, run quick `dotnet build edge/Brain.Mcp/Brain.Mcp.csproj --no-restore`. Use `--no-build` in run args. Delete repeated rebuild waste.
-- **Minimal/isolated AppHost**: Use `aspire run` with resource filters or isolated mode when full stack not needed. Inject live `aspire__list_resources` + doctor output into context at start (dynamic state over static docs).
-- **Tests**: During TDD, run the smallest owning test project with `dotnet test <project> --logger "console;verbosity=minimal"`. **Never use --filter**. Before every checkpoint or completion claim, run the exact root command `dotnet test --logger "console;verbosity=minimal"`.
-  - Launch the full root suite in the background and poll immediately. Focused project tests may run in the foreground.
-- **Targeted restarts (use Aspire MCP)**: After changes to Mcp/Kernel/INO, use `aspire__execute_resource_command` "restart" on only the affected resource (e.g. "mcp" or specific kernel). Poll with `aspire__list_console_logs` / `list_traces`. Delete full `aspire run` default.
-- **After every change** (small slice):
-  1. Build (root or targeted).
-  2. Run the owning test project; run the exact root suite once the slice integrates.
-  3. `aspire doctor` (MCP or CLI).
-  4. Relevant MCP inspection (resources, logs, traces).
-- **Cycle metrics + retro**: Log start/end time for iterations (use terminal Measure-Command or timestamps). At end, quick retro: "which of 5 steps skipped?". Use Aspire MCP traces for "time to green". Apply 5 steps to reduce time.
-- **Delete trash aggressively** (docs, dead code, plans). 99% of historical plans/specs are noise — kill them. Keep only living README.md + this CLAUDE.md.
-- **Relative paths only**. Never reference anything under C:\Users\.
-- COMMENTS ARE FORBIDDEN.
-- No tracked C#, Dart, Proto, PowerShell, shell, XML, MSBuild, YAML, or JSON-with-comments file may contain line comments, block comments, documentation comments, commented-out code, generated comments, or explanatory annotations.
-- Markdown prose is documentation, not a source-code comment. Only `README.md`, `CLAUDE.md`, and this temporary execution plan may remain while the plan is active.
-- Generated source must either be untracked and produced during build or be sanitized before it is tracked. Generated code is not exempt from the zero-comment rule.
-- Replace useful comments with names, types, tests, validation, or smaller functions. Delete stale, narrative, redundant, and commented-out code.
-- **Latest deliberate versions** via central `Directory.Packages.props`.
-- **Self-evolution is the product**: The only path for user-visible mutations (packs, automations, new neurons, Ino creations) is human-approved proposals through the journaled rail. Ino + Foundry + Marketplace feed the same approved rail. Durable, replayable, rollback-capable.
-- **Self-evolution meta for WoW**: Use Ino/rail to propose improvements to CLAUDE.md, .mcp.json, or this WoW (e.g. "propose new optimization"). Stage via proposal, get approved, apply. The process improves itself.
-
-## Retained Execution Path (North Star)
-
-Keep one path: `Client -> Edge/Auth -> INO operation -> deterministic function or bounded model workflow -> effect gate -> connector adapter`. Commands and queries use typed grain interfaces. Orleans streams are reserved for progress, fan-out, and observability. The generic Neuron/Synapse runtime, legacy gateway, second auth system, Foundry execution loop, pack runtime, and duplicate UI rail are removed after their remaining behavior is either migrated or explicitly discarded.
-
-## Local Dev Speed Hacks (Brainstormed Improvements)
-
-To accelerate iteration cycles (using Context7 + Aspire MCP/CLI + 5 steps):
-
-- **CodeGraph for architecture**: Use the `codegraph` MCP (not manual reads/grep) for fast queries on structure, call paths, and blast radius. Prefer `codegraph_explore` over file crawling.
-- **MCP-first inspection**: Before any `aspire run` or manual debug, use `aspire__list_resources`, execute "restart" on specific resource, pull logs/traces. This replaces slow full restarts and log tailing.
-- To start the MCP edge on its fixed port: `dotnet run --project edge/Brain.Mcp/Brain.Mcp.csproj --no-build` (http on :5310 via its launch profile; connect via url in .mcp.json). Start the silo (`hosts/Brain.Kernel.Host`) first.
-- **Context7 + parallel tools**: Lookup APIs in parallel while editing. Never context-switch to docs/search.
-- **Strict delete-first + clean docs**: This CLAUDE.md + README are the *only* living docs. All plan/*.md, archive, superpowers, old specs = trash. Deleting them reduces reading waste and decision fatigue (Step 2 of algorithm).
-- **Resource-level control**: Stop/restart only kernels or flutter via MCP before builds to avoid DLL locks from live replicas. Then test.
-- **Minimal full runs**: `dotnet test` (min verbosity, root) + `aspire doctor` + targeted MCP. Use background for long tests. Parallel calls.
-- **Follow 5 steps on every edit**: Question why the change, delete related trash first, simplify the diff, make feedback faster (e.g. more MCP), automate only if the loop is clean.
-- **Self-evolution meta**: Use the rail itself to evolve the WoW (e.g. new automation for "stop kernels + test + doctor").
-- **Avoid early optimize/automate**: Don't add watch scripts or fancy until the base loop (question/delete/simplify) is clean.
-- Result: Smaller context, faster feedback, less "running the app" tax.
-
-## Rules (Non-Negotiable)
-
-- Context7 before any API-touching code.
-- **CodeGraph MCP first for architecture**: Use `codegraph` server (init after clean via build target or `codegraph init`) for all codebase structure, symbols, and impact questions. Do not manually explore files for architecture.
-- Aspire MCP/CLI + doctor in every cycle.
-- Project-level TDD + exact root `dotnet test` integration gate. No filters.
-- Delete > add. Clean docs = fast brains.
-- Relative paths. Meaningful names.
-- Self-evolution rail is sacred for mutations.
-
-Update this file when the loop improves (via the rail, of course).
+Canonical for every agent and contributor. `AGENTS.md` points here. Written to be followable by
+any harness — Claude Code, Codex, Grok — with nothing but a shell and this repository.
 
 ---
 
-Follow the 5 steps. Use the tools. Delete the trash. Ship self-evolution.
+## 1. What is being built
+
+DigitalBrain is a .NET framework for durable agents on Orleans and Aspire. The paradigm is
+**neurons, synapses, and simulations**. The thing that makes it worth building is the last part:
+
+> **A brain you program by writing ordinary C#, and that can program itself.**
+
+The architecture in six lines:
+
+- **The typed interface is the surface, the synapse is the substrate, the generator is the bridge.**
+- **A synapse is a fact** — a thin record, broadcast, no reply. **An interface method is a request** —
+  directed at a capability, replies. Both are journaled; neither is privileged.
+- **Modules own vocabulary** — synapse records and neuron interfaces. Compile-time, needs a rebuild.
+- **Behaviors own logic** — single-file C# scripts. Runtime, needs only approval.
+- **The client API is the programming model.** The same file runs outside the cluster as a script and
+  installs inside it as a behavior.
+- **Every install is a human-approved proposal**, journaled and reversible.
+
+`ARCHITECTURE-REVIEW.md` is the plan of record. **Read §3 (ratified decisions) and §9 (the ordered
+plan) before doing anything.** §14 lists this plan's own known defects and their resolutions —
+defects are kept with their answers, because a defect deleted without a recorded answer comes back.
+
+Do not re-litigate anything in §3. Do not silently discard it either: §1 exists because a prior plan
+inherited conclusions without re-deriving them, and that is the failure this repository is organised
+against. If a decision is wrong, say so and record the reversal.
+
+---
+
+## 2. The loop
+
+Apply in order. Order matters — jumping to optimise or automate locks in waste.
+
+1. **Question the requirement.** Trace it to a person or a consumer that exists *today*. "The plan
+   says so" is not a reason. If nothing consumes it, it is a guess — say so out loud.
+2. **Delete.** Prefer deleting a thing to simplifying it. Target a net reduction. If you are not
+   adding things back occasionally, you are not deleting enough.
+3. **Simplify what remains.** Then check you have not just moved the complexity somewhere else.
+4. **Accelerate the feedback loop.**
+5. **Automate.** Last. Never automate a process you have not first deleted and simplified.
+
+---
+
+## 3. Grilling
+
+Grilling is the discipline that makes step 1 real. It applies before building **and during it**.
+
+### Before building
+
+State a recommendation, state the strongest argument against it, and defend or fold. Present
+evidence, not opinion. When a decision belongs to a person, put it to them with your recommendation
+attached — never a neutral menu.
+
+### During implementation — three moves
+
+**Before the step — write the proof that fails.** Assert the behaviour the system *should* have and
+watch it fail before writing the code that satisfies it. When the behaviour is not coming yet, keep
+the proof and exclude it rather than deleting it. **Never a red root gate.**
+
+The two exclusion mechanisms behave differently on demand, and the difference matters:
+
+| Kind | Marked | Prove it red with | What you get |
+|---|---|---|---|
+| xUnit | `[Fact(Explicit = true, DisplayName = "…")]` | `./tests/<proj>/bin/Debug/net10.0/<proj>.exe -explicit only` | The test **runs** and fails |
+| Gherkin | `@ignore @red-until-<reason>` | `./tests/<proj>/bin/Debug/net10.0/<proj>.exe -failSkips` | The scenario is **reported failed because it was skipped** — its body never ran |
+
+`-explicit only` does not reach `@ignore` scenarios; it reports them as not run. To actually execute
+an ignored scenario you must remove the tag locally. Prefer the xUnit form when you want a proof that
+genuinely executes on demand, and always tag the Gherkin form with the reason it is held.
+
+**Before the commit — grill the diff.** Three questions, answered in the commit message:
+
+- What did I add that has no consumer today?
+- What did I claim without running a command to check?
+- What changed that I did not change?
+
+**Before the claim — run it and quote it.** Evidence precedes assertion, always. "Tests pass" is not
+a claim you may make without the output in front of you. If a step was skipped, say so. If something
+failed, say so with the failure.
+
+### Per phase
+
+A real adversarial review at every phase boundary, and **verify its findings yourself**. Reviews are
+worth their cost — a prior phase raised six findings and all six were real — but a review is a claim
+like any other. Check its method, not only its conclusions.
+
+---
+
+## 4. Oracles and tools
+
+**The mandatory path uses only the compiler, the test suite, and git.** These exist in every harness.
+
+| Question | Oracle |
+|---|---|
+| Does this API exist? Is this signature right? | **The compiler.** Write a throwaway file referencing it and build. No `CS0246` proves the type exists |
+| Does the system behave this way? | **The test suite.** Not the docs — several docs have been wrong |
+| What was here before? Is this recoverable? | **git.** Retired trees live at `git show <sha>^:<path>` |
+
+Optional accelerators, in `.mcp.json`: `codegraph` for architecture, `context7` for package docs,
+`aspire` for resource control, `microsoft-learn` for .NET docs.
+
+**If an accelerator is unavailable, say so and fall back to the oracles. Do not skip silently.** Both
+`context7` and `codegraph` have been unavailable in this repository — quota exhausted and `npx`
+exiting 9009 — and a ritual that mandates an unavailable tool gets worked around instead of followed.
+Note: Microsoft Learn returns the older `Orleans.EventSourcing.JournaledGrain` for journaling queries.
+That is a different API from `Microsoft.Orleans.Journaling`. Do not conflate them.
+
+**Check whether the ground moved.** Record `git rev-parse HEAD` and `git status --porcelain` at the
+start of a session, and check both again before staging. This repository has been modified mid-session
+by other tools. If something changed that you did not change, **surface it and stop** — do not revert
+it and do not sweep it into your commit.
+
+**Fan-out needs a scoring rule.** When dispatching parallel agents, give them the rule by which a
+finding counts — for example "changes a decision that is currently open", not "find valuable
+content". Without a rule they return summaries; with one they return findings.
+
+---
+
+## 5. Gates
+
+**The root gate, every phase, no exceptions:**
+
+```
+dotnet test --logger "console;verbosity=minimal"
+```
+
+**Never `--filter`.** Run it in the background and poll. A project-scoped run has already missed a
+failing contract that the root run caught. During TDD you may run the smallest owning project in the
+foreground, but the root gate is what permits a completion claim.
+
+**The website gate** runs `node` directly, not `npm` — npm's cmd children lose the nodejs PATH here:
+
+```
+node tools/render-specification.mjs
+node --test tests/*.test.mjs
+```
+
+Two guards fail the build by design, and that is correct:
+
+- Adding a public type means updating `PublicAPI.Unshipped.txt`.
+- Adding an `[Alias]` means updating the pinned-alias contract.
+
+---
+
+## 6. Rules
+
+- **No comments as narrative, boilerplate, or commented-out code.** No `/// <summary>` restating a
+  signature. Carry meaning in names, types, and tests instead — `[Fact(DisplayName = "...")]` is the
+  supported way to make a test self-describing. The rule exists to stop narration and rot, not to
+  forbid the rare case where a name genuinely cannot carry the information. Markdown prose is
+  documentation, not a comment.
+- **Keep decision records and design rationale. Delete session logs, progress reports, and task
+  checklists.** The earlier form of this rule said to kill 99% of plans as noise; applied literally
+  it destroys the best artifacts a repository produces. The distinction is durability, not age.
+- **Relative paths only.** Never reference anything under a user profile directory.
+- **Latest deliberate package versions**, centrally in `Directory.Packages.props`.
+- **Small slices, green at each boundary.** Build, run the owning project, run the root gate before
+  claiming the slice is done.
+- **Commit at green boundaries** with the diff-grill answers in the message.
+- **Self-evolution is the product.** The only path to a live behaviour is a human-approved proposal
+  through the journaled rail. That rail is `ARCHITECTURE-REVIEW.md` §9 Phase 4 and it is not built
+  yet — until it is, changes arrive the ordinary way.
+
+---
+
+## 7. Where things stand
+
+Phases 0, 1, 2.1 and 2.2 are done. **Next is 2.3**, then 2.4 to close Phase 2a green, then **2.5 —
+R-3, the owner boundary**, which gates everything client-facing.
+
+One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
+`ARCHITECTURE-REVIEW.md` §11 records the standard for settling it — a pre-committed numeric threshold
+run against a real model — and the two corrections that standard needs, learned from a prior
+generation that scored its benchmark against a stub and shipped the interpreter anyway.
+
+Update this file through the same rail as everything else, and only when the loop actually improves.

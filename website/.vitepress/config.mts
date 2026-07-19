@@ -13,6 +13,7 @@ export default defineConfig({
     nav: [
       { text: 'Quickstart', link: '/quickstart' },
       { text: 'Concepts', link: '/concepts' },
+      { text: 'Architecture', link: '/architecture' },
       { text: 'Specification', link: '/specification' },
       { text: 'Packages', link: '/packages/' },
       { text: 'Status', link: '/status' }
@@ -23,6 +24,7 @@ export default defineConfig({
         items: [
           { text: 'Quickstart', link: '/quickstart' },
           { text: 'Concepts', link: '/concepts' },
+          { text: 'Architecture', link: '/architecture' },
           { text: 'Specification', link: '/specification' }
         ]
       },
