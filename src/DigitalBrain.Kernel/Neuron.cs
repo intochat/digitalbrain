@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Runtime;
@@ -17,7 +18,10 @@ public abstract class Neuron : DurableGrain, INeuron
     private readonly Serializer<Synapse> _synapses;
     private readonly Serializer<OutboxEntry> _entries;
 
+    private static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(50);
+
     private SynapseMetadata? _handling;
+    private IGrainTimer? _draining;
 
     protected Neuron()
     {
@@ -65,9 +69,19 @@ public abstract class Neuron : DurableGrain, INeuron
 
         _handling = synapse.Stamped;
 
+        var committedOutgoing = _outgoing.Count;
+        var committedOutbox = _outbox.Count;
+
         try
         {
             await DispatchAsync(synapse);
+        }
+        catch
+        {
+            Discard(_outgoing, committedOutgoing);
+            Discard(_outbox, committedOutbox);
+
+            throw;
         }
         finally
         {
@@ -134,12 +148,33 @@ public abstract class Neuron : DurableGrain, INeuron
         }
     }
 
+    private static void Discard(IDurableList<byte[]> journal, int committed)
+    {
+        while (journal.Count > committed)
+        {
+            journal.RemoveAt(journal.Count - 1);
+        }
+    }
+
     private void ScheduleDrain()
     {
-        if (_outbox.Count > 0)
+        if (_outbox.Count == 0 || _draining is not null)
         {
-            this.RegisterGrainTimer(DrainAsync, TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+            return;
         }
+
+        _draining = this.RegisterGrainTimer(DrainAsync, RetryInterval, RetryInterval);
+    }
+
+    private void StopDrainingWhenOutboxIsEmpty()
+    {
+        if (_outbox.Count > 0 || _draining is null)
+        {
+            return;
+        }
+
+        _draining.Dispose();
+        _draining = null;
     }
 
     private async Task DrainAsync(CancellationToken cancellationToken)
@@ -167,6 +202,8 @@ public abstract class Neuron : DurableGrain, INeuron
         }
 
         await WriteStateAsync(cancellationToken);
+
+        StopDrainingWhenOutboxIsEmpty();
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -175,26 +212,39 @@ public abstract class Neuron : DurableGrain, INeuron
         Justification = "Any failure other than a permanent refusal keeps the receiver pending so the outbox redelivers it; letting it escape would abandon the delivery guarantee.")]
     private async Task<bool> TryDeliverAsync(Synapse synapse, NeuronId receiver)
     {
-        using var depth = SynapseDepth.Enter(synapse.Stamped);
-
         try
         {
-            await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).DeliverAsync(synapse);
+            if (receiver == Id)
+            {
+                await DeliverAsync(synapse);
+            }
+            else
+            {
+                await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).DeliverAsync(synapse);
+            }
 
             return true;
         }
-        catch (NeuronAuthorizationException)
+        catch (NeuronAuthorizationException refusal)
         {
-            return true;
-        }
-        catch (SynapseDepthExceededException)
-        {
+            RecordRefusal(synapse, receiver, refusal);
+
             return true;
         }
         catch (Exception)
         {
             return false;
         }
+    }
+
+    private static void RecordRefusal(Synapse synapse, NeuronId receiver, Exception refusal)
+    {
+        using var refused = SynapseTelemetry.Source.StartActivity("refused");
+
+        refused?.SetTag(SynapseTelemetry.ReceiverTag, receiver.ToString());
+        refused?.SetTag(SynapseTelemetry.SynapseTag, synapse.GetType().Name);
+        refused?.SetTag(SynapseTelemetry.CorrelationTag, synapse.Stamped.CorrelationId.ToString());
+        refused?.SetStatus(ActivityStatusCode.Error, refusal.Message);
     }
 
     private List<Synapse> Read(IDurableList<byte[]> journal)

@@ -507,6 +507,32 @@ referencing it.
     owner filter a trustworthy `SourceId` — client-originated calls carry none, so client-path
     authorization stays with M6.
 
+16. **2026-07-19 — Registry is per-owner, not one cluster singleton.** Refines Decision 7: the
+    registry grain's key is the owner, so `(owner, synapse type) → NeuronId[]` is sharded by owner
+    rather than funnelled through a single cluster-wide grain. Same queryable surface and the same
+    late-type tolerance; it removes a cluster-wide write bottleneck on every neuron activation and
+    keeps one owner's registrations from touching another's state.
+17. **2026-07-19 — Recursion bounding needs a durable depth carrier; the RequestContext guard was
+    deleted rather than shipped dead.** The M3 review proved the guard could never fire: delivery
+    is a detached grain-timer drain (Decision 15), Orleans creates timer callbacks inside an
+    `ExecutionContextSuppressor` and delivers them as fresh one-way messages, so the AsyncLocal
+    `RequestContext` is always empty at the drain — depth read back as 0 on every hop. A guard
+    that cannot trip is worse than none, so it is deleted. A correct guard must carry depth across
+    the durable outbox hop (in `OutboxEntry`, or as a `SynapseMetadata` field, which would amend
+    Decision 5). **Open work, not done:** unbounded emit cycles between two neurons are currently
+    possible.
+18. **2026-07-19 — Outbox delivery re-arms itself, but the durable wake-up Decision 6 promises is
+    still missing.** The M3 review found a committed entry could be delivered zero times: the
+    drain was a one-shot timer that never re-armed after a partial failure, and Orleans discards
+    timers on deactivation without keeping the grain alive. The drain is now a repeating timer
+    that runs while the outbox is non-empty and disposes itself when it drains — closing the
+    in-process hole. **Open work, not done:** the Orleans *reminder* that Decision 6 requires as
+    the durable wake-up for a deactivated emitter is not implemented, so an emitter that
+    deactivates with a pending entry still needs inbound traffic to resume delivery. Also still
+    open from that review: no bounded retry horizon and no attempt/age record in `OutboxEntry`
+    (refusals are now surfaced as a `refused` OTel activity, but transient failures retry
+    forever).
+
 ## Definition of Done
 
 All milestone boxes ticked with execution records; root Release suite, pack, empty-cache quickstart

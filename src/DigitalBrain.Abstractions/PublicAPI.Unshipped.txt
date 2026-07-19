@@ -51,10 +51,6 @@ DigitalBrain.Synapse.Metadata.init -> void
 DigitalBrain.Synapse.Stamped.get -> DigitalBrain.SynapseMetadata!
 DigitalBrain.Synapse.Synapse() -> void
 DigitalBrain.Synapse.Synapse(DigitalBrain.Synapse! original) -> void
-DigitalBrain.SynapseDepthExceededException
-DigitalBrain.SynapseDepthExceededException.SynapseDepthExceededException() -> void
-DigitalBrain.SynapseDepthExceededException.SynapseDepthExceededException(string! message, System.Exception! innerException) -> void
-DigitalBrain.SynapseDepthExceededException.SynapseDepthExceededException(string! message) -> void
 DigitalBrain.SynapseId
 DigitalBrain.SynapseId.Deconstruct(out System.Guid Value) -> void
 DigitalBrain.SynapseId.Equals(DigitalBrain.SynapseId other) -> bool
