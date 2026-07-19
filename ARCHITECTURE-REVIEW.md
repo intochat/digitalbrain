@@ -46,9 +46,10 @@ prototypes solved it three different ways and none of the three was carried forw
 
 Two structural corrections follow, and they are the reason this document is shaped as it is:
 
-1. **The retirement ledger (§9) is a living artifact, not a one-time sweep.** A row closes only
-   on evidence. "Rejected" is a legitimate outcome but must be written down; silence is not
-   rejection.
+1. **Rejection must be written down; silence is not rejection.** This was originally implemented
+   as a living retirement ledger. §10 records why that shape failed — rows scored on "valuable
+   content" cannot close — and what replaced it: a single harvest scored on "changes a decision
+   that is open", executed once, with its findings and its explicit rejections recorded there.
 2. **This plan records what it rejects and why**, in §10, so the next plan cannot discard it
    silently.
 
@@ -56,7 +57,9 @@ There is also a loose thread this plan cannot close. `sources/Projects/docs/*` d
 codebase containing `DigitalBrain.Core`, `DigitalBrain.Silo`, `IPackBehavior`,
 `PackAlcEmbodier`, and `GeneratedNeuron`. None of those identifiers exist anywhere on disk —
 not in `sources/`, not in the working tree. **At least one generation between `Projects/` and
-today is not in this repository.** Ledger row L-0 covers it.
+today is not in this repository.** Unresolved, and now unresolvable from disk: `sources/` was
+retired in §10 and this generation was never in it. It remains a written finding rather than a
+recoverable artifact.
 
 ---
 
@@ -1144,8 +1147,9 @@ machine and `ReadPage` gap detection for the feed; `brain_from_master`'s `Runtim
 
 ### B-2 — The module system
 
-**What:** `IModule`, the module descriptor, `AddModule<T>()`, the three-package template, the
-conformance harness, and the composition-time validation in §4.2.
+**What:** `IModule`, the module descriptor, `AddModule<T>()`, the two-package template (DEC-3 as
+amended; the conformance harness returns with the second adapter at Phase 3.7), and the
+composition-time validation in §4.2.
 
 **Why:** the core ask. It does not exist anywhere in this lineage — verified: zero occurrences
 of `IModule`, `AddModule`, `ModuleRegistry`, or `ModuleDescriptor` across every `.cs` on disk,
