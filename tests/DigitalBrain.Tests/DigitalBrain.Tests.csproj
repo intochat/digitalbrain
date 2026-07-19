@@ -1,30 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net11.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
-    <ProjectReference Include="../../kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
-    <ProjectReference Include="../../kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
-    <ProjectReference Include="../../hosts/Brain.Kernel.Host/Brain.Kernel.Host.csproj" />
-    <ProjectReference Include="../../hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
-    <ProjectReference Include="../../integrations/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
-    <ProjectReference Include="../../integrations/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
-    <ProjectReference Include="../../integrations/DigitalBrain.DevTools/DigitalBrain.DevTools.csproj" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="xunit.v3" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="xunit" />
-    <PackageReference Include="xunit.runner.visualstudio">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="Microsoft.Orleans.TestingHost" />
-    <PackageReference Include="Microsoft.Orleans.Journaling" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" />
-    <PackageReference Include="Aspire.Hosting.Testing" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Client\DigitalBrain.Client.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.DevTools\DigitalBrain.DevTools.csproj" />
   </ItemGroup>
 </Project>

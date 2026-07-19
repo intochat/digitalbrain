@@ -1,8 +1,0 @@
-<Project>
-  <PropertyGroup>
-    <DigitalBrainVersion Condition="'$(DigitalBrainVersion)' == ''">0.1.0-alpha.1</DigitalBrainVersion>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
-</Project>

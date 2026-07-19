@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Owner-bound access to a DigitalBrain cluster from outside: typed neuron access and fire-and-observe.</Description>
+  </PropertyGroup>
+</Project>

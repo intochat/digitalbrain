@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>The DigitalBrain neuron runtime: journaled neurons, the durable synapse fabric, and AI model binding on Orleans.</Description>
+  </PropertyGroup>
+</Project>

@@ -272,7 +272,30 @@ referencing it.
 
 ## Decision Log
 
-(append dated, numbered decisions here as milestones record them)
+1. **2026-07-19 — Dependency pins re-verified live** against api.nuget.org; every floor exists:
+   Orleans `10.2.2-rc.2` (Sdk, Server, Client, Core.Abstractions, Serialization, TestingHost),
+   `Microsoft.Orleans.Journaling 10.2.2-rc.2.alpha.1`, `Microsoft.Orleans.Dashboard 10.2.2-rc.2`
+   (official package, not community `OrleansDashboard`), Aspire `13.4.6` (Hosting, Hosting.AppHost,
+   AppHost.Sdk, Hosting.Testing, Hosting.Orleans), `Microsoft.Extensions.AI` + `.Abstractions` +
+   `.OpenAI` `10.8.0`, `OpenAI 2.12.0`, `Anthropic 12.36.0`, `Reqnroll 3.3.4` +
+   `Reqnroll.xunit.v3 3.3.4`, `xunit.v3 3.2.2`, `xunit.runner.visualstudio 3.1.5`,
+   `Microsoft.NET.Test.Sdk 18.8.1`, `Microsoft.CodeAnalysis.PublicApiAnalyzers 5.6.0`,
+   `Microsoft.Agents.AI.DevUI 1.13.0-preview.260703.1`. `Directory.Packages.props` carries only
+   what the code currently references; remaining pins join it as milestones consume them.
+2. **2026-07-19 — `dotnet test` stays in VSTest mode** (no `test` section in `global.json`): the
+   contract's exact root gate passes the `.slnx` positionally, which MTP-mode `dotnet test`
+   rejects (`--solution` only); VSTest accepts the two intentionally empty test projects (MTP
+   exits 8 on zero tests); Reqnroll.xunit.v3's documented setup is VSTest-based. Revisit only if
+   the gate command itself is revised.
+3. **2026-07-19 — `net10.0` (GA, LTS) is the working target framework**; `global.json` pins the
+   10.0 SDK line (`rollForward: latestFeature`, prerelease allowed for the local
+   10.0.400-preview SDK). The formal package-TFM decision stays with M1.
+4. **2026-07-19 — Demolition judgment calls** beyond the listed set: `workspace/` (v1 Flutter UI,
+   an explicit non-goal), `Directory.Build.targets`, `aspire.config.json`, `.lsp.json`,
+   `.mcp.json`, `.codex/`, `.config/`, and all of `.github/` deleted as v1 machinery; `AGENTS.md`
+   kept as a one-line pointer to CLAUDE.md; `nuget.config`, `.editorconfig`, `.gitignore`
+   rewritten fresh; `README.md` rewritten truthful; untracked `.digitalbrain/keys` left
+   untouched.
 
 ## Definition of Done
 

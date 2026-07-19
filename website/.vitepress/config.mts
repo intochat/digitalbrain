@@ -2,7 +2,7 @@ import { defineConfig } from 'vitepress'
 
 export default defineConfig({
   title: 'DigitalBrain',
-  description: 'A small kernel for durable, addressable capabilities',
+  description: 'Neurons, synapses, and simulations — durable agents for .NET on Orleans and Aspire',
   cleanUrls: true,
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
@@ -11,75 +11,26 @@ export default defineConfig({
   themeConfig: {
     logo: '/logo.svg',
     nav: [
-      { text: 'Getting Started', link: '/getting-started/' },
-      { text: 'Concepts', link: '/guide/' },
-      { text: 'Build', link: '/build/first-module' },
-      { text: 'Status', link: '/reference/status' },
-      { text: 'Contributing', link: '/contributing/' }
+      { text: 'Concepts', link: '/concepts' },
+      { text: 'Status', link: '/status' }
     ],
-    sidebar: {
-      '/getting-started/': [
-        {
-          text: 'Getting Started',
-          items: [
-            { text: 'Run DigitalBrain', link: '/getting-started/' },
-            { text: 'First MCP call', link: '/getting-started/first-call' }
-          ]
-        }
-      ],
-      '/guide/': [
-        {
-          text: 'Concepts',
-          items: [
-            { text: 'What is DigitalBrain?', link: '/guide/' },
-            { text: 'Architecture', link: '/guide/architecture' }
-          ]
-        },
-        {
-          text: 'Core model',
-          items: [
-            { text: 'Neurons', link: '/guide/neurons' },
-            { text: 'Synapses', link: '/guide/synapses' },
-            { text: 'Modules', link: '/guide/modules' },
-            { text: 'Programming model', link: '/guide/programming-model' },
-            { text: 'Webhook neurons', link: '/guide/webhooks' }
-          ]
-        }
-      ],
-      '/build/': [
-        {
-          text: 'Build',
-          items: [
-            { text: 'First module', link: '/build/first-module' }
-          ]
-        }
-      ],
-      '/contributing/': [
-        {
-          text: 'Contributing',
-          items: [
-            { text: 'Start here', link: '/contributing/' }
-          ]
-        }
-      ],
-      '/reference/': [
-        {
-          text: 'Reference',
-          items: [
-            { text: 'Implementation status', link: '/reference/status' },
-            { text: 'Architecture decisions', link: '/reference/decisions' }
-          ]
-        }
-      ]
-    },
+    sidebar: [
+      {
+        text: 'DigitalBrain',
+        items: [
+          { text: 'Concepts', link: '/concepts' },
+          { text: 'Status', link: '/status' }
+        ]
+      }
+    ],
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/InteractiveAgents/DigitalBrain' }
+      { icon: 'github', link: 'https://github.com/digitalbraintech/brain' }
     ],
     search: {
       provider: 'local'
     },
     footer: {
-      message: 'Current behavior is documented separately from target architecture.',
+      message: 'The v2 foundation is being rebuilt in the open. Nothing is published yet.',
       copyright: 'DigitalBrain contributors'
     },
     outline: {

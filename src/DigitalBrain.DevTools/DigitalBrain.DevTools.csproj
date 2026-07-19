@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Development-time dashboards and diagnostics for DigitalBrain hosts.</Description>
+  </PropertyGroup>
+</Project>

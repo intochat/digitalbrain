@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>The DigitalBrain simulation machine: fire synapses into a real in-process cluster and expect synapses on the timeline. Development-only.</Description>
+  </PropertyGroup>
+</Project>

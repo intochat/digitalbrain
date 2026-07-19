@@ -3,49 +3,9 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="Aspire.Hosting" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.OpenAI" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
-    <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.2.2-rc.2" />
-    <PackageVersion Include="Microsoft.Orleans.Dashboard" Version="10.2.2-rc.2" />
-    <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.2-rc.2" />
-    <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.2-rc.2" />
-    <PackageVersion Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.2-rc.2" />
-    <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.2.2-rc.2" />
-    <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.2-rc.2" />
-    <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.2.2-rc.2" />
-    <PackageVersion Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.2.2-rc.2" />
-    <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.2.2-rc.2" />
-    <PackageVersion Include="Microsoft.Orleans.Streaming.AzureStorage" Version="10.2.2-rc.2" />
-    <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.2.2-rc.2" />
-    <PackageVersion Include="Microsoft.Orleans.Journaling" Version="10.2.2-rc.2.alpha.1" />
-    <PackageVersion Include="Microsoft.Orleans.Journaling.AzureStorage" Version="10.2.2-rc.2.alpha.1" />
-    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.8.0" />
-    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.8.0" />
-    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.8.0" />
-    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.8.0" />
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="11.0.0-preview.6.26359.118" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="11.0.0-preview.6.26359.118" />
-    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="11.0.0-preview.6.26359.118" />
-    <PackageVersion Include="OpenAI" Version="2.12.0" />
-    <PackageVersion Include="Anthropic" Version="12.36.0" />
-    <PackageVersion Include="Microsoft.Agents.AI" Version="1.13.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.DevUI" Version="1.13.0-preview.260703.1" />
-    <PackageVersion Include="Azure.Storage.Blobs" Version="12.29.1" />
-    <PackageVersion Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.5.0" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
-    <PackageVersion Include="Testcontainers.Azurite" Version="4.13.0" />
-    <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0-pre.5" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>
 </Project>

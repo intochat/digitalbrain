@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+    <Project Path="src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+    <Project Path="src/DigitalBrain.Client/DigitalBrain.Client.csproj" />
+    <Project Path="src/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <Project Path="src/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
+    <Project Path="src/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+    <Project Path="src/DigitalBrain.DevTools/DigitalBrain.DevTools.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.Simulations/DigitalBrain.Simulations.csproj" />
+    <Project Path="tests/DigitalBrain.HostTests/DigitalBrain.HostTests.csproj" />
+  </Folder>
+</Solution>
