@@ -1,5 +1,9 @@
 #nullable enable
 DigitalBrain.DigitalBrainSiloBuilderExtensions
+DigitalBrain.DispatchManifest
+DigitalBrain.DispatchManifest.DispatchManifest(System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>! handlers, System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>! emissions) -> void
+DigitalBrain.DispatchManifest.Emissions.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>!
+DigitalBrain.DispatchManifest.Handlers.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseWiringEntry!>!
 DigitalBrain.Neuron
 DigitalBrain.Neuron.DeliverAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron.EmitAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
@@ -10,4 +14,21 @@ DigitalBrain.Neuron.Outgoing.get -> System.Collections.Generic.IReadOnlyList<Dig
 DigitalBrain.Neuron.ReadJournalAsync(DigitalBrain.JournalKind kind) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Synapse!>!>!
 DigitalBrain.Neuron.ReplyAsync(DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron.SendAsync(DigitalBrain.NeuronId receiver, DigitalBrain.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.SynapseWiring
+DigitalBrain.SynapseWiringEntry
+DigitalBrain.SynapseWiringEntry.<Clone>$() -> DigitalBrain.SynapseWiringEntry!
+DigitalBrain.SynapseWiringEntry.Deconstruct(out string! Neuron, out string! Synapse) -> void
+DigitalBrain.SynapseWiringEntry.Equals(DigitalBrain.SynapseWiringEntry? other) -> bool
+DigitalBrain.SynapseWiringEntry.Neuron.get -> string!
+DigitalBrain.SynapseWiringEntry.Neuron.init -> void
+DigitalBrain.SynapseWiringEntry.Synapse.get -> string!
+DigitalBrain.SynapseWiringEntry.Synapse.init -> void
+DigitalBrain.SynapseWiringEntry.SynapseWiringEntry(string! Neuron, string! Synapse) -> void
+override DigitalBrain.SynapseWiringEntry.Equals(object? obj) -> bool
+override DigitalBrain.SynapseWiringEntry.GetHashCode() -> int
+override DigitalBrain.SynapseWiringEntry.ToString() -> string!
 static DigitalBrain.DigitalBrainSiloBuilderExtensions.AddDigitalBrain(this Orleans.Hosting.ISiloBuilder! builder) -> Orleans.Hosting.ISiloBuilder!
+static DigitalBrain.SynapseWiring.HandledSynapseTypes(System.Type! neuronType) -> System.Collections.Generic.IReadOnlyCollection<System.Type!>!
+static DigitalBrain.SynapseWiring.TryGetManifest(System.Reflection.Assembly! assembly, out DigitalBrain.DispatchManifest! manifest) -> bool
+static DigitalBrain.SynapseWiringEntry.operator !=(DigitalBrain.SynapseWiringEntry? left, DigitalBrain.SynapseWiringEntry? right) -> bool
+static DigitalBrain.SynapseWiringEntry.operator ==(DigitalBrain.SynapseWiringEntry? left, DigitalBrain.SynapseWiringEntry? right) -> bool

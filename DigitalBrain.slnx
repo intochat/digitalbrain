@@ -7,6 +7,7 @@
     <Project Path="src/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="src/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
     <Project Path="src/DigitalBrain.DevTools/DigitalBrain.DevTools.csproj" />
+    <Project Path="src/DigitalBrain.SourceGeneration/DigitalBrain.SourceGeneration.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
