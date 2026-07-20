@@ -60,9 +60,3 @@ static DigitalBrain.Kernel.SynapseWiring.HandledSynapseTypes(System.Type! neuron
 static DigitalBrain.Kernel.SynapseWiring.TryGetManifest(System.Reflection.Assembly! assembly, out DigitalBrain.Kernel.DispatchManifest! manifest) -> bool
 static DigitalBrain.Kernel.SynapseWiringEntry.operator !=(DigitalBrain.Kernel.SynapseWiringEntry? left, DigitalBrain.Kernel.SynapseWiringEntry? right) -> bool
 static DigitalBrain.Kernel.SynapseWiringEntry.operator ==(DigitalBrain.Kernel.SynapseWiringEntry? left, DigitalBrain.Kernel.SynapseWiringEntry? right) -> bool
-DigitalBrain.Kernel.ModuleComposition
-static DigitalBrain.Kernel.ModuleComposition.AddModule<TModule>(this Orleans.Hosting.ISiloBuilder! builder) -> Orleans.Hosting.ISiloBuilder!
-static DigitalBrain.Kernel.ModuleComposition.Validate(DigitalBrain.Abstractions.IModule! module) -> void
-DigitalBrain.Kernel.ModuleWiring
-static DigitalBrain.Kernel.ModuleWiring.EnsureManifestMatchesReflection(System.Reflection.Assembly! assembly) -> void
-static DigitalBrain.Kernel.ModuleWiring.HandlerWiring(System.Reflection.Assembly! assembly) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Kernel.SynapseWiringEntry!>!

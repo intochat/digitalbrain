@@ -16,8 +16,6 @@
     <Project Path="hosts/DigitalBrain.TestingAppHost/DigitalBrain.TestingAppHost.csproj" />
   </Folder>
   <Folder Name="/modules/">
-    <Project Path="modules/DigitalBrain.Modules.Probe.Contracts/DigitalBrain.Modules.Probe.Contracts.csproj" />
-    <Project Path="modules/DigitalBrain.Modules.Probe/DigitalBrain.Modules.Probe.csproj" />
     <Project Path="modules/DigitalBrain.Modules.AI.Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <Project Path="modules/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
   </Folder>
@@ -27,4 +25,3 @@
     <Project Path="tests/DigitalBrain.HostTests/DigitalBrain.HostTests.csproj" />
   </Folder>
 </Solution>
-

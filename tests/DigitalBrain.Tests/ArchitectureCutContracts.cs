@@ -1,4 +1,5 @@
 using System.Reflection;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using Xunit;
 
@@ -17,7 +18,14 @@ public sealed class ArchitectureCutContracts
         "AddDigitalBrain" + "Models",
         "AddAI" + "Module",
         "Chat" + "ModelNeuron",
+        "Module" + "Descriptor",
+        "Module" + "Composition",
+        "Module" + "Wiring",
     ];
+
+    [Fact(DisplayName = "a module is a marker, not a second configuration language")]
+    public void ModuleIsAMarker()
+        => Assert.Empty(typeof(IModule).GetMembers(BindingFlags.Instance | BindingFlags.Public));
 
     [Fact(DisplayName = "the kernel exposes no model operation")]
     public void KernelExposesNoModelOperation()
