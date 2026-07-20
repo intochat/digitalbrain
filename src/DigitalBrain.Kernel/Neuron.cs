@@ -25,11 +25,12 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
     private readonly IDurableList<byte[]> _outbox;
     private readonly IDurableList<Guid> _handled;
     private readonly HashSet<SynapseId> _remembered = [];
-    private readonly List<Synapse> _firedWhileHandling = [];
+    private readonly List<SynapseDelivery> _firedWhileHandling = [];
     private readonly Serializer<OutboxEntry> _entries;
+    private readonly Serializer<Synapse> _synapses;
     private readonly TimeProvider _clock;
 
-    private SynapseMetadata? _handling;
+    private SynapseDelivery? _handling;
     private int _handlingDepth;
     private IGrainTimer? _draining;
     private bool _wakeUpRegistered;
@@ -41,13 +42,16 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         _outbox = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(OutboxName);
         _handled = ServiceProvider.GetRequiredKeyedService<IDurableList<Guid>>(HandledName);
         _entries = ServiceProvider.GetRequiredService<Serializer<OutboxEntry>>();
+        _synapses = ServiceProvider.GetRequiredService<Serializer<Synapse>>();
         _clock = ServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
     }
 
     public NeuronId Id => NeuronId.FromGrainKey(this.GetGrainId().Type.ToString()!, this.GetPrimaryKeyString());
 
-    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    public sealed override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
+        NeuronConcurrency.RequireSerializedTurns(GetType());
+
         await base.OnActivateAsync(cancellationToken);
 
         _wakeUpRegistered = await this.GetReminder(OutboxReminderName) is not null;
@@ -71,11 +75,11 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         await ForgetWakeUpWhenOutboxIsEmptyAsync();
     }
 
-    public async Task DeliverAsync(Synapse synapse)
+    public async Task DeliverAsync(SynapseDelivery delivery)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(delivery);
 
-        if (HasAlreadyHandled(synapse))
+        if (HasAlreadyHandled(delivery))
         {
             return;
         }
@@ -83,11 +87,11 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         using var handling = SynapseTelemetry.Source.StartActivity("handle");
 
         handling?.SetTag(SynapseTelemetry.ReceiverTag, Id.ToString());
-        handling?.SetTag(SynapseTelemetry.SynapseTag, synapse.GetType().Name);
-        handling?.SetTag(SynapseTelemetry.CorrelationTag, synapse.Stamped.CorrelationId.ToString());
+        handling?.SetTag(SynapseTelemetry.SynapseTag, delivery.Synapse.GetType().Name);
+        handling?.SetTag(SynapseTelemetry.CorrelationTag, delivery.CorrelationId.ToString());
 
-        _handling = synapse.Stamped;
-        _handlingDepth = SynapseDelivery.InboundDepth();
+        _handling = delivery;
+        _handlingDepth = DeliveryPolicy.InboundDepth();
 
         var committedOutbox = _outbox.Count;
         var committedHandled = _handled.Count;
@@ -96,16 +100,16 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
 
         try
         {
-            await DispatchAsync(synapse);
+            await DispatchAsync(Snapshot(delivery.Synapse));
 
             foreach (var fired in _firedWhileHandling)
             {
                 _outgoing.Append(fired);
             }
 
-            _incoming.Append(synapse);
+            _incoming.Append(delivery);
 
-            Remember(synapse.Stamped.SynapseId);
+            Remember(delivery.SynapseId);
 
             await CommitAsync(CancellationToken.None);
         }
@@ -142,7 +146,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
     {
         ArgumentNullException.ThrowIfNull(synapse);
 
-        return FireAsync(synapse, SynapseMetadata.ForSend(Id, receiver, _handling), [receiver]);
+        return FireAsync(synapse, [receiver]);
     }
 
     protected Task ReplyAsync(Synapse synapse)
@@ -152,9 +156,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         var answered = _handling
             ?? throw new InvalidOperationException($"{GetType().Name} has nothing to reply to: replies are only valid while handling a synapse.");
 
-        var metadata = SynapseMetadata.ForReply(Id, answered);
-
-        return FireAsync(synapse, metadata, [metadata.Receiver!.Value]);
+        return FireAsync(synapse, [answered.Caller]);
     }
 
     protected async Task EmitAsync(Synapse synapse)
@@ -164,7 +166,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         var subscribers = await SubscriptionRegistry.For(GrainFactory, Id.Owner)
             .SubscribersAsync(synapse.GetType().FullName!);
 
-        await FireAsync(synapse, SynapseMetadata.ForBroadcast(Id, _handling), [.. subscribers]);
+        await FireAsync(synapse, [.. subscribers]);
     }
 
     protected async Task<string> AskModelAsync(ModelTier tier, string prompt, CancellationToken cancellationToken)
@@ -180,23 +182,71 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         return answer.Text;
     }
 
-    private async Task FireAsync(Synapse synapse, SynapseMetadata metadata, NeuronId[] receivers)
+    protected IGrainTimer RegisterGrainTimer(
+        Func<CancellationToken, Task> callback,
+        GrainTimerCreationOptions options)
     {
-        var fired = synapse with { Metadata = metadata };
+        NeuronConcurrency.RequireSerializedTimer(options);
+
+        return GrainBaseExtensions.RegisterGrainTimer(this, callback, options);
+    }
+
+    protected IGrainTimer RegisterGrainTimer(
+        Func<Task> callback,
+        GrainTimerCreationOptions options)
+    {
+        NeuronConcurrency.RequireSerializedTimer(options);
+
+        return GrainBaseExtensions.RegisterGrainTimer(this, callback, options);
+    }
+
+    protected IGrainTimer RegisterGrainTimer<TState>(
+        Func<TState, CancellationToken, Task> callback,
+        TState state,
+        GrainTimerCreationOptions options)
+    {
+        NeuronConcurrency.RequireSerializedTimer(options);
+
+        return GrainBaseExtensions.RegisterGrainTimer(this, callback, state, options);
+    }
+
+    protected IGrainTimer RegisterGrainTimer<TState>(
+        Func<TState, Task> callback,
+        TState state,
+        GrainTimerCreationOptions options)
+    {
+        NeuronConcurrency.RequireSerializedTimer(options);
+
+        return GrainBaseExtensions.RegisterGrainTimer(this, callback, state, options);
+    }
+
+    protected new IDisposable RegisterTimer(
+        Func<object, Task> callback,
+        object state,
+        TimeSpan dueTime,
+        TimeSpan period)
+        => throw new InvalidOperationException(
+            $"{nameof(RegisterTimer)} creates interleaving callbacks, but neurons require serialized turns.");
+
+    internal async Task<SynapseDelivery> FireAsync(Synapse synapse, NeuronId[] receivers)
+    {
+        var sequence = _outgoing.NextSequence
+            + (_handling is null ? 0 : _firedWhileHandling.Count);
+        var delivery = SynapseDelivery.Create(Snapshot(synapse), Id, sequence, _handling, _clock);
 
         if (_handling is null)
         {
-            _outgoing.Append(fired);
+            _outgoing.Append(delivery);
         }
         else
         {
-            _firedWhileHandling.Add(fired);
+            _firedWhileHandling.Add(delivery);
         }
 
         if (receivers.Length > 0)
         {
             _outbox.Add(_entries.SerializeToArray(
-                new OutboxEntry(fired, receivers, _handlingDepth + 1, Attempts: 0, _clock.GetUtcNow())));
+                new OutboxEntry(delivery, receivers, _handlingDepth + 1, Attempts: 0)));
         }
 
         if (_handling is null)
@@ -204,6 +254,8 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
             await CommitAsync(CancellationToken.None);
             ScheduleDrain();
         }
+
+        return delivery;
     }
 
     private async Task CommitAsync(CancellationToken cancellationToken)
@@ -270,9 +322,9 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
             var committed = _entries.Deserialize(_outbox[0]);
             var entry = committed with { Attempts = committed.Attempts + 1 };
 
-            if (entry.Depth > SynapseDelivery.MaximumDepth)
+            if (entry.Depth > DeliveryPolicy.MaximumDepth)
             {
-                Abandon(entry, $"exceeded the maximum synapse depth of {SynapseDelivery.MaximumDepth}");
+                Abandon(entry, $"exceeded the maximum synapse depth of {DeliveryPolicy.MaximumDepth}");
                 _outbox.RemoveAt(0);
 
                 continue;
@@ -312,8 +364,8 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
     }
 
     private bool Exhausted(OutboxEntry entry)
-        => entry.Attempts >= SynapseDelivery.MaximumAttempts
-        || _clock.GetUtcNow() - entry.FirstAttempted > SynapseDelivery.RetryHorizon;
+        => entry.Attempts >= DeliveryPolicy.MaximumAttempts
+        || _clock.GetUtcNow() - entry.Delivery.Timestamp > DeliveryPolicy.RetryHorizon;
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Design",
@@ -321,24 +373,24 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         Justification = "Any failure other than a permanent refusal keeps the receiver pending so the outbox redelivers it; letting it escape would abandon the delivery guarantee.")]
     private async Task<bool> TryDeliverAsync(OutboxEntry entry, NeuronId receiver)
     {
-        SynapseDelivery.CarryDepth(entry.Depth);
+        DeliveryPolicy.CarryDepth(entry.Depth);
 
         try
         {
             if (receiver == Id)
             {
-                await DeliverAsync(entry.Synapse);
+                await DeliverAsync(entry.Delivery);
             }
             else
             {
-                await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).DeliverAsync(entry.Synapse);
+                await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).DeliverAsync(entry.Delivery);
             }
 
             return true;
         }
         catch (NeuronAuthorizationException refusal)
         {
-            Record("refused", entry.Synapse, receiver, refusal.Message);
+            Record("refused", entry.Delivery, receiver, refusal.Message);
 
             return true;
         }
@@ -352,22 +404,22 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
     {
         foreach (var receiver in entry.Pending)
         {
-            Record("abandoned", entry.Synapse, receiver, reason);
+            Record("abandoned", entry.Delivery, receiver, reason);
         }
     }
 
-    private static void Record(string outcome, Synapse synapse, NeuronId receiver, string reason)
+    private static void Record(string outcome, SynapseDelivery delivery, NeuronId receiver, string reason)
     {
         using var recorded = SynapseTelemetry.Source.StartActivity(outcome);
 
         recorded?.SetTag(SynapseTelemetry.ReceiverTag, receiver.ToString());
-        recorded?.SetTag(SynapseTelemetry.SynapseTag, synapse.GetType().Name);
-        recorded?.SetTag(SynapseTelemetry.CorrelationTag, synapse.Stamped.CorrelationId.ToString());
+        recorded?.SetTag(SynapseTelemetry.SynapseTag, delivery.Synapse.GetType().Name);
+        recorded?.SetTag(SynapseTelemetry.CorrelationTag, delivery.CorrelationId.ToString());
         recorded?.SetStatus(ActivityStatusCode.Error, reason);
     }
 
-    private bool HasAlreadyHandled(Synapse synapse)
-        => _remembered.Contains(synapse.Stamped.SynapseId);
+    private bool HasAlreadyHandled(SynapseDelivery delivery)
+        => _remembered.Contains(delivery.SynapseId);
 
     private void Remember(SynapseId delivered)
     {
@@ -395,4 +447,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         => SynapseDispatch.HandlersFor(GetType()).TryGetValue(synapse.GetType(), out var handler)
             ? handler(this, synapse, CancellationToken.None)
             : Task.CompletedTask;
+
+    private Synapse Snapshot(Synapse synapse)
+        => _synapses.Deserialize(_synapses.SerializeToArray(synapse));
 }

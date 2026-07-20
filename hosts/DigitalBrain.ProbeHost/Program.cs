@@ -69,7 +69,9 @@ app.MapGet("/probe/answers", async (IGrainFactory grains) =>
         ? Results.Problem(
             "The answer journal compacted before its payloads were read.",
             statusCode: StatusCodes.Status409Conflict)
-        : Results.Ok(string.Join("|", answered.Delta.OfType<IAnswer>().Select(answer => answer.Text)));
+        : Results.Ok(string.Join(
+            "|",
+            answered.Delta.Select(delivery => delivery.Synapse).OfType<IAnswer>().Select(answer => answer.Text)));
 });
 
 app.Run();

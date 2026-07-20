@@ -27,7 +27,7 @@ var fired = await brain.Session.ReadJournalAsync(JournalKind.Outgoing, afterSequ
 var firedCount = fired.ResetSnapshot?.TotalRecorded ?? fired.Delta.Count;
 var firedTypes = fired.ResetSnapshot is { } reset
     ? reset.Tallies.Select(tally => tally.SynapseType)
-    : fired.Delta.Select(synapse => synapse.GetType().Name);
+    : fired.Delta.Select(delivery => delivery.Synapse.GetType().Name);
 
 Console.WriteLine($"the session durably recorded {firedCount} fired synapse(s): {string.Join(", ", firedTypes)}");
 

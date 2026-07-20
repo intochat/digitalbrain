@@ -50,8 +50,8 @@ envelope the kernel owns and the author never constructs:
 public sealed record NewMail(string From, string Subject, string Body);
 ```
 
-*Status: facts, journals, and delivery are built. The thin-record shape and call reification are
-designed; today metadata is carried on the synapse itself.*
+*Status: facts, thin records, kernel-owned delivery envelopes, journals, and delivery are built.
+Call reification is designed and not yet built.*
 
 ## Vocabulary and behavior
 

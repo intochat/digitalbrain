@@ -58,9 +58,12 @@ answered without having recorded that it was asked.
 ### Delivery
 
 Sending does not deliver inline — a non-reentrant grain that awaited its own receiver would deadlock on
-any reply. Instead a durable outbox is committed with the turn and drained by a repeating timer, backed
-by an Orleans reminder so a drain survives deactivation. Delivery is at-least-once per subscriber, and
-`SynapseId` dedupe at the receiver makes *processing* effectively-once.
+any reply. Neuron activation rejects Orleans reentrancy and interleaving attributes because journal
+order and delivery lineage require serialized turns; its protected grain-timer overloads reject
+`Interleave = true`, and its legacy timer overload is unavailable because legacy timers always
+interleave. A durable outbox is committed with the turn and drained by a repeating timer, backed by
+an Orleans reminder so a drain survives deactivation. Delivery is
+at-least-once per subscriber, and `SynapseId` dedupe at the receiver makes *processing* effectively-once.
 
 ## Placement
 

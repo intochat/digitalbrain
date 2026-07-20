@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Testing;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -6,61 +7,40 @@ namespace DigitalBrain.Tests;
 public sealed class StampingContracts
 {
     private static readonly NeuronId Caller = new("Greeter", new OwnerId("acme"), "polite");
-    private static readonly NeuronId Receiver = new("Echo", new OwnerId("acme"), "first");
 
     [Fact]
-    public void SendWithoutCauseStartsANewConversation()
+    public void DeliveryWithoutCauseStartsANewConversation()
     {
-        var metadata = SynapseMetadata.ForSend(Caller, Receiver);
+        var synapse = new DeliveryProbe();
 
-        Assert.Equal(Caller, metadata.Caller);
-        Assert.Equal(Receiver, metadata.Receiver);
-        Assert.Equal(RoutingMode.PointToPoint, metadata.RoutingMode);
-        Assert.Null(metadata.CausationId);
-        Assert.NotEqual(default, metadata.CorrelationId);
-        Assert.NotEqual(default, metadata.SynapseId);
+        var delivery = SynapseDelivery.Create(synapse, Caller, sequence: 1);
+
+        Assert.Same(synapse, delivery.Synapse);
+        Assert.Equal(Caller, delivery.Caller);
+        Assert.Equal(1, delivery.Sequence);
+        Assert.Null(delivery.CausationId);
+        Assert.NotEqual(default, delivery.CorrelationId);
+        Assert.NotEqual(default, delivery.SynapseId);
     }
 
     [Fact]
-    public void SendWithCauseInheritsTheConversationAndPointsAtItsParent()
+    public void CausedDeliveryInheritsTheConversationAndPointsAtItsParent()
     {
-        var cause = SynapseMetadata.ForSend(Receiver, Caller);
+        var cause = SynapseDelivery.Create(new DeliveryProbe(), Caller, sequence: 1);
 
-        var metadata = SynapseMetadata.ForSend(Caller, Receiver, cause);
+        var delivery = SynapseDelivery.Create(new DeliveryProbe(), Caller, sequence: 2, cause);
 
-        Assert.Equal(cause.CorrelationId, metadata.CorrelationId);
-        Assert.Equal(cause.SynapseId, metadata.CausationId);
-        Assert.NotEqual(cause.SynapseId, metadata.SynapseId);
-    }
-
-    [Fact]
-    public void BroadcastHasNoReceiver()
-    {
-        var metadata = SynapseMetadata.ForBroadcast(Caller);
-
-        Assert.Null(metadata.Receiver);
-        Assert.Equal(RoutingMode.Broadcast, metadata.RoutingMode);
-    }
-
-    [Fact]
-    public void ReplyAddressesTheCallerOfTheSynapseItAnswers()
-    {
-        var cause = SynapseMetadata.ForSend(Caller, Receiver);
-
-        var metadata = SynapseMetadata.ForReply(Receiver, cause);
-
-        Assert.Equal(Caller, metadata.Receiver);
-        Assert.Equal(Receiver, metadata.Caller);
-        Assert.Equal(cause.CorrelationId, metadata.CorrelationId);
-        Assert.Equal(cause.SynapseId, metadata.CausationId);
+        Assert.Equal(cause.CorrelationId, delivery.CorrelationId);
+        Assert.Equal(cause.SynapseId, delivery.CausationId);
+        Assert.NotEqual(cause.SynapseId, delivery.SynapseId);
     }
 
     [Fact]
     public void CorrelationSurvivesEveryHopWhileCausationTracksTheParent()
     {
-        var first = SynapseMetadata.ForSend(Caller, Receiver);
-        var second = SynapseMetadata.ForReply(Receiver, first);
-        var third = SynapseMetadata.ForReply(Caller, second);
+        var first = SynapseDelivery.Create(new DeliveryProbe(), Caller, sequence: 1);
+        var second = SynapseDelivery.Create(new DeliveryProbe(), Caller, sequence: 2, first);
+        var third = SynapseDelivery.Create(new DeliveryProbe(), Caller, sequence: 3, second);
 
         Assert.Equal(first.CorrelationId, third.CorrelationId);
         Assert.Equal(second.SynapseId, third.CausationId);
@@ -71,10 +51,32 @@ public sealed class StampingContracts
     {
         var time = new FixedTime(DateTimeOffset.Parse("2026-07-19T10:30:00Z", System.Globalization.CultureInfo.InvariantCulture));
 
-        var metadata = SynapseMetadata.ForSend(Caller, Receiver, cause: null, timeProvider: time);
+        var delivery = SynapseDelivery.Create(
+            new DeliveryProbe(),
+            Caller,
+            sequence: 1,
+            cause: null,
+            timeProvider: time);
 
-        Assert.Equal(time.GetUtcNow(), metadata.Timestamp);
+        Assert.Equal(time.GetUtcNow(), delivery.Timestamp);
     }
+
+    [Fact]
+    public void DeliverySequenceMustBePositive()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => SynapseDelivery.Create(new DeliveryProbe(), Caller, sequence: 0));
+    }
+
+    [Fact]
+    public void SimulationCallerHandsTheKernelOnlyAPlainSynapse()
+    {
+        var stimulus = typeof(ISimulationNeuron).GetMethod(nameof(ISimulationNeuron.StimulateAsync))!;
+
+        Assert.Equal(typeof(Synapse), stimulus.GetParameters()[1].ParameterType);
+    }
+
+    private sealed record DeliveryProbe : Synapse;
 
     private sealed class FixedTime(DateTimeOffset now) : TimeProvider
     {

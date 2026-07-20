@@ -121,7 +121,7 @@ not only storage.
 
 `Neuron.DrainAsync` processes `_outbox[0]` and `break`s out of the loop when any receiver of
 that entry is undelivered. A single unreachable receiver stalls **all** outgoing traffic from
-that neuron until the retry horizon expires — `SynapseDelivery.RetryHorizon` is 30 minutes.
+that neuron until the retry horizon expires — `DeliveryPolicy.RetryHorizon` is 30 minutes.
 This is not listed as a debt anywhere.
 
 ### 2.6 The owner boundary does not constrain clients, and the code shows why
@@ -1347,7 +1347,7 @@ records as its failure mode. Nothing client-facing ships before it.
 | 2.1 | Feed state machine: snapshot, bounded delta log, cursor, invariant validation (R-1) — *done* |
 | 2.2 | Bounded dedupe set replacing the journal scan — turns 1.2 green — *done* |
 | 2.3 | Cursor-based read replacing `ReadJournalAsync` across every consumer — *done* |
-| 2.4 | DEC-10 — synapse becomes a thin record; metadata moves to the delivery envelope. Absorbs D-3 |
+| 2.4 | DEC-10 — synapse becomes a thin record; metadata moves to the delivery envelope. Absorbs D-3 — *done* |
 
 **Phase 2b — the boundary and the rail.**
 
@@ -1617,11 +1617,10 @@ Recorded in one place so it cannot be silently reversed.
 
 ## 13. First action
 
-**Phase 0 is complete and `sources/` is retired (§10).** Phases 2.1 through 2.3 are committed.
+**Phase 0 is complete and `sources/` is retired (§10).** Phase 2a (steps 2.1 through 2.4) is
+committed and is the green rollback point.
 
-The next action is **Phase 2.4** (DEC-10) to close Phase 2a green.
-
-Then **2.5, R-3, the owner boundary.** It is the gate on everything client-facing, and under
+The next action is **2.5, R-3, the owner boundary.** It is the gate on everything client-facing, and under
 DEC-8 that means it is the gate on the product. Nothing in Phase 4 may start before it.
 
 **Standing gate, every phase, no exceptions:** `dotnet test --logger "console;verbosity=minimal"`

@@ -1,6 +1,6 @@
 namespace DigitalBrain.Kernel;
 
-internal static class SynapseDelivery
+internal static class DeliveryPolicy
 {
     private const string DepthKey = "db.depth";
 

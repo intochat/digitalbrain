@@ -28,12 +28,17 @@ DigitalBrain.Kernel.ModelDescriptor.Tier.get -> DigitalBrain.Abstractions.ModelT
 DigitalBrain.Kernel.ModelDescriptor.Tier.init -> void
 DigitalBrain.Kernel.Neuron
 DigitalBrain.Kernel.Neuron.AskModelAsync(DigitalBrain.Abstractions.ModelTier tier, string! prompt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<string!>!
-DigitalBrain.Kernel.Neuron.DeliverAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.Kernel.Neuron.DeliverAsync(DigitalBrain.Abstractions.SynapseDelivery! delivery) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.Neuron.EmitAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.Neuron.Id.get -> DigitalBrain.Abstractions.NeuronId
 DigitalBrain.Kernel.Neuron.Neuron() -> void
 DigitalBrain.Kernel.Neuron.ReadJournalAsync(DigitalBrain.Abstractions.JournalKind kind, long afterSequence) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.JournalRead!>!
 DigitalBrain.Kernel.Neuron.ReceiveReminder(string! reminderName, Orleans.Runtime.TickStatus status) -> System.Threading.Tasks.Task!
+DigitalBrain.Kernel.Neuron.RegisterGrainTimer(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback, Orleans.Runtime.GrainTimerCreationOptions options) -> Orleans.Runtime.IGrainTimer!
+DigitalBrain.Kernel.Neuron.RegisterGrainTimer(System.Func<System.Threading.Tasks.Task!>! callback, Orleans.Runtime.GrainTimerCreationOptions options) -> Orleans.Runtime.IGrainTimer!
+DigitalBrain.Kernel.Neuron.RegisterGrainTimer<TState>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback, TState state, Orleans.Runtime.GrainTimerCreationOptions options) -> Orleans.Runtime.IGrainTimer!
+DigitalBrain.Kernel.Neuron.RegisterGrainTimer<TState>(System.Func<TState, System.Threading.Tasks.Task!>! callback, TState state, Orleans.Runtime.GrainTimerCreationOptions options) -> Orleans.Runtime.IGrainTimer!
+DigitalBrain.Kernel.Neuron.RegisterTimer(System.Func<object!, System.Threading.Tasks.Task!>! callback, object! state, System.TimeSpan dueTime, System.TimeSpan period) -> System.IDisposable!
 DigitalBrain.Kernel.Neuron.ReplyAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.Neuron.SendAsync(DigitalBrain.Abstractions.NeuronId receiver, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.PinToSiloAttribute
@@ -66,7 +71,7 @@ const DigitalBrain.Kernel.SynapseTelemetry.SynapseTag = "db.synapse" -> string!
 override DigitalBrain.Kernel.ModelDescriptor.Equals(object? obj) -> bool
 override DigitalBrain.Kernel.ModelDescriptor.GetHashCode() -> int
 override DigitalBrain.Kernel.ModelDescriptor.ToString() -> string!
-override DigitalBrain.Kernel.Neuron.OnActivateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+override sealed DigitalBrain.Kernel.Neuron.OnActivateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 override DigitalBrain.Kernel.PinToSiloStrategy.AdditionalInitialize(Orleans.Metadata.GrainProperties! properties) -> void
 override DigitalBrain.Kernel.SynapseWiringEntry.Equals(object? obj) -> bool
 override DigitalBrain.Kernel.SynapseWiringEntry.GetHashCode() -> int

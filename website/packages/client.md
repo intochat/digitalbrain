@@ -46,8 +46,10 @@ any other neuron's journal is.
 ## `NeuronHandle`
 
 `brain.Neuron<TNeuron>(name)` and `brain.Neuron(type, name)` return a handle exposing `Id` and
-`ReadJournalAsync(kind, afterSequence)`. A valid cursor receives only the later synapses in `Delta`
-and advances through `ResumeSequence`. If compaction has overtaken the cursor, `Delta` is empty and
+`ReadJournalAsync(kind, afterSequence)`. A valid cursor receives only the later delivery envelopes in
+`Delta`; each exposes its plain `Synapse` plus kernel-stamped identity, lineage, origin sequence and
+timestamp. The read advances through the journal-local `ResumeSequence`, which is independent from
+each envelope's caller-local `Sequence`. If compaction has overtaken the cursor, `Delta` is empty and
 `ResetSnapshot` carries the full durable summary plus the sequence from which reading can resume.
 
 ::: warning Open debt

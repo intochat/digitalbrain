@@ -9,7 +9,7 @@ namespace DigitalBrain.Kernel;
 [Alias("db.journal-entry")]
 internal sealed record JournalEntry(
     [property: Id(0)] long Sequence,
-    [property: Id(1)] Synapse Synapse);
+    [property: Id(1)] SynapseDelivery Delivery);
 
 internal sealed class NeuronFeed
 {
@@ -45,17 +45,19 @@ internal sealed class NeuronFeed
 
         return new(
             ResumeSequence: lastSequence,
-            Delta: [.. _retained.Skip(firstIndex).Select(_entries.Deserialize).Select(entry => entry.Synapse)],
+            Delta: [.. _retained.Skip(firstIndex).Select(_entries.Deserialize).Select(entry => entry.Delivery)],
             ResetSnapshot: null);
     }
 
-    internal void Append(Synapse synapse)
+    internal long NextSequence => _lastSequence.Value + 1;
+
+    internal void Append(SynapseDelivery delivery)
     {
         var sequence = _lastSequence.Value + 1;
-        var synapseType = synapse.GetType().FullName!;
+        var synapseType = delivery.Synapse.GetType().FullName!;
 
         _lastSequence.Value = sequence;
-        _retained.Add(_entries.SerializeToArray(new JournalEntry(sequence, synapse)));
+        _retained.Add(_entries.SerializeToArray(new JournalEntry(sequence, delivery)));
         _tallies[synapseType] = RecordedOf(synapseType) + 1;
 
         Compact();

@@ -12,7 +12,7 @@ DigitalBrain.Abstractions.IEmit<TSynapse>
 DigitalBrain.Abstractions.IHandle<TSynapse>
 DigitalBrain.Abstractions.IHandle<TSynapse>.HandleAsync(TSynapse! synapse, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 DigitalBrain.Abstractions.INeuron
-DigitalBrain.Abstractions.INeuron.DeliverAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.Abstractions.INeuron.DeliverAsync(DigitalBrain.Abstractions.SynapseDelivery! delivery) -> System.Threading.Tasks.Task!
 DigitalBrain.Abstractions.INeuron.ReadJournalAsync(DigitalBrain.Abstractions.JournalKind kind, long afterSequence) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.JournalRead!>!
 DigitalBrain.Abstractions.ISessionNeuron
 DigitalBrain.Abstractions.ISessionNeuron.FireAsync(DigitalBrain.Abstractions.NeuronId receiver, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
@@ -25,11 +25,11 @@ DigitalBrain.Abstractions.JournalKind.Incoming = 0 -> DigitalBrain.Abstractions.
 DigitalBrain.Abstractions.JournalKind.Outgoing = 1 -> DigitalBrain.Abstractions.JournalKind
 DigitalBrain.Abstractions.JournalRead
 DigitalBrain.Abstractions.JournalRead.<Clone>$() -> DigitalBrain.Abstractions.JournalRead!
-DigitalBrain.Abstractions.JournalRead.Deconstruct(out long ResumeSequence, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>! Delta, out DigitalBrain.Abstractions.JournalSnapshot? ResetSnapshot) -> void
-DigitalBrain.Abstractions.JournalRead.Delta.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>!
+DigitalBrain.Abstractions.JournalRead.Deconstruct(out long ResumeSequence, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.SynapseDelivery!>! Delta, out DigitalBrain.Abstractions.JournalSnapshot? ResetSnapshot) -> void
+DigitalBrain.Abstractions.JournalRead.Delta.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.SynapseDelivery!>!
 DigitalBrain.Abstractions.JournalRead.Delta.init -> void
 DigitalBrain.Abstractions.JournalRead.Equals(DigitalBrain.Abstractions.JournalRead? other) -> bool
-DigitalBrain.Abstractions.JournalRead.JournalRead(long ResumeSequence, System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.Synapse!>! Delta, DigitalBrain.Abstractions.JournalSnapshot? ResetSnapshot) -> void
+DigitalBrain.Abstractions.JournalRead.JournalRead(long ResumeSequence, System.Collections.Generic.IReadOnlyList<DigitalBrain.Abstractions.SynapseDelivery!>! Delta, DigitalBrain.Abstractions.JournalSnapshot? ResetSnapshot) -> void
 DigitalBrain.Abstractions.JournalRead.ResetSnapshot.get -> DigitalBrain.Abstractions.JournalSnapshot?
 DigitalBrain.Abstractions.JournalRead.ResetSnapshot.init -> void
 DigitalBrain.Abstractions.JournalRead.ResumeSequence.get -> long
@@ -83,15 +83,17 @@ DigitalBrain.Abstractions.OwnerId.Equals(DigitalBrain.Abstractions.OwnerId other
 DigitalBrain.Abstractions.OwnerId.OwnerId() -> void
 DigitalBrain.Abstractions.OwnerId.OwnerId(string! value) -> void
 DigitalBrain.Abstractions.OwnerId.Value.get -> string!
-DigitalBrain.Abstractions.RoutingMode
-DigitalBrain.Abstractions.RoutingMode.Broadcast = 1 -> DigitalBrain.Abstractions.RoutingMode
-DigitalBrain.Abstractions.RoutingMode.PointToPoint = 0 -> DigitalBrain.Abstractions.RoutingMode
 DigitalBrain.Abstractions.Synapse
-DigitalBrain.Abstractions.Synapse.Metadata.get -> DigitalBrain.Abstractions.SynapseMetadata?
-DigitalBrain.Abstractions.Synapse.Metadata.init -> void
-DigitalBrain.Abstractions.Synapse.Stamped.get -> DigitalBrain.Abstractions.SynapseMetadata!
 DigitalBrain.Abstractions.Synapse.Synapse() -> void
 DigitalBrain.Abstractions.Synapse.Synapse(DigitalBrain.Abstractions.Synapse! original) -> void
+DigitalBrain.Abstractions.SynapseDelivery
+DigitalBrain.Abstractions.SynapseDelivery.Caller.get -> DigitalBrain.Abstractions.NeuronId
+DigitalBrain.Abstractions.SynapseDelivery.CausationId.get -> DigitalBrain.Abstractions.SynapseId?
+DigitalBrain.Abstractions.SynapseDelivery.CorrelationId.get -> DigitalBrain.Abstractions.CorrelationId
+DigitalBrain.Abstractions.SynapseDelivery.Sequence.get -> long
+DigitalBrain.Abstractions.SynapseDelivery.Synapse.get -> DigitalBrain.Abstractions.Synapse!
+DigitalBrain.Abstractions.SynapseDelivery.SynapseId.get -> DigitalBrain.Abstractions.SynapseId
+DigitalBrain.Abstractions.SynapseDelivery.Timestamp.get -> System.DateTimeOffset
 DigitalBrain.Abstractions.SynapseId
 DigitalBrain.Abstractions.SynapseId.Deconstruct(out System.Guid Value) -> void
 DigitalBrain.Abstractions.SynapseId.Equals(DigitalBrain.Abstractions.SynapseId other) -> bool
@@ -99,25 +101,6 @@ DigitalBrain.Abstractions.SynapseId.SynapseId() -> void
 DigitalBrain.Abstractions.SynapseId.SynapseId(System.Guid Value) -> void
 DigitalBrain.Abstractions.SynapseId.Value.get -> System.Guid
 DigitalBrain.Abstractions.SynapseId.Value.init -> void
-DigitalBrain.Abstractions.SynapseMetadata
-DigitalBrain.Abstractions.SynapseMetadata.<Clone>$() -> DigitalBrain.Abstractions.SynapseMetadata!
-DigitalBrain.Abstractions.SynapseMetadata.Caller.get -> DigitalBrain.Abstractions.NeuronId
-DigitalBrain.Abstractions.SynapseMetadata.Caller.init -> void
-DigitalBrain.Abstractions.SynapseMetadata.CausationId.get -> DigitalBrain.Abstractions.SynapseId?
-DigitalBrain.Abstractions.SynapseMetadata.CausationId.init -> void
-DigitalBrain.Abstractions.SynapseMetadata.CorrelationId.get -> DigitalBrain.Abstractions.CorrelationId
-DigitalBrain.Abstractions.SynapseMetadata.CorrelationId.init -> void
-DigitalBrain.Abstractions.SynapseMetadata.Deconstruct(out DigitalBrain.Abstractions.SynapseId SynapseId, out DigitalBrain.Abstractions.CorrelationId CorrelationId, out DigitalBrain.Abstractions.SynapseId? CausationId, out DigitalBrain.Abstractions.NeuronId Caller, out DigitalBrain.Abstractions.NeuronId? Receiver, out DigitalBrain.Abstractions.RoutingMode RoutingMode, out System.DateTimeOffset Timestamp) -> void
-DigitalBrain.Abstractions.SynapseMetadata.Equals(DigitalBrain.Abstractions.SynapseMetadata? other) -> bool
-DigitalBrain.Abstractions.SynapseMetadata.Receiver.get -> DigitalBrain.Abstractions.NeuronId?
-DigitalBrain.Abstractions.SynapseMetadata.Receiver.init -> void
-DigitalBrain.Abstractions.SynapseMetadata.RoutingMode.get -> DigitalBrain.Abstractions.RoutingMode
-DigitalBrain.Abstractions.SynapseMetadata.RoutingMode.init -> void
-DigitalBrain.Abstractions.SynapseMetadata.SynapseId.get -> DigitalBrain.Abstractions.SynapseId
-DigitalBrain.Abstractions.SynapseMetadata.SynapseId.init -> void
-DigitalBrain.Abstractions.SynapseMetadata.SynapseMetadata(DigitalBrain.Abstractions.SynapseId SynapseId, DigitalBrain.Abstractions.CorrelationId CorrelationId, DigitalBrain.Abstractions.SynapseId? CausationId, DigitalBrain.Abstractions.NeuronId Caller, DigitalBrain.Abstractions.NeuronId? Receiver, DigitalBrain.Abstractions.RoutingMode RoutingMode, System.DateTimeOffset Timestamp) -> void
-DigitalBrain.Abstractions.SynapseMetadata.Timestamp.get -> System.DateTimeOffset
-DigitalBrain.Abstractions.SynapseMetadata.Timestamp.init -> void
 abstract DigitalBrain.Abstractions.Synapse.<Clone>$() -> DigitalBrain.Abstractions.Synapse!
 const DigitalBrain.Abstractions.ISessionNeuron.GrainTypeName = "sessionneuron" -> string!
 const DigitalBrain.Abstractions.ModelProviders.Anthropic = "anthropic" -> string!
@@ -142,9 +125,6 @@ override DigitalBrain.Abstractions.Synapse.GetHashCode() -> int
 override DigitalBrain.Abstractions.Synapse.ToString() -> string!
 override DigitalBrain.Abstractions.SynapseId.GetHashCode() -> int
 override DigitalBrain.Abstractions.SynapseId.ToString() -> string!
-override DigitalBrain.Abstractions.SynapseMetadata.Equals(object? obj) -> bool
-override DigitalBrain.Abstractions.SynapseMetadata.GetHashCode() -> int
-override DigitalBrain.Abstractions.SynapseMetadata.ToString() -> string!
 static DigitalBrain.Abstractions.CorrelationId.New() -> DigitalBrain.Abstractions.CorrelationId
 static DigitalBrain.Abstractions.CorrelationId.operator !=(DigitalBrain.Abstractions.CorrelationId left, DigitalBrain.Abstractions.CorrelationId right) -> bool
 static DigitalBrain.Abstractions.CorrelationId.operator ==(DigitalBrain.Abstractions.CorrelationId left, DigitalBrain.Abstractions.CorrelationId right) -> bool
@@ -166,11 +146,6 @@ static DigitalBrain.Abstractions.Synapse.operator ==(DigitalBrain.Abstractions.S
 static DigitalBrain.Abstractions.SynapseId.New() -> DigitalBrain.Abstractions.SynapseId
 static DigitalBrain.Abstractions.SynapseId.operator !=(DigitalBrain.Abstractions.SynapseId left, DigitalBrain.Abstractions.SynapseId right) -> bool
 static DigitalBrain.Abstractions.SynapseId.operator ==(DigitalBrain.Abstractions.SynapseId left, DigitalBrain.Abstractions.SynapseId right) -> bool
-static DigitalBrain.Abstractions.SynapseMetadata.ForBroadcast(DigitalBrain.Abstractions.NeuronId caller, DigitalBrain.Abstractions.SynapseMetadata? cause = null, System.TimeProvider? timeProvider = null) -> DigitalBrain.Abstractions.SynapseMetadata!
-static DigitalBrain.Abstractions.SynapseMetadata.ForReply(DigitalBrain.Abstractions.NeuronId caller, DigitalBrain.Abstractions.SynapseMetadata! cause, System.TimeProvider? timeProvider = null) -> DigitalBrain.Abstractions.SynapseMetadata!
-static DigitalBrain.Abstractions.SynapseMetadata.ForSend(DigitalBrain.Abstractions.NeuronId caller, DigitalBrain.Abstractions.NeuronId receiver, DigitalBrain.Abstractions.SynapseMetadata? cause = null, System.TimeProvider? timeProvider = null) -> DigitalBrain.Abstractions.SynapseMetadata!
-static DigitalBrain.Abstractions.SynapseMetadata.operator !=(DigitalBrain.Abstractions.SynapseMetadata? left, DigitalBrain.Abstractions.SynapseMetadata? right) -> bool
-static DigitalBrain.Abstractions.SynapseMetadata.operator ==(DigitalBrain.Abstractions.SynapseMetadata? left, DigitalBrain.Abstractions.SynapseMetadata? right) -> bool
 virtual DigitalBrain.Abstractions.Synapse.EqualityContract.get -> System.Type!
 virtual DigitalBrain.Abstractions.Synapse.Equals(DigitalBrain.Abstractions.Synapse? other) -> bool
 virtual DigitalBrain.Abstractions.Synapse.PrintMembers(System.Text.StringBuilder! builder) -> bool

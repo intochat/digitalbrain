@@ -37,8 +37,8 @@ public sealed class JournalCursorContracts
         Assert.Single(second.Delta);
         Assert.Equal(first.ResumeSequence + 1, second.ResumeSequence);
         Assert.NotEqual(
-            first.Delta.Single().Stamped.SynapseId,
-            second.Delta.Single().Stamped.SynapseId);
+            first.Delta.Single().SynapseId,
+            second.Delta.Single().SynapseId);
     }
 
     [Fact(DisplayName = "a stale journal cursor receives a full snapshot and a resume sequence")]
@@ -78,7 +78,7 @@ public sealed class JournalCursorContracts
 
         Assert.NotNull(reset.ResetSnapshot);
         Assert.Null(later.ResetSnapshot);
-        Assert.IsType<Pong>(Assert.Single(later.Delta));
+        Assert.IsType<Pong>(Assert.Single(later.Delta).Synapse);
         Assert.Equal(reset.ResumeSequence + 1, later.ResumeSequence);
     }
 

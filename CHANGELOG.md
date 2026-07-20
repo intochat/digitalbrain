@@ -13,9 +13,10 @@ depend on prereleases.
 
 - **Neurons.** `Neuron` is an Orleans journaled grain with dual durable journals — incoming and
   outgoing — typed identity, owner-bound authorization, and restart recovery.
-- **Synapses.** Immutable typed records carrying correlation and causation lineage stamped on every
-  hop. Neurons declare `IHandle<TSynapse>` and `IEmit<TSynapse>`; a source generator emits a dispatch
-  manifest whose completeness is proven without a cluster.
+- **Synapses.** Immutable typed fact records. The kernel wraps each one in a read-only delivery
+  envelope carrying identity, correlation and causation lineage, origin sequence and timestamp;
+  authors cannot construct that envelope. Neurons declare `IHandle<TSynapse>` and `IEmit<TSynapse>`;
+  a source generator emits a dispatch manifest whose completeness is proven without a cluster.
 - **The synapse fabric.** A durable outbox is the source of truth for delivery: at-least-once per
   registered subscriber, effectively-once processing through `SynapseId` dedupe, and a bounded retry
   horizon. Broadcast is owner-scoped through a journaled subscription registry that tolerates neuron
@@ -43,10 +44,17 @@ depend on prereleases.
 - **A journal is a bounded feed, not an unbounded log.** Each journal now keeps a delta log bounded
   by both record count and total bytes, a durable tally of how many of each synapse type it has
   recorded, and a monotonic sequence. Compaction evicts from the delta log only, so the tally and
-  the sequence survive it. Journal reads now take a cursor and return only later synapses; a cursor
-  overtaken by compaction receives the complete tally summary and a resume sequence instead of a
-  gap. Storage per neuron is bounded for the first time. The cost, stated plainly: the journal is no
-  longer an audit log.
+  the sequence survive it. Journal reads now take a cursor and return only later delivery envelopes;
+  a cursor overtaken by compaction receives the complete tally summary and a resume sequence instead
+  of a gap. Storage per neuron is bounded for the first time. The cost, stated plainly: the journal
+  is no longer an audit log.
+- **Delivery metadata moved off the payload.** `Synapse.Metadata`, `Synapse.Stamped`,
+  `SynapseMetadata` and `RoutingMode` are gone. A synapse is now exactly the record its author writes;
+  the kernel snapshots it into a kernel-owned `SynapseDelivery` envelope, which is the durable unit
+  carried by the outbox and journal entries. A journal entry keeps its feed-local cursor sequence
+  distinct from the envelope's origin sequence. Handlers receive their own snapshot, and neuron
+  activations reject Orleans interleaving modes, including interleaving grain timers, so one turn
+  cannot corrupt another turn's lineage or journal order.
 - **Dedupe is O(1).** Detecting a redelivered synapse was a linear scan of the whole incoming
   journal, deserialized on every delivery, making delivery O(n) per synapse and O(n²) over a
   neuron's lifetime. A neuron now keeps the last 4,096 handled `SynapseId`s in a bounded durable

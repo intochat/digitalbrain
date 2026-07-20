@@ -18,8 +18,10 @@ neuron still sees a truthful account of it after the delta log has evicted old e
 
 ## Synapse
 
-A synapse is an immutable typed message record. Every synapse carries metadata: a synapse id,
-correlation and causation lineage stamped on every hop, the caller, the receiver, and a timestamp.
+A synapse is an immutable typed fact record. Before it crosses a neuron boundary, the kernel snapshots
+it into a read-only delivery envelope carrying a synapse id, correlation and causation lineage, the
+caller, an origin sequence, and a timestamp. Receiver selection remains an outbox decision and is not
+fact metadata.
 
 A neuron declares `IHandle<TSynapse>` for what it consumes and `IEmit<TSynapse>` for what it
 produces. Those declarations live on the interface, so the wiring graph can be read without loading

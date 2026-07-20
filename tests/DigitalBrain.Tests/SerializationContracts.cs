@@ -14,12 +14,11 @@ public sealed class SerializationContracts
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             [nameof(Synapse)] = "db.synapse",
-            [nameof(SynapseMetadata)] = "db.synapse-metadata",
+            [nameof(SynapseDelivery)] = "db.synapse-delivery",
             [nameof(SynapseId)] = "db.synapse-id",
             [nameof(CorrelationId)] = "db.correlation-id",
             [nameof(NeuronId)] = "db.neuron-id",
             [nameof(OwnerId)] = "db.owner-id",
-            [nameof(RoutingMode)] = "db.routing-mode",
             [nameof(JournalKind)] = "db.journal-kind",
             [nameof(JournalRead)] = "db.journal-read",
             [nameof(JournalSnapshot)] = "db.journal-snapshot",
@@ -53,7 +52,7 @@ public sealed class SerializationContracts
     }
 
     [Fact]
-    public void SynapseCarriesMetadataAsItsOnlySerializedMember()
+    public void SynapseIsAThinRecordWithNoFrameworkPayloadMembers()
     {
         var serializedMembers = typeof(Synapse)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -61,16 +60,41 @@ public sealed class SerializationContracts
             .Select(property => property.Name)
             .ToList();
 
-        Assert.Equal([nameof(Synapse.Metadata)], serializedMembers);
+        Assert.Empty(serializedMembers);
     }
 
     [Fact]
-    public void UnstampedSynapseFailsLoudlyInsteadOfReturningEmptyLineage()
+    public void DeliveryEnvelopeCarriesMetadataOutsideTheSynapse()
     {
-        var unstamped = new SerializationProbe();
+        var serializedMembers = typeof(SynapseDelivery)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property => property.GetCustomAttribute<IdAttribute>() is not null)
+            .Select(property => property.Name)
+            .ToList();
 
-        Assert.Throws<InvalidOperationException>(() => unstamped.Stamped);
+        Assert.Equal(
+            [
+                nameof(SynapseDelivery.Synapse),
+                nameof(SynapseDelivery.SynapseId),
+                nameof(SynapseDelivery.CorrelationId),
+                nameof(SynapseDelivery.CausationId),
+                nameof(SynapseDelivery.Caller),
+                nameof(SynapseDelivery.Sequence),
+                nameof(SynapseDelivery.Timestamp),
+            ],
+            serializedMembers);
     }
 
-    private sealed record SerializationProbe : Synapse;
+    [Fact]
+    public void DeliveryEnvelopeHasNoPublicConstructorOrMetadataSetters()
+    {
+        Assert.Empty(typeof(SynapseDelivery).GetConstructors(BindingFlags.Public | BindingFlags.Instance));
+
+        var publicSetters = typeof(SynapseDelivery)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property => property.SetMethod?.IsPublic is true)
+            .Select(property => property.Name);
+
+        Assert.Empty(publicSetters);
+    }
 }

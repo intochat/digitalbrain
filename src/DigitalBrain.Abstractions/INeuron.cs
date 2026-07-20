@@ -4,7 +4,7 @@ namespace DigitalBrain.Abstractions;
 public interface INeuron : IGrainWithStringKey
 {
     [Alias("Deliver")]
-    Task DeliverAsync(Synapse synapse);
+    Task DeliverAsync(SynapseDelivery delivery);
 
     [Alias("ReadJournal")]
     Task<JournalRead> ReadJournalAsync(JournalKind kind, long afterSequence);

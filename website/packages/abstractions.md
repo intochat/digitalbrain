@@ -11,28 +11,40 @@ dragging either into the other.
 ## Synapses
 
 ```csharp
-public abstract record Synapse
+public abstract record Synapse;
+
+public sealed class SynapseDelivery
 {
-    public SynapseMetadata? Metadata { get; init; }
-    public SynapseMetadata Stamped { get; }
+    public Synapse Synapse { get; }
+    public SynapseId SynapseId { get; }
+    public CorrelationId CorrelationId { get; }
+    public SynapseId? CausationId { get; }
+    public NeuronId Caller { get; }
+    public long Sequence { get; }
+    public DateTimeOffset Timestamp { get; }
 }
 ```
 
-A synapse is an immutable record. `Metadata` is null until the fabric stamps it; `Stamped` is the
-non-null view for code that knows it is handling a delivered synapse. `SynapseMetadata` carries the
-identity and lineage of a message:
+A synapse is only the fact its author declared. The kernel takes a serialization-aware snapshot and
+wraps it in a `SynapseDelivery`, whose constructor is not public, before the fact can cross a neuron
+boundary. That snapshot keeps a later mutation of the author's object from changing either side of
+the rail. Handlers receive their own plain typed snapshot; journal readers receive the unchanged
+envelope so identity and lineage remain observable without polluting the payload:
 
 | Member | Meaning |
 | --- | --- |
+| `Synapse` | The plain typed fact |
 | `SynapseId` | Identity of this message, used for effectively-once processing |
 | `CorrelationId` | The conversation this message belongs to |
 | `CausationId` | The synapse that directly caused this one |
-| `Caller` / `Receiver` | Who sent it, and who it was addressed to |
-| `RoutingMode` | `PointToPoint` or `Broadcast` |
-| `Timestamp` | When it was stamped |
+| `Caller` | The neuron that emitted it |
+| `Sequence` | Its monotonic position in the caller's outgoing feed |
+| `Timestamp` | When the kernel created the delivery |
 
-`ForSend`, `ForReply` and `ForBroadcast` build metadata from a cause, which is how correlation survives
-a chain of neurons and how causation stays a tree rather than a guess.
+Receiver selection is an outbox decision, not recorded payload metadata. Sending, replying and
+broadcasting therefore share one envelope shape while correlation survives a chain of neurons and
+causation stays a tree rather than a guess. The envelope's `Sequence` belongs to its caller; a
+journal read's `ResumeSequence` is the receiving feed's independent cursor.
 
 ## Identity
 

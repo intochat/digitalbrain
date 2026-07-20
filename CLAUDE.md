@@ -171,8 +171,8 @@ Two guards fail the build by design, and that is correct:
 
 ## 7. Where things stand
 
-Phases 0, 1, 2.1, 2.2 and 2.3 are done. **Next is 2.4** to close Phase 2a green, then **2.5 — R-3,
-the owner boundary**, which gates everything client-facing.
+Phases 0, 1 and 2a are done. **Next is 2.5 — R-3, the owner boundary**, which gates everything
+client-facing.
 
 One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
 `ARCHITECTURE-REVIEW.md` §11 records the standard for settling it — a pre-committed numeric threshold

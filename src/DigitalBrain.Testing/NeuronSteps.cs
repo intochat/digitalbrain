@@ -60,7 +60,11 @@ public sealed class NeuronSteps(Simulation simulation)
                 $"The outgoing journal of {neuronType} '{name}' compacted before its answer payloads were asserted.");
         }
 
-        var answers = emitted.Delta.OfType<IAnswer>().Select(answer => answer.Text).ToList();
+        var answers = emitted.Delta
+            .Select(delivery => delivery.Synapse)
+            .OfType<IAnswer>()
+            .Select(answer => answer.Text)
+            .ToList();
 
         if (!answers.Contains(expected, StringComparer.Ordinal))
         {
@@ -97,7 +101,7 @@ public sealed class NeuronSteps(Simulation simulation)
         var expected = NeuronCatalog.SynapseType(synapseType);
         var occurrences = recorded.ResetSnapshot is { } reset
             ? reset.RecordedOf(expected.FullName!)
-            : recorded.Delta.Count(expected.IsInstanceOfType);
+            : recorded.Delta.Count(delivery => expected.IsInstanceOfType(delivery.Synapse));
 
         if (occurrences != 1)
         {
@@ -232,11 +236,11 @@ public sealed class NeuronSteps(Simulation simulation)
                 $"Expected the {kind} journal of {neuronType} '{name}' to contain {synapseType}, but its snapshot recorded no such synapse.");
         }
 
-        if (!journal.Delta.Any(expected.IsInstanceOfType))
+        if (!journal.Delta.Any(delivery => expected.IsInstanceOfType(delivery.Synapse)))
         {
             var recorded = journal.Delta.Count == 0
                 ? "nothing"
-                : string.Join(", ", journal.Delta.Select(synapse => synapse.GetType().Name));
+                : string.Join(", ", journal.Delta.Select(delivery => delivery.Synapse.GetType().Name));
 
             throw new SimulationAssertionException(
                 $"Expected the {kind} journal of {neuronType} '{name}' to contain {synapseType}, but it recorded {recorded}.");

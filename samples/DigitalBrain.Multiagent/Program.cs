@@ -32,11 +32,11 @@ var verdicts = await Settled(brain.Neuron(nameof(Scribe), "one"));
 
 Console.WriteLine(verdicts.Count == 0
     ? "the panel has not reached a verdict yet"
-    : $"the scribe recorded: {string.Join(" | ", verdicts.OfType<VerdictReached>().Select(verdict => verdict.Verdict))}");
+    : $"the scribe recorded: {string.Join(" | ", verdicts.Select(delivery => delivery.Synapse).OfType<VerdictReached>().Select(verdict => verdict.Verdict))}");
 
 await host.StopAsync();
 
-static async Task<IReadOnlyList<Synapse>> Settled(NeuronHandle neuron)
+static async Task<IReadOnlyList<SynapseDelivery>> Settled(NeuronHandle neuron)
 {
     long cursor = 0;
 
@@ -59,7 +59,7 @@ static async Task<IReadOnlyList<Synapse>> Settled(NeuronHandle neuron)
     return DeltaOrThrow(final);
 }
 
-static IReadOnlyList<Synapse> DeltaOrThrow(JournalRead journal)
+static IReadOnlyList<SynapseDelivery> DeltaOrThrow(JournalRead journal)
 {
     if (journal.ResetSnapshot is not null)
     {
