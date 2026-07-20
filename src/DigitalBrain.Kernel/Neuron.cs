@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using DigitalBrain.Abstractions;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
@@ -273,17 +272,15 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         await FireAsync(synapse, [.. receivers], correlation);
     }
 
-    protected async Task<string> AskModelAsync(ModelTier tier, string prompt, CancellationToken cancellationToken)
+    protected Task<string> AskModelAsync(ModelTier tier, string prompt, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
 
-        var model = ServiceProvider.GetKeyedService<IChatClient>(tier)
+        var models = ServiceProvider.GetService<IModelCompletionService>()
             ?? throw new InvalidOperationException(
-                $"{GetType().Name} asked for the {tier} model tier, but no model is bound to it. Tiers are bound in AppHost configuration.");
+                $"{GetType().Name} asked a model, but no {nameof(IModelCompletionService)} is registered. Add the AI module and bind tiers.");
 
-        var answer = await model.GetResponseAsync([new ChatMessage(ChatRole.User, prompt)], options: null, cancellationToken);
-
-        return answer.Text;
+        return models.CompleteAsync(tier, prompt, cancellationToken);
     }
 
     protected IGrainTimer RegisterGrainTimer(

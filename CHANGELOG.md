@@ -72,8 +72,6 @@ depend on prereleases.
   counts, not as records, so history older than the window cannot be read back.
 - Effectively-once processing holds within a window of the last 4,096 deliveries per neuron. A
   redelivery older than that window would be handled again.
-- The `Embedding` model tier cannot work. Every tier is registered as an `IChatClient`, and an
-  embedding model is an `IEmbeddingGenerator<string, Embedding<float>>`.
 - No per-identity feed yet: a client watches individual neurons, not one brain-scoped feed.
 - The client projection still delegates to Orleans' `AsClient()`, which would leak a credentialed
   provider connection string if the brain were configured with durable stores.

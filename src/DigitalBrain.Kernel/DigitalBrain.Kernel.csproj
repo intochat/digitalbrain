@@ -1,13 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>The DigitalBrain neuron runtime: journaled neurons, the durable synapse fabric, and AI model binding on Orleans.</Description>
+    <Description>The DigitalBrain neuron runtime: journaled neurons, the durable synapse fabric, on Orleans.</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Anthropic" />
-    <PackageReference Include="Microsoft.Extensions.AI" />
-    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
     <PackageReference Include="Microsoft.Orleans.Journaling.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Reminders" />

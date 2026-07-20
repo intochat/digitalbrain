@@ -1,6 +1,5 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.TestingHost;
@@ -60,10 +59,7 @@ public static class SimulationCluster
             silo.UseInMemoryReminderService();
             silo.Services.AddSingleton<IJournalStorageProvider>(journalStorage);
 
-            foreach (var (tier, model) in Models)
-            {
-                silo.Services.AddKeyedSingleton<IChatClient>(tier, model);
-            }
+            silo.Services.AddSingleton<IModelCompletionService, ScriptedModelCompletion>();
         });
 
         var cluster = builder.Build();

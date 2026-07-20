@@ -18,7 +18,7 @@ entirely, it is listed under [open debts](#open-debts) rather than quietly impli
 | Neuron kernel | done |
 | Durable synapse fabric | done |
 | Multi-silo delivery and recovery | done |
-| AI model binding | done, except the `Embedding` tier, which cannot work |
+| AI model binding | done — lives in `DigitalBrain.Modules.AI`, not the kernel |
 | Client package | done |
 | Aspire integration | done |
 | Hosts, dev tools, quickstart | done |
@@ -121,12 +121,6 @@ pretend to be is provided separately by the governance ledger, which is not buil
 older than that window would be handled a second time. This is a deliberate trade: the previous
 design remembered every synapse forever and paid a whole-journal scan on every delivery to do it.
 
-**The `Embedding` model tier cannot work.** Every declared tier is registered as an `IChatClient`. An
-embedding model is not an `IChatClient` but an `IEmbeddingGenerator<string, Embedding<float>>`, so
-the `Embedding` member of `ModelTier` binds to a client type that cannot serve it. It shipped
-documented but never exercised — `Embedding` appears exactly once in the codebase, in the enum that
-declares it — which is how it survived.
-
 ## Delivery ordering
 
 Directed sends are FIFO **per target** and at-least-once; handlers own idempotency through the
@@ -151,14 +145,7 @@ they still register on the durable per-owner registry at install.
 
 ## Proofs held red
 
-These proofs are written and checked in, and they fail. They assert the behaviour the foundation is
-meant to have, not the behaviour it has, so each one is excluded from the default run and turns green
-when the debt above it is paid. They are listed here because a proof that nobody runs is worth
-nothing unless its existence and its state are both public.
-
-| Proof | Asserts | Goes green when |
-| --- | --- | --- |
-| `the kernel assembly reaches no vendor model SDK` | `DigitalBrain.Kernel` has no transitive reference to Anthropic, OpenAI or `Microsoft.Extensions.AI` | AI becomes an ordinary module and leaves the kernel |
+None. Every written proof that is not explicit for a future phase runs in the default gate.
 
 ## Where this is going
 

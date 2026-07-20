@@ -7,5 +7,4 @@ public enum ModelTier
     Fast,
     Balanced,
     Reasoning,
-    Embedding,
 }

@@ -5,7 +5,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using OpenAI;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Modules.AI;
 
 public sealed record ModelDescriptor(ModelTier Tier, string Provider, string ModelId)
 {
@@ -70,15 +70,20 @@ public static class ModelBindingExtensions
     }
 }
 
-internal static class ProviderFactory
+public static class ProviderFactory
 {
-    internal static IChatClient Create(ModelDescriptor descriptor) => descriptor.Provider switch
+    public static IChatClient Create(ModelDescriptor descriptor)
     {
-        ModelDescriptor.OpenAiProvider => CreateOpenAi(descriptor),
-        ModelDescriptor.AnthropicProvider => CreateAnthropic(descriptor),
-        _ => throw new InvalidOperationException(
-            $"'{descriptor.Provider}' is not a known model provider. Declare {ModelDescriptor.OpenAiProvider} or {ModelDescriptor.AnthropicProvider}."),
-    };
+        ArgumentNullException.ThrowIfNull(descriptor);
+
+        return descriptor.Provider switch
+        {
+            ModelDescriptor.OpenAiProvider => CreateOpenAi(descriptor),
+            ModelDescriptor.AnthropicProvider => CreateAnthropic(descriptor),
+            _ => throw new InvalidOperationException(
+                $"'{descriptor.Provider}' is not a known model provider. Declare {ModelDescriptor.OpenAiProvider} or {ModelDescriptor.AnthropicProvider}."),
+        };
+    }
 
     private static IChatClient CreateOpenAi(ModelDescriptor descriptor)
     {

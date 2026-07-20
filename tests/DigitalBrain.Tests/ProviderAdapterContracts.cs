@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Kernel;
+using DigitalBrain.Modules.AI;
 using Xunit;
 
 namespace DigitalBrain.Tests;

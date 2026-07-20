@@ -81,7 +81,6 @@ DigitalBrain.Abstractions.JournalTally.SynapseType.init -> void
 DigitalBrain.Abstractions.ModelProviders
 DigitalBrain.Abstractions.ModelTier
 DigitalBrain.Abstractions.ModelTier.Balanced = 1 -> DigitalBrain.Abstractions.ModelTier
-DigitalBrain.Abstractions.ModelTier.Embedding = 3 -> DigitalBrain.Abstractions.ModelTier
 DigitalBrain.Abstractions.ModelTier.Fast = 0 -> DigitalBrain.Abstractions.ModelTier
 DigitalBrain.Abstractions.ModelTier.Reasoning = 2 -> DigitalBrain.Abstractions.ModelTier
 DigitalBrain.Abstractions.NeuronAuthorizationException
@@ -386,3 +385,5 @@ static DigitalBrain.Abstractions.ConnectionTokenExpired.operator ==(DigitalBrain
 virtual DigitalBrain.Abstractions.ConnectionHealth.EqualityContract.get -> System.Type!
 virtual DigitalBrain.Abstractions.ConnectionHealth.Equals(DigitalBrain.Abstractions.ConnectionHealth? other) -> bool
 virtual DigitalBrain.Abstractions.ConnectionHealth.PrintMembers(System.Text.StringBuilder! builder) -> bool
+DigitalBrain.Abstractions.IModelCompletionService
+DigitalBrain.Abstractions.IModelCompletionService.CompleteAsync(DigitalBrain.Abstractions.ModelTier tier, string! prompt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<string!>!

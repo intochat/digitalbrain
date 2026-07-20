@@ -12,7 +12,7 @@ public sealed class AssemblyBoundaryContracts
 {
     private static readonly string[] VendorModelSdks = ["Anthropic", "OpenAI", "Microsoft.Extensions.AI"];
 
-    [Fact(Explicit = true, DisplayName = "R-5 gate for Phase 3.5: the kernel assembly reaches no vendor model SDK")]
+    [Fact(DisplayName = "R-5 gate for Phase 3.5: the kernel assembly reaches no vendor model SDK")]
     public void TheKernelReachesNoVendorModelSdk()
     {
         var reachable = ReachableFrom(typeof(Neuron).Assembly);

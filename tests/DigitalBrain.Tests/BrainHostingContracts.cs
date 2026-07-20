@@ -2,7 +2,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Kernel;
+using DigitalBrain.Modules.AI;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 

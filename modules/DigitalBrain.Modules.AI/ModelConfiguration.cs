@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Modules.AI;
 
 public static class ModelConfiguration
 {
@@ -26,8 +26,10 @@ public static class ModelConfiguration
             });
     }
 
-    internal static IEnumerable<ModelDescriptor> Read(IConfiguration configuration)
+    public static IEnumerable<ModelDescriptor> Read(IConfiguration configuration)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+
         foreach (var bound in configuration.GetSection(SectionName).GetChildren())
         {
             var tier = bound["Tier"];

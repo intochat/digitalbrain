@@ -4,7 +4,6 @@ using DigitalBrain.DevTools;
 using DigitalBrain.Kernel;
 using DigitalBrain.ProbeHost;
 using DigitalBrain.Testing;
-using Microsoft.Extensions.AI;
 using Orleans;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,7 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 var scripted = new ScriptedModel();
 scripted.Answer("is the kernel awake?", "the kernel is awake");
 
-builder.Services.AddKeyedSingleton<IChatClient>(ModelTier.Balanced, scripted);
+builder.Services.AddSingleton<IModelCompletionService>(_ => new ProbeModelCompletion(scripted));
 builder.UseOrleans(silo => silo
     .AddDigitalBrain()
     .AddBroadcastHandlers(typeof(Recorder).Assembly)
@@ -78,3 +77,9 @@ app.MapGet("/probe/answers", async (IGrainFactory grains) =>
 app.Run();
 
 static BrainClient Brain(IGrainFactory grains) => new(grains, new OwnerId("hosted"));
+
+internal sealed class ProbeModelCompletion(ScriptedModel scripted) : IModelCompletionService
+{
+    public Task<string> CompleteAsync(ModelTier tier, string prompt, CancellationToken cancellationToken)
+        => Task.FromResult(scripted.Complete(prompt));
+}
