@@ -24,24 +24,20 @@ var brain = new BrainClient(host.Services.GetRequiredService<IGrainFactory>(), n
 
 await brain.FireAsync(nameof(Moderator), "chair", new QuestionAsked("should we ship it?"));
 
-var verdicts = await Settled(brain.Neuron(nameof(Moderator), "chair"), JournalKind.Outgoing);
-var verdict = verdicts.Select(delivery => delivery.Synapse).OfType<VerdictReached>().LastOrDefault();
+var emitted = await Settled(brain.Neuron(nameof(Moderator), "chair"), JournalKind.Outgoing);
+var verdictDelivery = emitted.LastOrDefault(delivery => delivery.Synapse is VerdictReached);
 
-if (verdict is null)
-{
-    Console.WriteLine("the panel has not reached a verdict yet");
-}
-else
-{
-    var scribe = NeuronId.BroadcastReceiver(nameof(Scribe), brain.Owner, verdicts
-        .Last(delivery => delivery.Synapse is VerdictReached)
-        .CorrelationId);
-    var recorded = await Settled(brain.Neuron(scribe.Type, scribe.Name), JournalKind.Incoming);
+IReadOnlyList<SynapseDelivery> recorded = [];
 
-    Console.WriteLine(recorded.Count == 0
-        ? "the panel has not reached a verdict yet"
-        : $"the scribe recorded: {string.Join(" | ", recorded.Select(delivery => delivery.Synapse).OfType<VerdictReached>().Select(entry => entry.Verdict))}");
+if (verdictDelivery is not null)
+{
+    var scribe = NeuronId.BroadcastReceiver(nameof(Scribe), brain.Owner, verdictDelivery.CorrelationId);
+    recorded = await Settled(brain.Neuron(scribe.Type, scribe.Name), JournalKind.Incoming);
 }
+
+Console.WriteLine(recorded.Count == 0
+    ? "the panel has not reached a verdict yet"
+    : $"the scribe recorded: {string.Join(" | ", recorded.Select(delivery => delivery.Synapse).OfType<VerdictReached>().Select(verdict => verdict.Verdict))}");
 
 await host.StopAsync();
 
