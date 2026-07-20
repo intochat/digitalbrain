@@ -167,7 +167,8 @@ watch verb are designed.*
 
 ## What is deliberately rejected
 
-Recorded so it is not silently reversed. Full reasoning is in `ARCHITECTURE-REVIEW.md` §12.
+Recorded so it is not silently reversed. The current decisions and deletion manifest are in
+`REFINED-ARCHITECTURE-AND-NEXT-STEPS.md`.
 
 | Rejected | Why |
 |---|---|

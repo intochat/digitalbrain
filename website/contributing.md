@@ -9,7 +9,7 @@ are the rules that keep the framework's promises checkable.
 
 [Architecture](/architecture) describes what is being built and marks each part as built or designed.
 `CLAUDE.md` in the repository is the canonical working discipline for agents and contributors alike,
-and `ARCHITECTURE-REVIEW.md` is the plan of record.
+and `REFINED-ARCHITECTURE-AND-NEXT-STEPS.md` is the plan of record.
 
 ## The gate
 

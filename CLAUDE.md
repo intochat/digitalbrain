@@ -23,13 +23,9 @@ The architecture in six lines:
   installs inside it as a behavior.
 - **Every install is a human-approved proposal**, journaled and reversible.
 
-`ARCHITECTURE-REVIEW.md` is the plan of record. **Read §3 (ratified decisions) and §9 (the ordered
-plan) before doing anything.** §14 lists this plan's own known defects and their resolutions —
-defects are kept with their answers, because a defect deleted without a recorded answer comes back.
-
-Do not re-litigate anything in §3. Do not silently discard it either: §1 exists because a prior plan
-inherited conclusions without re-deriving them, and that is the failure this repository is organised
-against. If a decision is wrong, say so and record the reversal.
+`REFINED-ARCHITECTURE-AND-NEXT-STEPS.md` is the plan of record. Read its ratified architecture,
+hard deletion manifest, and ordered implementation plan before changing framework code. Do not
+silently reverse its decisions. If evidence invalidates one, record the reversal in that file.
 
 ---
 
@@ -171,19 +167,18 @@ Two guards fail the build by design, and that is correct:
   claiming the slice is done.
 - **Commit at green boundaries** with the diff-grill answers in the message.
 - **Self-evolution is the product.** The only path to a live behaviour is a human-approved proposal
-  through the journaled rail. That rail is `ARCHITECTURE-REVIEW.md` §9 Phase 4 and it is not built
-  yet — until it is, changes arrive the ordinary way.
+  through the journaled rail. That rail is not built yet — until it is, changes arrive the ordinary
+  way.
 
 ---
 
 ## 7. Where things stand
 
-Phases 0, 1 and 2a are done. **Next is 2.5 — R-3, the owner boundary**, which gates everything
-client-facing.
+The durable neuron and synapse foundation is proven. Module composition and AI are undergoing the
+hard cut defined in `REFINED-ARCHITECTURE-AND-NEXT-STEPS.md`.
 
 One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
-`ARCHITECTURE-REVIEW.md` §11 records the standard for settling it — a pre-committed numeric threshold
-run against a real model — and the two corrections that standard needs, learned from a prior
-generation that scored its benchmark against a stub and shipped the interpreter anyway.
+The plan of record requires a pre-committed numeric threshold run against a real model, correcting a
+prior generation that scored its benchmark against a stub and shipped the interpreter anyway.
 
 Update this file through the same rail as everything else, and only when the loop actually improves.

@@ -88,8 +88,8 @@ wire identity of a call and no gate notices. It is inert while every caller is r
 repository in lockstep, and it becomes real the moment an external client is version-skewed from the
 silo — which is the external hosting mode of Phase 4.7 and the MCP edge of Phase 7.
 
-**Transport authentication is deferred, so identity is self-asserted.** DEC-11 defers authentication
-out of the framework: the product MCP edge is a thin client of the client API and owns no identity of
+**Transport authentication is deferred, so identity is self-asserted.** The product MCP edge is a
+thin client of the client API and owns no identity of
 its own. An actor (DEC-12) therefore names who acts, but nothing proves the claim. The consequence is
 stated rather than implied — the approval gate that refuses a self-approved behavior is a **safety**
 property, preventing accident, not a **security** property preventing attack. Three claims are
@@ -98,9 +98,9 @@ calls fail, that an invalid token fails, and that a wrong audience or origin is 
 deferral is revisited when DigitalBrain is exposed beyond a loopback single-operator stack, or when a
 second principal must be distrusted rather than merely distinguished.
 
-**No authenticated edge exists.** An imported MCP project was deleted unbuilt — it never compiled and
-no gate ever ran it, and `ARCHITECTURE-REVIEW.md` DEC-11 records why in detail. The thin edge is
-built at Phase 7.
+**No authenticated edge exists.** An imported MCP project was deleted unbuilt because it never
+compiled and no gate ever ran it. A thin MCP edge remains deferred until the typed client and
+approval rail exist.
 
 Until then the only way in is an Orleans cluster client, which the debt above already describes as a
 trusted peer — the probe host and both samples are exactly that. So this is not "no way in", it is
@@ -126,7 +126,7 @@ design remembered every synapse forever and paid a whole-journal scan on every d
 Directed sends are FIFO **per target** and at-least-once; handlers own idempotency through the
 windowed `SynapseId` dedupe set. There is no cross-target ordering: one unreachable receiver does not
 stall traffic to other receivers. A broadcast is the same isolation per listener — one failure does
-not fail the fact for the rest. The guarantee is DEC-13 in `ARCHITECTURE-REVIEW.md`.
+not fail the fact for the rest. This per-target guarantee is proven by the simulation suite.
 
 **Hosted proof is driven from inside the cluster.** An external Orleans client cannot complete a
 handshake through an Aspire-proxied gateway, because the silo advertises its own address. The hosted
@@ -165,7 +165,7 @@ Capability is the set of contracts packages a script compiles against, enforced 
 and every install is a human-approved proposal that is journaled and reversible.
 
 [Architecture](/architecture) describes the design and marks each part as built or designed.
-`ARCHITECTURE-REVIEW.md` in the repository is the plan of record.
+`REFINED-ARCHITECTURE-AND-NEXT-STEPS.md` in the repository is the plan of record.
 
 One assumption underneath it is **load-bearing and unmeasured**: that a language model can reliably
 emit these scripts. It is called out here rather than left implicit, because a prior generation in

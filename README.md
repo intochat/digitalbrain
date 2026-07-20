@@ -40,8 +40,8 @@ The v2 foundation is complete and unpublished. No packages are on NuGet. The scr
 above is **designed and not yet built** — see [website/status.md](website/status.md) for the milestone
 table, the gates, the open debts, and the proofs deliberately held red.
 
-`ARCHITECTURE-REVIEW.md` is the plan of record: §3 the ratified decisions, §9 the ordered plan, §14
-this plan's own known defects and their resolutions.
+[`REFINED-ARCHITECTURE-AND-NEXT-STEPS.md`](REFINED-ARCHITECTURE-AND-NEXT-STEPS.md) is the plan of
+record: current status, ratified architecture, hard deletion manifest, and ordered implementation.
 
 ## Repository shape
 
