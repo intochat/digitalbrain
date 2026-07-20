@@ -120,6 +120,13 @@ it and do not sweep it into your commit.
 finding counts — for example "changes a decision that is currently open", not "find valuable
 content". Without a rule they return summaries; with one they return findings.
 
+**Agent harness (Claude / Grok / Codex).** Capability inventory is `tools/harness/inventory.json`
+(IAW-aligned plugins + mattpocock). Portable skills live in `.agents/skills/`. Per-harness adapters:
+`.claude/settings.json`, `.grok/config.toml`, `.codex/config.toml`. Install/sync with
+`pwsh tools/harness/setup.ps1`; check declared capability presence with
+`pwsh tools/harness/verify.ps1`. This is an installation check, not a behavioural conformance
+suite. Codex will never get Claude LSP/hooks; those rows are explicit `unsupported`.
+
 ---
 
 ## 5. Gates

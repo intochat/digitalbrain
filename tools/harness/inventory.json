@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "description": "Declared harness capability inventory for Claude, Grok, and Codex. Verification checks configured presence, not behavioral equivalence.",
+  "capabilities": [
+    {
+      "id": "superpowers",
+      "iaw_plugin": "superpowers@claude-plugins-official",
+      "kind": ["skill", "hook"],
+      "portable_skills": [
+        "brainstorming",
+        "dispatching-parallel-agents",
+        "executing-plans",
+        "finishing-a-development-branch",
+        "receiving-code-review",
+        "requesting-code-review",
+        "subagent-driven-development",
+        "systematic-debugging",
+        "test-driven-development",
+        "using-git-worktrees",
+        "using-superpowers",
+        "verification-before-completion",
+        "writing-plans",
+        "writing-skills"
+      ],
+      "claude": { "mode": "plugin", "id": "superpowers@claude-plugins-official" },
+      "grok": { "mode": "plugin", "name": "superpowers", "install": "obra/superpowers" },
+      "codex": { "mode": "plugin", "id": "superpowers@openai-curated" }
+    },
+    {
+      "id": "frontend-design",
+      "iaw_plugin": "frontend-design@claude-plugins-official",
+      "kind": ["skill"],
+      "portable_skills": ["frontend-design"],
+      "claude": { "mode": "plugin", "id": "frontend-design@claude-plugins-official" },
+      "grok": { "mode": "skill", "path": ".agents/skills/frontend-design" },
+      "codex": { "mode": "skill", "path": ".agents/skills/frontend-design" }
+    },
+    {
+      "id": "code-review",
+      "iaw_plugin": "code-review@claude-plugins-official",
+      "kind": ["command"],
+      "portable_skills": ["pr-code-review"],
+      "notes": "Anthropic PR review command. Portable skill renamed pr-code-review to avoid collision with mattpocock code-review.",
+      "claude": { "mode": "plugin", "id": "code-review@claude-plugins-official" },
+      "grok": { "mode": "skill", "path": ".agents/skills/pr-code-review" },
+      "codex": { "mode": "skill", "path": ".agents/skills/pr-code-review" }
+    },
+    {
+      "id": "feature-dev",
+      "iaw_plugin": "feature-dev@claude-plugins-official",
+      "kind": ["command", "agent"],
+      "portable_skills": ["feature-dev", "code-architect", "code-explorer", "feature-dev-code-reviewer"],
+      "claude": { "mode": "plugin", "id": "feature-dev@claude-plugins-official" },
+      "grok": { "mode": "skill", "path": ".agents/skills/feature-dev" },
+      "codex": { "mode": "skill", "path": ".agents/skills/feature-dev" }
+    },
+    {
+      "id": "code-simplifier",
+      "iaw_plugin": "code-simplifier@claude-plugins-official",
+      "kind": ["agent"],
+      "portable_skills": ["code-simplifier"],
+      "claude": { "mode": "plugin", "id": "code-simplifier@claude-plugins-official" },
+      "grok": { "mode": "skill", "path": ".agents/skills/code-simplifier" },
+      "codex": { "mode": "skill", "path": ".agents/skills/code-simplifier" }
+    },
+    {
+      "id": "double-shot-latte",
+      "iaw_plugin": "double-shot-latte@superpowers-marketplace",
+      "kind": ["hook"],
+      "portable_skills": [],
+      "claude": { "mode": "plugin", "id": "double-shot-latte@superpowers-marketplace" },
+      "grok": { "mode": "plugin", "name": "double-shot-latte", "install": "obra/double-shot-latte" },
+      "codex": { "mode": "unsupported", "reason": "Claude/Grok hooks only; no Codex hook equivalent" }
+    },
+    {
+      "id": "ralph-loop",
+      "iaw_plugin": "ralph-loop@claude-plugins-official",
+      "kind": ["command", "hook"],
+      "portable_skills": ["ralph-loop"],
+      "claude": { "mode": "plugin", "id": "ralph-loop@claude-plugins-official" },
+      "grok": { "mode": "skill", "path": ".agents/skills/ralph-loop" },
+      "codex": { "mode": "skill", "path": ".agents/skills/ralph-loop" }
+    },
+    {
+      "id": "claude-md-management",
+      "iaw_plugin": "claude-md-management@claude-plugins-official",
+      "kind": ["skill", "command"],
+      "portable_skills": ["claude-md-improver", "revise-claude-md"],
+      "claude": { "mode": "plugin", "id": "claude-md-management@claude-plugins-official" },
+      "grok": { "mode": "skill", "path": ".agents/skills/claude-md-improver" },
+      "codex": { "mode": "skill", "path": ".agents/skills/claude-md-improver" }
+    },
+    {
+      "id": "pr-review-toolkit",
+      "iaw_plugin": "pr-review-toolkit@claude-plugins-official",
+      "kind": ["agent", "command"],
+      "portable_skills": [
+        "review-pr",
+        "pr-code-reviewer",
+        "pr-code-simplifier",
+        "comment-analyzer",
+        "pr-test-analyzer",
+        "silent-failure-hunter",
+        "type-design-analyzer"
+      ],
+      "claude": { "mode": "plugin", "id": "pr-review-toolkit@claude-plugins-official" },
+      "grok": { "mode": "skill", "path": ".agents/skills/review-pr" },
+      "codex": { "mode": "skill", "path": ".agents/skills/review-pr" }
+    },
+    {
+      "id": "commit-commands",
+      "iaw_plugin": "commit-commands@claude-plugins-official",
+      "kind": ["command"],
+      "portable_skills": ["commit", "commit-push-pr", "clean-gone"],
+      "claude": { "mode": "plugin", "id": "commit-commands@claude-plugins-official" },
+      "grok": { "mode": "skill", "path": ".agents/skills/commit" },
+      "codex": { "mode": "skill", "path": ".agents/skills/commit" }
+    },
+    {
+      "id": "hookify",
+      "iaw_plugin": "hookify@claude-plugins-official",
+      "kind": ["hook", "skill", "command"],
+      "portable_skills": ["writing-rules"],
+      "claude": { "mode": "plugin", "id": "hookify@claude-plugins-official" },
+      "grok": { "mode": "skill", "path": ".agents/skills/writing-rules" },
+      "codex": { "mode": "skill", "path": ".agents/skills/writing-rules" }
+    },
+    {
+      "id": "security-guidance",
+      "iaw_plugin": "security-guidance@claude-plugins-official",
+      "kind": ["hook"],
+      "portable_skills": [],
+      "claude": { "mode": "plugin", "id": "security-guidance@claude-plugins-official" },
+      "grok": { "mode": "plugin", "name": "security-guidance", "install": "local:claude-plugins-official/security-guidance" },
+      "codex": { "mode": "unsupported", "reason": "Security hooks are Claude/Grok only" }
+    },
+    {
+      "id": "episodic-memory",
+      "iaw_plugin": "episodic-memory@superpowers-marketplace",
+      "kind": ["skill", "hook", "agent"],
+      "portable_skills": ["remembering-conversations"],
+      "claude": { "mode": "plugin", "id": "episodic-memory@superpowers-marketplace" },
+      "grok": { "mode": "plugin", "name": "episodic-memory", "install": "obra/episodic-memory" },
+      "codex": { "mode": "skill", "path": ".agents/skills/remembering-conversations" }
+    },
+    {
+      "id": "csharp-lsp",
+      "iaw_plugin": "csharp-lsp@claude-plugins-official",
+      "kind": ["lsp"],
+      "portable_skills": [],
+      "claude": { "mode": "plugin", "id": "csharp-lsp@claude-plugins-official" },
+      "grok": { "mode": "unsupported", "reason": "LSP plugin is Claude-oriented; use compiler as oracle" },
+      "codex": { "mode": "unsupported", "reason": "No LSP plugin support; use compiler as oracle" }
+    },
+    {
+      "id": "typescript-lsp",
+      "iaw_plugin": "typescript-lsp@claude-plugins-official",
+      "kind": ["lsp"],
+      "portable_skills": [],
+      "claude": { "mode": "plugin", "id": "typescript-lsp@claude-plugins-official" },
+      "grok": { "mode": "unsupported", "reason": "LSP plugin is Claude-oriented" },
+      "codex": { "mode": "unsupported", "reason": "No LSP plugin support" }
+    },
+    {
+      "id": "mattpocock-skills",
+      "iaw_plugin": "mattpocock-skills@mattpocock",
+      "kind": ["skill"],
+      "portable_skills": [
+        "grill-me",
+        "grilling",
+        "grill-with-docs",
+        "setup-matt-pocock-skills",
+        "wayfinder",
+        "to-spec",
+        "to-tickets",
+        "tdd",
+        "implement",
+        "prototype",
+        "research",
+        "domain-modeling",
+        "codebase-design",
+        "code-review",
+        "diagnosing-bugs",
+        "triage",
+        "improve-codebase-architecture",
+        "ask-matt",
+        "resolving-merge-conflicts",
+        "handoff",
+        "teach",
+        "writing-great-skills"
+      ],
+      "claude": { "mode": "plugin", "id": "mattpocock-skills@mattpocock" },
+      "grok": { "mode": "plugin", "name": "mattpocock-skills", "install": "mattpocock/skills" },
+      "codex": { "mode": "skill", "path": ".agents/skills/grill-me" }
+    }
+  ]
+}

@@ -1,5 +1,21 @@
-# Project plugin enablement (mirrors .claude/settings.json → mattpocock-skills@mattpocock).
-# Install once per machine: grok plugin install mattpocock/skills --trust
+# Project plugin enablement for Grok.
+# Portable skills (shared with Codex/Claude) live in .agents/skills/
+# Install once: pwsh tools/harness/setup.ps1 -Harness grok
 
 [plugins]
-enabled = ["mattpocock-skills"]
+enabled = [
+    "superpowers",
+    "mattpocock-skills",
+    "double-shot-latte",
+    "episodic-memory",
+    "frontend-design",
+    "code-review",
+    "feature-dev",
+    "code-simplifier",
+    "ralph-loop",
+    "claude-md-management",
+    "pr-review-toolkit",
+    "commit-commands",
+    "hookify",
+    "security-guidance",
+]

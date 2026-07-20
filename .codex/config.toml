@@ -1,0 +1,28 @@
+# Project-scoped Codex config (loaded only when this repo is trusted).
+# Skills live in .agents/skills/ (shared across Codex / Grok / Claude).
+# Harness inventory + verify: tools/harness/
+# Secrets and auth stay in ~/.codex/config.toml — not here.
+
+# Mirror .mcp.json so Codex sessions pick up the same servers as other harnesses.
+[mcp_servers.codegraph]
+command = "gcf-proxy"
+args = ["npx", "-y", "@colbymchenry/codegraph", "serve", "--mcp"]
+startup_timeout_sec = 30.0
+tool_timeout_sec = 120.0
+
+[mcp_servers.aspire]
+command = "gcf-proxy"
+args = ["aspire", "agent", "mcp"]
+startup_timeout_sec = 20.0
+tool_timeout_sec = 120.0
+
+[mcp_servers.context7]
+command = "gcf-proxy"
+args = ["npx", "-y", "@upstash/context7-mcp@latest"]
+startup_timeout_sec = 30.0
+tool_timeout_sec = 90.0
+
+[mcp_servers.microsoft-learn]
+url = "https://learn.microsoft.com/api/mcp"
+startup_timeout_sec = 15.0
+tool_timeout_sec = 60.0

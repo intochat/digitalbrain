@@ -10,6 +10,7 @@ logs/
 .codegraph/
 .config/.codegraph-initialized
 .digitalbrain/
+.agents/
 .superpowers/
 .worktrees/
 sources/
