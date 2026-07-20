@@ -63,11 +63,19 @@ memory-backed stores, and it must be closed before a production deployment.
 interactive surface for talking to a brain.
 
 **An Orleans client is a trusted cluster peer.** The owner boundary is a correctness boundary, not an
-authentication boundary. Any process holding an `IGrainFactory` can address any grain directly,
-including another owner's, without going through `BrainClient`. The kernel's call filter constrains
-neuron-to-neuron and registry traffic, where the caller's identity is known and unforgeable; it cannot
-constrain a caller already inside the cluster's trust boundary. Authenticate users at the edge and
-never expose an Orleans client endpoint publicly.
+authentication boundary. The kernel's call filter constrains neuron-to-neuron and registry traffic,
+where the caller's identity is known and unforgeable; it cannot constrain a caller already inside the
+cluster's trust boundary. Authenticate users at the edge and never expose an Orleans client endpoint
+publicly — a hosted proof now asserts that the `orleans-gateway` and `orleans-silo` endpoints are
+host-allocated and never published outside the host.
+
+What changed is narrower than authentication and worth stating exactly. A client no longer reaches a
+neuron's state surface without naming an owner: an unattributed caller may invoke only an interface
+carrying `[ClientEntryPoint]`, which is `ISessionNeuron` and nothing else the framework ships, and
+that session refuses any subject outside its own owner. Everything else — `INeuron`, the subscription
+registry, and every capability interface a module will declare — is closed by default. But the owner
+a client names is still the owner it chose at `BrainClient` construction, so the boundary keeps a
+caller inside the owner it stated; it does not establish that the statement is true.
 
 **Method aliases are part of the wire contract and nothing pins them.** `PinnedAliasesNeverChange`
 asserts an exact map of **type** aliases, so renaming `db.session` fails the build. Orleans also

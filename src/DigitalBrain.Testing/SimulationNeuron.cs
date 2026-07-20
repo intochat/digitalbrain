@@ -4,6 +4,7 @@ using DigitalBrain.Kernel;
 namespace DigitalBrain.Testing;
 
 [Alias("db.testing.simulation")]
+[ClientEntryPoint]
 public interface ISimulationNeuron : INeuron
 {
     [Alias("Stimulate")]

@@ -11,6 +11,11 @@ Scenario: a neuron cannot subscribe itself into another owner's registry
     When the Echo neuron named "listener" subscribes to Ping in owner "tenant-e"'s registry
     Then the synapse is refused as unauthorized
 
+Scenario: a registry refuses to enrol a neuron belonging to another owner
+    Given a brain for owner "tenant-f"
+    When the Echo neuron named "outsider" owned by "tenant-g" is refused subscription to Ping in this brain's registry
+    Then the synapse is refused as unauthorized
+
 Scenario: a neuron accepts a synapse from its own owner
     Given a brain for owner "tenant-c"
     When Ping is sent to the Echo neuron named "shared"

@@ -22,6 +22,7 @@ DigitalBrain.Testing.NeuronSteps.ThenTheSubscriberCountHasGrownBy(string! synaps
 DigitalBrain.Testing.NeuronSteps.ThenTheSynapseIsRefusedAsUnauthorized() -> void
 DigitalBrain.Testing.NeuronSteps.ThenTheSynapseIsRefusedAsUnscripted() -> void
 DigitalBrain.Testing.NeuronSteps.ThenTheTwoNeuronsAreOnDifferentSilos(string! firstType, string! firstName, string! secondType, string! secondName) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.NeuronSteps.WhenAForeignNeuronIsRefusedSubscription(string! neuronType, string! name, string! subscriberOwner, string! synapseType) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenANeuronSubscribesInAnotherOwnersRegistry(string! neuronType, string! name, string! synapseType, string! registryOwner) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenARawClientIsRefusedCountingSubscribers(string! synapseType, string! registryOwner) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.WhenARawClientIsRefusedReading(string! journal, string! neuronType, string! name, string! targetOwner) -> System.Threading.Tasks.Task!
@@ -67,6 +68,7 @@ DigitalBrain.Testing.Simulation.SendTwiceAsync(string! synapseTypeName, string! 
 DigitalBrain.Testing.Simulation.SessionReadOfForeignOwnerExpectingRefusalAsync(DigitalBrain.Abstractions.JournalKind kind, string! neuronType, string! name, string! targetOwner) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.SettleAsync(DigitalBrain.Abstractions.JournalKind kind, string! neuronType, string! name) -> System.Threading.Tasks.Task<int>!
 DigitalBrain.Testing.Simulation.Simulation() -> void
+DigitalBrain.Testing.Simulation.SubscribeForeignNeuronExpectingRefusalAsync(string! neuronType, string! name, string! synapseTypeName, string! subscriberOwner) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.SubscribeInOwnerExpectingRefusalAsync(string! neuronType, string! name, string! synapseTypeName, string! registryOwner) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.SubscriberCountAsync(string! synapseTypeName) -> System.Threading.Tasks.Task<int>!
 DigitalBrain.Testing.SimulationAssertionException

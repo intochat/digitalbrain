@@ -1,4 +1,6 @@
 #nullable enable
+DigitalBrain.Abstractions.ClientEntryPointAttribute
+DigitalBrain.Abstractions.ClientEntryPointAttribute.ClientEntryPointAttribute() -> void
 DigitalBrain.Abstractions.CorrelationId
 DigitalBrain.Abstractions.CorrelationId.CorrelationId() -> void
 DigitalBrain.Abstractions.CorrelationId.CorrelationId(System.Guid Value) -> void

@@ -38,6 +38,10 @@ public sealed class NeuronSteps(Simulation simulation)
     public async Task ThenTheClientReadsItsOwnSessionJournal(string journal)
         => _ = await simulation.ClientReadSessionJournalAsync(Enum.Parse<JournalKind>(journal, ignoreCase: true));
 
+    [When("the {word} neuron named {string} owned by {string} is refused subscription to {word} in this brain's registry")]
+    public Task WhenAForeignNeuronIsRefusedSubscription(string neuronType, string name, string subscriberOwner, string synapseType)
+        => simulation.SubscribeForeignNeuronExpectingRefusalAsync(neuronType, name, synapseType, subscriberOwner);
+
     [When("the session is refused reading the {word} journal of the {word} neuron named {string} owned by {string}")]
     public Task WhenTheSessionIsRefusedReadingAcrossOwners(string journal, string neuronType, string name, string targetOwner)
         => simulation.SessionReadOfForeignOwnerExpectingRefusalAsync(

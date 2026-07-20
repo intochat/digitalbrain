@@ -195,6 +195,12 @@ public sealed class Simulation
             NeuronNamed(neuronType, name),
             new OwnerId(registryOwner)));
 
+    public Task SubscribeForeignNeuronExpectingRefusalAsync(string neuronType, string name, string synapseTypeName, string subscriberOwner)
+        => CaptureRefusalAsync(() => Driver().SubscribeAsync(
+            NeuronCatalog.SynapseType(synapseTypeName).FullName!,
+            new NeuronId(neuronType, new OwnerId(subscriberOwner), name),
+            Owner));
+
     public Task<int> SubscriberCountAsync(string synapseTypeName)
         => Driver().SubscriberCountAsync(NeuronCatalog.SynapseType(synapseTypeName).FullName!);
 

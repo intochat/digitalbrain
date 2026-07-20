@@ -1,3 +1,4 @@
+using System.Reflection;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Kernel;
@@ -10,16 +11,16 @@ internal sealed class OwnerBoundCallFilter : IIncomingGrainCallFilter
 
         if (OwnerOf(context.SourceId) is not { } caller)
         {
-            if (context.InterfaceMethod?.DeclaringType == typeof(INeuron))
-            {
-                throw new NeuronAuthorizationException(
-                    $"'{context.InterfaceMethod.Name}' names no owner, so an unattributed caller cannot be authorized to reach '{context.Grain}'. Reach a neuron through a session of the owner you are acting as.");
-            }
-
             if (context.Grain is SubscriptionRegistry unattributedRegistry)
             {
                 throw new NeuronAuthorizationException(
                     $"The subscription registry of owner '{unattributedRegistry.Owner}' cannot be reached by an unattributed caller.");
+            }
+
+            if (context.Grain is Neuron unattributedTarget && !IsClientEntryPoint(context.InterfaceMethod))
+            {
+                throw new NeuronAuthorizationException(
+                    $"'{context.InterfaceMethod?.Name}' is not a client entry point, so an unattributed caller cannot be authorized to reach '{unattributedTarget.Id}'. Reach a neuron through a session of the owner you are acting as.");
             }
         }
         else
@@ -39,6 +40,9 @@ internal sealed class OwnerBoundCallFilter : IIncomingGrainCallFilter
 
         return context.Invoke();
     }
+
+    private static bool IsClientEntryPoint(MethodInfo? method)
+        => method?.DeclaringType?.GetCustomAttribute<ClientEntryPointAttribute>() is not null;
 
     private static OwnerId? OwnerOf(GrainId? source)
     {

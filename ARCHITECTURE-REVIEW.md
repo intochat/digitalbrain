@@ -1728,6 +1728,22 @@ authentic. What it makes is a claim **mandatory and consistent**:
 So a caller must **state** an owner and cannot reach outside the one it stated. It may still state a
 false one, and that is DEC-11's accepted cost, disclosed in `website/status.md`.
 
+**Client reachability is default-closed, by attribute.** The first implementation refused unattributed
+calls to methods declared on `INeuron` — a denylist of two methods. Adversarial review broke it with
+an executable probe: `ISimulationNeuron.StimulateAsync` is declared on a *derived* interface, so an
+unattributed caller drove another owner's neuron and laundered a registry read around the guard added
+in the same change. The attributed branch was grain-shaped and total; the unattributed branch was
+method-shaped and partial.
+
+An interface is now reachable by an unattributed caller only when it carries `[ClientEntryPoint]`.
+`ISessionNeuron` carries it; `ISimulationNeuron` carries it because a test driver is one; `INeuron`
+does not, so the state surface is closed. **This matters most for Phase 4:** every capability
+interface resolved by `Get<T>()` would otherwise have been reachable by default the moment it was
+declared. Default-closed means a new contract is unreachable until someone writes the attribute,
+which is a decision rather than an oversight. `ClientEntryPointContracts` pins both halves — that an
+unmarked derived interface is refused, and that `ISessionNeuron` is the only marked contract the
+framework ships.
+
 **Two claim defects were caught by adversarial review and are recorded rather than quietly fixed,
 because §1 exists for this failure.** The first draft of this amendment asserted that reading across
 owners is *"not expressible through the client at all."* That is false — `new BrainClient(grains,
