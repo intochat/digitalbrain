@@ -1,6 +1,6 @@
 # DigitalBrain
 
-DigitalBrain is an open-source .NET framework for durable agents, built on Orleans and Aspire. Its
+DigitalBrain is an open-source .NET framework for durable agents on Orleans and Aspire. Its
 paradigm is **neurons, synapses, and simulations**: neurons are durable Orleans-journaled agents,
 synapses are typed messages with full lineage, and simulations fire synapses into a real in-process
 cluster and assert on the timeline.
@@ -10,25 +10,25 @@ What it is being built toward:
 > **A brain you program by writing ordinary C#, and that can program itself.**
 
 ```csharp
-var brain = DigitalBrainClient.Connect();
-var gpt   = brain.Get<IGpt56>();
-
-await brain.On<NewMail>(async mail =>
-{
-    var verdict = await gpt.AskAsync($"Is this urgent? {mail.Body}");
-    if (verdict.IsUrgent) await brain.Emit(new Escalation(mail.From));
-});
+var brain = DigitalBrainClient.Connect(grains, "acme");
+await brain.SendAsync<IAnalyst>(
+    "incident-42",
+    new SummaryRequested("Summarize the incident."));
 ```
 
-That file is both a script you run against a cluster and a behavior you install inside one. See
-[website/architecture.md](website/architecture.md) for the design and what is built versus designed.
+The owner-bound client enters through a session; neurons call typed capabilities such as `ILlama32`
+inside the brain. The same vocabulary will later support approved C# behaviors generated from
+natural language. See [website/architecture.md](website/architecture.md) for what is built versus
+designed.
 
 ## The shape of it
 
 - **A synapse is a fact** — a thin record, broadcast, no reply. **An interface method is a request** —
   directed at a capability, and it replies. Both are journaled; neither is privileged.
-- **Modules own vocabulary** — synapse records and neuron interfaces. Compile-time, because Orleans
-  freezes its grain type manifest at silo startup. Adding a noun needs a rebuild.
+- **Modules own their domain** — contracts, neurons, dependencies, authentication, and Aspire
+  resources. Kernel stays domain-neutral.
+- **Namespaces and type names are architecture** — `DigitalBrain.AI.Ollama.ILlama32` is identity,
+  not a lookup result from a model descriptor.
 - **Behaviors own logic** — single-file C# scripts carried as durable state by one registered grain
   type. Adding a verb needs only approval.
 - **Capability is the contracts package a script compiles against**, enforced where it resolves one.
@@ -36,9 +36,9 @@ That file is both a script you run against a cluster and a behavior you install 
 
 ## Status
 
-The v2 foundation is complete and unpublished. No packages are on NuGet. The scripting rail described
-above is **designed and not yet built** — see [website/status.md](website/status.md) for the milestone
-table, the gates, the open debts, and the proofs deliberately held red.
+The durable foundation, generated module activation, typed AI neurons, and AI-owned Aspire integration
+are built and unpublished. Agent/group-chat implementations, semantic discovery, integration modules,
+and the scripting rail are not built. See [website/status.md](website/status.md).
 
 [`REFINED-ARCHITECTURE-AND-NEXT-STEPS.md`](REFINED-ARCHITECTURE-AND-NEXT-STEPS.md) is the plan of
 record: current status, ratified architecture, hard deletion manifest, and ordered implementation.
@@ -46,7 +46,8 @@ record: current status, ratified architecture, hard deletion manifest, and order
 ## Repository shape
 
 ```text
-src/       framework packages (Abstractions, Kernel, Client, Testing, Aspire, Aspire.Hosting, DevTools)
+src/       domain-neutral framework packages
+modules/   independently shipped domains, beginning with AI
 hosts/     runnable silo, AppHost, and the test-only probe hosts
 samples/   package-only consumers proven against an empty package cache
 tests/     contract tests, simulations, hosted proof

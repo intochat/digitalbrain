@@ -106,9 +106,10 @@ Every version is pinned exactly in `Directory.Packages.props`. No floating range
 
 ## The security boundary
 
-Provider SDKs and credentials live **only** in `DigitalBrain.Kernel`. `DigitalBrain.Abstractions`,
-`.Client`, `.Testing` and `.Aspire` must never reference them. `eng/pack.ps1` verifies this against the
-produced `.nupkg` files, not the project files, because the artifact is what ships.
+Provider SDKs live only in their owning runtime module. Today that is
+`DigitalBrain.Modules.AI`; its Aspire provider integrations live in
+`DigitalBrain.Modules.AI.Aspire.Hosting`. Kernel, AI Contracts, and every consumer-path package must
+remain provider-free. `eng/pack.ps1` verifies the produced artifacts, not only project files.
 
 An API key must never appear in the repository, in a test, in a sample, or in a publish manifest.
 

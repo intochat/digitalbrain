@@ -12,6 +12,7 @@ const read = (...segments) => readFileSync(join(repositoryRoot, ...segments), 'u
 
 const packagePages = [
   'metapackage', 'abstractions', 'kernel', 'client', 'testing', 'aspire', 'aspire-hosting', 'devtools',
+  'ai-contracts', 'ai', 'ai-aspire-hosting',
 ]
 
 const contentPages = [
@@ -86,7 +87,7 @@ test('concepts define the three primitives and the scope fence', () => {
   assert.match(concepts, /IEmit<TSynapse>/)
   assert.match(concepts, /journaled grain/)
   assert.match(concepts, /correlation and causation lineage/)
-  assert.match(concepts, /dev-only package/)
+  assert.match(concepts, /dev-only/)
   assert.match(concepts, /out of scope/)
 })
 
@@ -95,7 +96,7 @@ test('the architecture page separates what is built from what is designed', () =
 
   assert.match(architecture, /designed and not yet built/)
   assert.match(architecture, /Modules own vocabulary|Vocabulary — synapse records/)
-  assert.match(architecture, /Behaviors own logic|Logic over existing vocabulary/)
+  assert.match(architecture, /Runtime behavior installation is designed and not yet built/)
   assert.match(architecture, /human-approved proposal/)
 
   const sections = architecture.split(/^## /m).slice(1)
@@ -117,8 +118,11 @@ test('the quickstart matches the sample that CI actually runs', () => {
     assert.ok(quickstart.includes(call), `the quickstart must document ${call}`)
   }
 
-  assert.ok(neurons.includes('IHandle<Hello>'), 'the sample neuron must still handle Hello')
-  assert.ok(quickstart.includes('IHandle<Hello>'), 'the quickstart must show the real neuron')
+  assert.ok(neurons.includes('interface IGreeter'), 'the sample must expose a typed neuron contract')
+  assert.ok(neurons.includes('record SayHello'), 'the sample must declare its incoming synapse')
+  assert.ok(program.includes('SendAsync<IGreeter>'), 'the sample must use the owner-bound client entry point')
+  assert.ok(quickstart.includes('interface IGreeter'), 'the quickstart must show the real contract')
+  assert.ok(quickstart.includes('SendAsync<IGreeter>'), 'the quickstart must show the real client call')
   assert.match(quickstart, /samples\/DigitalBrain\.Quickstart/)
 })
 
@@ -142,9 +146,11 @@ test('every shipped package has a page, and the boundary is stated', () => {
     assert.ok(index.includes(`/packages/${page}`), `the package index must link ${page}`)
   }
 
-  assert.match(index, /only in `DigitalBrain\.Kernel`/)
+  assert.match(index, /Provider SDKs live only in `DigitalBrain\.Modules\.AI`/)
   assert.match(read('website', 'packages', 'metapackage.md'), /does \*\*not\*\* reference \[`DigitalBrain\.Kernel`\]/)
   assert.match(read('website', 'packages', 'kernel.md'), /refuses to start/i)
+  assert.match(read('website', 'packages', 'ai.md'), /namespace and type name are the model identity/i)
+  assert.match(read('website', 'packages', 'ai-aspire-hosting.md'), /openai-api-key/)
 })
 
 test('the contributing guide states the gate and the non-negotiable rules', () => {
@@ -164,7 +170,7 @@ test('status stays truthful about the rebuild', () => {
   assert.match(status, /ground-up rebuild/)
   assert.match(status, /No packages are published/)
   assert.match(status, /dotnet test \.\\DigitalBrain\.slnx -c Release/)
-  assert.match(status, /npm run build/)
+  assert.match(status, /node --test tests\/\*\.test\.mjs/)
 })
 
 test('the open debts are disclosed rather than buried', () => {
@@ -174,12 +180,12 @@ test('the open debts are disclosed rather than buried', () => {
   assert.match(status, /AsClient/)
   assert.match(status, /DevUI/)
   assert.match(status, /trusted cluster peer/)
-  assert.match(status, /history is lost/)
-  assert.match(status, /Effectively-once processing is windowed/)
+  assert.match(status, /Journal history is bounded/)
+  assert.match(status, /Effectively-once processing is also windowed/)
   assert.match(status, /Broadcast addressing/)
   assert.match(status, /handler \*\*types\*\*/)
   assert.match(status, /Delivery ordering/)
-  assert.match(status, /FIFO \*\*per target\*\*/)
+  assert.match(status, /FIFO per target/)
 
   const changelog = read('CHANGELOG.md')
   assert.match(changelog, /Known limitations/)
@@ -191,9 +197,22 @@ test('the open debts are disclosed rather than buried', () => {
 
 test('no page resurrects rejected v1 vocabulary', () => {
   const v1Identifiers = /INeuronKind|INeuronContract|NeuronGrain|NeuronProxy|\bBrain\.slnx|neuron_invoke/
+  const rejectedArchitecture = new RegExp([
+    'Model' + 'Tier',
+    'Model' + 'Providers',
+    'IModel' + 'CompletionService',
+    'Ask' + 'ModelAsync',
+    'With' + 'Model\\(',
+    'AddAI' + 'Module',
+    'AddDigitalBrain' + 'Models',
+    'ChatModel' + 'Neuron',
+    'Scripted' + 'Model',
+    '\\bBrain' + 'Client\\b',
+  ].join('|'))
 
   for (const page of contentPages) {
     assert.doesNotMatch(read('website', page), v1Identifiers, `${page} must not mention v1 identifiers`)
+    assert.doesNotMatch(read('website', page), rejectedArchitecture, `${page} must not teach the rejected architecture`)
   }
   assert.doesNotMatch(read('website', '.vitepress', 'config.mts'), v1Identifiers)
   assert.doesNotMatch(read('README.md'), v1Identifiers)
@@ -204,7 +223,7 @@ test('the repository README points at the v2 gate and story', () => {
 
   assert.match(readme, /neurons,\s+synapses, and simulations/i)
   assert.match(readme, /DigitalBrain\.slnx/)
-  assert.doesNotMatch(readme, /kernel\/|modules\/|edge\/|workspace\//)
+  assert.doesNotMatch(readme, /kernel\/|edge\/|workspace\//)
 })
 
 test('generated VitePress, npm and specification output stays out of git', () => {

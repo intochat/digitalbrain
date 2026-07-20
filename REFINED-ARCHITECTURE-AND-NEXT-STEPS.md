@@ -26,26 +26,31 @@
 
 ## 1. Honest status on 2026-07-20
 
-The repository starts this migration at commit `f5ae864651c8d37edbbf2827d893d8e6eac05219`.
+The hard cut started at commit `f5ae864651c8d37edbbf2827d893d8e6eac05219`. The durable slices
+through authoritative AppHost activation and duplicate-client removal are committed on `master`.
 
-Fresh baseline evidence:
+Fresh completion evidence:
 
 ```text
-DigitalBrain.Tests:       111 passed
-DigitalBrain.Simulations:  52 passed
-DigitalBrain.HostTests:     7 passed
-Total:                    170 passed, 0 failed, 0 skipped
+DigitalBrain.Tests:       125 passed
+DigitalBrain.Simulations:  50 passed
+DigitalBrain.HostTests:     5 passed
+Website contracts:         16 passed
+NuGet packages/symbols:    11 / 11 packed
+Package-only samples:       2 restored, built, and ran from an empty cache
+Dependency hygiene:         no vulnerable, deprecated, or floating dependencies
 ```
 
-Passing tests do not mean the product vision is complete.
+Passing foundation tests do not mean the product vision is complete.
 
 | Area | Status | Evidence |
 |---|---:|---|
 | Durable neuron and synapse kernel | About 80% | Journals, bounded dedupe, owner checks, broadcast delivery, observation, and host restart tests exist |
-| Approved framework architecture | About 40–45% | Kernel is useful, but module and AI work is provisional and contradictory |
-| Typed AI module | About 10% | AI packages exist, but calls still route through tiers and Kernel |
-| Module-owned Aspire integration | 0% | Current hosting owns `WithModel(ModelTier, provider, modelId, key)` |
-| Generated module activation | 0% | Silo manually calls `AddModule<AIModule>()`, `AddAIModule()`, and `AddDigitalBrainModels()` |
+| Approved framework architecture | About 65–70% | Kernel/module boundaries, typed AI, and hosting composition now match the ratified design |
+| Typed AI module | About 60% | `ILLM`, `Llama32`, and `Gpt56` exist; agent and group-chat implementations do not |
+| Module-owned Aspire integration | Built for AI | AI owns Ollama/OpenAI resources, models, parameters, and silo projection |
+| Generated module activation | Built | AppHost selection is validated against the generated silo catalog |
+| Owner-bound client entry | Built | `DigitalBrainClient` sends and emits through the session; it exposes no raw neuron proxies |
 | Natural-language-to-typed catalog | 0% | No canonical generated neuron catalog or semantic index exists |
 | Script → proposal → approval → install → rollback | 0% end to end | Client surface is provisional; installation and governance rail do not exist |
 
@@ -342,11 +347,11 @@ Git history is the archive. Contradictory live plans are not documentation.
 - Consumes: compiled framework assemblies and the repository project graph
 - Produces: an executable deletion gate for forbidden types, methods, package references, and registration names
 
-- [ ] Write a test asserting Kernel exposes no method containing `Model`, no framework assembly defines `ModelTier`, and Kernel reaches no AI SDK.
-- [ ] Write a repository search test rejecting the exact legacy identifiers in production `.cs` and `.csproj` files.
-- [ ] Run `dotnet test tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj`; verify it fails against the existing tier architecture.
-- [ ] Perform the deletion slice.
-- [ ] Run the owning tests and the root gate.
+- [x] Write a test asserting Kernel exposes no method containing `Model`, no framework assembly defines `ModelTier`, and Kernel reaches no AI SDK.
+- [x] Write a repository search test rejecting the exact legacy identifiers in production `.cs` and `.csproj` files.
+- [x] Run `dotnet test tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj`; verify it fails against the existing tier architecture.
+- [x] Perform the deletion slice.
+- [x] Run the owning tests and the root gate.
 
 ### Task 2: Replace the provisional module descriptor
 
@@ -364,13 +369,13 @@ Git history is the archive. Contradictory live plans are not documentation.
 - Consumes: canonical `IModule` marker types and referenced assemblies at compilation
 - Produces: generated `AddDigitalBrain()` composition with the available module catalog
 
-- [ ] Write a generated-catalog test proving the test assembly sees `AIModule` from its project reference.
-- [ ] Verify the test fails because no generated module catalog exists.
-- [ ] Reduce `IModule` to a marker.
-- [ ] Generate the `AddDigitalBrain()` extension in the consuming compilation.
-- [ ] Move Kernel’s fixed runtime setup behind the generated extension.
-- [ ] Validate AppHost-selected module names against generated available module names at startup.
-- [ ] Run generator tests, the owning test project, and the root gate.
+- [x] Write a generated-catalog test proving the test assembly sees `AIModule` from its project reference.
+- [x] Verify the test fails because no generated module catalog exists.
+- [x] Reduce `IModule` to a marker.
+- [x] Generate the `AddDigitalBrain()` extension in the consuming compilation.
+- [x] Move Kernel’s fixed runtime setup behind the generated extension.
+- [x] Validate AppHost-selected module names against generated available module names at startup.
+- [x] Run generator tests, the owning test project, and the root gate.
 
 ### Task 3: Build typed AI contracts and runtime
 
@@ -396,12 +401,12 @@ Git history is the archive. Contradictory live plans are not documentation.
 - Consumes: `INeuron`, Kernel `Neuron`, and provider `IChatClient` implementations
 - Produces: `ILLM`, `ILlama32`, `IGpt56`, `IAgent`, `IGroupChat`, `LLM`, and `[Llm<TModel>]`
 
-- [ ] Write a test that constructs `Llama32` from an `IChatClient` keyed by `typeof(Llama32)`.
-- [ ] Verify it fails because the typed model and key attribute do not exist.
-- [ ] Implement the contracts and base `LLM`.
-- [ ] Implement convention-driven OpenAI and Ollama client registration keyed by the concrete model type.
-- [ ] Add an architecture test rejecting `IChatClient` constructor injection outside concrete `LLM` subclasses.
-- [ ] Run AI tests, package guards, and the root gate.
+- [x] Write a test that constructs `Llama32` from an `IChatClient` keyed by `typeof(Llama32)`.
+- [x] Verify it fails because the typed model and key attribute do not exist.
+- [x] Implement the contracts and base `LLM`.
+- [x] Implement convention-driven OpenAI and Ollama client registration keyed by the concrete model type.
+- [x] Add an architecture test rejecting `IChatClient` constructor injection outside concrete `LLM` subclasses.
+- [x] Run AI tests, package guards, and the root gate.
 
 ### Task 4: Give AI its own Aspire hosting package
 
@@ -418,16 +423,16 @@ Git history is the archive. Contradictory live plans are not documentation.
 
 **Interfaces:**
 
-- Consumes: `BrainService`, `BrainModuleBuilder<AIModule>`, concrete model types, Aspire OpenAI, and Aspire Ollama resources
+- Consumes: `BrainService`, `AIModule`, concrete model types, Aspire OpenAI, and Aspire Ollama resources
 - Produces: `brain.AddModule<AIModule>(ai => ai.WithLlm<TModel>())`
 
-- [ ] Write AppHost model tests for one module declaration, duplicate rejection, shared OpenAI parameter, Markdown description, and no Ollama secret.
-- [ ] Verify those tests fail against `WithModel`.
-- [ ] Implement generic module selection in core Aspire hosting.
-- [ ] Implement AI’s `WithLlm<TModel>()` convention and resources.
-- [ ] Project only parameter/resource expressions into the silo.
-- [ ] Prove publish output contains no secret literal.
-- [ ] Run hosting tests, publish-manifest tests, and the root gate.
+- [x] Write AppHost model tests for one module declaration, duplicate rejection, shared OpenAI parameter, Markdown description, and no Ollama secret.
+- [x] Verify those tests fail against `WithModel`.
+- [x] Implement generic module selection in core Aspire hosting.
+- [x] Implement AI’s `WithLlm<TModel>()` convention and resources.
+- [x] Project only parameter/resource expressions into the silo.
+- [x] Prove publish output contains no secret literal.
+- [x] Run hosting tests, publish-manifest tests, and the root gate.
 
 ### Task 5: Remove the duplicate client and model test path
 
@@ -450,12 +455,12 @@ Git history is the archive. Contradictory live plans are not documentation.
 - Consumes: owner-bound Orleans client and session neuron
 - Produces: one `DigitalBrainClient` programming interface
 
-- [ ] Change client contract tests to require one public client type.
-- [ ] Verify they fail while `BrainClient` exists.
-- [ ] Move still-consumed observation support behind `DigitalBrainClient` or testing-only helpers.
-- [ ] Migrate hosts, samples, and simulations.
-- [ ] Delete the tier-driven scripted model path.
-- [ ] Run simulations, host tests, and the root gate.
+- [x] Change client contract tests to require one public client type.
+- [x] Verify they fail while `BrainClient` exists.
+- [x] Move still-consumed observation support behind `DigitalBrainClient` or testing-only helpers.
+- [x] Migrate hosts, samples, and simulations.
+- [x] Delete the tier-driven scripted model path.
+- [x] Run simulations, host tests, and the root gate.
 
 ### Task 6: Delete provisional modules and stale documents
 
@@ -486,14 +491,14 @@ Git history is the archive. Contradictory live plans are not documentation.
 - Consumes: the refined architecture in this file
 - Produces: one live plan and documentation matching the compiled public surface
 
-- [ ] Remove no-consumer scaffolding and its self-referential tests.
-- [ ] Point `CLAUDE.md` to this file as the plan of record.
-- [ ] Rewrite the README quickstart around AppHost module selection and `silo.AddDigitalBrain()`.
-- [ ] Remove all website claims about tiers, `AskModelAsync`, and `BrainClient`.
-- [ ] Regenerate or edit public API baselines to the compiled surface.
-- [ ] Run `node tools/render-specification.mjs`.
-- [ ] Run `node --test tests/*.test.mjs` from `website/`.
-- [ ] Run the root gate.
+- [x] Remove no-consumer scaffolding and its self-referential tests.
+- [x] Point `CLAUDE.md` to this file as the plan of record.
+- [x] Rewrite the README quickstart around AppHost module selection and `silo.AddDigitalBrain()`.
+- [x] Remove all website claims about tiers, `AskModelAsync`, and `BrainClient`.
+- [x] Regenerate or edit public API baselines to the compiled surface.
+- [x] Run `node tools/render-specification.mjs`.
+- [x] Run `node --test tests/*.test.mjs` from `website/`.
+- [x] Run the root gate.
 
 ## 5. Acceptance gates
 

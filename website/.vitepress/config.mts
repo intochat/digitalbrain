@@ -39,7 +39,10 @@ export default defineConfig({
           { text: 'DigitalBrain.Testing', link: '/packages/testing' },
           { text: 'DigitalBrain.Aspire', link: '/packages/aspire' },
           { text: 'DigitalBrain.Aspire.Hosting', link: '/packages/aspire-hosting' },
-          { text: 'DigitalBrain.DevTools', link: '/packages/devtools' }
+          { text: 'DigitalBrain.DevTools', link: '/packages/devtools' },
+          { text: 'AI Contracts', link: '/packages/ai-contracts' },
+          { text: 'AI Runtime', link: '/packages/ai' },
+          { text: 'AI Aspire Hosting', link: '/packages/ai-aspire-hosting' }
         ]
       },
       {

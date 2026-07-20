@@ -24,21 +24,26 @@ depend on prereleases.
   The durable registry remains only for install-time behavior subscriptions.
 - **Multi-silo.** Cross-silo point-to-point and broadcast, cluster-wide registry correctness, and
   `[PinToSilo]` placement onto labelled silos.
-- **AI model binding.** Role tiers bound to models by AppHost configuration; OpenAI and Anthropic
-  adapters live only in `DigitalBrain.Kernel`. Three tiers work: fast, balanced and reasoning. The
-  declared `Embedding` tier does not, and is listed under known limitations.
-- **`DigitalBrain.Client`.** Owner sessions, typed neuron access, and fire-and-read from outside the
-  cluster, with the owner boundary enforced at the session.
+- **Typed AI module.** `Llama32` and `Gpt56` are concrete `LLM` neurons keyed to their dedicated
+  `IChatClient`. The AI runtime owns OllamaSharp, OpenAI, and Microsoft.Extensions.AI; Kernel remains
+  provider-free. AI's Aspire package owns provider resources, model resources, and the OpenAI secret
+  parameter.
+- **Generated module activation.** AppHost selects modules with `AddModule<TModule>()`; the silo keeps
+  only `AddDigitalBrain()`. Generated composition validates the projected selection against the
+  compiled catalog and activates only selected modules.
+- **`DigitalBrain.Client`.** One owner-bound `DigitalBrainClient` facade. `SendAsync` and
+  `EmitAsync` enter through the deliberate session neuron; the client never exposes a raw neuron
+  proxy or a delegate registration that is not connected to delivery.
 - **`DigitalBrain.Aspire.Hosting` and `DigitalBrain.Aspire`.** A brain resource composing Orleans and
   storage with a privileged silo projection and a client projection that carries no model binding and
   no secret.
-- **`DigitalBrain.Testing`.** One shared in-process cluster per test run, a Gherkin vocabulary over
-  `Fire`/`Expect`, and a deterministic scripted model that fails loudly on an unscripted prompt.
+- **`DigitalBrain.Testing`.** One shared in-process cluster per test run and a Gherkin vocabulary over
+  real neuron journals and telemetry.
 - **`DigitalBrain.DevTools`.** The Orleans Dashboard and a volatile journal store, both
   Development-only.
 - **`DigitalBrain`.** A convenience metapackage pulling in `DigitalBrain.Abstractions`,
   `DigitalBrain.Client` and `DigitalBrain.Aspire` — the packages a consumer of a brain needs. It
-  deliberately excludes `DigitalBrain.Kernel`, which is where provider SDKs and credentials live.
+  deliberately excludes `DigitalBrain.Kernel` and all domain modules.
 
 ### Changed
 
@@ -76,6 +81,5 @@ depend on prereleases.
 - The client projection still delegates to Orleans' `AsClient()`, which would leak a credentialed
   provider connection string if the brain were configured with durable stores.
 - `Microsoft.Agents.AI.DevUI` is not wired.
-- The generated dispatch manifest does not dispatch. Runtime dispatch reflects over `IHandle<>`; the
-  manifest encodes the same wiring at compile time but is consumed only by a contract test, so the
-  same knowledge has two sources of truth and the compile-time one is decorative.
+- Agent and group-chat implementations, semantic typed discovery, integration modules, and runtime
+  behavior installation are not built.

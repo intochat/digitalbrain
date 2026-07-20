@@ -174,8 +174,9 @@ Two guards fail the build by design, and that is correct:
 
 ## 7. Where things stand
 
-The durable neuron and synapse foundation is proven. Module composition and AI are undergoing the
-hard cut defined in `REFINED-ARCHITECTURE-AND-NEXT-STEPS.md`.
+The durable neuron and synapse foundation, generated module activation, typed AI neurons, and
+AI-owned Aspire integration are proven. The next slices are `IAgent`, `IGroupChat`, and the generated
+canonical neuron registry defined in `REFINED-ARCHITECTURE-AND-NEXT-STEPS.md`.
 
 One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
 The plan of record requires a pre-committed numeric threshold run against a real model, correcting a
