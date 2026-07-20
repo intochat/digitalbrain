@@ -344,6 +344,37 @@ public sealed class TaskLifecycleContracts
         Assert.Equal(1, ScriptedWorker.OperationCount(taskId, nameof(ScriptedWorker.AcceptAsync)));
     }
 
+    [Fact(DisplayName = "a Waiting fact acknowledges a Continue call whose reply was ambiguous")]
+    public async Task WaitingFactAcknowledgesAmbiguousContinueCall()
+    {
+        await SimulationCluster.StartAsync();
+
+        var owner = new OwnerId("task-continue-waiting-then-throw");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ScriptedWorker>(owner, "worker");
+        var task = TaskFor(taskId);
+
+        await task.StartAsync(new(
+            CommandId.New(),
+            new TracerGoal("continue-waiting-then-throw"),
+            workerId,
+            new TaskPolicy(1, TimeSpan.Zero, null)));
+
+        var waiting = await ReadUntilAsync(
+            task,
+            snapshot => snapshot is { State: TaskState.Waiting, Revision: 1 });
+        var reminderId = NeuronId.For<ReminderProbe>(owner, "continue-ack-reminder-probe");
+        var reminder = SimulationCluster.Grains.GetGrain<IReminderProbe>(reminderId.ToGrainId());
+        await WaitForReminderAsync(reminder, taskId, "tasks.dispatch");
+        await Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+
+        var current = await task.ReadAsync();
+        Assert.IsType<InputRequired>(waiting.Blocker);
+        Assert.Equal(TaskState.Waiting, current.State);
+        Assert.False(await reminder.ExistsAsync(taskId, "tasks.dispatch"));
+        Assert.Equal(1, ScriptedWorker.OperationCount(taskId, nameof(ScriptedWorker.ContinueAsync)));
+    }
+
     [Fact(DisplayName = "a forwarded Kernel db.outbox reminder drains delivery after sender restart")]
     public async Task ForwardedKernelOutboxReminderDrainsAfterRestart()
     {
@@ -1041,7 +1072,10 @@ internal sealed class ScriptedWorker :
             return;
         }
 
-        if (request.Goal is TracerGoal { Description: "advance" or "progress" or "recover-continue" })
+        if (request.Goal is TracerGoal
+            {
+                Description: "advance" or "progress" or "recover-continue" or "continue-waiting-then-throw"
+            })
         {
             await SendAsync(
                 request.Task,
@@ -1099,6 +1133,19 @@ internal sealed class ScriptedWorker :
         if (script == "recover-continue" && dispatch == 1)
         {
             throw new InvalidOperationException("scripted transient Continue failure");
+        }
+
+        if (script == "continue-waiting-then-throw" && dispatch == 1)
+        {
+            ScheduleFact(
+                cursor.Task,
+                new AttemptWaiting(
+                    cursor.Task,
+                    cursor.Worker,
+                    cursor.Attempt,
+                    cursor.Revision,
+                    new InputRequired(new BlockerId(Guid.NewGuid()))));
+            throw new InvalidOperationException("scripted ambiguous Continue outcome");
         }
 
         if (script == "progress-hold")

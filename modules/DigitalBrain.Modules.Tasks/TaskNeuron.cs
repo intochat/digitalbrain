@@ -157,7 +157,7 @@ internal sealed class TaskNeuron :
         }
 
         data.State = TaskState.Running;
-        AcknowledgeAccept(data, fact);
+        AcknowledgePendingDispatch(data, fact);
 
         Stage(data);
         return Task.CompletedTask;
@@ -182,7 +182,7 @@ internal sealed class TaskNeuron :
 
         data.State = TaskState.Waiting;
         data.Blocker = fact.Blocker;
-        AcknowledgeAccept(data, fact);
+        AcknowledgePendingDispatch(data, fact);
 
         Stage(data);
         return Task.CompletedTask;
@@ -531,13 +531,24 @@ internal sealed class TaskNeuron :
         return fact.Revision == data.Revision;
     }
 
-    private static void AcknowledgeAccept(TaskData data, AttemptFact fact)
+    private static void AcknowledgePendingDispatch(TaskData data, AttemptFact fact)
     {
-        if (data.PendingDispatch is AcceptWorkerDispatch { Request: var request }
-            && request.Task == fact.Task
-            && request.Worker == fact.Worker
-            && request.Attempt == fact.Attempt
-            && request.Revision == fact.Revision)
+        var matches = data.PendingDispatch switch
+        {
+            AcceptWorkerDispatch { Request: var request } =>
+                request.Task == fact.Task
+                && request.Worker == fact.Worker
+                && request.Attempt == fact.Attempt
+                && request.Revision == fact.Revision,
+            ContinueWorkerDispatch { Cursor: var cursor } =>
+                cursor.Task == fact.Task
+                && cursor.Worker == fact.Worker
+                && cursor.Attempt == fact.Attempt
+                && cursor.Revision == fact.Revision,
+            _ => false
+        };
+
+        if (matches)
         {
             data.PendingDispatch = null;
         }
