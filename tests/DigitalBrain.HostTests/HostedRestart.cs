@@ -55,39 +55,6 @@ public sealed class HostedRestart
     }
 
     [Fact]
-    public async Task ANeuronAnswersThroughTheScriptedModelOnTheRealHost()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var appHost = await DistributedApplicationTestingBuilder
-            .CreateAsync<Projects.DigitalBrain_TestingAppHost>(cancellationToken);
-
-        await using var app = await appHost.BuildAsync(cancellationToken).WaitAsync(StartupLimit, cancellationToken);
-
-        await app.StartAsync(cancellationToken).WaitAsync(StartupLimit, cancellationToken);
-        await Healthy(app, cancellationToken);
-
-        using var kernel = app.CreateHttpClient("probe");
-        using var asked = await kernel.PostAsync(new Uri("/probe/ask", UriKind.Relative), content: null, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, asked.StatusCode);
-
-        var deadline = DateTimeOffset.UtcNow + DeliveryLimit;
-
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            using var answers = await kernel.GetAsync(new Uri("/probe/answers", UriKind.Relative), cancellationToken);
-            var text = await answers.Content.ReadAsStringAsync(cancellationToken);
-
-            if (text.Contains("the kernel is awake", StringComparison.Ordinal))
-            {
-                return;
-            }
-        }
-
-        Assert.Fail("the scripted model never answered on the real host");
-    }
-
-    [Fact]
     public async Task TheOrleansDashboardIsServedInDevelopment()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

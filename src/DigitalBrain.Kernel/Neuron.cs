@@ -272,17 +272,6 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         await FireAsync(synapse, [.. receivers], correlation);
     }
 
-    protected Task<string> AskModelAsync(ModelTier tier, string prompt, CancellationToken cancellationToken)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
-
-        var models = ServiceProvider.GetService<IModelCompletionService>()
-            ?? throw new InvalidOperationException(
-                $"{GetType().Name} asked a model, but no {nameof(IModelCompletionService)} is registered. Add the AI module and bind tiers.");
-
-        return models.CompleteAsync(tier, prompt, cancellationToken);
-    }
-
     protected IGrainTimer RegisterGrainTimer(
         Func<CancellationToken, Task> callback,
         GrainTimerCreationOptions options)

@@ -13,21 +13,8 @@ public static class SimulationCluster
     private static readonly string[] SiloLabels = ["alpha", "beta", "gamma"];
 
 
-    private static readonly Dictionary<ModelTier, ScriptedModel> Models =
-        Enum.GetValues<ModelTier>().ToDictionary(tier => tier, _ => new ScriptedModel());
-
     private static InProcessTestCluster? _cluster;
     private static SynapseObserver? _observer;
-
-    public static ScriptedModel Model(ModelTier tier) => Models[tier];
-
-    public static void ForgetScripts()
-    {
-        foreach (var model in Models.Values)
-        {
-            model.Forget();
-        }
-    }
 
     public static IGrainFactory Grains => Deployed().Client;
 
@@ -58,8 +45,6 @@ public static class SimulationCluster
 
             silo.UseInMemoryReminderService();
             silo.Services.AddSingleton<IJournalStorageProvider>(journalStorage);
-
-            silo.Services.AddSingleton<IModelCompletionService, ScriptedModelCompletion>();
         });
 
         var cluster = builder.Build();

@@ -5,8 +5,6 @@ DigitalBrain.Aspire.Hosting.BrainService
 DigitalBrain.Aspire.Hosting.BrainService.AsClient() -> DigitalBrain.Aspire.Hosting.BrainClientService!
 DigitalBrain.Aspire.Hosting.BrainService.Builder.get -> Aspire.Hosting.IDistributedApplicationBuilder!
 DigitalBrain.Aspire.Hosting.BrainService.Name.get -> string!
-DigitalBrain.Aspire.Hosting.BrainService.WithModel(DigitalBrain.Abstractions.ModelTier tier, string! provider, string! modelId, Aspire.Hosting.ApplicationModel.IResourceBuilder<Aspire.Hosting.ApplicationModel.ParameterResource!>! apiKey) -> DigitalBrain.Aspire.Hosting.BrainService!
-const DigitalBrain.Aspire.Hosting.BrainHostingExtensions.ModelConfigurationPrefix = "DigitalBrain__Models" -> string!
 static DigitalBrain.Aspire.Hosting.BrainHostingExtensions.AddBrain(this Aspire.Hosting.IDistributedApplicationBuilder! builder, string! name) -> DigitalBrain.Aspire.Hosting.BrainService!
 static DigitalBrain.Aspire.Hosting.BrainHostingExtensions.WithDevelopmentStores(this DigitalBrain.Aspire.Hosting.BrainService! brain) -> DigitalBrain.Aspire.Hosting.BrainService!
 static DigitalBrain.Aspire.Hosting.BrainHostingExtensions.WithReference<T>(this Aspire.Hosting.ApplicationModel.IResourceBuilder<T>! builder, DigitalBrain.Aspire.Hosting.BrainClientService! client) -> Aspire.Hosting.ApplicationModel.IResourceBuilder<T>!

@@ -24,7 +24,6 @@ public sealed class SerializationContracts
             [nameof(JournalRead)] = "db.journal-read",
             [nameof(JournalSnapshot)] = "db.journal-snapshot",
             [nameof(JournalTally)] = "db.journal-tally",
-            [nameof(ModelTier)] = "db.model-tier",
             [nameof(INeuron)] = "db.neuron",
             [nameof(ISessionNeuron)] = "db.session",
             [nameof(NeuronAuthorizationException)] = "db.authorization-error",

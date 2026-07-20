@@ -6,7 +6,6 @@ DigitalBrain.Kernel.DispatchManifest.Emissions.get -> System.Collections.Generic
 DigitalBrain.Kernel.DispatchManifest.Handlers.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Kernel.SynapseWiringEntry!>!
 DigitalBrain.Kernel.JournalStorageHosting
 DigitalBrain.Kernel.Neuron
-DigitalBrain.Kernel.Neuron.AskModelAsync(DigitalBrain.Abstractions.ModelTier tier, string! prompt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<string!>!
 DigitalBrain.Kernel.Neuron.DeliverAsync(DigitalBrain.Abstractions.SynapseDelivery! delivery) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.Neuron.EmitAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.Neuron.Id.get -> DigitalBrain.Abstractions.NeuronId
@@ -64,9 +63,6 @@ static DigitalBrain.Kernel.SynapseWiringEntry.operator ==(DigitalBrain.Kernel.Sy
 DigitalBrain.Kernel.ModuleComposition
 static DigitalBrain.Kernel.ModuleComposition.AddModule<TModule>(this Orleans.Hosting.ISiloBuilder! builder) -> Orleans.Hosting.ISiloBuilder!
 static DigitalBrain.Kernel.ModuleComposition.Validate(DigitalBrain.Abstractions.IModule! module) -> void
-DigitalBrain.Kernel.ConnectionLifecycle
 DigitalBrain.Kernel.ModuleWiring
-static DigitalBrain.Kernel.ConnectionLifecycle.Advance(DigitalBrain.Abstractions.ConnectionLifecycleState current, DigitalBrain.Abstractions.ConnectionHealth! health) -> DigitalBrain.Abstractions.ConnectionLifecycleState
-static DigitalBrain.Kernel.ConnectionLifecycle.DescribeAction(DigitalBrain.Abstractions.ConnectionHealth! health) -> string!
 static DigitalBrain.Kernel.ModuleWiring.EnsureManifestMatchesReflection(System.Reflection.Assembly! assembly) -> void
 static DigitalBrain.Kernel.ModuleWiring.HandlerWiring(System.Reflection.Assembly! assembly) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Kernel.SynapseWiringEntry!>!
