@@ -42,13 +42,21 @@ Every commit keeps all of these green:
 
 These are real gaps in the foundation. They are tracked, not hidden.
 
-**No timeline stream.** A client can fire synapses and catch up through cursor-based journal reads,
-but cannot observe a brain as it works. Code that needs to react must poll a journal. This is the most
-visible missing primitive.
+**The timeline stream is per neuron, not yet per identity.** A client can now watch a neuron:
+`WatchAsync(kind, cursor, observer)` pushes each committed delta to a registered observer, a
+reconnecting client resumes from its cursor and receives only what it missed, and a cursor that has
+fallen off the retention window receives a reset carrying a snapshot rather than a silent gap.
+Nothing polls: the kernel pushes at its commit boundary, and no wait path in the product holds a
+timer.
 
-The kernel does emit an OpenTelemetry activity on every delivery, and the testing package listens to
-it, so in-process observation exists and the simulation suite uses it. What is missing is the durable,
-per-identity, catch-up-after-disconnect feed that an out-of-process client needs.
+What is still missing is the **per-identity** feed — one object that aggregates everything in an
+owner's scope, so a client watches a brain rather than enumerating its neurons. That is a broadcast
+subscription question, not an observation question, and it lands with broadcast addressing.
+
+An observer registration is transient: it is held in the watched neuron's memory and is lost when
+that neuron deactivates or its silo restarts. This is deliberate — durability lives in the cursor,
+not in the subscription, so a client re-watches with the cursor it holds and catches up. A client
+that never re-watches silently stops receiving, and nothing yet tells it that happened.
 
 **Outbox redelivery is unproven.** Delivery retries across a receiver outage are implemented, but no
 scenario yet drives an outage and asserts the redelivery. It is code without a proof, which is not the

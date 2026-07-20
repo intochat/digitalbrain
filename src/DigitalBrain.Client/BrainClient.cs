@@ -44,4 +44,9 @@ public sealed class NeuronHandle
 
     public Task<JournalRead> ReadJournalAsync(JournalKind kind, long afterSequence)
         => _session.ReadNeuronJournalAsync(Id, kind, afterSequence);
+
+    public Task WatchAsync(JournalKind kind, long afterSequence, IJournalObserver observer)
+        => _session.WatchNeuronAsync(Id, kind, afterSequence, observer);
+
+    public Task UnwatchAsync(IJournalObserver observer) => _session.UnwatchNeuronAsync(Id, observer);
 }

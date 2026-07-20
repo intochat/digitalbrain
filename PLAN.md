@@ -293,8 +293,13 @@ records in `final`'s benchmark: a number produced by machinery that never ran.
 51. `PROOF` — a contract asserting no `Task.Delay` appears in any wait path reachable from
     `WatchAsync`. Prefer a structural assertion over a grep.
 52. `RED` — run all three. Quote failures.
-53. `IMPL` — `WatchAsync` on `INeuron`. Push-based. No server-side timer.
-54. `IMPL` — `FeedNeuron` as an ordinary neuron, not a special kind. §4.1's collapse.
+53. `IMPL` — `WatchAsync` on `INeuron`. Push-based. No server-side timer. **Done** — observers, not
+    `IAsyncEnumerable`, for the `StartEnumeration` reason recorded above.
+54. `IMPL` — ~~`FeedNeuron`~~ **deferred to 2.8, deliberately.** §4.1 says *"feed subscription is the
+    broadcast decision"*, and broadcast addressing is 2.8. A `FeedNeuron` built now would be a neuron
+    that subscribes to nothing, which is added code with no present consumer — the Deleter rule
+    applies to this plan's own steps as much as to anything else. It lands at 2.8 with the mechanism
+    that makes it able to aggregate an owner's scope.
 55. `IMPL` — `PublicAPI.Unshipped.txt` for the new surface.
 56. `GREEN` — owning project.
 57. `IMPL` — delete the polling loop this replaces in `DigitalBrain.Testing`, if one exists there.

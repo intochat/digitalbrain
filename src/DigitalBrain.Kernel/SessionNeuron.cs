@@ -19,4 +19,14 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
         => subject == Id
             ? ReadJournalAsync(kind, afterSequence)
             : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).ReadJournalAsync(kind, afterSequence);
+
+    public Task WatchNeuronAsync(NeuronId subject, JournalKind kind, long afterSequence, IJournalObserver observer)
+        => subject == Id
+            ? WatchAsync(kind, afterSequence, observer)
+            : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).WatchAsync(kind, afterSequence, observer);
+
+    public Task UnwatchNeuronAsync(NeuronId subject, IJournalObserver observer)
+        => subject == Id
+            ? UnwatchAsync(observer)
+            : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).UnwatchAsync(observer);
 }

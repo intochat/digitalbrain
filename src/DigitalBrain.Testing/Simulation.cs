@@ -5,10 +5,8 @@ namespace DigitalBrain.Testing;
 
 public sealed class Simulation
 {
-    private const int SettleProbes = 200;
-    private const int SettleProbesWithoutChange = 5;
-
-    private static readonly TimeSpan SettleProbeInterval = TimeSpan.FromMilliseconds(50);
+    private static readonly TimeSpan SettleQuietPeriod = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan SettleLimit = TimeSpan.FromSeconds(20);
 
     private static readonly Dictionary<string, string> EmptyValues = new(StringComparer.Ordinal);
 
@@ -129,29 +127,23 @@ public sealed class Simulation
     public async Task<int> SettleAsync(JournalKind kind, string neuronType, string name)
     {
         var neuron = Client.Neuron(neuronType, name);
-        long previousSequence = -1;
-        var unchanged = 0;
-        var retained = 0;
+        var quiet = new QuietWatch(SettleQuietPeriod);
+        var reference = SimulationCluster.Grains.CreateObjectReference<IJournalObserver>(quiet);
 
-        for (var probe = 0; probe < SettleProbes; probe++)
+        await neuron.WatchAsync(kind, afterSequence: 0, reference);
+
+        try
         {
-            await Task.Delay(SettleProbeInterval);
-
-            var current = await neuron.ReadJournalAsync(kind, afterSequence: 0);
-            retained = current.ResetSnapshot?.RetainedCount ?? current.Delta.Count;
-
-            unchanged = current.ResumeSequence == previousSequence ? unchanged + 1 : 0;
-
-            if (unchanged >= SettleProbesWithoutChange)
-            {
-                return retained;
-            }
-
-            previousSequence = current.ResumeSequence;
+            await quiet.AwaitQuietAsync(SettleLimit);
+        }
+        finally
+        {
+            await neuron.UnwatchAsync(reference);
         }
 
-        throw new SimulationAssertionException(
-            $"The {kind} journal of {neuronType} '{name}' never stopped changing: it reached sequence {previousSequence} with {retained} retained entries after {SettleProbes} probes.");
+        var settled = await neuron.ReadJournalAsync(kind, afterSequence: 0);
+
+        return settled.ResetSnapshot?.RetainedCount ?? settled.Delta.Count;
     }
 
     public async Task RegisterManyAsync(int count, string neuronType)
@@ -206,6 +198,48 @@ public sealed class Simulation
 
     private Task StimulateAsync(string synapseTypeName, NeuronId receiver, IReadOnlyDictionary<string, string> values)
         => Driver().StimulateAsync(receiver, NeuronCatalog.Create(synapseTypeName, values));
+
+    private sealed class QuietWatch(TimeSpan quietPeriod) : IJournalObserver
+    {
+        private readonly Lock _gate = new();
+
+        private DateTimeOffset _lastPush = DateTimeOffset.UtcNow;
+
+        public Task ObserveAsync(JournalKind kind, JournalRead read)
+        {
+            lock (_gate)
+            {
+                _lastPush = DateTimeOffset.UtcNow;
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public async Task AwaitQuietAsync(TimeSpan limit)
+        {
+            var deadline = DateTimeOffset.UtcNow + limit;
+
+            while (DateTimeOffset.UtcNow < deadline)
+            {
+                TimeSpan remaining;
+
+                lock (_gate)
+                {
+                    remaining = quietPeriod - (DateTimeOffset.UtcNow - _lastPush);
+                }
+
+                if (remaining <= TimeSpan.Zero)
+                {
+                    return;
+                }
+
+                await Task.Delay(remaining);
+            }
+
+            throw new SimulationAssertionException(
+                $"The journal never went quiet for {quietPeriod.TotalMilliseconds:0} ms within {limit.TotalSeconds:0} seconds.");
+        }
+    }
 
     private ISimulationNeuron Driver() => SimulationCluster.Grains.GetGrain<ISimulationNeuron>(Id.ToGrainId());
 

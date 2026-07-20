@@ -10,3 +10,5 @@ DigitalBrain.Client.BrainClient.Session.get -> DigitalBrain.Client.NeuronHandle!
 DigitalBrain.Client.NeuronHandle
 DigitalBrain.Client.NeuronHandle.Id.get -> DigitalBrain.Abstractions.NeuronId
 DigitalBrain.Client.NeuronHandle.ReadJournalAsync(DigitalBrain.Abstractions.JournalKind kind, long afterSequence) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.JournalRead!>!
+DigitalBrain.Client.NeuronHandle.UnwatchAsync(DigitalBrain.Abstractions.IJournalObserver! observer) -> System.Threading.Tasks.Task!
+DigitalBrain.Client.NeuronHandle.WatchAsync(DigitalBrain.Abstractions.JournalKind kind, long afterSequence, DigitalBrain.Abstractions.IJournalObserver! observer) -> System.Threading.Tasks.Task!

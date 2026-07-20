@@ -13,12 +13,18 @@ DigitalBrain.Abstractions.IAnswer.Text.get -> string!
 DigitalBrain.Abstractions.IEmit<TSynapse>
 DigitalBrain.Abstractions.IHandle<TSynapse>
 DigitalBrain.Abstractions.IHandle<TSynapse>.HandleAsync(TSynapse! synapse, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.Abstractions.IJournalObserver
+DigitalBrain.Abstractions.IJournalObserver.ObserveAsync(DigitalBrain.Abstractions.JournalKind kind, DigitalBrain.Abstractions.JournalRead! read) -> System.Threading.Tasks.Task!
 DigitalBrain.Abstractions.INeuron
 DigitalBrain.Abstractions.INeuron.DeliverAsync(DigitalBrain.Abstractions.SynapseDelivery! delivery) -> System.Threading.Tasks.Task!
 DigitalBrain.Abstractions.INeuron.ReadJournalAsync(DigitalBrain.Abstractions.JournalKind kind, long afterSequence) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.JournalRead!>!
+DigitalBrain.Abstractions.INeuron.UnwatchAsync(DigitalBrain.Abstractions.IJournalObserver! observer) -> System.Threading.Tasks.Task!
+DigitalBrain.Abstractions.INeuron.WatchAsync(DigitalBrain.Abstractions.JournalKind kind, long afterSequence, DigitalBrain.Abstractions.IJournalObserver! observer) -> System.Threading.Tasks.Task!
 DigitalBrain.Abstractions.ISessionNeuron
 DigitalBrain.Abstractions.ISessionNeuron.FireAsync(DigitalBrain.Abstractions.NeuronId receiver, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Abstractions.ISessionNeuron.ReadNeuronJournalAsync(DigitalBrain.Abstractions.NeuronId subject, DigitalBrain.Abstractions.JournalKind kind, long afterSequence) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.JournalRead!>!
+DigitalBrain.Abstractions.ISessionNeuron.UnwatchNeuronAsync(DigitalBrain.Abstractions.NeuronId subject, DigitalBrain.Abstractions.IJournalObserver! observer) -> System.Threading.Tasks.Task!
+DigitalBrain.Abstractions.ISessionNeuron.WatchNeuronAsync(DigitalBrain.Abstractions.NeuronId subject, DigitalBrain.Abstractions.JournalKind kind, long afterSequence, DigitalBrain.Abstractions.IJournalObserver! observer) -> System.Threading.Tasks.Task!
 DigitalBrain.Abstractions.ISubscriptionRegistry
 DigitalBrain.Abstractions.ISubscriptionRegistry.RegisterAsync(string! synapseType, DigitalBrain.Abstractions.NeuronId subscriber) -> System.Threading.Tasks.Task!
 DigitalBrain.Abstractions.ISubscriptionRegistry.SubscriberCountAsync(string! synapseType) -> System.Threading.Tasks.Task<int>!

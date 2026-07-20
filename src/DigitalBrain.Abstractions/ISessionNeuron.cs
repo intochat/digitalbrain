@@ -15,4 +15,10 @@ public interface ISessionNeuron : INeuron
 
     [Alias("ReadNeuronJournal")]
     Task<JournalRead> ReadNeuronJournalAsync(NeuronId subject, JournalKind kind, long afterSequence);
+
+    [Alias("WatchNeuron")]
+    Task WatchNeuronAsync(NeuronId subject, JournalKind kind, long afterSequence, IJournalObserver observer);
+
+    [Alias("UnwatchNeuron")]
+    Task UnwatchNeuronAsync(NeuronId subject, IJournalObserver observer);
 }

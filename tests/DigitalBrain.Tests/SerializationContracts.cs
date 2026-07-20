@@ -28,6 +28,7 @@ public sealed class SerializationContracts
             [nameof(ISessionNeuron)] = "db.session",
             [nameof(NeuronAuthorizationException)] = "db.authorization-error",
             [nameof(ISubscriptionRegistry)] = "db.subscription-registry",
+            [nameof(IJournalObserver)] = "db.journal-observer",
         };
 
         var declared = Abstractions.GetExportedTypes()

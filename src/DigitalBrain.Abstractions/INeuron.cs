@@ -8,4 +8,10 @@ public interface INeuron : IGrainWithStringKey
 
     [Alias("ReadJournal")]
     Task<JournalRead> ReadJournalAsync(JournalKind kind, long afterSequence);
+
+    [Alias("Watch")]
+    Task WatchAsync(JournalKind kind, long afterSequence, IJournalObserver observer);
+
+    [Alias("Unwatch")]
+    Task UnwatchAsync(IJournalObserver observer);
 }
