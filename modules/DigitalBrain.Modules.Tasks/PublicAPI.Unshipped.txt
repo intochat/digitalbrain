@@ -1,0 +1,4 @@
+#nullable enable
+DigitalBrain.Tasks.TasksModule
+DigitalBrain.Tasks.TasksModule.TasksModule() -> void
+static DigitalBrain.Tasks.TasksModule.Configure(Orleans.Hosting.ISiloBuilder! builder) -> void

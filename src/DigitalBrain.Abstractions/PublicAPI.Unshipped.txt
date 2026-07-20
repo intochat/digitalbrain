@@ -26,6 +26,17 @@ DigitalBrain.Abstractions.CapabilityRequested.Equals(DigitalBrain.Abstractions.C
 DigitalBrain.Abstractions.CapabilityRequested.Method.get -> string!
 DigitalBrain.Abstractions.CapabilityRequested.Method.init -> void
 DigitalBrain.Abstractions.CapabilityRequested.Target.get -> DigitalBrain.Abstractions.NeuronId
+DigitalBrain.Abstractions.CommandId
+DigitalBrain.Abstractions.CommandId.CommandId() -> void
+DigitalBrain.Abstractions.CommandId.CommandId(System.Guid value) -> void
+DigitalBrain.Abstractions.CommandId.Equals(DigitalBrain.Abstractions.CommandId other) -> bool
+DigitalBrain.Abstractions.CommandId.Value.get -> System.Guid
+override DigitalBrain.Abstractions.CommandId.GetHashCode() -> int
+override DigitalBrain.Abstractions.CommandId.ToString() -> string!
+static DigitalBrain.Abstractions.CommandId.New() -> DigitalBrain.Abstractions.CommandId
+static DigitalBrain.Abstractions.CommandId.operator !=(DigitalBrain.Abstractions.CommandId left, DigitalBrain.Abstractions.CommandId right) -> bool
+static DigitalBrain.Abstractions.CommandId.operator ==(DigitalBrain.Abstractions.CommandId left, DigitalBrain.Abstractions.CommandId right) -> bool
+~override DigitalBrain.Abstractions.CommandId.Equals(object obj) -> bool
 DigitalBrain.Abstractions.CapabilityRequested.Target.init -> void
 DigitalBrain.Abstractions.ClientEntryPointAttribute
 DigitalBrain.Abstractions.ClientEntryPointAttribute.ClientEntryPointAttribute() -> void

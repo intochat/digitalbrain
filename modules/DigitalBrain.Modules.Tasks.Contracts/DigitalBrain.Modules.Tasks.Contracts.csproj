@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Tasks module contracts: durable task, worker, attempt, outcome, and blocker vocabulary.</Description>
+    <RootNamespace>DigitalBrain.Tasks</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

@@ -14,5 +14,7 @@ internal static class PackableProjects
         "DigitalBrain.Modules.AI.Contracts",
         "DigitalBrain.Modules.AI",
         "DigitalBrain.Modules.AI.Aspire.Hosting",
+        "DigitalBrain.Modules.Tasks.Contracts",
+        "DigitalBrain.Modules.Tasks",
     ];
 }

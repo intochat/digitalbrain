@@ -17,6 +17,7 @@ public sealed class PackageBoundaryContracts
         "DigitalBrain.Aspire",
         "DigitalBrain.Aspire.Hosting",
         "DigitalBrain.Modules.AI.Contracts",
+        "DigitalBrain.Modules.Tasks.Contracts",
     ];
 
     private static readonly string[] NeuronHosting = ["DigitalBrain.Testing", "DigitalBrain.DevTools"];
@@ -71,6 +72,7 @@ public sealed class PackageBoundaryContracts
             .Append("DigitalBrain.Kernel")
             .Append("DigitalBrain.Modules.AI")
             .Append("DigitalBrain.Modules.AI.Aspire.Hosting")
+            .Append("DigitalBrain.Modules.Tasks")
             .ToHashSet(StringComparer.Ordinal);
 
         var packable = ProductionRoots

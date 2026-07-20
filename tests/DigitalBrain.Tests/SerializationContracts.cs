@@ -1,5 +1,6 @@
 using System.Reflection;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Tasks;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -17,6 +18,7 @@ public sealed class SerializationContracts
             [nameof(CapabilityCompleted)] = "db.capability-completed",
             [nameof(CapabilityFailed)] = "db.capability-failed",
             [nameof(CapabilityRejected)] = "db.capability-rejected",
+            [nameof(CommandId)] = "db.command-id",
             [nameof(Synapse)] = "db.synapse",
             [nameof(SynapseDelivery)] = "db.synapse-delivery",
             [nameof(SynapseId)] = "db.synapse-id",
@@ -100,6 +102,58 @@ public sealed class SerializationContracts
             .Select(property => property.Name);
 
         Assert.Empty(publicSetters);
+    }
+
+    [Fact(DisplayName = "Tasks serialization aliases are pinned as durable vocabulary")]
+    public void TaskAliasesNeverChange()
+    {
+        var expected = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [nameof(ITask)] = "tasks.task",
+            [nameof(IWorker)] = "tasks.worker",
+            [nameof(TaskPolicy)] = "tasks.policy",
+            [nameof(StartTask)] = "tasks.start",
+            [nameof(CancelTask)] = "tasks.cancel",
+            [nameof(TaskState)] = "tasks.state",
+            [nameof(TaskSnapshot)] = "tasks.snapshot",
+            [nameof(Goal)] = "tasks.goal",
+            [nameof(Result)] = "tasks.result",
+            [nameof(Failure)] = "tasks.failure",
+            [nameof(AttemptId)] = "tasks.attempt-id",
+            [nameof(BlockerId)] = "tasks.blocker-id",
+            [nameof(FactReference)] = "tasks.fact-reference",
+            [nameof(AttemptRequest)] = "tasks.attempt-request",
+            [nameof(AttemptCursor)] = "tasks.attempt-cursor",
+            [nameof(AttemptFact)] = "tasks.attempt-fact",
+            [nameof(AttemptAccepted)] = "tasks.attempt-accepted",
+            [nameof(AttemptAdvanced)] = "tasks.attempt-advanced",
+            [nameof(AttemptProgressed)] = "tasks.attempt-progressed",
+            [nameof(AttemptWaiting)] = "tasks.attempt-waiting",
+            [nameof(AttemptSucceeded)] = "tasks.attempt-succeeded",
+            [nameof(AttemptFailed)] = "tasks.attempt-failed",
+            [nameof(AttemptCancelled)] = "tasks.attempt-cancelled",
+            [nameof(AttemptOutcomeUncertain)] = "tasks.attempt-outcome-uncertain",
+            [nameof(TaskBlocker)] = "tasks.blocker",
+            [nameof(InputRequired)] = "tasks.input-required",
+            [nameof(ApprovalRequired)] = "tasks.approval-required",
+            [nameof(DependencyPending)] = "tasks.dependency-pending",
+            [nameof(RetryScheduled)] = "tasks.retry-scheduled",
+            [nameof(OutcomeUncertain)] = "tasks.outcome-uncertain",
+        };
+        var contracts = typeof(ITask).Assembly;
+        var declared = contracts.GetExportedTypes()
+            .Select(type => (
+                type.Name,
+                Alias: type.GetCustomAttributes<AliasAttribute>(inherit: false).FirstOrDefault()?.Alias))
+            .Where(entry => entry.Alias is not null)
+            .ToDictionary(entry => entry.Name, entry => entry.Alias!, StringComparer.Ordinal);
+
+        Assert.Equal(expected, declared);
+        Assert.DoesNotContain(
+            contracts.GetExportedTypes()
+                .Where(type => type.GetCustomAttributes<AliasAttribute>(inherit: false).Any())
+                .Where(type => !type.IsEnum && !type.IsInterface),
+            type => type.GetCustomAttribute<GenerateSerializerAttribute>(inherit: false) is null);
     }
 
     [Fact(DisplayName = "generic capability facts carry protocol metadata and no domain payload")]
