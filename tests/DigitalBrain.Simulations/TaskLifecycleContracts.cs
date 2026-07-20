@@ -27,6 +27,32 @@ public sealed class TaskLifecycleContracts
         Assert.Contains("is not a client entry point", refusal.Message, StringComparison.Ordinal);
     }
 
+    [Fact(DisplayName = "same-owner neurons cannot impersonate the Orleans reminder provider")]
+    public async Task SameOwnerNeuronsCannotDeliverPrivateReminders()
+    {
+        await SimulationCluster.StartAsync();
+
+        var owner = new OwnerId("task-private-reminder-owner");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var callerId = NeuronId.For<ReminderCaller>(owner, "caller");
+        var caller = SimulationCluster.Grains.GetGrain<IReminderCaller>(callerId.ToGrainId());
+
+        _ = await Assert.ThrowsAsync<NeuronAuthorizationException>(
+            () => caller.DeliverAsync(taskId, "tasks.retry"));
+    }
+
+    [Fact(DisplayName = "a spoofed grain-service prefix cannot impersonate the Orleans reminder provider")]
+    public async Task SpoofedGrainServicePrefixCannotDeliverPrivateReminders()
+    {
+        await SimulationCluster.StartAsync();
+
+        var targetOwner = new OwnerId("task-private-reminder-target");
+        var taskId = NeuronId.For<ITask>(targetOwner, "task");
+
+        _ = await Assert.ThrowsAsync<NeuronAuthorizationException>(
+            () => Simulation.DeliverReminderFromGrainServiceAsync(taskId, "tasks.retry"));
+    }
+
     [Fact(DisplayName = "Task capabilities are causally journaled and owner-bound")]
     public async Task TaskCapabilitiesAreCausallyJournaledAndOwnerBound()
     {
@@ -107,12 +133,13 @@ public sealed class TaskLifecycleContracts
         AssertEquivalent(running, await task.ReadAsync());
     }
 
-    [Theory(DisplayName = "typed null Attempt payloads are rejected before Task state is staged")]
+    [Theory(DisplayName = "invalid Attempt payloads are durably ignored without poisoning the Worker outbox")]
     [InlineData("invalid-blocker")]
     [InlineData("invalid-failure")]
     [InlineData("invalid-result")]
     [InlineData("invalid-evidence")]
-    public async Task InvalidAttemptPayloadsDoNotMutateState(string script)
+    [InlineData("invalid-uncertain")]
+    public async Task InvalidAttemptPayloadsAreDurablyIgnored(string script)
     {
         await SimulationCluster.StartAsync();
 
@@ -131,6 +158,22 @@ public sealed class TaskLifecycleContracts
         await Task.Delay(TimeSpan.FromMilliseconds(250), TestContext.Current.CancellationToken);
 
         AssertEquivalent(running, await task.ReadAsync());
+
+        var worker = SimulationCluster.Grains.GetGrain<IScriptedWorkerControl>(workerId.ToGrainId());
+        await worker.SendFactAsync(new AttemptSucceeded(
+            taskId,
+            workerId,
+            running.ActiveAttempt!.Value,
+            running.Revision,
+            new TracerResult("after invalid"),
+            []));
+
+        var succeeded = await ReadUntilAsync(
+            task,
+            snapshot => snapshot.State == TaskState.Succeeded,
+            TimeSpan.FromSeconds(3));
+
+        Assert.Equal("after invalid", Assert.IsType<TracerResult>(succeeded.Result).Value);
     }
 
     [Fact(DisplayName = "future-revision Attempt facts are durably ignored without retry storms")]
@@ -256,28 +299,49 @@ public sealed class TaskLifecycleContracts
         var reminderId = NeuronId.For<ReminderProbe>(owner, "dispatch-reminder-probe");
         var reminder = SimulationCluster.Grains.GetGrain<IReminderProbe>(reminderId.ToGrainId());
 
-        if (script == "recover-accept")
-        {
-            await WaitForReminderAsync(reminder, taskId, "tasks.dispatch");
-            await SimulationCluster.RestartHostOfAsync(taskId);
-        }
-
         if (script == "recover-cancel")
         {
             var running = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Running);
             await task.CancelAsync(new(CommandId.New(), running.Revision));
         }
 
-        if (script != "recover-accept")
-        {
-            await WaitForReminderAsync(reminder, taskId, "tasks.dispatch");
-        }
+        await WaitForReminderAsync(reminder, taskId, "tasks.dispatch");
+        await SimulationCluster.RestartHostOfAsync(taskId);
 
         var expected = script == "recover-cancel" ? TaskState.Cancelled : TaskState.Succeeded;
         var terminal = await ReadUntilAsync(task, snapshot => snapshot.State == expected);
 
         Assert.True(ScriptedWorker.DispatchCount(taskId) >= 2);
         Assert.Equal(expected, terminal.State);
+    }
+
+    [Theory(DisplayName = "an Accept fact acknowledges a Worker call whose reply was ambiguous")]
+    [InlineData("accepted-then-throw", TaskState.Running)]
+    [InlineData("waiting-then-throw", TaskState.Waiting)]
+    public async Task AcceptFactsAcknowledgeAmbiguousWorkerCalls(string script, TaskState expected)
+    {
+        await SimulationCluster.StartAsync();
+
+        var owner = new OwnerId($"task-{script}");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ScriptedWorker>(owner, "worker");
+        var task = TaskFor(taskId);
+
+        await task.StartAsync(new(
+            CommandId.New(),
+            new TracerGoal(script),
+            workerId,
+            new TaskPolicy(1, TimeSpan.Zero, null)));
+
+        var acknowledged = await ReadUntilAsync(task, snapshot => snapshot.State == expected);
+        var reminderId = NeuronId.For<ReminderProbe>(owner, "ack-reminder-probe");
+        var reminder = SimulationCluster.Grains.GetGrain<IReminderProbe>(reminderId.ToGrainId());
+        await WaitForReminderAsync(reminder, taskId, "tasks.dispatch");
+        await Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+
+        Assert.Equal(expected, acknowledged.State);
+        Assert.False(await reminder.ExistsAsync(taskId, "tasks.dispatch"));
+        Assert.Equal(1, ScriptedWorker.OperationCount(taskId, nameof(ScriptedWorker.AcceptAsync)));
     }
 
     [Fact(DisplayName = "a forwarded Kernel db.outbox reminder drains delivery after sender restart")]
@@ -462,7 +526,7 @@ public sealed class TaskLifecycleContracts
             CommandId.New(),
             new TracerGoal("retry"),
             workerId,
-            new TaskPolicy(2, TimeSpan.FromSeconds(1), null)));
+            new TaskPolicy(2, TimeSpan.FromSeconds(3), null)));
 
         var waiting = await ReadUntilAsync(
             task,
@@ -471,6 +535,7 @@ public sealed class TaskLifecycleContracts
         var reminder = SimulationCluster.Grains.GetGrain<IReminderProbe>(reminderId.ToGrainId());
 
         await WaitForReminderAsync(reminder, taskId, "tasks.retry");
+        await SimulationCluster.RestartHostOfAsync(taskId);
 
         var succeeded = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Succeeded);
 
@@ -595,9 +660,10 @@ public sealed class TaskLifecycleContracts
 
     private static async Task<TaskSnapshot> ReadUntilAsync(
         TaskTestClient task,
-        Func<TaskSnapshot, bool> condition)
+        Func<TaskSnapshot, bool> condition,
+        TimeSpan? limit = null)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        using var timeout = new CancellationTokenSource(limit ?? TimeSpan.FromSeconds(20));
 
         while (true)
         {
@@ -729,6 +795,22 @@ internal sealed class TaskDriver : Neuron, ITaskDriver
         => GrainFactory.GetGrain<ITask>(task.ToGrainId());
 }
 
+[Alias("db.test.reminder-caller")]
+[ClientEntryPoint]
+internal interface IReminderCaller : INeuron
+{
+    [Alias("DeliverReminder")]
+    Task DeliverAsync(NeuronId target, string reminderName);
+}
+
+internal sealed class ReminderCaller : Neuron, IReminderCaller
+{
+    public Task DeliverAsync(NeuronId target, string reminderName)
+        => GrainFactory
+            .GetGrain<IRemindable>(target.ToGrainId())
+            .ReceiveReminder(reminderName, default);
+}
+
 [GenerateSerializer]
 [Alias("db.test.tracer-goal")]
 internal sealed record TracerGoal([property: Id(0)] string Description) : Goal;
@@ -756,9 +838,13 @@ internal sealed class ScriptedWorker :
     private static readonly ConcurrentDictionary<NeuronId, string> Scripts = new();
     private static readonly ConcurrentDictionary<NeuronId, int> Acceptances = new();
     private static readonly ConcurrentDictionary<(NeuronId Task, string Operation), int> Dispatches = new();
+    private IGrainTimer? _delayedFact;
 
     internal static int DispatchCount(NeuronId task)
         => Dispatches.Where(entry => entry.Key.Task == task).Sum(entry => entry.Value);
+
+    internal static int OperationCount(NeuronId task, string operation)
+        => Dispatches.TryGetValue((task, operation), out var count) ? count : 0;
 
     public Task SendFactAsync(AttemptFact fact) => SendAsync(fact.Task, fact);
 
@@ -788,6 +874,25 @@ internal sealed class ScriptedWorker :
                     new TracerResult("recovered accept"),
                     []));
             return;
+        }
+
+        if (description is "accepted-then-throw" or "waiting-then-throw")
+        {
+            var fact = description == "accepted-then-throw"
+                ? (AttemptFact)new AttemptAccepted(
+                    request.Task,
+                    request.Worker,
+                    request.Attempt,
+                    request.Revision)
+                : new AttemptWaiting(
+                    request.Task,
+                    request.Worker,
+                    request.Attempt,
+                    request.Revision,
+                    new InputRequired(new BlockerId(Guid.NewGuid())));
+
+            ScheduleFact(request.Task, fact);
+            throw new InvalidOperationException("scripted ambiguous Accept outcome");
         }
 
         if (description is "hold" or "cancel" or "progress-hold" or "recover-cancel"
@@ -848,6 +953,17 @@ internal sealed class ScriptedWorker :
                         request.Revision,
                         new TracerResult("invalid"),
                         null!));
+            }
+            else if (description == "invalid-uncertain")
+            {
+                await SendAsync(
+                    request.Task,
+                    new AttemptOutcomeUncertain(
+                        request.Task,
+                        request.Worker,
+                        request.Attempt,
+                        request.Revision,
+                        default));
             }
 
             return;
@@ -1062,6 +1178,19 @@ internal sealed class ScriptedWorker :
                 cursor.Worker,
                 cursor.Attempt,
                 cursor.Revision));
+    }
+
+    private void ScheduleFact(NeuronId task, AttemptFact fact)
+    {
+        _delayedFact?.Dispose();
+        _delayedFact = RegisterGrainTimer(
+            async () =>
+            {
+                _delayedFact?.Dispose();
+                _delayedFact = null;
+                await SendAsync(task, fact);
+            },
+            new GrainTimerCreationOptions(TimeSpan.Zero, Timeout.InfiniteTimeSpan));
     }
 }
 

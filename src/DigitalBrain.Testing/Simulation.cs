@@ -75,6 +75,17 @@ public sealed class Simulation
         => CaptureRefusalAsync(() => Neuron(new NeuronId(neuronType, new OwnerId(targetOwner), name))
             .ReadJournalAsync(kind, afterSequence: 0));
 
+    public static Task DeliverReminderFromGrainServiceAsync(NeuronId target, string reminderName)
+    {
+        var caller = NeuronId.For<SpoofReminderServiceCaller>(
+            new OwnerId("testing-reminder-spoof"),
+            "caller");
+
+        return SimulationCluster.Grains
+            .GetGrain<ISpoofReminderServiceCaller>(caller.ToGrainId())
+            .DeliverAsync(target, reminderName);
+    }
+
     public Task SendExpectingRefusalAsync(string synapseTypeName, string neuronType, string name)
         => CaptureRefusalAsync(() => StimulateAsync(synapseTypeName, NeuronNamed(neuronType, name), EmptyValues));
 

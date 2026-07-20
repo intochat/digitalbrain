@@ -157,6 +157,7 @@ internal sealed class TaskNeuron :
         }
 
         data.State = TaskState.Running;
+        AcknowledgeAccept(data, fact);
 
         Stage(data);
         return Task.CompletedTask;
@@ -165,7 +166,11 @@ internal sealed class TaskNeuron :
     public Task HandleAsync(AttemptWaiting fact, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
-        ArgumentNullException.ThrowIfNull(fact.Blocker);
+
+        if (fact.Blocker is null)
+        {
+            return Task.CompletedTask;
+        }
 
         var data = Load();
 
@@ -177,6 +182,7 @@ internal sealed class TaskNeuron :
 
         data.State = TaskState.Waiting;
         data.Blocker = fact.Blocker;
+        AcknowledgeAccept(data, fact);
 
         Stage(data);
         return Task.CompletedTask;
@@ -213,8 +219,11 @@ internal sealed class TaskNeuron :
     public Task HandleAsync(AttemptSucceeded fact, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
-        ArgumentNullException.ThrowIfNull(fact.Result);
-        ArgumentNullException.ThrowIfNull(fact.Evidence);
+
+        if (fact.Result is null || fact.Evidence is null)
+        {
+            return Task.CompletedTask;
+        }
 
         var data = Load();
 
@@ -239,7 +248,11 @@ internal sealed class TaskNeuron :
     public async Task HandleAsync(AttemptFailed fact, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
-        ArgumentNullException.ThrowIfNull(fact.Failure);
+
+        if (fact.Failure is null)
+        {
+            return;
+        }
 
         var data = Load();
 
@@ -301,7 +314,7 @@ internal sealed class TaskNeuron :
 
         if (fact.Blocker.Value == Guid.Empty)
         {
-            throw new ArgumentException("An uncertain-outcome blocker is required.", nameof(fact));
+            return Task.CompletedTask;
         }
 
         var data = Load();
@@ -516,6 +529,18 @@ internal sealed class TaskNeuron :
         }
 
         return fact.Revision == data.Revision;
+    }
+
+    private static void AcknowledgeAccept(TaskData data, AttemptFact fact)
+    {
+        if (data.PendingDispatch is AcceptWorkerDispatch { Request: var request }
+            && request.Task == fact.Task
+            && request.Worker == fact.Worker
+            && request.Attempt == fact.Attempt
+            && request.Revision == fact.Revision)
+        {
+            data.PendingDispatch = null;
+        }
     }
 
     private static TaskSnapshot Snapshot(TaskData data) => new(

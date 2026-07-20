@@ -46,6 +46,8 @@ public static class SimulationCluster
             }
 
             silo.UseInMemoryReminderService();
+            silo.Services.AddGrainService<SpoofReminderService>();
+            silo.Services.AddSingleton<ISpoofReminderServiceClient, SpoofReminderServiceClient>();
             silo.Services.AddSingleton<IReminderTable>(reminderTable);
             silo.Services.Configure<ReminderOptions>(reminders =>
             {

@@ -9,9 +9,15 @@ internal sealed class OwnerBoundCallFilter : IIncomingGrainCallFilter
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        if (IsReminderDelivery(context))
+        if (IsReminderCall(context))
         {
-            return context.Invoke();
+            if (IsTrustedReminderProvider(context.SourceId))
+            {
+                return context.Invoke();
+            }
+
+            throw new NeuronAuthorizationException(
+                $"'{nameof(IRemindable.ReceiveReminder)}' can be called only by the Orleans reminder provider.");
         }
 
         if (OwnerOf(context.SourceId) is not { } caller)
@@ -46,12 +52,13 @@ internal sealed class OwnerBoundCallFilter : IIncomingGrainCallFilter
         return context.Invoke();
     }
 
-    private static bool IsReminderDelivery(IIncomingGrainCallContext context)
-        => context.SourceId is { } source
-            && source.Type.ToString() is { } sourceType
-            && sourceType.StartsWith(GrainServiceTypePrefix, StringComparison.Ordinal)
-            && context.InterfaceMethod?.DeclaringType == typeof(IRemindable)
+    private static bool IsReminderCall(IIncomingGrainCallContext context)
+        => context.InterfaceMethod?.DeclaringType == typeof(IRemindable)
             && context.InterfaceMethod?.Name == nameof(IRemindable.ReceiveReminder);
+
+    private static bool IsTrustedReminderProvider(GrainId? source)
+        => source?.Type.ToString() is { } sourceType
+            && string.Equals(sourceType, ReminderGrainServiceType, StringComparison.Ordinal);
 
     private static bool IsClientEntryPoint(MethodInfo? method)
         => method?.DeclaringType?.GetCustomAttribute<ClientEntryPointAttribute>() is not null;
@@ -68,6 +75,6 @@ internal sealed class OwnerBoundCallFilter : IIncomingGrainCallFilter
         return separator <= 0 ? null : new OwnerId(key[..separator]);
     }
 
-    private const string GrainServiceTypePrefix = "sys.svc.user.";
+    private const string ReminderGrainServiceType = "sys.svc.user.36F5F3BF";
     private const char IdentityPartSeparator = '/';
 }
