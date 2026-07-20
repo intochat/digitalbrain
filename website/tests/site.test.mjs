@@ -183,7 +183,7 @@ test('the open debts are disclosed rather than buried', () => {
 
   const changelog = read('CHANGELOG.md')
   assert.match(changelog, /Known limitations/)
-  assert.match(changelog, /timeline stream/)
+  assert.match(changelog, /per-identity feed/)
   assert.match(changelog, /trusted cluster peer/)
 
   assert.match(read('website', 'packages', 'client.md'), /not\*\* an authentication boundary/)

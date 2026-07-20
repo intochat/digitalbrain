@@ -20,57 +20,73 @@ using var host = builder.Build();
 
 await host.StartAsync();
 
-var brain = new BrainClient(host.Services.GetRequiredService<IGrainFactory>(), new OwnerId("panel"));
+var grains = host.Services.GetRequiredService<IGrainFactory>();
+var brain = new BrainClient(grains, new OwnerId("panel"));
+var moderator = brain.Neuron(nameof(Moderator), "chair");
 
-await brain.FireAsync(nameof(Moderator), "chair", new QuestionAsked("should we ship it?"));
+var verdicts = new FirstMatchWatch(delivery => delivery.Synapse is VerdictReached);
+var verdictReference = grains.CreateObjectReference<IJournalObserver>(verdicts);
 
-var emitted = await Settled(brain.Neuron(nameof(Moderator), "chair"), JournalKind.Outgoing);
-var verdictDelivery = emitted.LastOrDefault(delivery => delivery.Synapse is VerdictReached);
+await moderator.WatchAsync(JournalKind.Outgoing, afterSequence: 0, verdictReference);
 
-IReadOnlyList<SynapseDelivery> recorded = [];
-
-if (verdictDelivery is not null)
+try
 {
-    var scribe = NeuronId.BroadcastReceiver(nameof(Scribe), brain.Owner, verdictDelivery.CorrelationId);
-    recorded = await Settled(brain.Neuron(scribe.Type, scribe.Name), JournalKind.Incoming);
-}
+    await brain.FireAsync(nameof(Moderator), "chair", new QuestionAsked("should we ship it?"));
 
-Console.WriteLine(recorded.Count == 0
-    ? "the panel has not reached a verdict yet"
-    : $"the scribe recorded: {string.Join(" | ", recorded.Select(delivery => delivery.Synapse).OfType<VerdictReached>().Select(verdict => verdict.Verdict))}");
+    var verdictDelivery = await verdicts.AwaitMatchAsync(TimeSpan.FromSeconds(30));
+    var scribeId = NeuronId.BroadcastReceiver(nameof(Scribe), brain.Owner, verdictDelivery.CorrelationId);
+    var scribe = brain.Neuron(scribeId.Type, scribeId.Name);
+
+    var recorded = new FirstMatchWatch(delivery => delivery.Synapse is VerdictReached);
+    var scribeReference = grains.CreateObjectReference<IJournalObserver>(recorded);
+
+    await scribe.WatchAsync(JournalKind.Incoming, afterSequence: 0, scribeReference);
+
+    try
+    {
+        var arrival = await recorded.AwaitMatchAsync(TimeSpan.FromSeconds(30));
+        var verdict = (VerdictReached)arrival.Synapse;
+
+        Console.WriteLine($"the scribe recorded: {verdict.Verdict}");
+    }
+    finally
+    {
+        await scribe.UnwatchAsync(scribeReference);
+    }
+}
+finally
+{
+    await moderator.UnwatchAsync(verdictReference);
+}
 
 await host.StopAsync();
 
-static async Task<IReadOnlyList<SynapseDelivery>> Settled(NeuronHandle neuron, JournalKind kind)
+internal sealed class FirstMatchWatch(Func<SynapseDelivery, bool> match) : IJournalObserver
 {
-    long cursor = 0;
+    private readonly TaskCompletionSource<SynapseDelivery> _matched =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    for (var probe = 0; probe < 100; probe++)
+    public Task ObserveAsync(JournalKind kind, JournalRead read)
     {
-        var journal = await neuron.ReadJournalAsync(kind, cursor);
-        var delta = DeltaOrThrow(journal);
-        cursor = journal.ResumeSequence;
-
-        if (delta.Count > 0 && (kind == JournalKind.Incoming || delta.Any(delivery => delivery.Synapse is VerdictReached)))
+        if (read.ResetSnapshot is not null)
         {
-            return delta;
+            _matched.TrySetException(new InvalidOperationException(
+                $"The panel journal compacted before sequence {read.ResumeSequence}; its verdict payload is no longer available."));
+
+            return Task.CompletedTask;
         }
 
-        await Task.Delay(TimeSpan.FromMilliseconds(100));
+        foreach (var delivery in read.Delta)
+        {
+            if (match(delivery))
+            {
+                _matched.TrySetResult(delivery);
+            }
+        }
+
+        return Task.CompletedTask;
     }
 
-    var final = await neuron.ReadJournalAsync(kind, cursor);
-
-    return DeltaOrThrow(final);
-}
-
-static IReadOnlyList<SynapseDelivery> DeltaOrThrow(JournalRead journal)
-{
-    if (journal.ResetSnapshot is not null)
-    {
-        throw new InvalidOperationException(
-            $"The panel journal compacted before sequence {journal.ResumeSequence}; its verdict payload is no longer available.");
-    }
-
-    return journal.Delta;
+    public Task<SynapseDelivery> AwaitMatchAsync(TimeSpan limit)
+        => _matched.Task.WaitAsync(limit);
 }
