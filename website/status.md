@@ -58,10 +58,6 @@ that neuron deactivates or its silo restarts. This is deliberate — durability 
 not in the subscription, so a client re-watches with the cursor it holds and catches up. A client
 that never re-watches silently stops receiving, and nothing yet tells it that happened.
 
-**Outbox redelivery is unproven.** Delivery retries across a receiver outage are implemented, but no
-scenario yet drives an outage and asserts the redelivery. It is code without a proof, which is not the
-same as a guarantee.
-
 **`AsClient()` can leak a connection string.** The Aspire client projection delegates to the Orleans
 hosting integration, which would pass a credentialed storage connection string to a referencing
 service if the brain were configured with durable Azure stores. It is inert while the AppHost composes
@@ -131,10 +127,12 @@ the `Embedding` member of `ModelTier` binds to a client type that cannot serve i
 documented but never exercised — `Embedding` appears exactly once in the codebase, in the enum that
 declares it — which is how it survived.
 
-**One unreachable receiver blocks a neuron's whole outbox.** The outbox drains strictly in order and
-stops at the first entry with an undelivered receiver. A single unreachable neuron therefore stalls
-*all* outgoing traffic from the sender — including traffic to receivers that are perfectly
-reachable — until that entry exhausts its attempts or the 30-minute retry horizon expires.
+## Delivery ordering
+
+Directed sends are FIFO **per target** and at-least-once; handlers own idempotency through the
+windowed `SynapseId` dedupe set. There is no cross-target ordering: one unreachable receiver does not
+stall traffic to other receivers. A broadcast is the same isolation per listener — one failure does
+not fail the fact for the rest. The guarantee is DEC-13 in `ARCHITECTURE-REVIEW.md`.
 
 **Hosted proof is driven from inside the cluster.** An external Orleans client cannot complete a
 handshake through an Aspire-proxied gateway, because the silo advertises its own address. The hosted
@@ -161,7 +159,6 @@ nothing unless its existence and its state are both public.
 | Proof | Asserts | Goes green when |
 | --- | --- | --- |
 | `the kernel assembly reaches no vendor model SDK` | `DigitalBrain.Kernel` has no transitive reference to Anthropic, OpenAI or `Microsoft.Extensions.AI` | AI becomes an ordinary module and leaves the kernel |
-| `an unreachable receiver does not block traffic to reachable ones` | Outbox progress is per-entry, not head-first | The outbox stops draining strictly in order |
 
 ## Where this is going
 

@@ -55,6 +55,11 @@ public sealed class SynapseObserver : IDisposable
 
     private void Record(Activity activity)
     {
+        if (activity.Status == ActivityStatusCode.Error)
+        {
+            return;
+        }
+
         var receiver = activity.GetTagItem(SynapseTelemetry.ReceiverTag) as string;
         var synapse = activity.GetTagItem(SynapseTelemetry.SynapseTag) as string;
 

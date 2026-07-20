@@ -703,6 +703,24 @@ accident, not attack. This lineage's recorded failure was not weak enforcement �
 privileged call had fired. The failure was weak enforcement **described as strong**. Naming this a
 safety property is what keeps that from recurring.
 
+### DEC-13 — Delivery ordering is per-target, not global FIFO
+
+**Ratified 2026-07-20 (human-approved at Phase 2.9).** The outbox no longer promises global FIFO
+across receivers. The guarantee is stated per verb because DEC-9 separates them:
+
+| Verb | Ordering | Delivery | Failure isolation |
+|---|---|---|---|
+| **Directed request** (`SendAsync` / `ReplyAsync`) | FIFO **per target** | at-least-once; handler-owned idempotency via `SynapseId` dedupe | one unreachable target does not stall other targets |
+| **Undirected fact** (`EmitAsync`) | none across receivers | at-least-once per receiver; same dedupe | one listener's failure does not fail the broadcast |
+
+No cross-target ordering is promised. Two sends to different neurons may complete in either order.
+Two sends to the **same** neuron complete in the order they entered the outbox.
+
+**Why this shape:** the prior drain broke on the first undelivered receiver of `_outbox[0]`, so one
+dead target stalled every later entry for up to the 30-minute retry horizon. That was an unstated
+global-FIFO accident, not a product requirement. Per-target FIFO keeps the only ordering a handler
+can usefully rely on (its own inbound sequence) without head-of-line blocking.
+
 ---
 
 ## 4. Target architecture
@@ -1034,12 +1052,11 @@ cursor-based read. Every consumer changes: `BrainClient`, `NeuronHandle`, both s
 **Why wrong:** one unreachable receiver stalls all outgoing traffic from that neuron for up to
 the 30-minute retry horizon (§2.5). Undocumented.
 
-**Replaces:** per-receiver progress. An entry with a failing receiver must not block entries
-behind it.
+**Replaces:** per-receiver progress under DEC-13. An entry with a failing receiver must not block
+entries behind it that target other receivers; per-target FIFO is preserved by skipping a later
+entry's receiver while an earlier entry still has that receiver pending.
 
-**Breaks:** delivery ordering guarantees. **This needs an explicit decision on what ordering is
-promised** — currently the code promises FIFO by construction and the documentation does not
-state it. Resolve before implementing.
+**Breaks:** the unstated global-FIFO accident. Replaced by DEC-13's documented guarantee.
 
 **Proves it:** a scenario with one unreachable receiver asserting that traffic to reachable
 receivers continues to flow.
@@ -1637,16 +1654,9 @@ measurement. **Narrowed:** the generator is no longer decorative regardless of t
 §4.2 makes the contract manifest the thing a module descriptor's wiring half is generated from,
 so the generator becomes load-bearing at Phase 3.3 even if reflection keeps the dispatch path.
 
-**Delivery ordering (R-2).** The code currently promises FIFO by construction; nothing documents
-it. Fixing head-of-line blocking changes an unstated guarantee. State the guarantee first.
-**Confirmed by the harvest: no prior generation states one either.** `final` forbids asserting
-order in three separate documents (*"flaky by design"*); `brain_from_master`'s outbox is
-single-destination and never met the problem. There is nothing to inherit. Two useful fragments:
-ino's vocabulary for the promise it did make elsewhere — *"best-effort ordering within a target,
-at-least-once, idempotency is the handler's responsibility"* — and its split by verb, where a
-broadcast returns `reached_count`/`failed_count`/`failed_grain_types` and *"one listener's failure
-doesn't fail the broadcast."* **A directed request and an undirected fact cannot share an ordering
-guarantee**, which DEC-9 already separates.
+**~~Delivery ordering (R-2).~~ Resolved by DEC-13.** Per-target FIFO for directed requests;
+at-least-once with handler-owned idempotency; no cross-target ordering; one broadcast listener's
+failure does not fail the broadcast. Recorded before the drain rewrite at Phase 2.9.
 
 **~~`IEmit<T>`'s future.~~ Resolved.** §4.2: the descriptor does not restate the wiring graph, so
 `IEmit<T>` is not redundant with it — it is the canonical declaration the wiring half is generated

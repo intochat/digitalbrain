@@ -109,8 +109,10 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
 
             await NotifyWatchersAsync();
         }
-        catch
+        catch (Exception failure)
         {
+            handling?.SetStatus(ActivityStatusCode.Error, failure.Message);
+
             Discard(_outbox, committedOutbox);
             Discard(_handled, committedHandled);
 
@@ -394,45 +396,78 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
 
     private async Task DrainAsync(CancellationToken cancellationToken)
     {
-        while (_outbox.Count > 0)
-        {
-            var committed = _entries.Deserialize(_outbox[0]);
-            var entry = committed with { Attempts = committed.Attempts + 1 };
+        var blockedTargets = new HashSet<NeuronId>();
 
-            if (entry.Depth > DeliveryPolicy.MaximumDepth)
+        for (var index = 0; index < _outbox.Count;)
+        {
+            var committed = _entries.Deserialize(_outbox[index]);
+
+            if (committed.Depth > DeliveryPolicy.MaximumDepth)
             {
-                Abandon(entry, $"exceeded the maximum synapse depth of {DeliveryPolicy.MaximumDepth}");
-                _outbox.RemoveAt(0);
+                Abandon(committed, $"exceeded the maximum synapse depth of {DeliveryPolicy.MaximumDepth}");
+                _outbox.RemoveAt(index);
 
                 continue;
             }
 
-            var undelivered = new List<NeuronId>();
+            var attemptable = committed.Pending.Where(receiver => !blockedTargets.Contains(receiver)).ToArray();
 
-            foreach (var receiver in entry.Pending)
+            if (attemptable.Length == 0)
             {
-                if (!await TryDeliverAsync(entry, receiver))
+                foreach (var receiver in committed.Pending)
                 {
-                    undelivered.Add(receiver);
+                    blockedTargets.Add(receiver);
                 }
+
+                index++;
+
+                continue;
             }
 
-            if (undelivered.Count > 0)
+            var entry = committed with { Attempts = committed.Attempts + 1 };
+            var stillPending = new List<NeuronId>();
+
+            foreach (var receiver in committed.Pending)
             {
-                if (Exhausted(entry))
+                if (blockedTargets.Contains(receiver))
                 {
-                    Abandon(entry, $"undeliverable to {string.Join(", ", undelivered)} after {entry.Attempts} attempts");
-                    _outbox.RemoveAt(0);
+                    stillPending.Add(receiver);
 
                     continue;
                 }
 
-                _outbox[0] = _entries.SerializeToArray(entry with { Pending = [.. undelivered] });
+                if (await TryDeliverAsync(entry, receiver))
+                {
+                    continue;
+                }
 
-                break;
+                stillPending.Add(receiver);
+                blockedTargets.Add(receiver);
             }
 
-            _outbox.RemoveAt(0);
+            if (stillPending.Count == 0)
+            {
+                _outbox.RemoveAt(index);
+
+                continue;
+            }
+
+            if (Exhausted(entry))
+            {
+                Abandon(entry with { Pending = [.. stillPending] },
+                    $"undeliverable to {string.Join(", ", stillPending)} after {entry.Attempts} attempts");
+                _outbox.RemoveAt(index);
+
+                foreach (var receiver in stillPending)
+                {
+                    blockedTargets.Remove(receiver);
+                }
+
+                continue;
+            }
+
+            _outbox[index] = _entries.SerializeToArray(entry with { Pending = [.. stillPending] });
+            index++;
         }
 
         await CommitAsync(cancellationToken);
