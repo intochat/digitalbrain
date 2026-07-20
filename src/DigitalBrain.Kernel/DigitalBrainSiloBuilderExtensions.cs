@@ -24,6 +24,7 @@ public static class DigitalBrainSiloBuilderExtensions
         builder.AddJournalStorage();
         builder.UseJsonJournalFormat(JournalJsonContext.Default);
         builder.AddIncomingGrainCallFilter<OwnerBoundCallFilter>();
+        builder.AddOutgoingGrainCallFilter<OutgoingReificationFilter>();
         builder.UseSiloMetadata(metadata);
         builder.Services.AddPinToSiloPlacement();
         builder.Services.AddSingleton(services =>

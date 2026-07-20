@@ -1,5 +1,10 @@
 Feature: Durable synapse fabric
 
+Scenario: a capability call is reified on the caller's outgoing journal
+    Given a brain for owner "reify"
+    When Ping is sent to the CapabilityCaller neuron named "caller"
+    Then the outgoing journal of the CapabilityCaller neuron named "caller" contains CapabilityCall
+
 Scenario: a point-to-point synapse reaches the neuron it is addressed to
     Given a brain for owner "delivery"
     When Ping is sent to the Relay neuron named "asker"

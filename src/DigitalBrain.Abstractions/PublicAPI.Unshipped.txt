@@ -1,4 +1,14 @@
 #nullable enable
+DigitalBrain.Abstractions.CapabilityCall
+DigitalBrain.Abstractions.CapabilityCall.CapabilityCall(string! Interface, string! Method, string! Target) -> void
+DigitalBrain.Abstractions.CapabilityCall.Deconstruct(out string! Interface, out string! Method, out string! Target) -> void
+DigitalBrain.Abstractions.CapabilityCall.Equals(DigitalBrain.Abstractions.CapabilityCall? other) -> bool
+DigitalBrain.Abstractions.CapabilityCall.Interface.get -> string!
+DigitalBrain.Abstractions.CapabilityCall.Interface.init -> void
+DigitalBrain.Abstractions.CapabilityCall.Method.get -> string!
+DigitalBrain.Abstractions.CapabilityCall.Method.init -> void
+DigitalBrain.Abstractions.CapabilityCall.Target.get -> string!
+DigitalBrain.Abstractions.CapabilityCall.Target.init -> void
 DigitalBrain.Abstractions.ClientEntryPointAttribute
 DigitalBrain.Abstractions.ClientEntryPointAttribute.ClientEntryPointAttribute() -> void
 DigitalBrain.Abstractions.CorrelationId
@@ -129,9 +139,14 @@ override DigitalBrain.Abstractions.NeuronId.GetHashCode() -> int
 override DigitalBrain.Abstractions.NeuronId.ToString() -> string!
 override DigitalBrain.Abstractions.OwnerId.GetHashCode() -> int
 override DigitalBrain.Abstractions.OwnerId.ToString() -> string!
+override DigitalBrain.Abstractions.CapabilityCall.<Clone>$() -> DigitalBrain.Abstractions.CapabilityCall!
+override DigitalBrain.Abstractions.CapabilityCall.Equals(object? obj) -> bool
+override DigitalBrain.Abstractions.CapabilityCall.GetHashCode() -> int
+override DigitalBrain.Abstractions.CapabilityCall.ToString() -> string!
 override DigitalBrain.Abstractions.Synapse.Equals(object? obj) -> bool
 override DigitalBrain.Abstractions.Synapse.GetHashCode() -> int
 override DigitalBrain.Abstractions.Synapse.ToString() -> string!
+override sealed DigitalBrain.Abstractions.CapabilityCall.Equals(DigitalBrain.Abstractions.Synapse? other) -> bool
 override DigitalBrain.Abstractions.SynapseId.GetHashCode() -> int
 override DigitalBrain.Abstractions.SynapseId.ToString() -> string!
 static DigitalBrain.Abstractions.CorrelationId.New() -> DigitalBrain.Abstractions.CorrelationId
@@ -152,6 +167,8 @@ static DigitalBrain.Abstractions.NeuronId.operator !=(DigitalBrain.Abstractions.
 static DigitalBrain.Abstractions.NeuronId.operator ==(DigitalBrain.Abstractions.NeuronId left, DigitalBrain.Abstractions.NeuronId right) -> bool
 static DigitalBrain.Abstractions.OwnerId.operator !=(DigitalBrain.Abstractions.OwnerId left, DigitalBrain.Abstractions.OwnerId right) -> bool
 static DigitalBrain.Abstractions.OwnerId.operator ==(DigitalBrain.Abstractions.OwnerId left, DigitalBrain.Abstractions.OwnerId right) -> bool
+static DigitalBrain.Abstractions.CapabilityCall.operator !=(DigitalBrain.Abstractions.CapabilityCall? left, DigitalBrain.Abstractions.CapabilityCall? right) -> bool
+static DigitalBrain.Abstractions.CapabilityCall.operator ==(DigitalBrain.Abstractions.CapabilityCall? left, DigitalBrain.Abstractions.CapabilityCall? right) -> bool
 static DigitalBrain.Abstractions.Synapse.operator !=(DigitalBrain.Abstractions.Synapse? left, DigitalBrain.Abstractions.Synapse? right) -> bool
 static DigitalBrain.Abstractions.Synapse.operator ==(DigitalBrain.Abstractions.Synapse? left, DigitalBrain.Abstractions.Synapse? right) -> bool
 static DigitalBrain.Abstractions.SynapseId.New() -> DigitalBrain.Abstractions.SynapseId

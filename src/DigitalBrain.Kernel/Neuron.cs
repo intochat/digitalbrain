@@ -224,6 +224,32 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         return FireAsync(synapse, [answered.Caller]);
     }
 
+    internal async Task ReifyCapabilityCallAsync(string interfaceName, string methodName, string target)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(interfaceName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(methodName);
+
+        var sequence = _outgoing.NextSequence
+            + (_handling is null ? 0 : _firedWhileHandling.Count);
+        var delivery = SynapseDelivery.Create(
+            new CapabilityCall(interfaceName, methodName, target),
+            Id,
+            sequence,
+            _handling,
+            _clock);
+
+        if (_handling is null)
+        {
+            _outgoing.Append(delivery);
+            await CommitAsync(CancellationToken.None);
+            await NotifyWatchersAsync();
+        }
+        else
+        {
+            _firedWhileHandling.Add(delivery);
+        }
+    }
+
     protected async Task EmitAsync(Synapse synapse)
     {
         ArgumentNullException.ThrowIfNull(synapse);

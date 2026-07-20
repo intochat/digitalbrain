@@ -13,6 +13,7 @@ public sealed class SerializationContracts
     {
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
+            [nameof(CapabilityCall)] = "db.capability-call",
             [nameof(Synapse)] = "db.synapse",
             [nameof(SynapseDelivery)] = "db.synapse-delivery",
             [nameof(SynapseId)] = "db.synapse-id",
@@ -32,7 +33,7 @@ public sealed class SerializationContracts
         };
 
         var declared = Abstractions.GetExportedTypes()
-            .Select(type => (type.Name, Alias: type.GetCustomAttribute<AliasAttribute>()?.Alias))
+            .Select(type => (type.Name, Alias: type.GetCustomAttributes<AliasAttribute>(inherit: false).FirstOrDefault()?.Alias))
             .Where(entry => entry.Alias is not null)
             .ToDictionary(entry => entry.Name, entry => entry.Alias!, StringComparer.Ordinal);
 
@@ -43,9 +44,9 @@ public sealed class SerializationContracts
     public void EverySerializableTypeDeclaresGenerateSerializer()
     {
         var aliasedWithoutSerializer = Abstractions.GetExportedTypes()
-            .Where(type => type.GetCustomAttribute<AliasAttribute>() is not null)
+            .Where(type => type.GetCustomAttributes<AliasAttribute>(inherit: false).Any())
             .Where(type => !type.IsEnum && !type.IsInterface)
-            .Where(type => type.GetCustomAttribute<GenerateSerializerAttribute>() is null)
+            .Where(type => type.GetCustomAttribute<GenerateSerializerAttribute>(inherit: false) is null)
             .Select(type => type.FullName)
             .ToList();
 

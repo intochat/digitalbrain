@@ -20,3 +20,9 @@ internal sealed class Echo : Neuron, IHandle<Ping>, IEchoProbe
 
     public Task PokeAsync() => Task.CompletedTask;
 }
+
+internal sealed class CapabilityCaller : Neuron, IHandle<Ping>
+{
+    public Task HandleAsync(Ping synapse, CancellationToken cancellationToken)
+        => GrainFactory.GetGrain<IEchoProbe>(NeuronId.For<Echo>(Id.Owner, "probe").ToGrainId()).PokeAsync();
+}

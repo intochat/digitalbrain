@@ -50,8 +50,9 @@ envelope the kernel owns and the author never constructs:
 public sealed record NewMail(string From, string Subject, string Body);
 ```
 
-*Status: facts, thin records, kernel-owned delivery envelopes, journals, and delivery are built.
-Call reification is designed and not yet built.*
+*Status: facts, thin records, kernel-owned delivery envelopes, journals, delivery, and call
+reification (outgoing filter onto the caller's feed for non-framework capability interfaces) are
+built.*
 
 ## Vocabulary and behavior
 
