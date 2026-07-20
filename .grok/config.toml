@@ -1,0 +1,5 @@
+# Project plugin enablement (mirrors .claude/settings.json → mattpocock-skills@mattpocock).
+# Install once per machine: grok plugin install mattpocock/skills --trust
+
+[plugins]
+enabled = ["mattpocock-skills"]

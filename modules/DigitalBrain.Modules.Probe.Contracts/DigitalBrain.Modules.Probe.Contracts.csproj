@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <Description>Contracts for the Probe sample module: leaf package, zero package dependencies of its own.</Description>
+    <RootNamespace>DigitalBrain.Modules.Probe.Contracts</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

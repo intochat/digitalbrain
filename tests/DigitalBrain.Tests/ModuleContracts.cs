@@ -42,6 +42,20 @@ public sealed class ModuleContracts
         Assert.Contains("duplicate capability", failure.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact(DisplayName = "module handler wiring is generated from interfaces and matches reflection")]
+    public void ModuleHandlerWiringMatchesReflection()
+    {
+        var assembly = typeof(DigitalBrain.Modules.Probe.ProbeModule).Assembly;
+
+        ModuleWiring.EnsureManifestMatchesReflection(assembly);
+
+        var handlers = ModuleWiring.HandlerWiring(assembly);
+        Assert.Contains(
+            handlers,
+            entry => entry.Neuron.Contains("ProbeEchoNeuron", StringComparison.Ordinal)
+                && entry.Synapse.Contains("ProbePinged", StringComparison.Ordinal));
+    }
+
     private sealed class InconsistentModule : IModule
     {
         public ModuleDescriptor Descriptor { get; } = new(

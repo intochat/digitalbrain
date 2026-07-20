@@ -15,9 +15,14 @@
     <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
     <Project Path="hosts/DigitalBrain.TestingAppHost/DigitalBrain.TestingAppHost.csproj" />
   </Folder>
+  <Folder Name="/modules/">
+    <Project Path="modules/DigitalBrain.Modules.Probe.Contracts/DigitalBrain.Modules.Probe.Contracts.csproj" />
+    <Project Path="modules/DigitalBrain.Modules.Probe/DigitalBrain.Modules.Probe.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Simulations/DigitalBrain.Simulations.csproj" />
     <Project Path="tests/DigitalBrain.HostTests/DigitalBrain.HostTests.csproj" />
   </Folder>
 </Solution>
+

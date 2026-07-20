@@ -12,6 +12,7 @@ public static class ModuleComposition
 
         var module = new TModule();
         Validate(module);
+        ModuleWiring.EnsureManifestMatchesReflection(typeof(TModule).Assembly);
         builder.Services.AddSingleton<IModule>(module);
         builder.AddBroadcastHandlers(typeof(TModule).Assembly);
 

@@ -285,3 +285,104 @@ static DigitalBrain.Abstractions.ModuleDescriptor.operator ==(DigitalBrain.Abstr
 static DigitalBrain.Abstractions.SecretRequirement.operator !=(DigitalBrain.Abstractions.SecretRequirement? left, DigitalBrain.Abstractions.SecretRequirement? right) -> bool
 static DigitalBrain.Abstractions.SecretRequirement.operator ==(DigitalBrain.Abstractions.SecretRequirement? left, DigitalBrain.Abstractions.SecretRequirement? right) -> bool
 DigitalBrain.Abstractions.ModuleCompositionException.ModuleCompositionException() -> void
+abstract DigitalBrain.Abstractions.ConnectionHealth.<Clone>$() -> DigitalBrain.Abstractions.ConnectionHealth!
+DigitalBrain.Abstractions.ConnectionHealth
+DigitalBrain.Abstractions.ConnectionHealth.ConnectionHealth() -> void
+DigitalBrain.Abstractions.ConnectionHealth.ConnectionHealth(DigitalBrain.Abstractions.ConnectionHealth! original) -> void
+DigitalBrain.Abstractions.ConnectionHealthy
+DigitalBrain.Abstractions.ConnectionHealthy.ConnectionHealthy() -> void
+DigitalBrain.Abstractions.ConnectionHealthy.Equals(DigitalBrain.Abstractions.ConnectionHealthy? other) -> bool
+DigitalBrain.Abstractions.ConnectionLifecycleState
+DigitalBrain.Abstractions.ConnectionLifecycleState.Authorized = 2 -> DigitalBrain.Abstractions.ConnectionLifecycleState
+DigitalBrain.Abstractions.ConnectionLifecycleState.Authorizing = 1 -> DigitalBrain.Abstractions.ConnectionLifecycleState
+DigitalBrain.Abstractions.ConnectionLifecycleState.Expired = 3 -> DigitalBrain.Abstractions.ConnectionLifecycleState
+DigitalBrain.Abstractions.ConnectionLifecycleState.NotConfigured = 0 -> DigitalBrain.Abstractions.ConnectionLifecycleState
+DigitalBrain.Abstractions.ConnectionLifecycleState.Revoked = 4 -> DigitalBrain.Abstractions.ConnectionLifecycleState
+DigitalBrain.Abstractions.ConnectionMissingAppCredentials
+DigitalBrain.Abstractions.ConnectionMissingAppCredentials.ConnectionMissingAppCredentials(string! Detail) -> void
+DigitalBrain.Abstractions.ConnectionMissingAppCredentials.Deconstruct(out string! Detail) -> void
+DigitalBrain.Abstractions.ConnectionMissingAppCredentials.Detail.get -> string!
+DigitalBrain.Abstractions.ConnectionMissingAppCredentials.Detail.init -> void
+DigitalBrain.Abstractions.ConnectionMissingAppCredentials.Equals(DigitalBrain.Abstractions.ConnectionMissingAppCredentials? other) -> bool
+DigitalBrain.Abstractions.ConnectionNetworkError
+DigitalBrain.Abstractions.ConnectionNetworkError.ConnectionNetworkError(string! Detail) -> void
+DigitalBrain.Abstractions.ConnectionNetworkError.Deconstruct(out string! Detail) -> void
+DigitalBrain.Abstractions.ConnectionNetworkError.Detail.get -> string!
+DigitalBrain.Abstractions.ConnectionNetworkError.Detail.init -> void
+DigitalBrain.Abstractions.ConnectionNetworkError.Equals(DigitalBrain.Abstractions.ConnectionNetworkError? other) -> bool
+DigitalBrain.Abstractions.ConnectionNotAuthorized
+DigitalBrain.Abstractions.ConnectionNotAuthorized.ConnectionNotAuthorized() -> void
+DigitalBrain.Abstractions.ConnectionNotAuthorized.Equals(DigitalBrain.Abstractions.ConnectionNotAuthorized? other) -> bool
+DigitalBrain.Abstractions.ConnectionNotConfigured
+DigitalBrain.Abstractions.ConnectionNotConfigured.ConnectionNotConfigured() -> void
+DigitalBrain.Abstractions.ConnectionNotConfigured.Equals(DigitalBrain.Abstractions.ConnectionNotConfigured? other) -> bool
+DigitalBrain.Abstractions.ConnectionProviderError
+DigitalBrain.Abstractions.ConnectionProviderError.ConnectionProviderError(string! Detail) -> void
+DigitalBrain.Abstractions.ConnectionProviderError.Deconstruct(out string! Detail) -> void
+DigitalBrain.Abstractions.ConnectionProviderError.Detail.get -> string!
+DigitalBrain.Abstractions.ConnectionProviderError.Detail.init -> void
+DigitalBrain.Abstractions.ConnectionProviderError.Equals(DigitalBrain.Abstractions.ConnectionProviderError? other) -> bool
+DigitalBrain.Abstractions.ConnectionTokenExpired
+DigitalBrain.Abstractions.ConnectionTokenExpired.ConnectionTokenExpired() -> void
+DigitalBrain.Abstractions.ConnectionTokenExpired.Equals(DigitalBrain.Abstractions.ConnectionTokenExpired? other) -> bool
+DigitalBrain.Abstractions.IConnectionProviderAdapter
+DigitalBrain.Abstractions.IConnectionProviderAdapter.ExchangeAuthorizationCodeAsync(string! code, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.ConnectionHealth!>!
+DigitalBrain.Abstractions.IConnectionProviderAdapter.Provider.get -> string!
+DigitalBrain.Abstractions.IConnectionProviderAdapter.RefreshAsync(string! refreshToken, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.ConnectionHealth!>!
+override DigitalBrain.Abstractions.ConnectionHealth.Equals(object? obj) -> bool
+override DigitalBrain.Abstractions.ConnectionHealth.GetHashCode() -> int
+override DigitalBrain.Abstractions.ConnectionHealth.ToString() -> string!
+override DigitalBrain.Abstractions.ConnectionHealthy.<Clone>$() -> DigitalBrain.Abstractions.ConnectionHealthy!
+override DigitalBrain.Abstractions.ConnectionHealthy.Equals(object? obj) -> bool
+override DigitalBrain.Abstractions.ConnectionHealthy.GetHashCode() -> int
+override DigitalBrain.Abstractions.ConnectionHealthy.ToString() -> string!
+override DigitalBrain.Abstractions.ConnectionMissingAppCredentials.<Clone>$() -> DigitalBrain.Abstractions.ConnectionMissingAppCredentials!
+override DigitalBrain.Abstractions.ConnectionMissingAppCredentials.Equals(object? obj) -> bool
+override DigitalBrain.Abstractions.ConnectionMissingAppCredentials.GetHashCode() -> int
+override DigitalBrain.Abstractions.ConnectionMissingAppCredentials.ToString() -> string!
+override DigitalBrain.Abstractions.ConnectionNetworkError.<Clone>$() -> DigitalBrain.Abstractions.ConnectionNetworkError!
+override DigitalBrain.Abstractions.ConnectionNetworkError.Equals(object? obj) -> bool
+override DigitalBrain.Abstractions.ConnectionNetworkError.GetHashCode() -> int
+override DigitalBrain.Abstractions.ConnectionNetworkError.ToString() -> string!
+override DigitalBrain.Abstractions.ConnectionNotAuthorized.<Clone>$() -> DigitalBrain.Abstractions.ConnectionNotAuthorized!
+override DigitalBrain.Abstractions.ConnectionNotAuthorized.Equals(object? obj) -> bool
+override DigitalBrain.Abstractions.ConnectionNotAuthorized.GetHashCode() -> int
+override DigitalBrain.Abstractions.ConnectionNotAuthorized.ToString() -> string!
+override DigitalBrain.Abstractions.ConnectionNotConfigured.<Clone>$() -> DigitalBrain.Abstractions.ConnectionNotConfigured!
+override DigitalBrain.Abstractions.ConnectionNotConfigured.Equals(object? obj) -> bool
+override DigitalBrain.Abstractions.ConnectionNotConfigured.GetHashCode() -> int
+override DigitalBrain.Abstractions.ConnectionNotConfigured.ToString() -> string!
+override DigitalBrain.Abstractions.ConnectionProviderError.<Clone>$() -> DigitalBrain.Abstractions.ConnectionProviderError!
+override DigitalBrain.Abstractions.ConnectionProviderError.Equals(object? obj) -> bool
+override DigitalBrain.Abstractions.ConnectionProviderError.GetHashCode() -> int
+override DigitalBrain.Abstractions.ConnectionProviderError.ToString() -> string!
+override DigitalBrain.Abstractions.ConnectionTokenExpired.<Clone>$() -> DigitalBrain.Abstractions.ConnectionTokenExpired!
+override DigitalBrain.Abstractions.ConnectionTokenExpired.Equals(object? obj) -> bool
+override DigitalBrain.Abstractions.ConnectionTokenExpired.GetHashCode() -> int
+override DigitalBrain.Abstractions.ConnectionTokenExpired.ToString() -> string!
+override sealed DigitalBrain.Abstractions.ConnectionHealthy.Equals(DigitalBrain.Abstractions.ConnectionHealth? other) -> bool
+override sealed DigitalBrain.Abstractions.ConnectionMissingAppCredentials.Equals(DigitalBrain.Abstractions.ConnectionHealth? other) -> bool
+override sealed DigitalBrain.Abstractions.ConnectionNetworkError.Equals(DigitalBrain.Abstractions.ConnectionHealth? other) -> bool
+override sealed DigitalBrain.Abstractions.ConnectionNotAuthorized.Equals(DigitalBrain.Abstractions.ConnectionHealth? other) -> bool
+override sealed DigitalBrain.Abstractions.ConnectionNotConfigured.Equals(DigitalBrain.Abstractions.ConnectionHealth? other) -> bool
+override sealed DigitalBrain.Abstractions.ConnectionProviderError.Equals(DigitalBrain.Abstractions.ConnectionHealth? other) -> bool
+override sealed DigitalBrain.Abstractions.ConnectionTokenExpired.Equals(DigitalBrain.Abstractions.ConnectionHealth? other) -> bool
+static DigitalBrain.Abstractions.ConnectionHealth.operator !=(DigitalBrain.Abstractions.ConnectionHealth? left, DigitalBrain.Abstractions.ConnectionHealth? right) -> bool
+static DigitalBrain.Abstractions.ConnectionHealth.operator ==(DigitalBrain.Abstractions.ConnectionHealth? left, DigitalBrain.Abstractions.ConnectionHealth? right) -> bool
+static DigitalBrain.Abstractions.ConnectionHealthy.operator !=(DigitalBrain.Abstractions.ConnectionHealthy? left, DigitalBrain.Abstractions.ConnectionHealthy? right) -> bool
+static DigitalBrain.Abstractions.ConnectionHealthy.operator ==(DigitalBrain.Abstractions.ConnectionHealthy? left, DigitalBrain.Abstractions.ConnectionHealthy? right) -> bool
+static DigitalBrain.Abstractions.ConnectionMissingAppCredentials.operator !=(DigitalBrain.Abstractions.ConnectionMissingAppCredentials? left, DigitalBrain.Abstractions.ConnectionMissingAppCredentials? right) -> bool
+static DigitalBrain.Abstractions.ConnectionMissingAppCredentials.operator ==(DigitalBrain.Abstractions.ConnectionMissingAppCredentials? left, DigitalBrain.Abstractions.ConnectionMissingAppCredentials? right) -> bool
+static DigitalBrain.Abstractions.ConnectionNetworkError.operator !=(DigitalBrain.Abstractions.ConnectionNetworkError? left, DigitalBrain.Abstractions.ConnectionNetworkError? right) -> bool
+static DigitalBrain.Abstractions.ConnectionNetworkError.operator ==(DigitalBrain.Abstractions.ConnectionNetworkError? left, DigitalBrain.Abstractions.ConnectionNetworkError? right) -> bool
+static DigitalBrain.Abstractions.ConnectionNotAuthorized.operator !=(DigitalBrain.Abstractions.ConnectionNotAuthorized? left, DigitalBrain.Abstractions.ConnectionNotAuthorized? right) -> bool
+static DigitalBrain.Abstractions.ConnectionNotAuthorized.operator ==(DigitalBrain.Abstractions.ConnectionNotAuthorized? left, DigitalBrain.Abstractions.ConnectionNotAuthorized? right) -> bool
+static DigitalBrain.Abstractions.ConnectionNotConfigured.operator !=(DigitalBrain.Abstractions.ConnectionNotConfigured? left, DigitalBrain.Abstractions.ConnectionNotConfigured? right) -> bool
+static DigitalBrain.Abstractions.ConnectionNotConfigured.operator ==(DigitalBrain.Abstractions.ConnectionNotConfigured? left, DigitalBrain.Abstractions.ConnectionNotConfigured? right) -> bool
+static DigitalBrain.Abstractions.ConnectionProviderError.operator !=(DigitalBrain.Abstractions.ConnectionProviderError? left, DigitalBrain.Abstractions.ConnectionProviderError? right) -> bool
+static DigitalBrain.Abstractions.ConnectionProviderError.operator ==(DigitalBrain.Abstractions.ConnectionProviderError? left, DigitalBrain.Abstractions.ConnectionProviderError? right) -> bool
+static DigitalBrain.Abstractions.ConnectionTokenExpired.operator !=(DigitalBrain.Abstractions.ConnectionTokenExpired? left, DigitalBrain.Abstractions.ConnectionTokenExpired? right) -> bool
+static DigitalBrain.Abstractions.ConnectionTokenExpired.operator ==(DigitalBrain.Abstractions.ConnectionTokenExpired? left, DigitalBrain.Abstractions.ConnectionTokenExpired? right) -> bool
+virtual DigitalBrain.Abstractions.ConnectionHealth.EqualityContract.get -> System.Type!
+virtual DigitalBrain.Abstractions.ConnectionHealth.Equals(DigitalBrain.Abstractions.ConnectionHealth? other) -> bool
+virtual DigitalBrain.Abstractions.ConnectionHealth.PrintMembers(System.Text.StringBuilder! builder) -> bool
