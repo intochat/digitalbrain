@@ -53,7 +53,7 @@ override DigitalBrain.Kernel.SynapseWiringEntry.GetHashCode() -> int
 override DigitalBrain.Kernel.SynapseWiringEntry.ToString() -> string!
 override sealed DigitalBrain.Kernel.Neuron.OnActivateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 static DigitalBrain.Kernel.DigitalBrainSiloBuilderExtensions.AddBroadcastHandlers(this Orleans.Hosting.ISiloBuilder! builder, System.Reflection.Assembly! assembly) -> Orleans.Hosting.ISiloBuilder!
-static DigitalBrain.Kernel.DigitalBrainRuntime.Add(Orleans.Hosting.ISiloBuilder! builder, string? siloLabel) -> Orleans.Hosting.ISiloBuilder!
+static DigitalBrain.Kernel.DigitalBrainRuntime.Add(Orleans.Hosting.ISiloBuilder! builder, string? siloLabel, System.Collections.Generic.IReadOnlyCollection<string!>! availableModules) -> System.Collections.Generic.IReadOnlySet<string!>!
 static DigitalBrain.Kernel.JournalStorageHosting.AddDigitalBrainJournalStorage(this Orleans.Hosting.ISiloBuilder! builder, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Orleans.Hosting.ISiloBuilder!
 static DigitalBrain.Kernel.PinToSiloExtensions.AddPinToSiloPlacement(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static DigitalBrain.Kernel.SynapseWiring.HandledSynapseTypes(System.Type! neuronType) -> System.Collections.Generic.IReadOnlyCollection<System.Type!>!

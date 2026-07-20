@@ -199,12 +199,27 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         source.AppendLine("            this global::Orleans.Hosting.ISiloBuilder builder,");
         source.AppendLine("            string? siloLabel)");
         source.AppendLine("        {");
-        source.AppendLine("            global::DigitalBrain.Kernel.DigitalBrainRuntime.Add(builder, siloLabel);");
+        source.AppendLine("            var selectedModules = global::DigitalBrain.Kernel.DigitalBrainRuntime.Add(");
+        source.AppendLine("                builder,");
+        source.AppendLine("                siloLabel,");
+        source.AppendLine("                new string[]");
+        source.AppendLine("                {");
 
         foreach (var module in model.Modules)
         {
-            source.AppendLine($"            global::{module}.Configure(builder);");
-            source.AppendLine($"            builder.AddBroadcastHandlers(typeof(global::{module}).Assembly);");
+            source.AppendLine($"                    \"{module}\",");
+        }
+
+        source.AppendLine("                });");
+
+        foreach (var module in model.Modules)
+        {
+            source.AppendLine();
+            source.AppendLine($"            if (selectedModules.Contains(\"{module}\"))");
+            source.AppendLine("            {");
+            source.AppendLine($"                global::{module}.Configure(builder);");
+            source.AppendLine($"                builder.AddBroadcastHandlers(typeof(global::{module}).Assembly);");
+            source.AppendLine("            }");
         }
 
         source.AppendLine();
