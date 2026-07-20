@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.TestingHost;
 
@@ -29,6 +30,7 @@ public static class SimulationCluster
         }
 
         var journalStorage = new VolatileJournalStorageProvider();
+        var reminderTable = new VolatileReminderTable();
         var builder = new InProcessTestClusterBuilder(SiloCount);
         var handlerAssemblies = AppDomain.CurrentDomain.GetAssemblies()
             .Where(assembly => SynapseWiring.TryGetManifest(assembly, out _))
@@ -44,6 +46,13 @@ public static class SimulationCluster
             }
 
             silo.UseInMemoryReminderService();
+            silo.Services.AddSingleton<IReminderTable>(reminderTable);
+            silo.Services.Configure<ReminderOptions>(reminders =>
+            {
+                reminders.InitializationTimeout = TimeSpan.FromSeconds(1);
+                reminders.MinimumReminderPeriod = TimeSpan.FromMilliseconds(50);
+                reminders.RefreshReminderListPeriod = TimeSpan.FromMilliseconds(50);
+            });
             silo.Services.AddSingleton<IJournalStorageProvider>(journalStorage);
         });
 

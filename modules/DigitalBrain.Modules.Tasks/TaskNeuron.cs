@@ -22,6 +22,7 @@ internal sealed class TaskNeuron :
 {
     private const string StateName = "tasks.task";
     private const string RetryReminderName = "tasks.retry";
+    private const string DispatchReminderName = "tasks.dispatch";
     private static readonly TimeSpan ReminderPeriod = TimeSpan.FromMinutes(1);
 
     private readonly IDurableValue<byte[]> _state;
@@ -37,6 +38,7 @@ internal sealed class TaskNeuron :
     public async Task<TaskSnapshot> StartAsync(StartTask command)
     {
         ArgumentNullException.ThrowIfNull(command);
+        Validate(command.CommandId);
 
         if (_state.Value is { Length: > 0 })
         {
@@ -74,17 +76,15 @@ internal sealed class TaskNeuron :
             evidence: [],
             command.RetryOf,
             attemptCount: 1,
-            receipts: new Dictionary<CommandId, TaskSnapshot>());
+            receipts: new Dictionary<CommandId, TaskSnapshot>(),
+            pendingDispatch: null);
+        data.PendingDispatch = new AcceptWorkerDispatch(Request(data));
         var snapshot = Snapshot(data);
         data.Receipts.Add(command.CommandId, snapshot);
 
+        await RegisterDispatchReminderAsync();
         await SaveAsync(data);
-        await Worker(data).AcceptAsync(new(
-            Id,
-            data.Worker,
-            attempt,
-            data.Revision,
-            data.Goal));
+        await TryDispatchPendingAsync();
 
         return snapshot;
     }
@@ -92,6 +92,7 @@ internal sealed class TaskNeuron :
     public async Task<TaskSnapshot> CancelAsync(CancelTask command)
     {
         ArgumentNullException.ThrowIfNull(command);
+        Validate(command.CommandId);
 
         var data = Load();
 
@@ -116,37 +117,35 @@ internal sealed class TaskNeuron :
 
         if (data.ActiveAttempt is null)
         {
-            var reminder = await this.GetReminder(RetryReminderName);
-
-            if (reminder is not null)
-            {
-                await this.UnregisterReminder(reminder);
-            }
-
             data.State = TaskState.Cancelled;
             data.Blocker = null;
+            data.PendingDispatch = null;
 
             var cancelled = Snapshot(data);
             data.Receipts.Add(command.CommandId, cancelled);
             await SaveAsync(data);
+            await UnregisterReminderAsync(RetryReminderName);
+            await UnregisterReminderAsync(DispatchReminderName);
             return cancelled;
         }
 
         data.State = TaskState.Cancelling;
         data.Blocker = null;
+        data.PendingDispatch = new CancelWorkerDispatch(Cursor(data));
 
         var snapshot = Snapshot(data);
         data.Receipts.Add(command.CommandId, snapshot);
 
+        await RegisterDispatchReminderAsync();
         await SaveAsync(data);
-        await Worker(data).CancelAsync(Cursor(data));
+        await TryDispatchPendingAsync();
 
         return snapshot;
     }
 
     public Task<TaskSnapshot> ReadAsync() => Task.FromResult(Snapshot(Load()));
 
-    public async Task HandleAsync(AttemptAccepted fact, CancellationToken cancellationToken)
+    public Task HandleAsync(AttemptAccepted fact, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
 
@@ -154,30 +153,33 @@ internal sealed class TaskNeuron :
 
         if (!Matches(data, fact) || data.State != TaskState.Pending)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         data.State = TaskState.Running;
 
-        await SaveAsync(data);
+        Stage(data);
+        return Task.CompletedTask;
     }
 
-    public async Task HandleAsync(AttemptWaiting fact, CancellationToken cancellationToken)
+    public Task HandleAsync(AttemptWaiting fact, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
+        ArgumentNullException.ThrowIfNull(fact.Blocker);
 
         var data = Load();
 
         if (!Matches(data, fact)
             || data.State is not (TaskState.Pending or TaskState.Running or TaskState.Waiting))
         {
-            return;
+            return Task.CompletedTask;
         }
 
         data.State = TaskState.Waiting;
         data.Blocker = fact.Blocker;
 
-        await SaveAsync(data);
+        Stage(data);
+        return Task.CompletedTask;
     }
 
     public async Task HandleAsync(AttemptAdvanced fact, CancellationToken cancellationToken)
@@ -201,21 +203,25 @@ internal sealed class TaskNeuron :
         data.Revision++;
         data.State = TaskState.Running;
         data.Blocker = null;
+        data.PendingDispatch = new ContinueWorkerDispatch(Cursor(data));
 
-        await SaveAsync(data);
-        ScheduleContinuation(Cursor(data));
+        await RegisterDispatchReminderAsync();
+        ScheduleContinuation();
+        Stage(data);
     }
 
-    public async Task HandleAsync(AttemptSucceeded fact, CancellationToken cancellationToken)
+    public Task HandleAsync(AttemptSucceeded fact, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
+        ArgumentNullException.ThrowIfNull(fact.Result);
+        ArgumentNullException.ThrowIfNull(fact.Evidence);
 
         var data = Load();
 
         if (!Matches(data, fact)
             || data.State is TaskState.Succeeded or TaskState.Failed or TaskState.Cancelled)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         data.State = TaskState.Succeeded;
@@ -224,13 +230,16 @@ internal sealed class TaskNeuron :
         data.Result = fact.Result;
         data.Failure = null;
         data.Evidence = [.. fact.Evidence];
+        data.PendingDispatch = null;
 
-        await SaveAsync(data);
+        Stage(data);
+        return Task.CompletedTask;
     }
 
     public async Task HandleAsync(AttemptFailed fact, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
+        ArgumentNullException.ThrowIfNull(fact.Failure);
 
         var data = Load();
 
@@ -244,6 +253,7 @@ internal sealed class TaskNeuron :
         data.Result = null;
         data.Failure = fact.Failure;
         data.Evidence = [];
+        data.PendingDispatch = null;
 
         if (fact.Retryable
             && data.State != TaskState.Cancelling
@@ -252,20 +262,20 @@ internal sealed class TaskNeuron :
         {
             data.State = TaskState.Waiting;
             data.Blocker = new RetryScheduled(new BlockerId(Guid.NewGuid()));
-            await SaveAsync(data);
             await this.RegisterOrUpdateReminder(
                 RetryReminderName,
                 data.Policy.RetryDelay,
                 ReminderPeriod);
+            Stage(data);
             return;
         }
 
         data.State = TaskState.Failed;
 
-        await SaveAsync(data);
+        Stage(data);
     }
 
-    public async Task HandleAsync(AttemptCancelled fact, CancellationToken cancellationToken)
+    public Task HandleAsync(AttemptCancelled fact, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
 
@@ -273,55 +283,70 @@ internal sealed class TaskNeuron :
 
         if (!Matches(data, fact) || data.State != TaskState.Cancelling)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         data.State = TaskState.Cancelled;
         data.ActiveAttempt = null;
         data.Blocker = null;
+        data.PendingDispatch = null;
 
-        await SaveAsync(data);
+        Stage(data);
+        return Task.CompletedTask;
     }
 
-    public async Task HandleAsync(AttemptOutcomeUncertain fact, CancellationToken cancellationToken)
+    public Task HandleAsync(AttemptOutcomeUncertain fact, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
+
+        if (fact.Blocker.Value == Guid.Empty)
+        {
+            throw new ArgumentException("An uncertain-outcome blocker is required.", nameof(fact));
+        }
 
         var data = Load();
 
         if (!Matches(data, fact) || IsTerminal(data.State))
         {
-            return;
+            return Task.CompletedTask;
         }
 
         data.State = TaskState.Waiting;
         data.Blocker = new OutcomeUncertain(fact.Blocker);
+        data.PendingDispatch = null;
 
-        await SaveAsync(data);
+        Stage(data);
+        return Task.CompletedTask;
     }
 
     async Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
     {
+        if (string.Equals(reminderName, DispatchReminderName, StringComparison.Ordinal))
+        {
+            await TryDispatchPendingAsync();
+            return;
+        }
+
         if (!string.Equals(reminderName, RetryReminderName, StringComparison.Ordinal))
         {
             await base.ReceiveReminder(reminderName, status);
             return;
         }
 
-        var reminder = await this.GetReminder(RetryReminderName);
+        var data = LoadIfStarted();
 
-        if (reminder is not null)
+        if (data is null)
         {
-            await this.UnregisterReminder(reminder);
+            await UnregisterReminderAsync(RetryReminderName);
+            return;
         }
-
-        var data = Load();
 
         if (data.State != TaskState.Waiting
             || data.Blocker is not RetryScheduled
             || data.AttemptCount >= data.Policy.MaximumAttempts
             || (data.Policy.Deadline is not null && data.Policy.Deadline <= DateTimeOffset.UtcNow))
         {
+            await UnregisterReminderAsync(RetryReminderName);
             return;
         }
 
@@ -330,9 +355,12 @@ internal sealed class TaskNeuron :
         data.ActiveAttempt = new AttemptId(Guid.NewGuid());
         data.Blocker = null;
         data.AttemptCount++;
+        data.PendingDispatch = new AcceptWorkerDispatch(Request(data));
 
+        await RegisterDispatchReminderAsync();
         await SaveAsync(data);
-        await Worker(data).AcceptAsync(Request(data));
+        await UnregisterReminderAsync(RetryReminderName);
+        await TryDispatchPendingAsync();
     }
 
     Task INeuron.DeliverAsync(SynapseDelivery delivery)
@@ -346,18 +374,104 @@ internal sealed class TaskNeuron :
 
     private TaskData Load()
     {
-        if (_state.Value is not { Length: > 0 } serialized)
+        if (LoadIfStarted() is not { } data)
         {
             throw new InvalidOperationException($"Task '{Id}' has not been started.");
         }
 
-        return _states.Deserialize(serialized);
+        return data;
     }
+
+    private TaskData? LoadIfStarted()
+        => _state.Value is { Length: > 0 } serialized
+            ? _states.Deserialize(serialized)
+            : null;
+
+    private void Stage(TaskData data)
+        => _state.Value = _states.SerializeToArray(data);
 
     private async Task SaveAsync(TaskData data)
     {
-        _state.Value = _states.SerializeToArray(data);
+        Stage(data);
         await WriteStateAsync();
+    }
+
+    private Task<Orleans.Runtime.IGrainReminder> RegisterDispatchReminderAsync()
+        => this.RegisterOrUpdateReminder(
+            DispatchReminderName,
+            TimeSpan.FromSeconds(1),
+            ReminderPeriod);
+
+    private async Task UnregisterReminderAsync(string reminderName)
+    {
+        if (await this.GetReminder(reminderName) is { } reminder)
+        {
+            await this.UnregisterReminder(reminder);
+        }
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "A durable pending dispatch remains registered for reminder-driven redelivery after any Worker failure.")]
+    private async Task TryDispatchPendingAsync()
+    {
+        var data = LoadIfStarted();
+
+        if (data is null)
+        {
+            await UnregisterReminderAsync(DispatchReminderName);
+            return;
+        }
+
+        var pending = data.PendingDispatch;
+
+        if (pending is null)
+        {
+            await UnregisterReminderAsync(DispatchReminderName);
+            return;
+        }
+
+        if (pending is not (AcceptWorkerDispatch or ContinueWorkerDispatch or CancelWorkerDispatch))
+        {
+            throw new InvalidOperationException(
+                $"Task '{Id}' has an unsupported pending Worker dispatch '{pending.GetType().Name}'.");
+        }
+
+        try
+        {
+            var worker = Worker(data);
+
+            switch (pending)
+            {
+                case AcceptWorkerDispatch accept:
+                    await worker.AcceptAsync(accept.Request);
+                    break;
+
+                case ContinueWorkerDispatch continuation:
+                    await worker.ContinueAsync(continuation.Cursor);
+                    break;
+
+                case CancelWorkerDispatch cancellation:
+                    await worker.CancelAsync(cancellation.Cursor);
+                    break;
+            }
+        }
+        catch (Exception)
+        {
+            return;
+        }
+
+        var current = Load();
+
+        if (current.PendingDispatch != pending)
+        {
+            return;
+        }
+
+        current.PendingDispatch = null;
+        await SaveAsync(current);
+        await UnregisterReminderAsync(DispatchReminderName);
     }
 
     private IWorker Worker(TaskData data)
@@ -378,7 +492,7 @@ internal sealed class TaskNeuron :
         data.Revision,
         data.Goal);
 
-    private void ScheduleContinuation(AttemptCursor cursor)
+    private void ScheduleContinuation()
     {
         _continuation?.Dispose();
         _continuation = RegisterGrainTimer(
@@ -387,16 +501,7 @@ internal sealed class TaskNeuron :
                 _continuation?.Dispose();
                 _continuation = null;
 
-                var current = Load();
-
-                if (current.ActiveAttempt != cursor.Attempt
-                    || current.Revision != cursor.Revision
-                    || current.State != TaskState.Running)
-                {
-                    return;
-                }
-
-                await Worker(current).ContinueAsync(cursor);
+                await TryDispatchPendingAsync();
             },
             new GrainTimerCreationOptions(TimeSpan.Zero, Timeout.InfiniteTimeSpan));
     }
@@ -408,12 +513,6 @@ internal sealed class TaskNeuron :
             || fact.Attempt != data.ActiveAttempt)
         {
             return false;
-        }
-
-        if (fact.Revision > data.Revision)
-        {
-            throw new InvalidOperationException(
-                $"Attempt fact revision {fact.Revision} is ahead of Task '{Id}' revision {data.Revision}.");
         }
 
         return fact.Revision == data.Revision;
@@ -456,6 +555,14 @@ internal sealed class TaskNeuron :
             throw new ArgumentException("A task worker is required.", nameof(command));
         }
 
+    }
+
+    private static void Validate(CommandId commandId)
+    {
+        if (commandId.Value == Guid.Empty)
+        {
+            throw new ArgumentException("A command id is required.", nameof(commandId));
+        }
     }
 
     private async Task ValidatePredecessorAsync(NeuronId? predecessor)
@@ -501,7 +608,8 @@ internal sealed class TaskData(
     FactReference[] evidence,
     NeuronId? retryOf,
     int attemptCount,
-    Dictionary<CommandId, TaskSnapshot> receipts)
+    Dictionary<CommandId, TaskSnapshot> receipts,
+    PendingWorkerDispatch? pendingDispatch)
 {
     [Id(0)]
     public Goal Goal { get; set; } = goal;
@@ -541,4 +649,26 @@ internal sealed class TaskData(
 
     [Id(12)]
     public Dictionary<CommandId, TaskSnapshot> Receipts { get; set; } = receipts;
+
+    [Id(13)]
+    public PendingWorkerDispatch? PendingDispatch { get; set; } = pendingDispatch;
 }
+
+[GenerateSerializer]
+[Alias("tasks.pending-worker-dispatch")]
+internal abstract record PendingWorkerDispatch;
+
+[GenerateSerializer]
+[Alias("tasks.pending-worker-accept")]
+internal sealed record AcceptWorkerDispatch(
+    [property: Id(0)] AttemptRequest Request) : PendingWorkerDispatch;
+
+[GenerateSerializer]
+[Alias("tasks.pending-worker-continue")]
+internal sealed record ContinueWorkerDispatch(
+    [property: Id(0)] AttemptCursor Cursor) : PendingWorkerDispatch;
+
+[GenerateSerializer]
+[Alias("tasks.pending-worker-cancel")]
+internal sealed record CancelWorkerDispatch(
+    [property: Id(0)] AttemptCursor Cursor) : PendingWorkerDispatch;

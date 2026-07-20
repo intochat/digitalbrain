@@ -9,6 +9,11 @@ internal sealed class OwnerBoundCallFilter : IIncomingGrainCallFilter
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        if (IsReminderDelivery(context))
+        {
+            return context.Invoke();
+        }
+
         if (OwnerOf(context.SourceId) is not { } caller)
         {
             if (context.Grain is SubscriptionRegistry unattributedRegistry)
@@ -41,6 +46,13 @@ internal sealed class OwnerBoundCallFilter : IIncomingGrainCallFilter
         return context.Invoke();
     }
 
+    private static bool IsReminderDelivery(IIncomingGrainCallContext context)
+        => context.SourceId is { } source
+            && source.Type.ToString() is { } sourceType
+            && sourceType.StartsWith(GrainServiceTypePrefix, StringComparison.Ordinal)
+            && context.InterfaceMethod?.DeclaringType == typeof(IRemindable)
+            && context.InterfaceMethod?.Name == nameof(IRemindable.ReceiveReminder);
+
     private static bool IsClientEntryPoint(MethodInfo? method)
         => method?.DeclaringType?.GetCustomAttribute<ClientEntryPointAttribute>() is not null;
 
@@ -56,5 +68,6 @@ internal sealed class OwnerBoundCallFilter : IIncomingGrainCallFilter
         return separator <= 0 ? null : new OwnerId(key[..separator]);
     }
 
+    private const string GrainServiceTypePrefix = "sys.svc.user.";
     private const char IdentityPartSeparator = '/';
 }
