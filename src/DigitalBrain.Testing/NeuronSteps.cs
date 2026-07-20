@@ -34,6 +34,30 @@ public sealed class NeuronSteps(Simulation simulation)
         _ = await simulation.ClientReadJournalAsync(kind, neuronType, name, afterSequence: 0);
     }
 
+    [Then("the client reads the {word} journal of its own session")]
+    public async Task ThenTheClientReadsItsOwnSessionJournal(string journal)
+        => _ = await simulation.ClientReadSessionJournalAsync(Enum.Parse<JournalKind>(journal, ignoreCase: true));
+
+    [When("the session is refused reading the {word} journal of the {word} neuron named {string} owned by {string}")]
+    public Task WhenTheSessionIsRefusedReadingAcrossOwners(string journal, string neuronType, string name, string targetOwner)
+        => simulation.SessionReadOfForeignOwnerExpectingRefusalAsync(
+            Enum.Parse<JournalKind>(journal, ignoreCase: true),
+            neuronType,
+            name,
+            targetOwner);
+
+    [When("a raw cluster client is refused counting {word} subscribers in owner {string}'s registry")]
+    public Task WhenARawClientIsRefusedCountingSubscribers(string synapseType, string registryOwner)
+        => simulation.RawClientSubscriberCountExpectingRefusalAsync(synapseType, registryOwner);
+
+    [When("a raw cluster client is refused reading the {word} journal of the {word} neuron named {string} owned by {string}")]
+    public Task WhenARawClientIsRefusedReading(string journal, string neuronType, string name, string targetOwner)
+        => simulation.RawClientReadJournalExpectingRefusalAsync(
+            Enum.Parse<JournalKind>(journal, ignoreCase: true),
+            neuronType,
+            name,
+            targetOwner);
+
     [When("{word} is refused by the {word} neuron named {string}")]
     public Task WhenSynapseIsRefused(string synapseType, string neuronType, string name)
         => simulation.SendExpectingRefusalAsync(synapseType, neuronType, name);

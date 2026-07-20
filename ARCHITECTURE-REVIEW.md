@@ -647,6 +647,62 @@ This merges what were three separate items: §7's `Stamped` rename, D-3's `Routi
 
 **Breaks:** the serialization surface, `StampingContracts`, `SerializationContracts`.
 
+### DEC-11 — Transport authentication is deferred, and the product MCP edge is a thin client
+
+**Ratified 2026-07-20.** The framework does not own authentication yet. The DigitalBrain product MCP
+edge is a thin client of the supported client API — it owns no kernel, no journal, no behavior
+runtime, no owner registry, and no source of truth.
+
+**Deferred, not rejected.** Revisit when either condition holds: DigitalBrain is exposed beyond a
+loopback single-operator stack, or a second principal must be *distrusted* rather than merely
+distinguished. Until then `website/status.md`'s standing disclosure governs — *"an Orleans client is
+a trusted cluster peer… authenticate users at the edge and never expose an Orleans client endpoint
+publicly."*
+
+**Evidence for the deferral.** The 8,023-line MCP import at `c858254` is what auth-in-the-edge
+produces when it is not held to a consumer: 27 files that never compiled, targeting `net11.0` against
+this repository's `net10.0`, referencing three projects that do not exist, constructing twelve types
+defined nowhere in the tree, and advertising a `feature_rollback` tool whose called overload is
+`DemandActor(context); throw new FeatureCommandRejectedException(...)` — a tool described, wired and
+shipped that could never once have succeeded. It also carried §12-rejected machinery, including
+server-side polling at 250 ms behind a streaming API. It is deleted; recover any file with
+`git show old-propotypes:sources/brain_from_master/src/DigitalBrain.Mcp/<file>`.
+
+**Harvested from it as Phase 7 requirements, and nothing else:** a transport limit ladder returning
+426/413/429/504 that *exempts long-lived feeds* rather than disabling timeouts globally; loopback-only
+binding with deny-by-default CORS outside development; a feed reset carrying `ResumeSequence` when a
+cursor falls off the retention window, which is DEC-1's *"never a gap, never silence"* stated as a
+wire requirement; and error logging that records `exception.GetType().Name` only. The import's
+remaining security checks — OIDC validation, refresh-token rotation, replay revocation, session
+audiences, development-login lockout — are **not** harvested, because under this decision they have no
+future consumer, and a proof written for machinery that will not be built is the defect §12 exists to
+prevent.
+
+**Cost, stated plainly:** these acceptance claims become unprovable and are struck rather than faked —
+that anonymous and invalid-token calls fail, and that an invalid audience, origin or token is
+rejected. What survives is every claim that does not rest on an unforgeable caller.
+
+### DEC-12 — An actor names who acts within an owner, and it is a safety property
+
+**Ratified 2026-07-20.** An owner is a tenant. An **actor** is who acts within that tenant. Both ride
+ambient context; neither is a parameter a caller supplies per call.
+
+The actor exists for exactly one consumer: DEC-8's approval gate. A behavior proposed by one actor
+and approved by the same actor is refused, which is what stops a self-modifying script from being an
+unattended loop. Owner alone cannot express this — proposing as owner `model` and approving as owner
+`human` would install the behavior into a different owner scope than the one proposed, which DEC-8
+forbids.
+
+**It lands at Phase 4.5 with B-6**, its first real consumer, and not before. `Connect()` is shaped at
+4.1 to carry ambient identity so 4.5 adds a field rather than breaking a shipped surface.
+
+**It is a safety property, not a security one, and the distinction is the whole point.** Under DEC-11
+an actor is self-asserted, so proposer-is-not-approver holds against an honest caller: it prevents
+accident, not attack. This lineage's recorded failure was not weak enforcement — `final` shipped
+`BundleHasGrant` as a hardcoded `return false` whose own audit found grants evaluated *after* the
+privileged call had fired. The failure was weak enforcement **described as strong**. Naming this a
+safety property is what keeps that from recurring.
+
 ---
 
 ## 4. Target architecture
@@ -1403,13 +1459,41 @@ behavior resolves `Get<ICalendar>()` and asks a human something.
 |---|---|
 | 5.1 | Durable request/response for unbounded waits — the human-input case (DEC-9) |
 | 5.2 | UI module `.Contracts` with component interfaces |
-| 5.3 | The Dart implementation, plus the drift guard failing the build when it does not implement the contract |
+| 5.3 | The Dart contracts package, plus the build-time drift guard failing the build when it does not implement the contract |
+
+**Reduced 2026-07-20.** 5.3 was "the Dart implementation". It is now the contracts package and a
+build-time conformance guard, because a live Flutter client needs an out-of-process transport and
+DEC-7 as amended deliberately deleted the surface protocol that used to be one. Building a second
+transport for UI alone would duplicate the edge Phase 7 exists to provide. 5.1 and 5.2 are in-cluster
+and unaffected. A live UI connection rides Phase 7's edge or is not built; either way `status.md`
+discloses which.
 
 ### Phase 6 — Cleanup.
 
-D-2, D-4, R-7, and §7's surviving renames. Deliberately last: they are the cheapest items and the
-most tempting to start with, and starting with them produces motion without progress. D-3 and the
-`Stamped` rename are gone from this phase — DEC-10 absorbed both into 2.4.
+D-2, D-4, R-7, and §7's surviving renames. Deliberately last of the framework phases: they are the
+cheapest items and the most tempting to start with, and starting with them produces motion without
+progress. D-3 and the `Stamped` rename are gone from this phase — DEC-10 absorbed both into 2.4.
+
+### Phase 7 — The MCP edge and live acceptance.
+
+**Added 2026-07-20.** §9 previously had no MCP step at all, which is how an 8,023-line import arrived
+outside the solution with no phase to belong to. It is placed **after** Phase 6 deliberately: cleanup
+mutates the code the acceptance run exercises, so cleanup preceding acceptance is what keeps the
+acceptance evidence true of the shipped tree.
+
+| Step | Action |
+|---|---|
+| 7.1 | Composition guard — every intended product and test project is compiled by the solution and reached by the root gate, or carries a concrete present justification for exclusion |
+| 7.2 | The thin MCP adapter over the client API (DEC-11). It adds no vocabulary the client API does not already expose |
+| 7.3 | Topology guard — resource `mcp`, a non-proxied endpoint on port and target port 5000, Aspire-managed internal endpoints, loopback binding, `aspire.config.json` at the root, and the `digitalbrain` entry in `.mcp.json` |
+| 7.4 | The transport limit ladder harvested under DEC-11, long-lived feeds exempted rather than untimed |
+| 7.5 | The live acceptance sequence — real Aspire topology, real MCP transport, real local model, proposal through approval to install and journal-entry rollback, proven in one running silo |
+
+Port 5000 is fixed and non-proxied because `.mcp.json` needs a URL that is stable before the AppHost
+starts. The cost is that two AppHosts cannot run side by side, and the prototype that made this trade
+carried no collision handling. Automated tests must therefore inspect the resource model rather than
+bind, or allocate dynamically; a collision must report the owning process and fail cleanly, never kill
+it.
 
 ---
 
@@ -1612,6 +1696,8 @@ Recorded in one place so it cannot be silently reversed.
 | `.brain` archives, signing, quarantine worlds | Consequences of runtime install, which DEC-2 rejects |
 | `flutter_bloc` | Present in both prototypes' pubspecs with zero usages in either |
 | Server-side polling behind a streaming API | `brain_from_master` does this at 250 ms per client; it is not an observation primitive |
+| An MCP edge that owns state | The `c858254` import grew a feature lifecycle, a UI wire format, a conversation store and a session authority behind the edge. Under DEC-11 the edge is a thin client of the client API and owns nothing |
+| Proofs for machinery that will not be built | Harvesting the import's OIDC, token-rotation and replay checks would write tests for a consumer DEC-11 defers. A proof with no future subject is the same defect as code with no present consumer |
 
 ---
 
@@ -1622,6 +1708,35 @@ committed and is the green rollback point.
 
 The next action is **2.5, R-3, the owner boundary.** It is the gate on everything client-facing, and under
 DEC-8 that means it is the gate on the product. Nothing in Phase 4 may start before it.
+
+**Amended 2026-07-20.** DEC-11 and DEC-12 were ratified, §9 gained Phase 7 and reduced 5.3, and the
+`src/DigitalBrain.Mcp` import was deleted. R-3's scope is unchanged by them: `OwnerOf` must stop
+falling through for unattributed callers, and the silo's client endpoint must be proven private. What
+2.5 does **not** become is an authentication boundary — DEC-11 defers that, and `status.md` already
+discloses that an Orleans client is a trusted cluster peer.
+
+**What 2.5 delivers, stated precisely.** Under DEC-11 a client is a trusted cluster peer and may
+claim any owner: `BrainClient`'s constructor takes an `OwnerId`, so owner is ambient *within* an
+instance and caller-chosen *at* construction. 2.5 therefore cannot and does not make a claim
+authentic. What it makes is a claim **mandatory and consistent**:
+
+| Before | After |
+|---|---|
+| `NeuronHandle.ReadJournalAsync` reached `INeuron` directly, consulting no owner anywhere | Reads route through `ISessionNeuron`, which refuses a subject outside the session's owner |
+| An unattributed caller reaching `INeuron` or the registry fell through unchecked | Both are refused; `OwnerOf` returning `null` is a decision, not a fall-through |
+
+So a caller must **state** an owner and cannot reach outside the one it stated. It may still state a
+false one, and that is DEC-11's accepted cost, disclosed in `website/status.md`.
+
+**Two claim defects were caught by adversarial review and are recorded rather than quietly fixed,
+because §1 exists for this failure.** The first draft of this amendment asserted that reading across
+owners is *"not expressible through the client at all."* That is false — `new BrainClient(grains,
+new OwnerId("other"))` expresses it, and the same diff had rewritten a test helper onto exactly that
+path. The draft before it asserted the opposite error, that `BrainClient` could read across owners
+while firing was checked; that proof failed to compile, which is how it surfaced. Both drafts
+described the boundary as stronger or weaker than the code. The lesson is the one §11 already records
+about `final`'s benchmark: the danger is not a weak property, it is a property **described
+inaccurately**.
 
 **Standing gate, every phase, no exceptions:** `dotnet test --logger "console;verbosity=minimal"`
 from the root. Never `--filter`. Held-red proofs assert the behaviour the system *should* have and

@@ -8,7 +8,21 @@ internal sealed class OwnerBoundCallFilter : IIncomingGrainCallFilter
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        if (OwnerOf(context.SourceId) is { } caller)
+        if (OwnerOf(context.SourceId) is not { } caller)
+        {
+            if (context.InterfaceMethod?.DeclaringType == typeof(INeuron))
+            {
+                throw new NeuronAuthorizationException(
+                    $"'{context.InterfaceMethod.Name}' names no owner, so an unattributed caller cannot be authorized to reach '{context.Grain}'. Reach a neuron through a session of the owner you are acting as.");
+            }
+
+            if (context.Grain is SubscriptionRegistry unattributedRegistry)
+            {
+                throw new NeuronAuthorizationException(
+                    $"The subscription registry of owner '{unattributedRegistry.Owner}' cannot be reached by an unattributed caller.");
+            }
+        }
+        else
         {
             if (context.Grain is Neuron target && caller != target.Id.Owner)
             {

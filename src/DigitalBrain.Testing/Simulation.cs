@@ -43,6 +43,23 @@ public sealed class Simulation
     public Task<JournalRead> ClientReadJournalAsync(JournalKind kind, string neuronType, string name, long afterSequence)
         => Client.Neuron(neuronType, name).ReadJournalAsync(kind, afterSequence);
 
+    public Task<JournalRead> ClientReadSessionJournalAsync(JournalKind kind)
+        => Client.Session.ReadJournalAsync(kind, afterSequence: 0);
+
+    public Task SessionReadOfForeignOwnerExpectingRefusalAsync(JournalKind kind, string neuronType, string name, string targetOwner)
+        => CaptureRefusalAsync(() => SimulationCluster.Grains
+            .GetGrain<ISessionNeuron>(new NeuronId(ISessionNeuron.GrainTypeName, Owner, "session").ToGrainId())
+            .ReadNeuronJournalAsync(new NeuronId(neuronType, new OwnerId(targetOwner), name), kind, afterSequence: 0));
+
+    public Task RawClientSubscriberCountExpectingRefusalAsync(string synapseTypeName, string registryOwner)
+        => CaptureRefusalAsync(() => SimulationCluster.Grains
+            .GetGrain<ISubscriptionRegistry>(registryOwner)
+            .SubscriberCountAsync(NeuronCatalog.SynapseType(synapseTypeName).FullName!));
+
+    public Task RawClientReadJournalExpectingRefusalAsync(JournalKind kind, string neuronType, string name, string targetOwner)
+        => CaptureRefusalAsync(() => Neuron(new NeuronId(neuronType, new OwnerId(targetOwner), name))
+            .ReadJournalAsync(kind, afterSequence: 0));
+
     public Task SendExpectingRefusalAsync(string synapseTypeName, string neuronType, string name)
         => CaptureRefusalAsync(() => StimulateAsync(synapseTypeName, NeuronNamed(neuronType, name), EmptyValues));
 
@@ -91,7 +108,7 @@ public sealed class Simulation
     }
 
     public async Task<JournalRead> ReadJournalAsync(JournalKind kind, string neuronType, string name, long afterSequence)
-        => await Neuron(NeuronNamed(neuronType, name)).ReadJournalAsync(kind, afterSequence);
+        => await Client.Neuron(neuronType, name).ReadJournalAsync(kind, afterSequence);
 
     public static async Task<JournalRead> ReadJournalOfOwnerAsync(
         JournalKind kind,
@@ -99,17 +116,19 @@ public sealed class Simulation
         string neuronType,
         string name,
         long afterSequence)
-        => await Neuron(new NeuronId(neuronType, new OwnerId(owner), name)).ReadJournalAsync(kind, afterSequence);
+        => await new BrainClient(SimulationCluster.Grains, new OwnerId(owner))
+            .Neuron(neuronType, name)
+            .ReadJournalAsync(kind, afterSequence);
 
     public async Task RegisterAsync(string neuronType, string name)
-        => _ = await Neuron(NeuronNamed(neuronType, name)).ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
+        => _ = await Client.Neuron(neuronType, name).ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
 
     public Task AwaitHandledAsync(string neuronType, string name, string synapseTypeName)
         => SimulationCluster.Observed.AwaitHandledAsync(NeuronNamed(neuronType, name), synapseTypeName);
 
     public async Task<int> SettleAsync(JournalKind kind, string neuronType, string name)
     {
-        var neuron = Neuron(NeuronNamed(neuronType, name));
+        var neuron = Client.Neuron(neuronType, name);
         long previousSequence = -1;
         var unchanged = 0;
         var retained = 0;
@@ -171,14 +190,13 @@ public sealed class Simulation
     }
 
     public Task SubscribeInOwnerExpectingRefusalAsync(string neuronType, string name, string synapseTypeName, string registryOwner)
-        => CaptureRefusalAsync(() => SimulationCluster.Grains
-            .GetGrain<ISubscriptionRegistry>(registryOwner)
-            .RegisterAsync(NeuronCatalog.SynapseType(synapseTypeName).FullName!, NeuronNamed(neuronType, name)));
+        => CaptureRefusalAsync(() => Driver().SubscribeAsync(
+            NeuronCatalog.SynapseType(synapseTypeName).FullName!,
+            NeuronNamed(neuronType, name),
+            new OwnerId(registryOwner)));
 
     public Task<int> SubscriberCountAsync(string synapseTypeName)
-        => SimulationCluster.Grains
-            .GetGrain<ISubscriptionRegistry>(Owner.Value)
-            .SubscriberCountAsync(NeuronCatalog.SynapseType(synapseTypeName).FullName!);
+        => Driver().SubscriberCountAsync(NeuronCatalog.SynapseType(synapseTypeName).FullName!);
 
     private Task StimulateAsync(string synapseTypeName, NeuronId receiver, IReadOnlyDictionary<string, string> values)
         => Driver().StimulateAsync(receiver, NeuronCatalog.Create(synapseTypeName, values));

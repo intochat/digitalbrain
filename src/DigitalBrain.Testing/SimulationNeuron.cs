@@ -11,6 +11,12 @@ public interface ISimulationNeuron : INeuron
 
     [Alias("StimulateTwice")]
     Task StimulateTwiceAsync(NeuronId receiver, Synapse synapse);
+
+    [Alias("Subscribe")]
+    Task SubscribeAsync(string synapseType, NeuronId subscriber, OwnerId registryOwner);
+
+    [Alias("SubscriberCount")]
+    Task<int> SubscriberCountAsync(string synapseType);
 }
 
 internal sealed class SimulationNeuron : Neuron, ISimulationNeuron
@@ -34,4 +40,10 @@ internal sealed class SimulationNeuron : Neuron, ISimulationNeuron
         await target.DeliverAsync(delivery);
         await target.DeliverAsync(delivery);
     }
+
+    public Task SubscribeAsync(string synapseType, NeuronId subscriber, OwnerId registryOwner)
+        => GrainFactory.GetGrain<ISubscriptionRegistry>(registryOwner.Value).RegisterAsync(synapseType, subscriber);
+
+    public Task<int> SubscriberCountAsync(string synapseType)
+        => GrainFactory.GetGrain<ISubscriptionRegistry>(Id.Owner.Value).SubscriberCountAsync(synapseType);
 }

@@ -69,6 +69,32 @@ neuron-to-neuron and registry traffic, where the caller's identity is known and 
 constrain a caller already inside the cluster's trust boundary. Authenticate users at the edge and
 never expose an Orleans client endpoint publicly.
 
+**Method aliases are part of the wire contract and nothing pins them.** `PinnedAliasesNeverChange`
+asserts an exact map of **type** aliases, so renaming `db.session` fails the build. Orleans also
+identifies grain *methods* by `[Alias]`, and those are unpinned: renaming a method alias changes the
+wire identity of a call and no gate notices. It is inert while every caller is rebuilt from this
+repository in lockstep, and it becomes real the moment an external client is version-skewed from the
+silo — which is the external hosting mode of Phase 4.7 and the MCP edge of Phase 7.
+
+**Transport authentication is deferred, so identity is self-asserted.** DEC-11 defers authentication
+out of the framework: the product MCP edge is a thin client of the client API and owns no identity of
+its own. An actor (DEC-12) therefore names who acts, but nothing proves the claim. The consequence is
+stated rather than implied — the approval gate that refuses a self-approved behavior is a **safety**
+property, preventing accident, not a **security** property preventing attack. Three claims are
+therefore not made anywhere on this site or in the suite, instead of being made weakly: that anonymous
+calls fail, that an invalid token fails, and that a wrong audience or origin is rejected. The
+deferral is revisited when DigitalBrain is exposed beyond a loopback single-operator stack, or when a
+second principal must be distrusted rather than merely distinguished.
+
+**No authenticated edge exists.** An imported MCP project was deleted unbuilt — it never compiled and
+no gate ever ran it, and `ARCHITECTURE-REVIEW.md` DEC-11 records why in detail. The thin edge is
+built at Phase 7.
+
+Until then the only way in is an Orleans cluster client, which the debt above already describes as a
+trusted peer — the probe host and both samples are exactly that. So this is not "no way in", it is
+"no *authenticated* way in", and the difference matters: the mitigation is the endpoint never being
+publicly reachable, not the absence of a door.
+
 **A journal is a summary plus a recent window, so history is lost.** Journals used to grow without
 bound; they are now bounded by both record count and total bytes. What survives compaction is a
 durable tally — how many of each synapse type the neuron has recorded, the last sequence, and the

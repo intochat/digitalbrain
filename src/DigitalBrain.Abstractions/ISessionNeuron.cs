@@ -11,4 +11,7 @@ public interface ISessionNeuron : INeuron
         "CA1030:Use events where appropriate",
         Justification = "Fire is the contract's ratified verb for sending a synapse into the brain; it raises no event.")]
     Task FireAsync(NeuronId receiver, Synapse synapse);
+
+    [Alias("ReadNeuronJournal")]
+    Task<JournalRead> ReadNeuronJournalAsync(NeuronId subject, JournalKind kind, long afterSequence);
 }

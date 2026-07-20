@@ -14,4 +14,9 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
 
         return SendAsync(receiver, synapse);
     }
+
+    public Task<JournalRead> ReadNeuronJournalAsync(NeuronId subject, JournalKind kind, long afterSequence)
+        => subject == Id
+            ? ReadJournalAsync(kind, afterSequence)
+            : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).ReadJournalAsync(kind, afterSequence);
 }
