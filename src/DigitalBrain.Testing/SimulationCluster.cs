@@ -3,6 +3,7 @@ using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Journaling;
+using Orleans.Serialization;
 using Orleans.TestingHost;
 
 namespace DigitalBrain.Testing;
@@ -12,7 +13,7 @@ public static class SimulationCluster
     private const int SiloCount = 3;
 
     private static readonly string[] SiloLabels = ["alpha", "beta", "gamma"];
-
+    private static readonly List<Func<Type, bool>> JsonSerializerPredicates = [];
 
     private static InProcessTestCluster? _cluster;
     private static SynapseObserver? _observer;
@@ -39,6 +40,7 @@ public static class SimulationCluster
         builder.ConfigureSilo((options, silo) =>
         {
             silo.AddDigitalBrain(LabelOf(options.SiloName));
+            silo.Services.AddSerializer(serializer => serializer.AddJsonSerializer(IsAdditionalJsonType));
 
             foreach (var assembly in handlerAssemblies)
             {
@@ -56,6 +58,10 @@ public static class SimulationCluster
                 reminders.RefreshReminderListPeriod = TimeSpan.FromMilliseconds(50);
             });
             silo.Services.AddSingleton<IJournalStorageProvider>(journalStorage);
+        });
+        builder.ConfigureClient(client =>
+        {
+            client.Services.AddSerializer(serializer => serializer.AddJsonSerializer(IsAdditionalJsonType));
         });
 
         var cluster = builder.Build();
@@ -98,7 +104,22 @@ public static class SimulationCluster
             siloName.AsSpan(siloName.LastIndexOf('_') + 1),
             System.Globalization.CultureInfo.InvariantCulture));
 
+    public static void AddJsonSerializer(Func<Type, bool> isSupported)
+    {
+        ArgumentNullException.ThrowIfNull(isSupported);
+
+        if (_cluster is not null)
+        {
+            throw new InvalidOperationException("JSON serializers must be registered before the simulation cluster starts.");
+        }
+
+        JsonSerializerPredicates.Add(isSupported);
+    }
+
     private static string LabelOfInstance(short instance) => SiloLabels[instance % SiloLabels.Length];
+
+    private static bool IsAdditionalJsonType(Type type)
+        => JsonSerializerPredicates.Any(isSupported => isSupported(type));
 
     private static InProcessTestCluster Deployed() => _cluster
         ?? throw new InvalidOperationException($"The simulation cluster is not running. Call {nameof(SimulationCluster)}.{nameof(StartAsync)} before a scenario runs.");

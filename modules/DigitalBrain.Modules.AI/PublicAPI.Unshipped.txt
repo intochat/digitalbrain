@@ -1,9 +1,14 @@
 #nullable enable
 DigitalBrain.AI.AIModule
 DigitalBrain.AI.AIModule.AIModule() -> void
+static DigitalBrain.AI.AIModule.ConfigureSerialization(Orleans.Hosting.ISiloBuilder! builder) -> void
+DigitalBrain.AI.Agent
+abstract DigitalBrain.AI.Agent.Instructions.get -> string!
+DigitalBrain.AI.Agent.Agent(DigitalBrain.AI.ILLM! model, params DigitalBrain.Abstractions.INeuron![]! capabilities) -> void
+DigitalBrain.AI.Agent.RespondAsync(System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.AI.ChatMessage!>! messages) -> System.Threading.Tasks.Task<Microsoft.Extensions.AI.ChatResponse!>!
 DigitalBrain.AI.LLM
-DigitalBrain.AI.LLM.AskAsync(string! prompt) -> System.Threading.Tasks.Task<string!>!
 DigitalBrain.AI.LLM.LLM(Microsoft.Extensions.AI.IChatClient! chatClient) -> void
+DigitalBrain.AI.LLM.RespondAsync(System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.AI.ChatMessage!>! messages) -> System.Threading.Tasks.Task<Microsoft.Extensions.AI.ChatResponse!>!
 DigitalBrain.AI.LlmAttribute<TModel>
 DigitalBrain.AI.LlmAttribute<TModel>.LlmAttribute() -> void
 DigitalBrain.AI.Ollama.Llama32

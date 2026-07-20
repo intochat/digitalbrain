@@ -11,6 +11,7 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
     private const string HandleInterface = "DigitalBrain.Abstractions.IHandle<TSynapse>";
     private const string EmitInterface = "DigitalBrain.Abstractions.IEmit<TSynapse>";
     private const string ModuleInterface = "DigitalBrain.Abstractions.IModule";
+    private const string ModuleSerializationMethod = "ConfigureSerialization";
     private const string SiloBuilder = "Orleans.Hosting.ISiloBuilder";
     private const string DigitalBrainRuntime = "DigitalBrain.Kernel.DigitalBrainRuntime";
 
@@ -99,6 +100,7 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
             return new CompositionModel([], emitExtension: false);
         }
 
+        var siloBuilder = compilation.GetTypeByMetadataName(SiloBuilder);
         var modules = compilation.SourceModule.ReferencedAssemblySymbols
             .Append(compilation.Assembly)
             .SelectMany(static assembly => TypesIn(assembly.GlobalNamespace))
@@ -110,17 +112,33 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
             })
             .Where(type => type.AllInterfaces.Any(contract =>
                 SymbolEqualityComparer.Default.Equals(contract, moduleContract)))
-            .Select(type => type.ToDisplayString(FullName))
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static name => name, StringComparer.Ordinal)
+            .Select(type => new ModuleModel(
+                type.ToDisplayString(FullName),
+                HasSerializationHook(type, siloBuilder)))
+            .GroupBy(static module => module.Name, StringComparer.Ordinal)
+            .Select(static group => group.First())
+            .OrderBy(static module => module.Name, StringComparer.Ordinal)
             .ToImmutableArray();
 
         var emitExtension = compilation.AssemblyName != "DigitalBrain.Kernel"
-            && compilation.GetTypeByMetadataName(SiloBuilder) is not null
+            && siloBuilder is not null
             && compilation.GetTypeByMetadataName(DigitalBrainRuntime) is not null;
 
         return new CompositionModel(modules, emitExtension);
     }
+
+    private static bool HasSerializationHook(INamedTypeSymbol module, INamedTypeSymbol? siloBuilder)
+        => siloBuilder is not null
+            && module.GetMembers(ModuleSerializationMethod)
+                .OfType<IMethodSymbol>()
+                .Any(method => method is
+                    {
+                        IsStatic: true,
+                        DeclaredAccessibility: Accessibility.Public,
+                        ReturnsVoid: true,
+                        Parameters.Length: 1,
+                    }
+                    && SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, siloBuilder));
 
     private static IEnumerable<INamedTypeSymbol> TypesIn(INamespaceSymbol scope)
     {
@@ -173,7 +191,7 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
 
         foreach (var module in model.Modules)
         {
-            source.AppendLine($"            \"{module}\",");
+            source.AppendLine($"            \"{module.Name}\",");
         }
 
         source.AppendLine("        ];");
@@ -207,18 +225,24 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
 
         foreach (var module in model.Modules)
         {
-            source.AppendLine($"                    \"{module}\",");
+            source.AppendLine($"                    \"{module.Name}\",");
         }
 
         source.AppendLine("                });");
 
+        foreach (var module in model.Modules.Where(static module => module.HasSerializationHook))
+        {
+            source.AppendLine();
+            source.AppendLine($"            global::{module.Name}.{ModuleSerializationMethod}(builder);");
+        }
+
         foreach (var module in model.Modules)
         {
             source.AppendLine();
-            source.AppendLine($"            if (selectedModules.Contains(\"{module}\"))");
+            source.AppendLine($"            if (selectedModules.Contains(\"{module.Name}\"))");
             source.AppendLine("            {");
-            source.AppendLine($"                global::{module}.Configure(builder);");
-            source.AppendLine($"                builder.AddBroadcastHandlers(typeof(global::{module}).Assembly);");
+            source.AppendLine($"                global::{module.Name}.Configure(builder);");
+            source.AppendLine($"                builder.AddBroadcastHandlers(typeof(global::{module.Name}).Assembly);");
             source.AppendLine("            }");
         }
 
@@ -240,9 +264,16 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         public bool IsHandler { get; } = isHandler;
     }
 
-    private readonly struct CompositionModel(ImmutableArray<string> modules, bool emitExtension)
+    private readonly struct ModuleModel(string name, bool hasSerializationHook)
     {
-        public ImmutableArray<string> Modules { get; } = modules;
+        public string Name { get; } = name;
+
+        public bool HasSerializationHook { get; } = hasSerializationHook;
+    }
+
+    private readonly struct CompositionModel(ImmutableArray<ModuleModel> modules, bool emitExtension)
+    {
+        public ImmutableArray<ModuleModel> Modules { get; } = modules;
 
         public bool EmitExtension { get; } = emitExtension;
     }

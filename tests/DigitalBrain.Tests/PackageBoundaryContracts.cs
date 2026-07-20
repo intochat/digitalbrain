@@ -5,7 +5,7 @@ namespace DigitalBrain.Tests;
 
 public sealed class PackageBoundaryContracts
 {
-    private static readonly string[] ProviderSdkPrefixes = ["OpenAI", "Anthropic", "Microsoft.Extensions.AI", "OllamaSharp"];
+    private static readonly string[] ProviderSdkPrefixes = ["OpenAI", "Anthropic", "Microsoft.Extensions.AI.OpenAI", "OllamaSharp"];
 
     private static readonly string RepositoryRoot = LocateRepositoryRoot();
 

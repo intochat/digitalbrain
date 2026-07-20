@@ -5,12 +5,10 @@ namespace DigitalBrain.AI;
 
 public abstract class LLM(IChatClient chatClient) : Neuron, ILLM
 {
-    public async Task<string> AskAsync(string prompt)
+    public Task<ChatResponse> RespondAsync(IReadOnlyList<ChatMessage> messages)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
+        ArgumentNullException.ThrowIfNull(messages);
 
-        var response = await chatClient.GetResponseAsync(prompt);
-
-        return response.Text;
+        return chatClient.GetResponseAsync(messages);
     }
 }

@@ -3,13 +3,14 @@ using DigitalBrain.Kernel;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Orleans.Serialization;
 using Xunit;
 
 namespace DigitalBrain.Tests;
 
 public sealed class ModuleActivationContracts
 {
-    [Fact(DisplayName = "a referenced module remains inactive until AppHost selects it")]
+    [Fact(DisplayName = "an available module contributes wire codecs without activating runtime services")]
     public void AvailableModuleIsNotAutomaticallySelected()
     {
         var builder = Host.CreateApplicationBuilder();
@@ -17,6 +18,19 @@ public sealed class ModuleActivationContracts
         builder.UseOrleans(silo => silo.AddDigitalBrain());
 
         Assert.DoesNotContain(builder.Services, IsChatClient);
+
+        using var host = builder.Build();
+        var message = new ChatMessage(ChatRole.User, "wire contract");
+        var response = new ChatResponse(new ChatMessage(ChatRole.Assistant, "wire response"));
+        var messageSerializer = host.Services.GetRequiredService<Serializer<ChatMessage>>();
+        var responseSerializer = host.Services.GetRequiredService<Serializer<ChatResponse>>();
+
+        Assert.Equal(
+            message.Text,
+            messageSerializer.Deserialize(messageSerializer.SerializeToArray(message)).Text);
+        Assert.Equal(
+            response.Text,
+            responseSerializer.Deserialize(responseSerializer.SerializeToArray(response)).Text);
     }
 
     [Fact(DisplayName = "AppHost selection activates the generated silo module")]

@@ -2,6 +2,7 @@ using System.Reflection;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
+using DigitalBrain.Tasks;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -13,6 +14,30 @@ namespace DigitalBrain.Tests;
 public sealed class AIContracts
 {
     private static readonly Assembly Runtime = typeof(AIModule).Assembly;
+
+    [Fact(DisplayName = "LLM and Agent expose only the frozen immutable MEAI request boundary")]
+    public void AiNeuronContractsExposeOnlyTheFrozenMeaiBoundary()
+    {
+        foreach (var contract in new[] { typeof(ILLM), typeof(IAgent) })
+        {
+            var method = Assert.Single(contract.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
+            var parameter = Assert.Single(method.GetParameters());
+
+            Assert.Equal("RespondAsync", method.Name);
+            Assert.Equal(typeof(Task<ChatResponse>), method.ReturnType);
+            Assert.Equal(typeof(IReadOnlyList<ChatMessage>), parameter.ParameterType);
+            Assert.DoesNotContain(method.GetParameters(), candidate => candidate.ParameterType == typeof(ChatOptions));
+        }
+
+        Assert.False(typeof(IAgent).IsAssignableFrom(typeof(ILLM)));
+    }
+
+    [Fact(DisplayName = "GroupChat is both an Agent and a Task Worker")]
+    public void GroupChatCombinesAgentAndWorkerContracts()
+    {
+        Assert.Contains(typeof(IAgent), typeof(IGroupChat).GetInterfaces());
+        Assert.Contains(typeof(IWorker), typeof(IGroupChat).GetInterfaces());
+    }
 
     [Fact(DisplayName = "model identity is expressed by its namespace and concrete neuron type")]
     public void ModelIdentityIsTheType()
@@ -90,16 +115,17 @@ public sealed class AIContracts
         }
     }
 
-    [Fact(DisplayName = "AI contracts do not expose or reference Microsoft.Extensions.AI")]
-    public void ContractsRemainProviderAgnostic()
+    [Fact(DisplayName = "AI contracts expose MEAI abstractions without provider or MAF types")]
+    public void ContractsExposeOnlyMeaiAbstractions()
     {
         var contracts = typeof(ILLM).Assembly;
+        var references = contracts.GetReferencedAssemblies();
+        var surface = contracts.GetExportedTypes().SelectMany(type => type.GetMembers()).ToArray();
 
-        Assert.DoesNotContain(
-            contracts.GetReferencedAssemblies(),
-            reference => reference.Name?.StartsWith("Microsoft.Extensions.AI", StringComparison.Ordinal) is true);
-        Assert.DoesNotContain(
-            contracts.GetExportedTypes().SelectMany(type => type.GetMembers()),
-            member => member.ToString()?.Contains("Microsoft.Extensions.AI", StringComparison.Ordinal) is true);
+        Assert.Contains(references, reference => reference.Name == "Microsoft.Extensions.AI.Abstractions");
+        Assert.DoesNotContain(references, reference => reference.Name?.StartsWith("Microsoft.Agents", StringComparison.Ordinal) is true);
+        Assert.DoesNotContain(references, reference => reference.Name == "Microsoft.Extensions.AI.OpenAI");
+        Assert.DoesNotContain(references, reference => reference.Name == "OllamaSharp");
+        Assert.DoesNotContain(surface, member => member.ToString()?.Contains("Microsoft.Agents", StringComparison.Ordinal) is true);
     }
 }

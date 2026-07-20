@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI;
 
@@ -6,5 +7,5 @@ namespace DigitalBrain.AI;
 public interface IAgent : INeuron
 {
     [Alias("Ask")]
-    Task<string> AskAsync(string prompt);
+    Task<ChatResponse> RespondAsync(IReadOnlyList<ChatMessage> messages);
 }

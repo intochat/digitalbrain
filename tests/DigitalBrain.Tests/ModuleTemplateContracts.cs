@@ -7,7 +7,7 @@ public sealed class ModuleTemplateContracts
 {
     private static readonly string RepositoryRoot = LocateRepositoryRoot();
 
-    [Fact(DisplayName = "module .Contracts packages are leaves: only DigitalBrain.Abstractions, no package references")]
+    [Fact(DisplayName = "module .Contracts packages are leaves with only approved public vocabulary dependencies")]
     public void ModuleContractsPackagesAreLeaves()
     {
         var contractsProjects = Directory
@@ -19,6 +19,7 @@ public sealed class ModuleTemplateContracts
         foreach (var project in contractsProjects)
         {
             var document = XDocument.Load(project);
+            var projectName = Path.GetFileNameWithoutExtension(project);
             var packageRefs = document.Descendants("PackageReference")
                 .Where(FlowsToConsumers)
                 .Select(IncludeOf)
@@ -28,12 +29,15 @@ public sealed class ModuleTemplateContracts
                 .Where(FlowsToConsumers)
                 .Select(reference => Path.GetFileNameWithoutExtension(IncludeOf(reference).Replace('\\', '/')))
                 .ToList();
+            var expectedPackages = projectName == "DigitalBrain.Modules.AI.Contracts"
+                ? new[] { "Microsoft.Extensions.AI.Abstractions" }
+                : [];
+            var expectedProjects = projectName == "DigitalBrain.Modules.AI.Contracts"
+                ? new[] { "DigitalBrain.Abstractions", "DigitalBrain.Modules.Tasks.Contracts" }
+                : ["DigitalBrain.Abstractions"];
 
-            Assert.True(
-                packageRefs.Count == 0,
-                $"{Path.GetFileName(project)} must not declare package references; found: {string.Join(", ", packageRefs)}");
-
-            Assert.Equal(["DigitalBrain.Abstractions"], projectRefs);
+            Assert.Equal(expectedPackages, packageRefs.Order(StringComparer.Ordinal));
+            Assert.Equal(expectedProjects, projectRefs.Order(StringComparer.Ordinal));
         }
     }
 
