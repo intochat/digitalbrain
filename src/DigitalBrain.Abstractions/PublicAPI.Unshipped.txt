@@ -387,3 +387,4 @@ virtual DigitalBrain.Abstractions.ConnectionHealth.Equals(DigitalBrain.Abstracti
 virtual DigitalBrain.Abstractions.ConnectionHealth.PrintMembers(System.Text.StringBuilder! builder) -> bool
 DigitalBrain.Abstractions.IModelCompletionService
 DigitalBrain.Abstractions.IModelCompletionService.CompleteAsync(DigitalBrain.Abstractions.ModelTier tier, string! prompt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<string!>!
+DigitalBrain.Abstractions.ISessionNeuron.EmitAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!

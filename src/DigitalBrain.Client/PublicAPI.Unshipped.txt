@@ -12,3 +12,11 @@ DigitalBrain.Client.NeuronHandle.Id.get -> DigitalBrain.Abstractions.NeuronId
 DigitalBrain.Client.NeuronHandle.ReadJournalAsync(DigitalBrain.Abstractions.JournalKind kind, long afterSequence) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.JournalRead!>!
 DigitalBrain.Client.NeuronHandle.UnwatchAsync(DigitalBrain.Abstractions.IJournalObserver! observer) -> System.Threading.Tasks.Task!
 DigitalBrain.Client.NeuronHandle.WatchAsync(DigitalBrain.Abstractions.JournalKind kind, long afterSequence, DigitalBrain.Abstractions.IJournalObserver! observer) -> System.Threading.Tasks.Task!
+DigitalBrain.Client.DigitalBrainClient
+DigitalBrain.Client.DigitalBrainClient.Emit(DigitalBrain.Abstractions.Synapse! fact) -> System.Threading.Tasks.Task!
+DigitalBrain.Client.DigitalBrainClient.Get<T>() -> T!
+DigitalBrain.Client.DigitalBrainClient.Get<T>(string! name) -> T!
+DigitalBrain.Client.DigitalBrainClient.HandledSynapseTypes() -> System.Collections.Generic.IReadOnlyCollection<System.Type!>!
+DigitalBrain.Client.DigitalBrainClient.On<TSynapse>(System.Func<TSynapse!, System.Threading.Tasks.Task!>! handler) -> System.Threading.Tasks.Task!
+DigitalBrain.Client.DigitalBrainClient.Owner.get -> DigitalBrain.Abstractions.OwnerId
+static DigitalBrain.Client.DigitalBrainClient.Connect(Orleans.IGrainFactory! grains, string! owner) -> DigitalBrain.Client.DigitalBrainClient!

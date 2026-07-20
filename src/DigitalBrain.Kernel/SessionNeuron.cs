@@ -15,6 +15,13 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
         return SendAsync(receiver, synapse);
     }
 
+    public new Task EmitAsync(Synapse synapse)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+
+        return base.EmitAsync(synapse);
+    }
+
     public Task<JournalRead> ReadNeuronJournalAsync(NeuronId subject, JournalKind kind, long afterSequence)
         => subject == Id
             ? ReadJournalAsync(kind, afterSequence)

@@ -13,6 +13,9 @@ public interface ISessionNeuron : INeuron
         Justification = "Fire is the contract's ratified verb for sending a synapse into the brain; it raises no event.")]
     Task FireAsync(NeuronId receiver, Synapse synapse);
 
+    [Alias("Emit")]
+    Task EmitAsync(Synapse synapse);
+
     [Alias("ReadNeuronJournal")]
     Task<JournalRead> ReadNeuronJournalAsync(NeuronId subject, JournalKind kind, long afterSequence);
 
