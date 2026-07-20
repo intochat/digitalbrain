@@ -20,16 +20,21 @@ using var host = builder.Build();
 
 await host.StartAsync();
 
-var brain = new BrainClient(host.Services.GetRequiredService<IGrainFactory>(), new OwnerId("quickstart"));
+var grains = host.Services.GetRequiredService<IGrainFactory>();
+var brain = DigitalBrainClient.Connect(grains, "quickstart");
+var greeter = brain.Get<IGreeter>("first");
 
-await brain.FireAsync(nameof(Greeter), "first", new Hello());
+await greeter.SayHelloAsync();
 
-var fired = await brain.Session.ReadJournalAsync(JournalKind.Outgoing, afterSequence: 0);
+var sessionId = new NeuronId(ISessionNeuron.GrainTypeName, brain.Owner, "session");
+var session = grains.GetGrain<ISessionNeuron>(sessionId.ToGrainId());
+var greeterId = new NeuronId(nameof(Greeter), brain.Owner, "first");
+var fired = await session.ReadNeuronJournalAsync(greeterId, JournalKind.Outgoing, afterSequence: 0);
 var firedCount = fired.ResetSnapshot?.TotalRecorded ?? fired.Delta.Count;
 var firedTypes = fired.ResetSnapshot is { } reset
     ? reset.Tallies.Select(tally => tally.SynapseType)
     : fired.Delta.Select(delivery => delivery.Synapse.GetType().Name);
 
-Console.WriteLine($"the session durably recorded {firedCount} fired synapse(s): {string.Join(", ", firedTypes)}");
+Console.WriteLine($"the greeter durably recorded {firedCount} outgoing synapse(s): {string.Join(", ", firedTypes)}");
 
 await host.StopAsync();

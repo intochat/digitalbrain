@@ -1,17 +1,4 @@
 #nullable enable
-DigitalBrain.Client.BrainClient
-DigitalBrain.Client.BrainClient.BrainClient(Orleans.IGrainFactory! grains, DigitalBrain.Abstractions.OwnerId owner) -> void
-DigitalBrain.Client.BrainClient.FireAsync(DigitalBrain.Abstractions.NeuronId receiver, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
-DigitalBrain.Client.BrainClient.FireAsync(string! neuronType, string! name, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
-DigitalBrain.Client.BrainClient.Neuron(string! neuronType, string! name) -> DigitalBrain.Client.NeuronHandle!
-DigitalBrain.Client.BrainClient.Neuron<TNeuron>(string! name) -> DigitalBrain.Client.NeuronHandle!
-DigitalBrain.Client.BrainClient.Owner.get -> DigitalBrain.Abstractions.OwnerId
-DigitalBrain.Client.BrainClient.Session.get -> DigitalBrain.Client.NeuronHandle!
-DigitalBrain.Client.NeuronHandle
-DigitalBrain.Client.NeuronHandle.Id.get -> DigitalBrain.Abstractions.NeuronId
-DigitalBrain.Client.NeuronHandle.ReadJournalAsync(DigitalBrain.Abstractions.JournalKind kind, long afterSequence) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.JournalRead!>!
-DigitalBrain.Client.NeuronHandle.UnwatchAsync(DigitalBrain.Abstractions.IJournalObserver! observer) -> System.Threading.Tasks.Task!
-DigitalBrain.Client.NeuronHandle.WatchAsync(DigitalBrain.Abstractions.JournalKind kind, long afterSequence, DigitalBrain.Abstractions.IJournalObserver! observer) -> System.Threading.Tasks.Task!
 DigitalBrain.Client.DigitalBrainClient
 DigitalBrain.Client.DigitalBrainClient.Emit(DigitalBrain.Abstractions.Synapse! fact) -> System.Threading.Tasks.Task!
 DigitalBrain.Client.DigitalBrainClient.Get<T>() -> T!

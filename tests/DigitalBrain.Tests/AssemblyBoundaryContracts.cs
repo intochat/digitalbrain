@@ -37,12 +37,12 @@ public sealed class AssemblyBoundaryContracts
 
     [Fact]
     public void TheClientDoesNotReachTheKernel()
-        => Assert.DoesNotContain("DigitalBrain.Kernel", ReachableFrom(typeof(BrainClient).Assembly), StringComparer.Ordinal);
+        => Assert.DoesNotContain("DigitalBrain.Kernel", ReachableFrom(typeof(DigitalBrainClient).Assembly), StringComparer.Ordinal);
 
     [Fact]
     public void TheAspireClientIntegrationDoesNotReachTheHostingIntegration()
         => Assert.DoesNotContain(
-            ReachableFrom(typeof(BrainClientIntegration).Assembly),
+            ReachableFrom(typeof(DigitalBrainClientHostingExtensions).Assembly),
             reference => reference.StartsWith("Aspire.Hosting", StringComparison.Ordinal));
 
     [Fact]

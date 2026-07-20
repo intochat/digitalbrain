@@ -21,26 +21,36 @@ using var host = builder.Build();
 await host.StartAsync();
 
 var grains = host.Services.GetRequiredService<IGrainFactory>();
-var brain = new BrainClient(grains, new OwnerId("panel"));
-var moderator = brain.Neuron(nameof(Moderator), "chair");
+var brain = DigitalBrainClient.Connect(grains, "panel");
+var moderator = brain.Get<IModerator>("chair");
+var moderatorId = new NeuronId(nameof(Moderator), brain.Owner, "chair");
+var sessionId = new NeuronId(ISessionNeuron.GrainTypeName, brain.Owner, "session");
+var session = grains.GetGrain<ISessionNeuron>(sessionId.ToGrainId());
 
 var verdicts = new FirstMatchWatch(delivery => delivery.Synapse is VerdictReached);
 var verdictReference = grains.CreateObjectReference<IJournalObserver>(verdicts);
 
-await moderator.WatchAsync(JournalKind.Outgoing, afterSequence: 0, verdictReference);
+await session.WatchNeuronAsync(
+    moderatorId,
+    JournalKind.Outgoing,
+    afterSequence: 0,
+    verdictReference);
 
 try
 {
-    await brain.FireAsync(nameof(Moderator), "chair", new QuestionAsked("should we ship it?"));
+    await moderator.AskAsync("should we ship it?");
 
     var verdictDelivery = await verdicts.AwaitMatchAsync(TimeSpan.FromSeconds(30));
     var scribeId = NeuronId.BroadcastReceiver(nameof(Scribe), brain.Owner, verdictDelivery.CorrelationId);
-    var scribe = brain.Neuron(scribeId.Type, scribeId.Name);
 
     var recorded = new FirstMatchWatch(delivery => delivery.Synapse is VerdictReached);
     var scribeReference = grains.CreateObjectReference<IJournalObserver>(recorded);
 
-    await scribe.WatchAsync(JournalKind.Incoming, afterSequence: 0, scribeReference);
+    await session.WatchNeuronAsync(
+        scribeId,
+        JournalKind.Incoming,
+        afterSequence: 0,
+        scribeReference);
 
     try
     {
@@ -51,12 +61,12 @@ try
     }
     finally
     {
-        await scribe.UnwatchAsync(scribeReference);
+        await session.UnwatchNeuronAsync(scribeId, scribeReference);
     }
 }
 finally
 {
-    await moderator.UnwatchAsync(verdictReference);
+    await session.UnwatchNeuronAsync(moderatorId, verdictReference);
 }
 
 await host.StopAsync();

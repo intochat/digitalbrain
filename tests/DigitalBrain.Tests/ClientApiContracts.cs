@@ -6,6 +6,17 @@ namespace DigitalBrain.Tests;
 
 public sealed class ClientApiContracts
 {
+    [Fact(DisplayName = "DigitalBrainClient is the package's only public client facade")]
+    public void ThereIsOneClientFacade()
+    {
+        var facades = typeof(DigitalBrainClient).Assembly
+            .GetExportedTypes()
+            .Where(type => type.IsClass)
+            .ToArray();
+
+        Assert.Equal([typeof(DigitalBrainClient)], facades);
+    }
+
     [Fact(DisplayName = "Get never takes an owner: owner is ambient")]
     public void GetDoesNotAcceptOwner()
     {

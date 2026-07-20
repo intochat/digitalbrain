@@ -4,15 +4,18 @@ using Orleans;
 
 namespace DigitalBrain.Quickstart;
 
-[GenerateSerializer]
-[Alias("quickstart.hello")]
-internal sealed record Hello : Synapse;
+[Alias("quickstart.greeter")]
+internal interface IGreeter : INeuron
+{
+    [Alias("SayHello")]
+    Task SayHelloAsync();
+}
 
 [GenerateSerializer]
 [Alias("quickstart.greeted")]
 internal sealed record Greeted : Synapse;
 
-internal sealed class Greeter : Neuron, IHandle<Hello>, IEmit<Greeted>
+internal sealed class Greeter : Neuron, IGreeter, IEmit<Greeted>
 {
-    public Task HandleAsync(Hello synapse, CancellationToken cancellationToken) => ReplyAsync(new Greeted());
+    public Task SayHelloAsync() => EmitAsync(new Greeted());
 }

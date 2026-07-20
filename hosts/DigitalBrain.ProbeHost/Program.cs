@@ -1,5 +1,4 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Client;
 using DigitalBrain.DevTools;
 using DigitalBrain.Kernel;
 using DigitalBrain.ProbeHost;
@@ -20,16 +19,22 @@ app.MapGet("/health", () => Results.Ok("healthy"));
 
 app.MapPost("/probe/turn", async (IGrainFactory grains) =>
 {
-    var brain = Brain(grains);
+    var owner = Owner();
 
-    await brain.FireAsync(NeuronId.For<Recorder>(brain.Owner, "one"), new Remembered("a durable turn"));
+    await Session(grains, owner).FireAsync(
+        NeuronId.For<Recorder>(owner, "one"),
+        new Remembered("a durable turn"));
 
     return Results.Ok();
 });
 
 app.MapGet("/probe/fired", async (IGrainFactory grains) =>
 {
-    var fired = await Brain(grains).Session.ReadJournalAsync(JournalKind.Outgoing, afterSequence: 0);
+    var owner = Owner();
+    var fired = await Session(grains, owner).ReadNeuronJournalAsync(
+        SessionId(owner),
+        JournalKind.Outgoing,
+        afterSequence: 0);
     var recorded = fired.ResetSnapshot?.TotalRecorded ?? fired.Delta.Count;
 
     return Results.Ok(recorded);
@@ -37,7 +42,9 @@ app.MapGet("/probe/fired", async (IGrainFactory grains) =>
 
 app.MapGet("/probe/delivered/{neuron}", async (string neuron, IGrainFactory grains) =>
 {
-    var delivered = await Brain(grains).Neuron(neuron, "one").ReadJournalAsync(
+    var owner = Owner();
+    var delivered = await Session(grains, owner).ReadNeuronJournalAsync(
+        new NeuronId(neuron, owner, "one"),
         JournalKind.Incoming,
         afterSequence: 0);
     var recorded = delivered.ResetSnapshot?.TotalRecorded ?? delivered.Delta.Count;
@@ -47,4 +54,9 @@ app.MapGet("/probe/delivered/{neuron}", async (string neuron, IGrainFactory grai
 
 app.Run();
 
-static BrainClient Brain(IGrainFactory grains) => new(grains, new OwnerId("hosted"));
+static OwnerId Owner() => new("hosted");
+
+static NeuronId SessionId(OwnerId owner) => new(ISessionNeuron.GrainTypeName, owner, "session");
+
+static ISessionNeuron Session(IGrainFactory grains, OwnerId owner)
+    => grains.GetGrain<ISessionNeuron>(SessionId(owner).ToGrainId());

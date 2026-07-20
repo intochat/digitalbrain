@@ -18,8 +18,12 @@ public sealed class WatchContracts
         var observer = new RecordingObserver();
         var reference = SimulationCluster.Grains.CreateObjectReference<IJournalObserver>(observer);
 
-        await simulation.Client.Neuron(nameof(Echo), "watched")
-            .WatchAsync(JournalKind.Incoming, afterSequence: 0, reference);
+        await simulation.WatchAsync(
+            JournalKind.Incoming,
+            nameof(Echo),
+            "watched",
+            afterSequence: 0,
+            reference);
 
         await simulation.SendAsync("Ping", nameof(Echo), "watched", NoValues);
 
@@ -37,25 +41,28 @@ public sealed class WatchContracts
         var simulation = new Simulation();
         simulation.OpenBrain("catch-up");
 
-        var handle = simulation.Client.Neuron(nameof(Echo), "resumed");
-
         var first = new RecordingObserver();
         var firstReference = SimulationCluster.Grains.CreateObjectReference<IJournalObserver>(first);
 
-        await handle.WatchAsync(JournalKind.Incoming, afterSequence: 0, firstReference);
+        await simulation.WatchAsync(
+            JournalKind.Incoming,
+            nameof(Echo),
+            "resumed",
+            afterSequence: 0,
+            firstReference);
         await simulation.SendAsync("Ping", nameof(Echo), "resumed", NoValues);
 
         var seen = await first.WaitForAsync(1);
         var cursor = first.Cursor;
 
-        await handle.UnwatchAsync(firstReference);
+        await simulation.UnwatchAsync(nameof(Echo), "resumed", firstReference);
 
         await simulation.SendAsync("Ping", nameof(Echo), "resumed", NoValues);
 
         var second = new RecordingObserver();
         var secondReference = SimulationCluster.Grains.CreateObjectReference<IJournalObserver>(second);
 
-        await handle.WatchAsync(JournalKind.Incoming, cursor, secondReference);
+        await simulation.WatchAsync(JournalKind.Incoming, nameof(Echo), "resumed", cursor, secondReference);
 
         var missed = await second.WaitForAsync(1);
 
@@ -77,8 +84,12 @@ public sealed class WatchContracts
 
         await simulation.SendAsync("Ping", nameof(Echo), "compacted", NoValues);
 
-        await simulation.Client.Neuron(nameof(Echo), "compacted")
-            .WatchAsync(JournalKind.Incoming, afterSequence: 9_000_000, reference);
+        await simulation.WatchAsync(
+            JournalKind.Incoming,
+            nameof(Echo),
+            "compacted",
+            afterSequence: 9_000_000,
+            reference);
 
         var reset = await observer.WaitForResetAsync();
 

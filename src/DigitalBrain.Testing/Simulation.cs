@@ -1,5 +1,4 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Client;
 
 namespace DigitalBrain.Testing;
 
@@ -35,21 +34,32 @@ public sealed class Simulation
         return StimulateAsync(synapseTypeName, NeuronNamed(neuronType, name), values);
     }
 
-    public BrainClient Client => new(SimulationCluster.Grains, Owner);
-
     public Task ClientFireAsync(string synapseTypeName, string neuronType, string name)
-        => Client.FireAsync(neuronType, name, NeuronCatalog.Create(synapseTypeName, EmptyValues));
+        => Session().FireAsync(
+            NeuronNamed(neuronType, name),
+            NeuronCatalog.Create(synapseTypeName, EmptyValues));
 
     public Task ClientFireExpectingRefusalAsync(string synapseTypeName, string neuronType, string name, string targetOwner)
-        => CaptureRefusalAsync(() => Client.FireAsync(
+        => CaptureRefusalAsync(() => Session().FireAsync(
             new NeuronId(neuronType, new OwnerId(targetOwner), name),
             NeuronCatalog.Create(synapseTypeName, EmptyValues)));
 
     public Task<JournalRead> ClientReadJournalAsync(JournalKind kind, string neuronType, string name, long afterSequence)
-        => Client.Neuron(neuronType, name).ReadJournalAsync(kind, afterSequence);
+        => Session().ReadNeuronJournalAsync(NeuronNamed(neuronType, name), kind, afterSequence);
 
     public Task<JournalRead> ClientReadSessionJournalAsync(JournalKind kind)
-        => Client.Session.ReadJournalAsync(kind, afterSequence: 0);
+        => Session().ReadNeuronJournalAsync(SessionId(Owner), kind, afterSequence: 0);
+
+    public Task WatchAsync(
+        JournalKind kind,
+        string neuronType,
+        string name,
+        long afterSequence,
+        IJournalObserver observer)
+        => Session().WatchNeuronAsync(NeuronNamed(neuronType, name), kind, afterSequence, observer);
+
+    public Task UnwatchAsync(string neuronType, string name, IJournalObserver observer)
+        => Session().UnwatchNeuronAsync(NeuronNamed(neuronType, name), observer);
 
     public Task SessionReadOfForeignOwnerExpectingRefusalAsync(JournalKind kind, string neuronType, string name, string targetOwner)
         => CaptureRefusalAsync(() => SimulationCluster.Grains
@@ -113,7 +123,7 @@ public sealed class Simulation
     }
 
     public async Task<JournalRead> ReadJournalAsync(JournalKind kind, string neuronType, string name, long afterSequence)
-        => await Client.Neuron(neuronType, name).ReadJournalAsync(kind, afterSequence);
+        => await Session().ReadNeuronJournalAsync(NeuronNamed(neuronType, name), kind, afterSequence);
 
     public static async Task<JournalRead> ReadJournalOfOwnerAsync(
         JournalKind kind,
@@ -121,23 +131,28 @@ public sealed class Simulation
         string neuronType,
         string name,
         long afterSequence)
-        => await new BrainClient(SimulationCluster.Grains, new OwnerId(owner))
-            .Neuron(neuronType, name)
-            .ReadJournalAsync(kind, afterSequence);
+        => await Session(new OwnerId(owner)).ReadNeuronJournalAsync(
+            new NeuronId(neuronType, new OwnerId(owner), name),
+            kind,
+            afterSequence);
 
     public async Task RegisterAsync(string neuronType, string name)
-        => _ = await Client.Neuron(neuronType, name).ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
+        => _ = await Session().ReadNeuronJournalAsync(
+            NeuronNamed(neuronType, name),
+            JournalKind.Incoming,
+            afterSequence: 0);
 
     public Task AwaitHandledAsync(string neuronType, string name, string synapseTypeName)
         => SimulationCluster.Observed.AwaitHandledAsync(NeuronNamed(neuronType, name), synapseTypeName);
 
     public async Task<int> SettleAsync(JournalKind kind, string neuronType, string name)
     {
-        var neuron = Client.Neuron(neuronType, name);
+        var neuron = NeuronNamed(neuronType, name);
+        var session = Session();
         var quiet = new QuietWatch(SettleQuietPeriod);
         var reference = SimulationCluster.Grains.CreateObjectReference<IJournalObserver>(quiet);
 
-        await neuron.WatchAsync(kind, afterSequence: 0, reference);
+        await session.WatchNeuronAsync(neuron, kind, afterSequence: 0, reference);
 
         try
         {
@@ -145,10 +160,10 @@ public sealed class Simulation
         }
         finally
         {
-            await neuron.UnwatchAsync(reference);
+            await session.UnwatchNeuronAsync(neuron, reference);
         }
 
-        var settled = await neuron.ReadJournalAsync(kind, afterSequence: 0);
+        var settled = await session.ReadNeuronJournalAsync(neuron, kind, afterSequence: 0);
 
         return settled.ResetSnapshot?.RetainedCount ?? settled.Delta.Count;
     }
@@ -267,6 +282,14 @@ public sealed class Simulation
 
     private Task StimulateAsync(string synapseTypeName, NeuronId receiver, IReadOnlyDictionary<string, string> values)
         => Driver().StimulateAsync(receiver, NeuronCatalog.Create(synapseTypeName, values));
+
+    private ISessionNeuron Session() => Session(Owner);
+
+    private static ISessionNeuron Session(OwnerId owner)
+        => SimulationCluster.Grains.GetGrain<ISessionNeuron>(SessionId(owner).ToGrainId());
+
+    private static NeuronId SessionId(OwnerId owner)
+        => new(ISessionNeuron.GrainTypeName, owner, "session");
 
     private sealed class QuietWatch(TimeSpan quietPeriod) : IJournalObserver
     {

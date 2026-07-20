@@ -1,11 +1,10 @@
-using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace DigitalBrain.Aspire;
 
-public static class BrainClientIntegration
+public static class DigitalBrainClientHostingExtensions
 {
     public static IHostApplicationBuilder AddDigitalBrainClient(this IHostApplicationBuilder builder, string owner)
     {
@@ -13,7 +12,10 @@ public static class BrainClientIntegration
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
 
         builder.UseOrleansClient();
-        builder.Services.AddSingleton(services => new BrainClient(services.GetRequiredService<IGrainFactory>(), new OwnerId(owner)));
+        builder.Services.AddSingleton(
+            services => DigitalBrainClient.Connect(
+                services.GetRequiredService<IGrainFactory>(),
+                owner));
 
         return builder;
     }
