@@ -70,6 +70,7 @@ public sealed class PackageBoundaryContracts
             .Concat(NeuronHosting)
             .Append("DigitalBrain.Kernel")
             .Append("DigitalBrain.Modules.AI")
+            .Append("DigitalBrain.Modules.AI.Aspire.Hosting")
             .ToHashSet(StringComparer.Ordinal);
 
         var packable = ProductionRoots

@@ -20,5 +20,6 @@
     <ProjectReference Include="..\..\src\DigitalBrain.DevTools\DigitalBrain.DevTools.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.AI\DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.AI.Aspire.Hosting\DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

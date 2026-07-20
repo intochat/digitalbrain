@@ -12,7 +12,11 @@ public sealed class PublicApiBaselineContracts
     [MemberData(nameof(PackableProjectNames))]
     public void EveryPackableProjectDeclaresItsPublicApiBaseline(string projectName)
     {
-        var projectDirectory = Path.Combine(RepositoryRoot, "src", projectName);
+        var projectFile = Directory
+            .EnumerateFiles(RepositoryRoot, $"{projectName}.csproj", SearchOption.AllDirectories)
+            .Single(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
+        var projectDirectory = Path.GetDirectoryName(projectFile)!;
 
         foreach (var baselineFileName in (string[])["PublicAPI.Shipped.txt", "PublicAPI.Unshipped.txt"])
         {

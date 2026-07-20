@@ -18,6 +18,7 @@
   <Folder Name="/modules/">
     <Project Path="modules/DigitalBrain.Modules.AI.Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <Project Path="modules/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
+    <Project Path="modules/DigitalBrain.Modules.AI.Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
