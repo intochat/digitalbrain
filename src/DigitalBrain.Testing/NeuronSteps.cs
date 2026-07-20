@@ -237,6 +237,22 @@ public sealed class NeuronSteps(Simulation simulation)
         }
     }
 
+    [Then("the subscriber count for {word} is {int}")]
+    public async Task ThenTheSubscriberCountIs(string synapseType, int expected)
+    {
+        var actual = await simulation.SubscriberCountAsync(synapseType);
+
+        if (actual != expected)
+        {
+            throw new SimulationAssertionException(
+                $"Expected the subscriber count for {synapseType} to be {expected}, but it is {actual}.");
+        }
+    }
+
+    [Then("the {word} for that broadcast's correlation contains {word}")]
+    public Task ThenTheBroadcastReceiverContains(string handlerType, string synapseType)
+        => simulation.AwaitBroadcastReceiverAsync(handlerType, synapseType);
+
     [Then("the incoming journal of the {word} neuron named {string} contains {word}")]
     public async Task ThenTheIncomingJournalContains(string neuronType, string name, string synapseType)
     {

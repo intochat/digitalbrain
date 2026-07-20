@@ -43,7 +43,8 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
 
 Three verbs address other neurons. `SendAsync` is point-to-point. `ReplyAsync` addresses the caller of
 the synapse currently being handled and throws if there is nothing being handled. `EmitAsync` broadcasts
-to everything registered for that synapse type **within the same owner**.
+to every handler **type** composed for that synapse via `AddBroadcastHandlers`, minting one instance
+per type from the firing correlation, **within the same owner**.
 
 `AskModelAsync` resolves the `IChatClient` bound to a tier and throws if that tier was never bound —
 an unbound tier is a configuration error, not a reason to silently degrade.

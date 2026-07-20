@@ -14,6 +14,8 @@ public sealed class Simulation
 
     private OwnerId _owner;
     private Exception? _refusal;
+    private string? _lastTargetType;
+    private string? _lastTargetName;
 
     public NeuronId Id => new(nameof(SimulationNeuron), Owner, "driver");
 
@@ -26,7 +28,12 @@ public sealed class Simulation
     public NeuronId NeuronNamed(string neuronType, string name) => new(neuronType, Owner, name);
 
     public Task SendAsync(string synapseTypeName, string neuronType, string name, IReadOnlyDictionary<string, string> values)
-        => StimulateAsync(synapseTypeName, NeuronNamed(neuronType, name), values);
+    {
+        _lastTargetType = neuronType;
+        _lastTargetName = name;
+
+        return StimulateAsync(synapseTypeName, NeuronNamed(neuronType, name), values);
+    }
 
     public BrainClient Client => new(SimulationCluster.Grains, Owner);
 
@@ -195,6 +202,68 @@ public sealed class Simulation
 
     public Task<int> SubscriberCountAsync(string synapseTypeName)
         => Driver().SubscriberCountAsync(NeuronCatalog.SynapseType(synapseTypeName).FullName!);
+
+    public async Task AwaitBroadcastReceiverAsync(string handlerType, string synapseTypeName)
+    {
+        if (_lastTargetType is null || _lastTargetName is null)
+        {
+            throw new SimulationAssertionException(
+                "No synapse was sent in this scenario, so there is no broadcast correlation to resolve a receiver from.");
+        }
+
+        var expected = NeuronCatalog.SynapseType(synapseTypeName);
+        var correlation = await AwaitOutgoingCorrelationAsync(_lastTargetType, _lastTargetName, expected);
+        var receiver = NeuronId.BroadcastReceiver(handlerType, Owner, correlation);
+
+        await SimulationCluster.Observed.AwaitHandledAsync(receiver, synapseTypeName);
+
+        var journal = await ReadJournalAsync(JournalKind.Incoming, handlerType, receiver.Name, afterSequence: 0);
+
+        if (!JournalContains(journal, expected))
+        {
+            throw new SimulationAssertionException(
+                $"Expected the incoming journal of {receiver} to contain {synapseTypeName}, but it did not.");
+        }
+    }
+
+    private async Task<CorrelationId> AwaitOutgoingCorrelationAsync(string neuronType, string name, Type synapseType)
+    {
+        var limit = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(10);
+
+        while (DateTimeOffset.UtcNow < limit)
+        {
+            var journal = await ReadJournalAsync(JournalKind.Outgoing, neuronType, name, afterSequence: 0);
+
+            foreach (var delivery in DeliveriesOf(journal))
+            {
+                if (delivery.Synapse.GetType() == synapseType)
+                {
+                    return delivery.CorrelationId;
+                }
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new SimulationAssertionException(
+            $"{synapseType.Name} never appeared on the outgoing journal of {neuronType} '{name}' within 10 seconds.");
+    }
+
+    private static bool JournalContains(JournalRead journal, Type synapseType)
+        => DeliveriesOf(journal).Any(delivery => delivery.Synapse.GetType() == synapseType);
+
+    private static IEnumerable<SynapseDelivery> DeliveriesOf(JournalRead journal)
+    {
+        if (journal.ResetSnapshot is not null)
+        {
+            yield break;
+        }
+
+        foreach (var delivery in journal.Delta)
+        {
+            yield return delivery;
+        }
+    }
 
     private Task StimulateAsync(string synapseTypeName, NeuronId receiver, IReadOnlyDictionary<string, string> values)
         => Driver().StimulateAsync(receiver, NeuronCatalog.Create(synapseTypeName, values));

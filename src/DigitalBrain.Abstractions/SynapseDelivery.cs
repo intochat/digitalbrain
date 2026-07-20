@@ -48,7 +48,8 @@ public sealed class SynapseDelivery
         NeuronId caller,
         long sequence,
         SynapseDelivery? cause = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        CorrelationId? correlation = null)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sequence);
@@ -56,7 +57,7 @@ public sealed class SynapseDelivery
         return new(
             synapse,
             SynapseId.New(),
-            cause?.CorrelationId ?? CorrelationId.New(),
+            correlation ?? cause?.CorrelationId ?? CorrelationId.New(),
             cause?.SynapseId,
             caller,
             sequence,

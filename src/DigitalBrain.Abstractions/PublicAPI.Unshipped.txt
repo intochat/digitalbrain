@@ -143,6 +143,8 @@ static DigitalBrain.Abstractions.JournalSnapshot.operator !=(DigitalBrain.Abstra
 static DigitalBrain.Abstractions.JournalSnapshot.operator ==(DigitalBrain.Abstractions.JournalSnapshot? left, DigitalBrain.Abstractions.JournalSnapshot? right) -> bool
 static DigitalBrain.Abstractions.JournalTally.operator !=(DigitalBrain.Abstractions.JournalTally? left, DigitalBrain.Abstractions.JournalTally? right) -> bool
 static DigitalBrain.Abstractions.JournalTally.operator ==(DigitalBrain.Abstractions.JournalTally? left, DigitalBrain.Abstractions.JournalTally? right) -> bool
+static DigitalBrain.Abstractions.NeuronId.BroadcastReceiver(string! type, DigitalBrain.Abstractions.OwnerId owner, DigitalBrain.Abstractions.CorrelationId correlation) -> DigitalBrain.Abstractions.NeuronId
+static DigitalBrain.Abstractions.NeuronId.BroadcastReceiver<TNeuron>(DigitalBrain.Abstractions.OwnerId owner, DigitalBrain.Abstractions.CorrelationId correlation) -> DigitalBrain.Abstractions.NeuronId
 static DigitalBrain.Abstractions.NeuronId.For<TNeuron>(DigitalBrain.Abstractions.OwnerId owner, string! name) -> DigitalBrain.Abstractions.NeuronId
 static DigitalBrain.Abstractions.NeuronId.FromGrainKey(string! type, string! grainKey) -> DigitalBrain.Abstractions.NeuronId
 static DigitalBrain.Abstractions.NeuronId.GrainTypeNameOf(System.Type! neuronType) -> string!

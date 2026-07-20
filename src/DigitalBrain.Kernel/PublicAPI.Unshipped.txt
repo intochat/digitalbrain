@@ -79,6 +79,7 @@ override DigitalBrain.Kernel.SynapseWiringEntry.Equals(object? obj) -> bool
 override DigitalBrain.Kernel.SynapseWiringEntry.GetHashCode() -> int
 override DigitalBrain.Kernel.SynapseWiringEntry.ToString() -> string!
 override sealed DigitalBrain.Kernel.Neuron.OnActivateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+static DigitalBrain.Kernel.DigitalBrainSiloBuilderExtensions.AddBroadcastHandlers(this Orleans.Hosting.ISiloBuilder! builder, System.Reflection.Assembly! assembly) -> Orleans.Hosting.ISiloBuilder!
 static DigitalBrain.Kernel.DigitalBrainSiloBuilderExtensions.AddDigitalBrain(this Orleans.Hosting.ISiloBuilder! builder) -> Orleans.Hosting.ISiloBuilder!
 static DigitalBrain.Kernel.DigitalBrainSiloBuilderExtensions.AddDigitalBrain(this Orleans.Hosting.ISiloBuilder! builder, string? siloLabel) -> Orleans.Hosting.ISiloBuilder!
 static DigitalBrain.Kernel.JournalStorageHosting.AddDigitalBrainJournalStorage(this Orleans.Hosting.ISiloBuilder! builder, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Orleans.Hosting.ISiloBuilder!

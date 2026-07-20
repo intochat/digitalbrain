@@ -18,7 +18,9 @@ DigitalBrain.Testing.NeuronSteps.ThenTheIncomingJournalSettlesBelow(string! neur
 DigitalBrain.Testing.NeuronSteps.ThenTheJournalContainsExactlyOnce(string! journal, string! neuronType, string! name, string! synapseType) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheNeuronAnswered(string! neuronType, string! name, string! expected) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheOutgoingJournalContains(string! neuronType, string! name, string! synapseType) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.NeuronSteps.ThenTheBroadcastReceiverContains(string! handlerType, string! synapseType) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheSubscriberCountHasGrownBy(string! synapseType, int expected) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.NeuronSteps.ThenTheSubscriberCountIs(string! synapseType, int expected) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.NeuronSteps.ThenTheSynapseIsRefusedAsUnauthorized() -> void
 DigitalBrain.Testing.NeuronSteps.ThenTheSynapseIsRefusedAsUnscripted() -> void
 DigitalBrain.Testing.NeuronSteps.ThenTheTwoNeuronsAreOnDifferentSilos(string! firstType, string! firstName, string! secondType, string! secondName) -> System.Threading.Tasks.Task!
@@ -45,6 +47,7 @@ DigitalBrain.Testing.ScriptedModel.GetStreamingResponseAsync(System.Collections.
 DigitalBrain.Testing.ScriptedModel.ScriptedModel() -> void
 DigitalBrain.Testing.Simulation
 DigitalBrain.Testing.Simulation.AwaitAllRegisteredHandledAsync(string! synapseTypeName) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Simulation.AwaitBroadcastReceiverAsync(string! handlerType, string! synapseTypeName) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.AwaitHandledAsync(string! neuronType, string! name, string! synapseTypeName) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Simulation.Client.get -> DigitalBrain.Client.BrainClient!
 DigitalBrain.Testing.Simulation.ClientFireAsync(string! synapseTypeName, string! neuronType, string! name) -> System.Threading.Tasks.Task!

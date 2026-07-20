@@ -44,10 +44,19 @@ public static class SimulationCluster
 
         var journalStorage = new VolatileJournalStorageProvider();
         var builder = new InProcessTestClusterBuilder(SiloCount);
+        var handlerAssemblies = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(assembly => SynapseWiring.TryGetManifest(assembly, out _))
+            .ToArray();
 
         builder.ConfigureSilo((options, silo) =>
         {
             silo.AddDigitalBrain(LabelOf(options.SiloName));
+
+            foreach (var assembly in handlerAssemblies)
+            {
+                silo.AddBroadcastHandlers(assembly);
+            }
+
             silo.UseInMemoryReminderService();
             silo.Services.AddSingleton<IJournalStorageProvider>(journalStorage);
 

@@ -13,6 +13,7 @@ builder.UseOrleans(silo => silo
     .UseLocalhostClustering()
     .UseInMemoryReminderService()
     .AddDigitalBrain()
+    .AddBroadcastHandlers(typeof(Moderator).Assembly)
     .AddDevelopmentJournalStorage());
 
 using var host = builder.Build();
@@ -21,32 +22,40 @@ await host.StartAsync();
 
 var brain = new BrainClient(host.Services.GetRequiredService<IGrainFactory>(), new OwnerId("panel"));
 
-foreach (var panellist in (string[])[nameof(Optimist), nameof(Skeptic), nameof(Scribe)])
-{
-    await brain.Neuron(panellist, "one").ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
-}
-
 await brain.FireAsync(nameof(Moderator), "chair", new QuestionAsked("should we ship it?"));
 
-var verdicts = await Settled(brain.Neuron(nameof(Scribe), "one"));
+var verdicts = await Settled(brain.Neuron(nameof(Moderator), "chair"), JournalKind.Outgoing);
+var verdict = verdicts.Select(delivery => delivery.Synapse).OfType<VerdictReached>().LastOrDefault();
 
-Console.WriteLine(verdicts.Count == 0
-    ? "the panel has not reached a verdict yet"
-    : $"the scribe recorded: {string.Join(" | ", verdicts.Select(delivery => delivery.Synapse).OfType<VerdictReached>().Select(verdict => verdict.Verdict))}");
+if (verdict is null)
+{
+    Console.WriteLine("the panel has not reached a verdict yet");
+}
+else
+{
+    var scribe = NeuronId.BroadcastReceiver(nameof(Scribe), brain.Owner, verdicts
+        .Last(delivery => delivery.Synapse is VerdictReached)
+        .CorrelationId);
+    var recorded = await Settled(brain.Neuron(scribe.Type, scribe.Name), JournalKind.Incoming);
+
+    Console.WriteLine(recorded.Count == 0
+        ? "the panel has not reached a verdict yet"
+        : $"the scribe recorded: {string.Join(" | ", recorded.Select(delivery => delivery.Synapse).OfType<VerdictReached>().Select(entry => entry.Verdict))}");
+}
 
 await host.StopAsync();
 
-static async Task<IReadOnlyList<SynapseDelivery>> Settled(NeuronHandle neuron)
+static async Task<IReadOnlyList<SynapseDelivery>> Settled(NeuronHandle neuron, JournalKind kind)
 {
     long cursor = 0;
 
     for (var probe = 0; probe < 100; probe++)
     {
-        var journal = await neuron.ReadJournalAsync(JournalKind.Incoming, cursor);
+        var journal = await neuron.ReadJournalAsync(kind, cursor);
         var delta = DeltaOrThrow(journal);
         cursor = journal.ResumeSequence;
 
-        if (delta.Count > 0)
+        if (delta.Count > 0 && (kind == JournalKind.Incoming || delta.Any(delivery => delivery.Synapse is VerdictReached)))
         {
             return delta;
         }
@@ -54,7 +63,7 @@ static async Task<IReadOnlyList<SynapseDelivery>> Settled(NeuronHandle neuron)
         await Task.Delay(TimeSpan.FromMilliseconds(100));
     }
 
-    var final = await neuron.ReadJournalAsync(JournalKind.Incoming, cursor);
+    var final = await neuron.ReadJournalAsync(kind, cursor);
 
     return DeltaOrThrow(final);
 }

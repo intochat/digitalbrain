@@ -15,6 +15,7 @@ scripted.Answer("is the kernel awake?", "the kernel is awake");
 builder.Services.AddKeyedSingleton<IChatClient>(ModelTier.Balanced, scripted);
 builder.UseOrleans(silo => silo
     .AddDigitalBrain()
+    .AddBroadcastHandlers(typeof(Recorder).Assembly)
     .AddDigitalBrainJournalStorage(builder.Configuration)
     .AddDigitalBrainDevTools(builder.Environment));
 

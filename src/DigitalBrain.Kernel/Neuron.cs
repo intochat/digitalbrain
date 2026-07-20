@@ -59,13 +59,6 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
 
         RecallHandledDeliveries();
 
-        var registry = SubscriptionRegistry.For(GrainFactory, Id.Owner);
-
-        foreach (var handled in SynapseWiring.HandledSynapseTypes(GetType()))
-        {
-            await registry.RegisterAsync(handled.FullName!, Id);
-        }
-
         ScheduleDrain();
     }
 
@@ -233,10 +226,23 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
     {
         ArgumentNullException.ThrowIfNull(synapse);
 
-        var subscribers = await SubscriptionRegistry.For(GrainFactory, Id.Owner)
-            .SubscribersAsync(synapse.GetType().FullName!);
+        var synapseType = synapse.GetType().FullName!;
+        var correlation = _handling?.CorrelationId ?? CorrelationId.New();
+        var catalog = ServiceProvider.GetRequiredService<BroadcastCatalog>();
 
-        await FireAsync(synapse, [.. subscribers]);
+        var receivers = catalog.HandlerGrainTypes(synapseType)
+            .Select(grainType => NeuronId.BroadcastReceiver(grainType, Id.Owner, correlation))
+            .ToList();
+
+        foreach (var subscriber in await SubscriptionRegistry.For(GrainFactory, Id.Owner).SubscribersAsync(synapseType))
+        {
+            if (!receivers.Contains(subscriber))
+            {
+                receivers.Add(subscriber);
+            }
+        }
+
+        await FireAsync(synapse, [.. receivers], correlation);
     }
 
     protected async Task<string> AskModelAsync(ModelTier tier, string prompt, CancellationToken cancellationToken)
@@ -298,11 +304,11 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         => throw new InvalidOperationException(
             $"{nameof(RegisterTimer)} creates interleaving callbacks, but neurons require serialized turns.");
 
-    internal async Task<SynapseDelivery> FireAsync(Synapse synapse, NeuronId[] receivers)
+    internal async Task<SynapseDelivery> FireAsync(Synapse synapse, NeuronId[] receivers, CorrelationId? correlation = null)
     {
         var sequence = _outgoing.NextSequence
             + (_handling is null ? 0 : _firedWhileHandling.Count);
-        var delivery = SynapseDelivery.Create(Snapshot(synapse), Id, sequence, _handling, _clock);
+        var delivery = SynapseDelivery.Create(Snapshot(synapse), Id, sequence, _handling, _clock, correlation);
 
         if (_handling is null)
         {

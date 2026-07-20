@@ -13,6 +13,7 @@ builder.UseOrleans(silo => silo
     .UseLocalhostClustering()
     .UseInMemoryReminderService()
     .AddDigitalBrain()
+    .AddBroadcastHandlers(typeof(Greeter).Assembly)
     .AddDevelopmentJournalStorage());
 
 using var host = builder.Build();

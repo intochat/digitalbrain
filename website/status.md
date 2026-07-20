@@ -136,19 +136,20 @@ stops at the first entry with an undelivered receiver. A single unreachable neur
 *all* outgoing traffic from the sender — including traffic to receivers that are perfectly
 reachable — until that entry exhausts its attempts or the 30-minute retry horizon expires.
 
-**Subscriptions are never removed.** The registry only grows: a neuron that registers for a synapse
-type stays registered forever, even if it is never activated again. Broadcast fan-out therefore grows
-monotonically with every neuron instance that has ever existed.
-
-**A neuron that has never activated does not receive broadcasts.** Subscription is registered during
-`OnActivateAsync`, and `EmitAsync` reads the subscriber set at emit time. A neuron that exists in
-code but has never been activated is not a subscriber and is silently skipped. The multiagent sample
-works around this by reading each neuron's journal purely to force activation before broadcasting.
-
 **Hosted proof is driven from inside the cluster.** An external Orleans client cannot complete a
 handshake through an Aspire-proxied gateway, because the silo advertises its own address. The hosted
 restart proof therefore runs from a probe host inside the cluster rather than from a true external
 client.
+
+## Broadcast addressing
+
+A broadcast addresses handler **types**, not instance names. The set of handler types is known at
+composition time because the interfaces declare it (`AddBroadcastHandlers`), so the catalog is
+populated at startup rather than learned during activation — which makes late subscription for
+compiled neurons impossible rather than merely tolerated, and removes the registry write from the
+activation path. The instance a broadcast reaches is derived from the firing correlation. Behaviors
+are the deliberate exception: a script's handled set cannot be known before the script exists, so
+they still register on the durable per-owner registry at install.
 
 ## Proofs held red
 
@@ -161,24 +162,6 @@ nothing unless its existence and its state are both public.
 | --- | --- | --- |
 | `the kernel assembly reaches no vendor model SDK` | `DigitalBrain.Kernel` has no transitive reference to Anthropic, OpenAI or `Microsoft.Extensions.AI` | AI becomes an ordinary module and leaves the kernel |
 | `an unreachable receiver does not block traffic to reachable ones` | Outbox progress is per-entry, not head-first | The outbox stops draining strictly in order |
-| `a neuron that has never activated still receives a broadcast` | Subscription does not depend on prior activation | Broadcast addressing is decided — see below |
-
-The last of these was, until recently, not merely unimplemented but **unsatisfiable**, and the reason
-is worth keeping. The registry maps a synapse type to an array of `NeuronId`s, and each `NeuronId`
-names a specific instance. Orleans grains are virtual, so every possible name of every neuron type
-already exists. There is therefore no set of "all neurons that would handle this synapse" for a
-broadcast to reach — only the set that has registered.
-
-**That is now decided, and the proof has a target.** A broadcast addresses handler **types**, not
-instance names. The set of handler types is known at composition time, because the interfaces declare
-it, so the registry is populated at startup rather than learned during activation — which makes late
-subscription impossible rather than merely tolerated, and removes the registry write from the
-activation path. The instance a broadcast reaches is derived from the firing correlation rather than
-enumerated. Two prior generations converged on this shape independently.
-
-Behaviors are the exception, and deliberately so: a script's handled set cannot be known before the
-script exists, so behaviors register when they are installed. That is a small, bounded, explicit
-registry — not the per-activation write that produced the debt above it.
 
 ## Where this is going
 

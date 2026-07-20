@@ -19,6 +19,5 @@ Scenario: a synapse crosses between neurons pinned to different silos
 @multisilo
 Scenario: a broadcast reaches subscribers across the cluster
     Given a brain for owner "everywhere"
-    And 12 Listener neurons are registered
     When Ping is sent to the Announcer neuron named "town-crier"
-    Then every registered Listener received Noticed
+    Then the Listener for that broadcast's correlation contains Noticed

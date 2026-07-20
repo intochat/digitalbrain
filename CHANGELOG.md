@@ -18,9 +18,10 @@ depend on prereleases.
   authors cannot construct that envelope. Neurons declare `IHandle<TSynapse>` and `IEmit<TSynapse>`;
   a source generator emits a dispatch manifest whose completeness is proven without a cluster.
 - **The synapse fabric.** A durable outbox is the source of truth for delivery: at-least-once per
-  registered subscriber, effectively-once processing through `SynapseId` dedupe, and a bounded retry
-  horizon. Broadcast is owner-scoped through a journaled subscription registry that tolerates neuron
-  types registered after silo start, provided the neuron has activated at least once.
+  receiver, effectively-once processing through `SynapseId` dedupe, and a bounded retry horizon.
+  Broadcast addresses handler **types** composed via `AddBroadcastHandlers` at silo start; the
+  instance is minted from the firing correlation so never-activated neurons still receive facts.
+  The durable registry remains only for install-time behavior subscriptions.
 - **Multi-silo.** Cross-silo point-to-point and broadcast, cluster-wide registry correctness, and
   `[PinToSilo]` placement onto labelled silos.
 - **AI model binding.** Role tiers bound to models by AppHost configuration; OpenAI and Anthropic
@@ -76,9 +77,6 @@ depend on prereleases.
 - One unreachable receiver blocks a neuron's entire outbox. The outbox drains in order and stops at
   the first entry with an undelivered receiver, stalling traffic to reachable receivers behind it
   until that entry exhausts its attempts or the 30-minute retry horizon expires.
-- Subscriptions are never removed, so broadcast fan-out grows monotonically.
-- A neuron that has never activated receives no broadcasts: subscription is registered during
-  activation, and `EmitAsync` reads subscribers at emit time.
 - No timeline stream, so a client can fire and read but cannot observe; samples poll.
 - Outbox redelivery after a receiver outage is implemented but not proven by a scenario.
 - The client projection still delegates to Orleans' `AsClient()`, which would leak a credentialed
