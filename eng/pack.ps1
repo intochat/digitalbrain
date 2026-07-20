@@ -28,10 +28,12 @@ try {
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-    $providerSdkPrefixes = @('Anthropic', 'OpenAI', 'Microsoft.Extensions.AI')
+    $providerSdkPrefixes = @('Anthropic', 'OpenAI', 'Microsoft.Extensions.AI', 'OllamaSharp')
+    $providerOwner = 'DigitalBrain.Modules.AI'
     $consumerPathPackages = @(
         'DigitalBrain', 'DigitalBrain.Abstractions', 'DigitalBrain.Client',
-        'DigitalBrain.Aspire', 'DigitalBrain.Aspire.Hosting')
+        'DigitalBrain.Aspire', 'DigitalBrain.Aspire.Hosting',
+        'DigitalBrain.Modules.AI.Contracts')
     $packagesThatMayHostNeurons = @('DigitalBrain.Testing', 'DigitalBrain.DevTools')
 
     $declaredDependencies = @{}
@@ -79,17 +81,23 @@ try {
         $reachable = & $reachableFrom $identity
 
         foreach ($sdk in $reachable | Where-Object { & $isProviderSdk $_ }) {
-            $breaches += "$identity can reach the provider SDK $sdk; provider SDKs and credentials live only in DigitalBrain.Kernel"
+            $breaches += "$identity can reach the provider SDK $sdk; provider SDKs and credentials live only in $providerOwner"
         }
 
         foreach ($forbidden in @('DigitalBrain.Kernel', 'DigitalBrain.Testing') | Where-Object { $reachable.Contains($_) }) {
-            $breaches += "$identity can reach $forbidden, which drags provider SDKs onto the consumer path"
+            $breaches += "$identity can reach $forbidden, which is forbidden on the consumer path"
         }
     }
 
     foreach ($identity in $packagesThatMayHostNeurons) {
         foreach ($sdk in $declaredDependencies[$identity] | Where-Object { & $isProviderSdk $_ }) {
-            $breaches += "$identity declares the provider SDK $sdk itself; only DigitalBrain.Kernel may"
+            $breaches += "$identity declares the provider SDK $sdk itself; only $providerOwner may"
+        }
+    }
+
+    foreach ($identity in $declaredDependencies.Keys | Where-Object { $_ -ne $providerOwner }) {
+        foreach ($sdk in $declaredDependencies[$identity] | Where-Object { & $isProviderSdk $_ }) {
+            $breaches += "$identity declares the provider SDK $sdk itself; only $providerOwner may"
         }
     }
 

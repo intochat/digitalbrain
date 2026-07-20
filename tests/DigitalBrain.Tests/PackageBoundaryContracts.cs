@@ -5,7 +5,7 @@ namespace DigitalBrain.Tests;
 
 public sealed class PackageBoundaryContracts
 {
-    private static readonly string[] ProviderSdkPrefixes = ["OpenAI", "Anthropic", "Microsoft.Extensions.AI"];
+    private static readonly string[] ProviderSdkPrefixes = ["OpenAI", "Anthropic", "Microsoft.Extensions.AI", "OllamaSharp"];
 
     private static readonly string RepositoryRoot = LocateRepositoryRoot();
 
@@ -16,9 +16,12 @@ public sealed class PackageBoundaryContracts
         "DigitalBrain.Client",
         "DigitalBrain.Aspire",
         "DigitalBrain.Aspire.Hosting",
+        "DigitalBrain.Modules.AI.Contracts",
     ];
 
     private static readonly string[] NeuronHosting = ["DigitalBrain.Testing", "DigitalBrain.DevTools"];
+
+    private static readonly string[] ProductionRoots = ["src", "modules"];
 
     public static TheoryData<string> ConsumerPathPackages { get; } = [.. ConsumerPath];
 
@@ -66,10 +69,14 @@ public sealed class PackageBoundaryContracts
         var guarded = ConsumerPath
             .Concat(NeuronHosting)
             .Append("DigitalBrain.Kernel")
+            .Append("DigitalBrain.Modules.AI")
             .ToHashSet(StringComparer.Ordinal);
 
-        var packable = Directory
-            .EnumerateFiles(Path.Combine(RepositoryRoot, "src"), "*.csproj", SearchOption.AllDirectories)
+        var packable = ProductionRoots
+            .SelectMany(root => Directory.EnumerateFiles(
+                Path.Combine(RepositoryRoot, root),
+                "*.csproj",
+                SearchOption.AllDirectories))
             .Where(IsPackable)
             .Select(Path.GetFileNameWithoutExtension)
             .ToList();
@@ -136,7 +143,9 @@ public sealed class PackageBoundaryContracts
         ?? throw new InvalidOperationException($"A {reference.Name.LocalName} element carries no Include attribute.");
 
     private static string ProjectFileOf(string package) =>
-        Path.Combine(RepositoryRoot, "src", package, $"{package}.csproj");
+        Directory.EnumerateFiles(RepositoryRoot, $"{package}.csproj", SearchOption.AllDirectories)
+            .Single(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                && !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
 
     private static string LocateRepositoryRoot()
     {

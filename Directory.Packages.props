@@ -12,7 +12,6 @@
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>
   <ItemGroup>
-    <PackageVersion Include="Anthropic" Version="12.36.0" />
     <PackageVersion Include="Aspire.Hosting" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.4.6" />
@@ -21,6 +20,7 @@
     <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.8.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.8.0" />
+    <PackageVersion Include="OllamaSharp" Version="5.4.27" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Dashboard" Version="10.2.2-rc.2" />

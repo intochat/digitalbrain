@@ -1,0 +1,13 @@
+#nullable enable
+DigitalBrain.AI.AIModule
+DigitalBrain.AI.AIModule.AIModule() -> void
+DigitalBrain.AI.LLM
+DigitalBrain.AI.LLM.AskAsync(string! prompt) -> System.Threading.Tasks.Task<string!>!
+DigitalBrain.AI.LLM.LLM(Microsoft.Extensions.AI.IChatClient! chatClient) -> void
+DigitalBrain.AI.LlmAttribute<TModel>
+DigitalBrain.AI.LlmAttribute<TModel>.LlmAttribute() -> void
+DigitalBrain.AI.Ollama.Llama32
+DigitalBrain.AI.Ollama.Llama32.Llama32(Microsoft.Extensions.AI.IChatClient! chatClient) -> void
+DigitalBrain.AI.OpenAI.Gpt56
+DigitalBrain.AI.OpenAI.Gpt56.Gpt56(Microsoft.Extensions.AI.IChatClient! chatClient) -> void
+static DigitalBrain.AI.AIModule.Configure(Orleans.Hosting.ISiloBuilder! builder) -> void

@@ -1,5 +1,6 @@
 using System.Reflection;
 using DigitalBrain.Abstractions;
+using DigitalBrain.AI;
 using DigitalBrain.Aspire;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Client;
@@ -10,7 +11,7 @@ namespace DigitalBrain.Tests;
 
 public sealed class AssemblyBoundaryContracts
 {
-    private static readonly string[] VendorModelSdks = ["Anthropic", "OpenAI", "Microsoft.Extensions.AI"];
+    private static readonly string[] VendorModelSdks = ["Anthropic", "OpenAI", "Microsoft.Extensions.AI", "OllamaSharp"];
 
     [Fact(DisplayName = "R-5 gate for Phase 3.5: the kernel assembly reaches no vendor model SDK")]
     public void TheKernelReachesNoVendorModelSdk()
@@ -18,6 +19,16 @@ public sealed class AssemblyBoundaryContracts
         var reachable = ReachableFrom(typeof(Neuron).Assembly);
 
         Assert.DoesNotContain(reachable, reference => VendorModelSdks.Any(sdk => reference.StartsWith(sdk, StringComparison.Ordinal)));
+    }
+
+    [Fact(DisplayName = "provider SDKs are owned by the AI runtime assembly")]
+    public void TheAiRuntimeOwnsProviderSdks()
+    {
+        var reachable = ReachableFrom(typeof(AIModule).Assembly);
+
+        Assert.Contains(reachable, reference => reference.StartsWith("Microsoft.Extensions.AI", StringComparison.Ordinal));
+        Assert.Contains(reachable, reference => reference.StartsWith("OllamaSharp", StringComparison.Ordinal));
+        Assert.Contains(reachable, reference => reference.StartsWith("OpenAI", StringComparison.Ordinal));
     }
 
     [Fact]
