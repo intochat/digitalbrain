@@ -85,6 +85,26 @@ Kernel must not contain:
 - Flutter contracts
 - Semantic memory
 
+Typed interface requests are reified as causal facts without turning the request itself into a
+synapse:
+
+1. Before invocation, the caller creates and commits `CapabilityRequested : Synapse`.
+2. Its `SynapseDelivery` is propagated through Orleans `RequestContext`.
+3. The target commits the same delivery to its incoming journal before invoking the method.
+4. The target executes with that delivery as its current causal context.
+5. Emitted synapses inherit the correlation and use the request fact's `SynapseId` as causation.
+6. `CapabilityCompleted`, `CapabilityFailed`, or `CapabilityRejected` records the outcome.
+
+Generic capability facts carry identity, caller, target, contract, method, correlation, causation,
+timestamp, and outcome only. They do not copy arguments, prompts, secrets, tokens, return values, or
+exception content into Kernel journals. Modules emit typed facts when payload-level audit is
+required.
+
+This protocol records attempted, accepted, completed, failed, rejected, and visibly incomplete
+requests. It does not claim exactly-once RPC. Domain `CommandId`, revision fencing, provider
+idempotency, and reconciliation remain responsible for safe retries. The provisional
+`CapabilityCall` name is replaced by `CapabilityRequested`.
+
 ### 2.2 Modules
 
 Each domain is an independent package family:
@@ -302,6 +322,20 @@ These interfaces are semantic capabilities, not MCP toolsets. `IGmail` means Gma
 schemas, reconnection, schema filtering, and invocation stay inside the owning module. Raw MCP
 clients, tool names, protocol DTOs, and tool dictionaries never cross the module interface.
 
+For the Foundation PoC, `IGmail` and `ISalesforce` are capability-root identities rather than
+hand-written CRUD facades. Their pinned, authenticated, and granted tool catalogs stay
+module-private. AI obtains transient exact tools from a provider-neutral runtime seam implemented by
+Google, Salesforce, and test adapters. That seam is module-author infrastructure: contract packages,
+behaviors, natural-language discovery, and the model cannot see or invoke it directly. The model sees
+only selected exact `AIFunction` schemas.
+
+Every selected tool still routes through the semantic integration neuron. The integration neuron
+therefore remains the owner of authorization, incoming request journals, approval validation,
+`CommandId`, mutation state, and reconciliation. A public high-level method or typed request is added
+to `IGmail` or `ISalesforce` only when a real deterministic non-agent caller requires it. MCP tool
+names and JSON never become permanent public domain vocabulary merely because an MCP server exposes
+them.
+
 Each integration module owns its Aspire hosting package. That package declares required OAuth
 parameters, secret descriptions, callback/resource references, and any official MCP process or
 endpoint. The silo still calls only `AddDigitalBrain()`.
@@ -325,6 +359,32 @@ current schema.
 Every tool-enabled agent has a safe `FindCapabilityTools` recovery function. A miss may retrieve and
 add only previously unseen tools from the pinned and granted catalog, then rerun with finite progress.
 There is no generic raw invoke escape hatch.
+
+External mutations use an integration-owned durable command protocol. Every mutation carries
+`DigitalBrain.Abstractions.CommandId` and a canonical payload fingerprint:
+
+```text
+Proposed
+  -> AwaitingApproval
+  -> Approved
+  -> Invoking
+  -> Completed
+             \-> OutcomeUncertain
+```
+
+The same CommandId and fingerprint resumes or returns the recorded result. Reusing an ID with
+different content is rejected. Human approval is bound to the exact fingerprint. MAF middleware
+coordinates the pause and resume, while the integration neuron independently validates the durable
+approval so typed callers cannot bypass it.
+
+The integration commits `Invoking` before contacting MCP and passes CommandId as the provider
+idempotency key when supported. After a crash in `Invoking`, it reconciles by reading provider state
+before considering another mutation. Proven state becomes `Completed`; an unprovable outcome becomes
+`OutcomeUncertain` and the Task waits. An uncertain mutation is never blindly repeated.
+
+The command ledger lives in the integration neuron's durable state and typed journal, not a new
+public service. Read-only operations remain safely retryable and do not require the mutation ledger.
+DigitalBrain never claims exactly-once external effects.
 
 ### 2.8 Canonical registry and semantic discovery
 
@@ -439,6 +499,40 @@ task/attempt facts, and typed blockers. The runtime owns an internal `TaskNeuron
 implement `IWorker`; ordinary stateless agents and raw LLMs do not. A single-agent hard task uses a
 one-participant `Sequential` worker.
 
+A Task owns one immutable, typed `Goal`. Tasks defines only the extension vocabulary:
+
+```csharp
+public abstract record Goal;
+public abstract record Result;
+public abstract record Failure;
+
+public readonly record struct FactReference(
+    NeuronId Source,
+    SynapseId Fact);
+
+public sealed record TaskPolicy(
+    int MaximumAttempts,
+    TimeSpan RetryDelay,
+    DateTimeOffset? Deadline);
+```
+
+Modules and applications define concrete Goals, Results, and Failures. Tasks contains no `object`,
+arbitrary JSON, metadata dictionaries, generic event strings, or AI prompts. AI may define an
+`AgentGoal` in its own contracts.
+
+Every Attempt receives the immutable Goal. Success returns one typed Result plus references to
+supporting facts. The Task copies the accepted Result and evidence references into its immutable
+terminal journal without duplicating evidence payloads.
+
+Failures are typed and classified as retryable or permanent. Retryable failures may create a new
+Attempt while `MaximumAttempts` and the optional absolute `Deadline` permit it. A fixed
+`RetryDelay` is sufficient for the PoC and uses private durable reminders, so Tasks does not depend
+on Time. `AttemptOutcomeUncertain` is never retried automatically.
+
+There is no public per-Attempt timeout. The internal fenced execution lease detects a stuck runner.
+Task deadline expiry requests cancellation; terminal state follows the observed outcome and records
+a typed deadline failure when work did not complete.
+
 Worker requests are short, idempotent interface methods:
 
 ```csharp
@@ -544,6 +638,11 @@ the outcome. The worker atomically accepts only its active lease. Cancellation r
 late or duplicate results cannot overwrite newer state. Reminders may redispatch an unfinished
 lease after a crash.
 
+Each supervised Task execution lease advances exactly one MAF Lockstep superstep. The runner
+restores the checkpoint, advances one superstep, and returns control for a durable worker commit
+before another lease may continue. MAF `Concurrent` may still run participants in parallel inside
+that superstep. Interactive, non-Task conversations may use normal OffThread streaming.
+
 The runner is infrastructure, not a public neuron: it has no registry entry, journal, semantic
 interface, scripting visibility, or durable domain identity.
 
@@ -646,28 +745,59 @@ exists.
 
 The following were discussed but not approved and must not be implemented as settled architecture:
 
-- The exact supervised MAF execution mode and whether every worker turn advances exactly one
-  Lockstep superstep.
-- The durable capability-invocation ledger, provider idempotency, reconciliation, and uncertain
-  external-side-effect protocol.
-- Exact Task request/result payload types, retry policy configuration, timeouts, and result/evidence
-  representation.
-- Exact public Time record shapes and the internal calendar recurrence library.
-- The complete capability-request caller/causation envelope and target-side request journaling.
+- The internal calendar recurrence library and exact recurring/calendar record shapes.
 - Memory architecture. It remains out of scope.
+
+The one-shot `ICountdown`/`IReminder`, Tasks, AI, integration-root, and capability-tool seams proposed
+for the Foundation PoC are written explicitly in
+`docs/superpowers/plans/2026-07-20-foundation-poc.md`. Approval of that plan freezes those PoC
+contracts. It does not approve recurring schedules or Memory.
 
 Evidence retained for the next grilling pass:
 
 - A throwaway prototype against `Microsoft.Agents.AI.Workflows` 1.13.0 showed that cancelling
   OffThread execution on the first `SuperStepCompletedEvent` was too late: later executors had
   already run and resume produced counts `first=1`, `second=2`, `third=3`. The equivalent Lockstep
-  prototype advanced and resumed with all three counts equal to one. This evidence motivates, but
-  does not yet ratify, one-superstep worker turns.
+  prototype advanced and resumed with all three counts equal to one. This evidence supports the
+  ratified one-superstep worker boundary.
 - Orleans persists reminder definitions but not individual occurrences; cluster downtime can miss a
   tick. This is why DigitalBrain coalesces overdue recurrence explicitly.
 - The old IAW `TaskLedgerGrain` has no production append callers in the inspected snapshot, mixes
   prompt formatting into persistence, duplicates other logs, and permits destructive clearing. Only
   its durable-hard-work intent survives.
+
+### 2.15 Foundation PoC boundary
+
+The first executable proof is one vertical scenario across exactly five module families: Tasks,
+Time, AI, Google, and Salesforce.
+
+```text
+Create durable Task
+  -> read Gmail through official MCP
+  -> ask two typed LLMs independently
+  -> reconcile them through MAF group orchestration
+  -> survive a silo restart between Lockstep supersteps
+  -> request human approval
+  -> update one Salesforce record through official MCP
+  -> schedule a follow-up Countdown or one-shot Reminder
+  -> complete with typed result/evidence and causal journals
+```
+
+The PoC includes one Gmail read capability, one Salesforce mutation, one Countdown, and one one-shot
+Reminder. Automated tests replace external systems only at the MCP boundary; credentialed live
+smoke tests are optional.
+
+The PoC explicitly excludes Memory, Flutter, model tiers/routing/balancing/fallback, broad MCP tool
+coverage, recurring calendar rules, and runtime Behavior installation. It uses ordinary compiled
+typed C# composition. This proves the durable module architecture, not the later self-programming
+governance rail.
+
+The exact minimal contracts, runtime seams, proof order, and stop conditions are now proposed in
+`docs/superpowers/plans/2026-07-20-foundation-poc.md`. Plan approval is the final architecture gate.
+After approval, grilling continues only as a diff/proof discipline at green slice boundaries; it
+does not reopen speculative architecture.
+Implementation proceeds as red-green vertical slices; no new abstraction is introduced unless a
+failing behavioral proof requires it.
 
 ## 3. Hard deletion manifest
 
@@ -874,23 +1004,25 @@ Git history is the archive. Contradictory live plans are not documentation.
 - [x] Run `node --test tests/*.test.mjs` from `website/`.
 - [x] Run the root gate.
 
-### Ratified continuation, not yet an executable checklist
+### Foundation PoC execution plan
 
-The next implementation plan must be cut from the ratified sections above only after the remaining
-questions in section 2.14 are resolved. It must cover, in dependency order:
+The completed hard-cut tasks above remain historical proof. The next executable work is the
+file-level, red-green plan in `docs/superpowers/plans/2026-07-20-foundation-poc.md`. It contains:
 
-1. Replace the provisional string AI exchange with the MEAI message/response boundary.
-2. Introduce `DigitalBrain.Tasks.Contracts` and the Task lifecycle without any AI dependency.
-3. Compose MAF-backed typed Agents and orchestration neurons.
-4. Implement `IWorker` in session-owning AI orchestrations and add the fenced runner.
-5. Implement behavior compilation and dynamic behavior-scoped agents against contract-only
-   references.
-6. Implement semantic capability/MCP adaptation, retrieval, and approval middleware.
-7. Introduce `DigitalBrain.Time` with `ICountdown`, `IReminder`, deterministic simulation time, and
-   shared durable reminder hosting.
-8. Continue with the generated semantic registry and integration modules.
+1. The causal capability-request repair.
+2. Independent Tasks contracts and lifecycle.
+3. The MEAI public wire and MAF-backed typed Agents.
+4. Concurrent/group orchestration with one serialized MAF session.
+5. The fenced one-Lockstep-superstep `IWorker` bridge.
+6. The neutral module-private capability-tool adaptation seam.
+7. Gmail read and Salesforce approved mutation through official MCP adapters.
+8. One-shot Countdown and Reminder neurons.
+9. The complete Azure durability profile.
+10. One hosted restart proof across all five module families.
 
-This list records scope and dependencies, not permission to fill unresolved details with guesses.
+Plan approval freezes its public seams and TDD order. Execution then proceeds one failing public proof
+at a time; discovering contradictory compiler, package, or official-service evidence triggers a
+recorded correction rather than an invented abstraction.
 
 ## 5. Acceptance gates
 
@@ -930,8 +1062,9 @@ After the ratified AI, Tasks, behavior, integration, and Time foundations are pr
 1. Complete owner-safe client scripting and the proposal/approval/install/rollback rail.
 2. Generate the canonical neuron catalog from public contracts and method/synapse vocabulary.
 3. Add semantic/vector discovery as a disposable index over that catalog.
-4. Add `DigitalBrain.Google` with typed `IGmail` and `ICalendar` neurons over official MCP.
-5. Add `DigitalBrain.Salesforce` with typed `ISalesforce` over official MCP.
+4. Extend `DigitalBrain.Google` from the Foundation `IGmail` root to `ICalendar` when a concrete
+   calendar story exists.
+5. Add recurring/calendar Time vocabulary after its library and public record shapes are approved.
 6. Add `DigitalBrain.Flutter` containing only Flutter neurons and its contract drift guard.
 7. Design `DigitalBrain.Memory` independently around its own vocabulary. Do not infer its
    architecture from AI, Tasks, or Time.

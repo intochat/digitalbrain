@@ -175,11 +175,14 @@ Two guards fail the build by design, and that is correct:
 ## 7. Where things stand
 
 The durable neuron and synapse foundation, generated module activation, typed AI neurons, and
-AI-owned Aspire integration are proven. The next slices are `IAgent`, `IGroupChat`, and the generated
-canonical neuron registry defined in `REFINED-ARCHITECTURE-AND-NEXT-STEPS.md`.
+AI-owned Aspire integration are proven. The Foundation PoC architecture is frozen through the
+ratified decision record. Its proposed public CLR seams, red-green order, and stop conditions are in
+`docs/superpowers/plans/2026-07-20-foundation-poc.md`; implementation begins only after that plan is
+approved and then proceeds one green slice at a time.
 
 One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
-The plan of record requires a pre-committed numeric threshold run against a real model, correcting a
-prior generation that scored its benchmark against a stub and shipped the interpreter anyway.
+That benchmark and the behavior proposal/install rail remain deliberately outside the Foundation
+PoC. Do not pull them forward while Tasks, AI/MAF, Google, Salesforce, Time, and the hosted restart
+story are being proven.
 
 Update this file through the same rail as everything else, and only when the loop actually improves.

@@ -65,6 +65,10 @@ _Avoid_: MCP tool, provider function
 A durable identity for a desired outcome and its lifecycle.
 _Avoid_: MAF workflow, prompt, ledger entry
 
+**Goal**:
+The immutable typed outcome a Task is intended to achieve.
+_Avoid_: Prompt, work dictionary
+
 **Attempt**:
 One revision-fenced execution of a Task by one Worker.
 _Avoid_: Task, retry counter
@@ -80,6 +84,10 @@ _Avoid_: Task
 **Blocker**:
 A typed reason a Task cannot currently advance.
 _Avoid_: AI run status, free-form error string
+
+**Result**:
+The typed outcome accepted when a Task succeeds.
+_Avoid_: Transcript, arbitrary JSON
 
 **Successor Task**:
 A new Task linked to an immutable terminal Task to continue or retry its outcome.
