@@ -320,8 +320,35 @@ records in `final`'s benchmark: a number produced by machinery that never ran.
 caller's feed with no cooperation from the caller. There is a held-red Gherkin scenario waiting for
 it: `Fabric.feature`, tagged `@ignore @red-until-phase-2.7`.
 
-63. `READ` — `tests/DigitalBrain.Simulations/Fabric.feature`, the `@red-until-phase-2.7` scenario.
-    This is the acceptance criterion; do not invent a different one.
+63. **Corrected 2026-07-20 — there is no held-red proof for reification, and the tag that looked like
+    one was mislabelled.** `Fabric.feature` carried `@ignore @red-until-phase-2.7` on *"an
+    unreachable receiver does not block traffic to reachable ones"*, which asserts per-entry outbox
+    progress — that is R-2, step **2.9**, and `status.md` says so: it goes green when *"the outbox
+    stops draining strictly in order."* The tag is now `@red-until-phase-2.9`. Step 63 previously
+    said "this is the acceptance criterion; do not invent a different one", which would have sent the
+    next builder to implement the wrong thing. **2.7 needs its proof written from scratch.**
+**Verified by the compiler oracle, 2026-07-20 — the mechanism, and a dead end.**
+
+- `RuntimeContext.Current` does **not** compile: `error CS0122: 'RuntimeContext' is inaccessible due
+  to its protection level`. It is Orleans-internal. Do not reach for it.
+- **`IOutgoingGrainCallFilter` with an injected `Orleans.Runtime.IGrainContextAccessor` builds
+  clean.** `callers.GrainContext?.GrainId` identifies the *calling* grain inside an outgoing call,
+  which is what §14.1 requires — reification records on the **caller's** feed, not the callee's.
+  An outgoing filter is also the cheap side: appending to the caller's own feed is local state, so
+  it makes no grain call and cannot recurse. An incoming filter would have to call back to the
+  caller's grain to record, which is both a network hop and a recursion hazard.
+- **§4.1 says "incoming grain call filter" and §14.1 says the record lands on the caller's feed.**
+  Those two readings pull apart, and the outgoing filter is what satisfies the second. Resolve the
+  wording when 2.7 lands.
+
+**The unsettled question is selectivity, and it is the whole difficulty.** An outgoing filter fires
+on *every* call a grain makes — `DeliverAsync` to receivers, `SubscriptionRegistry.RegisterAsync` on
+activation, the watcher pushes added in 2.6. Reifying all of it floods the bounded feed and evicts
+the domain facts §14.3 says are the feed-worthy ones. So 2.7 needs a stated rule for what counts as a
+capability request, and DEC-9's answer — *"an interface method directed at a capability"* — has no
+referent until modules exist in Phase 3. Decide the rule before writing the filter, and write the
+proof against a call that is genuinely a capability request rather than kernel plumbing.
+
 64. `READ` — §14.3's resolution: *"Domain facts are feed-worthy. Call traffic is traced and reified,
     not accumulated."* Reification must not evict domain events from a bounded feed.
 65. `READ` — §14.1's resolution: reification records on the **caller's** feed, which is why keying a

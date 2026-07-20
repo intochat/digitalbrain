@@ -18,7 +18,7 @@ Scenario: a broadcast reaches every neuron subscribed to that synapse
     Then the incoming journal of the Listener neuron named "first" contains Noticed
     And the incoming journal of the Listener neuron named "second" contains Noticed
 
-@ignore @red-until-phase-2.7
+@ignore @red-until-phase-2.9
 Scenario: an unreachable receiver does not block traffic to reachable ones
     Given a brain for owner "head-of-line"
     When Ping is sent to the Splitter neuron named "fan-out"
