@@ -29,6 +29,7 @@ public static class DigitalBrainRuntime
 
         builder.AddJournalStorage();
         builder.UseJsonJournalFormat(JournalJsonContext.Default);
+        builder.AddIncomingGrainCallFilter<IncomingReificationFilter>();
         builder.AddIncomingGrainCallFilter<OwnerBoundCallFilter>();
         builder.AddOutgoingGrainCallFilter<OutgoingReificationFilter>();
         builder.UseSiloMetadata(metadata);

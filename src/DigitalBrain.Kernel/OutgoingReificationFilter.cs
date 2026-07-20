@@ -1,66 +1,60 @@
-using System.Reflection;
 using DigitalBrain.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime;
 
 namespace DigitalBrain.Kernel;
 
-internal sealed class OutgoingReificationFilter(IServiceProvider services) : IOutgoingGrainCallFilter
+internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
 {
-    private static readonly HashSet<Type> FrameworkInterfaces =
-    [
-        typeof(INeuron),
-        typeof(ISessionNeuron),
-        typeof(ISubscriptionRegistry),
-        typeof(IJournalObserver),
-    ];
-
     public async Task Invoke(IOutgoingGrainCallContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        await context.Invoke();
-
-        if (!IsCapabilityRequest(context.InterfaceMethod))
+        if (!CapabilityInvocation.IsRequest(context.InterfaceMethod))
         {
+            await context.Invoke();
+
             return;
         }
 
-        var caller = services.GetService<IGrainContextAccessor>()?.GrainContext?.GrainInstance as Neuron;
+        var caller = context.SourceContext?.GrainInstance as Neuron;
 
         if (caller is null)
         {
+            await context.Invoke();
+
             return;
         }
 
         var interfaceName = context.InterfaceMethod!.DeclaringType!.FullName!;
         var methodName = context.InterfaceMethod.Name;
-        var target = context.TargetId.ToString();
+        var target = NeuronId.FromGrainKey(
+            context.TargetId.Type.ToString()
+                ?? throw new InvalidOperationException("The capability target has no grain type."),
+            context.TargetId.Key.ToString());
+        var request = await caller.BeginCapabilityRequestAsync(interfaceName, methodName, target);
 
-        await caller.ReifyCapabilityCallAsync(interfaceName, methodName, target);
-    }
-
-    private static bool IsCapabilityRequest(MethodInfo? method)
-    {
-        if (method?.DeclaringType is not { IsInterface: true } type)
+        try
         {
-            return false;
+            await CapabilityRequestContext.InvokeAsync(request, context.Invoke);
+        }
+        catch (NeuronAuthorizationException) when (caller.Id.Owner != target.Owner)
+        {
+            await caller.RecordCapabilityOutcomeAsync(
+                CapabilityOutcome.Rejected,
+                request);
+
+            throw;
+        }
+        catch
+        {
+            await caller.RecordCapabilityOutcomeAsync(
+                CapabilityOutcome.Failed,
+                request);
+
+            throw;
         }
 
-        if (FrameworkInterfaces.Contains(type))
-        {
-            return false;
-        }
-
-        var ns = type.Namespace ?? string.Empty;
-
-        if (ns.StartsWith("Orleans", StringComparison.Ordinal)
-            || ns.StartsWith("DigitalBrain.Kernel", StringComparison.Ordinal)
-            || ns.StartsWith("DigitalBrain.Testing", StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        return true;
+        await caller.RecordCapabilityOutcomeAsync(
+            CapabilityOutcome.Completed,
+            request);
     }
 }

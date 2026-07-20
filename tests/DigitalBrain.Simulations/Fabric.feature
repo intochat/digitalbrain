@@ -1,9 +1,22 @@
 Feature: Durable synapse fabric
 
-Scenario: a capability call is reified on the caller's outgoing journal
+Scenario: a capability request is durable at both neurons before the target runs
     Given a brain for owner "reify"
     When Ping is sent to the CapabilityCaller neuron named "caller"
-    Then the outgoing journal of the CapabilityCaller neuron named "caller" contains CapabilityCall
+    Then the outgoing journal of the CapabilityCaller neuron named "caller" contains CapabilityRequested
+    And the incoming journal of the Echo neuron named "probe" contains CapabilityRequested
+    And the outgoing journal of the Echo neuron named "probe" contains CapabilityObserved
+    And the outgoing journal of the CapabilityCaller neuron named "caller" contains CapabilityCompleted
+
+Scenario: a failed capability request records a failed outcome
+    Given a brain for owner "failed-capability"
+    When FailCapability is sent to the FailingCapabilityCaller neuron named "caller"
+    Then the outgoing journal of the FailingCapabilityCaller neuron named "caller" contains CapabilityFailed
+
+Scenario: an owner-rejected capability request records a rejected outcome
+    Given a brain for owner "rejected-capability"
+    When RejectCapability is sent to the RejectedCapabilityCaller neuron named "caller"
+    Then the outgoing journal of the RejectedCapabilityCaller neuron named "caller" contains CapabilityRejected
 
 Scenario: a point-to-point synapse reaches the neuron it is addressed to
     Given a brain for owner "delivery"

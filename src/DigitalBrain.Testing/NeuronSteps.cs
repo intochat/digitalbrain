@@ -218,6 +218,19 @@ public sealed class NeuronSteps(Simulation simulation)
     [Then("the incoming journal of the {word} neuron named {string} contains {word}")]
     public async Task ThenTheIncomingJournalContains(string neuronType, string name, string synapseType)
     {
+        var recorded = await simulation.ReadJournalAsync(
+            JournalKind.Incoming,
+            neuronType,
+            name,
+            afterSequence: 0);
+
+        var expected = NeuronCatalog.SynapseType(synapseType);
+
+        if (expected == typeof(CapabilityRequested) && Contains(recorded, expected))
+        {
+            return;
+        }
+
         await simulation.AwaitHandledAsync(neuronType, name, synapseType);
         await AssertJournalContains(JournalKind.Incoming, neuronType, name, synapseType);
     }
@@ -252,4 +265,8 @@ public sealed class NeuronSteps(Simulation simulation)
                 $"Expected the {kind} journal of {neuronType} '{name}' to contain {synapseType}, but it recorded {recorded}.");
         }
     }
+
+    private static bool Contains(JournalRead journal, Type expected)
+        => journal.ResetSnapshot?.RecordedOf(expected.FullName!) > 0
+            || journal.Delta.Any(delivery => expected.IsInstanceOfType(delivery.Synapse));
 }

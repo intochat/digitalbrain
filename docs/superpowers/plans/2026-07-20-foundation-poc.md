@@ -690,6 +690,8 @@ it.
 - Create: `modules/DigitalBrain.Modules.AI/CapabilityToolSelector.cs`
 - Create: `modules/DigitalBrain.Modules.AI/CapabilityToolApproval.cs`
 - Create: `modules/DigitalBrain.Modules.AI/CapabilityInvocationLease.cs`
+- Modify: `src/DigitalBrain.Kernel/CapabilityRequestContext.cs`
+- Modify: `src/DigitalBrain.Kernel/IncomingReificationFilter.cs`
 - Create: `tests/DigitalBrain.Tests/CapabilityBoundaryContracts.cs`
 - Create: `tests/DigitalBrain.Simulations/CapabilityToolContracts.cs`
 
@@ -707,6 +709,9 @@ it.
   approval.
 - Prove the model-visible tool calls the fake source through the semantic capability neuron path and
   produces the Kernel causal request/outcome facts.
+- Prove a private non-neuron runner can carry only a current, owner-bound, one-use invocation lease;
+  the target journals the precommitted request, while replay, stale revision, wrong owner, and an
+  unleased raw `RequestContext` value are rejected before the module-private method runs.
 - Prove client/contracts/behavior-visible packages cannot reference `DigitalBrain.Capabilities`.
 
 **Green implementation:**
@@ -720,6 +725,9 @@ it.
 - Before an off-turn runner invokes a tool, call back to the owning orchestration neuron to commit
   `CapabilityRequested` and mint a one-use lease for the active Attempt/revision. Reject replay,
   staleness, and cross-owner use.
+- Extend the Kernel causal bridge only through that failing leased-runner proof. Keep the raw
+  `RequestContext` key private; if the proof requires a new public runtime contract, stop and record
+  that architecture decision before adding it.
 
 **Commit:** `ai: project semantic capabilities into approved MAF tools`
 

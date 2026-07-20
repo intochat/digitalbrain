@@ -32,6 +32,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
 
     private SynapseDelivery? _handling;
     private int _handlingDepth;
+    private TurnCheckpoint? _turnCheckpoint;
     private IGrainTimer? _draining;
     private bool _wakeUpRegistered;
 
@@ -86,8 +87,11 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         _handling = delivery;
         _handlingDepth = DeliveryPolicy.InboundDepth();
 
-        var committedOutbox = _outbox.Count;
-        var committedHandled = _handled.Count;
+        var previousCheckpoint = _turnCheckpoint;
+        _turnCheckpoint = new(
+            _outbox.Count,
+            _handled.Count,
+            InboundCommitted: false);
 
         _firedWhileHandling.Clear();
 
@@ -95,14 +99,8 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         {
             await DispatchAsync(Snapshot(delivery.Synapse));
 
-            foreach (var fired in _firedWhileHandling)
-            {
-                _outgoing.Append(fired);
-            }
-
-            _incoming.Append(delivery);
-
-            Remember(delivery.SynapseId);
+            FlushOutgoing();
+            StageInboundCause();
 
             await CommitAsync(CancellationToken.None);
 
@@ -112,10 +110,14 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         {
             handling?.SetStatus(ActivityStatusCode.Error, failure.Message);
 
-            Discard(_outbox, committedOutbox);
-            Discard(_handled, committedHandled);
+            var checkpoint = _turnCheckpoint
+                ?? throw new InvalidOperationException("The handling turn lost its durable checkpoint.");
+
+            Discard(_outbox, checkpoint.CommittedOutbox);
+            Discard(_handled, checkpoint.CommittedHandled);
 
             RecallHandledDeliveries();
+            ScheduleDrain();
 
             throw;
         }
@@ -124,6 +126,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
             _firedWhileHandling.Clear();
             _handling = null;
             _handlingDepth = 0;
+            _turnCheckpoint = previousCheckpoint;
         }
 
         ScheduleDrain();
@@ -223,30 +226,129 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         return FireAsync(synapse, [answered.Caller]);
     }
 
-    internal async Task ReifyCapabilityCallAsync(string interfaceName, string methodName, string target)
+    internal async Task<SynapseDelivery> BeginCapabilityRequestAsync(
+        string contract,
+        string method,
+        NeuronId target)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(interfaceName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(methodName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(contract);
+        ArgumentException.ThrowIfNullOrWhiteSpace(method);
 
         var sequence = _outgoing.NextSequence
             + (_handling is null ? 0 : _firedWhileHandling.Count);
         var delivery = SynapseDelivery.Create(
-            new CapabilityCall(interfaceName, methodName, target),
+            new CapabilityRequested(contract, method, target),
             Id,
             sequence,
             _handling,
             _clock);
 
-        if (_handling is null)
+        StageInboundCause();
+        FlushOutgoing();
+        _outgoing.Append(delivery);
+        await CommitAsync(CancellationToken.None);
+        AdvanceTurnCheckpoint();
+        await NotifyWatchersAsync();
+
+        return delivery;
+    }
+
+    internal async Task RecordCapabilityOutcomeAsync(
+        CapabilityOutcome outcome,
+        SynapseDelivery request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        Synapse fact = outcome switch
         {
-            _outgoing.Append(delivery);
-            await CommitAsync(CancellationToken.None);
-            await NotifyWatchersAsync();
-        }
-        else
+            CapabilityOutcome.Completed => new CapabilityCompleted(request.SynapseId),
+            CapabilityOutcome.Failed => new CapabilityFailed(request.SynapseId),
+            CapabilityOutcome.Rejected => new CapabilityRejected(request.SynapseId),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(outcome)),
+        };
+
+        var sequence = _outgoing.NextSequence + _firedWhileHandling.Count;
+        var delivery = SynapseDelivery.Create(
+            fact,
+            Id,
+            sequence,
+            request,
+            _clock);
+
+        FlushOutgoing();
+        _outgoing.Append(delivery);
+        await CommitAsync(CancellationToken.None);
+        AdvanceTurnCheckpoint();
+        await NotifyWatchersAsync();
+    }
+
+    internal async Task<CapabilityTurn> BeginIncomingCapabilityRequestAsync(
+        SynapseDelivery delivery,
+        GrainId? source)
+    {
+        ArgumentNullException.ThrowIfNull(delivery);
+
+        if (_handling is not null)
         {
-            _firedWhileHandling.Add(delivery);
+            throw new InvalidOperationException(
+                $"Neuron '{Id}' cannot begin a capability request while it is already handling '{_handling.SynapseId}'.");
         }
+
+        if (delivery.Synapse is not CapabilityRequested request || request.Target != Id)
+        {
+            throw new InvalidOperationException(
+                $"The capability request delivery does not target neuron '{Id}'.");
+        }
+
+        if (source is null
+            || NeuronId.FromGrainKey(
+                source.Value.Type.ToString()
+                    ?? throw new InvalidOperationException("The capability caller has no grain type."),
+                source.Value.Key.ToString()) != delivery.Caller)
+        {
+            throw new InvalidOperationException(
+                $"The capability request caller '{delivery.Caller}' does not match its Orleans source.");
+        }
+
+        var turn = new CapabilityTurn(
+            _outbox.Count,
+            _handling,
+            _handlingDepth,
+            _turnCheckpoint);
+
+        _incoming.Append(delivery);
+        await CommitAsync(CancellationToken.None);
+        await NotifyWatchersAsync();
+
+        _handling = delivery;
+        _handlingDepth = DeliveryPolicy.InboundDepth();
+        _turnCheckpoint = new(
+            _outbox.Count,
+            _handled.Count,
+            InboundCommitted: true);
+
+        return turn;
+    }
+
+    internal async Task CompleteIncomingCapabilityRequestAsync(CapabilityTurn turn)
+    {
+        FlushOutgoing();
+        await CommitAsync(CancellationToken.None);
+        await NotifyWatchersAsync();
+
+        Restore(turn);
+        ScheduleDrain();
+    }
+
+    internal void FailIncomingCapabilityRequest(CapabilityTurn turn)
+    {
+        Discard(
+            _outbox,
+            _turnCheckpoint?.CommittedOutbox ?? turn.CommittedOutbox);
+        _firedWhileHandling.Clear();
+        Restore(turn);
+        ScheduleDrain();
     }
 
     protected async Task EmitAsync(Synapse synapse)
@@ -572,6 +674,59 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
             ? handler(this, synapse, CancellationToken.None)
             : Task.CompletedTask;
 
+    private void FlushOutgoing()
+    {
+        foreach (var fired in _firedWhileHandling)
+        {
+            _outgoing.Append(fired);
+        }
+
+        _firedWhileHandling.Clear();
+    }
+
+    private void Restore(CapabilityTurn turn)
+    {
+        _handling = turn.PreviousHandling;
+        _handlingDepth = turn.PreviousDepth;
+        _turnCheckpoint = turn.PreviousCheckpoint;
+    }
+
+    private void AdvanceTurnCheckpoint()
+    {
+        if (_turnCheckpoint is { } checkpoint)
+        {
+            _turnCheckpoint = checkpoint with
+            {
+                CommittedOutbox = _outbox.Count,
+                CommittedHandled = _handled.Count,
+            };
+        }
+    }
+
+    private void StageInboundCause()
+    {
+        if (_handling is null
+            || _turnCheckpoint is not { InboundCommitted: false } checkpoint)
+        {
+            return;
+        }
+
+        _incoming.Append(_handling);
+        Remember(_handling.SynapseId);
+        _turnCheckpoint = checkpoint with { InboundCommitted = true };
+    }
+
     private Synapse Snapshot(Synapse synapse)
         => _synapses.Deserialize(_synapses.SerializeToArray(synapse));
+
+    internal readonly record struct CapabilityTurn(
+        int CommittedOutbox,
+        SynapseDelivery? PreviousHandling,
+        int PreviousDepth,
+        TurnCheckpoint? PreviousCheckpoint);
+
+    internal readonly record struct TurnCheckpoint(
+        int CommittedOutbox,
+        int CommittedHandled,
+        bool InboundCommitted);
 }

@@ -13,7 +13,10 @@ public sealed class SerializationContracts
     {
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            [nameof(CapabilityCall)] = "db.capability-call",
+            [nameof(CapabilityRequested)] = "db.capability-requested",
+            [nameof(CapabilityCompleted)] = "db.capability-completed",
+            [nameof(CapabilityFailed)] = "db.capability-failed",
+            [nameof(CapabilityRejected)] = "db.capability-rejected",
             [nameof(Synapse)] = "db.synapse",
             [nameof(SynapseDelivery)] = "db.synapse-delivery",
             [nameof(SynapseId)] = "db.synapse-id",
@@ -98,4 +101,22 @@ public sealed class SerializationContracts
 
         Assert.Empty(publicSetters);
     }
+
+    [Fact(DisplayName = "generic capability facts carry protocol metadata and no domain payload")]
+    public void CapabilityFactsCarryNoDomainPayload()
+    {
+        Assert.Equal(
+            [nameof(CapabilityRequested.Contract), nameof(CapabilityRequested.Method), nameof(CapabilityRequested.Target)],
+            PublicPropertiesDeclaredBy<CapabilityRequested>());
+        Assert.Equal([nameof(CapabilityCompleted.Request)], PublicPropertiesDeclaredBy<CapabilityCompleted>());
+        Assert.Equal([nameof(CapabilityFailed.Request)], PublicPropertiesDeclaredBy<CapabilityFailed>());
+        Assert.Equal([nameof(CapabilityRejected.Request)], PublicPropertiesDeclaredBy<CapabilityRejected>());
+        Assert.Null(Abstractions.GetType("DigitalBrain.Abstractions.CapabilityCall"));
+    }
+
+    private static string[] PublicPropertiesDeclaredBy<T>()
+        => typeof(T)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Select(property => property.Name)
+            .ToArray();
 }

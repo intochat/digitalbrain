@@ -1,14 +1,32 @@
 #nullable enable
-DigitalBrain.Abstractions.CapabilityCall
-DigitalBrain.Abstractions.CapabilityCall.CapabilityCall(string! Interface, string! Method, string! Target) -> void
-DigitalBrain.Abstractions.CapabilityCall.Deconstruct(out string! Interface, out string! Method, out string! Target) -> void
-DigitalBrain.Abstractions.CapabilityCall.Equals(DigitalBrain.Abstractions.CapabilityCall? other) -> bool
-DigitalBrain.Abstractions.CapabilityCall.Interface.get -> string!
-DigitalBrain.Abstractions.CapabilityCall.Interface.init -> void
-DigitalBrain.Abstractions.CapabilityCall.Method.get -> string!
-DigitalBrain.Abstractions.CapabilityCall.Method.init -> void
-DigitalBrain.Abstractions.CapabilityCall.Target.get -> string!
-DigitalBrain.Abstractions.CapabilityCall.Target.init -> void
+DigitalBrain.Abstractions.CapabilityCompleted
+DigitalBrain.Abstractions.CapabilityCompleted.CapabilityCompleted(DigitalBrain.Abstractions.SynapseId Request) -> void
+DigitalBrain.Abstractions.CapabilityCompleted.Deconstruct(out DigitalBrain.Abstractions.SynapseId Request) -> void
+DigitalBrain.Abstractions.CapabilityCompleted.Equals(DigitalBrain.Abstractions.CapabilityCompleted? other) -> bool
+DigitalBrain.Abstractions.CapabilityCompleted.Request.get -> DigitalBrain.Abstractions.SynapseId
+DigitalBrain.Abstractions.CapabilityCompleted.Request.init -> void
+DigitalBrain.Abstractions.CapabilityFailed
+DigitalBrain.Abstractions.CapabilityFailed.CapabilityFailed(DigitalBrain.Abstractions.SynapseId Request) -> void
+DigitalBrain.Abstractions.CapabilityFailed.Deconstruct(out DigitalBrain.Abstractions.SynapseId Request) -> void
+DigitalBrain.Abstractions.CapabilityFailed.Equals(DigitalBrain.Abstractions.CapabilityFailed? other) -> bool
+DigitalBrain.Abstractions.CapabilityFailed.Request.get -> DigitalBrain.Abstractions.SynapseId
+DigitalBrain.Abstractions.CapabilityFailed.Request.init -> void
+DigitalBrain.Abstractions.CapabilityRejected
+DigitalBrain.Abstractions.CapabilityRejected.CapabilityRejected(DigitalBrain.Abstractions.SynapseId Request) -> void
+DigitalBrain.Abstractions.CapabilityRejected.Deconstruct(out DigitalBrain.Abstractions.SynapseId Request) -> void
+DigitalBrain.Abstractions.CapabilityRejected.Equals(DigitalBrain.Abstractions.CapabilityRejected? other) -> bool
+DigitalBrain.Abstractions.CapabilityRejected.Request.get -> DigitalBrain.Abstractions.SynapseId
+DigitalBrain.Abstractions.CapabilityRejected.Request.init -> void
+DigitalBrain.Abstractions.CapabilityRequested
+DigitalBrain.Abstractions.CapabilityRequested.CapabilityRequested(string! Contract, string! Method, DigitalBrain.Abstractions.NeuronId Target) -> void
+DigitalBrain.Abstractions.CapabilityRequested.Contract.get -> string!
+DigitalBrain.Abstractions.CapabilityRequested.Contract.init -> void
+DigitalBrain.Abstractions.CapabilityRequested.Deconstruct(out string! Contract, out string! Method, out DigitalBrain.Abstractions.NeuronId Target) -> void
+DigitalBrain.Abstractions.CapabilityRequested.Equals(DigitalBrain.Abstractions.CapabilityRequested? other) -> bool
+DigitalBrain.Abstractions.CapabilityRequested.Method.get -> string!
+DigitalBrain.Abstractions.CapabilityRequested.Method.init -> void
+DigitalBrain.Abstractions.CapabilityRequested.Target.get -> DigitalBrain.Abstractions.NeuronId
+DigitalBrain.Abstractions.CapabilityRequested.Target.init -> void
 DigitalBrain.Abstractions.ClientEntryPointAttribute
 DigitalBrain.Abstractions.ClientEntryPointAttribute.ClientEntryPointAttribute() -> void
 DigitalBrain.Abstractions.CorrelationId
@@ -129,14 +147,29 @@ override DigitalBrain.Abstractions.NeuronId.GetHashCode() -> int
 override DigitalBrain.Abstractions.NeuronId.ToString() -> string!
 override DigitalBrain.Abstractions.OwnerId.GetHashCode() -> int
 override DigitalBrain.Abstractions.OwnerId.ToString() -> string!
-override DigitalBrain.Abstractions.CapabilityCall.<Clone>$() -> DigitalBrain.Abstractions.CapabilityCall!
-override DigitalBrain.Abstractions.CapabilityCall.Equals(object? obj) -> bool
-override DigitalBrain.Abstractions.CapabilityCall.GetHashCode() -> int
-override DigitalBrain.Abstractions.CapabilityCall.ToString() -> string!
 override DigitalBrain.Abstractions.Synapse.Equals(object? obj) -> bool
 override DigitalBrain.Abstractions.Synapse.GetHashCode() -> int
 override DigitalBrain.Abstractions.Synapse.ToString() -> string!
-override sealed DigitalBrain.Abstractions.CapabilityCall.Equals(DigitalBrain.Abstractions.Synapse? other) -> bool
+override DigitalBrain.Abstractions.CapabilityCompleted.<Clone>$() -> DigitalBrain.Abstractions.CapabilityCompleted!
+override DigitalBrain.Abstractions.CapabilityCompleted.Equals(object? obj) -> bool
+override DigitalBrain.Abstractions.CapabilityCompleted.GetHashCode() -> int
+override DigitalBrain.Abstractions.CapabilityCompleted.ToString() -> string!
+override sealed DigitalBrain.Abstractions.CapabilityCompleted.Equals(DigitalBrain.Abstractions.Synapse? other) -> bool
+override DigitalBrain.Abstractions.CapabilityFailed.<Clone>$() -> DigitalBrain.Abstractions.CapabilityFailed!
+override DigitalBrain.Abstractions.CapabilityFailed.Equals(object? obj) -> bool
+override DigitalBrain.Abstractions.CapabilityFailed.GetHashCode() -> int
+override DigitalBrain.Abstractions.CapabilityFailed.ToString() -> string!
+override sealed DigitalBrain.Abstractions.CapabilityFailed.Equals(DigitalBrain.Abstractions.Synapse? other) -> bool
+override DigitalBrain.Abstractions.CapabilityRejected.<Clone>$() -> DigitalBrain.Abstractions.CapabilityRejected!
+override DigitalBrain.Abstractions.CapabilityRejected.Equals(object? obj) -> bool
+override DigitalBrain.Abstractions.CapabilityRejected.GetHashCode() -> int
+override DigitalBrain.Abstractions.CapabilityRejected.ToString() -> string!
+override sealed DigitalBrain.Abstractions.CapabilityRejected.Equals(DigitalBrain.Abstractions.Synapse? other) -> bool
+override DigitalBrain.Abstractions.CapabilityRequested.<Clone>$() -> DigitalBrain.Abstractions.CapabilityRequested!
+override DigitalBrain.Abstractions.CapabilityRequested.Equals(object? obj) -> bool
+override DigitalBrain.Abstractions.CapabilityRequested.GetHashCode() -> int
+override DigitalBrain.Abstractions.CapabilityRequested.ToString() -> string!
+override sealed DigitalBrain.Abstractions.CapabilityRequested.Equals(DigitalBrain.Abstractions.Synapse? other) -> bool
 override DigitalBrain.Abstractions.SynapseId.GetHashCode() -> int
 override DigitalBrain.Abstractions.SynapseId.ToString() -> string!
 static DigitalBrain.Abstractions.CorrelationId.New() -> DigitalBrain.Abstractions.CorrelationId
@@ -157,8 +190,14 @@ static DigitalBrain.Abstractions.NeuronId.operator !=(DigitalBrain.Abstractions.
 static DigitalBrain.Abstractions.NeuronId.operator ==(DigitalBrain.Abstractions.NeuronId left, DigitalBrain.Abstractions.NeuronId right) -> bool
 static DigitalBrain.Abstractions.OwnerId.operator !=(DigitalBrain.Abstractions.OwnerId left, DigitalBrain.Abstractions.OwnerId right) -> bool
 static DigitalBrain.Abstractions.OwnerId.operator ==(DigitalBrain.Abstractions.OwnerId left, DigitalBrain.Abstractions.OwnerId right) -> bool
-static DigitalBrain.Abstractions.CapabilityCall.operator !=(DigitalBrain.Abstractions.CapabilityCall? left, DigitalBrain.Abstractions.CapabilityCall? right) -> bool
-static DigitalBrain.Abstractions.CapabilityCall.operator ==(DigitalBrain.Abstractions.CapabilityCall? left, DigitalBrain.Abstractions.CapabilityCall? right) -> bool
+static DigitalBrain.Abstractions.CapabilityCompleted.operator !=(DigitalBrain.Abstractions.CapabilityCompleted? left, DigitalBrain.Abstractions.CapabilityCompleted? right) -> bool
+static DigitalBrain.Abstractions.CapabilityCompleted.operator ==(DigitalBrain.Abstractions.CapabilityCompleted? left, DigitalBrain.Abstractions.CapabilityCompleted? right) -> bool
+static DigitalBrain.Abstractions.CapabilityFailed.operator !=(DigitalBrain.Abstractions.CapabilityFailed? left, DigitalBrain.Abstractions.CapabilityFailed? right) -> bool
+static DigitalBrain.Abstractions.CapabilityFailed.operator ==(DigitalBrain.Abstractions.CapabilityFailed? left, DigitalBrain.Abstractions.CapabilityFailed? right) -> bool
+static DigitalBrain.Abstractions.CapabilityRejected.operator !=(DigitalBrain.Abstractions.CapabilityRejected? left, DigitalBrain.Abstractions.CapabilityRejected? right) -> bool
+static DigitalBrain.Abstractions.CapabilityRejected.operator ==(DigitalBrain.Abstractions.CapabilityRejected? left, DigitalBrain.Abstractions.CapabilityRejected? right) -> bool
+static DigitalBrain.Abstractions.CapabilityRequested.operator !=(DigitalBrain.Abstractions.CapabilityRequested? left, DigitalBrain.Abstractions.CapabilityRequested? right) -> bool
+static DigitalBrain.Abstractions.CapabilityRequested.operator ==(DigitalBrain.Abstractions.CapabilityRequested? left, DigitalBrain.Abstractions.CapabilityRequested? right) -> bool
 static DigitalBrain.Abstractions.Synapse.operator !=(DigitalBrain.Abstractions.Synapse? left, DigitalBrain.Abstractions.Synapse? right) -> bool
 static DigitalBrain.Abstractions.Synapse.operator ==(DigitalBrain.Abstractions.Synapse? left, DigitalBrain.Abstractions.Synapse? right) -> bool
 static DigitalBrain.Abstractions.SynapseId.New() -> DigitalBrain.Abstractions.SynapseId
