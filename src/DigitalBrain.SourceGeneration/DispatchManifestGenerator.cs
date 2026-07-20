@@ -10,6 +10,9 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
 {
     private const string HandleInterface = "DigitalBrain.Abstractions.IHandle<TSynapse>";
     private const string EmitInterface = "DigitalBrain.Abstractions.IEmit<TSynapse>";
+    private const string ModuleInterface = "DigitalBrain.Abstractions.IModule";
+    private const string SiloBuilder = "Orleans.Hosting.ISiloBuilder";
+    private const string DigitalBrainRuntime = "DigitalBrain.Kernel.DigitalBrainRuntime";
 
     private static readonly SymbolDisplayFormat FullName =
         SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Omitted);
@@ -25,6 +28,12 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(wirings, static (production, entries) =>
             production.AddSource("DispatchManifest.g.cs", Manifest(entries.SelectMany(entry => entry).ToImmutableArray())));
+
+        var composition = context.CompilationProvider
+            .Select(static (compilation, _) => CompositionOf(compilation));
+
+        context.RegisterSourceOutput(composition, static (production, model) =>
+            production.AddSource("DigitalBrainComposition.g.cs", Composition(model)));
     }
 
     private static ImmutableArray<Wiring> Wirings(GeneratorSyntaxContext syntax)
@@ -58,6 +67,7 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
     {
         var source = new StringBuilder();
 
+        source.AppendLine("#nullable enable");
         source.AppendLine("using System.Diagnostics.CodeAnalysis;");
         source.AppendLine();
         source.AppendLine("namespace DigitalBrain.Generated;");
@@ -80,6 +90,132 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         return source.ToString();
     }
 
+    private static CompositionModel CompositionOf(Compilation compilation)
+    {
+        var moduleContract = compilation.GetTypeByMetadataName(ModuleInterface);
+
+        if (moduleContract is null)
+        {
+            return new CompositionModel([], emitExtension: false);
+        }
+
+        var modules = compilation.SourceModule.ReferencedAssemblySymbols
+            .Append(compilation.Assembly)
+            .SelectMany(static assembly => TypesIn(assembly.GlobalNamespace))
+            .Where(type => type is
+            {
+                TypeKind: TypeKind.Class,
+                IsAbstract: false,
+                DeclaredAccessibility: Accessibility.Public,
+            })
+            .Where(type => type.AllInterfaces.Any(contract =>
+                SymbolEqualityComparer.Default.Equals(contract, moduleContract)))
+            .Select(type => type.ToDisplayString(FullName))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToImmutableArray();
+
+        var emitExtension = compilation.AssemblyName != "DigitalBrain.Kernel"
+            && compilation.GetTypeByMetadataName(SiloBuilder) is not null
+            && compilation.GetTypeByMetadataName(DigitalBrainRuntime) is not null;
+
+        return new CompositionModel(modules, emitExtension);
+    }
+
+    private static IEnumerable<INamedTypeSymbol> TypesIn(INamespaceSymbol scope)
+    {
+        foreach (var type in scope.GetTypeMembers())
+        {
+            yield return type;
+
+            foreach (var nested in NestedTypesIn(type))
+            {
+                yield return nested;
+            }
+        }
+
+        foreach (var child in scope.GetNamespaceMembers())
+        {
+            foreach (var type in TypesIn(child))
+            {
+                yield return type;
+            }
+        }
+    }
+
+    private static IEnumerable<INamedTypeSymbol> NestedTypesIn(INamedTypeSymbol containing)
+    {
+        foreach (var nested in containing.GetTypeMembers())
+        {
+            yield return nested;
+
+            foreach (var descendant in NestedTypesIn(nested))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
+    private static string Composition(CompositionModel model)
+    {
+        var source = new StringBuilder();
+
+        source.AppendLine("#nullable enable");
+        source.AppendLine("using System.Diagnostics.CodeAnalysis;");
+        source.AppendLine();
+        source.AppendLine("namespace DigitalBrain.Generated");
+        source.AppendLine("{");
+        source.AppendLine("    [ExcludeFromCodeCoverage]");
+        source.AppendLine("    internal static class ModuleCatalog");
+        source.AppendLine("    {");
+        source.AppendLine("        internal static readonly string[] Modules =");
+        source.AppendLine("        [");
+
+        foreach (var module in model.Modules)
+        {
+            source.AppendLine($"            \"{module}\",");
+        }
+
+        source.AppendLine("        ];");
+        source.AppendLine("    }");
+        source.AppendLine("}");
+
+        if (!model.EmitExtension)
+        {
+            return source.ToString();
+        }
+
+        source.AppendLine();
+        source.AppendLine("namespace DigitalBrain.Kernel");
+        source.AppendLine("{");
+        source.AppendLine("    [ExcludeFromCodeCoverage]");
+        source.AppendLine("    internal static class GeneratedDigitalBrainSiloBuilderExtensions");
+        source.AppendLine("    {");
+        source.AppendLine("        internal static global::Orleans.Hosting.ISiloBuilder AddDigitalBrain(");
+        source.AppendLine("            this global::Orleans.Hosting.ISiloBuilder builder)");
+        source.AppendLine("            => AddDigitalBrain(builder, siloLabel: null);");
+        source.AppendLine();
+        source.AppendLine("        internal static global::Orleans.Hosting.ISiloBuilder AddDigitalBrain(");
+        source.AppendLine("            this global::Orleans.Hosting.ISiloBuilder builder,");
+        source.AppendLine("            string? siloLabel)");
+        source.AppendLine("        {");
+        source.AppendLine("            global::DigitalBrain.Kernel.DigitalBrainRuntime.Add(builder, siloLabel);");
+
+        foreach (var module in model.Modules)
+        {
+            source.AppendLine($"            global::{module}.Configure(builder);");
+            source.AppendLine($"            builder.AddBroadcastHandlers(typeof(global::{module}).Assembly);");
+        }
+
+        source.AppendLine();
+        source.AppendLine("            return builder;");
+        source.AppendLine("        }");
+        source.AppendLine("    }");
+        source.AppendLine("}");
+
+        return source.ToString();
+    }
+
     private readonly struct Wiring(string neuron, string synapse, bool isHandler)
     {
         public string Neuron { get; } = neuron;
@@ -87,5 +223,12 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         public string Synapse { get; } = synapse;
 
         public bool IsHandler { get; } = isHandler;
+    }
+
+    private readonly struct CompositionModel(ImmutableArray<string> modules, bool emitExtension)
+    {
+        public ImmutableArray<string> Modules { get; } = modules;
+
+        public bool EmitExtension { get; } = emitExtension;
     }
 }

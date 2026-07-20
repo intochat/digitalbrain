@@ -7,5 +7,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.AI.Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
 </Project>

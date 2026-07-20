@@ -13,6 +13,18 @@ public sealed class DispatchManifestContracts
     public void ManifestIsGeneratedForThisAssembly()
         => Assert.True(SynapseWiring.TryGetManifest(Probed, out _));
 
+    [Fact(DisplayName = "the generated module catalog includes modules available through project references")]
+    public void ModuleCatalogIncludesReferencedModules()
+    {
+        var catalog = Probed.GetType("DigitalBrain.Generated.ModuleCatalog", throwOnError: false);
+        var modules = catalog?
+            .GetField("Modules", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)?
+            .GetValue(null) as IEnumerable<string>;
+
+        Assert.NotNull(modules);
+        Assert.Contains("DigitalBrain.AI.AIModule", modules);
+    }
+
     [Fact]
     public void ManifestListsEveryHandlerReflectionCanFind()
     {

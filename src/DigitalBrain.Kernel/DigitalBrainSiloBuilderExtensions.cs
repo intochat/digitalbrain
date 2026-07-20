@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -6,11 +7,10 @@ using Orleans.Runtime.MembershipService.SiloMetadata;
 
 namespace DigitalBrain.Kernel;
 
-public static class DigitalBrainSiloBuilderExtensions
+[EditorBrowsable(EditorBrowsableState.Never)]
+public static class DigitalBrainRuntime
 {
-    public static ISiloBuilder AddDigitalBrain(this ISiloBuilder builder) => builder.AddDigitalBrain(siloLabel: null);
-
-    public static ISiloBuilder AddDigitalBrain(this ISiloBuilder builder, string? siloLabel)
+    public static ISiloBuilder Add(ISiloBuilder builder, string? siloLabel)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
@@ -41,7 +41,10 @@ public static class DigitalBrainSiloBuilderExtensions
 
         return builder;
     }
+}
 
+public static class DigitalBrainSiloBuilderExtensions
+{
     public static ISiloBuilder AddBroadcastHandlers(this ISiloBuilder builder, Assembly assembly)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -62,4 +65,3 @@ internal sealed class AssemblyBroadcastHandlers(Assembly assembly) : IConfigureB
 {
     public void Configure(BroadcastCatalog catalog) => catalog.AddAssembly(assembly);
 }
-
