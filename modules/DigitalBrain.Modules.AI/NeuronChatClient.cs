@@ -3,7 +3,7 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI;
 
-internal sealed class NeuronChatClient(ILLM model) : IChatClient
+internal sealed class NeuronChatClient(ILLM model, TaskScheduler? turnScheduler = null) : IChatClient
 {
     public Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
@@ -13,7 +13,15 @@ internal sealed class NeuronChatClient(ILLM model) : IChatClient
         ArgumentNullException.ThrowIfNull(messages);
         cancellationToken.ThrowIfCancellationRequested();
 
-        return model.RespondAsync(Request(messages, options));
+        var request = Request(messages, options);
+
+        return turnScheduler is null
+            ? model.RespondAsync(request)
+            : Task.Factory.StartNew(
+                () => model.RespondAsync(request),
+                CancellationToken.None,
+                TaskCreationOptions.DenyChildAttach,
+                turnScheduler).Unwrap();
     }
 
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(

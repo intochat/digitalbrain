@@ -3,9 +3,11 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Tasks;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Xunit;
 
@@ -73,6 +75,19 @@ public sealed class AIContracts
         Assert.NotNull(llama);
         Assert.Throws<InvalidOperationException>(
             () => host.Services.GetRequiredKeyedService<IChatClient>(typeof(Gpt56)));
+    }
+
+    [Fact(DisplayName = "AIModule preserves the host Data Protection application discriminator")]
+    public void ModulePreservesHostDataProtectionIsolation()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Services.AddDataProtection().SetApplicationName("brain-deployment");
+        builder.UseOrleans(AIModule.Configure);
+
+        using var host = builder.Build();
+        var options = host.Services.GetRequiredService<IOptions<DataProtectionOptions>>().Value;
+
+        Assert.Equal("brain-deployment", options.ApplicationDiscriminator);
     }
 
     [Fact(DisplayName = "IChatClient injection is confined to concrete LLM neurons")]

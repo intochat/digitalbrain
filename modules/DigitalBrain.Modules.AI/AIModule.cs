@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Serialization;
@@ -13,6 +14,7 @@ public sealed class AIModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
 
+        builder.Services.AddDataProtection();
         AIClients.Add(builder.Services);
     }
 
