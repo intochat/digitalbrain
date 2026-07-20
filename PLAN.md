@@ -227,6 +227,55 @@ on its own"*, which under DEC-11 is exactly why it is written down rather than r
 **Consumer:** the multiagent sample's polling loop (D-6, step 2.10) and every out-of-process observer.
 **Deletes:** both polling loops. §12 rejects *"server-side polling behind a streaming API"* by name.
 
+**Verified by the compiler oracle, 2026-07-20 — do not re-derive:**
+
+- **Orleans in this repository accepts `IAsyncEnumerable<T>` grain methods.** A throwaway
+  `IAsyncEnumerable<SynapseDelivery> WatchAsync(long, CancellationToken)` on a
+  `IGrainWithStringKey` built clean, and codegen emitted the invokable. So the mechanism exists.
+- **`JournalEntry` is `internal` to `DigitalBrain.Kernel`** (`NeuronFeed.cs`). The public wire type
+  for anything on `INeuron` is `SynapseDelivery`, which is what `JournalRead.Delta` already carries.
+- **`INeuron` is closed to unattributed callers as of 2.5.** `WatchAsync` placed on `INeuron` is
+  therefore not client-reachable; a client watches through `ISessionNeuron`, exactly as
+  `ReadNeuronJournalAsync` does. Whatever shape 2.6 takes, the session forwards it.
+
+**The open design fork, and it must be settled before implementing.** A grain method that awaits new
+data *inside the turn* keeps that turn open, and neurons are strictly non-reentrant
+(`NeuronConcurrency` refuses `Reentrant`, `MayInterleave`, `StatelessWorker`, `AlwaysInterleave`,
+`ReadOnly`). A long-lived `WatchAsync` that awaits would therefore **block the neuron it is watching**
+— trading a polling loop for a liveness bug, which is not an improvement. Two candidates:
+
+| Shape | Blocking risk | Notes |
+|---|---|---|
+| `IAsyncEnumerable` grain method | The producing turn stays open while awaiting the next item | Compiler-verified to exist; needs proof it does not stall the activation before it is chosen |
+| `IGrainObserver` push (`CreateObjectReference`) | None — `Append` pushes, no turn is held | Classic Orleans; not durable across disconnect, so the client re-subscribes **with its cursor** and receives catch-up, which is the behaviour DEC-1 already requires |
+
+Settle it with a proof that a watched neuron still answers other calls while a watch is open. Do not
+choose on elegance; choose on that test.
+
+**Two further facts, both learned the hard way. Do not re-derive.**
+
+**Orleans streams an `IAsyncEnumerable` grain method through a synthetic grain-extension method
+named `StartEnumeration`, and 2.5's filter refuses it.** The observed failure, verbatim:
+
+```
+NeuronAuthorizationException: 'StartEnumeration' is not a client entry point, so an unattributed
+caller cannot be authorized to reach 'tailprobe:tail/one'.
+```
+
+`[ClientEntryPoint]` is read from the *declaring interface of the invoked method*, and for an
+enumeration that is an Orleans extension interface, not the neuron contract being enumerated. So the
+async-enumerable route is not merely a style choice — it requires teaching `OwnerBoundCallFilter`
+about Orleans' streaming extension, and doing that carelessly re-opens the hole 2.5 closed, because
+the extension is the same for every grain. The observer route sidesteps this entirely: `Append`
+pushes to an `IGrainObserver`, and no new inbound surface exists to authorize.
+
+**The blocking question is still open.** The first probe appeared to prove that an open watch does
+not block the neuron. It proved nothing: the enumeration had already faulted on the filter, so the
+grain was idle when the second call arrived. The vacuity guard — `Assert.False(tail.IsCompleted)`
+before making the second call — is what exposed it. **Any rerun of this experiment must keep that
+guard**, or it will report a comfortable answer that means nothing. This is the same defect §11
+records in `final`'s benchmark: a number produced by machinery that never ran.
+
 45. `READ` — `src/DigitalBrain.Testing/SynapseObserver.cs`. It is an `ActivityListener` over
     `SynapseTelemetry` — push-based, no polling, already correct. What is missing is durability and
     catch-up, not observation.
