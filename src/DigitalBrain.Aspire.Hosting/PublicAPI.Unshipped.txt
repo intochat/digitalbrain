@@ -1,18 +1,18 @@
 #nullable enable
-DigitalBrain.Aspire.Hosting.BrainClientService
+DigitalBrain.Aspire.Hosting.ClientBrainReference
 DigitalBrain.Aspire.Hosting.BrainHostingExtensions
 DigitalBrain.Aspire.Hosting.BrainModuleHosting
 DigitalBrain.Aspire.Hosting.BrainModuleReference
 DigitalBrain.Aspire.Hosting.BrainModuleReference.BrainModuleReference() -> void
 DigitalBrain.Aspire.Hosting.BrainService
-DigitalBrain.Aspire.Hosting.BrainService.AsClient() -> DigitalBrain.Aspire.Hosting.BrainClientService!
+DigitalBrain.Aspire.Hosting.BrainService.AsClient() -> DigitalBrain.Aspire.Hosting.ClientBrainReference!
 DigitalBrain.Aspire.Hosting.BrainService.Builder.get -> Aspire.Hosting.IDistributedApplicationBuilder!
 DigitalBrain.Aspire.Hosting.BrainService.Name.get -> string!
 abstract DigitalBrain.Aspire.Hosting.BrainModuleReference.Apply<T>(Aspire.Hosting.ApplicationModel.IResourceBuilder<T>! builder) -> void
 static DigitalBrain.Aspire.Hosting.BrainHostingExtensions.AddModule<TModule>(this DigitalBrain.Aspire.Hosting.BrainService! brain, System.Action<TModule!>! configure) -> DigitalBrain.Aspire.Hosting.BrainService!
 static DigitalBrain.Aspire.Hosting.BrainHostingExtensions.AddBrain(this Aspire.Hosting.IDistributedApplicationBuilder! builder, string! name) -> DigitalBrain.Aspire.Hosting.BrainService!
 static DigitalBrain.Aspire.Hosting.BrainHostingExtensions.WithDevelopmentStores(this DigitalBrain.Aspire.Hosting.BrainService! brain) -> DigitalBrain.Aspire.Hosting.BrainService!
-static DigitalBrain.Aspire.Hosting.BrainHostingExtensions.WithReference<T>(this Aspire.Hosting.ApplicationModel.IResourceBuilder<T>! builder, DigitalBrain.Aspire.Hosting.BrainClientService! client) -> Aspire.Hosting.ApplicationModel.IResourceBuilder<T>!
+static DigitalBrain.Aspire.Hosting.BrainHostingExtensions.WithReference<T>(this Aspire.Hosting.ApplicationModel.IResourceBuilder<T>! builder, DigitalBrain.Aspire.Hosting.ClientBrainReference! client) -> Aspire.Hosting.ApplicationModel.IResourceBuilder<T>!
 static DigitalBrain.Aspire.Hosting.BrainHostingExtensions.WithReference<T>(this Aspire.Hosting.ApplicationModel.IResourceBuilder<T>! builder, DigitalBrain.Aspire.Hosting.BrainService! brain) -> Aspire.Hosting.ApplicationModel.IResourceBuilder<T>!
 static DigitalBrain.Aspire.Hosting.BrainModuleHosting.AddReference(DigitalBrain.Aspire.Hosting.BrainService! brain, DigitalBrain.Aspire.Hosting.BrainModuleReference! reference) -> void
 static DigitalBrain.Aspire.Hosting.BrainModuleHosting.BrainOf(DigitalBrain.Abstractions.IModule! module) -> DigitalBrain.Aspire.Hosting.BrainService!

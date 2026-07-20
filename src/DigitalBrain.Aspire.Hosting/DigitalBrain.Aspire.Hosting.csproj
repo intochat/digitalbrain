@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>The DigitalBrain brain resource for Aspire AppHosts: Orleans, storage, and model tiers composed as one resource.</Description>
+    <Description>Core DigitalBrain AppHost composition: Orleans, stores, module selection, and silo/client projection.</Description>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting" />

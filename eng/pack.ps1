@@ -7,12 +7,20 @@ param(
 $ErrorActionPreference = 'Stop'
 $repository = Split-Path -Parent $PSScriptRoot
 $packages = Join-Path $repository $Output
+$repositoryPath = [System.IO.Path]::GetFullPath($repository)
+$packagesPath = [System.IO.Path]::GetFullPath($packages)
+
+if (-not $packagesPath.StartsWith(
+    $repositoryPath + [System.IO.Path]::DirectorySeparatorChar,
+    [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "package output must stay inside the repository: $packagesPath"
+}
 
 Push-Location $repository
 
 try {
-    if (Test-Path $packages) {
-        Remove-Item -Recurse -Force $packages
+    if (Test-Path -LiteralPath $packagesPath) {
+        Remove-Item -Recurse -Force -LiteralPath $packagesPath
     }
 
     dotnet build-server shutdown | Out-Null
@@ -20,8 +28,8 @@ try {
     dotnet pack "$repository/DigitalBrain.slnx" -c $Configuration -o $packages
     if ($LASTEXITCODE -ne 0) { throw "pack failed with exit code $LASTEXITCODE" }
 
-    $produced = Get-ChildItem $packages -Filter *.nupkg
-    $symbols = Get-ChildItem $packages -Filter *.snupkg
+    $produced = Get-ChildItem $packagesPath -Filter *.nupkg
+    $symbols = Get-ChildItem $packagesPath -Filter *.snupkg
     if ($produced.Count -ne $symbols.Count) {
         throw "every package must ship symbols: $($produced.Count) packages, $($symbols.Count) symbol packages"
     }
@@ -109,9 +117,9 @@ try {
         "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)  $($_.Name)"
     }
 
-    Set-Content -Path (Join-Path $packages 'SHA256SUMS.txt') -Value $checksums -Encoding utf8
+    Set-Content -Path (Join-Path $packagesPath 'SHA256SUMS.txt') -Value $checksums -Encoding utf8
 
-    "packed $($produced.Count) packages and $($symbols.Count) symbol packages into $packages"
+    "packed $($produced.Count) packages and $($symbols.Count) symbol packages into $packagesPath"
 }
 finally {
     Pop-Location

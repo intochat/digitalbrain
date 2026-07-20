@@ -6,16 +6,18 @@ namespace DigitalBrain.Quickstart;
 
 [Alias("quickstart.greeter")]
 internal interface IGreeter : INeuron
-{
-    [Alias("SayHello")]
-    Task SayHelloAsync();
-}
+;
+
+[GenerateSerializer]
+[Alias("quickstart.say-hello")]
+internal sealed record SayHello : Synapse;
 
 [GenerateSerializer]
 [Alias("quickstart.greeted")]
 internal sealed record Greeted : Synapse;
 
-internal sealed class Greeter : Neuron, IGreeter, IEmit<Greeted>
+internal sealed class Greeter : Neuron, IGreeter, IHandle<SayHello>, IEmit<Greeted>
 {
-    public Task SayHelloAsync() => EmitAsync(new Greeted());
+    public Task HandleAsync(SayHello synapse, CancellationToken cancellationToken)
+        => EmitAsync(new Greeted());
 }

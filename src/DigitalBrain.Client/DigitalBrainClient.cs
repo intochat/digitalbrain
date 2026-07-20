@@ -1,4 +1,3 @@
-using System.Reflection;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Client;
@@ -9,7 +8,6 @@ public sealed class DigitalBrainClient
     private const string DefaultInstance = "default";
 
     private readonly IGrainFactory _grains;
-    private readonly Dictionary<Type, Func<Synapse, Task>> _handlers = [];
 
     private DigitalBrainClient(IGrainFactory grains, OwnerId owner)
     {
@@ -27,64 +25,41 @@ public sealed class DigitalBrainClient
         return new DigitalBrainClient(grains, new OwnerId(owner));
     }
 
-    public T Get<T>()
-        where T : class, IGrainWithStringKey
-        => Get<T>(DefaultInstance);
+    public Task SendAsync<TNeuron>(Synapse synapse)
+        where TNeuron : INeuron
+        => SendAsync<TNeuron>(DefaultInstance, synapse);
 
-    public T Get<T>(string name)
-        where T : class, IGrainWithStringKey
+    public Task SendAsync<TNeuron>(string name, Synapse synapse)
+        where TNeuron : INeuron
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        var grainType = GrainTypeFor(typeof(T));
-        var id = new NeuronId(grainType, Owner, name);
-
-        return _grains.GetGrain<T>(id.ToGrainId());
+        return SendAsync(
+            new NeuronId(NeuronId.GrainTypeNameOf(typeof(TNeuron)), Owner, name),
+            synapse);
     }
 
-    public Task Emit(Synapse fact)
+    public Task SendAsync(NeuronId receiver, Synapse synapse)
     {
-        ArgumentNullException.ThrowIfNull(fact);
+        ArgumentNullException.ThrowIfNull(synapse);
 
-        return Session().EmitAsync(fact);
+        if (receiver.Owner != Owner)
+        {
+            throw new NeuronAuthorizationException(
+                $"Client owner '{Owner}' cannot send to neuron '{receiver}' owned by '{receiver.Owner}'.");
+        }
+
+        return Session().FireAsync(receiver, synapse);
     }
 
-    public Task On<TSynapse>(Func<TSynapse, Task> handler)
-        where TSynapse : Synapse
+    public Task EmitAsync(Synapse synapse)
     {
-        ArgumentNullException.ThrowIfNull(handler);
+        ArgumentNullException.ThrowIfNull(synapse);
 
-        _handlers[typeof(TSynapse)] = synapse => handler((TSynapse)synapse);
-
-        return Task.CompletedTask;
+        return Session().EmitAsync(synapse);
     }
-
-    public IReadOnlyCollection<Type> HandledSynapseTypes() => _handlers.Keys.ToArray();
 
     private ISessionNeuron Session()
         => _grains.GetGrain<ISessionNeuron>(
             new NeuronId(ISessionNeuron.GrainTypeName, Owner, SessionName).ToGrainId());
-
-    private static string GrainTypeFor(Type contract)
-    {
-        var declared = contract.GetCustomAttributesData()
-            .FirstOrDefault(attribute => attribute.AttributeType.Name == "GrainTypeAttribute")?
-            .ConstructorArguments is { Count: > 0 } args
-            ? args[0].Value as string
-            : null;
-
-        if (declared is not null)
-        {
-            return declared;
-        }
-
-        var name = contract.Name;
-
-        if (name.Length > 1 && name[0] == 'I' && char.IsUpper(name[1]))
-        {
-            name = name[1..];
-        }
-
-        return name;
-    }
 }

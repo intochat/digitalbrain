@@ -9,6 +9,7 @@ public sealed class GrainTypeNamingContracts
 
     [Theory]
     [InlineData(typeof(Ledger), "Ledger")]
+    [InlineData(typeof(ILedger), "Ledger")]
     [InlineData(typeof(LedgerGrain), "Ledger")]
     [InlineData(typeof(Basket), "cart")]
     [InlineData(typeof(Grain), "Grain")]
@@ -23,6 +24,8 @@ public sealed class GrainTypeNamingContracts
         => Assert.Equal(expected, new NeuronId(NeuronId.GrainTypeNameOf(neuronType), Owner, "main").Type);
 
     private sealed class Ledger;
+
+    private interface ILedger;
 
     private sealed class LedgerGrain;
 

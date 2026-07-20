@@ -1,9 +1,8 @@
 #nullable enable
 DigitalBrain.Client.DigitalBrainClient
-DigitalBrain.Client.DigitalBrainClient.Emit(DigitalBrain.Abstractions.Synapse! fact) -> System.Threading.Tasks.Task!
-DigitalBrain.Client.DigitalBrainClient.Get<T>() -> T!
-DigitalBrain.Client.DigitalBrainClient.Get<T>(string! name) -> T!
-DigitalBrain.Client.DigitalBrainClient.HandledSynapseTypes() -> System.Collections.Generic.IReadOnlyCollection<System.Type!>!
-DigitalBrain.Client.DigitalBrainClient.On<TSynapse>(System.Func<TSynapse!, System.Threading.Tasks.Task!>! handler) -> System.Threading.Tasks.Task!
+DigitalBrain.Client.DigitalBrainClient.EmitAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Client.DigitalBrainClient.Owner.get -> DigitalBrain.Abstractions.OwnerId
+DigitalBrain.Client.DigitalBrainClient.SendAsync(DigitalBrain.Abstractions.NeuronId receiver, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.Client.DigitalBrainClient.SendAsync<TNeuron>(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
+DigitalBrain.Client.DigitalBrainClient.SendAsync<TNeuron>(string! name, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 static DigitalBrain.Client.DigitalBrainClient.Connect(Orleans.IGrainFactory! grains, string! owner) -> DigitalBrain.Client.DigitalBrainClient!

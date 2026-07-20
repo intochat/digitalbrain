@@ -55,6 +55,11 @@ public readonly record struct NeuronId
         const string OrleansGrainSuffix = "Grain";
         var name = neuronType.Name;
 
+        if (neuronType.IsInterface && name.Length > 1 && name[0] == 'I' && char.IsUpper(name[1]))
+        {
+            return name[1..];
+        }
+
         return name.Length > OrleansGrainSuffix.Length && name.EndsWith(OrleansGrainSuffix, StringComparison.Ordinal)
             ? name[..^OrleansGrainSuffix.Length]
             : name;

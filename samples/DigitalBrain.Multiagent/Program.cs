@@ -22,7 +22,6 @@ await host.StartAsync();
 
 var grains = host.Services.GetRequiredService<IGrainFactory>();
 var brain = DigitalBrainClient.Connect(grains, "panel");
-var moderator = brain.Get<IModerator>("chair");
 var moderatorId = new NeuronId(nameof(Moderator), brain.Owner, "chair");
 var sessionId = new NeuronId(ISessionNeuron.GrainTypeName, brain.Owner, "session");
 var session = grains.GetGrain<ISessionNeuron>(sessionId.ToGrainId());
@@ -38,7 +37,7 @@ await session.WatchNeuronAsync(
 
 try
 {
-    await moderator.AskAsync("should we ship it?");
+    await brain.SendAsync<IModerator>("chair", new QuestionAsked("should we ship it?"));
 
     var verdictDelivery = await verdicts.AwaitMatchAsync(TimeSpan.FromSeconds(30));
     var scribeId = NeuronId.BroadcastReceiver(nameof(Scribe), brain.Owner, verdictDelivery.CorrelationId);

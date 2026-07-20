@@ -6,10 +6,11 @@ namespace DigitalBrain.Multiagent;
 
 [Alias("multiagent.moderator")]
 internal interface IModerator : INeuron
-{
-    [Alias("Ask")]
-    Task AskAsync(string question);
-}
+;
+
+[GenerateSerializer]
+[Alias("multiagent.question-asked")]
+internal sealed record QuestionAsked([property: Id(0)] string Question) : Synapse;
 
 [GenerateSerializer]
 [Alias("multiagent.opinion-wanted")]
@@ -23,16 +24,20 @@ internal sealed record OpinionOffered([property: Id(0)] string From, [property: 
 [Alias("multiagent.verdict-reached")]
 internal sealed record VerdictReached([property: Id(0)] string Verdict) : Synapse;
 
-internal sealed class Moderator : Neuron, IModerator, IEmit<OpinionWanted>, IHandle<OpinionOffered>, IEmit<VerdictReached>
+internal sealed class Moderator :
+    Neuron,
+    IModerator,
+    IHandle<QuestionAsked>,
+    IEmit<OpinionWanted>,
+    IHandle<OpinionOffered>,
+    IEmit<VerdictReached>
 {
     private readonly List<string> _heard = [];
 
-    public async Task AskAsync(string question)
+    public async Task HandleAsync(QuestionAsked synapse, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(question);
-
-        await SendAsync(NeuronId.For<Optimist>(Id.Owner, "one"), new OpinionWanted(question));
-        await SendAsync(NeuronId.For<Skeptic>(Id.Owner, "one"), new OpinionWanted(question));
+        await SendAsync(NeuronId.For<Optimist>(Id.Owner, "one"), new OpinionWanted(synapse.Question));
+        await SendAsync(NeuronId.For<Skeptic>(Id.Owner, "one"), new OpinionWanted(synapse.Question));
     }
 
     public async Task HandleAsync(OpinionOffered synapse, CancellationToken cancellationToken)

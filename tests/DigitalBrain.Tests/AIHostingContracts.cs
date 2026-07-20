@@ -28,6 +28,58 @@ public sealed class AIHostingContracts
         Assert.Single(builder.Resources, resource => resource.Name == "openai-api-key");
     }
 
+    [Fact(DisplayName = "AppHost rejects duplicate AI modules and duplicate typed LLMs")]
+    public void AppHostRejectsDuplicateSelections()
+    {
+        var moduleBuilder = DistributedApplication.CreateBuilder();
+        var moduleBrain = moduleBuilder.AddBrain("module-brain");
+
+        moduleBrain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
+
+        Assert.Throws<InvalidOperationException>(
+            () => moduleBrain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>()));
+
+        var modelBuilder = DistributedApplication.CreateBuilder();
+        var modelBrain = modelBuilder.AddBrain("model-brain");
+
+        Assert.Throws<InvalidOperationException>(
+            () => modelBrain.AddModule<AIModule>(ai => ai
+                .WithLlm<Llama32>()
+                .WithLlm<Llama32>()));
+    }
+
+    [Fact(DisplayName = "OpenAI configuration is a documented secret parameter")]
+    public void OpenAIUsesDocumentedSecretParameter()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder
+            .AddBrain("brain")
+            .WithDevelopmentStores();
+
+        brain.AddModule<AIModule>(ai => ai.WithLlm<Gpt56>());
+
+        var apiKey = Assert.IsType<ParameterResource>(
+            Assert.Single(builder.Resources, resource => resource.Name == "openai-api-key"));
+
+        Assert.True(apiKey.Secret);
+        Assert.True(apiKey.EnableDescriptionMarkdown);
+        Assert.Contains(
+            "[OpenAI Platform](https://platform.openai.com/api-keys)",
+            apiKey.Description,
+            StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "Ollama configuration creates no secret parameter")]
+    public void OllamaCreatesNoSecretParameter()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddBrain("brain");
+
+        brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
+
+        Assert.DoesNotContain(builder.Resources, resource => resource is ParameterResource);
+    }
+
     [Fact(DisplayName = "AI configuration is projected only to the silo reference")]
     public async Task AIConfigurationIsProjectedOnlyToTheSilo()
     {
@@ -50,7 +102,25 @@ public sealed class AIHostingContracts
         Assert.DoesNotContain(clientEnvironment.Keys, key => key.StartsWith("DigitalBrain__", StringComparison.Ordinal));
     }
 
-    private static async Task<Dictionary<string, string>> ProjectAsync(IResourceWithEnvironment resource)
+    [Fact(DisplayName = "OpenAI publish projection references the secret instead of embedding it")]
+    public async Task OpenAIProjectionContainsOnlyAParameterExpression()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder
+            .AddBrain("brain")
+            .WithDevelopmentStores();
+
+        brain.AddModule<AIModule>(ai => ai.WithLlm<Gpt56>());
+
+        var silo = builder.AddResource(new ProjectionProbe("silo")).WithReference(brain);
+        var environment = await ProjectAsync(silo.Resource);
+        var apiKey = Assert.IsType<ParameterResource>(
+            Assert.Single(builder.Resources, resource => resource.Name == "openai-api-key"));
+
+        Assert.Same(apiKey, environment["DigitalBrain__AI__OpenAI__ApiKey"]);
+    }
+
+    private static async Task<Dictionary<string, object>> ProjectAsync(IResourceWithEnvironment resource)
     {
         var context = new EnvironmentCallbackContext(
             new DistributedApplicationExecutionContext(DistributedApplicationOperation.Publish));
@@ -62,7 +132,7 @@ public sealed class AIHostingContracts
 
         return context.EnvironmentVariables.ToDictionary(
             entry => entry.Key,
-            entry => entry.Value.ToString() ?? string.Empty,
+            entry => entry.Value,
             StringComparer.Ordinal);
     }
 

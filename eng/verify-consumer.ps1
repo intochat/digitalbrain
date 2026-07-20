@@ -4,16 +4,49 @@ param([string]$Configuration = 'Release')
 $ErrorActionPreference = 'Stop'
 $repository = Split-Path -Parent $PSScriptRoot
 $samples = @('samples/DigitalBrain.Quickstart', 'samples/DigitalBrain.Multiagent')
-$cache = Join-Path ([System.IO.Path]::GetTempPath()) "digitalbrain-empty-cache-$([guid]::NewGuid().ToString('n'))"
+$repositoryPath = [System.IO.Path]::GetFullPath($repository)
+$tempPath = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
+$cache = [System.IO.Path]::GetFullPath(
+    (Join-Path $tempPath "digitalbrain-empty-cache-$([guid]::NewGuid().ToString('n'))"))
 $previous = $env:NUGET_PACKAGES
 
+function Assert-DescendantPath {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+
+        [Parameter(Mandatory)]
+        [string]$Root
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $fullRoot = [System.IO.Path]::GetFullPath($Root)
+    $rootPrefix = $fullRoot
+
+    if (-not $rootPrefix.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
+        $rootPrefix += [System.IO.Path]::DirectorySeparatorChar
+    }
+
+    if (-not $fullPath.StartsWith(
+        $rootPrefix,
+        [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "path must stay inside '$fullRoot': $fullPath"
+    }
+
+    $fullPath
+}
+
 try {
+    $cache = Assert-DescendantPath -Path $cache -Root $tempPath
     $env:NUGET_PACKAGES = $cache
 
     foreach ($sample in $samples) {
-        $project = Join-Path $repository $sample
+        $project = Assert-DescendantPath -Path (Join-Path $repositoryPath $sample) -Root $repositoryPath
 
-        Remove-Item -Recurse -Force (Join-Path $project 'obj'), (Join-Path $project 'bin') -ErrorAction SilentlyContinue
+        foreach ($directory in @('obj', 'bin')) {
+            $buildOutput = Assert-DescendantPath -Path (Join-Path $project $directory) -Root $project
+            Remove-Item -Recurse -Force -LiteralPath $buildOutput -ErrorAction SilentlyContinue
+        }
 
         Push-Location $project
 
@@ -30,5 +63,6 @@ try {
 }
 finally {
     $env:NUGET_PACKAGES = $previous
-    Remove-Item -Recurse -Force $cache -ErrorAction SilentlyContinue
+    $cache = Assert-DescendantPath -Path $cache -Root $tempPath
+    Remove-Item -Recurse -Force -LiteralPath $cache -ErrorAction SilentlyContinue
 }

@@ -45,12 +45,12 @@ public sealed class BrainService
 
     internal void AddReference(BrainModuleReference reference) => _moduleReferences.Add(reference);
 
-    public BrainClientService AsClient() => new(this);
+    public ClientBrainReference AsClient() => new(this);
 }
 
-public sealed class BrainClientService
+public sealed class ClientBrainReference
 {
-    internal BrainClientService(BrainService brain) => Brain = brain;
+    internal ClientBrainReference(BrainService brain) => Brain = brain;
 
     internal BrainService Brain { get; }
 }
@@ -167,7 +167,7 @@ public static class BrainHostingExtensions
         return builder;
     }
 
-    public static IResourceBuilder<T> WithReference<T>(this IResourceBuilder<T> builder, BrainClientService client)
+    public static IResourceBuilder<T> WithReference<T>(this IResourceBuilder<T> builder, ClientBrainReference client)
         where T : IResourceWithEnvironment, IResourceWithEndpoints
     {
         ArgumentNullException.ThrowIfNull(builder);
