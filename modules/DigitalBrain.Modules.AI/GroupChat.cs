@@ -134,7 +134,42 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
 
     public abstract Task ContinueAsync(AttemptCursor cursor);
 
-    public abstract Task CancelAsync(AttemptCursor cursor);
+    public async Task CancelAsync(AttemptCursor cursor)
+    {
+        ArgumentNullException.ThrowIfNull(cursor);
+        ValidateCursor(cursor);
+        ValidateCapabilityCaller(cursor.Task);
+
+        var state = LoadWorkerState()
+            ?? throw new InvalidOperationException(
+                $"GroupChat '{Id}' has no supervised Attempt state.");
+
+        if (cursor != state.Cursor)
+        {
+            throw new InvalidOperationException(
+                $"Attempt cursor '{cursor}' does not match GroupChat '{Id}'s current cursor '{state.Cursor}'.");
+        }
+
+        if (state.ActiveRun is null)
+        {
+            return;
+        }
+
+        if (state.ActiveRun.Cursor != cursor)
+        {
+            throw new InvalidOperationException(
+                $"GroupChat '{Id}'s active run does not match its persisted Attempt cursor.");
+        }
+
+        StageWorkerState(state with { ActiveRun = null });
+        await ReplyAsync(
+            state.Causation,
+            new AttemptCancelled(
+                cursor.Task,
+                cursor.Worker,
+                cursor.Attempt,
+                cursor.Revision));
+    }
 
     async Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
     {
@@ -481,6 +516,48 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
         }
     }
 
+    private void ValidateCursor(AttemptCursor cursor)
+    {
+        if (cursor.Task == default)
+        {
+            throw new ArgumentException("An Attempt Task is required.", nameof(cursor));
+        }
+
+        if (cursor.Task != NeuronId.For<ITask>(cursor.Task.Owner, cursor.Task.Name))
+        {
+            throw new InvalidOperationException(
+                $"Attempt Task '{cursor.Task}' is not a canonical Task neuron.");
+        }
+
+        if (cursor.Worker == default)
+        {
+            throw new ArgumentException("An Attempt Worker is required.", nameof(cursor));
+        }
+
+        if (cursor.Worker != Id)
+        {
+            throw new InvalidOperationException(
+                $"Attempt Worker '{cursor.Worker}' does not match GroupChat '{Id}'.");
+        }
+
+        if (cursor.Task.Owner != Id.Owner)
+        {
+            throw new InvalidOperationException(
+                $"Attempt Task '{cursor.Task}' does not belong to GroupChat '{Id}'s owner.");
+        }
+
+        if (cursor.Attempt.Value == Guid.Empty)
+        {
+            throw new ArgumentException("An Attempt id is required.", nameof(cursor));
+        }
+
+        if (cursor.Revision < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(cursor),
+                "An Attempt revision cannot be negative.");
+        }
+    }
 
     private static async Task<AgentSession> RestoreAsync(
         AIAgent agent,

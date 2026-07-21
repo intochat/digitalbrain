@@ -66,14 +66,15 @@ public sealed class AIContracts
             candidate => candidate.Name == "AcceptAsync");
         Assert.False(accept.IsAbstract);
 
-        foreach (var methodName in new[] { "ContinueAsync", "CancelAsync" })
-        {
-            var deferred = Assert.Single(
-                typeof(GroupChat).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-                candidate => candidate.Name == methodName);
+        var cancel = Assert.Single(
+            typeof(GroupChat).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            candidate => candidate.Name == "CancelAsync");
+        Assert.False(cancel.IsAbstract);
 
-            Assert.True(deferred.IsAbstract);
-        }
+        var deferred = Assert.Single(
+            typeof(GroupChat).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            candidate => candidate.Name == "ContinueAsync");
+        Assert.True(deferred.IsAbstract);
     }
 
     [Fact(DisplayName = "the workflow runner is private non-neuron Orleans infrastructure")]

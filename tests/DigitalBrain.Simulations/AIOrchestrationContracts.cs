@@ -415,8 +415,6 @@ internal sealed class TestGroupChat : GroupChat, ITestGroupChat
 
     public override Task ContinueAsync(AttemptCursor cursor) => throw new NotSupportedException();
 
-    public override Task CancelAsync(AttemptCursor cursor) => throw new NotSupportedException();
-
 }
 
 internal static class GroupDefinitionSource

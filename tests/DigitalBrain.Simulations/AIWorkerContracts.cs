@@ -378,6 +378,152 @@ public sealed class AIWorkerContracts
         }
     }
 
+    [Fact(DisplayName = "cancellation clears the active run and late workflow output cannot overwrite it")]
+    public async Task CancellationClearsTheActiveRunAndFencesLateWorkflowOutput()
+    {
+        const string recoveryReminder = "db.ai.workflow-run";
+        var cluster = await StartWorkerClusterAsync();
+        AIWorkerLogProvider.Clear();
+
+        var owner = new OwnerId("ai-worker-cancel-late-output");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        AIWorkerRunnerDispatchProbe.Reset(workerId);
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var probe = cluster.Client.GetGrain<IAIWorkerProbe>(
+            NeuronId.For<AIWorkerProbe>(owner, "probe").ToGrainId());
+        var reminder = cluster.Client.GetGrain<IReminderProbe>(
+            NeuronId.For<ReminderProbe>(owner, "reminder-probe").ToGrainId());
+        var gate = AIWorkerGate.Prepare(
+            owner,
+            "cancel the supervised run",
+            "output that arrived after cancellation");
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("cancel the supervised run"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            var running = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Running);
+            await gate.Entered.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Equal(1, AIWorkerRunnerDispatchProbe.EntriesFor(workerId));
+
+            var cancelling = await task.CancelAsync(new(CommandId.New(), running.Revision));
+            Assert.Equal(TaskState.Cancelling, cancelling.State);
+
+            var cancelled = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Cancelled);
+            Assert.Null(cancelled.ActiveAttempt);
+            Assert.Null(cancelled.Result);
+
+            var cancellationJournal = await ReadJournalUntilAsync(
+                probe,
+                workerId,
+                journal => journal.Delta.Any(delivery => delivery.Synapse is AttemptCancelled));
+            var acceptedDelivery = Assert.Single(
+                cancellationJournal.Delta,
+                delivery => delivery.Synapse is AttemptAccepted);
+            var cancelledDelivery = Assert.Single(
+                cancellationJournal.Delta,
+                delivery => delivery.Synapse is AttemptCancelled fact
+                    && fact.Task == taskId
+                    && fact.Worker == workerId
+                    && fact.Attempt == running.ActiveAttempt
+                    && fact.Revision == running.Revision);
+            Assert.NotNull(acceptedDelivery.CausationId);
+            Assert.Equal(acceptedDelivery.CausationId, cancelledDelivery.CausationId);
+            Assert.DoesNotContain(
+                cancellationJournal.Delta,
+                delivery => delivery.Synapse is CapabilityRequested request
+                    && request.Target == workerId);
+
+            gate.ReleaseFirst();
+            await WaitUntilAsync(
+                () => AIWorkerLogProvider.Messages.Any(message =>
+                    message.Contains("failed before adoption", StringComparison.Ordinal)),
+                "The cancelled workflow runner did not reach its late-result fence.");
+
+            var afterLateOutput = await task.ReadAsync();
+            Assert.Equal(TaskState.Cancelled, afterLateOutput.State);
+            Assert.Equal(cancelled.Revision, afterLateOutput.Revision);
+            Assert.Null(afterLateOutput.ActiveAttempt);
+            Assert.Null(afterLateOutput.Result);
+            var lateJournal = await probe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+            Assert.DoesNotContain(
+                lateJournal.Delta,
+                delivery => delivery.Synapse is CapabilityRequested request
+                    && request.Target == workerId);
+
+            await reminder.ExpediteAsync(workerId, recoveryReminder);
+            await WaitForReminderStateAsync(
+                reminder,
+                workerId,
+                recoveryReminder,
+                exists: false);
+            Assert.Equal(1, AIWorkerRunnerDispatchProbe.EntriesFor(workerId));
+        }
+        finally
+        {
+            gate.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "a same-owner neuron cannot cancel another Task's active workflow run")]
+    public async Task WrongCallerCannotCancelAnActiveWorkflowRun()
+    {
+        var cluster = await StartWorkerClusterAsync();
+        var owner = new OwnerId("ai-worker-cancel-wrong-caller");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var probe = cluster.Client.GetGrain<IAIWorkerProbe>(
+            NeuronId.For<AIWorkerProbe>(owner, "wrong-caller").ToGrainId());
+        var gate = AIWorkerGate.Prepare(
+            owner,
+            "protect cancellation authority",
+            "authorized task answer");
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("protect cancellation authority"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            var running = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Running);
+            await gate.Entered.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            var before = await probe.ReadWorkerStateAsync(workerId);
+            var cursor = new AttemptCursor(
+                taskId,
+                workerId,
+                running.ActiveAttempt!.Value,
+                running.Revision);
+
+            _ = await Assert.ThrowsAsync<NeuronAuthorizationException>(
+                () => probe.CancelAsync(workerId, cursor));
+
+            Assert.Equal(before, await probe.ReadWorkerStateAsync(workerId));
+            Assert.Equal(TaskState.Running, (await task.ReadAsync()).State);
+            Assert.Equal(1, gate.EntryCount);
+
+            gate.ReleaseFirst();
+            _ = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Succeeded);
+        }
+        finally
+        {
+            gate.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
     [Fact(DisplayName = "GroupChat copies mutable input and read-only output mapping boundaries")]
     public async Task GroupChatCopiesBothTaskMappingBoundaries()
     {
@@ -1296,8 +1442,6 @@ internal sealed class TaskGroupChat : GroupChat, ITaskGroupChat
 
     public override Task ContinueAsync(AttemptCursor cursor) => throw new NotSupportedException();
 
-    public override Task CancelAsync(AttemptCursor cursor) => throw new NotSupportedException();
-
     public Task<byte[]> ReadDirectStateAsync()
         => Task.FromResult(ReadState(DirectStateName));
 
@@ -1322,8 +1466,6 @@ internal sealed class EmptyTaskGroupChat : GroupChat, IEmptyTaskGroupChat
         => throw new NotSupportedException();
 
     public override Task ContinueAsync(AttemptCursor cursor) => throw new NotSupportedException();
-
-    public override Task CancelAsync(AttemptCursor cursor) => throw new NotSupportedException();
 }
 
 [Alias("db.test.foreign-participant-task-group-chat")]
@@ -1345,8 +1487,6 @@ internal sealed class ForeignParticipantTaskGroupChat : GroupChat, IForeignParti
         => throw new NotSupportedException();
 
     public override Task ContinueAsync(AttemptCursor cursor) => throw new NotSupportedException();
-
-    public override Task CancelAsync(AttemptCursor cursor) => throw new NotSupportedException();
 }
 
 [Alias("db.test.ai-worker-probe")]
@@ -1358,6 +1498,9 @@ internal interface IAIWorkerProbe : INeuron
 
     [Alias("Respond")]
     Task<ChatResponse> RespondAsync(NeuronId worker, IReadOnlyList<ChatMessage> messages);
+
+    [Alias("Cancel")]
+    Task CancelAsync(NeuronId worker, AttemptCursor cursor);
 
     [Alias("ReadDirectState")]
     Task<byte[]> ReadDirectStateAsync(NeuronId worker);
@@ -1376,6 +1519,9 @@ internal sealed class AIWorkerProbe : Neuron, IAIWorkerProbe
 
     public Task<ChatResponse> RespondAsync(NeuronId worker, IReadOnlyList<ChatMessage> messages)
         => GrainFactory.GetGrain<IAgent>(worker.ToGrainId()).RespondAsync(messages);
+
+    public Task CancelAsync(NeuronId worker, AttemptCursor cursor)
+        => GrainFactory.GetGrain<IWorker>(worker.ToGrainId()).CancelAsync(cursor);
 
     public Task<byte[]> ReadDirectStateAsync(NeuronId worker)
         => GrainFactory.GetGrain<ITaskGroupChat>(worker.ToGrainId()).ReadDirectStateAsync();
