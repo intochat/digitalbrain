@@ -52,6 +52,124 @@ public sealed class CapabilityDelegationSecurityContracts
         Assert.Equal(17, await runner.InvokeAsync(delegation, targetId));
     }
 
+    [Fact(DisplayName = "a failed delegation mint does not consume durable retention capacity")]
+    public async Task FailedDelegationMintDoesNotConsumeDurableRetentionCapacity()
+    {
+        await SimulationCluster.StartAsync();
+
+        var owner = new OwnerId("delegation-mint-write-rollback");
+        var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
+        var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
+        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+            IdSpan.Create($"{owner.Value}/runner"));
+
+        SimulationCluster.FailJournalWriteAfter(
+            issuerId.ToGrainId(),
+            completedWritesBeforeFailure: 0,
+            "injected delegation mint persistence failure");
+
+        try
+        {
+            _ = await Assert.ThrowsAsync<InvalidOperationException>(() => issuer.IssueAsync(
+                runner.GetGrainId(),
+                targetId,
+                nameof(IDelegatedCapabilityTarget.EnterAsync)));
+        }
+        finally
+        {
+            SimulationCluster.ClearJournalWriteFailure(issuerId.ToGrainId());
+        }
+
+        for (var index = 0; index < MaximumRememberedDelegations; index++)
+        {
+            _ = await issuer.IssueAsync(
+                runner.GetGrainId(),
+                targetId,
+                nameof(IDelegatedCapabilityTarget.EnterAsync));
+        }
+    }
+
+    [Fact(DisplayName = "a failed delegation redemption can be retried")]
+    public async Task FailedDelegationRedemptionCanBeRetried()
+    {
+        await SimulationCluster.StartAsync();
+
+        var owner = new OwnerId("delegation-redemption-write-rollback");
+        var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
+        var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
+        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+            IdSpan.Create($"{owner.Value}/runner"));
+        var delegation = await issuer.IssueAsync(
+            runner.GetGrainId(),
+            targetId,
+            nameof(IDelegatedCapabilityTarget.EnterAsync));
+
+        SimulationCluster.FailJournalWriteAfter(
+            issuerId.ToGrainId(),
+            completedWritesBeforeFailure: 0,
+            "injected delegation redemption persistence failure");
+
+        try
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                runner.RedeemOnlyAsync(delegation, issuerId));
+        }
+        finally
+        {
+            SimulationCluster.ClearJournalWriteFailure(issuerId.ToGrainId());
+        }
+
+        Assert.Equal(17, await runner.InvokeAsync(delegation, targetId));
+    }
+
+    [Fact(DisplayName = "a failed delegation finish retry durably records one terminal outcome")]
+    public async Task FailedDelegationFinishRetryDurablyRecordsOneTerminalOutcome()
+    {
+        await SimulationCluster.StartAsync();
+
+        var owner = new OwnerId("delegation-finish-write-rollback");
+        var simulation = new Simulation();
+        simulation.OpenBrain(owner.Value);
+        var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
+        var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
+        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+            IdSpan.Create($"{owner.Value}/runner"));
+        var delegation = await issuer.IssueAsync(
+            runner.GetGrainId(),
+            targetId,
+            nameof(IDelegatedCapabilityTarget.EnterAsync));
+        await runner.RedeemOnlyAsync(delegation, issuerId);
+
+        SimulationCluster.FailJournalWriteAfter(
+            issuerId.ToGrainId(),
+            completedWritesBeforeFailure: 0,
+            "injected delegation finish persistence failure");
+
+        try
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                runner.RepeatOutcomeAsync(delegation, issuerId, succeeded: true));
+        }
+        finally
+        {
+            SimulationCluster.ClearJournalWriteFailure(issuerId.ToGrainId());
+        }
+
+        await runner.RepeatOutcomeAsync(delegation, issuerId, succeeded: true);
+        await issuer.DeactivateAsync();
+
+        var durableOutgoing = await simulation.ReadJournalAsync(
+            JournalKind.Outgoing,
+            nameof(DelegationIssuer),
+            "issuer",
+            afterSequence: 0);
+
+        Assert.Single(durableOutgoing.Delta, Is<CapabilityCompleted>);
+    }
+
     [Fact(DisplayName = "a failed target journal write prevents semantic method entry")]
     public async Task FailedTargetJournalWritePreventsSemanticMethodEntry()
     {

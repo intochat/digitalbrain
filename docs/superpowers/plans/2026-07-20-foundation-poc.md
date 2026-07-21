@@ -728,9 +728,10 @@ it.
   Kernel delegation.
 - Run the superstep in a private, owner-bound Orleans runner grain. It is infrastructure: no
   `INeuron`, journal, registry entry, or scripting contract.
-- Implement the real MAF JSON checkpoint manager over Orleans durable storage. Stop streaming at the
-  first `SuperStepCompletedEvent`; accept only its `CompletionInfo.Checkpoint`, commit
-  checkpoint/worker state, then ask the Task for continuation.
+- Implement the real MAF JSON checkpoint manager over Orleans durable storage. Retain only the first
+  `SuperStepCompletedEvent.CompletionInfo.Checkpoint`; because MAF 1.13 can emit terminal output after
+  that event, finish consuming the same stream without another `TurnToken`, then commit
+  checkpoint/worker state and ask the Task for continuation.
 - On runner loss, replace the expired run with a fresh `RunId`; never derive checkpoint storage from
   that transient identifier.
 - Keep direct `RespondAsync` on its protected outer `AgentSession` and reject it while a supervised

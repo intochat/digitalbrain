@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
@@ -237,6 +238,20 @@ public sealed class SerializationContracts
             .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Select(property => property.Name)
             .ToArray();
+
+    [Fact(DisplayName = "neuron identity round-trips through the durable JSON boundary")]
+    public void NeuronIdentityRoundTripsThroughJson()
+    {
+        var identity = new NeuronId(
+            "ai.test-model",
+            new OwnerId("json-round-trip"),
+            "participant");
+
+        var restored = JsonSerializer.Deserialize<NeuronId>(
+            JsonSerializer.Serialize(identity));
+
+        Assert.Equal(identity, restored);
+    }
 
     private static (string Name, uint Id)[] SerializedMembers(Type type)
         => type

@@ -8,7 +8,11 @@ DigitalBrain.Kernel.DispatchManifest.Emissions.get -> System.Collections.Generic
 DigitalBrain.Kernel.DispatchManifest.Handlers.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Kernel.SynapseWiringEntry!>!
 DigitalBrain.Kernel.JournalStorageHosting
 DigitalBrain.Kernel.Neuron
+DigitalBrain.Kernel.Neuron.CaptureCapabilityCausation(DigitalBrain.Abstractions.NeuronId expectedCaller) -> DigitalBrain.Abstractions.SynapseId
+DigitalBrain.Kernel.Neuron.EnlistTurnRollback(System.Action! rollback) -> void
+DigitalBrain.Kernel.Neuron.ValidateCapabilityCaller(DigitalBrain.Abstractions.NeuronId expectedCaller) -> void
 DigitalBrain.Kernel.Neuron.DeliverAsync(DigitalBrain.Abstractions.SynapseDelivery! delivery) -> System.Threading.Tasks.Task!
+DigitalBrain.Kernel.Neuron.DelegateCapabilityAsync(DigitalBrain.Abstractions.SynapseId causation, Orleans.Runtime.GrainId delegateSource, DigitalBrain.Abstractions.NeuronId target, System.Type! contract, string! method) -> System.Threading.Tasks.Task<DigitalBrain.Kernel.CapabilityDelegation!>!
 DigitalBrain.Kernel.Neuron.DelegateCapabilityAsync(Orleans.Runtime.GrainId delegateSource, DigitalBrain.Abstractions.NeuronId target, System.Type! contract, string! method) -> System.Threading.Tasks.Task<DigitalBrain.Kernel.CapabilityDelegation!>!
 DigitalBrain.Kernel.Neuron.EmitAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.Neuron.Id.get -> DigitalBrain.Abstractions.NeuronId
@@ -20,6 +24,7 @@ DigitalBrain.Kernel.Neuron.RegisterGrainTimer(System.Func<System.Threading.Tasks
 DigitalBrain.Kernel.Neuron.RegisterGrainTimer<TState>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback, TState state, Orleans.Runtime.GrainTimerCreationOptions options) -> Orleans.Runtime.IGrainTimer!
 DigitalBrain.Kernel.Neuron.RegisterGrainTimer<TState>(System.Func<TState, System.Threading.Tasks.Task!>! callback, TState state, Orleans.Runtime.GrainTimerCreationOptions options) -> Orleans.Runtime.IGrainTimer!
 DigitalBrain.Kernel.Neuron.RegisterTimer(System.Func<object!, System.Threading.Tasks.Task!>! callback, object! state, System.TimeSpan dueTime, System.TimeSpan period) -> System.IDisposable!
+DigitalBrain.Kernel.Neuron.ReplyAsync(DigitalBrain.Abstractions.SynapseId causation, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.Neuron.ReplyAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.Neuron.SendAsync(DigitalBrain.Abstractions.NeuronId receiver, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.Neuron.UnwatchAsync(DigitalBrain.Abstractions.IJournalObserver! observer) -> System.Threading.Tasks.Task!

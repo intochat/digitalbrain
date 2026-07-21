@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Kernel;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
@@ -20,7 +21,7 @@ internal static class MafParticipantAdapter
         return new OrchestrationParticipant(
             participant.Contract.AssemblyQualifiedName
                 ?? throw new InvalidOperationException("A participant contract has no assembly-qualified identity."),
-            participant.Id.ToString(),
+            participant.Id,
             agentId,
             agentName);
     }
@@ -46,6 +47,29 @@ internal static class MafParticipantAdapter
         }
 
         return [.. participants.Select(participant => participant.CreateAgent(grains, turnScheduler))];
+    }
+
+    internal static AIAgent[] CreateDelegated(
+        IGrainFactory grains,
+        IReadOnlyList<OrchestrationParticipant> participants,
+        TaskScheduler turnScheduler,
+        Func<OrchestrationParticipant, Task<CapabilityDelegation>> authorize)
+    {
+        ArgumentNullException.ThrowIfNull(grains);
+        ArgumentNullException.ThrowIfNull(participants);
+        ArgumentNullException.ThrowIfNull(turnScheduler);
+        ArgumentNullException.ThrowIfNull(authorize);
+
+        if (participants.Count == 0)
+        {
+            throw new InvalidOperationException("An orchestration requires at least one participant.");
+        }
+
+        return [.. participants.Select(participant => CreateDelegated(
+            grains,
+            participant,
+            turnScheduler,
+            authorize))];
     }
 
     [SuppressMessage(
@@ -102,6 +126,46 @@ internal static class MafParticipantAdapter
     private static InvalidOperationException Unsupported(Type contract)
         => new($"Participant contract '{contract.FullName}' must implement {nameof(ILLM)} or {nameof(IAgent)}.");
 
+    [SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "The delegated adapter owns no disposable resource and lives with its MAF agent.")]
+    private static ChatClientAgent CreateDelegated(
+        IGrainFactory grains,
+        OrchestrationParticipant participant,
+        TaskScheduler turnScheduler,
+        Func<OrchestrationParticipant, Task<CapabilityDelegation>> authorize)
+    {
+        var contract = Type.GetType(participant.Contract, throwOnError: true)
+            ?? throw new InvalidOperationException(
+                $"Participant contract '{participant.Contract}' cannot be resolved.");
+        Validate(contract);
+
+        Func<IReadOnlyList<ChatMessage>, Task<ChatResponse>> invoke =
+            typeof(ILLM).IsAssignableFrom(contract)
+                ? grains.GetGrain<ILLM>(participant.NeuronId.ToGrainId()).RespondAsync
+                : grains.GetGrain<IAgent>(participant.NeuronId.ToGrainId()).RespondAsync;
+        var client = new DelegatedNeuronChatClient(
+            request => OnTurn(
+                async () =>
+                {
+                    var delegation = await authorize(participant);
+
+                    return await DigitalBrainRuntime.InvokeAsync(
+                        delegation,
+                        () => invoke(request));
+                },
+                turnScheduler));
+
+        return new ChatClientAgent(
+            client,
+            new ChatClientAgentOptions
+            {
+                Id = participant.AgentId,
+                Name = participant.AgentName,
+            });
+    }
+
     private static Task<T> OnTurn<T>(Func<Task<T>> invoke, TaskScheduler turnScheduler)
         => Task.Factory.StartNew(
             invoke,
@@ -121,6 +185,41 @@ internal static class MafParticipantAdapter
 
             var request = messages as IReadOnlyList<ChatMessage> ?? messages.ToArray();
             return OnTurn(() => agent.RespondAsync(request), turnScheduler);
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+
+            foreach (var update in response.ToChatResponseUpdates())
+            {
+                yield return update;
+            }
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+            => serviceType.IsInstanceOfType(this) ? this : null;
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class DelegatedNeuronChatClient(
+        Func<IReadOnlyList<ChatMessage>, Task<ChatResponse>> invoke) : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(messages);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return invoke(messages as IReadOnlyList<ChatMessage> ?? messages.ToArray());
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(

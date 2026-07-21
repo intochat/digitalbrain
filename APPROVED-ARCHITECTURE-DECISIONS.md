@@ -575,6 +575,11 @@ general-purpose public Kernel bypass remains forbidden.
 | **Status** | **RATIFIED** |
 
 **Evidence retained:** MAF Workflows 1.13.0 prototype—OffThread cancel/resume repeated executors; Lockstep did not.
+The executable supervised-run contract also established that MAF 1.13 may emit the canonical terminal
+`WorkflowOutputEvent` after the first `SuperStepCompletedEvent`. “Stop” therefore means retain that
+event's checkpoint and send no further `TurnToken`; the runner must finish consuming the same stream
+to collect terminal output before adoption. The test's single model entry proves this remains one
+Lockstep superstep.
 
 ---
 

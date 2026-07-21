@@ -51,6 +51,11 @@ internal sealed class NeuronFeed
 
     internal long NextSequence => _lastSequence.Value + 1;
 
+    internal NeuronFeedCheckpoint Checkpoint() => new(
+        [.. _retained],
+        _tallies.ToDictionary(entry => entry.Key, entry => entry.Value),
+        _lastSequence.Value);
+
     internal void Append(SynapseDelivery delivery)
     {
         var sequence = _lastSequence.Value + 1;
@@ -70,6 +75,31 @@ internal sealed class NeuronFeed
         RetainedCount: _retained.Count,
         Tallies: [.. _tallies.Select(tally => new JournalTally(tally.Key, tally.Value))]);
 
+    internal void Restore(NeuronFeedCheckpoint checkpoint)
+    {
+        while (_retained.Count > 0)
+        {
+            _retained.RemoveAt(_retained.Count - 1);
+        }
+
+        foreach (var entry in checkpoint.Retained)
+        {
+            _retained.Add(entry);
+        }
+
+        foreach (var key in _tallies.Select(entry => entry.Key).ToArray())
+        {
+            _tallies.Remove(key);
+        }
+
+        foreach (var tally in checkpoint.Tallies)
+        {
+            _tallies[tally.Key] = tally.Value;
+        }
+
+        _lastSequence.Value = checkpoint.LastSequence;
+    }
+
     private long EarliestRetainedSequence()
         => _retained.Count == 0 ? _lastSequence.Value + 1 : _lastSequence.Value - _retained.Count + 1;
 
@@ -88,3 +118,8 @@ internal sealed class NeuronFeed
         }
     }
 }
+
+internal readonly record struct NeuronFeedCheckpoint(
+    IReadOnlyList<byte[]> Retained,
+    IReadOnlyDictionary<string, long> Tallies,
+    long LastSequence);

@@ -1,4 +1,5 @@
 using System.Reflection;
+using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
@@ -40,6 +41,148 @@ public sealed class AIContracts
         Assert.Contains(typeof(IAgent), typeof(IGroupChat).GetInterfaces());
         Assert.Contains(typeof(IWorker), typeof(IGroupChat).GetInterfaces());
     }
+
+    [Fact(DisplayName = "GroupChat owns exact protected Task mapping hooks and concrete short Worker methods")]
+    public void GroupChatOwnsTaskMappingAndWorkerExecutionBoundary()
+    {
+        var messages = Assert.Single(
+            typeof(GroupChat).GetMethods(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            method => method.Name == "CreateMessages");
+        var result = Assert.Single(
+            typeof(GroupChat).GetMethods(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            method => method.Name == "CreateResult");
+
+        Assert.True(messages.IsFamily);
+        Assert.True(messages.IsAbstract);
+        Assert.Equal(typeof(IReadOnlyList<ChatMessage>), messages.ReturnType);
+        Assert.Equal(typeof(Goal), Assert.Single(messages.GetParameters()).ParameterType);
+        Assert.True(result.IsFamily);
+        Assert.True(result.IsAbstract);
+        Assert.Equal(typeof(Result), result.ReturnType);
+        Assert.Equal(typeof(IReadOnlyList<ChatMessage>), Assert.Single(result.GetParameters()).ParameterType);
+
+        var accept = Assert.Single(
+            typeof(GroupChat).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            candidate => candidate.Name == "AcceptAsync");
+        Assert.False(accept.IsAbstract);
+
+        foreach (var methodName in new[] { "ContinueAsync", "CancelAsync" })
+        {
+            var deferred = Assert.Single(
+                typeof(GroupChat).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+                candidate => candidate.Name == methodName);
+
+            Assert.True(deferred.IsAbstract);
+        }
+    }
+
+    [Fact(DisplayName = "the workflow runner is private non-neuron Orleans infrastructure")]
+    public void WorkflowRunnerIsPrivateNonNeuronInfrastructure()
+    {
+        var runner = Runtime.GetType("DigitalBrain.AI.WorkflowRunner", throwOnError: false);
+
+        Assert.NotNull(runner);
+        Assert.False(runner.IsPublic);
+        Assert.True(typeof(Grain).IsAssignableFrom(runner));
+        Assert.False(typeof(INeuron).IsAssignableFrom(runner));
+        Assert.DoesNotContain(Runtime.GetExportedTypes(), type => type.Name.Contains("WorkflowRunner", StringComparison.Ordinal));
+    }
+
+    [Fact(DisplayName = "supervised AI wire aliases and field ids are pinned")]
+    public void SupervisedAiWireVocabularyIsPinned()
+    {
+        var expected = new Dictionary<string, (string Alias, (string Name, uint Id)[] Members)>(StringComparer.Ordinal)
+        {
+            ["DigitalBrain.AI.AIWorkerState"] = ("ai.worker-state", [("Cursor", 0u), ("ReplayInput", 1u), ("Definition", 2u), ("Checkpoint", 3u), ("Causation", 4u), ("ActiveRun", 5u)]),
+            ["DigitalBrain.AI.WorkflowCheckpointReference"] = ("ai.workflow-checkpoint-reference", [("SessionId", 0u), ("CheckpointId", 1u)]),
+            ["DigitalBrain.AI.WorkflowRun"] = ("ai.workflow-run", [("RunId", 0u), ("Cursor", 1u), ("DefinitionFingerprint", 2u), ("InputCheckpoint", 3u), ("RecoverAfterUtc", 4u)]),
+            ["DigitalBrain.AI.WorkflowRunCommand"] = ("ai.workflow-run-command", [("Run", 0u), ("Definition", 1u), ("ReplayInput", 2u), ("Completion", 3u)]),
+            ["DigitalBrain.AI.WorkflowRunResult"] = ("ai.workflow-run-result", [("Run", 0u), ("OutputCheckpoint", 1u), ("TerminalMessages", 2u)]),
+            ["DigitalBrain.AI.OrchestrationParticipant"] = ("ai.orchestration-participant", [("Contract", 0u), ("NeuronId", 1u), ("AgentId", 2u), ("AgentName", 3u)]),
+            ["DigitalBrain.AI.OrchestrationDefinition"] = ("ai.orchestration-definition", [("FormatVersion", 0u), ("MafVersion", 1u), ("Fingerprint", 2u), ("Participants", 3u), ("HostId", 4u), ("HostName", 5u)]),
+            ["DigitalBrain.AI.CheckpointWrite"] = ("ai.checkpoint-write", [("SessionId", 0u), ("ProtectedPayload", 1u), ("Parent", 2u)]),
+        };
+        var aliases = new List<string>();
+
+        foreach (var (name, contract) in expected)
+        {
+            var type = Assert.IsType<Type>(Runtime.GetType(name, throwOnError: false), exactMatch: false);
+
+            Assert.Equal(contract.Alias, type.GetCustomAttribute<AliasAttribute>()?.Alias);
+            Assert.NotNull(type.GetCustomAttribute<GenerateSerializerAttribute>());
+            Assert.Equal(contract.Members, SerializedMembers(type));
+            aliases.Add(contract.Alias);
+        }
+
+        var interfaces = new Dictionary<string, (string Alias, string[] Methods)>(StringComparer.Ordinal)
+        {
+            ["DigitalBrain.AI.IWorkflowRunner"] = ("ai.workflow-runner", ["Execute"]),
+            ["DigitalBrain.AI.IWorkflowRunOwner"] = ("ai.workflow-run-owner", ["AuthorizeParticipant"]),
+            ["DigitalBrain.AI.IWorkflowRunCompletion"] = ("ai.workflow-run-completion", ["Complete"]),
+            ["DigitalBrain.AI.IWorkflowCheckpointGrain"] = ("ai.workflow-checkpoint-grain", ["Create", "Read", "Index"]),
+        };
+
+        foreach (var (name, contract) in interfaces)
+        {
+            var type = Assert.IsType<Type>(Runtime.GetType(name, throwOnError: false), exactMatch: false);
+
+            Assert.Equal(contract.Alias, type.GetCustomAttribute<AliasAttribute>()?.Alias);
+            Assert.Equal(
+                contract.Methods,
+                type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                    .Select(method => method.GetCustomAttribute<AliasAttribute>()?.Alias)
+                    .ToArray());
+            aliases.Add(contract.Alias);
+        }
+
+        Assert.Equal(aliases.Count, aliases.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    [Fact(DisplayName = "workflow checkpoint identity uses exact Worker, Task and Attempt while excluding revision")]
+    public void WorkflowCheckpointIdentityUsesOnlyWorkerTaskAndAttempt()
+    {
+        var identity = Assert.IsType<Type>(
+            Runtime.GetType("DigitalBrain.AI.WorkflowCheckpointIdentity", throwOnError: false),
+            exactMatch: false);
+        var create = Assert.Single(
+            identity.GetMethods(BindingFlags.NonPublic | BindingFlags.Static),
+            method => method.Name == "For");
+        Assert.Equal(typeof(AttemptCursor), Assert.Single(create.GetParameters()).ParameterType);
+        var owner = new OwnerId("checkpoint-identity-contract");
+        var task = NeuronId.For<ITask>(owner, "task");
+        var worker = NeuronId.For<IGroupChat>(owner, "worker");
+        var attempt = new AttemptId(Guid.NewGuid());
+        var first = create.Invoke(null, [new AttemptCursor(task, worker, attempt, Revision: 0)]);
+        var revised = create.Invoke(null, [new AttemptCursor(task, worker, attempt, Revision: 91)]);
+        var differentAttempt = create.Invoke(
+            null,
+            [new AttemptCursor(task, worker, new AttemptId(Guid.NewGuid()), Revision: 0)]);
+        var differentTask = create.Invoke(
+            null,
+            [new AttemptCursor(NeuronId.For<ITask>(owner, "other-task"), worker, attempt, Revision: 0)]);
+        var differentWorker = create.Invoke(
+            null,
+            [new AttemptCursor(task, NeuronId.For<IGroupChat>(owner, "other-worker"), attempt, Revision: 0)]);
+
+        Assert.NotNull(first);
+        Assert.Equal(first, revised);
+        Assert.NotEqual(first, differentAttempt);
+        Assert.NotEqual(first, differentTask);
+        Assert.NotEqual(first, differentWorker);
+    }
+
+    private static (string Name, uint Id)[] SerializedMembers(Type type)
+        => type.GetMembers(
+                BindingFlags.Instance
+                | BindingFlags.Public
+                | BindingFlags.NonPublic
+                | BindingFlags.DeclaredOnly)
+            .Where(member => member is FieldInfo or PropertyInfo)
+            .Select(member => (member.Name, Id: member.GetCustomAttribute<IdAttribute>()?.Id))
+            .Where(member => member.Id.HasValue)
+            .OrderBy(member => member.Id)
+            .Select(member => (member.Name, member.Id!.Value))
+            .ToArray();
 
     [Fact(DisplayName = "model identity is expressed by its namespace and concrete neuron type")]
     public void ModelIdentityIsTheType()

@@ -55,6 +55,27 @@ public sealed class MafPackageContracts
         Func<Workflow, ChatMessage, CancellationToken, ValueTask<StreamingRun>> stream =
             (workflow, input, cancellationToken) =>
                 InProcessExecution.Lockstep.RunStreamingAsync(workflow, input, cancellationToken: cancellationToken);
+        Func<Workflow, ChatMessage[], string, CancellationToken, ValueTask<StreamingRun>> firstSuperstep =
+            (workflow, input, sessionId, cancellationToken) =>
+                InProcessExecution.Lockstep
+                    .WithCheckpointing(checkpoints)
+                    .RunStreamingAsync(workflow, input, sessionId, cancellationToken);
+        Func<Workflow, CheckpointInfo, CancellationToken, ValueTask<StreamingRun>> resumeSuperstep =
+            (workflow, checkpoint, cancellationToken) =>
+                InProcessExecution.Lockstep
+                    .WithCheckpointing(checkpoints)
+                    .ResumeStreamingAsync(workflow, checkpoint, cancellationToken);
+        Func<StreamingRun, ValueTask<bool>> sendTurn = streamingRun =>
+            streamingRun.TrySendMessageAsync(new TurnToken(emitEvents: true));
+        Func<StreamingRun, ValueTask> cancelRun = streamingRun =>
+            streamingRun.CancelRunAsync();
+        Func<StreamingRun, CancellationToken, IAsyncEnumerable<WorkflowEvent>> watch =
+            (streamingRun, cancellationToken) => streamingRun.WatchStreamAsync(cancellationToken);
+        Func<WorkflowOutputEvent, List<ChatMessage>?> terminalMessages = output =>
+            !output.IsIntermediate() && output.Is<List<ChatMessage>>(out var messages)
+                ? messages
+                : null;
+        var reconstructedCheckpoint = new CheckpointInfo("session", "checkpoint");
         var completion = new SuperStepCompletedEvent(
             stepNumber: 1,
             new SuperStepCompletionInfo(activatedExecutors: []) { Checkpoint = default });
@@ -65,6 +86,14 @@ public sealed class MafPackageContracts
         Assert.NotNull(InProcessExecution.Lockstep.WithCheckpointing(checkpoints));
         Assert.NotNull(run);
         Assert.NotNull(stream);
+        Assert.NotNull(firstSuperstep);
+        Assert.NotNull(resumeSuperstep);
+        Assert.NotNull(sendTurn);
+        Assert.NotNull(cancelRun);
+        Assert.NotNull(watch);
+        Assert.NotNull(terminalMessages);
+        Assert.Equal("session", reconstructedCheckpoint.SessionId);
+        Assert.Equal("checkpoint", reconstructedCheckpoint.CheckpointId);
         Assert.Null(checkpoint);
     }
 

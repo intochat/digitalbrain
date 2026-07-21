@@ -51,6 +51,7 @@ public sealed class CapabilityDelegationContracts
             .Where(type => type.Name.Contains("Capability", StringComparison.Ordinal))
             .ToArray();
         var minting = typeof(Neuron).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Where(method => method.IsFamily)
             .Where(method => method.ReturnType == typeof(Task<CapabilityDelegation>))
             .ToArray();
         var carrying = typeof(DigitalBrainRuntime).GetMethods(BindingFlags.Static | BindingFlags.Public)
@@ -58,8 +59,15 @@ public sealed class CapabilityDelegationContracts
             .ToArray();
 
         Assert.Equal([typeof(CapabilityDelegation)], capabilityTypes);
-        Assert.Single(minting);
-        Assert.True(minting[0].IsFamily);
+        Assert.Equal(2, minting.Length);
+        Assert.Contains(
+            minting,
+            method => method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(
+                [typeof(GrainId), typeof(NeuronId), typeof(Type), typeof(string)]));
+        Assert.Contains(
+            minting,
+            method => method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(
+                [typeof(SynapseId), typeof(GrainId), typeof(NeuronId), typeof(Type), typeof(string)]));
         Assert.Single(carrying);
         Assert.True(carrying[0].IsGenericMethodDefinition);
         Assert.DoesNotContain(

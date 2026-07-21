@@ -1,9 +1,12 @@
 namespace DigitalBrain.Abstractions;
 
+using System.Text.Json.Serialization;
+
 [GenerateSerializer]
 [Alias("db.neuron-id")]
 public readonly record struct NeuronId
 {
+    [JsonConstructor]
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Globalization",
         "CA1308:Normalize strings to uppercase",

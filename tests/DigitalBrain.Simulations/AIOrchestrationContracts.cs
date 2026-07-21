@@ -384,6 +384,12 @@ internal sealed class TestGroupChat : GroupChat, ITestGroupChat
         Participant<IGpt56>()
     ];
 
+    protected override IReadOnlyList<ChatMessage> CreateMessages(Goal goal)
+        => throw new NotSupportedException();
+
+    protected override Result CreateResult(IReadOnlyList<ChatMessage> messages)
+        => throw new NotSupportedException();
+
     public Task<byte[]> ReadSessionStateAsync()
     {
         var state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(SessionStateName);
@@ -407,11 +413,10 @@ internal sealed class TestGroupChat : GroupChat, ITestGroupChat
 
     public Task<Guid> ActivationAsync() => Task.FromResult(_activation);
 
-    public override Task AcceptAsync(AttemptRequest request) => throw new NotSupportedException();
-
     public override Task ContinueAsync(AttemptCursor cursor) => throw new NotSupportedException();
 
     public override Task CancelAsync(AttemptCursor cursor) => throw new NotSupportedException();
+
 }
 
 internal static class GroupDefinitionSource

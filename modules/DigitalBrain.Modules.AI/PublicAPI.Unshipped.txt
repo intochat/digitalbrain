@@ -15,7 +15,9 @@ DigitalBrain.AI.GroupChat
 DigitalBrain.AI.GroupChat.GroupChat() -> void
 abstract DigitalBrain.AI.GroupChat.Participants.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.AI.Participant!>!
 DigitalBrain.AI.GroupChat.Participant<TNeuron>(string? name = null) -> DigitalBrain.AI.Participant<TNeuron>!
-abstract DigitalBrain.AI.GroupChat.AcceptAsync(DigitalBrain.Tasks.AttemptRequest! request) -> System.Threading.Tasks.Task!
+abstract DigitalBrain.AI.GroupChat.CreateMessages(DigitalBrain.Tasks.Goal! goal) -> System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.AI.ChatMessage!>!
+abstract DigitalBrain.AI.GroupChat.CreateResult(System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.AI.ChatMessage!>! messages) -> DigitalBrain.Tasks.Result!
+DigitalBrain.AI.GroupChat.AcceptAsync(DigitalBrain.Tasks.AttemptRequest! request) -> System.Threading.Tasks.Task!
 abstract DigitalBrain.AI.GroupChat.ContinueAsync(DigitalBrain.Tasks.AttemptCursor! cursor) -> System.Threading.Tasks.Task!
 abstract DigitalBrain.AI.GroupChat.CancelAsync(DigitalBrain.Tasks.AttemptCursor! cursor) -> System.Threading.Tasks.Task!
 DigitalBrain.AI.GroupChat.RespondAsync(System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.AI.ChatMessage!>! messages) -> System.Threading.Tasks.Task<Microsoft.Extensions.AI.ChatResponse!>!

@@ -25,10 +25,6 @@ internal static class CapabilityInvocation
             return false;
         }
 
-        var ns = type.Namespace ?? string.Empty;
-
-        return !ns.StartsWith("Orleans", StringComparison.Ordinal)
-            && !ns.StartsWith("DigitalBrain.Kernel", StringComparison.Ordinal)
-            && !ns.StartsWith("DigitalBrain.Testing", StringComparison.Ordinal);
+        return typeof(INeuron).IsAssignableFrom(type);
     }
 }
