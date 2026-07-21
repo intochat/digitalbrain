@@ -6,15 +6,21 @@ using Orleans.Serialization;
 
 namespace DigitalBrain.Kernel;
 
-public abstract class Neuron : DurableGrain, INeuron, IRemindable
+public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDelegationAuthority
 {
     private const string IncomingJournalName = "incoming";
     private const string OutgoingJournalName = "outgoing";
     private const string OutboxName = "outbox";
     private const string HandledName = "handled";
+    private const string DelegationsName = "delegations";
+    private const string DelegationConsumedName = "delegation-consumed";
+    private const string DelegationTerminalsName = "delegation-terminals";
     private const string OutboxReminderName = "db.outbox";
 
     private const int RememberedDeliveries = 4096;
+    private const int MaximumRememberedDelegations = 32;
+    private const int ProtectedConsumedDelegations = 1;
+    private const int ProtectedTerminalDelegations = 1;
 
     private static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(50);
     private static readonly TimeSpan ReminderInterval = TimeSpan.FromMinutes(1);
@@ -24,10 +30,14 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
     private readonly List<Watcher> _watchers = [];
     private readonly IDurableList<byte[]> _outbox;
     private readonly IDurableList<Guid> _handled;
+    private readonly IDurableDictionary<Guid, byte[]> _delegations;
+    private readonly IDurableList<Guid> _delegationConsumed;
+    private readonly IDurableList<Guid> _delegationTerminals;
     private readonly HashSet<SynapseId> _remembered = [];
     private readonly List<SynapseDelivery> _firedWhileHandling = [];
     private readonly Serializer<OutboxEntry> _entries;
     private readonly Serializer<Synapse> _synapses;
+    private readonly Serializer<CapabilityDelegationState> _delegationStates;
     private readonly TimeProvider _clock;
 
     private SynapseDelivery? _handling;
@@ -42,8 +52,12 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         _outgoing = new NeuronFeed(ServiceProvider, OutgoingJournalName);
         _outbox = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(OutboxName);
         _handled = ServiceProvider.GetRequiredKeyedService<IDurableList<Guid>>(HandledName);
+        _delegations = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(DelegationsName);
+        _delegationConsumed = ServiceProvider.GetRequiredKeyedService<IDurableList<Guid>>(DelegationConsumedName);
+        _delegationTerminals = ServiceProvider.GetRequiredKeyedService<IDurableList<Guid>>(DelegationTerminalsName);
         _entries = ServiceProvider.GetRequiredService<Serializer<OutboxEntry>>();
         _synapses = ServiceProvider.GetRequiredService<Serializer<Synapse>>();
+        _delegationStates = ServiceProvider.GetRequiredService<Serializer<CapabilityDelegationState>>();
         _clock = ServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
     }
 
@@ -226,6 +240,68 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         return FireAsync(synapse, [answered.Caller]);
     }
 
+    protected async Task<CapabilityDelegation> DelegateCapabilityAsync(
+        GrainId delegateSource,
+        NeuronId target,
+        Type contract,
+        string method)
+    {
+        ArgumentNullException.ThrowIfNull(contract);
+        ArgumentException.ThrowIfNullOrWhiteSpace(method);
+
+        if (!contract.IsInterface || contract.FullName is null)
+        {
+            throw new ArgumentException("The delegated capability contract must be a named interface.", nameof(contract));
+        }
+
+        var matchingMethods = contract.GetMethods()
+            .Where(candidate => candidate.Name == method)
+            .ToArray();
+
+        if (matchingMethods.Length != 1)
+        {
+            throw new ArgumentException(
+                $"Capability contract '{contract.FullName}' must have exactly one method named '{method}'.",
+                nameof(method));
+        }
+
+        if (GrainOwnership.RequireOwner(delegateSource) != Id.Owner || target.Owner != Id.Owner)
+        {
+            throw new NeuronAuthorizationException(
+                $"Neuron '{Id}' can delegate only to a runner and target owned by '{Id.Owner}'.");
+        }
+
+        MakeRoomForDelegation();
+
+        var sequence = _outgoing.NextSequence
+            + (_handling is null ? 0 : _firedWhileHandling.Count);
+        var request = SynapseDelivery.Create(
+            new CapabilityRequested(contract.FullName, method, target),
+            Id,
+            sequence,
+            _handling,
+            _clock);
+        var delegation = new CapabilityDelegation(
+            Guid.NewGuid(),
+            request,
+            delegateSource,
+            Id.Owner);
+
+        StageInboundCause();
+        FlushOutgoing();
+        _outgoing.Append(request);
+        _delegations.Add(
+            delegation.Identity,
+            _delegationStates.SerializeToArray(new(
+                delegation,
+                CapabilityDelegationStatus.Issued)));
+        await CommitAsync(CancellationToken.None);
+        AdvanceTurnCheckpoint();
+        await NotifyWatchersAsync();
+
+        return delegation;
+    }
+
     internal async Task<SynapseDelivery> BeginCapabilityRequestAsync(
         string contract,
         string method,
@@ -283,9 +359,101 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
         await NotifyWatchersAsync();
     }
 
+    async Task ICapabilityDelegationAuthority.RedeemAsync(CapabilityDelegation delegation)
+    {
+        ArgumentNullException.ThrowIfNull(delegation);
+
+        if (!_delegations.TryGetValue(delegation.Identity, out var serialized))
+        {
+            throw new NeuronAuthorizationException("The capability delegation was not issued by its causal caller.");
+        }
+
+        var state = _delegationStates.Deserialize(serialized);
+
+        if (!state.Delegation.Matches(delegation)
+            || delegation.Request.Caller != Id
+            || delegation.Owner != Id.Owner)
+        {
+            throw new NeuronAuthorizationException("The capability delegation does not match its durable issued state.");
+        }
+
+        if (state.Status != CapabilityDelegationStatus.Issued)
+        {
+            throw new NeuronAuthorizationException("The capability delegation has already been consumed.");
+        }
+
+        _delegations[delegation.Identity] = _delegationStates.SerializeToArray(new(
+            state.Delegation,
+            CapabilityDelegationStatus.Consumed));
+        _delegationConsumed.Add(delegation.Identity);
+        await CommitAsync(CancellationToken.None);
+        AdvanceTurnCheckpoint();
+    }
+
+    async Task ICapabilityDelegationAuthority.FinishAsync(CapabilityDelegation delegation, bool succeeded)
+    {
+        ArgumentNullException.ThrowIfNull(delegation);
+
+        if (!_delegations.TryGetValue(delegation.Identity, out var serialized))
+        {
+            throw new NeuronAuthorizationException("The capability delegation was not issued by its causal caller.");
+        }
+
+        var state = _delegationStates.Deserialize(serialized);
+
+        if (!state.Delegation.Matches(delegation))
+        {
+            throw new NeuronAuthorizationException("The capability delegation is not awaiting an outcome.");
+        }
+
+        var terminal = succeeded ? CapabilityDelegationStatus.Completed : CapabilityDelegationStatus.Failed;
+
+        if (state.Status == terminal)
+        {
+            return;
+        }
+
+        if (state.Status != CapabilityDelegationStatus.Consumed)
+        {
+            throw new NeuronAuthorizationException(
+                "The capability delegation already has a contradictory terminal outcome.");
+        }
+
+        var consumedIndex = IndexOf(_delegationConsumed, delegation.Identity);
+
+        if (consumedIndex < 0)
+        {
+            throw new InvalidOperationException(
+                "The durable capability delegation state is missing its consumed retention entry.");
+        }
+
+        var fact = succeeded
+            ? (Synapse)new CapabilityCompleted(delegation.Request.SynapseId)
+            : new CapabilityFailed(delegation.Request.SynapseId);
+        var sequence = _outgoing.NextSequence + _firedWhileHandling.Count;
+        var delivery = SynapseDelivery.Create(
+            fact,
+            Id,
+            sequence,
+            delegation.Request,
+            _clock);
+
+        FlushOutgoing();
+        _outgoing.Append(delivery);
+        _delegations[delegation.Identity] = _delegationStates.SerializeToArray(new(
+            state.Delegation,
+            terminal));
+        _delegationConsumed.RemoveAt(consumedIndex);
+        _delegationTerminals.Add(delegation.Identity);
+        await CommitAsync(CancellationToken.None);
+        AdvanceTurnCheckpoint();
+        await NotifyWatchersAsync();
+    }
+
     internal async Task<CapabilityTurn> BeginIncomingCapabilityRequestAsync(
         SynapseDelivery delivery,
-        GrainId? source)
+        GrainId? source,
+        GrainId? delegatedSource = null)
     {
         ArgumentNullException.ThrowIfNull(delivery);
 
@@ -301,14 +469,18 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
                 $"The capability request delivery does not target neuron '{Id}'.");
         }
 
-        if (source is null
-            || NeuronId.FromGrainKey(
-                source.Value.Type.ToString()
-                    ?? throw new InvalidOperationException("The capability caller has no grain type."),
-                source.Value.Key.ToString()) != delivery.Caller)
+        var sourceMatches = delegatedSource is { } expectedDelegate
+            ? source == expectedDelegate
+            : source is not null
+                && NeuronId.FromGrainKey(
+                    source.Value.Type.ToString()
+                        ?? throw new InvalidOperationException("The capability caller has no grain type."),
+                    source.Value.Key.ToString()) == delivery.Caller;
+
+        if (!sourceMatches)
         {
-            throw new InvalidOperationException(
-                $"The capability request caller '{delivery.Caller}' does not match its Orleans source.");
+            throw new NeuronAuthorizationException(
+                $"The capability request caller '{delivery.Caller}' does not authorize its actual Orleans source.");
         }
 
         var turn = new CapabilityTurn(
@@ -718,6 +890,68 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable
 
     private Synapse Snapshot(Synapse synapse)
         => _synapses.Deserialize(_synapses.SerializeToArray(synapse));
+
+    private void MakeRoomForDelegation()
+    {
+        while (_delegations.Count >= MaximumRememberedDelegations)
+        {
+            if (TryEvictOldest(
+                _delegationTerminals,
+                ProtectedTerminalDelegations))
+            {
+                continue;
+            }
+
+            if (TryEvictOldest(
+                _delegationConsumed,
+                ProtectedConsumedDelegations))
+            {
+                continue;
+            }
+
+            break;
+        }
+
+        if (_delegations.Count >= MaximumRememberedDelegations)
+        {
+            throw new InvalidOperationException(
+                $"Neuron '{Id}' has reached its limit of {MaximumRememberedDelegations} remembered capability delegations, with no safely evictable terminal or consumed history. Resolve an issued delegation or finish another consumed delegation before minting another.");
+        }
+    }
+
+    private bool TryEvictOldest(
+        IDurableList<Guid> retentionOrder,
+        int protectedDelegations)
+    {
+        if (retentionOrder.Count <= protectedDelegations)
+        {
+            return false;
+        }
+
+        var evicted = retentionOrder[0];
+        retentionOrder.RemoveAt(0);
+
+        if (!_delegations.Remove(evicted))
+        {
+            throw new InvalidOperationException(
+                "The durable capability delegation retention order references missing state.");
+        }
+
+        return true;
+    }
+
+    private static int IndexOf(IDurableList<Guid> retentionOrder, Guid identity)
+    {
+        for (var index = 0; index < retentionOrder.Count; index++)
+        {
+            if (retentionOrder[index] == identity)
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
 
     internal readonly record struct CapabilityTurn(
         int CommittedOutbox,

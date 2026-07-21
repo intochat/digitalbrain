@@ -1,5 +1,6 @@
 using System.Reflection;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
 using Xunit;
 
@@ -8,6 +9,69 @@ namespace DigitalBrain.Tests;
 public sealed class SerializationContracts
 {
     private static readonly Assembly Abstractions = typeof(Synapse).Assembly;
+
+    [Fact(DisplayName = "the opaque Kernel delegation alias is pinned")]
+    public void CapabilityDelegationAliasIsPinned()
+    {
+        Assert.Equal(
+            "db.capability-delegation",
+            typeof(CapabilityDelegation).GetCustomAttribute<AliasAttribute>()?.Alias);
+        Assert.NotNull(typeof(CapabilityDelegation).GetCustomAttribute<GenerateSerializerAttribute>());
+        Assert.Equal(
+            [
+                ("Identity", 0u),
+                ("Request", 1u),
+                ("DelegateSource", 2u),
+                ("Owner", 3u),
+            ],
+            SerializedMembers(typeof(CapabilityDelegation)));
+    }
+
+    [Fact(DisplayName = "all internal delegation wire names and status values are pinned")]
+    public void InternalDelegationWireNamesAndStatusValuesArePinned()
+    {
+        var aliases = new Dictionary<Type, string>
+        {
+            [typeof(RedeemedCapabilityDelegation)] = "db.kernel.redeemed-capability-delegation",
+            [typeof(ICapabilityDelegationAuthority)] = "db.kernel.capability-delegation-authority",
+            [typeof(CapabilityDelegationState)] = "db.kernel.capability-delegation-state",
+            [typeof(CapabilityDelegationStatus)] = "db.kernel.capability-delegation-status",
+        };
+
+        foreach (var (type, expected) in aliases)
+        {
+            Assert.Equal(expected, type.GetCustomAttribute<AliasAttribute>()?.Alias);
+        }
+
+        Assert.NotNull(
+            typeof(RedeemedCapabilityDelegation).GetCustomAttribute<GenerateSerializerAttribute>());
+        Assert.NotNull(
+            typeof(CapabilityDelegationState).GetCustomAttribute<GenerateSerializerAttribute>());
+        Assert.Equal(
+            [
+                ("Delegation", 0u),
+            ],
+            SerializedMembers(typeof(RedeemedCapabilityDelegation)));
+        Assert.Equal(
+            [
+                ("Delegation", 0u),
+                ("Status", 1u),
+            ],
+            SerializedMembers(typeof(CapabilityDelegationState)));
+        var callbacks = typeof(ICapabilityDelegationAuthority)
+            .GetMethods()
+            .ToDictionary(
+                method => method.Name,
+                method => method.GetCustomAttribute<AliasAttribute>()?.Alias,
+                StringComparer.Ordinal);
+
+        Assert.Equal("Redeem", callbacks[nameof(ICapabilityDelegationAuthority.RedeemAsync)]);
+        Assert.Equal("Finish", callbacks[nameof(ICapabilityDelegationAuthority.FinishAsync)]);
+        Assert.Equal(0, (int)CapabilityDelegationStatus.Issued);
+        Assert.Equal(1, (int)CapabilityDelegationStatus.Consumed);
+        Assert.Equal(2, (int)CapabilityDelegationStatus.Completed);
+        Assert.Equal(3, (int)CapabilityDelegationStatus.Failed);
+    }
 
     [Fact]
     public void PinnedAliasesNeverChange()
@@ -172,5 +236,21 @@ public sealed class SerializationContracts
         => typeof(T)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Select(property => property.Name)
+            .ToArray();
+
+    private static (string Name, uint Id)[] SerializedMembers(Type type)
+        => type
+            .GetMembers(
+                BindingFlags.Instance
+                | BindingFlags.Public
+                | BindingFlags.NonPublic
+                | BindingFlags.DeclaredOnly)
+            .Where(member => member is FieldInfo or PropertyInfo)
+            .Select(member => (
+                member.Name,
+                Id: member.GetCustomAttribute<IdAttribute>()?.Id))
+            .Where(member => member.Id.HasValue)
+            .OrderBy(member => member.Id)
+            .Select(member => (member.Name, member.Id!.Value))
             .ToArray();
 }

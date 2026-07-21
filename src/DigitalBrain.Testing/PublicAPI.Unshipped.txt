@@ -82,6 +82,9 @@ static DigitalBrain.Testing.Simulation.HostingSiloCountAsync(params DigitalBrain
 static DigitalBrain.Testing.Simulation.ReadJournalOfOwnerAsync(DigitalBrain.Abstractions.JournalKind kind, string! owner, string! neuronType, string! name, long afterSequence) -> System.Threading.Tasks.Task<DigitalBrain.Abstractions.JournalRead!>!
 static DigitalBrain.Testing.SimulationCluster.Grains.get -> Orleans.IGrainFactory!
 static DigitalBrain.Testing.SimulationCluster.AddJsonSerializer(System.Func<System.Type!, bool>! isSupported) -> void
+static DigitalBrain.Testing.SimulationCluster.ClearJournalWriteFailure(Orleans.Runtime.GrainId grain) -> void
+static DigitalBrain.Testing.SimulationCluster.CompletedJournalWrites(Orleans.Runtime.GrainId grain) -> long
+static DigitalBrain.Testing.SimulationCluster.FailJournalWriteAfter(Orleans.Runtime.GrainId grain, int completedWritesBeforeFailure, string! message) -> void
 static DigitalBrain.Testing.SimulationCluster.Observed.get -> DigitalBrain.Testing.SynapseObserver!
 static DigitalBrain.Testing.SimulationCluster.RestartHostOfAsync(DigitalBrain.Abstractions.NeuronId neuron) -> System.Threading.Tasks.Task!
 static DigitalBrain.Testing.SimulationCluster.StartAsync() -> System.Threading.Tasks.Task!

@@ -61,6 +61,21 @@ public sealed class DispatchManifestContracts
     public void TheKernelCarriesAGeneratedManifestSoConsumersInheritTheGenerator()
         => Assert.True(SynapseWiring.TryGetManifest(typeof(Neuron).Assembly, out _));
 
+    [Fact(DisplayName = "the opaque delegation transport is absent from semantic dispatch manifests")]
+    public void DelegationTransportIsAbsentFromSemanticDispatchManifests()
+    {
+        Assert.True(SynapseWiring.TryGetManifest(Probed, out var manifest));
+        Assert.True(SynapseWiring.TryGetManifest(typeof(Neuron).Assembly, out var kernelManifest));
+
+        Assert.DoesNotContain(
+            manifest.Handlers
+                .Concat(manifest.Emissions)
+                .Concat(kernelManifest.Handlers)
+                .Concat(kernelManifest.Emissions),
+            entry => entry.Neuron.Contains(nameof(CapabilityDelegation), StringComparison.Ordinal)
+                || entry.Synapse.Contains(nameof(CapabilityDelegation), StringComparison.Ordinal));
+    }
+
     [Fact]
     public void HandlerLookupIsEmptyForATypeThatHandlesNothing()
         => Assert.Empty(SynapseWiring.HandledSynapseTypes(typeof(DispatchManifestContracts)));

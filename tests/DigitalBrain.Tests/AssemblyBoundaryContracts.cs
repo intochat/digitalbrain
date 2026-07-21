@@ -5,6 +5,7 @@ using DigitalBrain.Aspire;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Client;
 using DigitalBrain.Kernel;
+using DigitalBrain.Tasks;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -34,6 +35,27 @@ public sealed class AssemblyBoundaryContracts
     [Fact]
     public void TheAbstractionsPackageIsALeaf()
         => Assert.DoesNotContain(ReachableFrom(typeof(NeuronId).Assembly), IsDigitalBrain);
+
+    [Fact(DisplayName = "no contracts assembly exposes or references the Kernel delegation transport")]
+    public void ContractsDoNotExposeOrReferenceCapabilityDelegation()
+    {
+        var contracts = new[]
+        {
+            typeof(INeuron).Assembly,
+            typeof(ILLM).Assembly,
+            typeof(ITask).Assembly,
+        };
+
+        foreach (var assembly in contracts)
+        {
+            Assert.DoesNotContain(
+                assembly.GetReferencedAssemblies(),
+                reference => reference.Name == typeof(CapabilityDelegation).Assembly.GetName().Name);
+            Assert.DoesNotContain(
+                assembly.GetExportedTypes(),
+                type => type.FullName == typeof(CapabilityDelegation).FullName);
+        }
+    }
 
     [Fact]
     public void TheClientDoesNotReachTheKernel()

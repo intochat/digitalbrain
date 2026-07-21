@@ -1,4 +1,5 @@
 #nullable enable
+DigitalBrain.Kernel.CapabilityDelegation
 DigitalBrain.Kernel.DigitalBrainSiloBuilderExtensions
 DigitalBrain.Kernel.DigitalBrainRuntime
 DigitalBrain.Kernel.DispatchManifest
@@ -8,6 +9,7 @@ DigitalBrain.Kernel.DispatchManifest.Handlers.get -> System.Collections.Generic.
 DigitalBrain.Kernel.JournalStorageHosting
 DigitalBrain.Kernel.Neuron
 DigitalBrain.Kernel.Neuron.DeliverAsync(DigitalBrain.Abstractions.SynapseDelivery! delivery) -> System.Threading.Tasks.Task!
+DigitalBrain.Kernel.Neuron.DelegateCapabilityAsync(Orleans.Runtime.GrainId delegateSource, DigitalBrain.Abstractions.NeuronId target, System.Type! contract, string! method) -> System.Threading.Tasks.Task<DigitalBrain.Kernel.CapabilityDelegation!>!
 DigitalBrain.Kernel.Neuron.EmitAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
 DigitalBrain.Kernel.Neuron.Id.get -> DigitalBrain.Abstractions.NeuronId
 DigitalBrain.Kernel.Neuron.Neuron() -> void
@@ -54,6 +56,7 @@ override DigitalBrain.Kernel.SynapseWiringEntry.ToString() -> string!
 override sealed DigitalBrain.Kernel.Neuron.OnActivateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 static DigitalBrain.Kernel.DigitalBrainSiloBuilderExtensions.AddBroadcastHandlers(this Orleans.Hosting.ISiloBuilder! builder, System.Reflection.Assembly! assembly) -> Orleans.Hosting.ISiloBuilder!
 static DigitalBrain.Kernel.DigitalBrainRuntime.Add(Orleans.Hosting.ISiloBuilder! builder, string? siloLabel, System.Collections.Generic.IReadOnlyCollection<string!>! availableModules) -> System.Collections.Generic.IReadOnlySet<string!>!
+static DigitalBrain.Kernel.DigitalBrainRuntime.InvokeAsync<TResult>(DigitalBrain.Kernel.CapabilityDelegation! delegation, System.Func<System.Threading.Tasks.Task<TResult>!>! invoke) -> System.Threading.Tasks.Task<TResult>!
 static DigitalBrain.Kernel.JournalStorageHosting.AddDigitalBrainJournalStorage(this Orleans.Hosting.ISiloBuilder! builder, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Orleans.Hosting.ISiloBuilder!
 static DigitalBrain.Kernel.PinToSiloExtensions.AddPinToSiloPlacement(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static DigitalBrain.Kernel.SynapseWiring.HandledSynapseTypes(System.Type! neuronType) -> System.Collections.Generic.IReadOnlyCollection<System.Type!>!

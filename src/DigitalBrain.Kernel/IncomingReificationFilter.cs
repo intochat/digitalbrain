@@ -9,6 +9,23 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        if (context.InterfaceMethod?.DeclaringType == typeof(ICapabilityDelegationAuthority))
+        {
+            if (context.Grain is not Neuron
+                || context.Request.GetArgumentCount() == 0
+                || context.Request.GetArgument(0) is not CapabilityDelegation delegation
+                || delegation.DelegateSource != context.SourceId
+                || delegation.Request.Caller.ToGrainId() != context.TargetId)
+            {
+                throw new NeuronAuthorizationException(
+                    "The capability delegation authority callback does not match its actual runner and causal caller.");
+            }
+
+            await context.Invoke();
+
+            return;
+        }
+
         if (!CapabilityInvocation.IsRequest(context.InterfaceMethod)
             || context.Grain is not Neuron target)
         {
@@ -17,7 +34,10 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
             return;
         }
 
-        if (CapabilityRequestContext.Current is not { } delivery)
+        var direct = CapabilityRequestContext.CurrentDelivery;
+        var redeemed = CapabilityRequestContext.CurrentRedeemedDelegation;
+
+        if (direct is null && redeemed is null)
         {
             if (IsUnattributed(context.SourceId))
             {
@@ -36,7 +56,28 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
                 $"Semantic capability '{context.InterfaceMethod!.DeclaringType!.FullName}.{context.InterfaceMethod.Name}' requires a committed capability request.");
         }
 
-        var turn = await target.BeginIncomingCapabilityRequestAsync(delivery, context.SourceId);
+        SynapseDelivery delivery;
+        GrainId? delegatedSource;
+
+        if (redeemed is not null)
+        {
+            redeemed.Delegation.RequireMatches(
+                context.SourceId,
+                context.TargetId,
+                context.InterfaceMethod);
+            delivery = redeemed.Delegation.Request;
+            delegatedSource = redeemed.Delegation.DelegateSource;
+        }
+        else
+        {
+            delivery = direct!;
+            delegatedSource = null;
+        }
+
+        var turn = await target.BeginIncomingCapabilityRequestAsync(
+            delivery,
+            context.SourceId,
+            delegatedSource);
 
         try
         {

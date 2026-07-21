@@ -5,17 +5,57 @@ namespace DigitalBrain.Kernel;
 internal static class CapabilityRequestContext
 {
     private const string DeliveryKey = "db.capability-request";
+    private static readonly AsyncLocal<CapabilityDelegation?> LocalDelegation = new();
 
-    internal static SynapseDelivery? Current
+    internal static SynapseDelivery? CurrentDelivery
         => RequestContext.Get(DeliveryKey) as SynapseDelivery;
 
-    internal static async Task InvokeAsync(SynapseDelivery delivery, Func<Task> invoke)
+    internal static CapabilityDelegation? CurrentDelegation
+        => LocalDelegation.Value;
+
+    internal static RedeemedCapabilityDelegation? CurrentRedeemedDelegation
+        => RequestContext.Get(DeliveryKey) as RedeemedCapabilityDelegation;
+
+    internal static Task InvokeAsync(SynapseDelivery delivery, Func<Task> invoke)
+        => InvokeWithAsync(delivery, invoke);
+
+    internal static Task<TResult> InvokeAsync<TResult>(
+        CapabilityDelegation delegation,
+        Func<Task<TResult>> invoke)
+        => InvokeWithLocalDelegationAsync(delegation, invoke);
+
+    internal static Task InvokeRedeemedAsync(
+        CapabilityDelegation delegation,
+        Func<Task> invoke)
+        => InvokeWithAsync(new RedeemedCapabilityDelegation(delegation), invoke);
+
+    private static async Task<TResult> InvokeWithLocalDelegationAsync<TResult>(
+        CapabilityDelegation delegation,
+        Func<Task<TResult>> invoke)
     {
-        ArgumentNullException.ThrowIfNull(delivery);
+        ArgumentNullException.ThrowIfNull(delegation);
+        ArgumentNullException.ThrowIfNull(invoke);
+
+        var previous = LocalDelegation.Value;
+        LocalDelegation.Value = delegation;
+
+        try
+        {
+            return await invoke();
+        }
+        finally
+        {
+            LocalDelegation.Value = previous;
+        }
+    }
+
+    private static async Task InvokeWithAsync(object carried, Func<Task> invoke)
+    {
+        ArgumentNullException.ThrowIfNull(carried);
         ArgumentNullException.ThrowIfNull(invoke);
 
         var previous = RequestContext.Get(DeliveryKey);
-        RequestContext.Set(DeliveryKey, delivery);
+        RequestContext.Set(DeliveryKey, carried);
 
         try
         {
@@ -23,14 +63,27 @@ internal static class CapabilityRequestContext
         }
         finally
         {
-            if (previous is null)
-            {
-                RequestContext.Remove(DeliveryKey);
-            }
-            else
-            {
-                RequestContext.Set(DeliveryKey, previous);
-            }
+            Restore(previous);
         }
     }
+
+    private static void Restore(object? previous)
+    {
+        if (previous is null)
+        {
+            RequestContext.Remove(DeliveryKey);
+        }
+        else
+        {
+            RequestContext.Set(DeliveryKey, previous);
+        }
+    }
+}
+
+[GenerateSerializer]
+[Alias("db.kernel.redeemed-capability-delegation")]
+internal sealed class RedeemedCapabilityDelegation(CapabilityDelegation delegation)
+{
+    [Id(0)]
+    internal CapabilityDelegation Delegation { get; } = delegation;
 }

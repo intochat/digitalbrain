@@ -17,11 +17,24 @@ public static class SimulationCluster
 
     private static InProcessTestCluster? _cluster;
     private static SynapseObserver? _observer;
+    private static RecordingJournalStorageProvider? _journalStorage;
 
     public static IGrainFactory Grains => Deployed().Client;
 
     public static SynapseObserver Observed => _observer
         ?? throw new InvalidOperationException($"The simulation cluster is not running. Call {nameof(SimulationCluster)}.{nameof(StartAsync)} before a scenario runs.");
+
+    public static long CompletedJournalWrites(GrainId grain)
+        => JournalStorage().CompletedWrites(grain);
+
+    public static void FailJournalWriteAfter(
+        GrainId grain,
+        int completedWritesBeforeFailure,
+        string message)
+        => JournalStorage().FailWriteAfter(grain, completedWritesBeforeFailure, message);
+
+    public static void ClearJournalWriteFailure(GrainId grain)
+        => JournalStorage().ClearFailure(grain);
 
     public static async Task StartAsync()
     {
@@ -30,7 +43,8 @@ public static class SimulationCluster
             return;
         }
 
-        var journalStorage = new VolatileJournalStorageProvider();
+        var journalStorage = new RecordingJournalStorageProvider(
+            new VolatileJournalStorageProvider());
         var reminderTable = new VolatileReminderTable();
         var builder = new InProcessTestClusterBuilder(SiloCount);
         var handlerAssemblies = AppDomain.CurrentDomain.GetAssemblies()
@@ -68,6 +82,7 @@ public static class SimulationCluster
         await cluster.DeployAsync();
 
         _observer = new SynapseObserver();
+        _journalStorage = journalStorage;
         _cluster = cluster;
     }
 
@@ -97,6 +112,7 @@ public static class SimulationCluster
         await _cluster.StopAllSilosAsync();
         await _cluster.DisposeAsync();
         _cluster = null;
+        _journalStorage = null;
     }
 
     internal static string LabelOf(string siloName)
@@ -123,4 +139,8 @@ public static class SimulationCluster
 
     private static InProcessTestCluster Deployed() => _cluster
         ?? throw new InvalidOperationException($"The simulation cluster is not running. Call {nameof(SimulationCluster)}.{nameof(StartAsync)} before a scenario runs.");
+
+    private static RecordingJournalStorageProvider JournalStorage()
+        => _journalStorage
+            ?? throw new InvalidOperationException($"The simulation cluster is not running. Call {nameof(SimulationCluster)}.{nameof(StartAsync)} before a scenario runs.");
 }

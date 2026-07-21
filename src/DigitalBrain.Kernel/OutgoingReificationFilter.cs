@@ -1,9 +1,13 @@
 using DigitalBrain.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Kernel;
 
 internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
 {
+    private const string OutcomeCallbackFailureDataKey =
+        "DigitalBrain.Kernel.CapabilityOutcomeCallbackFailure";
+
     public async Task Invoke(IOutgoingGrainCallContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -19,8 +23,9 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
 
         if (caller is null)
         {
-            throw new NeuronAuthorizationException(
-                $"Semantic capability '{context.InterfaceMethod!.DeclaringType!.FullName}.{context.InterfaceMethod.Name}' can be called only by a neuron with a committed capability request.");
+            await InvokeDelegatedAsync(context);
+
+            return;
         }
 
         var interfaceName = context.InterfaceMethod!.DeclaringType!.FullName!;
@@ -55,5 +60,70 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
         await caller.RecordCapabilityOutcomeAsync(
             CapabilityOutcome.Completed,
             request);
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Any outcome callback failure must remain diagnostic so the original semantic exception is rethrown unchanged.")]
+    private static async Task InvokeDelegatedAsync(IOutgoingGrainCallContext context)
+    {
+        var delegation = CapabilityRequestContext.CurrentDelegation
+            ?? throw new NeuronAuthorizationException(
+                $"Semantic capability '{context.InterfaceMethod!.DeclaringType!.FullName}.{context.InterfaceMethod.Name}' can be called only by a neuron with a committed capability request or its authorized delegate runner.");
+
+        if (context.SourceId != context.SourceContext?.GrainId)
+        {
+            throw new NeuronAuthorizationException(
+                "The delegated call's inherited Orleans source does not match its activation source.");
+        }
+
+        delegation.RequireMatches(
+            context.SourceId,
+            context.TargetId,
+            context.InterfaceMethod);
+
+        var authority = context.SourceContext!.ActivationServices
+            .GetRequiredService<IGrainFactory>()
+            .GetGrain<ICapabilityDelegationAuthority>(delegation.Request.Caller.ToGrainId());
+
+        await authority.RedeemAsync(delegation);
+
+        try
+        {
+            await CapabilityRequestContext.InvokeRedeemedAsync(delegation, context.Invoke);
+        }
+        catch (Exception semanticFailure)
+        {
+            try
+            {
+                await authority.FinishAsync(delegation, succeeded: false);
+            }
+            catch (Exception callbackFailure)
+            {
+                TryAttachOutcomeCallbackFailure(semanticFailure, callbackFailure);
+            }
+
+            throw;
+        }
+
+        await authority.FinishAsync(delegation, succeeded: true);
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Diagnostic attachment is best-effort and must never replace the original semantic exception.")]
+    private static void TryAttachOutcomeCallbackFailure(
+        Exception semanticFailure,
+        Exception callbackFailure)
+    {
+        try
+        {
+            semanticFailure.Data[OutcomeCallbackFailureDataKey] = callbackFailure.ToString();
+        }
+        catch
+        {
+        }
     }
 }
