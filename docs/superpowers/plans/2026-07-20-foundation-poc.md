@@ -396,17 +396,21 @@ public interface ICapabilityToolSource
 One source is registered per semantic contract, not per owner or neuron instance. AI matches the
 typed capability proxy to `CapabilityContract`, then passes its exact owner-bound `NeuronId` into the
 source. This interface is callable only by AI runtime infrastructure registered in the silo. It is
-excluded from behavior references and generated semantic discovery. AI converts a selected
+absent from contracts packages and generated semantic discovery. The future contract-only behavior
+compiler must exclude it, but that compiler is not current evidence. AI converts a selected
 `CapabilityTool` to an exact MAF/MEAI `AIFunction`; the model never receives
 `ICapabilityToolSource.InvokeAsync`, an MCP client, or a generic raw-invoke tool.
 
 Every source implementation routes invocation through the module-private method on the semantic
 capability neuron. For normal neuron calls, Kernel filters commit and propagate
 `CapabilityRequested`. For a private off-turn MAF runner, the owning orchestration neuron first
-commits the request and issues a revision-fenced, one-use invocation lease; the private runner then
-propagates that delivery through `RequestContext`. The integration neuron journals the same incoming
-request before its module-private method runs. This preserves the approved causal rail without
-pretending the runner is a public neuron.
+commits an exact request and Kernel issues the single opaque-public, non-semantic
+`DigitalBrain.Kernel.CapabilityDelegation` for the physical runner source. Kernel's private context
+carrier delivers it; consumers never write a raw `RequestContext` value. The integration neuron
+journals the same incoming request before its module-private method runs. Every off-turn participant
+or integration call receives a distinct precommitted request and delegation. This preserves the
+approved causal rail without pretending the runner is a public neuron or putting Task revision,
+run, checkpoint, MAF, approval, integration, lease, generation, or renewal semantics in Kernel.
 
 ## TDD and commit protocol
 
@@ -629,42 +633,111 @@ it.
 
 **Commit:** `ai: add durable concurrent and group orchestration`
 
-## Task 5: Bridge GroupChat to Tasks through one fenced Lockstep superstep
+## Task 5: Bridge GroupChat to Tasks through one recoverable Lockstep superstep
 
-**Files:**
+**Files and proof owners:**
 
-- Create: `modules/DigitalBrain.Modules.AI/ExecutionLease.cs`
+- Create: `src/DigitalBrain.Kernel/CapabilityDelegation.cs`
+- Modify: `src/DigitalBrain.Kernel/CapabilityRequestContext.cs`
+- Modify: `src/DigitalBrain.Kernel/OutgoingReificationFilter.cs`
+- Modify: `src/DigitalBrain.Kernel/IncomingReificationFilter.cs`
+- Modify: `src/DigitalBrain.Kernel/Neuron.cs`
+- Modify: `src/DigitalBrain.Kernel/PublicAPI.Unshipped.txt`
+- Create: `modules/DigitalBrain.Modules.AI/WorkflowRun.cs`
 - Create: `modules/DigitalBrain.Modules.AI/AIWorkerState.cs`
-- Create: `modules/DigitalBrain.Modules.AI/FencedWorkflowRunner.cs`
+- Create: `modules/DigitalBrain.Modules.AI/WorkflowRunner.cs`
 - Create: `modules/DigitalBrain.Modules.AI/OrleansCheckpointStore.cs`
 - Modify: `modules/DigitalBrain.Modules.AI/GroupChat.cs`
-- Create: `tests/DigitalBrain.Simulations/AIWorkerContracts.cs`
+- Create: `tests/DigitalBrain.Tests/CapabilityDelegationContracts.cs`
+- Modify: `tests/DigitalBrain.Tests/SerializationContracts.cs`
+- Modify: `tests/DigitalBrain.Tests/DispatchManifestContracts.cs`
+- Exercise the existing API/architecture guards:
+  `tests/DigitalBrain.Tests/PublicApiBaselineContracts.cs`,
+  `tests/DigitalBrain.Tests/ArchitectureCutContracts.cs`, and
+  `tests/DigitalBrain.Tests/PackageBoundaryContracts.cs`
+- Create: `tests/DigitalBrain.Simulations/CapabilityDelegationSecurityContracts.cs`
+- Extend without replacing the retained characterization:
+  `tests/DigitalBrain.Simulations/AIWorkerContracts.cs`
 - Modify: `hosts/DigitalBrain.ProbeHost/Neurons.cs`
 - Modify: `hosts/DigitalBrain.ProbeHost/Program.cs`
 - Modify: `tests/DigitalBrain.HostTests/HostedRestart.cs`
 
-**Red proof:**
+**Evidence already held:**
 
-- Prove `AcceptAsync`/`ContinueAsync`/`CancelAsync` validate and persist, schedule work, and return
-  without running a model inline.
-- Prove one active lease advances exactly one MAF Lockstep superstep and persists the MAF checkpoint
-  before emitting `AttemptAdvanced`.
-- Restart the silo after the first superstep; prove the same session/checkpoint resumes without
-  repeating the already-completed executor.
-- Prove duplicate, stale, future, cancelled, and late lease results cannot overwrite current worker
-  state.
-- Prove pending MAF approval/input maps to typed Task Waiting facts; MAF `RunStatus` never appears in
-  Tasks contracts.
+- The focused causal RED failed 1/1 because the raw non-neuron runner reached the target with no
+  committed incoming `CapabilityRequested`; the retained characterization then passed 1/1.
+- The unfiltered root gate passed `DigitalBrain.Tests` 143/143,
+  `DigitalBrain.Simulations` 94/94, and `DigitalBrain.HostTests` 5/5: **242/242**, zero failed or
+  skipped.
 
-**Green implementation:**
+**Red-green order:**
 
-- Store Attempt, revision, workflow fingerprint, checkpoint reference, lease generation, and lease
-  deadline in the GroupChat neuron.
-- Run the leased superstep in a private, owner-bound Orleans runner grain. It is infrastructure: no
+1. **Close the default-allow Kernel hole.** Replace the target's self-check as the security boundary
+   with instrumentation that proves a raw same-owner non-neuron call is rejected before target
+   method entry and before any semantic side effect. First observe that proof fail. Separately prove
+   the intended `[ClientEntryPoint]` exemption. Then make both filters default-deny unless the actual
+   caller is a `Neuron` carrying its normal reified request or the call carries a valid Kernel
+   delegation; keep the client exemption deliberate and executable.
+2. **Prove the minimal delegation rail.** Add failing executable proofs for a valid delegated call;
+   caller outgoing request committed before execution; target incoming journal containing the same
+   `SynapseId`, correlation, and causation before entry; execution under the original causal
+   delivery; exactly one `CapabilityCompleted` on success; exactly one `CapabilityFailed` on a
+   legitimate target failure; rejection before entry for wrong actual runner source, owner, target,
+   contract, or method; forged raw `RequestContext`; replay; replay after caller deactivation and
+   restart; and delegation consumption durably committed before semantic invocation. Unauthorized
+   attempts must neither consume a valid token nor create contradictory terminal outcomes.
+3. **Implement only the proved Kernel transport.** Add one sealed opaque-public
+   `DigitalBrain.Kernel.CapabilityDelegation` with no public constructor or readable payload.
+   `Neuron` mints it only after committing the outgoing request and issued-delegation state. Kernel's
+   private `CapabilityRequestContext` carries it, both filters validate the actual source, target,
+   contract, and method, and a private/internal callback to the `CausalCaller` durably redeems it and
+   records the outcome. Issued/consumed state belongs to the causal caller neuron, never a global
+   manager. Use `DigitalBrainRuntime` only if a cross-assembly invocation helper is compiler-proven
+   necessary.
+4. **Prove the boundary shape.** `CausalCaller` is the GroupChat whose outgoing journal owns the
+   request; `DelegateSource` is the private runner `GrainId` physically observed by the filters. The
+   token binds only those generic causal/transport identities, owner, exact target, contract/method,
+   correlation/causation, and opaque one-use identity. Prove no contracts package references it,
+   generated semantic registries ignore it, serialization round-trips only through Kernel-owned
+   machinery, and the Kernel public API baseline contains only this approved opaque surface. Prove
+   that no friend assembly, forgeable public raw context, proxy neuron, public service hierarchy,
+   manager, registry, lease, generation, or renewal framework was added. Contract-only behavior
+   compilation is a future invariant because that compiler does not exist yet, not current evidence.
+5. **Prove the crash boundary.** Redemption commits before semantic invocation, but caller and
+   target grains do not form an exactly-once transaction. Prove/document that a crash after consume
+   but before target commit requires a newly journaled request and fresh delegation.
+6. **Build the supervised worker on the proven rail.** Prove
+   `AcceptAsync`/`ContinueAsync`/`CancelAsync` validate and persist, schedule work, and return without
+   running a model inline. Each later runner-to-`ILLM`, runner-to-`IAgent`, or
+   runner-to-integration call receives its own precommitted request and delegation; the initiating
+   Task-to-worker request is insufficient.
+7. **Complete the worker red-green slice.** Prove one `ActiveRun` advances exactly one MAF Lockstep
+   superstep and durably stores its returned checkpoint before `AttemptAdvanced`; restart resumes the
+   same Attempt lineage without repeating a completed executor; recovery changes `RunId` but not
+   Worker + Task + Attempt checkpoint identity or replay input; and duplicate, stale, future,
+   cancelled, and late results cannot overwrite current state. Prove Waiting/terminal mappings,
+   deterministic Goal/message/Result hooks, private runner exclusion, and the hosted restart path.
+
+**Worker implementation after the Kernel rail is green:**
+
+- Add deterministic synchronous `GroupChat.CreateMessages(Goal)` and `CreateResult(messages)` hooks;
+  copy their boundaries and do not introduce AI-owned Goal/Result wrappers or public mapper seams.
+- Persist replayable input, definition fingerprint, committed checkpoint reference, the initiating
+  causal reference, and at most one `ActiveRun`. `WorkflowRun` contains `RunId`, full
+  `AttemptCursor`, fingerprint, input checkpoint, and `RecoverAfter`; none of those fields enter the
+  Kernel delegation.
+- Run the superstep in a private, owner-bound Orleans runner grain. It is infrastructure: no
   `INeuron`, journal, registry entry, or scripting contract.
-- Implement the real MAF JSON checkpoint manager over Orleans durable storage.
-- Commit worker state/checkpoint before asking the Task for the next continuation.
-- On runner loss, expire and redispatch the same fenced lease; accept only the active generation.
+- Implement the real MAF JSON checkpoint manager over Orleans durable storage. Stop streaming at the
+  first `SuperStepCompletedEvent`; accept only its `CompletionInfo.Checkpoint`, commit
+  checkpoint/worker state, then ask the Task for continuation.
+- On runner loss, replace the expired run with a fresh `RunId`; never derive checkpoint storage from
+  that transient identifier.
+- Keep direct `RespondAsync` on its protected outer `AgentSession` and reject it while a supervised
+  run is active. Supervised work owns raw checkpoint lineage; do not bridge or duplicate one path's
+  outer artifact into the other.
+- Do not claim exactly-once across either the delegation consume/target-commit boundary or a crash
+  after checkpoint-store commit but before worker adoption.
 
 **Commit:** `ai: execute task attempts one durable lockstep at a time`
 
@@ -689,9 +762,6 @@ it.
 - Create: `modules/DigitalBrain.Modules.AI/CapabilityAIContextProvider.cs`
 - Create: `modules/DigitalBrain.Modules.AI/CapabilityToolSelector.cs`
 - Create: `modules/DigitalBrain.Modules.AI/CapabilityToolApproval.cs`
-- Create: `modules/DigitalBrain.Modules.AI/CapabilityInvocationLease.cs`
-- Modify: `src/DigitalBrain.Kernel/CapabilityRequestContext.cs`
-- Modify: `src/DigitalBrain.Kernel/IncomingReificationFilter.cs`
 - Create: `tests/DigitalBrain.Tests/CapabilityBoundaryContracts.cs`
 - Create: `tests/DigitalBrain.Simulations/CapabilityToolContracts.cs`
 
@@ -709,9 +779,10 @@ it.
   approval.
 - Prove the model-visible tool calls the fake source through the semantic capability neuron path and
   produces the Kernel causal request/outcome facts.
-- Prove a private non-neuron runner can carry only a current, owner-bound, one-use invocation lease;
-  the target journals the precommitted request, while replay, stale revision, wrong owner, and an
-  unleased raw `RequestContext` value are rejected before the module-private method runs.
+- Prove each runner-to-integration call receives its own exact precommitted request and reuses the
+  Task 5 `CapabilityDelegation` rail; the initiating Task-to-worker request is insufficient. Task 6
+  owns no delegation state. Its AI layer rejects a stale `ActiveRun` or Attempt revision before
+  requesting a token, and the integration independently validates approval and `CommandId`.
 - Prove client/contracts/behavior-visible packages cannot reference `DigitalBrain.Capabilities`.
 
 **Green implementation:**
@@ -722,12 +793,12 @@ it.
 - Map selected exact schemas to `AIFunction`; never expose a generic invoke function.
 - Configure MAF tool-approval middleware as the pause/resume coordinator.
 - Have the integration neuron independently validate the same approval fingerprint.
-- Before an off-turn runner invokes a tool, call back to the owning orchestration neuron to commit
-  `CapabilityRequested` and mint a one-use lease for the active Attempt/revision. Reject replay,
-  staleness, and cross-owner use.
-- Extend the Kernel causal bridge only through that failing leased-runner proof. Keep the raw
-  `RequestContext` key private; if the proof requires a new public runtime contract, stop and record
-  that architecture decision before adding it.
+- Before each off-turn runner tool invocation, validate AI run/Attempt state, then call the owning
+  orchestration neuron to commit that call's exact `CapabilityRequested` and ask Kernel for the
+  generic one-use delegation bound to the actual runner, owner, target, and operation. The Kernel
+  token contains no AI or integration state.
+- Reuse Task 5's Kernel filters, private context carrier, and caller-owned redemption state without
+  adding a Task 6 lease, token manager, registry, renewal path, or Kernel modification.
 
 **Commit:** `ai: project semantic capabilities into approved MAF tools`
 
@@ -1053,7 +1124,7 @@ it.
 | Tasks is independent of AI | Task 2 package boundary | Task 11 durable Task |
 | Public AI wire is MEAI, not strings or caller options | Task 3 contract test | Task 11 typed clients |
 | MAF owns orchestration and session | Tasks 3–4 MAF API/session tests | Task 11 group reconciliation |
-| One Lockstep superstep per fenced lease | Task 5 worker/restart test | Task 11 mid-attempt restart |
+| One Lockstep superstep per recoverable run | Task 5 worker/restart test | Task 11 mid-attempt restart |
 | Same question can reach several typed models | Task 4 Concurrent test | Task 11 two-model comparison |
 | Integration roots are semantic, MCP remains private | Tasks 6–8 boundaries | Task 11 official-shaped fake servers |
 | Progressive exact tools, no fixed count/raw invoke | Task 6 catalog tests | Task 11 selected Gmail/Salesforce tools |

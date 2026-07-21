@@ -80,7 +80,7 @@ These early menu choices set the next workstream before MAF alignment began. Som
 
 ## 1. Microsoft Agent Framework seam
 
-### D1.1 — Sole conversational state is MAF AgentSession
+### D1.1 — MAF owns conversational state; DigitalBrain keeps one outer artifact per entry path
 
 | | |
 |---|---|
@@ -88,7 +88,18 @@ These early menu choices set the next workstream before MAF alignment began. Som
 | **Approved as** | `› apptove` → recorded **Approved** |
 | **Status** | **RATIFIED** |
 
-**Implication:** DigitalBrain does not reimplement group-chat history; it durably stores MAF’s session.
+**Evidence-driven clarification (2026-07-21):** The approved rule applies directly to interactive
+`RespondAsync`: its sole DigitalBrain-owned conversation artifact is the protected serialized MAF
+`AgentSession`. A supervised `IWorker` Attempt instead persists the raw standard MAF workflow
+checkpoint lineage as its sole outer MAF artifact. That checkpoint may contain MAF-owned participant
+sessions internally; DigitalBrain neither extracts them nor maintains a parallel outer
+`AgentSession`. MAF 1.13 exposes no supported public bridge between the outer `AgentSession` used by
+the direct path and a workflow checkpoint, so the two entry paths reconstruct the same declared
+workflow through separate adapters and never seed one path implicitly from the other.
+
+**Implication:** DigitalBrain does not reimplement group-chat history. Direct chat durably stores the
+MAF session; supervised work durably stores the MAF checkpoint lineage; neither path keeps a second
+transcript or competing state model.
 
 ---
 
@@ -315,13 +326,20 @@ public sealed class ModelAnswers(
 
 ---
 
-### D4.2 — Durability boundary: Orleans + MAF session/checkpoint; no Durable Extension
+### D4.2 — Durability boundary: Orleans around one MAF artifact; no Durable Extension
 
 | | |
 |---|---|
 | **Proposed** | Orchestration neuron owns: (1) serialized `AgentSession` for completed conversational state; (2) latest standard MAF workflow checkpoint for unfinished current turn. Orleans persists both. Terminal completion saves session and clears checkpoint. Approval wait saves checkpoint and resumes. Reject MAF Durable Extension. |
 | **Approved as** | `› approve` → **Durability is approved** |
 | **Status** | **RATIFIED** |
+
+**Evidence-driven clarification (2026-07-21):** The artifacts are path-specific, not a combined
+session-plus-checkpoint aggregate. Interactive `RespondAsync` commits its protected outer
+`AgentSession`. A supervised Attempt commits its raw workflow checkpoint reference before reporting
+progress. The checkpoint store identity is stable for Worker + Task + Attempt and is never derived
+from a redispatch `RunId`. Only the checkpoint reported by the completed Lockstep superstep may
+advance the worker's committed lineage.
 
 ---
 
@@ -345,13 +363,18 @@ public sealed class ModelAnswers(
 
 ---
 
-### D4.5 — Fingerprinted session compatibility; explicit migration/reset
+### D4.5 — Fingerprinted MAF-state compatibility; explicit migration/reset
 
 | | |
 |---|---|
 | **Proposed** | No MAF `AIHostAgent` / `AgentSessionStore`. Versioned envelope: DigitalBrain state version, MAF version, definition fingerprint, participants, session, optional checkpoint. Restore only through exact composed definition. Mismatch preserves old state and emits `AgentStateMigrationRequired`. Reset/migration is explicit approved action—never silent discard. Treat as sensitive encrypted state. |
 | **Approved as** | `› approve` → **Session compatibility is approved** |
 | **Status** | **RATIFIED** |
+
+**Evidence-driven clarification (2026-07-21):** Direct session envelopes and supervised checkpoint
+envelopes are separate. Both bind the exact MAF version, definition fingerprint, and typed
+participants, but a supervised envelope stores a checkpoint reference and replayable initial input,
+not an additional outer `AgentSession`. Definition compatibility is checked before MAF runs.
 
 ---
 
@@ -375,6 +398,51 @@ public sealed class ModelAnswers(
 
 ---
 
+### D4.8 — CapabilityDelegation is opaque public Kernel transport, not vocabulary
+
+| | |
+|---|---|
+| **Proposed** | Permit one narrowly public `DigitalBrain.Kernel.CapabilityDelegation` transport so a private non-neuron runner can carry an already committed capability request across the Kernel/AI assembly boundary. Kernel exclusively mints, carries, validates, redeems, and records outcomes for it. The token is sealed, opaque, non-constructible by consumers, hidden from IntelliSense, absent from `DigitalBrain.Abstractions` and every contracts package, and non-semantic: it is never a neuron contract, synapse, registry entry, or behavior vocabulary. |
+| **Approved as** | `› approve and write down it to md file` |
+| **Status** | **RATIFIED** |
+
+The delegation binds only generic causal and transport facts: the committed
+`CapabilityRequested` delivery; `CausalCaller`, the GroupChat neuron whose outgoing journal owns
+that request; `DelegateSource`, the private runner `GrainId` physically observed by the Kernel
+filters; owner; exact target; contract and method; correlation and causation; and an opaque one-use
+identity. `CausalCaller` and `DelegateSource` are deliberately different identities. Undelegated
+non-neuron capability calls are denied before semantic code executes. Redemption is durably
+recorded before invocation, and replay, wrong source, wrong owner, wrong target, wrong operation,
+and forged raw `RequestContext` are rejected.
+
+`RunId`, `AttemptId`, `AttemptCursor`, Task revision, definition fingerprint, checkpoint identity,
+MAF state, approval state, integration command state, and lease/generation/renewal semantics are
+forbidden in the Kernel delegation. AI validates `ActiveRun` before minting and fences returned
+results; integration modules retain approval and `CommandId` reconciliation. Every off-turn typed
+participant or integration call gets its own exact precommitted request and delegation; the
+initiating Task-to-worker request cannot authorize later runner-to-`ILLM`, runner-to-`IAgent`, or
+runner-to-integration calls. The cross-grain consume/invoke boundary is not an exactly-once
+transaction: recovery may require a newly journaled request and fresh delegation.
+
+This is one concrete infrastructure seam, not a public service hierarchy. Broad friend access, a
+public raw-context API, proxy neurons, a global delegation manager, and lease/generation/renewal
+frameworks remain forbidden.
+
+**Evidence retained (2026-07-21):**
+`AIWorkerContracts.RawRunnerCannotPreserveCausalCapabilityBoundary` first failed 1/1 when the
+target's self-check found no committed incoming request. The retained characterization then passed
+1/1, proving the current default-allow hole without making the root gate red. The unfiltered root
+gate passed `DigitalBrain.Tests` 143/143, `DigitalBrain.Simulations` 94/94, and
+`DigitalBrain.HostTests` 5/5: **242/242**, zero failed or skipped. Task 5 must move rejection ahead
+of target method entry, then prove the delegation rail.
+
+The executable exclusion boundary for the present repository is that no contracts package
+references the token and no generated semantic registry discovers it. Contract-only behavior
+compilation does not exist yet; excluding `CapabilityDelegation` from that future compiler remains
+an invariant, not current test evidence.
+
+---
+
 ## 5. Tasks module and MAF workers
 
 ### D5.1 — Task owns durable desired outcome; MAF Workflow owns one attempt’s execution
@@ -391,8 +459,8 @@ public sealed class ModelAnswers(
 
 | | |
 |---|---|
-| **Proposed** | Prototype evidence: default OffThread cancel-on-checkpoint **repeats work** (`first=1, second=2, third=3`). Lockstep yields exact one superstep without repeats (`1,1,1`). Supervised hard tasks use Lockstep internally; interactive agents keep OffThread streaming. One worker turn ≤ one MAF superstep. Public execution-mode option rejected. |
-| **User response** | Asked for deeper ownership grill first; later explicitly approved Lockstep lease rule |
+| **Proposed** | Prototype evidence: default OffThread cancel-on-checkpoint **repeats work** (`first=1, second=2, third=3`). Lockstep yields exact one superstep without repeats (`1,1,1`). Supervised hard tasks use Lockstep internally; direct interactive conversations use their separate session-owned adapter. One worker turn ≤ one MAF superstep. Public execution-mode option rejected. |
+| **User response** | Asked for deeper ownership grill first; later explicitly approved the one-superstep Lockstep rule |
 | **Status** | **RATIFIED** as D5.15 |
 
 ---
@@ -401,7 +469,7 @@ public sealed class ModelAnswers(
 
 | | |
 |---|---|
-| **Proposed** | `TaskNeuron` owns task identity, goal, lifecycle, attempts, worker selection, terminal result—not sessions/checkpoints/executors. Task-scoped orchestration neuron owns AgentSession + checkpoint + workflow reconstruction. MAF executors are private reconstructed runtime objects (no Orleans identity, no registry, no public contracts). Each attempt gets distinct worker identity e.g. `{task}/attempt-N`. Reject: executor-as-grain, TaskNeuron-as-Executor, dual checkpoint storage, public executor IDs, mirroring every MAF event. |
+| **Proposed** | `TaskNeuron` owns task identity, goal, lifecycle, attempts, worker selection, terminal result—not sessions/checkpoints/executors. The task-scoped orchestration neuron owns the path-appropriate MAF state (direct session or supervised checkpoint lineage) plus workflow reconstruction. MAF executors are private reconstructed runtime objects (no semantic neuron identity, registry entry, or public contract). Each attempt gets distinct worker identity e.g. `{task}/attempt-N`. Reject: TaskNeuron-as-Executor, dual checkpoint storage, public executor IDs, mirroring every MAF event. |
 | **Approved as** | `› approve` → **ownership split is approved** |
 | **Status** | **RATIFIED** |
 
@@ -483,21 +551,26 @@ Tasks knows nothing about AI/MAF/models/prompts/executors/checkpoints.
 
 ---
 
-### D5.10 — Asynchronous fenced runner (not long superstep on grain turn)
+### D5.10 — Recoverable asynchronous WorkflowRun (not a long grain turn)
 
 | | |
 |---|---|
-| **Proposed** | Worker persists fenced `ExecutionLease` (attempt, revision, fingerprint, deadline), returns. Internal AI runner (not a public neuron) executes one MAF superstep. Worker accepts only active lease. Cancellation revokes lease; late results cannot overwrite. Reminders redispatch unfinished leases. Runner has no registry/journal/scripting identity. |
+| **Proposed** | Worker persists one active `WorkflowRun` (`RunId`, full `AttemptCursor`, definition fingerprint, input checkpoint reference, `RecoverAfter`) plus replayable input and the initiating causal reference, then returns. An internal AI runner (not a public neuron) executes one MAF superstep. Recovery replaces only the `RunId`; checkpoint-store identity remains stable for Worker + Task + Attempt. The worker accepts a result only when the exact active `RunId`, cursor, fingerprint, and input checkpoint match, and only after the returned checkpoint is durable. Cancellation clears `ActiveRun`; late or duplicate results cannot overwrite. Reminders redispatch unfinished runs. Runner has no registry/journal/scripting identity. |
 | **Approved as** | `› approve, but also think about proper introduction of ITimer and IReminder…` |
-| **Status** | **RATIFIED** (Time workstream opened from this approval) |
+| **Status** | **RATIFIED**, with evidence-driven vocabulary correction to recoverable run (Time workstream remains open from this approval) |
+
+The initiating capability request must be journaled before off-turn execution. Every later off-turn
+typed participant or integration call receives its own exact, owner-bound, one-use
+`CapabilityDelegation` under D4.8. The token is public only for opaque cross-assembly transport; a
+general-purpose public Kernel bypass remains forbidden.
 
 ---
 
-### D5.15 — One MAF Lockstep superstep per supervised Task execution lease
+### D5.15 — One MAF Lockstep superstep per supervised WorkflowRun
 
 | | |
 |---|---|
-| **Proposed** | Each supervised Task execution lease advances exactly one Lockstep superstep; restore checkpoint → one superstep → durable worker commit before next lease. Concurrent may still fan out *inside* that superstep. Interactive non-Task conversations use OffThread streaming. |
+| **Proposed** | Each supervised `WorkflowRun` advances exactly one Lockstep superstep; restore its input checkpoint → stop at the first `SuperStepCompletedEvent` → durably commit the returned checkpoint before another run may continue. Concurrent may still fan out *inside* that superstep. Interactive non-Task conversations use their separately persisted direct session path. No exactly-once claim is made across the checkpoint-store-commit/worker-adoption crash window. |
 | **Approved as** | `› approve, but what about implementation…` |
 | **Status** | **RATIFIED** |
 
@@ -521,7 +594,7 @@ Tasks knows nothing about AI/MAF/models/prompts/executors/checkpoints.
 
 | | |
 |---|---|
-| **Proposed** | Kernel keeps private outbox/lease timers. Public `DigitalBrain.Time` neurons are addressable schedules. Behaviors never see `IGrainTimer` / `IGrainReminder` / `TickStatus` / raw reminder names. Kernel names use reserved `db.*`. Internal non-neuron adapter receives raw Orleans callbacks. |
+| **Proposed** | Kernel keeps private outbox/recovery timers. Public `DigitalBrain.Time` neurons are addressable schedules. Behaviors never see `IGrainTimer` / `IGrainReminder` / `TickStatus` / raw reminder names. Kernel names use reserved `db.*`. Internal non-neuron adapter receives raw Orleans callbacks. |
 | **Approved as** | `› approve` |
 | **Status** | **RATIFIED** |
 
@@ -659,7 +732,7 @@ Tasks knows nothing about AI/MAF/models/prompts/executors/checkpoints.
 
 ## 7. Foundation PoC boundary (post-documentation grilling)
 
-### D7.1 — Lockstep lease (see D5.15)
+### D7.1 — Lockstep WorkflowRun (see D5.15)
 
 Already ratified above.
 
@@ -696,7 +769,8 @@ Use this as a hard checklist. If code contradicts it, the code is wrong unless y
 
 ### Kernel & modules
 
-1. Kernel = neuron mechanics only; no AI/provider/memory/UI domain knowledge.
+1. Kernel = neuron mechanics only; no AI/provider/memory/UI domain knowledge. Its one opaque
+   `CapabilityDelegation` transport seam is infrastructure, never semantic vocabulary.
 2. Modules own vocabulary; behaviors own logic over existing vocabulary.
 3. AppHost selects modules once; silo is `AddDigitalBrain()` only.
 4. Namespaces and type names are the programming vocabulary.
@@ -705,18 +779,18 @@ Use this as a hard checklist. If code contradicts it, the code is wrong unless y
 ### AI / MAF
 
 6. MAF owns agent/orchestration execution; DigitalBrain owns durable typed boundaries.
-7. Sole group conversation state = serialized MAF `AgentSession`.
+7. One outer MAF artifact per entry path: direct session or supervised checkpoint lineage.
 8. Public contracts use MEAI `ChatMessage`/`ChatResponse`; MAF types stay internal.
 9. Orchestration-by-base-type (`GroupChat`/`Sequential`/`Concurrent`/`Handoff`/`Magentic`).
 10. Orchestrations accept both `ILLM` and `IAgent` participants.
 11. Participants resolve by typed `NeuronId`, not fake DI.
 12. Individual agents are stateless unless contract says otherwise; workers own sessions.
 13. Adopt MAF selectively; reject Harness-as-core and Durable Extension.
-14. Orleans persists session + standard checkpoints.
+14. Orleans persists direct sessions and supervised standard checkpoints in separate envelopes.
 15. Compaction internal, token-budget, same typed model.
 16. Journals = durable truth; OTel = diagnostics.
 17. Fingerprinted session restore; explicit migration/reset.
-18. Supervised Task leases: **one Lockstep superstep** per lease.
+18. Supervised `WorkflowRun`: **one Lockstep superstep**, then durable checkpoint adoption.
 
 ### Behaviors
 
@@ -795,7 +869,7 @@ Use this as a hard checklist. If code contradicts it, the code is wrong unless y
 | `› approve` | D6.1–D6.13 (Time/hosting chain) |
 | `› do it` | D6.13 ICountdown naming |
 | `› its too deep. stop… document decisions` | Pause; D6.14 open |
-| `› approve, but what about implementation…` | D5.15 Lockstep lease |
+| `› approve, but what about implementation…` | D5.15 Lockstep run |
 | `› approve` after the exact Foundation story | D7.2 Foundation PoC boundary |
 | `› approve` after causal request proposal | D4.7 capability request envelope |
 | `› approve` after typed Task vocabulary | D5.16 Goal/Result/Evidence |

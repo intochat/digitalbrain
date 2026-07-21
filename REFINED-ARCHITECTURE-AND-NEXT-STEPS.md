@@ -105,6 +105,21 @@ requests. It does not claim exactly-once RPC. Domain `CommandId`, revision fenci
 idempotency, and reconciliation remain responsible for safe retries. The provisional
 `CapabilityCall` name is replaced by `CapabilityRequested`.
 
+A private off-turn runner crosses the Kernel/AI assembly boundary with the single deliberately
+public `DigitalBrain.Kernel.CapabilityDelegation` transport. It is sealed, opaque,
+non-constructible by consumers, hidden from IntelliSense, and non-semantic. Kernel alone mints,
+carries, validates, durably redeems, and records outcomes for it. `CausalCaller` is the GroupChat
+whose outgoing journal owns the precommitted request; `DelegateSource` is the private runner
+`GrainId` the filters physically observe. The delegation binds those identities plus owner, exact
+target, contract and method, correlation/causation, and opaque one-use identity—nothing from Tasks,
+AI, MAF, checkpoints, approvals, integrations, leases, generations, or renewals.
+
+Every off-turn participant or integration call receives its own precommitted request and
+delegation. The initiating Task-to-worker request does not authorize later runner calls. A raw
+non-neuron call, forged context, replay, or mismatched source/owner/target/operation is rejected
+before semantic method entry. Consumption is durable before invocation; a crash may require a new
+request and delegation because the cross-grain boundary is not exactly once.
+
 ### 2.2 Modules
 
 Each domain is an independent package family:
@@ -276,9 +291,12 @@ An individual typed `IAgent` is stateless between calls unless its declared cont
 otherwise. It is a durable neuron identity and synapse boundary around a reconstructed MAF
 `AIAgent`; MAF owns agent semantics and the concrete `ILLM` owns inference.
 
-Only session-owning orchestration neurons are conversationally stateful. Each `IGroupChat` owns
-exactly one serialized MAF `AgentSession` as its sole conversation state. DigitalBrain must not keep
-a second transcript beside that session.
+Only state-owning orchestration neurons are conversationally stateful. The direct `RespondAsync`
+entry path owns one protected serialized MAF `AgentSession`. A supervised `IWorker` Attempt owns one
+raw MAF workflow checkpoint lineage instead; participant sessions remain encapsulated inside that
+checkpoint. DigitalBrain must not keep a second transcript, extract a participant session, or add a
+parallel outer `AgentSession` to the supervised path. MAF 1.13 exposes no supported public bridge
+between these artifacts, so neither path implicitly seeds the other.
 
 The public orchestration vocabulary is selected through typed base classes:
 
@@ -415,8 +433,8 @@ Vector search may rank candidates. It may never execute an invented type or bypa
 A working C# file creates live behavior by composing existing typed vocabulary. It does not invent
 new public neuron contracts at runtime.
 
-Each working file contains exactly one public `Behavior` class. The behavior compiler is
-contract-only:
+Each working file contains exactly one public `Behavior` class. When the behavior compiler is
+introduced, it is contract-only:
 
 - Allowed: the Behavior API, `DigitalBrain.Abstractions`, selected module contracts, approved BCL
   types, and MEAI message types.
@@ -432,22 +450,27 @@ capabilities, bypass the typed registry, or register the temporary agent as a pu
 
 ### 2.10 MAF state, durability, compaction, and diagnostics
 
-Orleans is the durability authority around MAF:
+Orleans is the durability authority around MAF, with one outer artifact per entry path:
 
-- A completed conversational turn is stored in the MAF `AgentSession`.
-- An unfinished current turn may additionally store the latest standard MAF workflow checkpoint.
+- A direct conversational turn is stored in a protected MAF `AgentSession` envelope.
+- A supervised Attempt stores the latest standard MAF workflow checkpoint lineage instead.
+- The supervised checkpoint may contain MAF-owned participant sessions internally; DigitalBrain does
+  not extract them or persist another outer session.
 - The MAF Durable Extension is rejected because it would duplicate Orleans durability.
 - Synapse journals remain the durable causal truth.
 - OpenTelemetry traces, metrics, and logs are diagnostic projections and never the audit source.
 
-Persisted AI state uses a versioned envelope containing:
+Both path-specific envelopes contain:
 
 - DigitalBrain state format version.
 - MAF version.
 - Definition fingerprint.
 - Typed participant identities.
-- Serialized `AgentSession`.
-- Optional current workflow checkpoint.
+
+The direct envelope then contains a serialized `AgentSession`. The supervised envelope instead
+contains replayable initial input and a durable checkpoint reference. Definition compatibility is
+validated before invoking MAF. A checkpoint-store identity is stable for Worker + Task + Attempt;
+redispatch creates a new `RunId`, not a new checkpoint lineage.
 
 Restore reconstructs the exact composed agent/workflow and then restores state. A change to
 participants, prompts, providers, tools, orchestration definition, or MAF version cannot silently
@@ -517,8 +540,17 @@ public sealed record TaskPolicy(
 ```
 
 Modules and applications define concrete Goals, Results, and Failures. Tasks contains no `object`,
-arbitrary JSON, metadata dictionaries, generic event strings, or AI prompts. AI may define an
-`AgentGoal` in its own contracts.
+arbitrary JSON, metadata dictionaries, generic event strings, or AI prompts. `GroupChat` maps those
+application-owned types through two deterministic, synchronous protected hooks:
+
+```csharp
+protected abstract IReadOnlyList<ChatMessage> CreateMessages(Goal goal);
+protected abstract Result CreateResult(IReadOnlyList<ChatMessage> messages);
+```
+
+The base class copies input before MAF receives it and exposes terminal workflow output as a
+read-only message list. It does not add an AI-owned Goal/Result hierarchy, a generic
+`GroupChat<TGoal, TResult>`, public mapper interface, reflection convention, or service-locator seam.
 
 Every Attempt receives the immutable Goal. Success returns one typed Result plus references to
 supporting facts. The Task copies the accepted Result and evidence references into its immutable
@@ -529,7 +561,8 @@ Attempt while `MaximumAttempts` and the optional absolute `Deadline` permit it. 
 `RetryDelay` is sufficient for the PoC and uses private durable reminders, so Tasks does not depend
 on Time. `AttemptOutcomeUncertain` is never retried automatically.
 
-There is no public per-Attempt timeout. The internal fenced execution lease detects a stuck runner.
+There is no public per-Attempt timeout. The internal `WorkflowRun.RecoverAfter` detects a runner
+whose result has not been adopted.
 Task deadline expiry requests cancellation; terminal state follows the observed outcome and records
 a typed deadline failure when work did not complete.
 
@@ -614,37 +647,50 @@ authority.
 MAF Harness todo/planning state remains private agent planning. It is not promoted to a domain Task
 unless the system deliberately creates an `ITask` identity.
 
-### 2.12 AI workers and the fenced runner
+### 2.12 AI workers and the recoverable runner
 
 The object ownership is:
 
 ```text
 TaskNeuron
   -> task-scoped orchestration neuron for Attempt N
-     -> persisted MAF session/checkpoint/fingerprint
-        -> reconstructed MAF Workflow
-           -> private MAF executors
-              -> typed ILLM and IAgent neurons
+     -> persisted replay input/checkpoint/fingerprint + at most one ActiveRun
+         -> reconstructed MAF Workflow
+            -> private MAF executors
+               -> typed ILLM and IAgent neurons
 ```
 
 Each Attempt receives a distinct task-scoped orchestration identity, such as
 `task-name/attempt-N`. `TaskNeuron` owns task state and attempt references. The orchestration neuron
-owns MAF session/checkpoint state. Private MAF executors own neither.
+owns the supervised MAF checkpoint lineage. Private MAF executors own neither. Direct chat uses a
+separate protected session envelope; `RespondAsync` is rejected while a supervised run is active so
+the paths cannot mutate orchestration state concurrently.
 
 A worker neuron must not execute a long MAF superstep inside its serialized Orleans turn. It
-persists a fenced execution lease containing Attempt, Revision, workflow fingerprint, and deadline,
-then returns. An internal AI runner executes the superstep and returns checkpoint/session state plus
-the outcome. The worker atomically accepts only its active lease. Cancellation revokes the lease;
-late or duplicate results cannot overwrite newer state. Reminders may redispatch an unfinished
-lease after a crash.
+persists replayable initial input, the initiating durable causal reference, and one active
+`WorkflowRun` containing a fresh `RunId`, full `AttemptCursor`, definition fingerprint, input
+checkpoint reference, and `RecoverAfter`, then returns. An internal AI runner executes the
+superstep and returns the exact input lineage plus the new checkpoint and terminal/pending output.
+The worker accepts a result only when its `RunId`, cursor, fingerprint, and input checkpoint match
+the current `ActiveRun`, and only after the checkpoint store has committed the returned checkpoint.
+Recovery replaces the `RunId` while retaining the stable Worker + Task + Attempt checkpoint-store
+identity. Cancellation clears `ActiveRun`; serialized turn ordering determines whether an already
+committed success or cancellation wins, and all later results are stale.
 
-Each supervised Task execution lease advances exactly one MAF Lockstep superstep. The runner
-restores the checkpoint, advances one superstep, and returns control for a durable worker commit
-before another lease may continue. MAF `Concurrent` may still run participants in parallel inside
-that superstep. Interactive, non-Task conversations may use normal OffThread streaming.
+Each supervised `WorkflowRun` advances exactly one MAF Lockstep superstep. The runner restores the
+input checkpoint, stops at the first `SuperStepCompletedEvent`, and returns control for durable
+checkpoint adoption before another run may continue. MAF `Concurrent` may still run participants in
+parallel inside that superstep. There is no exactly-once claim across a crash after checkpoint-store
+commit but before worker adoption.
 
 The runner is infrastructure, not a public neuron: it has no registry entry, journal, semantic
-interface, scripting visibility, or durable domain identity.
+interface, scripting visibility, or durable domain identity. The initiating Task-to-worker request
+is journaled before the runner starts, but it cannot authorize later off-turn calls. Before each
+typed participant or integration call, the GroupChat commits a distinct exact
+`CapabilityRequested` and Kernel mints the opaque-public, non-semantic `CapabilityDelegation` for
+the actual runner source. The Kernel token carries no run, Attempt, Task revision, checkpoint, MAF,
+approval, integration, lease, generation, or renewal state; each owning module validates those
+semantics independently. A broad Kernel bypass remains forbidden.
 
 MAF `RunStatus` is not a Task state. Running means the Attempt is executing; an idle checkpoint is
 not completion; pending MAF requests map to Task `Waiting`; output may complete an Attempt; error
@@ -655,7 +701,7 @@ feeds Task retry/failure policy.
 Time is an independent module family with public vocabulary in `DigitalBrain.Time`. Public scheduled
 behavior and private Kernel scheduling are separate:
 
-- Kernel timers/reminders maintain outbox delivery, lease recovery, and retry pumps.
+- Kernel timers/reminders maintain outbox delivery, run recovery, and retry pumps.
 - Time neurons represent schedules that behaviors, Tasks, and modules may address.
 - Behaviors never see Orleans `IGrainTimer`, `IGrainReminder`, `TickStatus`, or reminder names.
 - Kernel-owned reminder names use a reserved `db.*` namespace.
