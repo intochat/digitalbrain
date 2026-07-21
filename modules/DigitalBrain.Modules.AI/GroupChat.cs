@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using Orleans.Runtime;
 using Orleans.Serialization;
 
 namespace DigitalBrain.AI;
@@ -19,9 +20,11 @@ namespace DigitalBrain.AI;
     "Naming",
     "CA1724:Type names should not match namespaces",
     Justification = "GroupChat is the ratified public orchestration vocabulary.")]
-public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkflowRunCompletion
+public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkflowRunCompletion, IRemindable
 {
+    private const string ClockName = "ai.group-chat.clock";
     private const string ProtectionPurpose = "DigitalBrain.AI.GroupChat.AgentSession.v1";
+    private const string RecoveryReminderName = "db.ai.workflow-run";
     private const string StateName = "ai.group-chat.session";
     private const string WorkerStateName = "ai.group-chat.worker";
     private static readonly TimeSpan RecoveryInterval = TimeSpan.FromMinutes(1);
@@ -39,7 +42,9 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
         _workerState = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(WorkerStateName);
         _workerStates = ServiceProvider.GetRequiredService<Serializer<AIWorkerState>>();
         _messages = ServiceProvider.GetRequiredService<Serializer<ChatMessage>>();
-        _clock = ServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
+        _clock = ServiceProvider.GetKeyedService<TimeProvider>(ClockName)
+            ?? ServiceProvider.GetService<TimeProvider>()
+            ?? TimeProvider.System;
     }
 
     protected abstract IReadOnlyList<Participant> Participants { get; }
@@ -114,6 +119,10 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
             causation,
             run);
 
+        await this.RegisterOrUpdateReminder(
+            RecoveryReminderName,
+            RecoveryInterval,
+            RecoveryInterval);
         StageWorkerState(state);
         await ReplyAsync(new AttemptAccepted(
             cursor.Task,
@@ -126,6 +135,40 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
     public abstract Task ContinueAsync(AttemptCursor cursor);
 
     public abstract Task CancelAsync(AttemptCursor cursor);
+
+    async Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
+    {
+        if (!string.Equals(reminderName, RecoveryReminderName, StringComparison.Ordinal))
+        {
+            await base.ReceiveReminder(reminderName, status);
+            return;
+        }
+
+        var state = LoadWorkerState();
+
+        if (state?.ActiveRun is not { } active)
+        {
+            await UnregisterRecoveryReminderAsync();
+            return;
+        }
+
+        var now = _clock.GetUtcNow();
+
+        if (now < active.RecoverAfterUtc)
+        {
+            return;
+        }
+
+        var replacement = active with
+        {
+            RunId = Guid.NewGuid(),
+            RecoverAfterUtc = now + RecoveryInterval,
+        };
+        var replacementState = state with { ActiveRun = replacement };
+
+        await SaveWorkerStateAsync(replacementState);
+        await DispatchAsync(replacementState);
+    }
 
     public async Task<ChatResponse> RespondAsync(IReadOnlyList<ChatMessage> messages)
     {
@@ -270,20 +313,7 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
             ?? throw new InvalidOperationException(
                 $"GroupChat '{Id}' has no supervised Attempt state.");
 
-        if (state.ActiveRun is not { } active
-            || active.RunId != run.RunId
-            || active.Cursor != run.Cursor
-            || !string.Equals(
-                active.DefinitionFingerprint,
-                run.DefinitionFingerprint,
-                StringComparison.Ordinal)
-            || active.InputCheckpoint != run.InputCheckpoint
-            || state.Cursor != run.Cursor
-            || !string.Equals(
-                state.Definition.Fingerprint,
-                run.DefinitionFingerprint,
-                StringComparison.Ordinal)
-            || state.Checkpoint != run.InputCheckpoint)
+        if (!MatchesActive(state, run))
         {
             throw new InvalidOperationException(
                 $"Workflow run '{run.RunId}' does not match GroupChat '{Id}'s active run fence.");
@@ -291,6 +321,22 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
 
         return state;
     }
+
+    private static bool MatchesActive(AIWorkerState state, WorkflowRun run)
+        => state.ActiveRun is { } active
+            && active.RunId == run.RunId
+            && active.Cursor == run.Cursor
+            && string.Equals(
+                active.DefinitionFingerprint,
+                run.DefinitionFingerprint,
+                StringComparison.Ordinal)
+            && active.InputCheckpoint == run.InputCheckpoint
+            && state.Cursor == run.Cursor
+            && string.Equals(
+                state.Definition.Fingerprint,
+                run.DefinitionFingerprint,
+                StringComparison.Ordinal)
+            && state.Checkpoint == run.InputCheckpoint;
 
     private static OrchestrationParticipant AssertParticipant(
         OrchestrationDefinition definition,
@@ -308,7 +354,28 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
 
     private void Schedule(AIWorkerState state)
     {
+        _runnerDispatch?.Dispose();
+        _runnerDispatch = RegisterGrainTimer(
+            async () =>
+            {
+                _runnerDispatch?.Dispose();
+                _runnerDispatch = null;
+
+                await DispatchAsync(state);
+            },
+            new GrainTimerCreationOptions(TimeSpan.Zero, Timeout.InfiniteTimeSpan));
+    }
+
+    private async Task DispatchAsync(AIWorkerState state)
+    {
         if (state.ActiveRun is not { } run)
+        {
+            return;
+        }
+
+        var current = LoadWorkerState();
+
+        if (current is null || !MatchesActive(current, run))
         {
             return;
         }
@@ -318,16 +385,7 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
             state.Definition,
             ChatMessageCopies.Clone(state.ReplayInput, _messages));
 
-        _runnerDispatch?.Dispose();
-        _runnerDispatch = RegisterGrainTimer(
-            async () =>
-            {
-                _runnerDispatch?.Dispose();
-                _runnerDispatch = null;
-
-                await Runner(run).ExecuteAsync(command);
-            },
-            new GrainTimerCreationOptions(TimeSpan.Zero, Timeout.InfiniteTimeSpan));
+        await Runner(run).ExecuteAsync(command);
     }
 
     private IWorkflowRunner Runner(WorkflowRun run)
@@ -345,6 +403,32 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
 
         EnlistTurnRollback(() => _workerState.Value = previous);
         _workerState.Value = _workerStates.SerializeToArray(state);
+    }
+
+    private async Task SaveWorkerStateAsync(AIWorkerState state)
+    {
+        var previous = _workerState.Value?.ToArray();
+
+        _workerState.Value = _workerStates.SerializeToArray(state);
+
+        try
+        {
+            await WriteStateAsync();
+        }
+        catch
+        {
+            _workerState.Value = previous;
+
+            throw;
+        }
+    }
+
+    private async Task UnregisterRecoveryReminderAsync()
+    {
+        if (await this.GetReminder(RecoveryReminderName) is { } reminder)
+        {
+            await this.UnregisterReminder(reminder);
+        }
     }
 
     private static void ValidateShape(AttemptRequest request)

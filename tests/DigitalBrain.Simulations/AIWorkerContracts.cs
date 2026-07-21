@@ -143,6 +143,241 @@ public sealed class AIWorkerContracts
         }
     }
 
+    [Fact(DisplayName = "an expired recovery reminder persists a fresh run before redispatch and stale output cannot win")]
+    public async Task ExpiredRecoveryReminderPersistsFreshRunBeforeRedispatchAndStaleOutputCannotWin()
+    {
+        const string recoveryReminder = "db.ai.workflow-run";
+        var journals = new AIWorkerJournalStorageProvider();
+        var clock = new AIWorkerTimeProvider(DateTimeOffset.Parse(
+            "2026-07-21T08:00:00Z",
+            System.Globalization.CultureInfo.InvariantCulture));
+        var cluster = await StartWorkerClusterAsync(journals, clock);
+        AIWorkerLogProvider.Clear();
+
+        var owner = new OwnerId("ai-worker-reminder-recovery");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        AIWorkerRunnerDispatchProbe.Reset(workerId);
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var probe = cluster.Client.GetGrain<IAIWorkerProbe>(
+            NeuronId.For<AIWorkerProbe>(owner, "probe").ToGrainId());
+        var reminder = cluster.Client.GetGrain<IReminderProbe>(
+            NeuronId.For<ReminderProbe>(owner, "reminder-probe").ToGrainId());
+        var gate = AIWorkerGate.Prepare(
+            owner,
+            "recover the supervised run",
+            "stale answer",
+            secondAnswer: "recovered answer");
+        AIWorkerWriteGate? replacementWrite = null;
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("recover the supervised run"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            var running = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Running);
+            await gate.Entered.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Equal(1, AIWorkerRunnerDispatchProbe.EntriesFor(workerId));
+
+            Assert.True(await reminder.ExistsAsync(workerId, recoveryReminder));
+
+            await reminder.ExpediteAsync(workerId, recoveryReminder);
+            await Task.Delay(TimeSpan.FromMilliseconds(1500), TestContext.Current.CancellationToken);
+            Assert.Equal(1, gate.EntryCount);
+
+            clock.Advance(TimeSpan.FromMinutes(2));
+            var writesBeforeReplacement = journals.CompletedWrites(workerId.ToGrainId());
+            replacementWrite = journals.BlockNextWrite(workerId.ToGrainId());
+            await reminder.ExpediteAsync(workerId, recoveryReminder);
+
+            await replacementWrite.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(300), TestContext.Current.CancellationToken);
+            Assert.Equal(1, AIWorkerRunnerDispatchProbe.EntriesFor(workerId));
+            Assert.Equal(1, gate.EntryCount);
+
+            replacementWrite.Release();
+            await WaitUntilAsync(
+                () => journals.CompletedWrites(workerId.ToGrainId()) > writesBeforeReplacement,
+                "The recovered WorkflowRun replacement was not committed.");
+            await WaitUntilAsync(
+                () => AIWorkerRunnerDispatchProbe.EntriesFor(workerId) == 2,
+                "The recovered WorkflowRun was not dispatched after its replacement commit.");
+            _ = await probe.ReadWorkerStateAsync(workerId);
+
+            _ = await ReadJournalUntilAsync(
+                probe,
+                workerId,
+                journal => journal.Delta.Count(delivery =>
+                    delivery.Synapse is CapabilityRequested request
+                    && request.Target == NeuronId.For<IAIWorkerModel>(owner, "worker")) == 2);
+            Assert.Equal(1, gate.EntryCount);
+
+            gate.ReleaseFirst();
+            await WaitUntilAsync(
+                () => AIWorkerLogProvider.Messages.Any(message =>
+                    message.Contains("failed before adoption", StringComparison.Ordinal)),
+                "The stale workflow runner did not reach its exact active-run fence.");
+            await gate.SecondEntry.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+
+            var recoveredRunning = await task.ReadAsync();
+            Assert.Equal(TaskState.Running, recoveredRunning.State);
+            Assert.Equal(running.ActiveAttempt, recoveredRunning.ActiveAttempt);
+            Assert.Equal(running.Revision, recoveredRunning.Revision);
+            Assert.Equal("recover the supervised run", gate.InputAt(1)[0].Text);
+            Assert.Equal("recover the supervised run", gate.InputAt(2)[0].Text);
+
+            await reminder.ExpediteAsync(workerId, recoveryReminder);
+            await Task.Delay(TimeSpan.FromMilliseconds(1500), TestContext.Current.CancellationToken);
+            Assert.Equal(2, gate.EntryCount);
+
+            gate.ReleaseSecond();
+            var succeeded = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Succeeded);
+            var result = Assert.IsType<AIWorkerResult>(succeeded.Result);
+            Assert.Equal("recovered answer", result.Answer);
+
+            var outgoing = await ReadJournalUntilAsync(
+                probe,
+                workerId,
+                journal => journal.Delta.Any(delivery =>
+                    delivery.Synapse is CapabilityCompleted));
+
+            Assert.Equal(
+                2,
+                outgoing.Delta.Count(delivery =>
+                    delivery.Synapse is CapabilityRequested request
+                    && request.Target == NeuronId.For<IAIWorkerModel>(owner, "worker")));
+            Assert.Single(
+                outgoing.Delta,
+                delivery => delivery.Synapse is CapabilityRequested request
+                    && request.Target == workerId);
+
+            await reminder.ExpediteAsync(workerId, recoveryReminder);
+            await WaitForReminderStateAsync(
+                reminder,
+                workerId,
+                recoveryReminder,
+                exists: false);
+        }
+        finally
+        {
+            replacementWrite?.Release();
+            gate.Release();
+            journals.ClearFailure(workerId.ToGrainId());
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "a failed recovery write neither redispatches nor consumes the expired run")]
+    public async Task FailedRecoveryWriteDoesNotDispatchAndTheNextReminderRetries()
+    {
+        const string recoveryReminder = "db.ai.workflow-run";
+        var journals = new AIWorkerJournalStorageProvider();
+        var clock = new AIWorkerTimeProvider(DateTimeOffset.Parse(
+            "2026-07-21T09:00:00Z",
+            System.Globalization.CultureInfo.InvariantCulture));
+        var cluster = await StartWorkerClusterAsync(journals, clock);
+        AIWorkerLogProvider.Clear();
+
+        var owner = new OwnerId("ai-worker-reminder-write-failure");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var workerGrain = workerId.ToGrainId();
+        AIWorkerRunnerDispatchProbe.Reset(workerId);
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var probe = cluster.Client.GetGrain<IAIWorkerProbe>(
+            NeuronId.For<AIWorkerProbe>(owner, "probe").ToGrainId());
+        var reminder = cluster.Client.GetGrain<IReminderProbe>(
+            NeuronId.For<ReminderProbe>(owner, "reminder-probe").ToGrainId());
+        var gate = AIWorkerGate.Prepare(
+            owner,
+            "retry a failed recovery commit",
+            "stale answer",
+            secondAnswer: "recovered after retry");
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("retry a failed recovery commit"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            _ = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Running);
+            await gate.Entered.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.True(await reminder.ExistsAsync(workerId, recoveryReminder));
+            Assert.Equal(1, AIWorkerRunnerDispatchProbe.EntriesFor(workerId));
+
+            var beforeFailure = await probe.ReadWorkerStateAsync(workerId);
+            clock.Advance(TimeSpan.FromMinutes(2));
+            journals.FailWriteAfter(
+                workerGrain,
+                completedWritesBeforeFailure: 0,
+                "injected recovery commit failure");
+            await reminder.ExpediteAsync(workerId, recoveryReminder);
+
+            await WaitUntilAsync(
+                () => journals.FiredFailures(workerGrain) == 1,
+                "The recovery commit failure was not injected.");
+            Assert.Equal(beforeFailure, await probe.ReadWorkerStateAsync(workerId));
+            await Task.Delay(TimeSpan.FromMilliseconds(300), TestContext.Current.CancellationToken);
+
+            var failedJournal = await probe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+            Assert.Single(
+                failedJournal.Delta,
+                delivery => delivery.Synapse is CapabilityRequested request
+                    && request.Target == NeuronId.For<IAIWorkerModel>(owner, "worker"));
+            Assert.Equal(1, gate.EntryCount);
+            Assert.Equal(1, AIWorkerRunnerDispatchProbe.EntriesFor(workerId));
+
+            journals.ClearFailure(workerGrain);
+            await reminder.ExpediteAsync(workerId, recoveryReminder);
+            _ = await ReadJournalUntilAsync(
+                probe,
+                workerId,
+                journal => journal.Delta.Count(delivery =>
+                    delivery.Synapse is CapabilityRequested request
+                    && request.Target == NeuronId.For<IAIWorkerModel>(owner, "worker")) == 2);
+            Assert.Equal(2, AIWorkerRunnerDispatchProbe.EntriesFor(workerId));
+
+            gate.ReleaseFirst();
+            await WaitUntilAsync(
+                () => AIWorkerLogProvider.Messages.Any(message =>
+                    message.Contains("failed before adoption", StringComparison.Ordinal)),
+                "The stale workflow runner did not reach its exact active-run fence.");
+            await gate.SecondEntry.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            gate.ReleaseSecond();
+
+            var succeeded = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Succeeded);
+            Assert.Equal("recovered after retry", Assert.IsType<AIWorkerResult>(succeeded.Result).Answer);
+
+            await reminder.ExpediteAsync(workerId, recoveryReminder);
+            await WaitForReminderStateAsync(
+                reminder,
+                workerId,
+                recoveryReminder,
+                exists: false);
+        }
+        finally
+        {
+            gate.Release();
+            journals.ClearFailure(workerGrain);
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
     [Fact(DisplayName = "GroupChat copies mutable input and read-only output mapping boundaries")]
     public async Task GroupChatCopiesBothTaskMappingBoundaries()
     {
@@ -657,6 +892,20 @@ public sealed class AIWorkerContracts
         }
     }
 
+    private static async Task WaitForReminderStateAsync(
+        IReminderProbe reminder,
+        NeuronId target,
+        string reminderName,
+        bool exists)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        while (await reminder.ExistsAsync(target, reminderName) != exists)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(10), timeout.Token);
+        }
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition, string timeoutMessage)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -688,7 +937,8 @@ public sealed class AIWorkerContracts
     }
 
     private static async Task<InProcessTestCluster> StartWorkerClusterAsync(
-        IJournalStorageProvider? journalStorage = null)
+        IJournalStorageProvider? journalStorage = null,
+        TimeProvider? clock = null)
     {
         var builder = new InProcessTestClusterBuilder(1);
 
@@ -700,6 +950,14 @@ public sealed class AIWorkerContracts
             silo.Services.AddSingleton<IJournalStorageProvider>(
                 journalStorage ?? new VolatileJournalStorageProvider());
             silo.Services.AddSingleton<ILoggerProvider>(AIWorkerLogProvider.Instance);
+            silo.AddIncomingGrainCallFilter<AIWorkerRunnerDispatchFilter>();
+
+            if (clock is not null)
+            {
+                silo.Services.AddKeyedSingleton(
+                    "ai.group-chat.clock",
+                    clock);
+            }
         });
         builder.ConfigureClient(client =>
         {
@@ -712,6 +970,49 @@ public sealed class AIWorkerContracts
 
         return cluster;
     }
+}
+
+internal sealed class AIWorkerRunnerDispatchFilter : IIncomingGrainCallFilter
+{
+    public async Task Invoke(IIncomingGrainCallContext context)
+    {
+        if (string.Equals(
+                context.TargetId.Type.ToString(),
+                "ai-workflow-runner",
+                StringComparison.Ordinal)
+            && string.Equals(
+                context.InterfaceMethod?.Name,
+                "ExecuteAsync",
+                StringComparison.Ordinal))
+        {
+            AIWorkerRunnerDispatchProbe.Record(context.TargetId);
+        }
+
+        await context.Invoke();
+    }
+}
+
+internal static class AIWorkerRunnerDispatchProbe
+{
+    private const string RunnerSeparator = "/workflow-run/";
+    private static readonly ConcurrentDictionary<string, int> Entries = new(StringComparer.Ordinal);
+
+    internal static int EntriesFor(NeuronId worker)
+        => Entries.GetValueOrDefault(worker.GrainKey);
+
+    internal static void Record(GrainId runner)
+    {
+        var key = runner.Key.ToString();
+        var separator = key.IndexOf(RunnerSeparator, StringComparison.Ordinal);
+
+        if (separator > 0)
+        {
+            Entries.AddOrUpdate(key[..separator], 1, static (_, count) => count + 1);
+        }
+    }
+
+    internal static void Reset(NeuronId worker)
+        => Entries.TryRemove(worker.GrainKey, out _);
 }
 
 internal sealed class AIWorkerJournalStorageProvider : IJournalStorageProvider
@@ -877,6 +1178,28 @@ internal sealed class AIWorkerWriteGate
     }
 
     internal void Release() => _release.TrySetResult(true);
+}
+
+internal sealed class AIWorkerTimeProvider(DateTimeOffset utcNow) : TimeProvider
+{
+    private readonly object _lock = new();
+    private DateTimeOffset _utcNow = utcNow;
+
+    public override DateTimeOffset GetUtcNow()
+    {
+        lock (_lock)
+        {
+            return _utcNow;
+        }
+    }
+
+    internal void Advance(TimeSpan elapsed)
+    {
+        lock (_lock)
+        {
+            _utcNow += elapsed;
+        }
+    }
 }
 
 internal sealed class AIWorkerLogProvider : ILoggerProvider
@@ -1068,11 +1391,14 @@ internal sealed class AIWorkerGate
 {
     private static readonly ConcurrentDictionary<OwnerId, AIWorkerGate> Gates = new();
     private readonly TaskCompletionSource<bool> _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly TaskCompletionSource<bool> _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _firstRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _secondRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<bool> _secondEntry = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly string _answer;
+    private readonly string _secondAnswer;
     private readonly bool _mutateSourceDuringEnumeration;
     private readonly bool _requirePromptMatch;
+    private readonly ConcurrentDictionary<int, ChatMessage[]> _inputs = new();
     private int _entries;
     private int _active;
     private int _maximumConcurrency;
@@ -1083,10 +1409,12 @@ internal sealed class AIWorkerGate
         string prompt,
         string answer,
         bool mutateSourceDuringEnumeration,
-        bool requirePromptMatch)
+        bool requirePromptMatch,
+        string? secondAnswer)
     {
         Prompt = prompt;
         _answer = answer;
+        _secondAnswer = secondAnswer ?? answer;
         _mutateSourceDuringEnumeration = mutateSourceDuringEnumeration;
         _requirePromptMatch = requirePromptMatch;
     }
@@ -1110,13 +1438,15 @@ internal sealed class AIWorkerGate
         string prompt,
         string answer,
         bool mutateSourceDuringEnumeration = false,
-        bool requirePromptMatch = true)
+        bool requirePromptMatch = true,
+        string? secondAnswer = null)
     {
         var gate = new AIWorkerGate(
             prompt,
             answer,
             mutateSourceDuringEnumeration,
-            requirePromptMatch);
+            requirePromptMatch,
+            secondAnswer);
         Gates[owner] = gate;
 
         return gate;
@@ -1147,6 +1477,7 @@ internal sealed class AIWorkerGate
     {
         _observedInput = [.. messages.Select(message => message.Clone())];
         var entry = Interlocked.Increment(ref _entries);
+        _inputs[entry] = [.. _observedInput.Select(message => message.Clone())];
         var active = Interlocked.Increment(ref _active);
         UpdateMaximum(active);
 
@@ -1161,17 +1492,32 @@ internal sealed class AIWorkerGate
 
         try
         {
-            await _release.Task;
+            await (entry == 1 ? _firstRelease.Task : _secondRelease.Task);
         }
         finally
         {
             Interlocked.Decrement(ref _active);
         }
 
-        return new ChatResponse(new ChatMessage(ChatRole.Assistant, _answer));
+        return new ChatResponse(new ChatMessage(
+            ChatRole.Assistant,
+            entry == 1 ? _answer : _secondAnswer));
     }
 
-    internal void Release() => _release.TrySetResult(true);
+    internal IReadOnlyList<ChatMessage> InputAt(int entry)
+        => _inputs.TryGetValue(entry, out var messages)
+            ? messages
+            : throw new InvalidOperationException($"The model has no recorded entry '{entry}'.");
+
+    internal void ReleaseFirst() => _firstRelease.TrySetResult(true);
+
+    internal void ReleaseSecond() => _secondRelease.TrySetResult(true);
+
+    internal void Release()
+    {
+        ReleaseFirst();
+        ReleaseSecond();
+    }
 
     private void UpdateMaximum(int candidate)
     {
