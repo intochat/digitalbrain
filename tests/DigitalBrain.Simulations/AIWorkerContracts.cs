@@ -78,6 +78,71 @@ public sealed class AIWorkerContracts
         }
     }
 
+    [Fact(DisplayName = "completion delegation is minted only after terminal output for the current run")]
+    public async Task CompletionDelegationIsMintedOnlyAfterTerminalOutputForTheCurrentRun()
+    {
+        var cluster = await StartWorkerClusterAsync();
+        var owner = new OwnerId("ai-worker-just-in-time-completion");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var probe = cluster.Client.GetGrain<IAIWorkerProbe>(
+            NeuronId.For<AIWorkerProbe>(owner, "probe").ToGrainId());
+        var gate = AIWorkerGate.Prepare(owner, "authorize completion late", "late authorization answer");
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("authorize completion late"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            await gate.Entered.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            var whileModelBlocked = await probe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+
+            Assert.DoesNotContain(
+                whileModelBlocked.Delta,
+                delivery => delivery.Synapse is CapabilityRequested request
+                    && request.Target == workerId);
+
+            gate.Release();
+            _ = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Succeeded);
+
+            var completed = await ReadJournalUntilAsync(
+                probe,
+                workerId,
+                journal =>
+                {
+                    var request = journal.Delta.SingleOrDefault(delivery =>
+                        delivery.Synapse is CapabilityRequested capability
+                        && capability.Target == workerId);
+
+                    return request is not null
+                        && journal.Delta.Any(delivery =>
+                            delivery.Synapse is CapabilityCompleted outcome
+                            && outcome.Request == request.SynapseId);
+                });
+            var completionRequest = Assert.Single(
+                completed.Delta,
+                delivery => delivery.Synapse is CapabilityRequested request
+                    && request.Target == workerId);
+
+            Assert.Single(
+                completed.Delta,
+                delivery => delivery.Synapse is CapabilityCompleted outcome
+                    && outcome.Request == completionRequest.SynapseId);
+        }
+        finally
+        {
+            gate.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
     [Fact(DisplayName = "GroupChat copies mutable input and read-only output mapping boundaries")]
     public async Task GroupChatCopiesBothTaskMappingBoundaries()
     {
@@ -566,6 +631,26 @@ public sealed class AIWorkerContracts
             if (condition(snapshot))
             {
                 return snapshot;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(10), timeout.Token);
+        }
+    }
+
+    private static async Task<JournalRead> ReadJournalUntilAsync(
+        IAIWorkerProbe probe,
+        NeuronId worker,
+        Func<JournalRead, bool> condition)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        while (true)
+        {
+            var journal = await probe.ReadJournalAsync(worker, JournalKind.Outgoing);
+
+            if (condition(journal))
+            {
+                return journal;
             }
 
             await Task.Delay(TimeSpan.FromMilliseconds(10), timeout.Token);

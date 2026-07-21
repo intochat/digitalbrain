@@ -25,6 +25,9 @@ internal interface IWorkflowRunOwner : IGrainWithStringKey
     Task<CapabilityDelegation> AuthorizeParticipantAsync(
         WorkflowRun run,
         OrchestrationParticipant participant);
+
+    [Alias("AuthorizeCompletion")]
+    Task<CapabilityDelegation> AuthorizeCompletionAsync(WorkflowRun run);
 }
 
 [Alias("ai.workflow-run-completion")]
@@ -177,12 +180,15 @@ internal sealed class WorkflowRunner(
                 outputCheckpoint.SessionId,
                 outputCheckpoint.CheckpointId),
             terminal is null ? null : ChatMessageCopies.Clone(terminal, messages));
+        var completionDelegation = await OnTurn(
+            () => owner.AuthorizeCompletionAsync(command.Run),
+            turnScheduler);
         var completion = grains.GetGrain<IWorkflowRunCompletion>(
             command.Run.Cursor.Worker.ToGrainId());
 
         _ = await OnTurn(
             () => DigitalBrainRuntime.InvokeAsync(
-                command.Completion,
+                completionDelegation,
                 () => completion.CompleteAsync(result)),
             turnScheduler);
     }

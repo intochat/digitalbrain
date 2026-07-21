@@ -96,7 +96,7 @@ public sealed class AIContracts
             ["DigitalBrain.AI.AIWorkerState"] = ("ai.worker-state", [("Cursor", 0u), ("ReplayInput", 1u), ("Definition", 2u), ("Checkpoint", 3u), ("Causation", 4u), ("ActiveRun", 5u)]),
             ["DigitalBrain.AI.WorkflowCheckpointReference"] = ("ai.workflow-checkpoint-reference", [("SessionId", 0u), ("CheckpointId", 1u)]),
             ["DigitalBrain.AI.WorkflowRun"] = ("ai.workflow-run", [("RunId", 0u), ("Cursor", 1u), ("DefinitionFingerprint", 2u), ("InputCheckpoint", 3u), ("RecoverAfterUtc", 4u)]),
-            ["DigitalBrain.AI.WorkflowRunCommand"] = ("ai.workflow-run-command", [("Run", 0u), ("Definition", 1u), ("ReplayInput", 2u), ("Completion", 3u)]),
+            ["DigitalBrain.AI.WorkflowRunCommand"] = ("ai.workflow-run-command", [("Run", 0u), ("Definition", 1u), ("ReplayInput", 2u)]),
             ["DigitalBrain.AI.WorkflowRunResult"] = ("ai.workflow-run-result", [("Run", 0u), ("OutputCheckpoint", 1u), ("TerminalMessages", 2u)]),
             ["DigitalBrain.AI.OrchestrationParticipant"] = ("ai.orchestration-participant", [("Contract", 0u), ("NeuronId", 1u), ("AgentId", 2u), ("AgentName", 3u)]),
             ["DigitalBrain.AI.OrchestrationDefinition"] = ("ai.orchestration-definition", [("FormatVersion", 0u), ("MafVersion", 1u), ("Fingerprint", 2u), ("Participants", 3u), ("HostId", 4u), ("HostName", 5u)]),
@@ -117,7 +117,7 @@ public sealed class AIContracts
         var interfaces = new Dictionary<string, (string Alias, string[] Methods)>(StringComparer.Ordinal)
         {
             ["DigitalBrain.AI.IWorkflowRunner"] = ("ai.workflow-runner", ["Execute"]),
-            ["DigitalBrain.AI.IWorkflowRunOwner"] = ("ai.workflow-run-owner", ["AuthorizeParticipant"]),
+            ["DigitalBrain.AI.IWorkflowRunOwner"] = ("ai.workflow-run-owner", ["AuthorizeParticipant", "AuthorizeCompletion"]),
             ["DigitalBrain.AI.IWorkflowRunCompletion"] = ("ai.workflow-run-completion", ["Complete"]),
             ["DigitalBrain.AI.IWorkflowCheckpointGrain"] = ("ai.workflow-checkpoint-grain", ["Create", "Read", "Index"]),
         };

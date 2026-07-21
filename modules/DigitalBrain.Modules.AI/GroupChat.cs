@@ -105,7 +105,6 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
             definition.Fingerprint,
             InputCheckpoint: null,
             _clock.GetUtcNow() + RecoveryInterval);
-        var runner = Runner(run);
         var causation = CaptureCapabilityCausation(request.Task);
         var state = new AIWorkerState(
             cursor,
@@ -121,13 +120,7 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
             cursor.Worker,
             cursor.Attempt,
             cursor.Revision));
-        var completion = await DelegateCapabilityAsync(
-            causation,
-            runner.GetGrainId(),
-            Id,
-            typeof(IWorkflowRunCompletion),
-            nameof(IWorkflowRunCompletion.CompleteAsync));
-        Schedule(state, completion);
+        Schedule(state);
     }
 
     public abstract Task ContinueAsync(AttemptCursor cursor);
@@ -202,6 +195,19 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
             storedParticipant.NeuronId,
             invocationContract,
             nameof(IAgent.RespondAsync));
+    }
+
+    async Task<CapabilityDelegation> IWorkflowRunOwner.AuthorizeCompletionAsync(WorkflowRun run)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        var state = RequireActive(run);
+
+        return await DelegateCapabilityAsync(
+            state.Causation,
+            Runner(run).GetGrainId(),
+            Id,
+            typeof(IWorkflowRunCompletion),
+            nameof(IWorkflowRunCompletion.CompleteAsync));
     }
 
     async Task<bool> IWorkflowRunCompletion.CompleteAsync(WorkflowRunResult result)
@@ -300,7 +306,7 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
                 "The requested participant is not an exact member of the active definition snapshot.");
     }
 
-    private void Schedule(AIWorkerState state, CapabilityDelegation completion)
+    private void Schedule(AIWorkerState state)
     {
         if (state.ActiveRun is not { } run)
         {
@@ -310,8 +316,7 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
         var command = new WorkflowRunCommand(
             run,
             state.Definition,
-            ChatMessageCopies.Clone(state.ReplayInput, _messages),
-            completion);
+            ChatMessageCopies.Clone(state.ReplayInput, _messages));
 
         _runnerDispatch?.Dispose();
         _runnerDispatch = RegisterGrainTimer(

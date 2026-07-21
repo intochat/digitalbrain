@@ -1,4 +1,3 @@
-using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
 using Microsoft.Extensions.AI;
 
@@ -24,8 +23,7 @@ internal sealed record WorkflowRun(
 internal sealed record WorkflowRunCommand(
     [property: Id(0)] WorkflowRun Run,
     [property: Id(1)] OrchestrationDefinition Definition,
-    [property: Id(2)] ChatMessage[] ReplayInput,
-    [property: Id(3)] CapabilityDelegation Completion);
+    [property: Id(2)] ChatMessage[] ReplayInput);
 
 [GenerateSerializer]
 [Alias("ai.workflow-run-result")]
