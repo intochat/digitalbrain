@@ -19,9 +19,8 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
 
         if (caller is null)
         {
-            await context.Invoke();
-
-            return;
+            throw new NeuronAuthorizationException(
+                $"Semantic capability '{context.InterfaceMethod!.DeclaringType!.FullName}.{context.InterfaceMethod.Name}' can be called only by a neuron with a committed capability request.");
         }
 
         var interfaceName = context.InterfaceMethod!.DeclaringType!.FullName!;
