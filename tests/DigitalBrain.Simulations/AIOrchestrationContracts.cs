@@ -412,9 +412,6 @@ internal sealed class TestGroupChat : GroupChat, ITestGroupChat
     }
 
     public Task<Guid> ActivationAsync() => Task.FromResult(_activation);
-
-    public override Task ContinueAsync(AttemptCursor cursor) => throw new NotSupportedException();
-
 }
 
 internal static class GroupDefinitionSource

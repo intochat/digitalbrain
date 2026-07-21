@@ -71,10 +71,10 @@ public sealed class AIContracts
             candidate => candidate.Name == "CancelAsync");
         Assert.False(cancel.IsAbstract);
 
-        var deferred = Assert.Single(
+        var continuation = Assert.Single(
             typeof(GroupChat).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
             candidate => candidate.Name == "ContinueAsync");
-        Assert.True(deferred.IsAbstract);
+        Assert.False(continuation.IsAbstract);
     }
 
     [Fact(DisplayName = "the workflow runner is private non-neuron Orleans infrastructure")]

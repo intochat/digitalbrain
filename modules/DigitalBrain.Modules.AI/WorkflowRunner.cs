@@ -137,7 +137,6 @@ internal sealed class WorkflowRunner(
 
         List<ChatMessage>? terminal = null;
         CheckpointInfo? outputCheckpoint = null;
-        var sawSuperStep = false;
 
         try
         {
@@ -150,10 +149,10 @@ internal sealed class WorkflowRunner(
                     terminal = messages;
                 }
 
-                if (!sawSuperStep && workflowEvent is SuperStepCompletedEvent completed)
+                if (workflowEvent is SuperStepCompletedEvent completed)
                 {
-                    sawSuperStep = true;
                     outputCheckpoint = completed.CompletionInfo?.Checkpoint;
+                    break;
                 }
             }
         }

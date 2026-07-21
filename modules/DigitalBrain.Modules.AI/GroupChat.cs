@@ -132,7 +132,64 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
         Schedule(state);
     }
 
-    public abstract Task ContinueAsync(AttemptCursor cursor);
+    public async Task ContinueAsync(AttemptCursor cursor)
+    {
+        ArgumentNullException.ThrowIfNull(cursor);
+        ValidateCursor(cursor);
+        ValidateCapabilityCaller(cursor.Task);
+
+        var state = LoadWorkerState()
+            ?? throw new InvalidOperationException(
+                $"GroupChat '{Id}' has no supervised Attempt state.");
+
+        if (cursor == state.Cursor)
+        {
+            return;
+        }
+
+        var expected = state.Cursor with
+        {
+            Revision = checked(state.Cursor.Revision + 1),
+        };
+
+        if (cursor != expected)
+        {
+            throw new InvalidOperationException(
+                $"Attempt cursor '{cursor}' is not GroupChat '{Id}'s next cursor '{expected}'.");
+        }
+
+        if (state.ActiveRun is not null)
+        {
+            throw new InvalidOperationException(
+                $"GroupChat '{Id}' cannot continue before its active run is adopted.");
+        }
+
+        if (state.Checkpoint is null)
+        {
+            throw new InvalidOperationException(
+                $"GroupChat '{Id}' cannot continue without an adopted checkpoint.");
+        }
+
+        var run = new WorkflowRun(
+            Guid.NewGuid(),
+            cursor,
+            state.Definition.Fingerprint,
+            state.Checkpoint,
+            _clock.GetUtcNow() + RecoveryInterval);
+        var resumed = state with
+        {
+            Cursor = cursor,
+            Causation = CaptureCapabilityCausation(cursor.Task),
+            ActiveRun = run,
+        };
+
+        await this.RegisterOrUpdateReminder(
+            RecoveryReminderName,
+            RecoveryInterval,
+            RecoveryInterval);
+        StageWorkerState(resumed);
+        Schedule(resumed);
+    }
 
     public async Task CancelAsync(AttemptCursor cursor)
     {
@@ -293,12 +350,6 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
         ArgumentNullException.ThrowIfNull(result);
         var state = RequireActive(result.Run);
 
-        if (result.TerminalMessages is null)
-        {
-            throw new NotSupportedException(
-                "This slice supports only a workflow that terminates in its first supervised superstep.");
-        }
-
         var identity = WorkflowCheckpointIdentity.For(state.Cursor);
 
         if (!string.Equals(
@@ -322,14 +373,29 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
 
         _ = await checkpointGrain.ReadAsync(result.OutputCheckpoint);
 
-        var terminalMessages = Array.AsReadOnly(ChatMessageCopies.Clone(result.TerminalMessages, _messages));
-        var mapped = CreateResult(terminalMessages)
-            ?? throw new InvalidOperationException("CreateResult returned null.");
-        StageWorkerState(state with
+        var adopted = state with
         {
             Checkpoint = result.OutputCheckpoint,
             ActiveRun = null,
-        });
+        };
+
+        if (result.TerminalMessages is null)
+        {
+            StageWorkerState(adopted);
+            await ReplyAsync(
+                state.Causation,
+                new AttemptAdvanced(
+                    state.Cursor.Task,
+                    state.Cursor.Worker,
+                    state.Cursor.Attempt,
+                    state.Cursor.Revision));
+            return true;
+        }
+
+        var terminalMessages = Array.AsReadOnly(ChatMessageCopies.Clone(result.TerminalMessages, _messages));
+        var mapped = CreateResult(terminalMessages)
+            ?? throw new InvalidOperationException("CreateResult returned null.");
+        StageWorkerState(adopted);
         await ReplyAsync(
             state.Causation,
             new AttemptSucceeded(

@@ -678,12 +678,13 @@ identity. Cancellation clears `ActiveRun`; serialized turn ordering determines w
 committed success or cancellation wins, and all later results are stale.
 
 Each supervised `WorkflowRun` advances exactly one MAF Lockstep superstep. The runner restores the
-input checkpoint and retains the first `SuperStepCompletedEvent` checkpoint. MAF 1.13 can emit the
-canonical terminal `WorkflowOutputEvent` after that event, so the runner finishes consuming the same
-stream without sending another `TurnToken`, then returns control for durable checkpoint adoption
-before another run may continue. MAF `Concurrent` may still run participants in parallel inside that
-superstep. There is no exactly-once claim across a crash after checkpoint-store commit but before
-worker adoption.
+input checkpoint, consumes events through the first `SuperStepCompletedEvent`, retains that event's
+checkpoint, and breaks immediately. In the pinned GroupChat path, canonical terminal output is
+emitted before the final superstep-completion event; requesting another event after completion can
+execute the next Lockstep superstep. A nonterminal checkpoint resumes its already queued messages
+without another `TurnToken`, then returns control for durable checkpoint adoption before another run
+may continue. MAF `Concurrent` may still run participants in parallel inside that superstep. There
+is no exactly-once claim across a crash after checkpoint-store commit but before worker adoption.
 
 The runner is infrastructure, not a public neuron: it has no registry entry, journal, semantic
 interface, scripting visibility, or durable domain identity. The initiating Task-to-worker request
