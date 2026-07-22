@@ -60,9 +60,11 @@ test, the specification, and the published documentation — every `.feature` fi
 [Specification](/specification) page automatically. Then make it pass, then run the gate.
 
 When the behaviour is not coming yet, keep the proof and exclude it rather than deleting it:
-`[Fact(Explicit = true)]` for xUnit, `@ignore` for Gherkin. Those proofs are listed publicly on the
-[Status](/status) page, because a proof nobody runs is worth nothing unless its state is visible. The
-root gate is never red.
+`[Fact(Explicit = true)]` for xUnit, `@ignore` for Gherkin. An excluded proof still reports as explicit
+or skipped in the test run rather than disappearing, because a proof nobody runs is worth nothing
+unless its state is visible — the same reasoning behind the [Architecture](/architecture) page's
+"Known limitations" section (§8), which discloses every debt in the built system rather than burying
+it. The root gate is never red.
 
 **Grill your own diff before you commit.** Three questions, answered in the commit message:
 
@@ -122,5 +124,6 @@ made deterministic, delete it and record why rather than retrying it in a loop.
 ## Honesty
 
 Never tick a box that is not fully met, and never describe something as proven when it is merely
-implemented. Where a guarantee is incomplete, say so plainly — the [Status](/status) page tracks the
-open debts, and a limitation a user discovers themselves costs far more than one you wrote down.
+implemented. Where a guarantee is incomplete, say so plainly — the [Architecture](/architecture)
+page's "Known limitations" section (§8) tracks the open debts, and a limitation a user discovers
+themselves costs far more than one you wrote down.

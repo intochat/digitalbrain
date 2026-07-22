@@ -468,7 +468,8 @@ What is settled, and why each rule is there:
   neurons and they are the only types that encapsulate the Orleans reminder and timer implementation;
   a module reaches scheduled behavior by talking to one of them, and a module's own private timing
   stays inside that module rather than being obtained by overriding an inherited callback.
-  `ReceiveReminder` is not part of the public neuron surface. The alternative is worse than it looks:
+  `ReceiveReminder` is not part of the public neuron surface — today's kernel deviates from that rule;
+  see the known deviation in §10. The alternative is worse than it looks:
   once a base class exposes a reminder hook, every subclass that wants a wake-up overrides it, each
   one has to know which names its ancestors already claimed and chain to `base` for the rest, and the
   answer to "whose reminder is this?" ends up spread along an inheritance chain instead of living in
@@ -769,7 +770,7 @@ letting the rule quietly soften.
 46. First durable profile: single Azure Storage (`WithAzureStorage`).
 47. Deterministic test time via `TimeProvider` + simulation driver.
 
-## 10. Open, and explicitly rejected
+## 10. Still open, known deviations, and rejected
 
 ### Still open
 
@@ -794,11 +795,12 @@ One ratified rule and the code disagree today, and it is the rule that stands. �
 module obtains scheduling by inheriting or overriding a reminder hook, and that `ReceiveReminder`
 therefore does not belong on the public neuron surface. The kernel exposes it publicly all the same —
 `Neuron` in `src/DigitalBrain.Kernel/Neuron.cs` implements `IRemindable` with a public
-`ReceiveReminder` that drains the outbox — and both `TaskNeuron` and `GroupChat` implement
-`IRemindable.ReceiveReminder`, claim the one reminder name each of them owns, and chain to `base` for
-every other name. That is a deviation to close, not a decision to reverse. Closing it belongs with the
-Time module work, because it is that work that builds the schedule neurons the inherited hook is
-currently standing in for.
+`ReceiveReminder` that drains the outbox — and both `TaskNeuron`
+(`modules/DigitalBrain.Modules.Tasks/TaskNeuron.cs`) and `GroupChat`
+(`modules/DigitalBrain.Modules.AI/GroupChat.cs`) implement `IRemindable.ReceiveReminder`, claim the
+reminder names each of them owns, and chain to `base` for every other name. That is a deviation to
+close, not a decision to reverse. Closing it belongs with the Time module work, because it is that work
+that builds the schedule neurons the inherited hook is currently standing in for.
 
 ### Rejected
 

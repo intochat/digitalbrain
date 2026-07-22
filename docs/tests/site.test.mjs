@@ -206,13 +206,25 @@ test('the open debts are disclosed rather than buried', () => {
 test('the ratified rules survive as a checklist', () => {
   const architecture = read('docs', 'architecture.md')
 
+  const sectionStart = /^## 9\. Ratified rules$/m.exec(architecture)
+  assert.ok(sectionStart, 'the "## 9. Ratified rules" heading must exist')
+
+  const afterSectionStart = architecture.slice(sectionStart.index + sectionStart[0].length)
+  const sectionEnd = /^## 10\..*$/m.exec(afterSectionStart)
+  assert.ok(sectionEnd, 'the "## 10." heading that closes section 9 must exist')
+
+  const ratifiedRulesSection = afterSectionStart.slice(0, sectionEnd.index)
+  assert.ok(
+    ratifiedRulesSection.trim().length > 0,
+    'the ratified rules section between "## 9." and "## 10." must not be empty')
+
   for (let rule = 1; rule <= 47; rule += 1) {
     assert.match(
-      architecture,
+      ratifiedRulesSection,
       new RegExp(`^${rule}\\. \\S`, 'm'),
-      `ratified rule ${rule} is missing`)
+      `ratified rule ${rule} is missing from section 9`)
   }
-  assert.doesNotMatch(architecture, /^48\. /m, 'the ratified list ends at 47')
+  assert.doesNotMatch(ratifiedRulesSection, /^48\. /m, 'the ratified list ends at 47')
 
   for (const rejected of ['Ical.Net', 'Durable Extension', 'model tier', 'raw invoke']) {
     assert.ok(architecture.includes(rejected), `the rejected list must name ${rejected}`)
