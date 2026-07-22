@@ -94,21 +94,30 @@ test('concepts define the three primitives and the whole vocabulary', () => {
   assert.ok(avoidLines.length >= 26, `every glossary term needs an _Avoid_ line, found ${avoidLines.length}`)
 })
 
-test('the architecture page separates what is built from what is designed', () => {
+test('the architecture page is module-organized and states each status once', () => {
   const architecture = read('docs', 'architecture.md')
 
-  assert.match(architecture, /designed and not yet built/)
-  assert.match(architecture, /Modules own vocabulary|Vocabulary — synapse records/)
-  assert.match(architecture, /Runtime behavior installation is designed and not yet built/)
+  for (const heading of [
+    'The vision', 'The kernel', 'The module model', 'The modules',
+    'Behaviors and scripting', 'Registry and discovery', 'Hosting and durability',
+  ]) {
+    assert.ok(architecture.includes(heading), `architecture must have a ${heading} section`)
+  }
+
+  for (const module of ['AI', 'Tasks', 'Google', 'Salesforce', 'Time', 'Flutter', 'Memory']) {
+    assert.ok(
+      new RegExp(`### .*\\b${module}\\b`).test(architecture),
+      `architecture must have a ${module} module section`)
+  }
+
+  const built = architecture.match(/^Status: Built$/gm) ?? []
+  const designed = architecture.match(/^Status: Designed$/gm) ?? []
+  assert.equal(built.length, 4, 'AI, Tasks, Google, and Salesforce are built')
+  assert.equal(designed.length, 2, 'Time and Flutter are designed')
+
   assert.match(architecture, /human-approved proposal/)
-
-  const sections = architecture.split(/^## /m).slice(1)
-  const designSections = sections.filter(section => /Status: /.test(section))
-  assert.ok(designSections.length >= 4, 'each design section must carry an explicit status line')
-
-  const status = read('docs', 'status.md')
-  assert.match(status, /Where this is going/)
-  assert.match(status, /load-bearing and unmeasured/)
+  assert.match(architecture, /Runtime behavior installation is designed and not yet built/)
+  assert.doesNotMatch(architecture, /REFINED-ARCHITECTURE|APPROVED-ARCHITECTURE/)
 })
 
 test('the quickstart matches the sample that CI actually runs', () => {
