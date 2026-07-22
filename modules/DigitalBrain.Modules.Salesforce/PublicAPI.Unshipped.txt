@@ -1,0 +1,4 @@
+#nullable enable
+DigitalBrain.Salesforce.SalesforceModule
+DigitalBrain.Salesforce.SalesforceModule.SalesforceModule() -> void
+static DigitalBrain.Salesforce.SalesforceModule.Configure(Orleans.Hosting.ISiloBuilder! builder) -> void

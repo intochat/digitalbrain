@@ -5,7 +5,8 @@ namespace DigitalBrain.Tests;
 
 public sealed class PackageBoundaryContracts
 {
-    private static readonly string[] ProviderSdkPrefixes = ["OpenAI", "Anthropic", "Microsoft.Extensions.AI.OpenAI", "OllamaSharp"];
+    private static readonly string[] ProviderSdkPrefixes =
+        ["OpenAI", "Anthropic", "Microsoft.Extensions.AI.OpenAI", "OllamaSharp", "ModelContextProtocol"];
 
     private static readonly string RepositoryRoot = LocateRepositoryRoot();
 
@@ -17,6 +18,8 @@ public sealed class PackageBoundaryContracts
         "DigitalBrain.Aspire",
         "DigitalBrain.Aspire.Hosting",
         "DigitalBrain.Modules.AI.Contracts",
+        "DigitalBrain.Modules.Google.Contracts",
+        "DigitalBrain.Modules.Salesforce.Contracts",
         "DigitalBrain.Modules.Tasks.Contracts",
     ];
 
@@ -72,6 +75,10 @@ public sealed class PackageBoundaryContracts
             .Append("DigitalBrain.Kernel")
             .Append("DigitalBrain.Modules.AI")
             .Append("DigitalBrain.Modules.AI.Aspire.Hosting")
+            .Append("DigitalBrain.Modules.Google")
+            .Append("DigitalBrain.Modules.Google.Aspire.Hosting")
+            .Append("DigitalBrain.Modules.Salesforce")
+            .Append("DigitalBrain.Modules.Salesforce.Aspire.Hosting")
             .Append("DigitalBrain.Modules.Tasks")
             .ToHashSet(StringComparer.Ordinal);
 

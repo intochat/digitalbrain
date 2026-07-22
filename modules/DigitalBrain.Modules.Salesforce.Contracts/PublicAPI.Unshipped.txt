@@ -1,0 +1,28 @@
+#nullable enable
+DigitalBrain.Salesforce.ISalesforce
+DigitalBrain.Salesforce.ISalesforce.ApproveAccountDescriptionAsync(DigitalBrain.Abstractions.CommandId commandId, string! fingerprint) -> System.Threading.Tasks.Task<DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation!>!
+DigitalBrain.Salesforce.ISalesforce.ProposeAccountDescriptionAsync(DigitalBrain.Abstractions.CommandId commandId, string! accountId, string! description) -> System.Threading.Tasks.Task<DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation!>!
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.<Clone>$() -> DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation!
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.AccountId.get -> string!
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.AccountId.init -> void
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.CommandId.get -> DigitalBrain.Abstractions.CommandId
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.CommandId.init -> void
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.Deconstruct(out DigitalBrain.Abstractions.CommandId CommandId, out string! AccountId, out string! Description, out string! Fingerprint, out DigitalBrain.Salesforce.SalesforceMutationState State) -> void
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.Description.get -> string!
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.Description.init -> void
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.Equals(DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation? other) -> bool
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.Fingerprint.get -> string!
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.Fingerprint.init -> void
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.SalesforceAccountDescriptionMutation(DigitalBrain.Abstractions.CommandId CommandId, string! AccountId, string! Description, string! Fingerprint, DigitalBrain.Salesforce.SalesforceMutationState State) -> void
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.State.get -> DigitalBrain.Salesforce.SalesforceMutationState
+DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.State.init -> void
+DigitalBrain.Salesforce.SalesforceMutationState
+DigitalBrain.Salesforce.SalesforceMutationState.AwaitingApproval = 0 -> DigitalBrain.Salesforce.SalesforceMutationState
+DigitalBrain.Salesforce.SalesforceMutationState.Completed = 1 -> DigitalBrain.Salesforce.SalesforceMutationState
+DigitalBrain.Salesforce.SalesforceMutationState.OutcomeUncertain = 2 -> DigitalBrain.Salesforce.SalesforceMutationState
+override DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.Equals(object? obj) -> bool
+override DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.GetHashCode() -> int
+override DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.ToString() -> string!
+static DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.operator !=(DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation? left, DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation? right) -> bool
+static DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation.operator ==(DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation? left, DigitalBrain.Salesforce.SalesforceAccountDescriptionMutation? right) -> bool

@@ -48,14 +48,14 @@ public sealed class ModuleActivationContracts
     public void MissingModuleFailsComposition()
     {
         var builder = Host.CreateApplicationBuilder();
-        builder.Configuration["DigitalBrain:Modules:0"] = "DigitalBrain.Google.GoogleModule";
+        builder.Configuration["DigitalBrain:Modules:0"] = "DigitalBrain.Missing.MissingModule";
 
         var failure = Assert.Throws<InvalidOperationException>(() =>
         {
             builder.UseOrleans(silo => silo.AddDigitalBrain());
         });
 
-        Assert.Contains("DigitalBrain.Google.GoogleModule", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("DigitalBrain.Missing.MissingModule", failure.Message, StringComparison.Ordinal);
     }
 
     private static bool IsChatClient(ServiceDescriptor descriptor) =>

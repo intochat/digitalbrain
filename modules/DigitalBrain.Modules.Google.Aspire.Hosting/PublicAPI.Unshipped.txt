@@ -1,0 +1,3 @@
+#nullable enable
+DigitalBrain.Google.Aspire.Hosting.GoogleHostingExtensions
+static DigitalBrain.Google.Aspire.Hosting.GoogleHostingExtensions.WithGmail(this DigitalBrain.Google.GoogleModule! module) -> DigitalBrain.Google.GoogleModule!
