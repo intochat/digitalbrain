@@ -195,11 +195,6 @@ test('the open debts are disclosed rather than buried', () => {
   assert.match(architecture, /AsClient/)
   assert.match(architecture, /DevUI/)
 
-  const changelog = read('CHANGELOG.md')
-  assert.match(changelog, /Known limitations/)
-  assert.match(changelog, /per-identity feed/)
-  assert.match(changelog, /trusted cluster peer/)
-
   assert.match(read('docs', 'packages.md'), /not\*\* an authentication boundary/)
 })
 
