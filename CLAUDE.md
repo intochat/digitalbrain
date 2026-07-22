@@ -101,11 +101,15 @@ like any other. Check its method, not only its conclusions.
 Optional accelerators, in `.mcp.json`: `codegraph` for architecture, `context7` for package docs,
 `aspire` for resource control, `microsoft-learn` for .NET docs.
 
-**If an accelerator is unavailable, say so and fall back to the oracles. Do not skip silently.** Both
-`context7` and `codegraph` have been unavailable in this repository — quota exhausted and `npx`
-exiting 9009 — and a ritual that mandates an unavailable tool gets worked around instead of followed.
-Note: Microsoft Learn returns the older `Orleans.EventSourcing.JournaledGrain` for journaling queries.
-That is a different API from `Microsoft.Orleans.Journaling`. Do not conflate them.
+**If an accelerator is unavailable, say so and fall back to the oracles. Do not skip silently.**
+`codegraph` maintains its index during `dotnet build` — which `aspire run` triggers — and
+`.mcp.json` serves that index over MCP. It resolves only when the session's working root is the
+repository itself; a session rooted above the repo (for example at a parent workspace folder) cannot
+reach it, and that absence is the environment, not a broken tool. `context7` requires an interactive
+OAuth login and is genuinely unavailable in a headless session — fall back to official docs
+(Microsoft Learn, the Aspire docs MCP) rather than skipping the lookup. Note: Microsoft Learn returns
+the older `Orleans.EventSourcing.JournaledGrain` for journaling queries. That is a different API from
+`Microsoft.Orleans.Journaling`. Do not conflate them.
 
 **Check whether the ground moved.** Record `git rev-parse HEAD` and `git status --porcelain` at the
 start of a session, and check both again before staging. This repository has been modified mid-session
