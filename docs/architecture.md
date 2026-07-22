@@ -463,6 +463,16 @@ What is settled, and why each rule is there:
   "Who configured this?" and "who receives the occurrence?" are different questions with different
   answers, which is what keeps delivery to another owner from becoming an accident — it requires an
   explicit grant that does not exist yet.
+- **Scheduling is obtained by addressing a schedule, never by inheriting a hook.** There is no
+  inheritance-based reminder handling in this architecture. `ICountdown` and `IReminder` are separate
+  neurons and they are the only types that encapsulate the Orleans reminder and timer implementation;
+  a module reaches scheduled behavior by talking to one of them, and a module's own private timing
+  stays inside that module rather than being obtained by overriding an inherited callback.
+  `ReceiveReminder` is not part of the public neuron surface. The alternative is worse than it looks:
+  once a base class exposes a reminder hook, every subclass that wants a wake-up overrides it, each
+  one has to know which names its ancestors already claimed and chain to `base` for the rest, and the
+  answer to "whose reminder is this?" ends up spread along an inheritance chain instead of living in
+  one neuron.
 - **Repeating a request has to be safe, because a caller that crashed cannot know whether it was
   heard.** Start applies only from unscheduled; reschedule and cancel only from scheduled and only
   against an expected revision; restart begins a new generation rather than resurrecting an old one.
@@ -638,3 +648,196 @@ Spans carry the identity attributes that let a trace be joined back to the journ
 synapse, and correlation today, with owner, neuron, synapse type, and causation as the ratified target
 set. Sensitive content is off by default, and turning it on is a deliberate act. Aspire receives the
 OTLP output.
+
+## 8. Known limitations
+
+These are limits of what stands today, and each one is a boundary someone chose rather than a defect
+waiting to be found. They are stated here because a system that hides them is harder to build on than
+one that does not.
+
+**An Orleans client is a trusted cluster peer.** `DigitalBrainClient.Connect` takes the owner as a
+string and binds every call to it, which stops one owner's neurons being addressed through another
+owner's session. That is a correctness boundary, not an authentication claim — a process that can
+reach the cluster can name any owner. Authenticate at the edge, and do not publish Orleans clustering
+endpoints.
+
+**Journal history is bounded.** A neuron feed retains a recent window — 512 entries, or 512 KB,
+whichever binds first — and compacts behind it. A read from a cursor older than that window is
+answered with a snapshot and a reset instead of the deliveries that no longer exist. The snapshot
+carries per-type tallies and sequence bounds, so totals stay honest even once the entries are gone,
+but this is a retained window and a summary rather than an eternal audit log.
+Effectively-once processing is also windowed: a neuron remembers the last 4096 handled delivery
+identities, and a duplicate older than that window is no longer recognised as one.
+
+**Delivery ordering is local.** Directed delivery is FIFO per target and at least once. A receiver
+that refuses a delivery blocks only the later deliveries aimed at that same receiver — the drain
+marks that one target blocked and carries on with every other. There is no cross-target ordering, and
+none is promised.
+
+**Broadcast addressing.** Broadcast resolves the handler **types** registered for a synapse and
+addresses one correlation-derived instance of each, so a fan-out reaches a fresh instance per
+correlation rather than a standing subscriber. Those instances are where the traffic actually landed,
+which is what a future identity-wide feed will have to account for.
+
+**Client observation is not the final timeline stream.** Journal reads take an `afterSequence` cursor
+and can be resumed or watched, which is enough for a simulation to assert on what happened. The client
+facade itself has no observation surface — it sends and it emits. A durable per-owner timeline and a
+reconnect lifecycle are not built.
+
+**`AsClient()` needs a production credential audit.** A client projection must never inherit
+silo-only storage or module secrets. Two of the ways that could go wrong are guarded today: AI
+resource configuration, and Google and Salesforce OAuth configuration, are both asserted to reach
+`WithReference(brain)` and never `brain.AsClient()`. What is unaudited is the general case, because
+the durable storage profile in §7 is not written yet and nothing proves that a profile carrying real
+credentials keeps them on the silo side.
+
+**DevUI is not part of the current architecture.** No interactive agent UI is wired, and
+`Microsoft.Agents.AI.DevUI` is referenced nowhere in the repository.
+
+## 9. Ratified rules
+
+This is the compact form of every decision above, kept as a checklist so that a change can be tested
+against it quickly. It states the ratified target, not a report of what is built — several rules
+describe things §4 already marks as settled and not yet standing up. Within that framing the rule is
+what wins: **if code contradicts a rule, the code is wrong unless the decision is reversed in
+writing.** Where code and rule are known to disagree today, §10 names the deviation rather than
+letting the rule quietly soften.
+
+### Kernel and modules
+
+1. Kernel = neuron mechanics only; no AI/provider/memory/UI domain knowledge. Its one opaque
+   `CapabilityDelegation` transport seam is infrastructure, never semantic vocabulary.
+2. Modules own vocabulary; behaviors own logic over existing vocabulary.
+3. AppHost selects modules once; silo is `AddDigitalBrain()` only.
+4. Namespaces and type names are the programming vocabulary.
+5. Generated catalogs; no runtime assembly scanning as truth.
+
+### AI and MAF
+
+6. MAF owns agent/orchestration execution; DigitalBrain owns durable typed boundaries.
+7. One outer MAF artifact per entry path: direct session or supervised checkpoint lineage.
+8. Public contracts use MEAI `ChatMessage`/`ChatResponse`; MAF types stay internal.
+9. Orchestration-by-base-type (`GroupChat`/`Sequential`/`Concurrent`/`Handoff`/`Magentic`).
+10. Orchestrations accept both `ILLM` and `IAgent` participants.
+11. Participants resolve by typed `NeuronId`, not fake DI.
+12. Individual agents are stateless unless contract says otherwise; workers own sessions.
+13. Adopt MAF selectively; reject Harness-as-core and Durable Extension.
+14. Orleans persists direct sessions and supervised standard checkpoints in separate envelopes.
+15. Compaction internal, token-budget, same typed model.
+16. Journals = durable truth; OTel = diagnostics.
+17. Fingerprinted session restore; explicit migration/reset.
+18. Supervised `WorkflowRun`: **one Lockstep superstep**, then durable checkpoint adoption.
+
+### Behaviors
+
+19. Scripts compose existing vocabulary; never create neuron types at runtime.
+20. One Behavior class per file; identity = namespace + class.
+21. Contract-only compilation; auto-derived capability manifest.
+22. Synapse activation externally; typed requests allowed internally.
+23. Dynamic prompts/personas OK; dynamic capabilities forbidden.
+
+### Integrations and MCP
+
+24. Public interfaces = semantic capabilities (`IGmail`, `ISalesforce`), not toolsets.
+25. MCP stays module-private behind pinned catalogs.
+26. MAF approval middleware; human authority; agent may only recommend.
+27. Progressive tool disclosure by token budget + hybrid retrieval; no hard tool count.
+28. `FindCapabilityTools` recovery; no raw string invoke escape hatch.
+29. Capability roots may expose no MCP-shaped methods; exact tools remain private/transient.
+30. No exactly-once claim; durable dedupe + uncertainty handling for mutations.
+
+### Tasks
+
+31. Independent `DigitalBrain.Tasks` module now.
+32. Task = durable desired outcome; MAF Workflow = one Attempt's execution.
+33. Tasks knows nothing about AI/MAF.
+34. `IWorker` short requests + attempt facts; only session-owning orchestrations implement it.
+35. One active Attempt per Task.
+36. Attempt failure ≠ Task failure; terminal Tasks immutable; retries are successors.
+37. Small lifecycle + typed blockers.
+38. Cooperative truthful cancellation.
+39. Fenced async runner; no long MAF work on grain turn.
+40. Typed Goal/Result/Failure + fact references; no untyped payload bag.
+
+### Time and hosting
+
+41. Semantic Time ≠ Kernel private timing.
+42. Public names: `ICountdown`, `IReminder` (not `ITimer`).
+43. One schedule per neuron; explicit destination; revision + CommandId.
+44. Interval vs Calendar schedules; deterministic DST; coalesce overdue recurrence.
+45. Persisted Time state authoritative; shared Kernel reminder store.
+46. First durable profile: single Azure Storage (`WithAzureStorage`).
+47. Deterministic test time via `TimeProvider` + simulation driver.
+
+## 10. Open, and explicitly rejected
+
+### Still open
+
+Nothing below is settled architecture. Do not implement one of these as though a decision has been
+taken, and do not infer a shape for it from a neighbouring module.
+
+- **The internal calendar recurrence library.** Ical.Net paired with Noda Time is the candidate that
+  was raised and never argued to a conclusion. §4.5 settles the behavior a recurrence engine has to
+  produce — deterministic DST resolution, coalesced overdue occurrences — and deliberately leaves open
+  what produces it.
+- **The exact Time record shapes.** The one-shot command and snapshot shapes, and the recurring and
+  calendar record shapes, are open. The names `ICountdown` and `IReminder` are not.
+- **Memory architecture.** Out of scope entirely, for the reasons in §4.7.
+- **The exact CLR records for the capability-tool seam.** §4.3 ratifies that seam's architecture and
+  its exclusions; the records and interfaces that would express it are unwritten.
+- **The exact `ITask` control methods and orchestration participant records.** The domain semantics in
+  §4.2 are ratified; the CLR shapes carrying them are not.
+
+### Known deviations
+
+One ratified rule and the code disagree today, and it is the rule that stands. §4.5 settles that no
+module obtains scheduling by inheriting or overriding a reminder hook, and that `ReceiveReminder`
+therefore does not belong on the public neuron surface. The kernel exposes it publicly all the same —
+`Neuron` in `src/DigitalBrain.Kernel/Neuron.cs` implements `IRemindable` with a public
+`ReceiveReminder` that drains the outbox — and both `TaskNeuron` and `GroupChat` implement
+`IRemindable.ReceiveReminder`, claim the one reminder name each of them owns, and chain to `base` for
+every other name. That is a deviation to close, not a decision to reverse. Closing it belongs with the
+Time module work, because it is that work that builds the schedule neurons the inherited hook is
+currently standing in for.
+
+### Rejected
+
+Each of these was argued and turned down. Reintroducing one is a design change with a case to make,
+not a configuration choice.
+
+- **AI logic in the kernel.** Model inference, provider names, prompts, OAuth, UI contracts, and
+  semantic memory all belong to modules.
+- **Provider routing tiers and balancing.** Any model tier, routing layer, balancing policy,
+  capability score, or fallback catalog. This is the exclusion §4.1 exists to protect, and hosting is
+  the easiest way to smuggle it back.
+- **Public model metadata definitions.** No descriptor, enum, or lookup table that resolves to a
+  model; the namespace and type name are the identity.
+- **Runtime module scanning.** A catalog discoverable at runtime is a catalog that drifts from the
+  code that was compiled.
+- **Raw MCP clients crossing module boundaries.** Tool names, protocol DTOs, and tool dictionaries
+  stay behind the neuron.
+- **A second client facade.** `DigitalBrainClient` is the only public one.
+- **Compatibility shims.** No adapter kept alive to preserve a shape that was already deleted.
+- **The MAF Durable Extension, and MAF Harness-as-core.** The first duplicates Orleans durability; the
+  second would make DigitalBrain a second agent loop.
+- **Any raw invoke escape hatch.** A model receives selected exact function schemas or nothing —
+  never a string-addressed call beside them.
+- **A recurrence library adopted because it is the obvious one.** Ical.Net with Noda Time sits on the
+  open list above; treating it as decided, rather than arguing it, is what is rejected here.
+
+## 11. Build order
+
+After the ratified AI, Tasks, behavior, integration, and Time foundations are proven, the remaining
+work has a dependency order, and this is it:
+
+1. Complete owner-safe client scripting and the proposal, approval, install, and rollback rail.
+2. Generate the canonical neuron catalog from public contracts and method and synapse vocabulary.
+3. Add semantic and vector discovery as a disposable index over that catalog.
+4. Extend `DigitalBrain.Google` from the `IGmail` root to `ICalendar` once a concrete calendar story
+   exists.
+5. Add recurring and calendar Time vocabulary once its library and public record shapes are approved.
+6. Add `DigitalBrain.Flutter` containing only Flutter neurons and its contract drift guard.
+7. Design `DigitalBrain.Memory` independently around its own vocabulary, never inferred from AI,
+   Tasks, or Time.
+
+No deferred item justifies retaining a rejected abstraction today.

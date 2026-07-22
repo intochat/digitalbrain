@@ -40,7 +40,7 @@ test('every documented page exists and nothing else claims to be documentation',
     assert.equal(existsSync(join(docsRoot, page)), true, `${page} must exist`)
   }
 
-  const retiredSections = ['guide', 'build', 'getting-started', 'contributing', 'reference', 'packages']
+  const retiredSections = ['guide', 'build', 'getting-started', 'contributing', 'reference', 'packages', 'status.md']
   for (const section of retiredSections) {
     assert.equal(existsSync(join(docsRoot, section)), false, `${section}/ must stay deleted`)
   }
@@ -55,7 +55,7 @@ test('navigation and sidebar reach every page', () => {
   assert.match(config, /github\.com\/digitalbraintech\/brain/)
   assert.doesNotMatch(config, /InteractiveAgents/)
 
-  for (const link of ['/quickstart', '/concepts', '/architecture', '/specification', '/packages', '/contributing', '/status']) {
+  for (const link of ['/quickstart', '/concepts', '/architecture', '/specification', '/packages', '/contributing']) {
     assert.ok(config.includes(`'${link}'`), `config must link ${link}`)
   }
 })
@@ -181,28 +181,19 @@ test('the contributing guide states the gate and the non-negotiable rules', () =
   assert.match(contributing, /Tier 2/)
 })
 
-test('status stays truthful about the rebuild', () => {
-  const status = read('docs', 'status.md')
-
-  assert.match(status, /ground-up rebuild/)
-  assert.match(status, /No packages are published/)
-  assert.match(status, /dotnet test \.\\DigitalBrain\.slnx -c Release/)
-  assert.match(status, /node --test tests\/\*\.test\.mjs/)
-})
-
 test('the open debts are disclosed rather than buried', () => {
-  const status = read('docs', 'status.md')
+  const architecture = read('docs', 'architecture.md')
 
-  assert.match(status, /timeline stream/)
-  assert.match(status, /AsClient/)
-  assert.match(status, /DevUI/)
-  assert.match(status, /trusted cluster peer/)
-  assert.match(status, /Journal history is bounded/)
-  assert.match(status, /Effectively-once processing is also windowed/)
-  assert.match(status, /Broadcast addressing/)
-  assert.match(status, /handler \*\*types\*\*/)
-  assert.match(status, /Delivery ordering/)
-  assert.match(status, /FIFO per target/)
+  assert.match(architecture, /trusted cluster peer/)
+  assert.match(architecture, /Journal history is bounded/)
+  assert.match(architecture, /Effectively-once processing is also windowed/)
+  assert.match(architecture, /FIFO per target/)
+  assert.match(architecture, /Delivery ordering/)
+  assert.match(architecture, /Broadcast addressing/)
+  assert.match(architecture, /handler \*\*types\*\*/)
+  assert.match(architecture, /timeline stream/)
+  assert.match(architecture, /AsClient/)
+  assert.match(architecture, /DevUI/)
 
   const changelog = read('CHANGELOG.md')
   assert.match(changelog, /Known limitations/)
@@ -210,6 +201,22 @@ test('the open debts are disclosed rather than buried', () => {
   assert.match(changelog, /trusted cluster peer/)
 
   assert.match(read('docs', 'packages.md'), /not\*\* an authentication boundary/)
+})
+
+test('the ratified rules survive as a checklist', () => {
+  const architecture = read('docs', 'architecture.md')
+
+  for (let rule = 1; rule <= 47; rule += 1) {
+    assert.match(
+      architecture,
+      new RegExp(`^${rule}\\. \\S`, 'm'),
+      `ratified rule ${rule} is missing`)
+  }
+  assert.doesNotMatch(architecture, /^48\. /m, 'the ratified list ends at 47')
+
+  for (const rejected of ['Ical.Net', 'Durable Extension', 'model tier', 'raw invoke']) {
+    assert.ok(architecture.includes(rejected), `the rejected list must name ${rejected}`)
+  }
 })
 
 test('no page resurrects rejected v1 vocabulary', () => {

@@ -16,8 +16,7 @@ export default defineConfig({
       { text: 'Concepts', link: '/concepts' },
       { text: 'Architecture', link: '/architecture' },
       { text: 'Specification', link: '/specification' },
-      { text: 'Packages', link: '/packages' },
-      { text: 'Status', link: '/status' }
+      { text: 'Packages', link: '/packages' }
     ],
     sidebar: [
       {
@@ -33,8 +32,7 @@ export default defineConfig({
       {
         text: 'Project',
         items: [
-          { text: 'Contributing', link: '/contributing' },
-          { text: 'Status', link: '/status' }
+          { text: 'Contributing', link: '/contributing' }
         ]
       }
     ],
