@@ -237,7 +237,7 @@ git commit -m "docs: rename website to docs"
 - Consumes: `docs/concepts.md` from Task 2
 - Produces: the vocabulary page that `docs/architecture.md` links to for term definitions in Tasks 5–6.
 
-`CONTEXT.md` is a 116-line glossary of 30 terms across Core, AI, Work, and Time, each with an `_Avoid_:` line naming the words that must not be used for that concept. Those `_Avoid_:` lines are the repository's strongest anti-drift device and are carried across verbatim.
+`CONTEXT.md` is a 116-line glossary of 26 terms — Core 6, AI 7, Work 8, Time 5 — each with an `_Avoid_:` line naming the words that must not be used for that concept. Those `_Avoid_:` lines are the repository's strongest anti-drift device and are carried across verbatim.
 
 - [ ] **Step 1: Extend the concepts test to demand the glossary**
 
@@ -282,7 +282,7 @@ Expected: FAIL with `concepts must define Capability request`.
 
 Keep the existing `docs/concepts.md` prose sections `Neuron`, `Synapse`, `Module`, and `Simulation` as the narrative introduction. Delete its final `## Scope` section — the scope claim now lives in `docs/architecture.md` §4 module status lines.
 
-Append a `## Vocabulary` section containing all four groups from `CONTEXT.md` (`Core`, `AI`, `Work`, `Time`) as `### ` subsections, with each of the 30 term blocks copied verbatim in the form:
+Append a `## Vocabulary` section containing all four groups from `CONTEXT.md` (`Core`, `AI`, `Work`, `Time`) as `### ` subsections, with each of the 26 term blocks copied verbatim in the form:
 
 ```markdown
 **Neuron**:
@@ -602,8 +602,13 @@ test('the open debts are disclosed rather than buried', () => {
 test('the ratified rules survive as a checklist', () => {
   const architecture = read('docs', 'architecture.md')
 
-  const numbered = architecture.match(/^\d+\. /gm) ?? []
-  assert.ok(numbered.length >= 47, `expected 47 ratified rules, found ${numbered.length}`)
+  for (let rule = 1; rule <= 47; rule += 1) {
+    assert.match(
+      architecture,
+      new RegExp(`^${rule}\\. \\S`, 'm'),
+      `ratified rule ${rule} is missing`)
+  }
+  assert.doesNotMatch(architecture, /^48\. /m, 'the ratified list ends at 47')
 
   for (const rejected of ['Ical.Net', 'Durable Extension', 'model tier', 'raw invoke']) {
     assert.ok(architecture.includes(rejected), `the rejected list must name ${rejected}`)
