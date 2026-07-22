@@ -177,8 +177,9 @@ Two guards fail the build by design, and that is correct:
 The durable neuron and synapse foundation, generated module activation, typed AI neurons, and
 AI-owned Aspire integration are proven. The Foundation PoC architecture is frozen through the
 ratified rules in `docs/architecture.md` (§9). Its proposed public CLR seams, red-green order, and stop conditions are in
-`docs/superpowers/plans/2026-07-20-foundation-poc.md`; implementation begins only after that plan is
-approved and then proceeds one green slice at a time.
+`docs/superpowers/plans/2026-07-20-foundation-poc.md`. That plan is approved and its Tasks 1 through 8
+are complete, as it records at its own line 11; the work remaining in it proceeds one green slice at a
+time.
 
 One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
 That benchmark and the behavior proposal/install rail remain deliberately outside the Foundation

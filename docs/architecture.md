@@ -121,12 +121,19 @@ which is why it is treated as architecture rather than as naming taste.
 Infrastructure is declared in AppHost:
 
 ```csharp
+var storage = builder.AddAzureStorage("storage").RunAsEmulator();
+var journal = storage.AddBlobs("journal");
+
 var brain = builder.AddBrain("brain")
     .WithDevelopmentStores();
 
 brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
+
+builder.AddProject<Projects.DigitalBrain_Host>("silo")
+    .WithReference(brain)
+    .WithReference(journal);
 ```
 
 The silo stays boring:
@@ -136,6 +143,9 @@ builder.UseOrleans(silo => silo
     .AddDigitalBrain()
     .AddDigitalBrainJournalStorage(builder.Configuration));
 ```
+
+The blob resource is not decoration. `AddDigitalBrainJournalStorage` throws when no `journal`
+connection string is configured, so a silo that references the brain and nothing else does not start.
 
 Package reference means *available*. `AddModule<T>()` means *selected and configured*. Each module is
 added exactly once; a repeat call is a composition error, not a merge.
@@ -224,14 +234,17 @@ active run — a fresh run identity, the full attempt cursor, the definition fin
 checkpoint, and a recovery deadline — and returns. A private runner advances exactly one Lockstep
 superstep, and the worker adopts the result only when run identity, cursor, fingerprint, and input
 checkpoint all match and the checkpoint store has committed. That runner is infrastructure: no
-registry entry, no journal, no semantic interface, no scripting visibility. Compaction is likewise
-internal — token-budget driven, collapsing old tool results first, summarizing with the same typed
-model, truncating only as an emergency, and never leaking experimental MAF types into public
-contracts.
+registry entry, no journal, no semantic interface, no scripting visibility.
 
 Settled but not yet standing up: `Sequential`, `Handoff`, and `Magentic` are ratified orchestration
 vocabulary and have no base class in the repository — `GroupChat` and `Concurrent` do. A single-agent
 hard task is expected to use a one-participant `Sequential` worker once that type exists.
+Compaction is ratified with the shape it will have to keep — internal, token-budget driven,
+collapsing old tool results first, summarizing with the same typed model, truncating only as an
+emergency, and never leaking experimental MAF types into public contracts — and none of it is
+written. Nothing in the repository compacts a conversation, summarizes one, or reasons about a token
+budget. The kernel's `NeuronFeed` trims a journal feed by entry count and byte size, which is a
+different mechanism answering a different question and must not be read as this one.
 
 ### 4.2 Tasks
 
@@ -281,9 +294,14 @@ Four rules make concurrency tractable:
 
 - **Exactly one Attempt is active per Task.** Parallel thinking belongs inside that Attempt. Two
   deliberately competing solutions are child Tasks under a parent, not attempts racing on one Task.
-- **Revision fencing is strict.** Older revisions are stale and ignored; a future revision means
-  corruption and is rejected; a terminal Attempt refuses continuation; a retry always gets a new
-  attempt identity.
+- **Revision fencing is strict, and the fact path and the cursor path enforce it differently.** A
+  worker's attempt fact is accepted only when task, worker, attempt, and revision all match, and
+  every other fact — older or newer — is durably ignored: `Matches` compares
+  `fact.Revision == data.Revision`, and a caller that gets `false` returns without touching state, so
+  a future-revision fact produces neither a retry storm nor a corruption signal. The worker's own
+  cursor path does reject: `GroupChat` requires an incoming cursor to be exactly its next revision
+  and throws on anything else. Either way a terminal Attempt refuses continuation and a retry always
+  gets a new attempt identity.
 - **An Attempt failure is not a Task failure.** Policy may start another sequential Attempt, enter
   `Waiting`, or declare terminal failure. A later retry is a successor Task linked by `RetryOf`.
 - **Cancellation is truthful.** It is best-effort intent, never pretend rollback. A cancelling worker
@@ -422,10 +440,24 @@ Salesforce" has to outlive the process that was in the middle of doing it. Recov
 asking Salesforce what it actually holds: a read-only query for the account, compared field by field
 against the payload that was approved. A match is proof and the command becomes `Completed`. A
 mismatch, an error, a query that itself fails — none of those prove anything, and each becomes
-`OutcomeUncertain`, which parks the owning Task rather than trying again. The command identity travels
-as the provider idempotency key wherever a provider offers one; Salesforce's update tool does not,
-which is why reconciliation and not the key is what carries this module. The rule underneath all of it
-is that a mutation whose outcome cannot be proven is never repeated, and it is the same reason
+`OutcomeUncertain` instead of another attempt.
+
+What the module then does is record and return. `ReconcileAsync` persists the uncertain status and
+hands back the receipt, and nothing in this module contacts a Task — it could not, because
+`DigitalBrain.Modules.Salesforce` references only its own contracts and the kernel, so Tasks
+vocabulary is out of reach by construction. The decision belongs to whoever read the receipt, and the
+repository's own consumer makes it bluntly: `AccountEnrichmentProcess` throws
+`InvalidOperationException` when the state it gets back is anything other than `Completed`.
+
+Ratified but not built: parking the owning Task on an `OutcomeUncertain` blocker rather than letting
+the uncertainty surface as a caller-side exception. `AttemptOutcomeUncertain` has no producer under
+`modules/`, `src/`, or `samples/`; its only construction anywhere is a scripted fake worker in the
+simulations.
+
+The command identity travels as the provider idempotency key wherever a provider offers one;
+Salesforce's update tool does not, which is why reconciliation and not the key is what carries this
+module. The rule underneath all of it is that a mutation whose outcome cannot be proven is never
+repeated, and it is the same reason
 DigitalBrain claims no exactly-once external effect anywhere: the provider is the only authority on
 its own state, and the most a durable ledger can honestly offer is a correct label for what it does
 not know.
@@ -483,6 +515,12 @@ What is settled, and why each rule is there:
   adapter is only a wake-up mechanism. A callback carries schedule identity, revision, and occurrence
   identity and nothing else — never a stored action or payload — which is what lets an uncommitted or
   late callback be recognised and dropped instead of firing work the schedule no longer describes.
+  The ordering that earns that property is itself settled, because a crash between any two of its
+  steps has to leave a readable state: register the revision-fenced wake-up first, then persist the
+  schedule, then retire the previous registration; on cancel, persist `Cancelled` before touching a
+  registration at all. A wake-up whose schedule was never committed finds no matching revision, a
+  wake-up from a registration already superseded finds a newer one, and a wake-up for a cancelled
+  schedule finds a terminal state — all three are dropped rather than acted on.
 - **Low latency and durable delivery are bought separately, so they race on purpose.** Production
   registers an activation-local Orleans timer for a prompt wake-up *and* a durable Orleans reminder as
   the backstop that outlives the silo. Both may fire for the same occurrence. The Time neuron
@@ -616,8 +654,12 @@ writable later without another redesign.
 
 ## 7. Hosting and durability
 
-AppHost declares infrastructure explicitly and the silo composes it (see §3). Storage profiles are
-chosen there too, and there are exactly two of them by design.
+AppHost declares infrastructure explicitly and the silo composes it (see §3). Two storage profiles are
+ratified — one development, one durable — and what AppHost runs today is neither of them cleanly. It
+calls `WithDevelopmentStores()` for clustering, grain storage, and reminders, and then declares an
+Azurite-backed blob `journal` resource beside it that belongs to no profile and is wired straight into
+the silo reference. The composed result is a development brain with one Azure-shaped store bolted on,
+which is why §3's excerpt has to show both halves to be runnable at all.
 
 `WithDevelopmentStores()` is explicitly non-durable — development clustering, memory grain storage,
 and memory reminders. It is honest about being a development convenience rather than pretending to be
@@ -625,11 +667,20 @@ a lightweight production mode.
 
 The first durable profile is a single Azure Storage resource supplying Blob-backed neuron journals and
 Table-backed Orleans clustering and reminders. Local development runs it against Azurite; deployment
-points it at real Azure Storage. In-memory reminders are development and test only and production
-rejects them. No generic durability-provider abstraction is introduced until a second *complete*
-journaling, clustering, and reminder profile actually exists — one profile does not justify an
-abstraction over profiles. That single-resource entry point on the brain is settled and not yet
-written; the journal storage wiring the silo already calls is the piece that exists.
+points it at real Azure Storage. No generic durability-provider abstraction is introduced until a
+second *complete* journaling, clustering, and reminder profile actually exists — one profile does not
+justify an abstraction over profiles.
+
+Settled but not yet standing up: that single-resource durable entry point on the brain, and the rule
+that in-memory reminders are development and test only and production rejects them. Neither exists.
+`WithDevelopmentStores()` takes no environment, performs no check, and throws nothing — it calls
+`WithDevelopmentClustering()`, `WithMemoryGrainStorage("journal")`, and `WithMemoryReminders()`
+unconditionally, and no code in `src/DigitalBrain.Aspire.Hosting/` inspects the environment at all.
+Read the consequence plainly, because it is the reason this is written down rather than left implied:
+a deployment that leaves `WithDevelopmentStores()` in AppHost gets memory-backed reminders for the
+kernel outbox pump and for the AI run-recovery reminder, and loses both on the first restart, with no
+framework refusal anywhere on that path. The journal storage wiring the silo already calls is the one
+piece of this section that exists.
 
 ### Observability
 
@@ -781,13 +832,13 @@ taken, and do not infer a shape for it from a neighbouring module.
   was raised and never argued to a conclusion. §4.5 settles the behavior a recurrence engine has to
   produce — deterministic DST resolution, coalesced overdue occurrences — and deliberately leaves open
   what produces it.
-- **The exact Time record shapes.** The one-shot command and snapshot shapes, and the recurring and
-  calendar record shapes, are open. The names `ICountdown` and `IReminder` are not.
+- **The recurring and calendar Time record shapes.** Only those. The one-shot shapes are frozen —
+  `StartCountdown`, `ScheduleReminder`, `CountdownSnapshot`, and `ReminderSnapshot` — and so are the
+  names `ICountdown` and `IReminder`. This matches §4.5, which leaves open the recurring and calendar
+  shapes and nothing else.
 - **Memory architecture.** Out of scope entirely, for the reasons in §4.7.
 - **The exact CLR records for the capability-tool seam.** §4.3 ratifies that seam's architecture and
   its exclusions; the records and interfaces that would express it are unwritten.
-- **The exact `ITask` control methods and orchestration participant records.** The domain semantics in
-  §4.2 are ratified; the CLR shapes carrying them are not.
 
 ### Known deviations
 
