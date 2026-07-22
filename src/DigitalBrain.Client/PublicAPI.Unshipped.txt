@@ -1,8 +1,0 @@
-#nullable enable
-DigitalBrain.Client.DigitalBrainClient
-DigitalBrain.Client.DigitalBrainClient.EmitAsync(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
-DigitalBrain.Client.DigitalBrainClient.Owner.get -> DigitalBrain.Abstractions.OwnerId
-DigitalBrain.Client.DigitalBrainClient.SendAsync(DigitalBrain.Abstractions.NeuronId receiver, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
-DigitalBrain.Client.DigitalBrainClient.SendAsync<TNeuron>(DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
-DigitalBrain.Client.DigitalBrainClient.SendAsync<TNeuron>(string! name, DigitalBrain.Abstractions.Synapse! synapse) -> System.Threading.Tasks.Task!
-static DigitalBrain.Client.DigitalBrainClient.Connect(Orleans.IGrainFactory! grains, string! owner) -> DigitalBrain.Client.DigitalBrainClient!

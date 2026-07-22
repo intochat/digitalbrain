@@ -148,10 +148,13 @@ node tools/render-specification.mjs
 node --test tests/*.test.mjs
 ```
 
-Two guards fail the build by design, and that is correct:
+One guard fails the build by design, and that is correct:
 
-- Adding a public type means updating `PublicAPI.Unshipped.txt`.
 - Adding an `[Alias]` means updating the pinned-alias contract.
+
+Public API is not baseline-locked while the framework is a pre-release alpha in flux; the
+`PublicApiAnalyzers` baseline files were removed. Re-introduce them when a real release approaches
+and the public surface should stop changing without review.
 
 ---
 

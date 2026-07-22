@@ -1,3 +1,0 @@
-#nullable enable
-DigitalBrain.Salesforce.Aspire.Hosting.SalesforceHostingExtensions
-static DigitalBrain.Salesforce.Aspire.Hosting.SalesforceHostingExtensions.WithSalesforce(this DigitalBrain.Salesforce.SalesforceModule! module) -> DigitalBrain.Salesforce.SalesforceModule!

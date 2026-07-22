@@ -1,4 +1,0 @@
-#nullable enable
-DigitalBrain.Google.GoogleModule
-DigitalBrain.Google.GoogleModule.GoogleModule() -> void
-static DigitalBrain.Google.GoogleModule.Configure(Orleans.Hosting.ISiloBuilder! builder) -> void

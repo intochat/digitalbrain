@@ -1,8 +1,0 @@
-#nullable enable
-DigitalBrain.AI.IAgent
-DigitalBrain.AI.IAgent.RespondAsync(System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.AI.ChatMessage!>! messages) -> System.Threading.Tasks.Task<Microsoft.Extensions.AI.ChatResponse!>!
-DigitalBrain.AI.IGroupChat
-DigitalBrain.AI.ILLM
-DigitalBrain.AI.ILLM.RespondAsync(System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.AI.ChatMessage!>! messages) -> System.Threading.Tasks.Task<Microsoft.Extensions.AI.ChatResponse!>!
-DigitalBrain.AI.Ollama.ILlama32
-DigitalBrain.AI.OpenAI.IGpt56
