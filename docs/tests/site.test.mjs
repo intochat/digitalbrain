@@ -52,7 +52,7 @@ test('navigation and sidebar reach every page', () => {
 
   assert.match(config, /title: 'DigitalBrain'/)
   assert.match(config, /provider: 'local'/)
-  assert.match(config, /github\.com\/digitalbraintech\/brain/)
+  assert.match(config, /github\.com\/intochat\/digitalbrain/)
   assert.doesNotMatch(config, /InteractiveAgents/)
 
   for (const link of ['/quickstart', '/concepts', '/architecture', '/specification', '/packages', '/contributing']) {

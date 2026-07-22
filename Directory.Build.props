@@ -14,8 +14,8 @@
     <VersionSuffix>alpha.1</VersionSuffix>
     <Authors>Digital Brain Tech</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/digitalbraintech/brain</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/digitalbraintech/brain</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/intochat/digitalbrain</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/intochat/digitalbrain</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>

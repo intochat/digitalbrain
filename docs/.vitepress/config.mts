@@ -37,7 +37,7 @@ export default defineConfig({
       }
     ],
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/digitalbraintech/brain' }
+      { icon: 'github', link: 'https://github.com/intochat/digitalbrain' }
     ],
     search: {
       provider: 'local'
