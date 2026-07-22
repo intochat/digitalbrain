@@ -8,7 +8,10 @@
 AI, Google, Salesforce, and Time without leaking provider, MCP, or orchestration mechanics into the
 Kernel or public behavior vocabulary.
 
-Tasks 1 through 8 are complete; git history holds their detail across `2d8bad34..2f21c9b4`.
+Tasks 1 through 8 are complete; git history holds their detail from `3abdc219` through `2f21c9b4`.
+That span starts at the causal capability-request slice and ends at the restart stabilization, taking
+in the Tasks contracts at `51e35c73`, the MEAI and MAF adoption at `ef362563`, the Lockstep worker
+bridge beginning at `6fcbb734`, and the Gmail and Salesforce slices at `fe058caa` and `05eb40a2`.
 
 **Architecture:** Typed neuron interfaces are the public programming language; synapses are the
 durable causal substrate. Orleans owns neuron identity, turns, journals, and recovery. Microsoft
