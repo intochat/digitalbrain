@@ -299,9 +299,17 @@ attempt, revision, and caller all match.
 One mapping is tempting enough to get wrong that it is settled explicitly: MAF's run status is not a
 Task state, and no adapter may treat it as one. A running workflow means the Attempt is executing. An
 idle checkpoint means a superstep ended, not that the Attempt finished — adopting it as completion
-would declare success for work that has not happened. A pending MAF request maps to Task `Waiting`
-with a typed blocker. Workflow output may complete an Attempt, and a workflow error feeds Task retry
-policy rather than terminating the Task on its own.
+would declare success for work that has not happened. Workflow output may complete an Attempt.
+
+Settled but not yet standing up: a pending MAF request mapping to Task `Waiting` with a typed blocker,
+and a workflow error feeding Task retry policy rather than terminating the Task on its own. Neither
+exists in the repository — `WorkflowRunner` watches only `WorkflowOutputEvent` and
+`SuperStepCompletedEvent`, and `AttemptWaiting`/`AttemptFailed` are constructed nowhere under
+`modules/` or `src/`, only inside a hand-rolled fake worker that exercises `TaskNeuron`'s state machine
+in isolation. What happens today when a run fails is infrastructure recovering itself rather than Task
+policy hearing about it: `GroupChat`'s own `db.ai.workflow-run` reminder notices the active run past
+its recovery deadline, mints a fresh `RunId` on the same cursor, and retries the superstep — the Task
+is never consulted.
 
 ### 4.3 Google
 
