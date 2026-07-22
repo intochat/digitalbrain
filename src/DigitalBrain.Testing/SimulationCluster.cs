@@ -3,6 +3,7 @@ using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Journaling;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.TestingHost;
 
@@ -97,6 +98,7 @@ public static class SimulationCluster
         var host = cluster.Silos.Single(silo => silo.SiloAddress.Equals(hosting));
 
         await cluster.RestartSiloAsync(host);
+        await WaitForClientConnectivityAsync(cluster.Client);
     }
 
     public static async Task StopAsync()
@@ -143,4 +145,27 @@ public static class SimulationCluster
     private static RecordingJournalStorageProvider JournalStorage()
         => _journalStorage
             ?? throw new InvalidOperationException($"The simulation cluster is not running. Call {nameof(SimulationCluster)}.{nameof(StartAsync)} before a scenario runs.");
+
+    private static async Task WaitForClientConnectivityAsync(IClusterClient client)
+    {
+        var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(20);
+        OrleansException? lastFailure = null;
+
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            try
+            {
+                await client.GetGrain<IManagementGrain>(0).GetHosts();
+                return;
+            }
+            catch (OrleansException failure)
+            {
+                lastFailure = failure;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(10));
+        }
+
+        throw new TimeoutException("The simulation client did not reconnect after its silo restarted.", lastFailure);
+    }
 }
