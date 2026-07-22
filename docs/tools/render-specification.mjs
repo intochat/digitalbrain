@@ -3,8 +3,8 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const toolsDirectory = dirname(fileURLToPath(import.meta.url))
-const websiteRoot = resolve(toolsDirectory, '..')
-const simulations = resolve(websiteRoot, '..', 'tests', 'DigitalBrain.Simulations')
+const docsRoot = resolve(toolsDirectory, '..')
+const simulations = resolve(docsRoot, '..', 'tests', 'DigitalBrain.Simulations')
 
 const featureFiles = readdirSync(simulations)
   .filter(entry => entry.endsWith('.feature'))
@@ -36,6 +36,6 @@ drift from what actually passes.
 
 ${sections.join('\n')}`
 
-writeFileSync(join(websiteRoot, 'specification.md'), page, 'utf8')
+writeFileSync(join(docsRoot, 'specification.md'), page, 'utf8')
 
 console.log(`rendered ${featureFiles.length} feature files into specification.md`)

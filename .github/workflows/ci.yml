@@ -45,11 +45,11 @@ jobs:
         shell: pwsh
         run: ./eng/verify-dependencies.ps1
 
-  website:
+  docs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: website
+        working-directory: docs
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

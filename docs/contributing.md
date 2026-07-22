@@ -33,7 +33,7 @@ The documentation site has its own gate. Invoke `node` directly rather than thro
 npm's child processes lose the nodejs PATH on Windows here:
 
 ```powershell
-cd website
+cd docs
 node tools/render-specification.mjs
 node --test tests/*.test.mjs
 ```

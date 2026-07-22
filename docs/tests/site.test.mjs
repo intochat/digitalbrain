@@ -6,7 +6,7 @@ import test from 'node:test'
 
 const testDirectory = dirname(fileURLToPath(import.meta.url))
 const repositoryRoot = resolve(testDirectory, '..', '..')
-const websiteRoot = join(repositoryRoot, 'website')
+const docsRoot = join(repositoryRoot, 'docs')
 
 const read = (...segments) => readFileSync(join(repositoryRoot, ...segments), 'utf8')
 
@@ -21,7 +21,7 @@ const contentPages = [
 ]
 
 test('documentation project exposes the standard VitePress commands', () => {
-  const packageJson = JSON.parse(read('website', 'package.json'))
+  const packageJson = JSON.parse(read('docs', 'package.json'))
 
   assert.equal(packageJson.private, true)
   assert.equal(packageJson.type, 'module')
@@ -33,27 +33,27 @@ test('documentation project exposes the standard VitePress commands', () => {
 })
 
 test('the specification is regenerated before the site is tested or built', () => {
-  const packageJson = JSON.parse(read('website', 'package.json'))
+  const packageJson = JSON.parse(read('docs', 'package.json'))
 
   assert.equal(packageJson.scripts.pretest, 'node tools/render-specification.mjs')
   assert.equal(packageJson.scripts.prebuild, 'node tools/render-specification.mjs')
-  assert.equal(existsSync(join(websiteRoot, 'tools', 'render-specification.mjs')), true)
+  assert.equal(existsSync(join(docsRoot, 'tools', 'render-specification.mjs')), true)
 })
 
 test('every documented page exists and nothing else claims to be documentation', () => {
   for (const page of contentPages) {
-    assert.equal(existsSync(join(websiteRoot, page)), true, `${page} must exist`)
+    assert.equal(existsSync(join(docsRoot, page)), true, `${page} must exist`)
   }
 
   const retiredSections = ['guide', 'build', 'getting-started', 'contributing', 'reference']
   for (const section of retiredSections) {
-    assert.equal(existsSync(join(websiteRoot, section)), false, `${section}/ must stay deleted`)
+    assert.equal(existsSync(join(docsRoot, section)), false, `${section}/ must stay deleted`)
   }
-  assert.equal(existsSync(join(websiteRoot, '.vitepress', 'theme')), false)
+  assert.equal(existsSync(join(docsRoot, '.vitepress', 'theme')), false)
 })
 
 test('navigation and sidebar reach every page', () => {
-  const config = read('website', '.vitepress', 'config.mts')
+  const config = read('docs', '.vitepress', 'config.mts')
 
   assert.match(config, /title: 'DigitalBrain'/)
   assert.match(config, /provider: 'local'/)
@@ -70,7 +70,7 @@ test('navigation and sidebar reach every page', () => {
 })
 
 test('the homepage tells the neurons, synapses, and simulations story', () => {
-  const homepage = read('website', 'index.md')
+  const homepage = read('docs', 'index.md')
 
   assert.match(homepage, /layout: home/)
   assert.match(homepage, /Neurons/)
@@ -81,7 +81,7 @@ test('the homepage tells the neurons, synapses, and simulations story', () => {
 })
 
 test('concepts define the three primitives and the scope fence', () => {
-  const concepts = read('website', 'concepts.md')
+  const concepts = read('docs', 'concepts.md')
 
   assert.match(concepts, /IHandle<TSynapse>/)
   assert.match(concepts, /IEmit<TSynapse>/)
@@ -92,7 +92,7 @@ test('concepts define the three primitives and the scope fence', () => {
 })
 
 test('the architecture page separates what is built from what is designed', () => {
-  const architecture = read('website', 'architecture.md')
+  const architecture = read('docs', 'architecture.md')
 
   assert.match(architecture, /designed and not yet built/)
   assert.match(architecture, /Modules own vocabulary|Vocabulary — synapse records/)
@@ -103,13 +103,13 @@ test('the architecture page separates what is built from what is designed', () =
   const designSections = sections.filter(section => /Status: /.test(section))
   assert.ok(designSections.length >= 4, 'each design section must carry an explicit status line')
 
-  const status = read('website', 'status.md')
+  const status = read('docs', 'status.md')
   assert.match(status, /Where this is going/)
   assert.match(status, /load-bearing and unmeasured/)
 })
 
 test('the quickstart matches the sample that CI actually runs', () => {
-  const quickstart = read('website', 'quickstart.md')
+  const quickstart = read('docs', 'quickstart.md')
   const program = read('samples', 'DigitalBrain.Quickstart', 'Program.cs')
   const neurons = read('samples', 'DigitalBrain.Quickstart', 'Neurons.cs')
 
@@ -129,7 +129,7 @@ test('the quickstart matches the sample that CI actually runs', () => {
 test('the specification publishes every Tier-1 feature file verbatim', () => {
   const simulations = join(repositoryRoot, 'tests', 'DigitalBrain.Simulations')
   const features = readdirSync(simulations).filter(entry => entry.endsWith('.feature'))
-  const specification = read('website', 'specification.md')
+  const specification = read('docs', 'specification.md')
 
   assert.ok(features.length > 0, 'there must be Tier-1 feature files to publish')
 
@@ -140,21 +140,21 @@ test('the specification publishes every Tier-1 feature file verbatim', () => {
 })
 
 test('every shipped package has a page, and the boundary is stated', () => {
-  const index = read('website', 'packages', 'index.md')
+  const index = read('docs', 'packages', 'index.md')
 
   for (const page of packagePages) {
     assert.ok(index.includes(`/packages/${page}`), `the package index must link ${page}`)
   }
 
   assert.match(index, /Provider SDKs live only in `DigitalBrain\.Modules\.AI`/)
-  assert.match(read('website', 'packages', 'metapackage.md'), /does \*\*not\*\* reference \[`DigitalBrain\.Kernel`\]/)
-  assert.match(read('website', 'packages', 'kernel.md'), /refuses to start/i)
-  assert.match(read('website', 'packages', 'ai.md'), /namespace and type name are the model identity/i)
-  assert.match(read('website', 'packages', 'ai-aspire-hosting.md'), /openai-api-key/)
+  assert.match(read('docs', 'packages', 'metapackage.md'), /does \*\*not\*\* reference \[`DigitalBrain\.Kernel`\]/)
+  assert.match(read('docs', 'packages', 'kernel.md'), /refuses to start/i)
+  assert.match(read('docs', 'packages', 'ai.md'), /namespace and type name are the model identity/i)
+  assert.match(read('docs', 'packages', 'ai-aspire-hosting.md'), /openai-api-key/)
 })
 
 test('the contributing guide states the gate and the non-negotiable rules', () => {
-  const contributing = read('website', 'contributing.md')
+  const contributing = read('docs', 'contributing.md')
 
   assert.match(contributing, /dotnet test \.\\DigitalBrain\.slnx -c Release/)
   assert.match(contributing, /--filter/)
@@ -165,7 +165,7 @@ test('the contributing guide states the gate and the non-negotiable rules', () =
 })
 
 test('status stays truthful about the rebuild', () => {
-  const status = read('website', 'status.md')
+  const status = read('docs', 'status.md')
 
   assert.match(status, /ground-up rebuild/)
   assert.match(status, /No packages are published/)
@@ -174,7 +174,7 @@ test('status stays truthful about the rebuild', () => {
 })
 
 test('the open debts are disclosed rather than buried', () => {
-  const status = read('website', 'status.md')
+  const status = read('docs', 'status.md')
 
   assert.match(status, /timeline stream/)
   assert.match(status, /AsClient/)
@@ -192,7 +192,7 @@ test('the open debts are disclosed rather than buried', () => {
   assert.match(changelog, /per-identity feed/)
   assert.match(changelog, /trusted cluster peer/)
 
-  assert.match(read('website', 'packages', 'client.md'), /not\*\* an authentication boundary/)
+  assert.match(read('docs', 'packages', 'client.md'), /not\*\* an authentication boundary/)
 })
 
 test('no page resurrects rejected v1 vocabulary', () => {
@@ -211,10 +211,10 @@ test('no page resurrects rejected v1 vocabulary', () => {
   ].join('|'))
 
   for (const page of contentPages) {
-    assert.doesNotMatch(read('website', page), v1Identifiers, `${page} must not mention v1 identifiers`)
-    assert.doesNotMatch(read('website', page), rejectedArchitecture, `${page} must not teach the rejected architecture`)
+    assert.doesNotMatch(read('docs', page), v1Identifiers, `${page} must not mention v1 identifiers`)
+    assert.doesNotMatch(read('docs', page), rejectedArchitecture, `${page} must not teach the rejected architecture`)
   }
-  assert.doesNotMatch(read('website', '.vitepress', 'config.mts'), v1Identifiers)
+  assert.doesNotMatch(read('docs', '.vitepress', 'config.mts'), v1Identifiers)
   assert.doesNotMatch(read('README.md'), v1Identifiers)
 })
 
@@ -230,7 +230,7 @@ test('generated VitePress, npm and specification output stays out of git', () =>
   const gitignore = read('.gitignore')
 
   assert.match(gitignore, /^node_modules\/$/m)
-  assert.match(gitignore, /^website\/\.vitepress\/cache\/$/m)
-  assert.match(gitignore, /^website\/\.vitepress\/dist\/$/m)
-  assert.match(gitignore, /^website\/specification\.md$/m)
+  assert.match(gitignore, /^docs\/\.vitepress\/cache\/$/m)
+  assert.match(gitignore, /^docs\/\.vitepress\/dist\/$/m)
+  assert.match(gitignore, /^docs\/specification\.md$/m)
 })

@@ -52,7 +52,7 @@ hosts/     runnable silo, AppHost, and the test-only probe hosts
 samples/   package-only consumers proven against an empty package cache
 tests/     contract tests, simulations, hosted proof
 eng/       pack and verification scripts
-website/   VitePress documentation and the published specification
+docs/      VitePress documentation and the published specification
 ```
 
 Earlier prototype generations were retired to git history rather than kept on disk. Recover any of
@@ -78,7 +78,7 @@ dotnet test .\DigitalBrain.slnx -c Release
 Never `--filter`, on either. The website gate runs `node` directly rather than through npm:
 
 ```powershell
-cd website
+cd docs
 node tools/render-specification.mjs
 node --test tests/*.test.mjs
 ```
@@ -88,4 +88,4 @@ Every commit keeps the gate green.
 ## Way of working
 
 [CLAUDE.md](CLAUDE.md) is the canonical working discipline for every agent and contributor, and
-`AGENTS.md` points there. The contributing guide is [website/contributing.md](website/contributing.md).
+`AGENTS.md` points there. The contributing guide is [docs/contributing.md](docs/contributing.md).
