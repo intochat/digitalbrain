@@ -80,7 +80,7 @@ test('the homepage tells the neurons, synapses, and simulations story', () => {
   assert.match(homepage, /Aspire/)
 })
 
-test('concepts define the three primitives and the scope fence', () => {
+test('concepts define the three primitives and the whole vocabulary', () => {
   const concepts = read('docs', 'concepts.md')
 
   assert.match(concepts, /IHandle<TSynapse>/)
@@ -88,7 +88,19 @@ test('concepts define the three primitives and the scope fence', () => {
   assert.match(concepts, /journaled grain/)
   assert.match(concepts, /correlation and causation lineage/)
   assert.match(concepts, /dev-only/)
-  assert.match(concepts, /out of scope/)
+
+  const glossaryTerms = [
+    'Neuron', 'Synapse', 'Capability request', 'Module', 'Behavior', 'Registry',
+    'LLM', 'Agent', 'Orchestration', 'Group Chat', 'Participant', 'Executor', 'Capability',
+    'Task', 'Goal', 'Attempt', 'Worker', 'Workflow', 'Blocker', 'Result', 'Successor Task',
+    'Countdown', 'Reminder', 'Interval schedule', 'Calendar schedule', 'Occurrence',
+  ]
+  for (const term of glossaryTerms) {
+    assert.ok(concepts.includes(`**${term}**`), `concepts must define ${term}`)
+  }
+
+  const avoidLines = concepts.match(/^_Avoid_: /gm) ?? []
+  assert.ok(avoidLines.length >= 26, `every glossary term needs an _Avoid_ line, found ${avoidLines.length}`)
 })
 
 test('the architecture page separates what is built from what is designed', () => {
