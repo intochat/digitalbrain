@@ -9,37 +9,21 @@ are the rules that keep the framework's promises checkable.
 
 [Architecture](/architecture) describes what is being built and marks each part as built or designed.
 `CLAUDE.md` in the repository is the canonical working discipline for agents and contributors alike,
-and `REFINED-ARCHITECTURE-AND-NEXT-STEPS.md` is the plan of record.
+and `docs/architecture.md` is the plan of record.
 
 ## The gate
 
-One command decides whether the repository is healthy. While working, run it from the root:
+`CLAUDE.md` §5 is the canonical gate, covering both the root command and the documentation site's
+`node`-based gate; run it at every phase and before any completion claim.
 
-```powershell
-dotnet test --logger "console;verbosity=minimal"
-```
-
-Before a release, run it across the solution in Release:
+Before a release, run the full suite across the solution in Release:
 
 ```powershell
 dotnet test .\DigitalBrain.slnx -c Release
 ```
 
-Both run all three tiers. **Never narrow either with `--filter`** — a green filtered run is not
-evidence, and a project-scoped run has already missed a failing contract that the root run caught.
-Run it in the background and poll rather than waiting on it.
-
-The documentation site has its own gate. Invoke `node` directly rather than through npm, because
-npm's child processes lose the nodejs PATH on Windows here:
-
-```powershell
-cd docs
-node tools/render-specification.mjs
-node --test tests/*.test.mjs
-```
-
-All of these are enforced in CI, along with `eng/pack.ps1` and a consumer restore from an **empty**
-package cache. A change is not done until every one of them is green.
+**Never narrow it with `--filter`** — a project-scoped run has already missed a failing contract
+that the root run caught.
 
 ## Three tiers of test
 

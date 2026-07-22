@@ -18,7 +18,7 @@ await brain.SendAsync<IAnalyst>(
 
 The owner-bound client enters through a session; neurons call typed capabilities such as `ILlama32`
 inside the brain. The same vocabulary will later support approved C# behaviors generated from
-natural language. See [website/architecture.md](website/architecture.md) for what is built versus
+natural language. See [docs/architecture.md](docs/architecture.md) for what is built versus
 designed.
 
 ## The shape of it
@@ -36,12 +36,11 @@ designed.
 
 ## Status
 
-The durable foundation, generated module activation, typed AI neurons, and AI-owned Aspire integration
-are built and unpublished. Agent/group-chat implementations, semantic discovery, integration modules,
-and the scripting rail are not built. See [website/status.md](website/status.md).
+See the module status lines in [docs/architecture.md](docs/architecture.md) for what is built versus
+designed.
 
-[`REFINED-ARCHITECTURE-AND-NEXT-STEPS.md`](REFINED-ARCHITECTURE-AND-NEXT-STEPS.md) is the plan of
-record: current status, ratified architecture, hard deletion manifest, and ordered implementation.
+[`docs/architecture.md`](docs/architecture.md) is the plan of record: ratified architecture, known
+limitations, and build order.
 
 ## Repository shape
 
