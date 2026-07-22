@@ -50,7 +50,6 @@ modules/   independently shipped domains, beginning with AI
 hosts/     runnable silo, AppHost, and the test-only probe hosts
 samples/   package-only consumers proven against an empty package cache
 tests/     contract tests, simulations, hosted proof
-eng/       pack and verification scripts
 docs/      VitePress documentation and the published specification
 ```
 
@@ -69,9 +68,6 @@ The full gate, run before a release:
 
 ```powershell
 dotnet test .\DigitalBrain.slnx -c Release
-.\eng\pack.ps1
-.\eng\verify-consumer.ps1
-.\eng\verify-dependencies.ps1
 ```
 
 Never `--filter`, on either. The website gate runs `node` directly rather than through npm:

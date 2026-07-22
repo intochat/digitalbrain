@@ -87,15 +87,15 @@ Reviewers are expected to push back on a name that needs help.
 
 ## Dependencies
 
-Every version is pinned exactly in `Directory.Packages.props`. No floating ranges, no wildcards —
-`eng/verify-dependencies.ps1` fails the build on either, and on any vulnerable or deprecated package.
+Every version is pinned exactly in `Directory.Packages.props`. Central Package Management is on, so a
+floating range or wildcard is a build error, not a convention.
 
 ## The security boundary
 
 Provider SDKs live only in their owning runtime module. Today that is
 `DigitalBrain.Modules.AI`; its Aspire provider integrations live in
 `DigitalBrain.Modules.AI.Aspire.Hosting`. Kernel, AI Contracts, and every consumer-path package must
-remain provider-free. `eng/pack.ps1` verifies the produced artifacts, not only project files.
+remain provider-free. A package-boundary contract test enforces this on project references.
 
 An API key must never appear in the repository, in a test, in a sample, or in a publish manifest.
 

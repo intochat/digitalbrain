@@ -7,8 +7,8 @@ title: Quickstart
 The checked-in quickstart runs a typed neuron on a local Orleans silo.
 
 ::: warning Nothing is published yet
-Build packages with `./eng/pack.ps1`. The sample under `samples/DigitalBrain.Quickstart` restores only
-from `artifacts/packages` and NuGet.org.
+Produce the packages locally with `dotnet pack DigitalBrain.slnx -o artifacts/packages`. The sample
+under `samples/DigitalBrain.Quickstart` restores only from `artifacts/packages` and NuGet.org.
 :::
 
 ## Declare a typed neuron
