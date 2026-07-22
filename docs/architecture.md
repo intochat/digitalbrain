@@ -193,6 +193,14 @@ none may be reintroduced — an architecture test asserts that every concrete `L
 namespace, contract, and typed-key grammar, and that `IChatClient` injection stays confined to those
 neurons.
 
+The exclusion list is longer than routing, and the rest of it is easy to reintroduce by accident
+through hosting rather than through code. Named accounts, provider failover, cost balancing, and
+per-model credentials are all deliberately out. Hosting supports exactly one connection per provider,
+and the API-key parameter belongs to the module rather than to any individual model — so two OpenAI
+models share one secret and one provider resource. A second account, a cheaper fallback, or a
+model-specific credential is not a configuration knob anyone can turn; it is a design change that has
+to be argued, because each of them smuggles back the selection tier this module exists to avoid.
+
 **Microsoft Agent Framework owns execution.** DigitalBrain must not build a second agent loop,
 group-chat engine, handoff engine, workflow engine, session format, or tool middleware stack.
 Orchestration is selected by typed base class — the application class name says *what* the team is,
@@ -242,6 +250,27 @@ pairing a source neuron with a fact, and a `TaskPolicy` of maximum attempts, ret
 deadline. Applications and modules define the concrete types. There is no `object`, no arbitrary
 JSON, no metadata dictionary, no generic event string, and no prompt anywhere in this module.
 
+That leaves an obvious question: if Tasks may not know what a prompt is, how does a `Goal` ever reach
+a model? Through two protected abstract methods on the AI `GroupChat` base class. One turns the
+immutable `Goal` into the chat messages a workflow starts from; the other turns the workflow's
+terminal messages back into a typed `Result`. Both are deterministic and synchronous, and the base
+class copies messages in each direction so that neither MAF nor the application ends up holding a
+reference into the other's state. That is the entire bridge. Tasks never learns what a `ChatMessage`
+is, AI never learns what any particular `Goal` means, and the application class that already defines
+both vocabularies is the one place the translation lives.
+
+Four other shapes for that seam were considered and rejected: a generic `GroupChat<TGoal, TResult>`,
+a public mapper interface, a reflection convention over method names, and a service-locator lookup.
+Each one moves the mapping out of the single class that provably knows both sides and into somewhere
+it can be mis-wired at runtime instead of failing to compile.
+
+Retry timing is where the module's independence was nearly lost. A retryable failure waits a fixed
+`RetryDelay` before another Attempt, and it waits on private durable reminders owned by the Task
+neuron rather than on a Time schedule. The reason is deployment, not taste: a Task that booked its
+retries through the Time module would force every application that wants Tasks to also deploy Time.
+The contracts test that pins the Tasks dependency list names `DigitalBrain.Time` alongside AI, MAF,
+and the integrations as assemblies it must not be able to reach.
+
 The lifecycle is deliberately small — `Pending`, `Running` and `Waiting` moving in both directions,
 `Cancelling`, and the immutable terminals `Succeeded`, `Failed`, and `Cancelled`. `Waiting` carries a
 typed blocker (`InputRequired`, `ApprovalRequired`, `DependencyPending`, `RetryScheduled`,
@@ -267,35 +296,75 @@ Only session-owning orchestration neurons implement `IWorker`; ordinary stateles
 do not. Workers report typed attempt facts, and the Task accepts a fact only when task, worker,
 attempt, revision, and caller all match.
 
+One mapping is tempting enough to get wrong that it is settled explicitly: MAF's run status is not a
+Task state, and no adapter may treat it as one. A running workflow means the Attempt is executing. An
+idle checkpoint means a superstep ended, not that the Attempt finished — adopting it as completion
+would declare success for work that has not happened. A pending MAF request maps to Task `Waiting`
+with a typed blocker. Workflow output may complete an Attempt, and a workflow error feeds Task retry
+policy rather than terminating the Task on its own.
+
 ### 4.3 Google
 
 Status: Built
 
 `IGmail` is a semantic capability, not an MCP toolset. It means "Gmail behavior" — it does not mirror
 whatever a `tools/list` response happens to contain today. The official MCP client, OAuth, token
-refresh, transport schemas, reconnection, schema filtering, and invocation all stay inside the module.
+refresh, transport schemas, session lifetime, schema admission, and invocation all stay inside the
+module.
 Raw MCP clients, tool names, protocol DTOs, and tool dictionaries never cross the module interface,
 and an MCP tool name never becomes permanent public domain vocabulary just because a server exposes
 it.
 
 The public surface is therefore small on purpose. A high-level typed method is added only when a real
-deterministic non-agent caller needs one; today that is a single message read. Everything else reaches
-Gmail through the tool path below.
+deterministic non-agent caller needs one, and today the whole of `IGmail` is one message read that
+returns an id, a subject, a sender, and a plaintext body.
 
-When AI uses Gmail as a tool, the module hands the model transient exact function schemas through a
-provider-neutral, module-private seam. That seam is module-author infrastructure: contract packages,
-behaviors, and natural-language discovery cannot see it, and the model sees only selected exact
-schemas — never a raw invoke escape hatch. Tool availability is bounded by a token budget and hybrid
-retrieval rather than a fixed tool count, previously used tools stay sticky within a session, and
-summaries and embeddings are disposable discovery indexes only: invocation always uses the exact
-current schema. Every selected tool still routes back through the neuron, which is why authorization,
-incoming request journals, and approval validation have exactly one home.
+Behind that method the MCP boundary is private in the literal sense rather than the aspirational one:
+the two interfaces it is assembled from — one that produces the OAuth options, one that reads a tool
+and calls it — are `internal`, so no contract package, behavior, or caller outside the module can name
+them, let alone reach the MCP client they wrap. The neuron is the only door.
+
+Every operation opens a fresh authenticated MCP session, lists what the server advertises, and refuses
+to continue unless the exact tool it came for is there. Admission is a positive check rather than a
+filter over whatever arrived: the tool must be annotated read-only, must not be annotated destructive,
+and its input schema must require the exact typed property the module intends to send. A tool that
+fails any of those throws instead of degrading into a best-effort call, because a Gmail server that
+has quietly changed what a name means is not a situation to muddle through.
+
+Schema drift between reading a tool and calling it is caught by fingerprint. The module hashes a
+canonicalized form of the advertised input schema — object properties written in ordinal order, so
+reformatting alone cannot change the hash — at admission, then re-reads and re-compares that
+fingerprint immediately before it invokes. A server that reshapes the tool between those two moments
+fails the call rather than sending arguments built for the old shape into a new contract.
+
+Authorization is the module's own problem too. Client id, secret, and redirect URI come from module
+configuration, the requested scope is the read-only Gmail scope, and the authorization code is
+collected by a local loopback listener. Tokens live in the neuron's durable state, encrypted under a
+data-protection purpose named for this module and committed through the neuron's own state write — so
+a refresh survives deactivation without introducing a second store to keep in sync.
 
 Google does not depend on AI. An application agent composes `IGmail` with a concrete LLM neuron;
 `IGmail` never composes a model.
 
-Settled but not yet standing up: `DigitalBrain.Google.ICalendar` is ratified vocabulary and waits for
-a concrete calendar story before it is written.
+Settled but not yet standing up. None of the following exists in the repository, and the tool path in
+particular should not be read as describing today's code:
+
+- `DigitalBrain.Google.ICalendar` is ratified vocabulary waiting for a concrete calendar story.
+- The provider-neutral capability-tool seam through which AI would borrow integration capabilities as
+  transient model-facing functions. It is ratified as module-author infrastructure — invisible to
+  contract packages, behaviors, and natural-language discovery — handing the model only selected exact
+  function schemas and never a raw invoke escape hatch. No such seam, middleware, or context provider
+  is implemented.
+- Its selection policy: availability bounded by a token budget rather than a fixed tool count, hybrid
+  retrieval when the granted catalog does not fit that budget, previously used tools sticky within a
+  session, and summaries and embeddings kept as disposable discovery indexes while invocation always
+  uses the exact current schema.
+- `FindCapabilityTools`, the always-available read-only recovery search over the pinned granted
+  catalog. A miss may retrieve only previously unseen tools and rerun with finite progress, and there
+  is deliberately no raw string invoke beside it.
+
+When that path is built, every selected tool must still route back through the neuron, so that
+authorization, incoming request journals, and approval validation keep exactly one home.
 
 ### 4.4 Salesforce
 
@@ -319,17 +388,39 @@ Proposed
 
 The same command identity and fingerprint resume the work or return the recorded result. Reusing an
 identity with different content is rejected. Human approval binds to the exact fingerprint, so an
-approved payload cannot be swapped after the fact. MAF middleware coordinates the pause and resume,
-but the neuron independently revalidates the durable approval — a typed caller cannot route around it.
-Safe read-only operations may be auto-approved by module classification; mutating and unknown
-operations require a human. An approver agent may advise and never holds authority.
+approved payload cannot be swapped between the moment a person read it and the moment it is sent.
 
-Reconciliation is where honesty matters most. The neuron commits `Invoking` before contacting the
-provider and passes the command identity as the provider idempotency key when one is supported. After
-a crash in `Invoking`, it reconciles by reading provider state before considering another mutation.
-Proven state becomes `Completed`; an unprovable outcome becomes `OutcomeUncertain` and the owning Task
-waits. An uncertain mutation is never blindly repeated, and DigitalBrain never claims exactly-once
-external effects.
+The pause between proposal and approval is not machinery. Proposing a description records the
+mutation, leaves it `AwaitingApproval`, and returns a receipt; resuming it is a second ordinary
+interface call, `ISalesforce.ApproveAccountDescriptionAsync`, carrying the approval record together
+with the durable delivery that proves a human produced it. Nothing intercepts, wraps, or watches the
+neuron — which is precisely why the neuron has to do the checking itself, and does. It requires that
+the delivery's caller is the approver the approval names, that the synapse inside that delivery is
+that same approval record rather than merely one shaped like it, and that the approver is a session
+neuron belonging to this neuron's owner. A caller who skips the proposal, mints an approval, reuses
+someone else's evidence, or approves a fingerprint that no longer matches the stored payload is
+refused before Salesforce is contacted at all. Approving something already finished returns the
+recorded receipt instead of writing twice.
+
+Ratified but not built: the operation classification that would let module-declared safe read-only
+work be auto-approved while mutating and unknown work still requires a human, and the rule that an
+approver agent may advise but never holds authority. The one mutating operation that exists today
+always demands human evidence.
+
+Reconciliation is where the design stops being able to bluff. A crash between sending a write and
+hearing the answer is ordinary, and the only dishonest response is to assume. So `Invoking` is
+committed durably *before* the provider is contacted — the record of "we may already have changed
+Salesforce" has to outlive the process that was in the middle of doing it. Recovery then starts by
+asking Salesforce what it actually holds: a read-only query for the account, compared field by field
+against the payload that was approved. A match is proof and the command becomes `Completed`. A
+mismatch, an error, a query that itself fails — none of those prove anything, and each becomes
+`OutcomeUncertain`, which parks the owning Task rather than trying again. The command identity travels
+as the provider idempotency key wherever a provider offers one; Salesforce's update tool does not,
+which is why reconciliation and not the key is what carries this module. The rule underneath all of it
+is that a mutation whose outcome cannot be proven is never repeated, and it is the same reason
+DigitalBrain claims no exactly-once external effect anywhere: the provider is the only authority on
+its own state, and the most a durable ledger can honestly offer is a correct label for what it does
+not know.
 
 The ledger lives in the neuron's durable state and typed journal — not in a new public service.
 Read-only operations stay retryable and do not touch it.
@@ -340,42 +431,63 @@ Status: Designed
 
 Time separates *public scheduled behavior* from *private kernel scheduling*, and that separation is
 the entire point of the module. Kernel timers and reminders maintain outbox delivery, run recovery,
-and retry pumps; those are infrastructure and their reminder names are reserved under `db.*`. Time
-neurons are addressable schedules that behaviors, Tasks, and modules may talk to. A behavior must
-never see `IGrainTimer`, `IGrainReminder`, `TickStatus`, or a raw reminder name.
+and retry pumps. Those are infrastructure, and by convention their reminder names begin `db.` — the
+kernel outbox registers `db.outbox` and the AI worker's recovery reminder registers
+`db.ai.workflow-run`. The prefix is a reading aid for whoever inspects a reminder table, not an
+enforced reservation: no code validates it, and durable state keys deliberately do not follow it at
+all, which is why the AI orchestration keys are `ai.*`. Time neurons, by contrast, are addressable
+schedules that behaviors, Tasks, and modules may talk to. A behavior must never see `IGrainTimer`,
+`IGrainReminder`, `TickStatus`, or a raw reminder name.
 
 The public vocabulary is `DigitalBrain.Time.ICountdown` for a one-shot duration and
 `DigitalBrain.Time.IReminder` for an absolute or recurring schedule. It is `ICountdown` and not
 `ITimer` because .NET 10 already defines `System.Threading.ITimer` and this repository enables
 implicit usings — an ambiguous name in a single-file script is a real cost.
 
-The settled semantics:
+What is settled, and why each rule is there:
 
-- Both survive deactivation and silo failure. Neither promises real-time precision: an occurrence is
-  never intentionally early and is eventually observed after its due time.
-- Each logical schedule has exactly one neuron identity, lifecycle, revision, and an explicit
-  owner-bound destination. "Who configured this?" and "who receives the occurrence?" are separate
-  questions; cross-owner delivery needs a future explicit grant.
-- Lifecycle requests are revision-fenced and idempotent: start only from unscheduled, reschedule and
-  cancel only from scheduled with an expected revision, restart begins a new generation, and every
-  mutation carries a `CommandId` whose repeat returns the recorded result. Transitions emit typed
-  facts rather than living only in opaque Orleans state.
-- Persisted Time state is authoritative and the Orleans adapter is only a wake-up mechanism. A
-  callback carries schedule identity, revision, and occurrence identity — never a stored action or
-  payload. An uncommitted or late callback is ignored.
-- Recurrence splits into `IntervalSchedule` (elapsed duration anchored to an instant) and
-  `CalendarSchedule` (wall-clock recurrence in an IANA zone). DST is deterministic: a gap moves the
-  occurrence to the first valid instant after it, an overlap fires once at the earlier instant, and
-  facts preserve requested local time, resolved instant, offset, and adjustment.
-- Missed occurrences coalesce. An overdue one-shot occurs once after recovery; recurring misses
-  collapse into a single overdue fact carrying first and last missed time, count, recovery time, and
-  revision, then the schedule advances to the next future occurrence. A Reminder is a wake-up, not a
-  durable job queue — work that requires every occurrence becomes Tasks.
-- The kernel owns one shared durable Orleans reminder provider because the outbox needs it even
-  without this module. Time reuses that provider and must not add a second store. In-memory reminders
-  are development and test only.
-- Tests drive schedules through `TimeProvider` plus a deterministic driver, so simulations advance
-  time without waiting on a wall clock.
+- **Durability is the promise; precision is not.** Both survive deactivation and silo failure, because
+  a schedule that dies with an activation was never a schedule. Neither claims real-time accuracy: an
+  occurrence is never intentionally early and is eventually observed after its due time. Anything
+  needing a hard deadline needs something other than a wake-up.
+- **A schedule is a thing you can address, not a callback you registered.** Each logical schedule is
+  one neuron identity with one lifecycle, one current revision, and an explicitly named destination.
+  "Who configured this?" and "who receives the occurrence?" are different questions with different
+  answers, which is what keeps delivery to another owner from becoming an accident — it requires an
+  explicit grant that does not exist yet.
+- **Repeating a request has to be safe, because a caller that crashed cannot know whether it was
+  heard.** Start applies only from unscheduled; reschedule and cancel only from scheduled and only
+  against an expected revision; restart begins a new generation rather than resurrecting an old one.
+  Every mutation carries a `CommandId` whose repeat returns the recorded result. Transitions emit
+  typed facts, so a schedule's history can be read without opening opaque Orleans state.
+- **Orleans rings the bell; it stores nothing.** Persisted Time state is the authority and the Orleans
+  adapter is only a wake-up mechanism. A callback carries schedule identity, revision, and occurrence
+  identity and nothing else — never a stored action or payload — which is what lets an uncommitted or
+  late callback be recognised and dropped instead of firing work the schedule no longer describes.
+- **Low latency and durable delivery are bought separately, so they race on purpose.** Production
+  registers an activation-local Orleans timer for a prompt wake-up *and* a durable Orleans reminder as
+  the backstop that outlives the silo. Both may fire for the same occurrence. The Time neuron
+  deduplicates by revision and occurrence, and that deduplication is what makes running two mechanisms
+  a safety measure rather than a source of doubled work.
+- **Elapsed duration and wall-clock recurrence are different problems and get different types.**
+  `IntervalSchedule` is a duration anchored to an instant; `CalendarSchedule` is a wall-clock rule in
+  an IANA zone. DST is resolved deterministically instead of inherited from a library default: an
+  occurrence inside a gap moves to the first valid instant after it, an overlap fires once at the
+  earlier instant, and the fact preserves requested local time, resolved instant, offset, and the
+  adjustment that was applied.
+- **A missed occurrence is news, not a backlog to replay.** An overdue one-shot occurs once after
+  recovery. Recurring misses collapse into a single overdue fact carrying first and last missed time,
+  count, recovery time, and revision, and the schedule then advances to the next future occurrence. A
+  Reminder is a wake-up, not a durable job queue; work that must happen for every occurrence belongs
+  in Tasks, which is the module built not to lose things.
+- **The registry indexes schedule contracts, never live schedules.** `ICountdown` and `IReminder` are
+  what discovery resolves against. A running schedule is neuron state, and indexing every instance
+  would turn a compile-time vocabulary into a runtime directory that drifts.
+- **One reminder provider, because the kernel already requires one.** The outbox needs a durable
+  Orleans reminder provider whether or not this module is selected, so Time reuses it and must not add
+  a second store. In-memory reminders stay development and test only.
+- **Tests must never wait on a clock.** Schedules are driven through `TimeProvider` plus a
+  deterministic driver, so a simulation can advance a week while no wall-clock time passes.
 
 Explicitly still open: the internal calendar recurrence library and the exact recurring and calendar
 record shapes. Do not implement those as though they were settled.
@@ -465,11 +577,11 @@ runtime.
 Natural-language programming is intended to follow one path:
 
 ```text
-"Ask Google Calendar for tomorrow's events"
+"Read the Gmail message that just arrived"
                       ↓
 derived vector search over the generated catalog
                       ↓
-DigitalBrain.Google.ICalendar
+DigitalBrain.Google.IGmail
                       ↓
 exact typed neuron proxy
 ```
