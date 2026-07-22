@@ -1,6 +1,4 @@
 # Project-scoped Codex config (loaded only when this repo is trusted).
-# Skills live in .agents/skills/ (shared across Codex / Grok / Claude).
-# Harness inventory + verify: tools/harness/
 # Secrets and auth stay in ~/.codex/config.toml — not here.
 
 # Mirror .mcp.json so Codex sessions pick up the same servers as other harnesses.

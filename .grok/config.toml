@@ -1,6 +1,4 @@
 # Project plugin enablement for Grok.
-# Portable skills (shared with Codex/Claude) live in .agents/skills/
-# Install once: pwsh tools/harness/setup.ps1 -Harness grok
 
 [plugins]
 enabled = [
