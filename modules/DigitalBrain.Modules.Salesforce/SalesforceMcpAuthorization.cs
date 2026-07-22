@@ -9,15 +9,14 @@ namespace DigitalBrain.Salesforce;
 internal sealed class SalesforceMcpAuthorization(IConfiguration configuration) : ISalesforceMcpAuthorization
 {
     private const string Root = "DigitalBrain:Salesforce";
-    private readonly ITokenCache _tokens = new MemoryTokenCache();
 
-    public ClientOAuthOptions CreateOptions() => new()
+    public ClientOAuthOptions CreateOptions(ITokenCache tokenCache) => new()
     {
         ClientId = Required("ClientId"),
         ClientSecret = Required("ClientSecret"),
         RedirectUri = RequiredUri("RedirectUri"),
         Scopes = ["mcp_api", "refresh_token"],
-        TokenCache = _tokens,
+        TokenCache = tokenCache ?? throw new ArgumentNullException(nameof(tokenCache)),
         AuthorizationRedirectDelegate = LoopbackAuthorization.AuthorizeAsync,
     };
 
@@ -32,20 +31,6 @@ internal sealed class SalesforceMcpAuthorization(IConfiguration configuration) :
         return Uri.TryCreate(value, UriKind.Absolute, out var uri)
             ? uri
             : throw new InvalidOperationException($"{Root}:{name} must be an absolute URI.");
-    }
-
-    private sealed class MemoryTokenCache : ITokenCache
-    {
-        private TokenContainer? _tokens;
-
-        public ValueTask<TokenContainer?> GetTokensAsync(CancellationToken cancellationToken)
-            => ValueTask.FromResult(_tokens);
-
-        public ValueTask StoreTokensAsync(TokenContainer tokens, CancellationToken cancellationToken)
-        {
-            _tokens = tokens;
-            return ValueTask.CompletedTask;
-        }
     }
 
     private static class LoopbackAuthorization

@@ -16,7 +16,9 @@ public sealed class IntegrationContracts
         var read = Assert.Single(typeof(IGmail).GetMethods());
         Assert.Equal(nameof(IGmail.ReadMessageAsync), read.Name);
         Assert.Equal(typeof(Task<GmailMessage>), read.ReturnType);
-        Assert.Equal([typeof(string)], read.GetParameters().Select(parameter => parameter.ParameterType));
+        Assert.Equal(
+            [typeof(string), typeof(CancellationToken)],
+            read.GetParameters().Select(parameter => parameter.ParameterType));
 
         AssertProviderAgnostic(typeof(IGmail).Assembly);
     }
@@ -35,10 +37,14 @@ public sealed class IntegrationContracts
         Assert.All(methods, method =>
             Assert.Equal(typeof(Task<SalesforceAccountDescriptionMutation>), method.ReturnType));
         Assert.Equal(
-            [typeof(CommandId), typeof(string)],
-            methods[0].GetParameters().Select(parameter => parameter.ParameterType));
+            [
+                "DigitalBrain.Salesforce.SalesforceMutationApproval",
+                typeof(SynapseDelivery).FullName,
+                typeof(CancellationToken).FullName,
+            ],
+            methods[0].GetParameters().Select(parameter => parameter.ParameterType.FullName));
         Assert.Equal(
-            [typeof(CommandId), typeof(string), typeof(string)],
+            [typeof(CommandId), typeof(NeuronId), typeof(string), typeof(string), typeof(CancellationToken)],
             methods[1].GetParameters().Select(parameter => parameter.ParameterType));
         Assert.Equal(
             [
@@ -47,6 +53,13 @@ public sealed class IntegrationContracts
                 SalesforceMutationState.OutcomeUncertain,
             ],
             Enum.GetValues<SalesforceMutationState>());
+        Assert.True(typeof(Synapse).IsAssignableFrom(typeof(SalesforceMutationApproval)));
+        Assert.Equal(
+            ["ApprovalId", "ApprovedAt", "Approver", "CommandId", "Fingerprint"],
+            typeof(SalesforceMutationApproval)
+                .GetProperties()
+                .Select(property => property.Name)
+                .Order(StringComparer.Ordinal));
 
         AssertProviderAgnostic(typeof(ISalesforce).Assembly);
     }

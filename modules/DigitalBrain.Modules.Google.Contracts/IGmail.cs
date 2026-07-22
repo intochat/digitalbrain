@@ -6,5 +6,7 @@ namespace DigitalBrain.Google;
 public interface IGmail : INeuron
 {
     [Alias("ReadMessage")]
-    Task<GmailMessage> ReadMessageAsync(string messageId);
+    Task<GmailMessage> ReadMessageAsync(
+        string messageId,
+        CancellationToken cancellationToken);
 }

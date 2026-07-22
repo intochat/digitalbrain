@@ -8,11 +8,14 @@ public interface ISalesforce : INeuron
     [Alias("ProposeAccountDescription")]
     Task<SalesforceAccountDescriptionMutation> ProposeAccountDescriptionAsync(
         CommandId commandId,
+        NeuronId requester,
         string accountId,
-        string description);
+        string description,
+        CancellationToken cancellationToken);
 
     [Alias("ApproveAccountDescription")]
     Task<SalesforceAccountDescriptionMutation> ApproveAccountDescriptionAsync(
-        CommandId commandId,
-        string fingerprint);
+        SalesforceMutationApproval approval,
+        SynapseDelivery approvalEvidence,
+        CancellationToken cancellationToken);
 }

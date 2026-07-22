@@ -13,7 +13,7 @@ DigitalBrain.Google.GmailMessage.Sender.init -> void
 DigitalBrain.Google.GmailMessage.Subject.get -> string!
 DigitalBrain.Google.GmailMessage.Subject.init -> void
 DigitalBrain.Google.IGmail
-DigitalBrain.Google.IGmail.ReadMessageAsync(string! messageId) -> System.Threading.Tasks.Task<DigitalBrain.Google.GmailMessage!>!
+DigitalBrain.Google.IGmail.ReadMessageAsync(string! messageId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Google.GmailMessage!>!
 override DigitalBrain.Google.GmailMessage.Equals(object? obj) -> bool
 override DigitalBrain.Google.GmailMessage.GetHashCode() -> int
 override DigitalBrain.Google.GmailMessage.ToString() -> string!

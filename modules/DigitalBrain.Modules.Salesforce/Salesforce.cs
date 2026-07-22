@@ -4,15 +4,18 @@ using System.Text.Json;
 using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
+using ModelContextProtocol.Authentication;
 
 namespace DigitalBrain.Salesforce;
 
 internal sealed class Salesforce : Neuron, ISalesforce
 {
     private const string MutationsName = "salesforce.mutations";
+    private const string TokensName = "salesforce.oauth";
     private static readonly Uri Endpoint = new(
         "https://api.salesforce.com/platform/mcp/v1/platform/sobject-mutations");
 
@@ -20,6 +23,7 @@ internal sealed class Salesforce : Neuron, ISalesforce
     private readonly ISalesforceMcpTransport _transport;
     private readonly IDurableDictionary<Guid, byte[]> _mutations;
     private readonly Serializer<MutationData> _states;
+    private readonly ITokenCache _tokens;
 
     public Salesforce(
         ISalesforceMcpAuthorization authorization,
@@ -30,14 +34,23 @@ internal sealed class Salesforce : Neuron, ISalesforce
         _mutations = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(
             MutationsName);
         _states = ServiceProvider.GetRequiredService<Serializer<MutationData>>();
+        _tokens = new DurableMcpTokenCache(
+            ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(TokensName),
+            () => WriteStateAsync(),
+            ServiceProvider.GetRequiredService<IDataProtectionProvider>()
+                .CreateProtector("DigitalBrain.Salesforce.OAuth"));
     }
 
     public async Task<SalesforceAccountDescriptionMutation> ProposeAccountDescriptionAsync(
         CommandId commandId,
+        NeuronId requester,
         string accountId,
-        string description)
+        string description,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         Validate(commandId, accountId, description);
+        ValidateCapabilityCaller(requester);
 
         var fingerprint = Fingerprint(accountId, description);
 
@@ -47,11 +60,28 @@ internal sealed class Salesforce : Neuron, ISalesforce
             return Receipt(existing);
         }
 
+        var authorization = _authorization.CreateOptions(_tokens);
+        var updateTool = await _transport.ReadToolAsync(
+            Endpoint,
+            authorization,
+            "update_sobject_record",
+            cancellationToken);
+        var queryTool = await _transport.ReadToolAsync(
+            Endpoint,
+            authorization,
+            "soqlQuery",
+            cancellationToken);
+
         var proposed = new MutationData(
             commandId,
+            requester,
             accountId,
             description,
             fingerprint,
+            updateTool.SchemaFingerprint,
+            queryTool.SchemaFingerprint,
+            Approval: null,
+            ApprovalEvidence: null,
             MutationStatus.Proposed);
         await SaveAsync(proposed, add: true);
 
@@ -66,29 +96,34 @@ internal sealed class Salesforce : Neuron, ISalesforce
         "CA1031:Do not catch general exception types",
         Justification = "Any failure after durable Invoking makes the external mutation outcome uncertain and must not escape into an automatic retry path.")]
     public async Task<SalesforceAccountDescriptionMutation> ApproveAccountDescriptionAsync(
-        CommandId commandId,
-        string fingerprint)
+        SalesforceMutationApproval approval,
+        SynapseDelivery approvalEvidence,
+        CancellationToken cancellationToken)
     {
-        if (commandId == default)
-        {
-            throw new ArgumentException("A mutation command identity is required.", nameof(commandId));
-        }
+        ArgumentNullException.ThrowIfNull(approval);
+        ArgumentNullException.ThrowIfNull(approvalEvidence);
+        cancellationToken.ThrowIfCancellationRequested();
+        Validate(approval, approvalEvidence);
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
-
-        var mutation = TryLoad(commandId, out var loaded)
+        var mutation = TryLoad(approval.CommandId, out var loaded)
             ? loaded
-            : throw new InvalidOperationException($"Salesforce mutation '{commandId}' has not been proposed.");
-        EnsureSame(mutation, fingerprint);
+            : throw new InvalidOperationException(
+                $"Salesforce mutation '{approval.CommandId}' has not been proposed.");
+        ValidateCapabilityCaller(mutation.Requester);
+        EnsureSame(mutation, approval.Fingerprint);
 
         if (mutation.Status is MutationStatus.Completed or MutationStatus.OutcomeUncertain)
         {
+            ValidateApprovalEvidence(mutation, approval, approvalEvidence);
+            EnsureSameApproval(mutation, approval);
             return Receipt(mutation);
         }
 
         if (mutation.Status is MutationStatus.Invoking)
         {
-            mutation = mutation with { Status = MutationStatus.OutcomeUncertain };
+            ValidateApprovalEvidence(mutation, approval, approvalEvidence);
+            EnsureSameApproval(mutation, approval);
+            mutation = await ReconcileAsync(mutation, cancellationToken);
             await SaveAsync(mutation);
             return Receipt(mutation);
         }
@@ -96,10 +131,17 @@ internal sealed class Salesforce : Neuron, ISalesforce
         if (mutation.Status is not MutationStatus.AwaitingApproval)
         {
             throw new InvalidOperationException(
-                $"Salesforce mutation '{commandId}' cannot be approved from {mutation.Status}.");
+                $"Salesforce mutation '{approval.CommandId}' cannot be approved from {mutation.Status}.");
         }
 
-        mutation = mutation with { Status = MutationStatus.Approved };
+        ValidateApprovalEvidence(mutation, approval, approvalEvidence);
+
+        mutation = mutation with
+        {
+            Approval = approval,
+            ApprovalEvidence = approvalEvidence.SynapseId,
+            Status = MutationStatus.Approved,
+        };
         await SaveAsync(mutation);
         mutation = mutation with { Status = MutationStatus.Invoking };
         await SaveAsync(mutation);
@@ -108,10 +150,11 @@ internal sealed class Salesforce : Neuron, ISalesforce
         {
             var content = await _transport.CallToolAsync(
                 Endpoint,
-                _authorization.CreateOptions(),
+                _authorization.CreateOptions(_tokens),
                 "update_sobject_record",
                 Arguments(mutation),
-                CancellationToken.None);
+                mutation.UpdateSchemaFingerprint,
+                cancellationToken);
             mutation = mutation with
             {
                 Status = content.TryGetProperty("success", out var success)
@@ -122,7 +165,7 @@ internal sealed class Salesforce : Neuron, ISalesforce
         }
         catch (Exception)
         {
-            mutation = mutation with { Status = MutationStatus.OutcomeUncertain };
+            mutation = await ReconcileAsync(mutation, CancellationToken.None);
         }
 
         await SaveAsync(mutation);
@@ -139,6 +182,70 @@ internal sealed class Salesforce : Neuron, ISalesforce
                 ["Description"] = mutation.Description,
             },
         };
+
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Reconciliation is best effort; inability to prove the provider state must durably become OutcomeUncertain.")]
+    private async Task<MutationData> ReconcileAsync(
+        MutationData mutation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var content = await _transport.CallToolAsync(
+                Endpoint,
+                _authorization.CreateOptions(_tokens),
+                "soqlQuery",
+                new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["query"] = $"SELECT Id, Description FROM Account WHERE Id = '{mutation.AccountId}' LIMIT 1",
+                },
+                mutation.QuerySchemaFingerprint,
+                cancellationToken);
+
+            return mutation with
+            {
+                Status = ReconciliationMatches(content, mutation)
+                    ? MutationStatus.Completed
+                    : MutationStatus.OutcomeUncertain,
+            };
+        }
+        catch (Exception)
+        {
+            return mutation with { Status = MutationStatus.OutcomeUncertain };
+        }
+    }
+
+    private static bool ReconciliationMatches(JsonElement content, MutationData mutation)
+    {
+        var records = content;
+
+        if (content.ValueKind is JsonValueKind.Object
+            && content.TryGetProperty("records", out var nested))
+        {
+            records = nested;
+        }
+
+        if (records.ValueKind is not JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        foreach (var record in records.EnumerateArray())
+        {
+            if (record.ValueKind is JsonValueKind.Object
+                && record.TryGetProperty("Id", out var id)
+                && record.TryGetProperty("Description", out var description)
+                && string.Equals(id.GetString(), mutation.AccountId, StringComparison.Ordinal)
+                && string.Equals(description.GetString(), mutation.Description, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private async Task SaveAsync(MutationData mutation, bool add = false)
     {
@@ -177,6 +284,31 @@ internal sealed class Salesforce : Neuron, ISalesforce
         }
     }
 
+    private static void EnsureSameApproval(
+        MutationData mutation,
+        SalesforceMutationApproval approval)
+    {
+        if (mutation.Approval != approval)
+        {
+            throw new NeuronAuthorizationException(
+                $"Salesforce mutation '{mutation.CommandId}' is bound to different approval evidence.");
+        }
+    }
+
+    private static void ValidateApprovalEvidence(
+        MutationData mutation,
+        SalesforceMutationApproval approval,
+        SynapseDelivery evidence)
+    {
+        if (evidence.Caller != approval.Approver
+            || evidence.Synapse is not SalesforceMutationApproval recorded
+            || recorded != approval)
+        {
+            throw new NeuronAuthorizationException(
+                $"Salesforce mutation '{mutation.CommandId}' has no exact durable human approval evidence.");
+        }
+    }
+
     private static SalesforceAccountDescriptionMutation Receipt(MutationData mutation)
         => new(
             mutation.CommandId,
@@ -212,15 +344,57 @@ internal sealed class Salesforce : Neuron, ISalesforce
 
         ArgumentException.ThrowIfNullOrWhiteSpace(accountId);
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
+
+        if (accountId.Length is not (15 or 18)
+            || accountId.Any(character => !char.IsAsciiLetterOrDigit(character)))
+        {
+            throw new ArgumentException(
+                "A Salesforce Account ID must be a 15- or 18-character alphanumeric value.",
+                nameof(accountId));
+        }
+    }
+
+    private void Validate(
+        SalesforceMutationApproval approval,
+        SynapseDelivery approvalEvidence)
+    {
+        if (approval.CommandId == default)
+        {
+            throw new ArgumentException(
+                "A mutation command identity is required.",
+                nameof(approval));
+        }
+
+        if (approval.ApprovalId == Guid.Empty || approvalEvidence.SynapseId == default)
+        {
+            throw new ArgumentException(
+                "Durable approval identity and evidence are required.",
+                nameof(approval));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(approval.Fingerprint);
+
+        if (approval.Approver.Owner != Id.Owner
+            || approval.Approver.Type != ISessionNeuron.GrainTypeName
+            || approval.ApprovedAt == default)
+        {
+            throw new NeuronAuthorizationException(
+                "Salesforce mutation approval must be issued by this owner's human session.");
+        }
     }
 
     [GenerateSerializer]
     internal sealed record MutationData(
         [property: Id(0)] CommandId CommandId,
-        [property: Id(1)] string AccountId,
-        [property: Id(2)] string Description,
-        [property: Id(3)] string Fingerprint,
-        [property: Id(4)] MutationStatus Status);
+        [property: Id(1)] NeuronId Requester,
+        [property: Id(2)] string AccountId,
+        [property: Id(3)] string Description,
+        [property: Id(4)] string Fingerprint,
+        [property: Id(5)] string UpdateSchemaFingerprint,
+        [property: Id(6)] string QuerySchemaFingerprint,
+        [property: Id(7)] SalesforceMutationApproval? Approval,
+        [property: Id(8)] SynapseId? ApprovalEvidence,
+        [property: Id(9)] MutationStatus Status);
 
     internal enum MutationStatus
     {

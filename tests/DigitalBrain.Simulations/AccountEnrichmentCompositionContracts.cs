@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AccountEnrichment;
@@ -18,11 +19,31 @@ namespace DigitalBrain.Simulations;
 
 public sealed class AccountEnrichmentCompositionContracts
 {
-    [Fact(DisplayName = "Salesforce binds approval to exact arguments and never retries uncertainty")]
-    public async Task SalesforceBindsApprovalToExactArgumentsAndNeverRetriesUncertainty()
+    [Fact(DisplayName = "Salesforce approval is a typed human authority fact")]
+    public void SalesforceApprovalIsATypedHumanAuthorityFact()
+    {
+        Assert.True(typeof(Synapse).IsAssignableFrom(typeof(SalesforceMutationApproval)));
+        Assert.Equal(
+            ["ApprovalId", "ApprovedAt", "Approver", "CommandId", "Fingerprint"],
+            typeof(SalesforceMutationApproval)
+                .GetProperties()
+                .Select(property => property.Name)
+                .Order(StringComparer.Ordinal));
+    }
+
+    [Theory(DisplayName = "Salesforce reconciles ambiguity and never repeats the update")]
+    [InlineData(null, SalesforceMutationState.OutcomeUncertain)]
+    [InlineData("Approved description", SalesforceMutationState.Completed)]
+    public async Task SalesforceReconcilesAmbiguityAndNeverRepeatsUpdate(
+        string? reconciliationDescription,
+        SalesforceMutationState expectedState)
     {
         var gmail = new RecordingGmailTransport();
-        var transport = new RecordingSalesforceTransport { FailCalls = true };
+        var transport = new RecordingSalesforceTransport
+        {
+            FailUpdateCalls = true,
+            ReconciliationDescription = reconciliationDescription,
+        };
         var cluster = await StartClusterAsync(gmail, transport);
 
         try
@@ -37,15 +58,29 @@ public sealed class AccountEnrichmentCompositionContracts
                 "001000000000042AAA",
                 "Approved description"));
 
+            var preparedDelivery = await ReadUntilAsync<SalesforceMutationPrepared>(session, verifier);
+            var prepared = Assert.IsType<SalesforceMutationPrepared>(preparedDelivery.Synapse);
+            var approval = new SalesforceMutationApproval(
+                Guid.Parse("ac10f0c8-bc07-445a-a9f8-c82acfb33846"),
+                command,
+                prepared.Fingerprint,
+                new NeuronId(ISessionNeuron.GrainTypeName, owner, "session"),
+                new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero));
+            await session.FireAsync(verifier, approval);
+
             var delivery = await ReadUntilAsync<SalesforceMutationVerified>(session, verifier);
             var verified = Assert.IsType<SalesforceMutationVerified>(delivery.Synapse);
 
             Assert.Equal(SalesforceMutationState.AwaitingApproval, verified.ProposedState);
             Assert.True(verified.WrongFingerprintRejected);
             Assert.True(verified.DifferentArgumentsRejected);
-            Assert.Equal(SalesforceMutationState.OutcomeUncertain, verified.ApprovedState);
+            Assert.Equal(expectedState, verified.ApprovedState);
             Assert.True(verified.ReplayReturnedSameReceipt);
-            Assert.Single(transport.Calls);
+            Assert.Single(transport.Calls, call => call.Tool == "update_sobject_record");
+            var query = Assert.Single(transport.Calls, call => call.Tool == "soqlQuery");
+            Assert.Equal(
+                "SELECT Id, Description FROM Account WHERE Id = '001000000000042AAA' LIMIT 1",
+                query.Arguments["query"]);
         }
         finally
         {
@@ -86,10 +121,26 @@ public sealed class AccountEnrichmentCompositionContracts
             Assert.NotEqual(string.Empty, proposed.Fingerprint);
             Assert.Empty(salesforce.Calls);
 
-            var approval = new ApproveAccountEnrichment(
+            var approval = new SalesforceMutationApproval(
+                Guid.Parse("509ab831-d9fd-4be9-ae1a-09e4bda9772f"),
                 command.CommandId,
-                command.MessageId,
-                proposed.Fingerprint);
+                proposed.Fingerprint,
+                new NeuronId(ISessionNeuron.GrainTypeName, owner, "session"),
+                new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero));
+
+            var forger = NeuronId.For<ApprovalForger>(owner, "forger");
+            await session.FireAsync(forger, new ForgeSalesforceApproval(composition, approval));
+            await ReadUntilAsync<ApprovalForgeryAttempted>(session, forger);
+            var afterForgery = await session.ReadNeuronJournalAsync(
+                composition,
+                JournalKind.Incoming,
+                afterSequence: 0);
+
+            Assert.DoesNotContain(
+                afterForgery.Delta,
+                delivery => delivery.Synapse is SalesforceMutationApproval);
+            Assert.Empty(salesforce.Calls);
+
             await session.FireAsync(composition, approval);
 
             var completed = await ReadUntilAsync<AccountEnriched>(session, composition);
@@ -121,8 +172,10 @@ public sealed class AccountEnrichmentCompositionContracts
             var body = Assert.IsType<Dictionary<string, object?>>(salesforceCall.Arguments["body"]);
             Assert.Equal(outcome.Description, body["Description"]);
 
+            await AssertCapabilityLineageAsync(session, composition, owner);
+
             await session.FireAsync(composition, approval);
-            await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
+            await ReadUntilCountAsync<AccountEnriched>(session, composition, expectedCount: 2);
 
             Assert.Single(salesforce.Calls);
         }
@@ -165,18 +218,58 @@ public sealed class AccountEnrichmentCompositionContracts
         return cluster;
     }
 
+    private static async Task AssertCapabilityLineageAsync(
+        ISessionNeuron session,
+        NeuronId composition,
+        OwnerId owner)
+    {
+        var outgoing = await session.ReadNeuronJournalAsync(
+            composition,
+            JournalKind.Outgoing,
+            afterSequence: 0);
+        var requests = outgoing.Delta
+            .Where(delivery => delivery.Synapse is CapabilityRequested)
+            .ToArray();
+        var gmail = Assert.Single(requests, delivery =>
+            delivery.Synapse is CapabilityRequested request
+            && request.Contract == typeof(IGmail).FullName
+            && request.Method == nameof(IGmail.ReadMessageAsync));
+        var proposed = Assert.Single(requests, delivery =>
+            delivery.Synapse is CapabilityRequested request
+            && request.Contract == typeof(ISalesforce).FullName
+            && request.Method == nameof(ISalesforce.ProposeAccountDescriptionAsync));
+        var approved = Assert.Single(requests, delivery =>
+            delivery.Synapse is CapabilityRequested request
+            && request.Contract == typeof(ISalesforce).FullName
+            && request.Method == nameof(ISalesforce.ApproveAccountDescriptionAsync));
+        var gmailIncoming = await session.ReadNeuronJournalAsync(
+            NeuronId.For<IGmail>(owner, "gmail"),
+            JournalKind.Incoming,
+            afterSequence: 0);
+        var salesforceIncoming = await session.ReadNeuronJournalAsync(
+            NeuronId.For<ISalesforce>(owner, "salesforce"),
+            JournalKind.Incoming,
+            afterSequence: 0);
+
+        Assert.Contains(gmailIncoming.Delta, delivery => delivery.SynapseId == gmail.SynapseId);
+        Assert.Contains(salesforceIncoming.Delta, delivery => delivery.SynapseId == proposed.SynapseId);
+        Assert.Contains(salesforceIncoming.Delta, delivery => delivery.SynapseId == approved.SynapseId);
+    }
+
     private static async Task<SynapseDelivery> ReadUntilAsync<TSynapse>(
         ISessionNeuron session,
         NeuronId neuron)
         where TSynapse : Synapse
     {
+        JournalRead? outgoing = null;
+
         for (var attempt = 0; attempt < 100; attempt++)
         {
-            var journal = await session.ReadNeuronJournalAsync(
+            outgoing = await session.ReadNeuronJournalAsync(
                 neuron,
                 JournalKind.Outgoing,
                 afterSequence: 0);
-            var delivery = journal.Delta.SingleOrDefault(entry => entry.Synapse is TSynapse);
+            var delivery = outgoing.Delta.SingleOrDefault(entry => entry.Synapse is TSynapse);
 
             if (delivery is not null)
             {
@@ -186,18 +279,57 @@ public sealed class AccountEnrichmentCompositionContracts
             await Task.Delay(TimeSpan.FromMilliseconds(10), TestContext.Current.CancellationToken);
         }
 
-        throw new TimeoutException($"Neuron '{neuron}' did not emit {typeof(TSynapse).Name}.");
+        var incoming = await session.ReadNeuronJournalAsync(
+            neuron,
+            JournalKind.Incoming,
+            afterSequence: 0);
+        var incomingSummary = string.Join(
+            ", ",
+            incoming.Delta.Select(delivery =>
+                $"{delivery.Synapse.GetType().Name} from {delivery.Caller}"));
+        var outgoingSummary = string.Join(
+            ", ",
+            outgoing?.Delta.Select(delivery => delivery.Synapse.GetType().Name) ?? []);
+
+        throw new TimeoutException(
+            $"Neuron '{neuron}' did not emit {typeof(TSynapse).Name}. "
+            + $"Incoming: [{incomingSummary}]. Outgoing: [{outgoingSummary}].");
+    }
+
+    private static async Task ReadUntilCountAsync<TSynapse>(
+        ISessionNeuron session,
+        NeuronId neuron,
+        int expectedCount)
+        where TSynapse : Synapse
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            var journal = await session.ReadNeuronJournalAsync(
+                neuron,
+                JournalKind.Outgoing,
+                afterSequence: 0);
+
+            if (journal.Delta.Count(entry => entry.Synapse is TSynapse) >= expectedCount)
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(10), TestContext.Current.CancellationToken);
+        }
+
+        throw new TimeoutException(
+            $"Neuron '{neuron}' did not emit {expectedCount} {typeof(TSynapse).Name} facts.");
     }
 }
 
 internal sealed class FakeGoogleAuthorization(string accessToken) : IGoogleMcpAuthorization
 {
-    public ClientOAuthOptions CreateOptions() => FakeOAuth.Options(accessToken);
+    public ClientOAuthOptions CreateOptions(ITokenCache tokenCache) => FakeOAuth.Options(accessToken);
 }
 
 internal sealed class FakeSalesforceAuthorization(string accessToken) : ISalesforceMcpAuthorization
 {
-    public ClientOAuthOptions CreateOptions() => FakeOAuth.Options(accessToken);
+    public ClientOAuthOptions CreateOptions(ITokenCache tokenCache) => FakeOAuth.Options(accessToken);
 }
 
 internal static class FakeOAuth
@@ -228,16 +360,40 @@ internal static class FakeOAuth
 internal sealed class RecordingGmailTransport : IGmailMcpTransport
 {
     private readonly ConcurrentQueue<RecordedMcpCall> _calls = new();
+    private readonly DigitalBrain.Google.McpToolSnapshot _tool =
+        DigitalBrain.Google.McpToolSnapshot.Create(
+            "get_message",
+            JsonSerializer.SerializeToElement(new
+            {
+                type = "object",
+                properties = new
+                {
+                    messageId = new { type = "string" },
+                    messageFormat = new { type = "string" },
+                },
+                required = new[] { "messageId" },
+            }),
+            readOnly: true,
+            destructive: false);
 
     internal IReadOnlyList<RecordedMcpCall> Calls => [.. _calls];
+
+    public ValueTask<DigitalBrain.Google.McpToolSnapshot> ReadToolAsync(
+        Uri endpoint,
+        ClientOAuthOptions authorization,
+        string tool,
+        CancellationToken cancellationToken)
+        => ValueTask.FromResult(_tool);
 
     public async ValueTask<JsonElement> CallToolAsync(
         Uri endpoint,
         ClientOAuthOptions authorization,
         string tool,
         IReadOnlyDictionary<string, object?> arguments,
+        string expectedSchemaFingerprint,
         CancellationToken cancellationToken)
     {
+        Assert.Equal(_tool.SchemaFingerprint, expectedSchemaFingerprint);
         var tokens = await authorization.TokenCache!.GetTokensAsync(cancellationToken);
         _calls.Enqueue(new(endpoint, tokens!.AccessToken, tool, arguments));
 
@@ -254,24 +410,77 @@ internal sealed class RecordingGmailTransport : IGmailMcpTransport
 internal sealed class RecordingSalesforceTransport : ISalesforceMcpTransport
 {
     private readonly ConcurrentQueue<RecordedMcpCall> _calls = new();
+    private readonly DigitalBrain.Salesforce.McpToolSnapshot _update =
+        DigitalBrain.Salesforce.McpToolSnapshot.Create(
+            "update_sobject_record",
+            JsonSerializer.SerializeToElement(new
+            {
+                type = "object",
+                properties = new Dictionary<string, object>(StringComparer.Ordinal)
+                {
+                    ["sobject-name"] = new { type = "string" },
+                    ["id"] = new { type = "string" },
+                    ["body"] = new { type = "object" },
+                },
+                required = new[] { "sobject-name", "id", "body" },
+            }),
+            readOnly: false,
+            destructive: false);
+    private readonly DigitalBrain.Salesforce.McpToolSnapshot _query =
+        DigitalBrain.Salesforce.McpToolSnapshot.Create(
+            "soqlQuery",
+            JsonSerializer.SerializeToElement(new
+            {
+                type = "object",
+                properties = new { query = new { type = "string" } },
+                required = new[] { "query" },
+            }),
+            readOnly: true,
+            destructive: false);
 
     internal IReadOnlyList<RecordedMcpCall> Calls => [.. _calls];
 
-    internal bool FailCalls { get; init; }
+    internal bool FailUpdateCalls { get; init; }
+
+    internal string? ReconciliationDescription { get; init; }
+
+    public ValueTask<DigitalBrain.Salesforce.McpToolSnapshot> ReadToolAsync(
+        Uri endpoint,
+        ClientOAuthOptions authorization,
+        string tool,
+        CancellationToken cancellationToken)
+        => ValueTask.FromResult(tool == "soqlQuery" ? _query : _update);
 
     public async ValueTask<JsonElement> CallToolAsync(
         Uri endpoint,
         ClientOAuthOptions authorization,
         string tool,
         IReadOnlyDictionary<string, object?> arguments,
+        string expectedSchemaFingerprint,
         CancellationToken cancellationToken)
     {
+        var snapshot = tool == "soqlQuery" ? _query : _update;
+        Assert.Equal(snapshot.SchemaFingerprint, expectedSchemaFingerprint);
         var tokens = await authorization.TokenCache!.GetTokensAsync(cancellationToken);
         _calls.Enqueue(new(endpoint, tokens!.AccessToken, tool, arguments));
 
-        if (FailCalls)
+        if (tool == "update_sobject_record" && FailUpdateCalls)
         {
             throw new HttpRequestException("Simulated loss after Salesforce invocation began.");
+        }
+
+        if (tool == "soqlQuery")
+        {
+            return ReconciliationDescription is null
+                ? JsonSerializer.SerializeToElement(Array.Empty<object>())
+                : JsonSerializer.SerializeToElement(new[]
+                {
+                    new
+                    {
+                        Id = "001000000000042AAA",
+                        Description = ReconciliationDescription,
+                    },
+                });
         }
 
         return JsonSerializer.SerializeToElement(new { success = true });
@@ -292,6 +501,62 @@ internal sealed record VerifySalesforceMutation(
     [property: Id(2)] string Description) : Synapse;
 
 [GenerateSerializer]
+[Alias("db.test.forge-salesforce-approval")]
+internal sealed record ForgeSalesforceApproval(
+    [property: Id(0)] NeuronId Target,
+    [property: Id(1)] SalesforceMutationApproval Approval) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.test.salesforce-approval-forgery-attempted")]
+internal sealed record ApprovalForgeryAttempted : Synapse;
+
+internal sealed class ApprovalForger : Neuron,
+    IHandle<ForgeSalesforceApproval>,
+    IEmit<ApprovalForgeryAttempted>
+{
+    public async Task HandleAsync(
+        ForgeSalesforceApproval synapse,
+        CancellationToken cancellationToken)
+    {
+        var target = GrainFactory.GetGrain<INeuron>(synapse.Target.ToGrainId());
+        await target.DeliverAsync(ForgedDelivery.Create(synapse.Approval, Id));
+        await EmitAsync(new ApprovalForgeryAttempted());
+    }
+}
+
+internal static class ForgedDelivery
+{
+    internal static SynapseDelivery Create(Synapse synapse, NeuronId caller)
+    {
+        var constructor = Assert.Single(typeof(SynapseDelivery).GetConstructors(
+            BindingFlags.Instance | BindingFlags.NonPublic));
+
+        return Assert.IsType<SynapseDelivery>(constructor.Invoke(
+        [
+            synapse,
+            SynapseId.New(),
+            CorrelationId.New(),
+            null,
+            caller,
+            1L,
+            new DateTimeOffset(2026, 7, 22, 9, 59, 0, TimeSpan.Zero),
+        ]));
+    }
+}
+
+[GenerateSerializer]
+[Alias("db.test.salesforce-mutation-prepared")]
+internal sealed record SalesforceMutationPrepared(
+    [property: Id(0)] SalesforceMutationState ProposedState,
+    [property: Id(1)] string Fingerprint,
+    [property: Id(2)] bool DifferentArgumentsRejected) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.test.verify-approved-salesforce-mutation")]
+internal sealed record VerifyApprovedSalesforceMutation(
+    [property: Id(0)] SalesforceMutationApproval Approval) : Synapse;
+
+[GenerateSerializer]
 [Alias("db.test.salesforce-mutation-verified")]
 internal sealed record SalesforceMutationVerified(
     [property: Id(0)] SalesforceMutationState ProposedState,
@@ -302,8 +567,15 @@ internal sealed record SalesforceMutationVerified(
 
 internal sealed class SalesforceMutationVerifier : Neuron,
     IHandle<VerifySalesforceMutation>,
+    IHandle<SalesforceMutationApproval>,
+    IHandle<VerifyApprovedSalesforceMutation>,
+    IEmit<SalesforceMutationPrepared>,
     IEmit<SalesforceMutationVerified>
 {
+    private VerifySalesforceMutation? _request;
+    private SalesforceAccountDescriptionMutation? _proposal;
+    private bool _differentArgumentsRejected;
+
     public async Task HandleAsync(
         VerifySalesforceMutation synapse,
         CancellationToken cancellationToken)
@@ -312,28 +584,68 @@ internal sealed class SalesforceMutationVerifier : Neuron,
             NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
         var proposal = await salesforce.ProposeAccountDescriptionAsync(
             synapse.CommandId,
+            Id,
             synapse.AccountId,
-            synapse.Description);
-        var wrongFingerprintRejected = await RejectsAsync(
-            () => salesforce.ApproveAccountDescriptionAsync(
-                synapse.CommandId,
-                "WRONG-FINGERPRINT"));
+            synapse.Description,
+            cancellationToken);
         var differentArgumentsRejected = await RejectsAsync(
             () => salesforce.ProposeAccountDescriptionAsync(
                 synapse.CommandId,
+                Id,
                 synapse.AccountId,
-                "Different description"));
+                "Different description",
+                cancellationToken));
+
+        _request = synapse;
+        _proposal = proposal;
+        _differentArgumentsRejected = differentArgumentsRejected;
+        await EmitAsync(new SalesforceMutationPrepared(
+            proposal.State,
+            proposal.Fingerprint,
+            differentArgumentsRejected));
+    }
+
+    public async Task HandleAsync(
+        SalesforceMutationApproval synapse,
+        CancellationToken cancellationToken)
+    {
+        await SendAsync(Id, new VerifyApprovedSalesforceMutation(synapse));
+    }
+
+    public async Task HandleAsync(
+        VerifyApprovedSalesforceMutation synapse,
+        CancellationToken cancellationToken)
+    {
+        _ = _request
+            ?? throw new InvalidOperationException("No Salesforce verification is awaiting approval.");
+        var proposal = _proposal
+            ?? throw new InvalidOperationException("No Salesforce proposal is awaiting approval.");
+        var approval = synapse.Approval;
+        var salesforce = GrainFactory.GetGrain<ISalesforce>(
+            NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
+        var incoming = await ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
+        var evidence = incoming.Delta.Single(delivery =>
+            delivery.Caller == approval.Approver
+            && delivery.Synapse is SalesforceMutationApproval recorded
+            && recorded == approval);
+        var wrongFingerprintRejected = await RejectsAsync(
+            () => salesforce.ApproveAccountDescriptionAsync(
+                approval with { Fingerprint = "WRONG-FINGERPRINT" },
+                evidence,
+                cancellationToken));
         var uncertain = await salesforce.ApproveAccountDescriptionAsync(
-            synapse.CommandId,
-            proposal.Fingerprint);
+            approval,
+            evidence,
+            cancellationToken);
         var replay = await salesforce.ApproveAccountDescriptionAsync(
-            synapse.CommandId,
-            proposal.Fingerprint);
+            approval,
+            evidence,
+            cancellationToken);
 
         await EmitAsync(new SalesforceMutationVerified(
             proposal.State,
             wrongFingerprintRejected,
-            differentArgumentsRejected,
+            _differentArgumentsRejected,
             uncertain.State,
             uncertain == replay));
     }
