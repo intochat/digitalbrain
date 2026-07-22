@@ -10,14 +10,9 @@ const docsRoot = join(repositoryRoot, 'docs')
 
 const read = (...segments) => readFileSync(join(repositoryRoot, ...segments), 'utf8')
 
-const packagePages = [
-  'metapackage', 'abstractions', 'kernel', 'client', 'testing', 'aspire', 'aspire-hosting', 'devtools',
-  'ai-contracts', 'ai', 'ai-aspire-hosting',
-]
-
 const contentPages = [
-  'index.md', 'concepts.md', 'architecture.md', 'quickstart.md', 'contributing.md', 'status.md',
-  'specification.md', 'packages/index.md', ...packagePages.map(page => `packages/${page}.md`),
+  'index.md', 'concepts.md', 'architecture.md', 'quickstart.md', 'contributing.md',
+  'packages.md', 'specification.md',
 ]
 
 test('documentation project exposes the standard VitePress commands', () => {
@@ -45,7 +40,7 @@ test('every documented page exists and nothing else claims to be documentation',
     assert.equal(existsSync(join(docsRoot, page)), true, `${page} must exist`)
   }
 
-  const retiredSections = ['guide', 'build', 'getting-started', 'contributing', 'reference']
+  const retiredSections = ['guide', 'build', 'getting-started', 'contributing', 'reference', 'packages']
   for (const section of retiredSections) {
     assert.equal(existsSync(join(docsRoot, section)), false, `${section}/ must stay deleted`)
   }
@@ -60,12 +55,8 @@ test('navigation and sidebar reach every page', () => {
   assert.match(config, /github\.com\/digitalbraintech\/brain/)
   assert.doesNotMatch(config, /InteractiveAgents/)
 
-  for (const link of ['/quickstart', '/concepts', '/architecture', '/specification', '/packages/', '/contributing', '/status']) {
+  for (const link of ['/quickstart', '/concepts', '/architecture', '/specification', '/packages', '/contributing', '/status']) {
     assert.ok(config.includes(`'${link}'`), `config must link ${link}`)
-  }
-
-  for (const page of packagePages) {
-    assert.ok(config.includes(`/packages/${page}`), `config must link /packages/${page}`)
   }
 })
 
@@ -151,18 +142,23 @@ test('the specification publishes every Tier-1 feature file verbatim', () => {
   }
 })
 
-test('every shipped package has a page, and the boundary is stated', () => {
-  const index = read('docs', 'packages', 'index.md')
+test('every shipped package is in the table, and the boundary is stated', () => {
+  const packages = read('docs', 'packages.md')
+  const packableSource = read('tests', 'DigitalBrain.Tests', 'PackableProjects.cs')
 
-  for (const page of packagePages) {
-    assert.ok(index.includes(`/packages/${page}`), `the package index must link ${page}`)
+  const packable = [...packableSource.matchAll(/"(DigitalBrain[^"]*)"/g)].map(match => match[1])
+  assert.ok(packable.length >= 18, `expected the packable list, found ${packable.length}`)
+
+  for (const name of packable) {
+    assert.ok(packages.includes(`\`${name}\``), `the table must list ${name}`)
   }
 
-  assert.match(index, /Provider SDKs live only in `DigitalBrain\.Modules\.AI`/)
-  assert.match(read('docs', 'packages', 'metapackage.md'), /does \*\*not\*\* reference \[`DigitalBrain\.Kernel`\]/)
-  assert.match(read('docs', 'packages', 'kernel.md'), /refuses to start/i)
-  assert.match(read('docs', 'packages', 'ai.md'), /namespace and type name are the model identity/i)
-  assert.match(read('docs', 'packages', 'ai-aspire-hosting.md'), /openai-api-key/)
+  assert.ok(packages.includes('`DigitalBrain`'), 'the table must list the metapackage')
+  assert.match(packages, /Provider SDKs live only in `DigitalBrain\.Modules\.AI`/)
+  assert.match(packages, /does \*\*not\*\* reference `DigitalBrain\.Kernel`/)
+  assert.match(packages, /refuses to start/i)
+  assert.match(packages, /namespace and type name are the model identity/i)
+  assert.match(packages, /openai-api-key/)
 })
 
 test('the contributing guide states the gate and the non-negotiable rules', () => {
@@ -204,7 +200,7 @@ test('the open debts are disclosed rather than buried', () => {
   assert.match(changelog, /per-identity feed/)
   assert.match(changelog, /trusted cluster peer/)
 
-  assert.match(read('docs', 'packages', 'client.md'), /not\*\* an authentication boundary/)
+  assert.match(read('docs', 'packages.md'), /not\*\* an authentication boundary/)
 })
 
 test('no page resurrects rejected v1 vocabulary', () => {

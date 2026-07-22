@@ -4,6 +4,7 @@ export default defineConfig({
   title: 'DigitalBrain',
   description: 'Neurons, synapses, and simulations — durable agents for .NET on Orleans and Aspire',
   cleanUrls: true,
+  srcExclude: ['superpowers/**'],
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
     ['meta', { name: 'theme-color', content: '#080a12' }]
@@ -15,7 +16,7 @@ export default defineConfig({
       { text: 'Concepts', link: '/concepts' },
       { text: 'Architecture', link: '/architecture' },
       { text: 'Specification', link: '/specification' },
-      { text: 'Packages', link: '/packages/' },
+      { text: 'Packages', link: '/packages' },
       { text: 'Status', link: '/status' }
     ],
     sidebar: [
@@ -25,24 +26,8 @@ export default defineConfig({
           { text: 'Quickstart', link: '/quickstart' },
           { text: 'Concepts', link: '/concepts' },
           { text: 'Architecture', link: '/architecture' },
-          { text: 'Specification', link: '/specification' }
-        ]
-      },
-      {
-        text: 'Packages',
-        items: [
-          { text: 'Overview', link: '/packages/' },
-          { text: 'DigitalBrain', link: '/packages/metapackage' },
-          { text: 'DigitalBrain.Abstractions', link: '/packages/abstractions' },
-          { text: 'DigitalBrain.Kernel', link: '/packages/kernel' },
-          { text: 'DigitalBrain.Client', link: '/packages/client' },
-          { text: 'DigitalBrain.Testing', link: '/packages/testing' },
-          { text: 'DigitalBrain.Aspire', link: '/packages/aspire' },
-          { text: 'DigitalBrain.Aspire.Hosting', link: '/packages/aspire-hosting' },
-          { text: 'DigitalBrain.DevTools', link: '/packages/devtools' },
-          { text: 'AI Contracts', link: '/packages/ai-contracts' },
-          { text: 'AI Runtime', link: '/packages/ai' },
-          { text: 'AI Aspire Hosting', link: '/packages/ai-aspire-hosting' }
+          { text: 'Specification', link: '/specification' },
+          { text: 'Packages', link: '/packages' }
         ]
       },
       {
