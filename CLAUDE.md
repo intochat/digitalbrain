@@ -98,18 +98,37 @@ like any other. Check its method, not only its conclusions.
 | Does the system behave this way? | **The test suite.** Not the docs — several docs have been wrong |
 | What was here before? Is this recoverable? | **git.** Retired trees live at `git show <sha>^:<path>` |
 
-Optional accelerators, in `.mcp.json`: `codegraph` for architecture, `context7` for package docs,
-`aspire` for resource control, `microsoft-learn` for .NET docs.
+Optional accelerators ship as **project MCP** in root `.mcp.json` only:
+
+| Server | Role |
+|---|---|
+| `aspire` | AppHost resource control |
+| `codegraph` | repo architecture index |
+| `context7` | package/docs lookup (`CONTEXT7_API_KEY`) |
+| `microsoft-learn` | official Microsoft docs (HTTP) |
+| `dart` | Dart/Flutter analysis MCP |
+| `digitalbrain-mcp` | product MCP HTTP at `http://localhost:5000/mcp` — Aspire client over `IDigitalBrain.Get<ILlama32>`; tool `ask_llama32` returns `ChatResponse` (requires silo + MCP host) |
+
+That file is the sole catalog. Shape matches sibling DigitalBrain projects: direct `aspire` / `dart`,
+Windows `cmd /c npx -y …` for Node MCPs, native `"type":"http"` for remote HTTP. No `gcf-proxy`, no
+user-profile paths, no global npm MCP installs as a requirement.
+
+Claude project trust is in `.claude/settings.json`: `enableAllProjectMcpServers`,
+`enabledMcpjsonServers` (same names as `.mcp.json`), and `permissions.allow` for `mcp__*` tools.
+Open agents at the repository root with a **plain** start (`claude` / `grok` / `codex`) — do not use
+`--strict-mcp-config` or isolated homes as proof of health. Codex cannot read `.mcp.json`; its only
+adapter is `.codex/config.toml` with the same servers. Project `.grok/config.toml` holds matching
+`[mcp_servers.*]` so name collisions with `~/.claude.json` still resolve to the project lines. Keep
+`.mcp.json`, `.claude/settings.json` allow-lists, `.codex/config.toml`, and `.grok` MCP blocks in
+lockstep. Do not enable plugins that inject MCP.
 
 **If an accelerator is unavailable, say so and fall back to the oracles. Do not skip silently.**
-`codegraph` maintains its index during `dotnet build` — which `aspire run` triggers — and
-`.mcp.json` serves that index over MCP. It resolves only when the session's working root is the
-repository itself; a session rooted above the repo (for example at a parent workspace folder) cannot
-reach it, and that absence is the environment, not a broken tool. `context7` requires an interactive
-OAuth login and is genuinely unavailable in a headless session — fall back to official docs
-(Microsoft Learn, the Aspire docs MCP) rather than skipping the lookup. Note: Microsoft Learn returns
-the older `Orleans.EventSourcing.JournaledGrain` for journaling queries. That is a different API from
-`Microsoft.Orleans.Journaling`. Do not conflate them.
+`codegraph` maintains its index during `dotnet build` — which `aspire run` triggers — and is served
+from `.mcp.json` when the session root is this repository. A session rooted above the repo cannot
+reach that index; that absence is the environment, not a broken tool. `context7` needs
+`CONTEXT7_API_KEY` in the process environment — fall back to Microsoft Learn when it is unset.
+Note: Microsoft Learn returns the older `Orleans.EventSourcing.JournaledGrain` for journaling
+queries. That is a different API from `Microsoft.Orleans.Journaling`. Do not conflate them.
 
 **Check whether the ground moved.** Record `git rev-parse HEAD` and `git status --porcelain` at the
 start of a session, and check both again before staging. This repository has been modified mid-session
@@ -120,9 +139,11 @@ it and do not sweep it into your commit.
 finding counts — for example "changes a decision that is currently open", not "find valuable
 content". Without a rule they return summaries; with one they return findings.
 
-**Agent harness (Claude / Grok / Codex).** Each harness reads its own adapter — `.claude/settings.json`,
-`.grok/config.toml`, `.codex/config.toml` — and they mirror `.mcp.json` so every harness sees the same
-servers. There is no cross-harness install or verify tool; each adapter is edited directly.
+**Agent harness (Claude / Grok / Codex).** MCP lives in `.mcp.json`. Harness adapters
+(`.claude/settings.json`, `.grok/config.toml`, `.codex/config.toml`) hold only harness-native
+non-MCP settings, except Codex’s required MCP TOML mirror. Do not fork the server list in three
+places. If a tool only appears from user-level config or a marketplace plugin, treat it as outside
+this repository’s harness and do not depend on it.
 
 ---
 

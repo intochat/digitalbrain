@@ -1,11 +1,43 @@
-# Project plugin enablement for Grok.
+# Same catalog as root `.mcp.json` so Grok name-collisions with ~/.claude.json
+# still resolve to the project launch lines. Keep in lockstep with `.mcp.json`.
+
+[mcp_servers.aspire]
+command = "aspire"
+args = ["agent", "mcp"]
+startup_timeout_sec = 20
+
+[mcp_servers.dart]
+command = "dart"
+args = ["mcp-server"]
+startup_timeout_sec = 20
+
+[mcp_servers.microsoft-learn]
+url = "https://learn.microsoft.com/api/mcp"
+startup_timeout_sec = 15
+
+[mcp_servers.context7]
+command = "cmd"
+args = ["/c", "npx", "-y", "@upstash/context7-mcp@latest"]
+startup_timeout_sec = 45
+env = { CONTEXT7_API_KEY = "${CONTEXT7_API_KEY}" }
+
+[mcp_servers.codegraph]
+command = "cmd"
+args = ["/c", "npx", "-y", "@colbymchenry/codegraph@latest", "serve", "--mcp"]
+startup_timeout_sec = 45
+
+[mcp_servers.digitalbrain-mcp]
+url = "http://localhost:5000/mcp"
+startup_timeout_sec = 15
+
+
+# Skills/hooks only — no plugins that inject MCP servers.
 
 [plugins]
 enabled = [
     "superpowers",
     "mattpocock-skills",
     "double-shot-latte",
-    "episodic-memory",
     "frontend-design",
     "code-review",
     "feature-dev",

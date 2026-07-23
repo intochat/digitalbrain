@@ -12,7 +12,7 @@ public static class DigitalBrainClientHostingExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
 
         builder.UseOrleansClient();
-        builder.Services.AddSingleton(
+        builder.Services.AddSingleton<IDigitalBrain>(
             services => DigitalBrainClient.Connect(
                 services.GetRequiredService<IGrainFactory>(),
                 owner));

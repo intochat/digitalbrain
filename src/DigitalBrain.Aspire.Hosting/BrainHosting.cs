@@ -68,10 +68,22 @@ public sealed class BrainService
 
     internal void RequireStateProtection()
     {
-        _stateProtectionKey ??= Builder
-            .AddParameter($"{Name}-state-protection-key", secret: true)
-            .WithDescription(
-                "Base64-encoded 256-bit key shared by every silo that recovers encrypted durable module state.");
+        if (_stateProtectionKey is not null)
+        {
+            return;
+        }
+
+        // Local run must not block on an interactive secret prompt (agents / aspire start --non-interactive).
+        // Publish/deploy still requires an explicit secret parameter.
+        _stateProtectionKey = Builder.ExecutionContext.IsRunMode
+            ? Builder.AddParameter(
+                $"{Name}-state-protection-key",
+                Convert.ToBase64String(new byte[32]),
+                secret: true)
+            : Builder.AddParameter($"{Name}-state-protection-key", secret: true);
+
+        _stateProtectionKey.WithDescription(
+            "Base64-encoded 256-bit key shared by every silo that recovers encrypted durable module state.");
     }
 
     public ClientBrainReference AsClient() => new(this);

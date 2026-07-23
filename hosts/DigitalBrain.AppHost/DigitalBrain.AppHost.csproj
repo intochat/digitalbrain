@@ -15,5 +15,7 @@
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Salesforce\DigitalBrain.Modules.Salesforce.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\src\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\DigitalBrain.Host\DigitalBrain.Host.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
   </ItemGroup>
 </Project>
+

@@ -18,7 +18,13 @@ brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 
-builder.AddProject<Projects.DigitalBrain_Host>("silo")
+var silo = builder.AddProject<Projects.DigitalBrain_Host>("silo")
     .WithReference(brain);
+
+builder.AddProject<Projects.DigitalBrain_Mcp>("digitalbrain-mcp")
+    .WithReference(brain.AsClient())
+    .WaitFor(silo)
+    .WithEnvironment("DigitalBrain__Owner", "dev")
+    .WithHttpEndpoint(port: 5000, name: "http", isProxied: false);
 
 builder.Build().Run();

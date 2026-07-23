@@ -1,4 +1,5 @@
 using System.Reflection;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using Xunit;
 
@@ -6,21 +7,28 @@ namespace DigitalBrain.Tests;
 
 public sealed class ClientApiContracts
 {
-    [Fact(DisplayName = "DigitalBrainClient is the package's only public client facade")]
-    public void ThereIsOneClientFacade()
+    [Fact(DisplayName = "DigitalBrainClient is the package's only public client class")]
+    public void ThereIsOneClientClass()
     {
-        var facades = typeof(DigitalBrainClient).Assembly
+        var classes = typeof(DigitalBrainClient).Assembly
             .GetExportedTypes()
             .Where(type => type.IsClass)
             .ToArray();
 
-        Assert.Equal([typeof(DigitalBrainClient)], facades);
+        Assert.Equal([typeof(DigitalBrainClient)], classes);
+    }
+
+    [Fact(DisplayName = "IDigitalBrain is the public client contract")]
+    public void ClientContractIsIDigitalBrain()
+    {
+        Assert.Contains(typeof(IDigitalBrain), typeof(DigitalBrainClient).Assembly.GetExportedTypes());
+        Assert.Contains(typeof(IDigitalBrain), typeof(DigitalBrainClient).GetInterfaces());
     }
 
     [Fact(DisplayName = "Send never takes an owner: owner is ambient")]
     public void SendDoesNotAcceptOwner()
     {
-        var sends = typeof(DigitalBrainClient).GetMethods(BindingFlags.Instance | BindingFlags.Public)
+        var sends = typeof(IDigitalBrain).GetMethods()
             .Where(method => method.Name == "SendAsync")
             .ToArray();
 
@@ -35,8 +43,8 @@ public sealed class ClientApiContracts
         }
     }
 
-    [Fact(DisplayName = "the client exposes only owner-bound session entry points")]
-    public void SurfaceIsConnectSendAndEmit()
+    [Fact(DisplayName = "the client exposes Connect, Get, Send, and Emit")]
+    public void SurfaceIsConnectGetSendAndEmit()
     {
         var names = typeof(DigitalBrainClient).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.Static)
             .Where(method => method.DeclaringType == typeof(DigitalBrainClient))
@@ -44,18 +52,18 @@ public sealed class ClientApiContracts
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.Equal(
-            ["Connect", "EmitAsync", "SendAsync", "get_Owner"],
+            ["Connect", "EmitAsync", "Get", "SendAsync", "get_Owner"],
             names.OrderBy(name => name, StringComparer.Ordinal));
     }
 
-    [Fact(DisplayName = "the client never returns raw neuron proxies")]
-    public void SurfaceReturnsNoNeuronProxy()
+    [Fact(DisplayName = "Get is constrained to neuron contracts")]
+    public void GetIsNeuronConstrained()
     {
-        var methods = typeof(DigitalBrainClient).GetMethods(BindingFlags.Instance | BindingFlags.Public)
-            .Where(method => method.DeclaringType == typeof(DigitalBrainClient));
+        var get = typeof(IDigitalBrain).GetMethods()
+            .Single(method => method.Name == "Get" && method.GetParameters().Length == 1);
 
-        Assert.DoesNotContain(
-            methods,
-            method => typeof(Orleans.IGrain).IsAssignableFrom(method.ReturnType));
+        var constraint = get.GetGenericArguments().Single().GetGenericParameterConstraints();
+
+        Assert.Contains(typeof(INeuron), constraint);
     }
 }
