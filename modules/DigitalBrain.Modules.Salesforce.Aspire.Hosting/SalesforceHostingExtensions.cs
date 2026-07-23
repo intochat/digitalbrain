@@ -11,7 +11,7 @@ public static class SalesforceHostingExtensions
         "salesforce",
         "DigitalBrain:Salesforce",
         "Consumer key from the Salesforce [External Client App](https://developer.salesforce.com/docs/platform/hosted-mcp-servers/guide/create-external-client-app.html).",
-        "Client secret from the Salesforce External Client App configured for this server-side client.",
+        ClientSecretDescription: null,
         "OAuth callback URI registered on the Salesforce External Client App. Use an HTTP loopback callback only with the explicit local development authorization mode.");
 
     public static SalesforceModule WithSalesforce(this SalesforceModule module)

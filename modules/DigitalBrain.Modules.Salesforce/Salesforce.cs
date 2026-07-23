@@ -20,7 +20,8 @@ internal sealed class Salesforce : Neuron, ISalesforce
         "DigitalBrain Salesforce",
         new Uri("https://api.salesforce.com/platform/mcp/v1/platform/sobject-mutations"),
         "DigitalBrain:Salesforce",
-        ["mcp_api", "refresh_token"]);
+        ["mcp_api", "refresh_token"],
+        requiresClientSecret: false);
     private static readonly McpToolContract UpdateAccount = McpToolContract.Mutation(
         "update_sobject_record",
         new McpToolProperty("sobject-name", "string"),

@@ -33,7 +33,17 @@ internal sealed class DurableMcpTokenCache(
         ArgumentNullException.ThrowIfNull(tokens);
         cancellationToken.ThrowIfCancellationRequested();
 
+        var previous = state.Value;
         state.Value = protector.Protect(purpose, JsonSerializer.SerializeToUtf8Bytes(tokens));
-        await commit();
+
+        try
+        {
+            await commit();
+        }
+        catch
+        {
+            state.Value = previous;
+            throw;
+        }
     }
 }

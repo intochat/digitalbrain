@@ -3,7 +3,6 @@ using System.Text.Json;
 using DigitalBrain.Integrations.Mcp;
 using DigitalBrain.Security;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Authentication;
 using Xunit;
 
@@ -11,27 +10,35 @@ namespace DigitalBrain.Simulations;
 
 public sealed class CentralMcpContracts
 {
-    [Fact(DisplayName = "MCP authorization is fail-closed unless the host owns an authenticated edge")]
-    public async Task AuthorizationIsFailClosedAndHostOwned()
+    [Fact(DisplayName = "MCP authorization is fail-closed unless local loopback is explicit")]
+    public async Task AuthorizationIsFailClosedUnlessLocalLoopbackIsExplicit()
     {
-        var services = new ServiceCollection();
-        McpRuntimeHosting.Configure(services, new ConfigurationBuilder().Build());
-        await using var provider = services.BuildServiceProvider();
-        var redirect = provider.GetRequiredService<IMcpAuthorizationRedirect>();
-
-        Assert.Same(RejectingMcpAuthorizationRedirect.Instance, redirect);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => redirect.AuthorizeAsync(
+        var reject = McpAuthorizationRedirect.Create(new ConfigurationBuilder().Build());
+        var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => reject(
             new Uri("https://authorization.example/authorize?state=expected"),
             new Uri("https://application.example/callback"),
             TestContext.Current.CancellationToken));
+        Assert.Contains("disabled", rejected.Message, StringComparison.Ordinal);
 
-        var hostRedirect = new StubAuthorizationRedirect();
-        var hostServices = new ServiceCollection();
-        hostServices.AddSingleton<IMcpAuthorizationRedirect>(hostRedirect);
-        McpRuntimeHosting.Configure(hostServices, new ConfigurationBuilder().Build());
-        await using var hostProvider = hostServices.BuildServiceProvider();
+        var local = McpAuthorizationRedirect.Create(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [McpRuntimeHosting.AuthorizationModeKey] = McpRuntimeHosting.LocalLoopbackDevelopmentMode,
+            })
+            .Build());
+        var unsafeRedirect = await Assert.ThrowsAsync<InvalidOperationException>(() => local(
+            new Uri("https://authorization.example/authorize?state=expected"),
+            new Uri("https://localhost:41001/callback"),
+            TestContext.Current.CancellationToken));
+        Assert.Contains("HTTP loopback", unsafeRedirect.Message, StringComparison.Ordinal);
+    }
 
-        Assert.Same(hostRedirect, hostProvider.GetRequiredService<IMcpAuthorizationRedirect>());
+    [Fact(DisplayName = "MCP authorization exposes no public redirect override seam")]
+    public void AuthorizationRedirectIsPrivate()
+    {
+        Assert.DoesNotContain(
+            typeof(McpRuntimeHosting).Assembly.GetExportedTypes(),
+            type => type.Name == "IMcpAuthorizationRedirect");
     }
 
     [Theory(DisplayName = "local MCP authorization accepts only explicit HTTP loopback callbacks with OAuth state")]
@@ -40,9 +47,8 @@ public sealed class CentralMcpContracts
     [InlineData("http://localhost:41001/callback", "https://authorization.example/authorize")]
     public async Task LocalAuthorizationRejectsUnsafeCallbacks(string redirect, string authorization)
     {
-        var adapter = new LocalLoopbackMcpAuthorizationRedirect();
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => adapter.AuthorizeAsync(
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            LocalLoopbackMcpAuthorizationRedirect.AuthorizeAsync(
             new Uri(authorization),
             new Uri(redirect),
             TestContext.Current.CancellationToken));
@@ -66,8 +72,7 @@ public sealed class CentralMcpContracts
         var options = McpOAuthOptions.Create(
             definition,
             configuration,
-            tokens,
-            RejectingMcpAuthorizationRedirect.Instance);
+            tokens);
 
         Assert.Equal("google-client", options.ClientId);
         Assert.Equal("google-secret", options.ClientSecret);
@@ -109,6 +114,92 @@ public sealed class CentralMcpContracts
         Assert.NotNull(state.Value);
         Assert.DoesNotContain("owner-token", Encoding.UTF8.GetString(state.Value), StringComparison.Ordinal);
         Assert.Equivalent(stored, restored, strict: true);
+    }
+
+    [Fact(DisplayName = "MCP token state rolls back when its durable commit fails")]
+    public async Task OAuthTokenStateRollsBackWhenCommitFails()
+    {
+        var previous = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray();
+        var state = new FakeDurableValue<byte[]> { Value = previous };
+        var cache = new DurableMcpTokenCache(
+            state,
+            () => ValueTask.FromException(new InvalidOperationException("commit failed")),
+            new DurablePayloadProtector(NewEncodedKey()),
+            "mcp/oauth/google.gmail/gmail:owner/account@example.com");
+        var replacement = await FakeOAuth.Options("replacement-token").TokenCache!
+            .GetTokensAsync(TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await cache.StoreTokensAsync(
+                replacement!,
+                TestContext.Current.CancellationToken));
+
+        Assert.Same(previous, state.Value);
+    }
+
+    [Theory(DisplayName = "explicit loopback authorization rejects callbacks outside the SDK redirect contract")]
+    [InlineData(
+        "http://localhost:41001/callback",
+        "https://authorization.example/authorize?state=sdk-state",
+        "http://localhost:41001/wrong?code=code&state=sdk-state")]
+    [InlineData(
+        "http://localhost:41001/callback",
+        "https://authorization.example/authorize?state=sdk-state",
+        "http://localhost:41001/callback?code=code&state=wrong-state")]
+    public void LoopbackAuthorizationRejectsWrongPathOrReturnedState(
+        string redirect,
+        string authorization,
+        string callback)
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            ValidateLoopbackCallback(authorization, redirect, callback));
+    }
+
+    [Fact(DisplayName = "explicit loopback authorization accepts the SDK-supplied state")]
+    public void LoopbackAuthorizationAcceptsSdkState()
+    {
+        var code = ValidateLoopbackCallback(
+            "https://authorization.example/authorize?state=sdk-state",
+            "http://localhost:41001/callback",
+            "http://localhost:41001/callback?code=authorization-code&state=sdk-state");
+
+        Assert.Equal("authorization-code", code);
+    }
+
+    [Fact(DisplayName = "Salesforce PKCE OAuth accepts an omitted client secret while Gmail does not")]
+    public void ProviderClientSecretRequirementsAreExact()
+    {
+        var salesforce = new McpServerDefinition(
+            "salesforce",
+            "DigitalBrain salesforce",
+            new Uri("https://api.salesforce.com/platform/mcp/v1/platform/sobject-mutations"),
+            "DigitalBrain:Salesforce",
+            ["mcp_api", "refresh_token"],
+            requiresClientSecret: false);
+        var salesforceOptions = McpOAuthOptions.Create(
+            salesforce,
+            Configuration(
+                salesforce.ConfigurationRoot,
+                "salesforce-client",
+                clientSecret: null,
+                redirectUri: "http://localhost:41001/callback"),
+            FakeOAuth.Options("owner-token").TokenCache!);
+
+        Assert.Null(salesforceOptions.ClientSecret);
+
+        var gmail = Server(
+            "google.gmail",
+            "DigitalBrain:Google:Gmail",
+            "https://gmailmcp.googleapis.com/mcp/v1",
+            "https://www.googleapis.com/auth/gmail.readonly");
+        Assert.Throws<InvalidOperationException>(() => McpOAuthOptions.Create(
+            gmail,
+            Configuration(
+                gmail.ConfigurationRoot,
+                "google-client",
+                clientSecret: null,
+                redirectUri: "http://localhost:41001/callback"),
+            FakeOAuth.Options("owner-token").TokenCache!));
     }
 
     [Theory(DisplayName = "one official MCP adapter serves read-only and mutation provider policies")]
@@ -286,7 +377,7 @@ public sealed class CentralMcpContracts
     private static IConfiguration Configuration(
         string root,
         string clientId,
-        string clientSecret,
+        string? clientSecret,
         string redirectUri)
         => new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -297,12 +388,17 @@ public sealed class CentralMcpContracts
             })
             .Build();
 
-    private sealed class StubAuthorizationRedirect : IMcpAuthorizationRedirect
+    private static string ValidateLoopbackCallback(
+        string authorization,
+        string redirect,
+        string callback)
     {
-        public Task<string?> AuthorizeAsync(
-            Uri authorizationUri,
-            Uri redirectUri,
-            CancellationToken cancellationToken)
-            => Task.FromResult<string?>(null);
+        return LocalLoopbackMcpAuthorizationRedirect.ValidateCallback(
+            new Uri(authorization),
+            new Uri(redirect),
+            new Uri(callback));
     }
+
+    private static string NewEncodedKey() =>
+        Convert.ToBase64String(Enumerable.Range(0, 32).Select(value => (byte)value).ToArray());
 }

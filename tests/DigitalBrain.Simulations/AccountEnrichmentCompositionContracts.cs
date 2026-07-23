@@ -20,6 +20,40 @@ namespace DigitalBrain.Simulations;
 
 public sealed class AccountEnrichmentCompositionContracts
 {
+    [Fact(DisplayName = "named Gmail neurons bind token purposes to their complete durable identity")]
+    public async Task NamedGmailAccountsHaveIsolatedTokenPurposes()
+    {
+        var gmail = new RecordingGmailClient();
+        var clients = new RecordingMcpClientFactory(gmail, new RecordingSalesforceClient());
+        var cluster = await StartClusterAsync(clients);
+
+        try
+        {
+            var owner = new OwnerId("named-gmail");
+            var first = NeuronId.For<IGmail>(owner, "first@example.com");
+            var second = NeuronId.For<IGmail>(owner, "second@example.com");
+
+            await Assert.ThrowsAsync<NeuronAuthorizationException>(() =>
+                cluster.Client.GetGrain<IGmail>(first.ToGrainId())
+                    .ReadMessageAsync("first-message", TestContext.Current.CancellationToken));
+            await Assert.ThrowsAsync<NeuronAuthorizationException>(() =>
+                cluster.Client.GetGrain<IGmail>(second.ToGrainId())
+                    .ReadMessageAsync("second-message", TestContext.Current.CancellationToken));
+
+            Assert.Equal(
+                [
+                    $"mcp/oauth/google.gmail/{first}",
+                    $"mcp/oauth/google.gmail/{second}",
+                ],
+                clients.TokenPurposes);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
     [Fact(DisplayName = "Salesforce approval is a typed human authority fact")]
     public void SalesforceApprovalIsATypedHumanAuthorityFact()
     {
@@ -192,6 +226,10 @@ public sealed class AccountEnrichmentCompositionContracts
     private static async Task<InProcessTestCluster> StartClusterAsync(
         RecordingGmailClient gmail,
         RecordingSalesforceClient salesforce)
+        => await StartClusterAsync(new RecordingMcpClientFactory(gmail, salesforce));
+
+    private static async Task<InProcessTestCluster> StartClusterAsync(
+        RecordingMcpClientFactory clients)
     {
         var builder = new InProcessTestClusterBuilder(1);
 
@@ -200,8 +238,7 @@ public sealed class AccountEnrichmentCompositionContracts
             silo.AddDigitalBrain("account-enrichment");
             GoogleModule.Configure(silo);
             SalesforceModule.Configure(silo);
-            silo.Services.AddSingleton<IMcpClientFactory>(
-                new RecordingMcpClientFactory(gmail, salesforce));
+            silo.Services.AddSingleton<IMcpClientFactory>(clients);
             silo.UseInMemoryReminderService();
             silo.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
         });
@@ -350,17 +387,24 @@ internal sealed class RecordingMcpClientFactory(
     RecordingGmailClient gmail,
     RecordingSalesforceClient salesforce) : IMcpClientFactory
 {
+    private readonly ConcurrentQueue<string> _tokenPurposes = new();
+
+    internal IReadOnlyList<string> TokenPurposes => [.. _tokenPurposes];
+
     public IMcpClient Create(
         McpServerDefinition server,
         IDurableValue<byte[]> tokenState,
         Func<ValueTask> commit,
-        string owner)
-        => server.Key switch
+        string durableIdentity)
+    {
+        _tokenPurposes.Enqueue(SdkMcpClientFactory.TokenPurpose(server, durableIdentity));
+        return server.Key switch
         {
             "google.gmail" => gmail,
             "salesforce" => salesforce,
             _ => throw new InvalidOperationException($"Unexpected MCP test server '{server.Key}'."),
         };
+    }
 }
 
 internal sealed class RecordingGmailClient : IMcpClient

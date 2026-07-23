@@ -13,7 +13,7 @@ internal interface IMcpClientFactory
         McpServerDefinition server,
         IDurableValue<byte[]> tokenState,
         Func<ValueTask> commit,
-        string owner);
+        string durableIdentity);
 }
 
 internal interface IMcpClient
@@ -31,31 +31,38 @@ internal interface IMcpClient
 internal sealed class SdkMcpClientFactory(
     IConfiguration configuration,
     IHttpClientFactory httpClients,
-    IDurablePayloadProtector protector,
-    IMcpAuthorizationRedirect authorizationRedirect) : IMcpClientFactory
+    IDurablePayloadProtector protector) : IMcpClientFactory
 {
     public IMcpClient Create(
         McpServerDefinition server,
         IDurableValue<byte[]> tokenState,
         Func<ValueTask> commit,
-        string owner)
+        string durableIdentity)
     {
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(tokenState);
         ArgumentNullException.ThrowIfNull(commit);
-        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(durableIdentity);
 
         var tokens = new DurableMcpTokenCache(
             tokenState,
             commit,
             protector,
-            $"mcp/oauth/{server.Key}/{owner}");
+            TokenPurpose(server, durableIdentity));
         var oauth = McpOAuthOptions.Create(
             server,
             configuration,
-            tokens,
-            authorizationRedirect);
+            tokens);
         return new SdkMcpClient(server, oauth, httpClients);
+    }
+
+    internal static string TokenPurpose(
+        McpServerDefinition server,
+        string durableIdentity)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        ArgumentException.ThrowIfNullOrWhiteSpace(durableIdentity);
+        return $"mcp/oauth/{server.Key}/{durableIdentity}";
     }
 }
 

@@ -11,7 +11,7 @@ internal sealed record McpProviderHostingDefinition(
     string ParameterPrefix,
     string ConfigurationRoot,
     string ClientIdDescription,
-    string ClientSecretDescription,
+    string? ClientSecretDescription,
     string RedirectUriDescription);
 
 internal static class McpProviderHosting
@@ -54,7 +54,7 @@ internal static class McpProviderHosting
                 ? builder.AddParameter("mcp-authorization-mode", "LocalLoopbackDevelopment")
                 : builder.AddParameter("mcp-authorization-mode"))
             .WithDescription(
-                "MCP authorization execution mode. Use `LocalLoopbackDevelopment` only for a local silo; production hosts must register an authenticated-edge authorization adapter.",
+                "MCP authorization execution mode. Use `LocalLoopbackDevelopment` only for a local silo; every other value disables interactive authorization.",
                 enableMarkdown: true);
 
         internal McpProviderParameters Register(McpProviderHostingDefinition definition)
@@ -80,12 +80,14 @@ internal static class McpProviderHosting
                     localValue: "local-dev",
                     secret: false,
                     description: definition.ClientIdDescription),
-                Parameter(
-                    builder,
-                    $"{definition.ParameterPrefix}-client-secret",
-                    localValue: "local-dev-secret",
-                    secret: true,
-                    description: definition.ClientSecretDescription),
+                definition.ClientSecretDescription is { } clientSecretDescription
+                    ? Parameter(
+                        builder,
+                        $"{definition.ParameterPrefix}-client-secret",
+                        localValue: "local-dev-secret",
+                        secret: true,
+                        description: clientSecretDescription)
+                    : null,
                 Parameter(
                     builder,
                     $"{definition.ParameterPrefix}-redirect-uri",
@@ -117,7 +119,11 @@ internal static class McpProviderHosting
             ArgumentException.ThrowIfNullOrWhiteSpace(definition.ParameterPrefix);
             ArgumentException.ThrowIfNullOrWhiteSpace(definition.ConfigurationRoot);
             ArgumentException.ThrowIfNullOrWhiteSpace(definition.ClientIdDescription);
-            ArgumentException.ThrowIfNullOrWhiteSpace(definition.ClientSecretDescription);
+            if (definition.ClientSecretDescription is not null)
+            {
+                ArgumentException.ThrowIfNullOrWhiteSpace(definition.ClientSecretDescription);
+            }
+
             ArgumentException.ThrowIfNullOrWhiteSpace(definition.RedirectUriDescription);
         }
     }
@@ -125,7 +131,7 @@ internal static class McpProviderHosting
     private sealed record McpProviderParameters(
         McpProviderHostingDefinition Definition,
         IResourceBuilder<ParameterResource> ClientId,
-        IResourceBuilder<ParameterResource> ClientSecret,
+        IResourceBuilder<ParameterResource>? ClientSecret,
         IResourceBuilder<ParameterResource> RedirectUri);
 
     private sealed class McpBrainReference(
@@ -161,8 +167,12 @@ internal static class McpProviderHosting
                 var root = provider.Definition.ConfigurationRoot.Replace(":", "__", StringComparison.Ordinal);
                 builder
                     .WithEnvironment($"{root}__ClientId", provider.ClientId)
-                    .WithEnvironment($"{root}__ClientSecret", provider.ClientSecret)
                     .WithEnvironment($"{root}__RedirectUri", provider.RedirectUri);
+
+                if (provider.ClientSecret is not null)
+                {
+                    builder.WithEnvironment($"{root}__ClientSecret", provider.ClientSecret);
+                }
             }
         }
     }

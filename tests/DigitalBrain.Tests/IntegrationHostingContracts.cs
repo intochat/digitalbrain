@@ -105,7 +105,7 @@ public sealed class IntegrationHostingContracts
         Assert.DoesNotContain("ConnectionStrings__journal", clientEnvironment.Keys);
     }
 
-    [Fact(DisplayName = "AppHost prompts once for official Gmail and Salesforce OAuth parameters")]
+    [Fact(DisplayName = "AppHost prompts only for provider-required OAuth parameters")]
     public void AppHostPromptsOnceForOfficialOAuthParameters()
     {
         var builder = DistributedApplication.CreateBuilder();
@@ -118,10 +118,10 @@ public sealed class IntegrationHostingContracts
         AssertParameter(builder, "google-client-secret", secret: true);
         AssertParameter(builder, "google-redirect-uri", secret: false);
         AssertParameter(builder, "salesforce-client-id", secret: false);
-        AssertParameter(builder, "salesforce-client-secret", secret: true);
         AssertParameter(builder, "salesforce-redirect-uri", secret: false);
         AssertParameter(builder, "mcp-authorization-mode", secret: false);
         AssertParameter(builder, "brain-state-protection-key", secret: true);
+        Assert.DoesNotContain(builder.Resources, resource => resource.Name == "salesforce-client-secret");
         Assert.Single(builder.Resources, resource => resource.Name == "brain-state-protection-key");
     }
 
@@ -144,13 +144,11 @@ public sealed class IntegrationHostingContracts
         Assert.Same(
             Parameter(builder, "google-client-secret"),
             siloEnvironment["DigitalBrain__Google__Gmail__ClientSecret"]);
-        Assert.Same(
-            Parameter(builder, "salesforce-client-secret"),
-            siloEnvironment["DigitalBrain__Salesforce__ClientSecret"]);
         Assert.Contains("DigitalBrain__Google__Gmail__ClientId", siloEnvironment.Keys);
         Assert.Contains("DigitalBrain__Google__Gmail__RedirectUri", siloEnvironment.Keys);
         Assert.Contains("DigitalBrain__Salesforce__ClientId", siloEnvironment.Keys);
         Assert.Contains("DigitalBrain__Salesforce__RedirectUri", siloEnvironment.Keys);
+        Assert.DoesNotContain("DigitalBrain__Salesforce__ClientSecret", siloEnvironment.Keys);
         Assert.Same(
             Parameter(builder, "brain-state-protection-key"),
             siloEnvironment["DigitalBrain__Security__StateProtectionKey"]);
