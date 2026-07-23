@@ -46,12 +46,12 @@
 **Interfaces:**
 - Produces: `BrainService.WithAzureStorage(IResourceBuilder<AzureStorageResource>)` and `BrainModuleHosting.RequireStateProtection(BrainService)`.
 
-- [ ] Add failing application-model tests for Table clustering/reminders, Blob journal projection, `WaitFor` readiness, one secret protection parameter, and client secret exclusion.
-- [ ] Run the owning test project and observe the missing-profile failures.
-- [ ] Make `BrainService` own the derived resources and lazily create one secret protection parameter.
-- [ ] Make `WithReference(brain)` apply Orleans, journal, readiness, modules, module references, and the protection key; keep `AsClient()` Orleans-only.
-- [ ] Convert both AppHosts from the mixed development profile to `WithAzureStorage(storage)`.
-- [ ] Run the owning test project and keep it green.
+- [x] Add failing application-model tests for Table clustering/reminders, Blob journal projection, `WaitFor` readiness, one secret protection parameter, and client secret exclusion.
+- [x] Run the owning test project and observe the missing-profile failures.
+- [x] Make `BrainService` own the derived resources and lazily create one secret protection parameter.
+- [x] Make `WithReference(brain)` apply Orleans, journal, readiness, modules, module references, and the protection key; keep `AsClient()` Orleans-only.
+- [x] Convert both AppHosts from the mixed development profile to `WithAzureStorage(storage)`.
+- [x] Run the owning test project and keep it green.
 
 ### Task 3: One official MCP client module
 

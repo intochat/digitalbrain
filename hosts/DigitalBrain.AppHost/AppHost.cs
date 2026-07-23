@@ -10,17 +10,15 @@ using DigitalBrain.Salesforce.Aspire.Hosting;
 var builder = DistributedApplication.CreateBuilder(args);
 
 var storage = builder.AddAzureStorage("storage").RunAsEmulator();
-var journal = storage.AddBlobs("journal");
 
 var brain = builder.AddBrain("brain")
-    .WithDevelopmentStores();
+    .WithAzureStorage(storage);
 
 brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 
 builder.AddProject<Projects.DigitalBrain_Host>("silo")
-    .WithReference(brain)
-    .WithReference(journal);
+    .WithReference(brain);
 
 builder.Build().Run();

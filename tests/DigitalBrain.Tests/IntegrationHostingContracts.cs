@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Azure;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
@@ -11,6 +12,43 @@ namespace DigitalBrain.Tests;
 
 public sealed class IntegrationHostingContracts
 {
+    [Fact(DisplayName = "one durable brain profile owns Orleans tables, journal readiness, and silo-only protection")]
+    public async Task DurableBrainProfileIsCompleteAndSiloOnly()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var storage = builder.AddAzureStorage("storage");
+        var brain = builder.AddBrain("brain").WithAzureStorage(storage);
+        BrainModuleHosting.RequireStateProtection(brain);
+        BrainModuleHosting.RequireStateProtection(brain);
+
+        var tables = builder.Resources
+            .OfType<AzureTableStorageResource>()
+            .Select(resource => resource.Name)
+            .ToList();
+        var journal = Assert.IsType<AzureBlobStorageResource>(
+            Assert.Single(builder.Resources, resource => resource.Name == "brain-journal"));
+        var protectionKey = Parameter(builder, "brain-state-protection-key");
+
+        Assert.Equal(["brain-clustering", "brain-reminders"], tables);
+        Assert.True(protectionKey.Secret);
+        Assert.Throws<InvalidOperationException>(() => brain.WithAzureStorage(storage));
+        Assert.Equal(2, builder.Resources.OfType<AzureTableStorageResource>().Count());
+        Assert.Single(builder.Resources.OfType<AzureBlobStorageResource>());
+
+        var silo = builder.AddResource(new ProjectionProbe("silo")).WithReference(brain);
+        var client = builder.AddResource(new ProjectionProbe("client")).WithReference(brain.AsClient());
+        var siloEnvironment = await ProjectAsync(silo.Resource);
+        var clientEnvironment = await ProjectAsync(client.Resource);
+
+        Assert.Same(protectionKey, siloEnvironment["DigitalBrain__Security__StateProtectionKey"]);
+        Assert.Contains("ConnectionStrings__journal", siloEnvironment.Keys);
+        Assert.Contains(
+            silo.Resource.Annotations.OfType<WaitAnnotation>(),
+            annotation => ReferenceEquals(annotation.Resource, journal));
+        Assert.DoesNotContain("DigitalBrain__Security__StateProtectionKey", clientEnvironment.Keys);
+        Assert.DoesNotContain("ConnectionStrings__journal", clientEnvironment.Keys);
+    }
+
     [Fact(DisplayName = "AppHost prompts once for official Gmail and Salesforce OAuth parameters")]
     public void AppHostPromptsOnceForOfficialOAuthParameters()
     {
