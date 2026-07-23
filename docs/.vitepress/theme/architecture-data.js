@@ -22,7 +22,7 @@ export const MODULES = [
     id: 'tasks', label: 'Tasks', status: 'built', section: '#42-tasks',
     role: 'Durable desired-outcome identity. Exactly one Attempt is active at a time; a MAF workflow runs each attempt. Workers report typed facts.',
     neurons: ['ITask', 'IWorker'],
-    synapses: ['AttemptSucceeded', 'AttemptFailed', 'AttemptWaiting', 'ApprovalRequired', 'AttemptOutcomeUncertain'],
+    synapses: ['AttemptSucceeded', 'AttemptFailed', 'AttemptWaiting', 'AttemptProgressed', 'AttemptOutcomeUncertain'],
     mcp: false, ui: false, aspire: [],
   },
   {
@@ -84,16 +84,17 @@ export const BEHAVIORS = [
 }`,
   },
   {
-    id: 'lead', label: 'Lead follow-up', status: 'designed', trigger: 'on ApprovalRequired',
-    uses: ['ApprovalRequired', 'ISalesforce', 'ICountdown'],
-    role: 'When a Task asks for approval, update the Salesforce record and set a follow-up countdown. Composes Tasks, Salesforce, and Time — the mutation stays behind the module\'s approval rail.',
+    id: 'lead', label: 'Lead follow-up', status: 'designed', trigger: 'on AttemptWaiting',
+    uses: ['AttemptWaiting', 'ISalesforce', 'ICountdown'],
+    role: 'When an attempt reports it is waiting on approval, update the Salesforce record and set a follow-up countdown. Composes Tasks, Salesforce, and Time — the mutation stays behind the module\'s approval rail.',
     script: `public sealed class LeadFollowUp(
     ISalesforce crm, ICountdown followUp)
-    : Behavior, IHandle<ApprovalRequired>
+    : Behavior, IHandle<AttemptWaiting>
 {
-    public async Task HandleAsync(ApprovalRequired a, ...)
+    public async Task HandleAsync(AttemptWaiting a, ...)
     {
-        await crm.UpdateAsync(a.Account, ...);
+        if (a.Blocker is not ApprovalRequired) return;
+        await crm.UpdateAsync(...);
         await followUp.StartAsync(TimeSpan.FromDays(2));
     }
 }`,
