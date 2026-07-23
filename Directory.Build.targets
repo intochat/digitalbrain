@@ -1,17 +1,20 @@
 <Project>
   <PropertyGroup>
-    <_CodeGraphRepositoryRoot>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)'))</_CodeGraphRepositoryRoot>
+    <_CodeGraphRepositoryRoot>$([System.IO.Path]::TrimEndingDirectorySeparator($([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)'))))</_CodeGraphRepositoryRoot>
     <_CodeGraphAppHostProject>$([System.IO.Path]::Combine('$(_CodeGraphRepositoryRoot)', 'hosts', 'DigitalBrain.AppHost', 'DigitalBrain.AppHost.csproj'))</_CodeGraphAppHostProject>
     <_CodeGraphDatabase>$([System.IO.Path]::Combine('$(_CodeGraphRepositoryRoot)', '.codegraph', 'codegraph.db'))</_CodeGraphDatabase>
   </PropertyGroup>
 
   <Target Name="RefreshCodeGraph" BeforeTargets="Build"
           Condition="'$(IsAspireHost)' == 'true' And '$(MSBuildProjectFullPath)' == '$(_CodeGraphAppHostProject)'">
+    <PropertyGroup>
+      <_CodeGraphDatabaseExists>$([System.IO.File]::Exists('$(_CodeGraphDatabase)'))</_CodeGraphDatabaseExists>
+    </PropertyGroup>
     <Exec Command="npx -y @colbymchenry/codegraph@latest init &quot;$(_CodeGraphRepositoryRoot)&quot;"
           WorkingDirectory="$(_CodeGraphRepositoryRoot)"
-          Condition="!Exists('$(_CodeGraphDatabase)')" />
+          Condition="'$(_CodeGraphDatabaseExists)' != 'True'" />
     <Exec Command="npx -y @colbymchenry/codegraph@latest sync &quot;$(_CodeGraphRepositoryRoot)&quot;"
           WorkingDirectory="$(_CodeGraphRepositoryRoot)"
-          Condition="Exists('$(_CodeGraphDatabase)')" />
+          Condition="'$(_CodeGraphDatabaseExists)' == 'True'" />
   </Target>
 </Project>

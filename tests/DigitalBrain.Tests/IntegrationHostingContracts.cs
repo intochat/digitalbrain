@@ -36,9 +36,13 @@ public sealed class IntegrationHostingContracts
             CommandOf(exec).Contains(" init ", StringComparison.Ordinal));
         var synchronize = Assert.Single(executions, exec =>
             CommandOf(exec).Contains(" sync ", StringComparison.Ordinal));
+        var snapshotGroup = Assert.Single(target.Elements("PropertyGroup"));
+        var databaseExists = Assert.Single(snapshotGroup.Elements("_CodeGraphDatabaseExists")).Value;
 
-        Assert.Equal("!Exists('$(_CodeGraphDatabase)')", AttributeOf(initialize, "Condition"));
-        Assert.Equal("Exists('$(_CodeGraphDatabase)')", AttributeOf(synchronize, "Condition"));
+        Assert.Empty(snapshotGroup.ElementsBeforeSelf("Exec"));
+        Assert.Equal("$([System.IO.File]::Exists('$(_CodeGraphDatabase)'))", databaseExists);
+        Assert.Equal("'$(_CodeGraphDatabaseExists)' != 'True'", AttributeOf(initialize, "Condition"));
+        Assert.Equal("'$(_CodeGraphDatabaseExists)' == 'True'", AttributeOf(synchronize, "Condition"));
         Assert.All(executions, exec =>
         {
             var command = CommandOf(exec);
@@ -54,6 +58,7 @@ public sealed class IntegrationHostingContracts
         var serialized = document.ToString();
 
         Assert.Contains("NormalizePath", repositoryRoot, StringComparison.Ordinal);
+        Assert.Contains("TrimEndingDirectorySeparator", repositoryRoot, StringComparison.Ordinal);
         Assert.Contains("MSBuildThisFileDirectory", repositoryRoot, StringComparison.Ordinal);
         Assert.Contains("_CodeGraphRepositoryRoot", appHostProject, StringComparison.Ordinal);
         Assert.Contains("DigitalBrain.AppHost.csproj", appHostProject, StringComparison.Ordinal);
