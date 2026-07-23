@@ -27,4 +27,7 @@ builder.AddProject<Projects.DigitalBrain_Mcp>("digitalbrain-mcp")
     .WithEnvironment("DigitalBrain__Owner", "dev")
     .WithHttpEndpoint(port: 5000, name: "http", isProxied: false);
 
+builder.AddViteApp("website", "../../docs")
+    .WithExternalHttpEndpoints();
+
 builder.Build().Run();

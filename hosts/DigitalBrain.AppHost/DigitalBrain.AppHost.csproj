@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Azure.Storage" />
+    <PackageReference Include="Aspire.Hosting.JavaScript" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.AI.Aspire.Hosting\DigitalBrain.Modules.AI.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
