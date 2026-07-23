@@ -3,6 +3,9 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1812;CA2000</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Data.Tables" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Server" />
   </ItemGroup>
   <ItemGroup>

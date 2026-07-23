@@ -96,9 +96,14 @@ DigitalBrain.Modules.<Name>.Aspire.Hosting   optional
 ```
 
 `.Contracts` references only `DigitalBrain.Abstractions` — never another module, never a provider SDK.
-The runtime package owns neurons and vendor adapters. The Aspire hosting package owns resources,
-parameters, authentication setup, and projection into the silo. This split is enforced by tests, not
-by convention alone.
+The runtime package owns neurons, provider vocabulary, exact tool policy, and semantic result mapping.
+The Aspire hosting package owns resources, parameters, and projection into the silo. Cross-provider
+mechanics are deliberately deeper packages rather than copied module code:
+`DigitalBrain.Security` owns purpose-bound durable encryption, and
+`DigitalBrain.Integrations.Mcp` owns the official SDK transport, OAuth/token-cache mechanics, session
+lifetime, schema admission, and invocation. Provider runtimes depend inward on those mechanics; the
+shared packages never acquire Gmail or Salesforce vocabulary. This split is enforced by tests, not by
+convention alone.
 
 ### Namespaces are the vocabulary
 
@@ -124,30 +129,32 @@ Infrastructure is declared in AppHost:
 
 ```csharp
 var storage = builder.AddAzureStorage("storage").RunAsEmulator();
-var journal = storage.AddBlobs("journal");
-
-var brain = builder.AddBrain("brain")
-    .WithDevelopmentStores();
+var brain = builder.AddBrain("brain").WithAzureStorage(storage);
 
 brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 
 builder.AddProject<Projects.DigitalBrain_Host>("silo")
-    .WithReference(brain)
-    .WithReference(journal);
+    .WithReference(brain);
 ```
 
 The silo stays boring:
 
 ```csharp
+builder.AddKeyedAzureTableServiceClient("brain-clustering");
+builder.AddKeyedAzureTableServiceClient("brain-reminders");
 builder.UseOrleans(silo => silo
     .AddDigitalBrain()
     .AddDigitalBrainJournalStorage(builder.Configuration));
 ```
 
-The blob resource is not decoration. `AddDigitalBrainJournalStorage` throws when no `journal`
-connection string is configured, so a silo that references the brain and nothing else does not start.
+`WithAzureStorage` is one complete profile: it derives the clustering table, reminder table, and
+`journal` blob resources from the same Azure Storage account, projects them only to the silo, and
+adds journal readiness to the silo reference. The service project loads the Orleans Azure clustering
+and reminder providers and registers Aspire's keyed `TableServiceClient`s under the exact projected
+resource names. `AddDigitalBrainJournalStorage` still throws when no `journal` connection string is
+configured, so an incomplete hand-wired silo does not start.
 
 Package reference means *available*. `AddModule<T>()` means *selected and configured*. Each module is
 added exactly once; a repeat call is a composition error, not a merge.
@@ -169,10 +176,11 @@ and reversing one requires writing down the reversal — but no code exists yet.
 
 Status: Built
 
-AI owns inference and orchestration vocabulary. Two contracts, deliberately separate even though
-their wire shape is identical: `ILLM` means model inference, `IAgent` means an agent with instructions
-and capabilities. `ILLM` never inherits `IAgent`, and no adapter may pretend a raw model is a durable
-agent.
+AI owns inference and orchestration vocabulary. Two contracts are deliberately separate even though
+their wire shape is identical: `ILLM` means model inference and `IAgent` means a role-bearing agent or
+orchestration. `ILLM` never inherits `IAgent`, and no adapter may pretend a raw model is a durable
+agent. There is no generic `Agent` base that collects instructions or capabilities without giving
+them MAF semantics; an agent is a concrete typed neuron contract, and MAF owns its execution path.
 
 ```csharp
 namespace DigitalBrain.AI;
@@ -222,9 +230,13 @@ by typed neuron identity, never by injecting fake constructor dependencies.
 
 **Orleans is the durability authority.** There is exactly one outer MAF artifact per entry path: a
 direct `RespondAsync` turn owns a protected serialized `AgentSession`; a supervised Attempt owns a raw
-MAF workflow checkpoint lineage instead. The supervised checkpoint may contain MAF-owned participant
-sessions internally — DigitalBrain neither extracts them nor keeps a parallel outer session. There is
-no second transcript, and the MAF Durable Extension is rejected because it would duplicate Orleans.
+MAF workflow checkpoint lineage through an Orleans-backed MAF `JsonCheckpointStore`. Both payloads
+are encrypted by `DigitalBrain.Security` with one brain-scoped 256-bit key and purposes derived from
+the neuron/definition or checkpoint lineage, so a restart or another silo can recover them without
+process-local ASP.NET Data Protection state. The supervised checkpoint may contain MAF-owned
+participant sessions internally — DigitalBrain neither extracts them nor keeps a parallel outer
+session. There is no second transcript, and the MAF Durable Extension is rejected because it would
+duplicate Orleans.
 Each envelope binds the DigitalBrain state version, the MAF version, the definition fingerprint, and
 the typed participants. Restore reconstructs the exact composed definition first and only then
 restores state; a change to participants, prompts, providers, tools, orchestration shape, or MAF
@@ -336,9 +348,10 @@ is never consulted.
 Status: Built
 
 `IGmail` is a semantic capability, not an MCP toolset. It means "Gmail behavior" — it does not mirror
-whatever a `tools/list` response happens to contain today. The official MCP client, OAuth, token
-refresh, transport schemas, session lifetime, schema admission, and invocation all stay inside the
-module.
+whatever a `tools/list` response happens to contain today. The module owns the official Gmail endpoint,
+read-only scope, exact admitted tools, arguments, and semantic result mapping. The shared internal MCP
+runtime owns the official SDK client, OAuth/token-cache mechanics, transport lifetime, schema
+fingerprinting, and invocation without exposing any of them as public application vocabulary.
 Raw MCP clients, tool names, protocol DTOs, and tool dictionaries never cross the module interface,
 and an MCP tool name never becomes permanent public domain vocabulary just because a server exposes
 it.
@@ -348,9 +361,9 @@ deterministic non-agent caller needs one, and today the whole of `IGmail` is one
 returns an id, a subject, a sender, and a plaintext body.
 
 Behind that method the MCP boundary is private in the literal sense rather than the aspirational one:
-the two interfaces it is assembled from — one that produces the OAuth options, one that reads a tool
-and calls it — are `internal`, so no contract package, behavior, or caller outside the module can name
-them, let alone reach the MCP client they wrap. The neuron is the only door.
+the shared client factory and client are `internal` and friend only provider runtimes and simulations.
+No contract package, behavior, or application caller can name them, let alone reach the SDK client
+they wrap. The neuron is the only semantic door.
 
 Every operation opens a fresh authenticated MCP session, lists what the server advertises, and refuses
 to continue unless the exact tool it came for is there. Admission is a positive check rather than a
@@ -365,11 +378,12 @@ reformatting alone cannot change the hash — at admission, then re-reads and re
 fingerprint immediately before it invokes. A server that reshapes the tool between those two moments
 fails the call rather than sending arguments built for the old shape into a new contract.
 
-Authorization is the module's own problem too. Client id, secret, and redirect URI come from module
-configuration, the requested scope is the read-only Gmail scope, and the authorization code is
-collected by a local loopback listener. Tokens live in the neuron's durable state, encrypted under a
-data-protection purpose named for this module and committed through the neuron's own state write — so
-a refresh survives deactivation without introducing a second store to keep in sync.
+The module defines its OAuth client configuration and requested read-only Gmail scope; the shared MCP
+runtime performs the protocol and keeps tokens in the neuron's durable state under the shared
+purpose-bound protector. Production interactive authorization belongs at an authenticated edge and
+is supplied through `IMcpAuthorizationRedirect`. The default runtime refuses interactive redirection;
+a loopback HTTP listener exists only behind the explicit `LocalLoopbackDevelopment` mode. This keeps a
+server-side silo from silently turning a developer callback into its production authentication model.
 
 Google does not depend on AI. An application agent composes `IGmail` with a concrete LLM neuron;
 `IGmail` never composes a model.
@@ -398,17 +412,16 @@ authorization, incoming request journals, and approval validation keep exactly o
 
 Status: Built
 
-`ISalesforce` follows every integration rule in §4.3 — semantic capability, private MCP catalog,
-module-owned OAuth and Aspire resources, no AI dependency. What it adds is the mutation story, because
-Salesforce is where DigitalBrain writes to a system it does not control.
+`ISalesforce` follows every integration rule in §4.3 — semantic capability, provider-owned endpoint,
+scopes, tool policy and mapping, shared private MCP mechanics, module-owned Aspire selection, and no
+AI dependency. What it adds is the mutation story, because Salesforce is where DigitalBrain writes to
+a system it does not control.
 
 External mutations use a durable command protocol owned by the integration neuron. Every mutation
 carries a `CommandId` and a canonical payload fingerprint and moves through:
 
 ```text
-Proposed
-  -> AwaitingApproval
-  -> Approved
+AwaitingApproval
   -> Invoking
   -> Completed
              \-> OutcomeUncertain
@@ -418,8 +431,9 @@ The same command identity and fingerprint resume the work or return the recorded
 identity with different content is rejected. Human approval binds to the exact fingerprint, so an
 approved payload cannot be swapped between the moment a person read it and the moment it is sent.
 
-The pause between proposal and approval is not machinery. Proposing a description records the
-mutation, leaves it `AwaitingApproval`, and returns a receipt; resuming it is a second ordinary
+The pause between proposal and approval is not machinery. Proposing a description performs zero MCP
+or provider operations, records the mutation once as `AwaitingApproval`, and returns a receipt;
+resuming it is a second ordinary
 interface call, `ISalesforce.ApproveAccountDescriptionAsync`, carrying the approval record together
 with the durable delivery that proves a human produced it. Nothing intercepts, wraps, or watches the
 neuron — which is precisely why the neuron has to do the checking itself, and does. It requires that
@@ -427,8 +441,10 @@ the delivery's caller is the approver the approval names, that the synapse insid
 that same approval record rather than merely one shaped like it, and that the approver is a session
 neuron belonging to this neuron's owner. A caller who skips the proposal, mints an approval, reuses
 someone else's evidence, or approves a fingerprint that no longer matches the stored payload is
-refused before Salesforce is contacted at all. Approving something already finished returns the
-recorded receipt instead of writing twice.
+refused before Salesforce is contacted at all. Only after that evidence passes does approval open an
+authenticated session and admit the exact read and mutation tools. The approval evidence, admitted
+schema fingerprints, and `Invoking` fence are committed in one durable save before the update call.
+Approving something already finished returns the recorded receipt instead of writing twice.
 
 Ratified but not built: the operation classification that would let module-declared safe read-only
 work be auto-approved while mutating and unknown work still requires a human, and the rule that an
@@ -446,8 +462,8 @@ mismatch, an error, a query that itself fails — none of those prove anything, 
 
 What the module then does is record and return. `ReconcileAsync` persists the uncertain status and
 hands back the receipt, and nothing in this module contacts a Task — it could not, because
-`DigitalBrain.Modules.Salesforce` references only its own contracts and the kernel, so Tasks
-vocabulary is out of reach by construction. The decision belongs to whoever read the receipt, and the
+`DigitalBrain.Modules.Salesforce` has no reference to Tasks contracts or runtime, so Tasks vocabulary
+is out of reach by construction. The decision belongs to whoever read the receipt, and the
 repository's own consumer makes it bluntly: `AccountEnrichmentProcess` throws
 `InvalidOperationException` when the state it gets back is anything other than `Completed`.
 
@@ -656,33 +672,25 @@ writable later without another redesign.
 
 ## 7. Hosting and durability
 
-AppHost declares infrastructure explicitly and the silo composes it (see §3). Two storage profiles are
-ratified — one development, one durable — and what AppHost runs today is neither of them cleanly. It
-calls `WithDevelopmentStores()` for clustering, grain storage, and reminders, and then declares an
-Azurite-backed blob `journal` resource beside it that belongs to no profile and is wired straight into
-the silo reference. The composed result is a development brain with one Azure-shaped store bolted on,
-which is why §3's excerpt has to show both halves to be runnable at all.
+AppHost declares infrastructure explicitly and the silo composes it (see §3). A brain selects exactly
+one complete storage profile; attempting to combine or repeat profiles is a composition error.
 
 `WithDevelopmentStores()` is explicitly non-durable — development clustering, memory grain storage,
 and memory reminders. It is honest about being a development convenience rather than pretending to be
 a lightweight production mode.
 
-The first durable profile is a single Azure Storage resource supplying Blob-backed neuron journals and
-Table-backed Orleans clustering and reminders. Local development runs it against Azurite; deployment
-points it at real Azure Storage. No generic durability-provider abstraction is introduced until a
+The durable profile is one Azure Storage resource supplying Blob-backed neuron journals and
+Table-backed Orleans clustering and reminders. Local development may run that resource against
+Azurite; deployment points it at real Azure Storage. The three derived resources have brain-scoped
+names, journal readiness is attached to the silo, and none of them or their connection material is
+projected through `AsClient()`. No generic durability-provider abstraction is introduced until a
 second *complete* journaling, clustering, and reminder profile actually exists — one profile does not
 justify an abstraction over profiles.
 
-Settled but not yet standing up: that single-resource durable entry point on the brain, and the rule
-that in-memory reminders are development and test only and production rejects them. Neither exists.
-`WithDevelopmentStores()` takes no environment, performs no check, and throws nothing — it calls
-`WithDevelopmentClustering()`, `WithMemoryGrainStorage("journal")`, and `WithMemoryReminders()`
-unconditionally, and no code in `src/DigitalBrain.Aspire.Hosting/` inspects the environment at all.
-Read the consequence plainly, because it is the reason this is written down rather than left implied:
-a deployment that leaves `WithDevelopmentStores()` in AppHost gets memory-backed reminders for the
-kernel outbox pump and for the AI run-recovery reminder, and loses both on the first restart, with no
-framework refusal anywhere on that path. The journal storage wiring the silo already calls is the one
-piece of this section that exists.
+Any selected AI or MCP-backed module also causes AppHost to declare one brain-scoped secret containing
+a base64-encoded 256-bit durable-state key. It is projected only to the silo and is shared by every
+silo in that brain. It encrypts MAF sessions, workflow checkpoints, and MCP OAuth tokens with distinct
+purposes; provider modules do not create their own keys or process-local key rings.
 
 ### Observability
 
@@ -738,12 +746,11 @@ and can be resumed or watched, which is enough for a simulation to assert on wha
 facade itself has no observation surface — it sends and it emits. A durable per-owner timeline and a
 reconnect lifecycle are not built.
 
-**`AsClient()` needs a production credential audit.** A client projection must never inherit
-silo-only storage or module secrets. Two of the ways that could go wrong are guarded today: AI
-resource configuration, and Google and Salesforce OAuth configuration, are both asserted to reach
-`WithReference(brain)` and never `brain.AsClient()`. What is unaudited is the general case, because
-the durable storage profile in §7 is not written yet and nothing proves that a profile carrying real
-credentials keeps them on the silo side.
+**`AsClient()` remains a security boundary.** A client projection must never inherit silo-only storage
+or module secrets. Architecture tests currently guard the durable journal connection, shared state
+key, AI resource configuration, and Google and Salesforce OAuth configuration: each reaches
+`WithReference(brain)` and never `brain.AsClient()`. Every new module reference or storage profile has
+to extend that proof rather than relying on the convention.
 
 **DevUI is not part of the current architecture.** No interactive agent UI is wired, and
 `Microsoft.Agents.AI.DevUI` is referenced nowhere in the repository.
@@ -774,9 +781,9 @@ letting the rule quietly soften.
 9. Orchestration-by-base-type (`GroupChat`/`Sequential`/`Concurrent`/`Handoff`/`Magentic`).
 10. Orchestrations accept both `ILLM` and `IAgent` participants.
 11. Participants resolve by typed `NeuronId`, not fake DI.
-12. Individual agents are stateless unless contract says otherwise; workers own sessions.
+12. No generic pseudo-agent layer; concrete typed agents/orchestrations use the one internal MEAI-to-MAF adapter.
 13. Adopt MAF selectively; reject Harness-as-core and Durable Extension.
-14. Orleans persists direct sessions and supervised standard checkpoints in separate envelopes.
+14. Orleans persists direct sessions and MAF JSON checkpoints in separate purpose-encrypted envelopes.
 15. Compaction internal, token-budget, same typed model.
 16. Journals = durable truth; OTel = diagnostics.
 17. Fingerprinted session restore; explicit migration/reset.
@@ -793,12 +800,12 @@ letting the rule quietly soften.
 ### Integrations and MCP
 
 24. Public interfaces = semantic capabilities (`IGmail`, `ISalesforce`), not toolsets.
-25. MCP stays module-private behind pinned catalogs.
-26. MAF approval middleware; human authority; agent may only recommend.
-27. Progressive tool disclosure by token budget + hybrid retrieval; no hard tool count.
-28. `FindCapabilityTools` recovery; no raw string invoke escape hatch.
-29. Capability roots may expose no MCP-shaped methods; exact tools remain private/transient.
-30. No exactly-once claim; durable dedupe + uncertainty handling for mutations.
+25. Shared MCP infrastructure owns official SDK/OAuth/token/session/schema mechanics; providers own endpoint, scopes, exact policy, arguments, and semantic mapping.
+26. MCP stays internal behind positive admission and a fingerprint recheck immediately before invocation.
+27. Production interactive authorization is an authenticated-edge responsibility; silo loopback callbacks require explicit development mode.
+28. Human authority is explicit: proposal performs zero provider operations; exact approval evidence precedes catalog inspection and the durable mutation fence.
+29. Progressive tool disclosure remains token-budgeted with no raw string invoke escape hatch; capability roots expose no MCP-shaped methods.
+30. No exactly-once claim; durable dedupe, pre-invocation fencing, reconciliation, and uncertainty handling for mutations.
 
 ### Tasks
 
@@ -820,8 +827,9 @@ letting the rule quietly soften.
 43. One schedule per neuron; explicit destination; revision + CommandId.
 44. Interval vs Calendar schedules; deterministic DST; coalesce overdue recurrence.
 45. Persisted Time state authoritative; shared Kernel reminder store.
-46. First durable profile: single Azure Storage (`WithAzureStorage`).
-47. Deterministic test time via `TimeProvider` + simulation driver.
+46. One complete storage profile per brain; first durable profile is single Azure Storage (`WithAzureStorage`).
+47. One silo-only brain key protects durable AI and MCP payloads with distinct purposes.
+48. Deterministic test time via `TimeProvider` + simulation driver.
 
 ## 10. Still open, known deviations, and rejected
 
