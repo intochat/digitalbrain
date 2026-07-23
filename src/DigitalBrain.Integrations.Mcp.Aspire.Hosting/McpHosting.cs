@@ -47,9 +47,12 @@ internal static class McpProviderHosting
     private sealed class McpApplicationParameters(IDistributedApplicationBuilder builder)
     {
         private readonly Dictionary<string, McpProviderParameters> _providers = new(StringComparer.Ordinal);
+        private readonly bool _localRun = builder.ExecutionContext.IsRunMode;
 
-        internal IResourceBuilder<ParameterResource> AuthorizationMode { get; } = builder
-            .AddParameter("mcp-authorization-mode")
+        internal IResourceBuilder<ParameterResource> AuthorizationMode { get; } =
+            (builder.ExecutionContext.IsRunMode
+                ? builder.AddParameter("mcp-authorization-mode", "LocalLoopbackDevelopment")
+                : builder.AddParameter("mcp-authorization-mode"))
             .WithDescription(
                 "MCP authorization execution mode. Use `LocalLoopbackDevelopment` only for a local silo; production hosts must register an authenticated-edge authorization adapter.",
                 enableMarkdown: true);
@@ -71,14 +74,40 @@ internal static class McpProviderHosting
 
             var created = new McpProviderParameters(
                 definition,
-                builder.AddParameter($"{definition.ParameterPrefix}-client-id")
-                    .WithDescription(definition.ClientIdDescription, enableMarkdown: true),
-                builder.AddParameter($"{definition.ParameterPrefix}-client-secret", secret: true)
-                    .WithDescription(definition.ClientSecretDescription, enableMarkdown: true),
-                builder.AddParameter($"{definition.ParameterPrefix}-redirect-uri")
-                    .WithDescription(definition.RedirectUriDescription, enableMarkdown: true));
+                Parameter(
+                    builder,
+                    $"{definition.ParameterPrefix}-client-id",
+                    localValue: "local-dev",
+                    secret: false,
+                    description: definition.ClientIdDescription),
+                Parameter(
+                    builder,
+                    $"{definition.ParameterPrefix}-client-secret",
+                    localValue: "local-dev-secret",
+                    secret: true,
+                    description: definition.ClientSecretDescription),
+                Parameter(
+                    builder,
+                    $"{definition.ParameterPrefix}-redirect-uri",
+                    localValue: "http://localhost/oauth/callback",
+                    secret: false,
+                    description: definition.RedirectUriDescription));
             _providers.Add(definition.Key, created);
             return created;
+        }
+
+        private IResourceBuilder<ParameterResource> Parameter(
+            IDistributedApplicationBuilder application,
+            string name,
+            string localValue,
+            bool secret,
+            string description)
+        {
+            var resource = _localRun
+                ? application.AddParameter(name, localValue, secret: secret)
+                : application.AddParameter(name, secret: secret);
+
+            return resource.WithDescription(description, enableMarkdown: true);
         }
 
         private static void Validate(McpProviderHostingDefinition definition)
