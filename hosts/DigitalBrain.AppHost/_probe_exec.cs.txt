@@ -1,4 +1,0 @@
-using Aspire.Hosting;
-var b = DistributedApplication.CreateBuilder(args);
-_ = b.ExecutionContext.IsRunMode;
-_ = b.ExecutionContext.IsPublishMode;

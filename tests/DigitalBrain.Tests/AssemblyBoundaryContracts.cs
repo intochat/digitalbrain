@@ -32,11 +32,12 @@ public sealed class AssemblyBoundaryContracts
         Assert.Contains(reachable, reference => reference.StartsWith("OpenAI", StringComparison.Ordinal));
     }
 
-    [Fact(DisplayName = "public AI runtime types expose MEAI but no MAF implementation types")]
-    public void PublicAiRuntimeSurfaceDoesNotExposeMafTypes()
+    [Fact(DisplayName = "public production package types expose MEAI but no MAF implementation types")]
+    public void PublicProductionPackageSurfacesDoNotExposeMafTypes()
     {
-        var exportedSurface = typeof(AIModule).Assembly
-            .GetExportedTypes()
+        var exportedSurface = PackableProjects.Names
+            .Select(Assembly.Load)
+            .SelectMany(assembly => assembly.GetExportedTypes())
             .SelectMany(PublicSurfaceTypes)
             .SelectMany(TypeClosure)
             .Distinct()

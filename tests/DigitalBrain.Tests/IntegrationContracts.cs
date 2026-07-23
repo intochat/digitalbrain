@@ -20,12 +20,16 @@ public sealed class IntegrationContracts
             "SdkMcpClientFactory",
             "McpSession",
             "McpToolContract",
+            "IMcpAuthorizationRedirect",
+            "RejectingMcpAuthorizationRedirect",
         };
         var assemblies = new[]
         {
             Assembly.Load("DigitalBrain.Integrations.Mcp"),
             typeof(IGmail).Assembly,
+            typeof(GoogleModule).Assembly,
             typeof(ISalesforce).Assembly,
+            typeof(SalesforceModule).Assembly,
         };
 
         Assert.DoesNotContain(
@@ -122,11 +126,8 @@ public sealed class IntegrationContracts
     private static void AssertProviderAgnostic(Assembly contracts)
     {
         var leaked = contracts.GetExportedTypes()
-            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
-            .SelectMany(method => method.GetParameters()
-                .Select(parameter => parameter.ParameterType)
-                .Append(method.ReturnType))
-            .SelectMany(Flatten)
+            .SelectMany(PublicSurfaceTypes)
+            .SelectMany(TypeClosure)
             .Where(type => type.Namespace?.StartsWith("ModelContextProtocol", StringComparison.Ordinal) is true
                 || type.Namespace?.StartsWith("System.Text.Json", StringComparison.Ordinal) is true
                 || IsDictionary(type))
@@ -137,15 +138,139 @@ public sealed class IntegrationContracts
         Assert.Empty(leaked);
     }
 
-    private static IEnumerable<Type> Flatten(Type type)
+    private static IEnumerable<Type> PublicSurfaceTypes(Type type)
     {
         yield return type;
 
-        foreach (var argument in type.GenericTypeArguments)
+        if (type.BaseType is not null)
         {
-            foreach (var nested in Flatten(argument))
+            yield return type.BaseType;
+        }
+
+        foreach (var contract in type.GetInterfaces())
+        {
+            yield return contract;
+        }
+
+        const BindingFlags Members =
+            BindingFlags.Public
+            | BindingFlags.NonPublic
+            | BindingFlags.Instance
+            | BindingFlags.Static
+            | BindingFlags.FlattenHierarchy;
+
+        foreach (var constructor in type.GetConstructors(Members).Where(IsVisible))
+        {
+            foreach (var parameter in constructor.GetParameters())
             {
-                yield return nested;
+                yield return parameter.ParameterType;
+            }
+        }
+
+        foreach (var method in type.GetMethods(Members).Where(IsVisible))
+        {
+            yield return method.ReturnType;
+
+            foreach (var parameter in method.GetParameters())
+            {
+                yield return parameter.ParameterType;
+            }
+
+            foreach (var argument in method.GetGenericArguments())
+            {
+                yield return argument;
+            }
+        }
+
+        foreach (var property in type.GetProperties(Members).Where(IsVisible))
+        {
+            yield return property.PropertyType;
+
+            foreach (var parameter in property.GetIndexParameters())
+            {
+                yield return parameter.ParameterType;
+            }
+        }
+
+        foreach (var field in type.GetFields(Members).Where(IsVisible))
+        {
+            yield return field.FieldType;
+        }
+
+        foreach (var eventInfo in type.GetEvents(Members).Where(IsVisible))
+        {
+            if (eventInfo.EventHandlerType is not null)
+            {
+                yield return eventInfo.EventHandlerType;
+            }
+        }
+    }
+
+    private static bool IsVisible(MethodBase method)
+        => method.IsPublic
+            || method.IsFamily
+            || method.IsFamilyOrAssembly
+            || method.IsFamilyAndAssembly;
+
+    private static bool IsVisible(FieldInfo field)
+        => field.IsPublic
+            || field.IsFamily
+            || field.IsFamilyOrAssembly
+            || field.IsFamilyAndAssembly;
+
+    private static bool IsVisible(PropertyInfo property)
+        => property.GetAccessors(nonPublic: true).Any(IsVisible);
+
+    private static bool IsVisible(EventInfo eventInfo)
+        => new[]
+        {
+            eventInfo.AddMethod,
+            eventInfo.RemoveMethod,
+            eventInfo.RaiseMethod,
+        }
+        .OfType<MethodInfo>()
+        .Any(IsVisible);
+
+    private static IEnumerable<Type> TypeClosure(Type type)
+    {
+        var pending = new Stack<Type>([type]);
+        var reached = new HashSet<Type>();
+
+        while (pending.TryPop(out var current))
+        {
+            if (!reached.Add(current))
+            {
+                continue;
+            }
+
+            yield return current;
+
+            if (current.HasElementType && current.GetElementType() is { } element)
+            {
+                pending.Push(element);
+            }
+
+            if (current.BaseType is { } baseType)
+            {
+                pending.Push(baseType);
+            }
+
+            foreach (var contract in current.GetInterfaces())
+            {
+                pending.Push(contract);
+            }
+
+            foreach (var argument in current.GetGenericArguments())
+            {
+                pending.Push(argument);
+            }
+
+            if (current.IsGenericParameter)
+            {
+                foreach (var constraint in current.GetGenericParameterConstraints())
+                {
+                    pending.Push(constraint);
+                }
             }
         }
     }
@@ -153,5 +278,7 @@ public sealed class IntegrationContracts
     private static bool IsDictionary(Type type) =>
         type.IsGenericType
         && type.GetGenericTypeDefinition() is var definition
-        && (definition == typeof(Dictionary<,>) || definition == typeof(IDictionary<,>));
+        && (definition == typeof(Dictionary<,>)
+            || definition == typeof(IDictionary<,>)
+            || definition == typeof(IReadOnlyDictionary<,>));
 }

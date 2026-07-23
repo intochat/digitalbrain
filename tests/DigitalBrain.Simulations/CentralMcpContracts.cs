@@ -43,6 +43,33 @@ public sealed class CentralMcpContracts
             type => type.Name == "IMcpAuthorizationRedirect");
     }
 
+    [Fact(DisplayName = "provider tests use the official HTTP protocol boundary instead of fake provider clients")]
+    public void ProviderTestsContainNoImitationClientLayers()
+    {
+        string[] providerMarkers = ["Mcp", "Gmail", "Salesforce"];
+        string[] removedTypes =
+        [
+            "IMcpClient",
+            "IMcpClientFactory",
+            "SdkMcpClient",
+            "SdkMcpClientFactory",
+            "McpSession",
+            "McpToolContract",
+            "IMcpAuthorizationRedirect",
+        ];
+
+        var imitationLayers = typeof(CentralMcpContracts).Assembly
+            .GetTypes()
+            .Where(type => removedTypes.Contains(type.Name, StringComparer.Ordinal)
+                || (providerMarkers.Any(marker => type.Name.Contains(marker, StringComparison.Ordinal))
+                    && (type.Name.EndsWith("Client", StringComparison.Ordinal)
+                        || type.Name.EndsWith("ClientFactory", StringComparison.Ordinal))))
+            .Select(type => type.FullName)
+            .ToArray();
+
+        Assert.Empty(imitationLayers);
+    }
+
     [Theory(DisplayName = "local MCP authorization accepts only explicit HTTP loopback callbacks with OAuth state")]
     [InlineData("https://localhost:41001/callback", "https://authorization.example/authorize?state=expected")]
     [InlineData("http://application.example/callback", "https://authorization.example/authorize?state=expected")]
