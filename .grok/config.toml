@@ -19,7 +19,6 @@ startup_timeout_sec = 15
 command = "cmd"
 args = ["/c", "npx", "-y", "@upstash/context7-mcp@latest"]
 startup_timeout_sec = 45
-env = { CONTEXT7_API_KEY = "${CONTEXT7_API_KEY}" }
 
 [mcp_servers.codegraph]
 command = "cmd"

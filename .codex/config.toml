@@ -23,9 +23,6 @@ args = ["/c", "npx", "-y", "@upstash/context7-mcp@latest"]
 startup_timeout_sec = 45.0
 tool_timeout_sec = 90.0
 
-[mcp_servers.context7.env]
-CONTEXT7_API_KEY = "${CONTEXT7_API_KEY}"
-
 [mcp_servers.codegraph]
 command = "cmd"
 args = ["/c", "npx", "-y", "@colbymchenry/codegraph@latest", "serve", "--mcp"]
@@ -36,4 +33,3 @@ tool_timeout_sec = 120.0
 url = "http://localhost:5000/mcp"
 startup_timeout_sec = 15.0
 tool_timeout_sec = 60.0
-

@@ -19,3 +19,8 @@ docs/.vitepress/cache/
 docs/.vitepress/dist/
 docs/specification.md
 *.feature.cs
+
+# Local MCP tool installs (Codex absolute launch)
+.config/codegraph-tool/
+.config/context7-tool/
+
