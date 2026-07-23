@@ -65,10 +65,31 @@ internal sealed class WorkflowCheckpointGrain : DurableGrain, IWorkflowCheckpoin
         }
 
         var checkpointId = Guid.NewGuid().ToString("N");
-        _payloads.Add(checkpointId, command.ProtectedPayload.ToArray());
-        _parents.Add(checkpointId, command.Parent?.CheckpointId ?? string.Empty);
-        _order.Add(checkpointId);
-        await WriteStateAsync();
+        var payloads = _payloads.ToDictionary(
+            static entry => entry.Key,
+            static entry => entry.Value.ToArray(),
+            StringComparer.Ordinal);
+        var parents = _parents.ToDictionary(
+            static entry => entry.Key,
+            static entry => entry.Value,
+            StringComparer.Ordinal);
+        var order = _order.ToArray();
+
+        try
+        {
+            _payloads.Add(checkpointId, command.ProtectedPayload.ToArray());
+            _parents.Add(checkpointId, command.Parent?.CheckpointId ?? string.Empty);
+            _order.Add(checkpointId);
+            await WriteStateAsync();
+        }
+        catch
+        {
+            Restore(_payloads, payloads);
+            Restore(_parents, parents);
+            Restore(_order, order);
+
+            throw;
+        }
 
         return new WorkflowCheckpointReference(command.SessionId, checkpointId);
     }
@@ -118,6 +139,30 @@ internal sealed class WorkflowCheckpointGrain : DurableGrain, IWorkflowCheckpoin
         var hash = separator >= 0 ? key[(separator + 1)..] : key;
 
         return $"dbw_{hash}";
+    }
+
+    private static void Restore<T>(
+        IDurableDictionary<string, T> target,
+        IReadOnlyDictionary<string, T> snapshot)
+    {
+        target.Clear();
+
+        foreach (var entry in snapshot)
+        {
+            target.Add(entry.Key, entry.Value);
+        }
+    }
+
+    private static void Restore<T>(
+        IDurableList<T> target,
+        IReadOnlyList<T> snapshot)
+    {
+        target.Clear();
+
+        foreach (var value in snapshot)
+        {
+            target.Add(value);
+        }
     }
 }
 
@@ -198,5 +243,18 @@ internal sealed record WorkflowCheckpointIdentity(
         return new(
             $"{cursor.Worker.GrainKey}/workflow-checkpoint/{hash}",
             $"dbw_{hash}");
+    }
+}
+
+internal static class WorkflowCheckpointProtection
+{
+    private const string RootPurpose = "DigitalBrain.AI.WorkflowCheckpoint.v1";
+
+    internal static string Purpose(string sessionId, string definitionFingerprint)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(definitionFingerprint);
+
+        return $"{RootPurpose}\n{sessionId}\n{definitionFingerprint}";
     }
 }

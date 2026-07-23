@@ -117,7 +117,7 @@ public sealed class AIContracts
 
         var interfaces = new Dictionary<string, (string Alias, string[] Methods)>(StringComparer.Ordinal)
         {
-            ["DigitalBrain.AI.IWorkflowRunner"] = ("ai.workflow-runner", ["Execute"]),
+            ["DigitalBrain.AI.IWorkflowRunner"] = ("ai.workflow-runner", ["Execute", "Cancel"]),
             ["DigitalBrain.AI.IWorkflowRunOwner"] = ("ai.workflow-run-owner", ["AuthorizeParticipant", "AuthorizeCompletion"]),
             ["DigitalBrain.AI.IWorkflowRunCompletion"] = ("ai.workflow-run-completion", ["Complete"]),
             ["DigitalBrain.AI.IWorkflowCheckpointGrain"] = ("ai.workflow-checkpoint-grain", ["Create", "Read", "Index"]),
@@ -373,7 +373,7 @@ public sealed class AIContracts
         Assert.NotNull(lifecycle);
         Assert.NotNull(rules);
         Assert.Equal(
-            ["Unknown", "Running", "AwaitingContinuation", "Succeeded", "Cancelled"],
+            ["Unknown", "Running", "AwaitingContinuation", "Succeeded", "Cancelled", "Cancelling"],
             Enum.GetNames(lifecycle));
         var defaultValue = Activator.CreateInstance(lifecycle);
         Assert.Equal("Unknown", Enum.GetName(lifecycle, defaultValue!));

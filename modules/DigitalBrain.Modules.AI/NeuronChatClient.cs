@@ -23,13 +23,16 @@ internal sealed class NeuronChatClient(
 
         var request = Request(messages, options);
 
-        return turnScheduler is null
+        var response = turnScheduler is null
             ? invoke(request)
             : Task.Factory.StartNew(
                 () => invoke(request),
-                CancellationToken.None,
+                cancellationToken,
                 TaskCreationOptions.DenyChildAttach,
                 turnScheduler).Unwrap();
+
+        ObserveFault(response);
+        return response.WaitAsync(cancellationToken);
     }
 
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -51,6 +54,13 @@ internal sealed class NeuronChatClient(
     public void Dispose()
     {
     }
+
+    private static void ObserveFault(Task response)
+        => _ = response.ContinueWith(
+            static completed => _ = completed.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default);
 
     private static Func<IReadOnlyList<ChatMessage>, Task<ChatResponse>> InvocationFor(
         INeuron participant)

@@ -22,6 +22,7 @@ internal enum SupervisedAttemptLifecycle
     AwaitingContinuation,
     Succeeded,
     Cancelled,
+    Cancelling,
 }
 
 internal static class SupervisedAttemptLifecycleRules

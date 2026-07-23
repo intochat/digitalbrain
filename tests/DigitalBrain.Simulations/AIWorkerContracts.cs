@@ -2,12 +2,15 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.Kernel;
 using DigitalBrain.Security;
 using DigitalBrain.Testing;
 using DigitalBrain.Tasks;
+using Microsoft.Agents.AI.Workflows;
+using Microsoft.Agents.AI.Workflows.Checkpointing;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -1258,6 +1261,1142 @@ public sealed class AIWorkerContracts
         }
     }
 
+    [Fact(DisplayName = "definition drift during the acceptance commit prevents runner dispatch")]
+    public async Task DefinitionDriftBeforeDispatchPreventsRunnerEntry()
+    {
+        var journals = new AIWorkerJournalStorageProvider();
+        var cluster = await StartWorkerClusterAsync(journals);
+        var owner = new OwnerId("ai-worker-definition-dispatch");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var model = AIWorkerGate.Prepare(
+            owner,
+            "fence dispatch drift",
+            "must not run");
+        var workerWrite = journals.BlockWriteAfter(
+            workerId.ToGrainId(),
+            completedWritesBeforeBlock: 1);
+        AIWorkerRunnerDispatchProbe.Reset(workerId);
+        AIWorkerDefinitionSource.Reset(owner);
+
+        try
+        {
+            var starting = task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("fence dispatch drift"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            await workerWrite.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+
+            AIWorkerDefinitionSource.Set(owner, "drifted-model");
+            workerWrite.Release();
+            _ = await starting;
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(750),
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal(0, AIWorkerRunnerDispatchProbe.EntriesFor(workerId));
+            Assert.Equal(0, model.EntryCount);
+        }
+        finally
+        {
+            workerWrite.Release();
+            AIWorkerDefinitionSource.Reset(owner);
+            model.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "definition drift is rejected before participant authorization and invocation")]
+    public async Task DefinitionDriftBeforeAuthorizationPreventsParticipantEntry()
+    {
+        var cluster = await StartWorkerClusterAsync();
+        var owner = new OwnerId("ai-worker-definition-authorization");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var model = AIWorkerGate.Prepare(
+            owner,
+            "fence authorization drift",
+            "must not run");
+        var execution = AIWorkerRunnerExecutionProbe.Block(workerId);
+        AIWorkerDefinitionSource.Reset(owner);
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("fence authorization drift"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            await execution.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+
+            AIWorkerDefinitionSource.Set(owner, "drifted-model");
+            execution.Release();
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(750),
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal(0, model.EntryCount);
+            Assert.NotNull(execution.Failure);
+        }
+        finally
+        {
+            execution.Release();
+            AIWorkerRunnerExecutionProbe.Reset(workerId);
+            AIWorkerDefinitionSource.Reset(owner);
+            model.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "definition drift is rejected before completion authorization and checkpoint adoption")]
+    public async Task DefinitionDriftBeforeCompletionPreventsCheckpointAdoption()
+    {
+        var cluster = await StartWorkerClusterAsync();
+        var owner = new OwnerId("ai-worker-definition-completion");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var probe = cluster.Client.GetGrain<IAIWorkerProbe>(
+            NeuronId.For<AIWorkerProbe>(owner, "probe").ToGrainId());
+        var model = AIWorkerGate.Prepare(
+            owner,
+            "fence completion drift",
+            "must not be adopted");
+        AIWorkerDefinitionSource.Reset(owner);
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("fence completion drift"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            await model.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+
+            AIWorkerDefinitionSource.Set(owner, "drifted-model");
+            model.Release();
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(1250),
+                TestContext.Current.CancellationToken);
+
+            var snapshot = await task.ReadAsync();
+            Assert.NotEqual(TaskState.Succeeded, snapshot.State);
+            var journal = await probe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+            Assert.DoesNotContain(journal.Delta, delivery => delivery.Synapse is AttemptSucceeded);
+        }
+        finally
+        {
+            AIWorkerDefinitionSource.Reset(owner);
+            model.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "an identical Accept replay validates the current definition before returning idempotently")]
+    public async Task IdenticalAcceptReplayRejectsCurrentDefinitionDrift()
+    {
+        var cluster = await StartWorkerClusterAsync();
+        var owner = new OwnerId("ai-worker-definition-accept-replay");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var model = AIWorkerGate.Prepare(
+            owner,
+            "fence identical acceptance replay",
+            "must remain blocked");
+        var replay = AIWorkerRpcProbe.Replay(workerId, "AcceptAsync");
+        AIWorkerDefinitionSource.Reset(owner);
+
+        try
+        {
+            var starting = task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("fence identical acceptance replay"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            await replay.ReplayReady.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+
+            AIWorkerDefinitionSource.Set(owner, "drifted-model");
+            replay.ReleaseReplay();
+            _ = await starting.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            await replay.Completed.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal(2, replay.InvocationCount);
+            Assert.Equal(1, replay.FailureCount);
+            Assert.Contains(
+                "incompatible",
+                replay.Failure?.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            replay.ReleaseReplay();
+            AIWorkerRpcProbe.Reset(workerId, "AcceptAsync");
+            AIWorkerDefinitionSource.Reset(owner);
+            model.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "definition drift is rejected before an expired reminder replaces or redispatches a run")]
+    public async Task DefinitionDriftBeforeReminderLeavesTheActiveRunUnchanged()
+    {
+        const string recoveryReminder = "db.ai.workflow-run";
+        var clock = new AIWorkerTimeProvider(DateTimeOffset.Parse(
+            "2026-07-23T12:00:00Z",
+            System.Globalization.CultureInfo.InvariantCulture));
+        var cluster = await StartWorkerClusterAsync(clock: clock);
+        var owner = new OwnerId("ai-worker-definition-reminder");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var probe = cluster.Client.GetGrain<IAIWorkerProbe>(
+            NeuronId.For<AIWorkerProbe>(owner, "probe").ToGrainId());
+        var reminder = cluster.Client.GetGrain<IReminderProbe>(
+            NeuronId.For<ReminderProbe>(owner, "reminder-probe").ToGrainId());
+        var model = AIWorkerGate.Prepare(
+            owner,
+            "fence reminder drift",
+            "must remain blocked");
+        AIWorkerDefinitionSource.Reset(owner);
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("fence reminder drift"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            await model.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            var before = await probe.ReadWorkerStateAsync(workerId);
+            var dispatchesBefore = AIWorkerRunnerDispatchProbe.EntriesFor(workerId);
+
+            AIWorkerDefinitionSource.Set(owner, "drifted-model");
+            clock.Advance(TimeSpan.FromMinutes(2));
+            await reminder.ExpediteAsync(workerId, recoveryReminder);
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(1500),
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal(before, await probe.ReadWorkerStateAsync(workerId));
+            Assert.Equal(
+                dispatchesBefore,
+                AIWorkerRunnerDispatchProbe.EntriesFor(workerId));
+            Assert.Equal(1, model.EntryCount);
+        }
+        finally
+        {
+            AIWorkerDefinitionSource.Reset(owner);
+            model.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "a silo restart and reminder redispatch adopt the checkpoint exactly once")]
+    public async Task SiloRestartAndReminderRedispatchDoNotDuplicateCheckpointAdoption()
+    {
+        const string recoveryReminder = "db.ai.workflow-run";
+        var journals = new AIWorkerJournalStorageProvider();
+        var clock = new AIWorkerTimeProvider(DateTimeOffset.Parse(
+            "2026-07-23T13:00:00Z",
+            System.Globalization.CultureInfo.InvariantCulture));
+        var cluster = await StartWorkerClusterAsync(journals, clock);
+        var owner = new OwnerId("ai-worker-restart-redispatch");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var model = AIWorkerGate.Prepare(
+            owner,
+            "restart the supervised run",
+            "stale answer",
+            secondAnswer: "recovered answer");
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("restart the supervised run"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            _ = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Running);
+            await model.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+
+            clock.Advance(TimeSpan.FromMinutes(2));
+            var crashed = cluster.Silos[0];
+            await cluster.KillSiloAsync(crashed)
+                .WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+            var restarted = await cluster.RestartSiloAsync(crashed)
+                .WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+            Assert.NotNull(restarted);
+            await cluster.WaitForLivenessToStabilizeAsync(didKill: true)
+                .WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+            await cluster.WaitForClusterManifestToStabilizeAsync(didKill: true)
+                .WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+            Assert.True(restarted.IsActive);
+
+            await cluster.StopClusterClientAsync()
+                .WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+            await cluster.InitializeClientAsync()
+                .WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+            var reconnectedDriver = cluster.Client.GetGrain<ITaskDriver>(
+                NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+            var reconnectedTask = new TaskTestClient(taskId, reconnectedDriver);
+            var reconnectedProbe = cluster.Client.GetGrain<IAIWorkerProbe>(
+                NeuronId.For<AIWorkerProbe>(owner, "probe").ToGrainId());
+            var reconnectedReminder = cluster.Client.GetGrain<IReminderProbe>(
+                NeuronId.For<ReminderProbe>(owner, "reminder-probe").ToGrainId());
+
+            Assert.Equal(TaskState.Running, (await reconnectedTask.ReadAsync()).State);
+            await reconnectedReminder.ExpediteAsync(workerId, recoveryReminder);
+            await model.SecondEntry.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
+
+            model.Release();
+            var succeeded = await ReadUntilAsync(
+                reconnectedTask,
+                snapshot => snapshot.State == TaskState.Succeeded);
+            Assert.Equal(
+                "recovered answer",
+                Assert.IsType<AIWorkerResult>(succeeded.Result).Answer);
+
+            var adopted = await reconnectedProbe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+            Assert.Single(adopted.Delta, delivery => delivery.Synapse is AttemptSucceeded);
+
+            await reconnectedReminder.ExpediteAsync(workerId, recoveryReminder);
+            await WaitForReminderStateAsync(
+                reconnectedReminder,
+                workerId,
+                recoveryReminder,
+                exists: false);
+            var afterDuplicateReminder = await reconnectedProbe.ReadJournalAsync(
+                workerId,
+                JournalKind.Outgoing);
+            Assert.Single(
+                afterDuplicateReminder.Delta,
+                delivery => delivery.Synapse is AttemptSucceeded);
+        }
+        finally
+        {
+            model.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "definition drift is the first failure at the real Task continuation boundary")]
+    public async Task DefinitionDriftPrecedesContinuationStateChecks()
+    {
+        var cluster = await StartWorkerClusterAsync();
+        var owner = new OwnerId("ai-worker-definition-continuation");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var model = AIWorkerGate.Prepare(
+            owner,
+            "fence continuation drift",
+            "must not run");
+        var continuation = AIWorkerContinuationGateProbe.Block(workerId);
+        AIWorkerDefinitionSource.Reset(owner);
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("fence continuation drift"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            await continuation.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+
+            AIWorkerDefinitionSource.Set(owner, "drifted-model");
+            continuation.Release();
+            await continuation.Completed.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+
+            Assert.NotNull(continuation.Failure);
+            Assert.Contains(
+                "incompatible",
+                continuation.Failure.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(0, model.EntryCount);
+        }
+        finally
+        {
+            continuation.Release();
+            AIWorkerContinuationGateProbe.Reset(workerId);
+            AIWorkerDefinitionSource.Reset(owner);
+            model.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "cancellation commits its durable fence before signaling and terminates the owned runner")]
+    public async Task CancellationCommitsFenceBeforeSignalAndTerminatesOwnedRunner()
+    {
+        var journals = new AIWorkerJournalStorageProvider();
+        var cluster = await StartWorkerClusterAsync(journals);
+        var owner = new OwnerId("ai-worker-cancellation-propagation");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var model = AIWorkerGate.Prepare(
+            owner,
+            "cancel the owned runner",
+            "must remain blocked");
+        var runner = AIWorkerRunnerLifetimeProbe.Prepare(workerId);
+        var cancellation = AIWorkerRunnerCancellationProbe.Block(workerId);
+        AIWorkerLogProvider.Clear();
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("cancel the owned runner"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            _ = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Running);
+            await model.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            var running = await task.ReadAsync();
+            await runner.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            var writesBeforeCancellation = journals.CompletedWrites(workerId.ToGrainId());
+
+            var cancelling = task.CancelAsync(new(CommandId.New(), running.Revision));
+            await cancellation.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+
+            Assert.True(
+                journals.CompletedWrites(workerId.ToGrainId()) > writesBeforeCancellation,
+                "The runner cancellation signal arrived before the durable worker fence committed.");
+
+            cancellation.Release();
+            _ = await cancelling;
+            _ = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Cancelled);
+            await WaitUntilAsync(
+                () => AIWorkerLogProvider.Messages.Any(message =>
+                    message.Contains("CanceledException", StringComparison.Ordinal)),
+                $"The owned workflow execution did not terminate through its cancellation token.{Environment.NewLine}"
+                + string.Join(Environment.NewLine, AIWorkerLogProvider.Messages));
+            Assert.Equal(1, cancellation.EntryCount);
+            Assert.Equal(runner.RunId, cancellation.RunId);
+            Assert.Equal(1, model.EntryCount);
+        }
+        finally
+        {
+            cancellation.Release();
+            model.Release();
+            AIWorkerRunnerCancellationProbe.Reset(workerId);
+            AIWorkerRunnerLifetimeProbe.Reset(workerId);
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "a failed runner cancellation signal cannot reopen the durable cancellation fence")]
+    public async Task FailedRunnerCancellationSignalLeavesTheAttemptCancelled()
+    {
+        var cluster = await StartWorkerClusterAsync();
+        var owner = new OwnerId("ai-worker-cancellation-signal-failure");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var model = AIWorkerGate.Prepare(
+            owner,
+            "fail the runner signal",
+            "must remain blocked");
+        var cancellation = AIWorkerRunnerCancellationProbe.Fail(
+            workerId,
+            "injected runner cancellation failure");
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("fail the runner signal"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            _ = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Running);
+            await model.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            var running = await task.ReadAsync();
+
+            _ = await task.CancelAsync(new(CommandId.New(), running.Revision));
+
+            await cancellation.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            var cancelled = await ReadUntilAsync(
+                task,
+                snapshot => snapshot.State == TaskState.Cancelled);
+
+            Assert.Null(cancelled.ActiveAttempt);
+            Assert.Equal(1, cancellation.EntryCount);
+        }
+        finally
+        {
+            model.Release();
+            AIWorkerRunnerCancellationProbe.Reset(workerId);
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "the runner send wait cancels a pending ValueTask without waiting for its late fault")]
+    public async Task RunnerSendWaitCancelsPendingValueTaskAndDetachesFromItsLateFault()
+    {
+        var runner = typeof(AIModule).Assembly.GetType(
+            "DigitalBrain.AI.WorkflowRunner",
+            throwOnError: true)!;
+        var wait = Assert.Single(
+            runner.GetMethods(
+                System.Reflection.BindingFlags.Static
+                | System.Reflection.BindingFlags.NonPublic),
+            method => method.Name == "AwaitSendAsync");
+        var pending = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cancellation = new CancellationTokenSource();
+        var waiting = Assert.IsType<Task<bool>>(
+            wait.Invoke(
+                null,
+                [new ValueTask<bool>(pending.Task), cancellation.Token]),
+            exactMatch: false);
+
+        await cancellation.CancelAsync();
+
+        _ = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => waiting.WaitAsync(
+                TimeSpan.FromSeconds(2),
+                TestContext.Current.CancellationToken));
+        pending.TrySetException(new InvalidOperationException("late send failure"));
+        await Task.Delay(
+            TimeSpan.FromMilliseconds(100),
+            TestContext.Current.CancellationToken);
+        Assert.True(pending.Task.IsFaulted);
+    }
+
+    [Fact(DisplayName = "runner cancellation initiates ordered real MAF cleanup without waiting for blocked executor disposal")]
+    public async Task RunnerCancellationInitiatesRealMafCleanupAndDetachesFromBlockedDisposal()
+    {
+        var executor = new BlockingDisposalExecutor();
+        var workflow = new WorkflowBuilder(executor).Build();
+        StreamingRun? execution = null;
+
+        try
+        {
+            execution = await InProcessExecution.Lockstep.RunStreamingAsync(
+                workflow,
+                "input",
+                cancellationToken: TestContext.Current.CancellationToken);
+            var runner = typeof(AIModule).Assembly.GetType(
+                "DigitalBrain.AI.WorkflowRunner",
+                throwOnError: true)!;
+            var cleanup = Assert.Single(
+                runner.GetMethods(
+                    System.Reflection.BindingFlags.Static
+                    | System.Reflection.BindingFlags.NonPublic),
+                method => method.Name == "AwaitCleanupAsync");
+            using var cancellation = new CancellationTokenSource();
+            await cancellation.CancelAsync();
+
+            var waiting = Assert.IsType<Task>(
+                cleanup.Invoke(null, [execution, cancellation.Token]),
+                exactMatch: false);
+
+            await executor.DisposalEntered.WaitAsync(
+                TimeSpan.FromSeconds(2),
+                TestContext.Current.CancellationToken);
+            _ = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => waiting.WaitAsync(
+                    TimeSpan.FromSeconds(2),
+                    TestContext.Current.CancellationToken));
+            Assert.False(executor.DisposalCompleted.IsCompleted);
+
+            executor.FailDisposal(new InvalidOperationException("late executor disposal failure"));
+            var completed = await Task.WhenAny(
+                executor.DisposalCompleted,
+                Task.Delay(
+                    TimeSpan.FromSeconds(2),
+                    TestContext.Current.CancellationToken));
+            Assert.Same(executor.DisposalCompleted, completed);
+            Assert.True(executor.DisposalCompleted.IsFaulted);
+        }
+        finally
+        {
+            executor.ReleaseDisposal();
+
+            if (execution is not null)
+            {
+                await execution.DisposeAsync();
+            }
+        }
+    }
+
+    [Fact(DisplayName = "cancellation terminates runner cleanup while participant authorization remains blocked")]
+    public async Task CancellationTerminatesRunnerWhileParticipantAuthorizationRpcRemainsBlocked()
+    {
+        var cluster = await StartWorkerClusterAsync();
+        AIWorkerLogProvider.Clear();
+        var owner = new OwnerId("ai-worker-cancel-participant-authorization");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var probe = cluster.Client.GetGrain<IAIWorkerProbe>(
+            NeuronId.For<AIWorkerProbe>(owner, "probe").ToGrainId());
+        var model = AIWorkerGate.Prepare(
+            owner,
+            "cancel blocked participant authorization",
+            "must not run");
+        var authorization = AIWorkerRpcProbe.Block(
+            workerId,
+            "AuthorizeParticipantAsync");
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("cancel blocked participant authorization"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            await authorization.InvocationCompleted.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            var running = await task.ReadAsync();
+
+            _ = await task.CancelAsync(new(CommandId.New(), running.Revision));
+            _ = await ReadUntilAsync(
+                task,
+                snapshot => snapshot.State == TaskState.Cancelled);
+            await WaitUntilAsync(
+                () => AIWorkerLogProvider.Messages.Any(message =>
+                    message.Contains("CanceledException", StringComparison.Ordinal)),
+                "The runner stayed attached to the blocked participant authorization RPC.");
+
+            Assert.False(authorization.Completed.IsCompleted);
+            Assert.Equal(0, model.EntryCount);
+            var outgoing = await probe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+            Assert.DoesNotContain(
+                outgoing.Delta,
+                delivery => delivery.Synapse is AttemptSucceeded);
+
+            authorization.Release();
+            await authorization.Completed.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            Assert.Null(authorization.Failure);
+        }
+        finally
+        {
+            authorization.Release();
+            AIWorkerRpcProbe.Reset(workerId, "AuthorizeParticipantAsync");
+            model.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "cancellation terminates runner cleanup while completion adoption remains blocked")]
+    public async Task CancellationTerminatesRunnerWhileCompletionRpcRemainsBlocked()
+    {
+        var cluster = await StartWorkerClusterAsync();
+        AIWorkerLogProvider.Clear();
+        var owner = new OwnerId("ai-worker-cancel-completion-rpc");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var probe = cluster.Client.GetGrain<IAIWorkerProbe>(
+            NeuronId.For<AIWorkerProbe>(owner, "probe").ToGrainId());
+        var model = AIWorkerGate.Prepare(
+            owner,
+            "cancel blocked completion",
+            "must not be adopted");
+        var completionAuthorization = AIWorkerRpcProbe.Block(
+            workerId,
+            "AuthorizeCompletionAsync");
+        var completion = AIWorkerRpcProbe.Observe(workerId, "CompleteAsync");
+        model.Release();
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("cancel blocked completion"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            await completionAuthorization.InvocationCompleted.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            var running = await task.ReadAsync();
+
+            _ = await task.CancelAsync(new(CommandId.New(), running.Revision));
+            _ = await ReadUntilAsync(
+                task,
+                snapshot => snapshot.State == TaskState.Cancelled);
+            await WaitUntilAsync(
+                () => AIWorkerLogProvider.Messages.Any(message =>
+                    message.Contains("CanceledException", StringComparison.Ordinal)),
+                $"The runner stayed attached to the blocked completion RPC.{Environment.NewLine}"
+                + string.Join(Environment.NewLine, AIWorkerLogProvider.Messages));
+
+            Assert.False(completionAuthorization.Completed.IsCompleted);
+            Assert.Equal(0, completion.EntryCount);
+            var outgoing = await probe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+            Assert.DoesNotContain(
+                outgoing.Delta,
+                delivery => delivery.Synapse is AttemptSucceeded);
+
+            completionAuthorization.Release();
+            await completionAuthorization.Completed.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            Assert.Null(completionAuthorization.Failure);
+            Assert.Equal(0, completion.EntryCount);
+            Assert.Equal(
+                TaskState.Cancelled,
+                (await task.ReadAsync()).State);
+        }
+        finally
+        {
+            completionAuthorization.Release();
+            AIWorkerRpcProbe.Reset(workerId, "AuthorizeCompletionAsync");
+            AIWorkerRpcProbe.Reset(workerId, "CompleteAsync");
+            model.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "a cancellation commit failure neither signals nor consumes reply authority and reminder retry completes")]
+    public async Task FailedCancellationCommitPreservesFenceFactAndRetryAuthority()
+    {
+        const string dispatchReminder = "tasks.dispatch";
+        var journals = new AIWorkerJournalStorageProvider();
+        var cluster = await StartWorkerClusterAsync(journals);
+        var owner = new OwnerId("ai-worker-cancel-commit-failure");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var probe = cluster.Client.GetGrain<IAIWorkerProbe>(
+            NeuronId.For<AIWorkerProbe>(owner, "probe").ToGrainId());
+        var reminder = cluster.Client.GetGrain<IReminderProbe>(
+            NeuronId.For<ReminderProbe>(owner, "reminder-probe").ToGrainId());
+        var model = AIWorkerGate.Prepare(
+            owner,
+            "retry cancellation commit",
+            "must remain blocked");
+        var cancellation = AIWorkerRunnerCancellationProbe.Block(workerId);
+        var workerGrain = workerId.ToGrainId();
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("retry cancellation commit"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            await model.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            var running = await task.ReadAsync();
+            var workerBefore = await probe.ReadWorkerStateAsync(workerId);
+            var outgoingBefore = await probe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+            journals.FailWriteAfter(
+                workerGrain,
+                completedWritesBeforeFailure: 0,
+                "injected cancellation commit failure");
+
+            _ = await task.CancelAsync(new(CommandId.New(), running.Revision));
+            await WaitUntilAsync(
+                () => journals.FiredFailures(workerGrain) == 1,
+                "The cancellation commit failure was not injected.");
+
+            Assert.Equal(0, cancellation.EntryCount);
+            Assert.Equal(workerBefore, await probe.ReadWorkerStateAsync(workerId));
+            var afterFailure = await probe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+            Assert.Equal(outgoingBefore.ResumeSequence, afterFailure.ResumeSequence);
+            Assert.Equal(
+                outgoingBefore.Delta.Select(delivery => delivery.SynapseId),
+                afterFailure.Delta.Select(delivery => delivery.SynapseId));
+            Assert.DoesNotContain(
+                afterFailure.Delta,
+                delivery => delivery.Synapse is AttemptCancelled);
+            Assert.Equal(TaskState.Cancelling, (await task.ReadAsync()).State);
+
+            journals.ClearFailure(workerGrain);
+            await reminder.ExpediteAsync(taskId, dispatchReminder);
+            await cancellation.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            cancellation.Release();
+            _ = await ReadUntilAsync(
+                task,
+                snapshot => snapshot.State == TaskState.Cancelled);
+            var afterRetry = await probe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+            Assert.Single(
+                afterRetry.Delta,
+                delivery => delivery.Synapse is AttemptCancelled);
+            Assert.Equal(1, cancellation.EntryCount);
+        }
+        finally
+        {
+            journals.ClearFailure(workerGrain);
+            cancellation.Release();
+            AIWorkerRunnerCancellationProbe.Reset(workerId);
+            model.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "a failed terminal cancellation commit preserves a coherent durable fence for one atomic retry")]
+    public async Task FailedTerminalCancellationCommitPreservesCoherentDurableFenceForRetry()
+    {
+        const string dispatchReminder = "tasks.dispatch";
+        const string recoveryReminder = "db.ai.workflow-run";
+        var journals = new AIWorkerJournalStorageProvider();
+        var clock = new AIWorkerTimeProvider(DateTimeOffset.Parse(
+            "2026-07-23T15:00:00Z",
+            System.Globalization.CultureInfo.InvariantCulture));
+        var cluster = await StartWorkerClusterAsync(journals, clock);
+        var owner = new OwnerId("ai-worker-cancel-terminal-commit-failure");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var probe = cluster.Client.GetGrain<IAIWorkerProbe>(
+            NeuronId.For<AIWorkerProbe>(owner, "probe").ToGrainId());
+        var reminder = cluster.Client.GetGrain<IReminderProbe>(
+            NeuronId.For<ReminderProbe>(owner, "reminder-probe").ToGrainId());
+        var model = AIWorkerGate.Prepare(
+            owner,
+            "fail terminal cancellation commit",
+            "must remain blocked");
+        var cancellation = AIWorkerRunnerCancellationProbe.Block(workerId);
+        var workerCancellation = AIWorkerRpcProbe.Block(
+            workerId,
+            nameof(IWorker.CancelAsync));
+        var workerGrain = workerId.ToGrainId();
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("fail terminal cancellation commit"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            await model.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            var running = await task.ReadAsync();
+            var before = await probe.ReadDurableWorkerAsync(workerId);
+            Assert.Equal(0, before.OutboxCount);
+            Assert.Equal(1, before.CapturedCauseCount);
+            journals.FailWriteAfter(
+                workerGrain,
+                completedWritesBeforeFailure: 2,
+                "injected terminal cancellation commit failure");
+
+            var cancelling = task.CancelAsync(new(CommandId.New(), running.Revision));
+            await cancellation.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            cancellation.Release();
+            await WaitUntilAsync(
+                () => journals.FiredFailures(workerGrain) == 1,
+                "The terminal cancellation commit failure was not injected.");
+            var fencedRunId = cancellation.RunId;
+
+            var inMemory = await probe.ReadDurableWorkerAsync(workerId);
+            Assert.NotEqual(before.WorkerState, inMemory.WorkerState);
+            Assert.Equal(0, inMemory.OutboxCount);
+            Assert.Equal(1, inMemory.CapturedCauseCount);
+            var afterFailure = await probe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+            Assert.DoesNotContain(
+                afterFailure.Delta,
+                delivery => delivery.Synapse is AttemptCancelled);
+
+            await probe.DeactivateWorkerAsync(workerId);
+            var reloaded = await probe.ReadDurableWorkerAsync(workerId);
+            Assert.NotEqual(inMemory.ActivationId, reloaded.ActivationId);
+            Assert.Equal(inMemory.WorkerState, reloaded.WorkerState);
+            Assert.Equal(0, reloaded.OutboxCount);
+            Assert.Equal(1, reloaded.CapturedCauseCount);
+            var direct = probe.RespondAsync(
+                workerId,
+                [new ChatMessage(ChatRole.User, "must remain fenced")]);
+            var directCompleted = await Task.WhenAny(
+                direct,
+                Task.Delay(
+                    TimeSpan.FromSeconds(2),
+                    TestContext.Current.CancellationToken));
+            Assert.Same(direct, directCompleted);
+            _ = await Assert.ThrowsAsync<InvalidOperationException>(() => direct);
+
+            var dispatchesBeforeReminder = AIWorkerRunnerDispatchProbe.EntriesFor(workerId);
+            clock.Advance(TimeSpan.FromMinutes(2));
+            await reminder.ExpediteAsync(workerId, recoveryReminder);
+            await WaitUntilAsync(
+                () => cancellation.EntryCount == 2,
+                "The cancellation-pending reminder did not re-signal the exact fenced run.");
+            var afterReminder = await probe.ReadDurableWorkerAsync(workerId);
+            Assert.Equal(fencedRunId, cancellation.RunId);
+            Assert.Equal(reloaded.WorkerState, afterReminder.WorkerState);
+            Assert.Equal(
+                dispatchesBeforeReminder,
+                AIWorkerRunnerDispatchProbe.EntriesFor(workerId));
+
+            workerCancellation.Release();
+            _ = await cancelling.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            AIWorkerRpcProbe.Reset(workerId, nameof(IWorker.CancelAsync));
+            Assert.Equal(TaskState.Cancelling, (await task.ReadAsync()).State);
+
+            journals.ClearFailure(workerGrain);
+            await reminder.ExpediteAsync(taskId, dispatchReminder);
+            _ = await ReadUntilAsync(
+                task,
+                snapshot => snapshot.State == TaskState.Cancelled);
+            var afterRetry = await probe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+            Assert.Single(
+                afterRetry.Delta,
+                delivery => delivery.Synapse is AttemptCancelled);
+            Assert.Equal(3, cancellation.EntryCount);
+            Assert.Equal(fencedRunId, cancellation.RunId);
+
+            AIWorkerDurableObservation final = null!;
+
+            for (var attempt = 0; attempt < 100; attempt++)
+            {
+                final = await probe.ReadDurableWorkerAsync(workerId);
+
+                if (final.OutboxCount == 0)
+                {
+                    break;
+                }
+
+                await Task.Delay(
+                    TimeSpan.FromMilliseconds(20),
+                    TestContext.Current.CancellationToken);
+            }
+
+            Assert.NotEqual(reloaded.WorkerState, final.WorkerState);
+            Assert.Equal(0, final.OutboxCount);
+            Assert.Equal(0, final.CapturedCauseCount);
+        }
+        finally
+        {
+            journals.ClearFailure(workerGrain);
+            workerCancellation.Release();
+            AIWorkerRpcProbe.Reset(workerId, nameof(IWorker.CancelAsync));
+            cancellation.Release();
+            AIWorkerRunnerCancellationProbe.Reset(workerId);
+            model.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "a repeated committed cancellation no-ops without duplicate signal fact or state mutation")]
+    public async Task RepeatedCommittedCancellationIsAnExactNoOp()
+    {
+        var cluster = await StartWorkerClusterAsync();
+        var owner = new OwnerId("ai-worker-cancel-idempotent-retry");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var probe = cluster.Client.GetGrain<IAIWorkerProbe>(
+            NeuronId.For<AIWorkerProbe>(owner, "probe").ToGrainId());
+        var model = AIWorkerGate.Prepare(
+            owner,
+            "repeat committed cancellation",
+            "must remain blocked");
+        var cancellation = AIWorkerRunnerCancellationProbe.Block(workerId);
+        var workerCalls = AIWorkerRpcProbe.Replay(workerId, "CancelAsync");
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("repeat committed cancellation"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            await model.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            var running = await task.ReadAsync();
+            var cancelling = task.CancelAsync(new(CommandId.New(), running.Revision));
+            await cancellation.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            cancellation.Release();
+            await workerCalls.ReplayReady.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            Assert.Equal(1, workerCalls.EntryCount);
+            Assert.True(
+                workerCalls.FailureCount == 0,
+                workerCalls.Failure?.ToString());
+            var committedState = await probe.ReadWorkerStateAsync(workerId);
+            var committedJournal = await probe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+            Assert.Single(
+                committedJournal.Delta,
+                delivery => delivery.Synapse is AttemptCancelled);
+
+            workerCalls.ReleaseReplay();
+            _ = await cancelling;
+            await workerCalls.Completed.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal(2, workerCalls.InvocationCount);
+            Assert.True(
+                workerCalls.FailureCount == 0,
+                workerCalls.Failure?.ToString());
+            Assert.Equal(1, cancellation.EntryCount);
+            Assert.Equal(committedState, await probe.ReadWorkerStateAsync(workerId));
+            var afterRetry = await probe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+            Assert.Single(
+                afterRetry.Delta,
+                delivery => delivery.Synapse is AttemptCancelled);
+
+            _ = await ReadUntilAsync(
+                task,
+                snapshot => snapshot.State == TaskState.Cancelled);
+        }
+        finally
+        {
+            cancellation.Release();
+            workerCalls.ReleaseReplay();
+            AIWorkerRpcProbe.Reset(workerId, "CancelAsync");
+            AIWorkerRunnerCancellationProbe.Reset(workerId);
+            model.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "a failed checkpoint write leaves no ghost and its retry is the sole readable child")]
+    public async Task FailedCheckpointWriteRollsBackAllCollectionsBeforeRetry()
+    {
+        var journals = new AIWorkerJournalStorageProvider();
+        var cluster = await StartWorkerClusterAsync(journals);
+        var owner = new OwnerId("ai-worker-checkpoint-rollback");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var attempt = new AttemptId(Guid.NewGuid());
+        var checkpointGrain = CheckpointGrain(taskId, workerId, attempt);
+        var harness = cluster.Client.GetGrain<IAIWorkerCheckpointHarness>(
+            NeuronId.For<AIWorkerCheckpointHarness>(owner, "checkpoint-harness").ToGrainId());
+
+        try
+        {
+            journals.FailWriteAfter(
+                checkpointGrain,
+                completedWritesBeforeFailure: 0,
+                "injected checkpoint write failure");
+
+            var observed = await harness.FailThenRetryAsync(taskId, workerId, attempt);
+
+            Assert.True(observed.FailureObserved);
+            Assert.Equal(0, observed.ChildrenAfterFailure);
+            Assert.Equal(1, observed.ChildrenAfterRetry);
+            Assert.True(observed.RetryPayloadReadable);
+        }
+        finally
+        {
+            journals.ClearFailure(checkpointGrain);
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "checkpoint protection rejects the same lineage under a different definition fingerprint")]
+    public async Task CheckpointProtectionBindsTheDefinitionFingerprint()
+    {
+        var cluster = await StartWorkerClusterAsync();
+        var owner = new OwnerId("ai-worker-checkpoint-definition-binding");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var attempt = new AttemptId(Guid.NewGuid());
+        var harness = cluster.Client.GetGrain<IAIWorkerCheckpointHarness>(
+            NeuronId.For<AIWorkerCheckpointHarness>(owner, "checkpoint-harness").ToGrainId());
+
+        try
+        {
+            Assert.True(await harness.CrossDefinitionReadFailsAsync(
+                taskId,
+                workerId,
+                attempt,
+                "definition-a",
+                "definition-b"));
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
     [Fact(DisplayName = "a raw same-owner runner is rejected before semantic target entry")]
     public async Task RawRunnerIsRejectedBeforeSemanticTargetEntry()
     {
@@ -1386,6 +2525,7 @@ public sealed class AIWorkerContracts
                 journalStorage ?? new VolatileJournalStorageProvider());
             silo.Services.AddSingleton<ILoggerProvider>(AIWorkerLogProvider.Instance);
             silo.AddIncomingGrainCallFilter<AIWorkerRunnerDispatchFilter>();
+            silo.AddOutgoingGrainCallFilter<AIWorkerRunnerOutgoingFilter>();
 
             if (clock is not null)
             {
@@ -1430,20 +2570,284 @@ internal sealed class AIWorkerRunnerDispatchFilter : IIncomingGrainCallFilter
             await checkpointRead.BlockAsync();
         }
 
-        if (string.Equals(
-                context.TargetId.Type.ToString(),
-                "ai-workflow-runner",
+        if (AIWorkerContinuationGateProbe.TryGet(
+                context.TargetId,
+                context.InterfaceMethod?.Name,
+                out var continuation))
+        {
+            await continuation.EnterAsync();
+
+            try
+            {
+                await context.Invoke();
+            }
+            catch (Exception failure)
+            {
+                continuation.RecordFailure(failure);
+                throw;
+            }
+            finally
+            {
+                continuation.Complete();
+            }
+
+            return;
+        }
+
+        var isRunner = string.Equals(
+            context.TargetId.Type.ToString(),
+            "ai-workflow-runner",
+            StringComparison.Ordinal);
+
+        if (isRunner
+            && string.Equals(
+                context.InterfaceMethod?.Name,
+                "CancelAsync",
                 StringComparison.Ordinal)
+            && AIWorkerRunnerCancellationProbe.TryGet(context.TargetId, out var cancellation)
+            && context.Request.GetArgument(0) is Guid runId)
+        {
+            await cancellation.EnterAsync(runId);
+        }
+
+        if (isRunner
             && string.Equals(
                 context.InterfaceMethod?.Name,
                 "ExecuteAsync",
                 StringComparison.Ordinal))
         {
             AIWorkerRunnerDispatchProbe.Record(context.TargetId);
+            var lifetime = AIWorkerRunnerLifetimeProbe.TryEnter(
+                context.TargetId,
+                context.Request.GetArgument(0));
+            var execution = AIWorkerRunnerExecutionProbe.TryGet(context.TargetId);
+
+            try
+            {
+                if (execution is not null)
+                {
+                    await execution.EnterAsync();
+                }
+
+                await context.Invoke();
+            }
+            catch (Exception failure)
+            {
+                execution?.RecordFailure(failure);
+                throw;
+            }
+            finally
+            {
+                execution?.Complete();
+                lifetime?.Complete();
+            }
+
+            return;
         }
 
         await context.Invoke();
     }
+}
+
+internal sealed class AIWorkerRunnerOutgoingFilter : IOutgoingGrainCallFilter
+{
+    public async Task Invoke(IOutgoingGrainCallContext context)
+    {
+        if (!AIWorkerRpcProbe.TryGet(
+                context.TargetId,
+                context.InterfaceMethod.Name,
+                out var observation))
+        {
+            await context.Invoke();
+            return;
+        }
+
+        observation.Enter();
+        var replay = observation.TryBeginReplay()
+            ? RequireReplay(context)
+            : null;
+
+        try
+        {
+            await InvokeOnceAsync(context, observation);
+
+            if (replay is not null)
+            {
+                observation.ReadyReplay();
+                await observation.WaitForReplayReleaseAsync();
+                await replay(context.Grain);
+            }
+        }
+        finally
+        {
+            await observation.WaitForResponseReleaseAsync();
+            observation.CompleteResponse();
+        }
+    }
+
+    private static async Task InvokeOnceAsync(
+        IOutgoingGrainCallContext context,
+        AIWorkerRpcObservation observation)
+    {
+        try
+        {
+            await context.Invoke();
+            observation.CompleteInvocation(null);
+        }
+        catch (Exception failure)
+        {
+            observation.CompleteInvocation(failure);
+            throw;
+        }
+    }
+
+    private static Func<object, Task> RequireReplay(IOutgoingGrainCallContext context)
+    {
+        if (context.Request.GetArgumentCount() != 1)
+        {
+            throw new InvalidOperationException(
+                "RPC replay requires exactly one worker argument. "
+                + $"Grain: {context.Grain?.GetType().FullName ?? "<null>"}, "
+                + $"arguments: {context.Request.GetArgumentCount()}.");
+        }
+
+        var argument = context.Request.GetArgument(0);
+
+        return (context.InterfaceMethod.Name, argument) switch
+        {
+            (nameof(IWorker.AcceptAsync), AttemptRequest request) =>
+                grain => ((IWorker)grain).AcceptAsync(request),
+            (nameof(IWorker.CancelAsync), AttemptCursor cursor) =>
+                grain => ((IWorker)grain).CancelAsync(cursor),
+            _ => throw new InvalidOperationException(
+                $"RPC replay does not support '{context.InterfaceMethod.Name}' "
+                + $"with argument '{argument?.GetType().FullName ?? "<null>"}'."),
+        };
+    }
+}
+
+internal static class AIWorkerRpcProbe
+{
+    private static readonly ConcurrentDictionary<(GrainId Target, string Method), AIWorkerRpcObservation>
+        Observations = new();
+
+    internal static AIWorkerRpcObservation Block(NeuronId target, string method)
+        => Add(target, method, block: true);
+
+    internal static AIWorkerRpcObservation Observe(NeuronId target, string method)
+        => Add(target, method, block: false);
+
+    internal static AIWorkerRpcObservation Replay(NeuronId target, string method)
+        => Add(target, method, block: false, replay: true);
+
+    internal static bool TryGet(
+        GrainId target,
+        string? method,
+        out AIWorkerRpcObservation observation)
+    {
+        if (method is not null
+            && Observations.TryGetValue((target, method), out var found))
+        {
+            observation = found;
+            return true;
+        }
+
+        observation = null!;
+        return false;
+    }
+
+    internal static void Reset(NeuronId target, string method)
+        => Observations.TryRemove((target.ToGrainId(), method), out _);
+
+    private static AIWorkerRpcObservation Add(
+        NeuronId target,
+        string method,
+        bool block,
+        bool replay = false)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(method);
+        var observation = new AIWorkerRpcObservation(block, replay);
+
+        if (!Observations.TryAdd((target.ToGrainId(), method), observation))
+        {
+            throw new InvalidOperationException(
+                $"RPC '{target}.{method}' already has an observation.");
+        }
+
+        return observation;
+    }
+}
+
+internal sealed class AIWorkerRpcObservation(bool blockResponse, bool replay)
+{
+    private readonly TaskCompletionSource<bool> _invocationCompleted =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _release =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _replayReady =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _replayRelease =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _completed =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _entryCount;
+    private int _failureCount;
+    private int _invocationCount;
+    private int _replayStarted;
+
+    internal Task InvocationCompleted => _invocationCompleted.Task;
+
+    internal Task Completed => _completed.Task;
+
+    internal int EntryCount => Volatile.Read(ref _entryCount);
+
+    internal int FailureCount => Volatile.Read(ref _failureCount);
+
+    internal int InvocationCount => Volatile.Read(ref _invocationCount);
+
+    internal Exception? Failure { get; private set; }
+
+    internal Task ReplayReady => _replayReady.Task;
+
+    internal void Enter()
+    {
+        Interlocked.Increment(ref _entryCount);
+    }
+
+    internal void CompleteInvocation(Exception? failure)
+    {
+        Interlocked.Increment(ref _invocationCount);
+
+        if (failure is not null)
+        {
+            Failure = failure;
+            Interlocked.Increment(ref _failureCount);
+        }
+
+        _invocationCompleted.TrySetResult(true);
+    }
+
+    internal void ReadyReplay() => _replayReady.TrySetResult(true);
+
+    internal bool TryBeginReplay()
+        => replay && Interlocked.CompareExchange(ref _replayStarted, 1, 0) == 0;
+
+    internal Task WaitForReplayReleaseAsync() => _replayRelease.Task;
+
+    internal async Task WaitForResponseReleaseAsync()
+    {
+        if (blockResponse)
+        {
+            await _release.Task;
+        }
+    }
+
+    internal void CompleteResponse()
+        => _completed.TrySetResult(true);
+
+    internal void Release() => _release.TrySetResult(true);
+
+    internal void ReleaseReplay() => _replayRelease.TrySetResult(true);
 }
 
 internal static class AIWorkerContinuationMutationProbe
@@ -1495,6 +2899,70 @@ internal sealed class AIWorkerContinuationMutation
         _entered.TrySetResult(true);
         return cursor with { Revision = checked(cursor.Revision + 1) };
     }
+}
+
+internal static class AIWorkerContinuationGateProbe
+{
+    private static readonly ConcurrentDictionary<GrainId, AIWorkerContinuationGate> Gates = new();
+
+    internal static AIWorkerContinuationGate Block(NeuronId worker)
+    {
+        var gate = new AIWorkerContinuationGate();
+
+        if (!Gates.TryAdd(worker.ToGrainId(), gate))
+        {
+            throw new InvalidOperationException($"Worker '{worker}' already has a continuation gate.");
+        }
+
+        return gate;
+    }
+
+    internal static bool TryGet(
+        GrainId target,
+        string? method,
+        out AIWorkerContinuationGate gate)
+    {
+        if (string.Equals(method, nameof(IWorker.ContinueAsync), StringComparison.Ordinal)
+            && Gates.TryGetValue(target, out var found))
+        {
+            gate = found;
+            return true;
+        }
+
+        gate = null!;
+        return false;
+    }
+
+    internal static void Reset(NeuronId worker)
+        => Gates.TryRemove(worker.ToGrainId(), out _);
+}
+
+internal sealed class AIWorkerContinuationGate
+{
+    private readonly TaskCompletionSource<bool> _entered =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _release =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _completed =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    internal Task Entered => _entered.Task;
+
+    internal Task Completed => _completed.Task;
+
+    internal Exception? Failure { get; private set; }
+
+    internal async Task EnterAsync()
+    {
+        _entered.TrySetResult(true);
+        await _release.Task;
+    }
+
+    internal void RecordFailure(Exception failure) => Failure = failure;
+
+    internal void Release() => _release.TrySetResult(true);
+
+    internal void Complete() => _completed.TrySetResult(true);
 }
 
 internal static class AIWorkerCheckpointReadProbe
@@ -1577,6 +3045,216 @@ internal static class AIWorkerRunnerDispatchProbe
         => Entries.TryRemove(worker.GrainKey, out _);
 }
 
+internal static class AIWorkerRunnerExecutionProbe
+{
+    private const string RunnerSeparator = "/workflow-run/";
+    private static readonly ConcurrentDictionary<string, AIWorkerRunnerExecution> Executions =
+        new(StringComparer.Ordinal);
+
+    internal static AIWorkerRunnerExecution Block(NeuronId worker)
+    {
+        var execution = new AIWorkerRunnerExecution();
+
+        if (!Executions.TryAdd(worker.GrainKey, execution))
+        {
+            throw new InvalidOperationException($"Worker '{worker}' already has a runner execution probe.");
+        }
+
+        return execution;
+    }
+
+    internal static AIWorkerRunnerExecution? TryGet(GrainId runner)
+    {
+        var key = runner.Key.ToString();
+        var separator = key.IndexOf(RunnerSeparator, StringComparison.Ordinal);
+
+        return separator > 0
+            && Executions.TryGetValue(key[..separator], out var execution)
+                ? execution
+                : null;
+    }
+
+    internal static void Reset(NeuronId worker)
+        => Executions.TryRemove(worker.GrainKey, out _);
+}
+
+internal sealed class AIWorkerRunnerExecution
+{
+    private readonly TaskCompletionSource<bool> _entered =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _release =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _completed =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    internal Task Entered => _entered.Task;
+
+    internal Task Completed => _completed.Task;
+
+    internal Exception? Failure { get; private set; }
+
+    internal async Task EnterAsync()
+    {
+        _entered.TrySetResult(true);
+        await _release.Task;
+    }
+
+    internal void RecordFailure(Exception failure) => Failure = failure;
+
+    internal void Release() => _release.TrySetResult(true);
+
+    internal void Complete() => _completed.TrySetResult(true);
+}
+
+internal static class AIWorkerRunnerLifetimeProbe
+{
+    private const string RunnerSeparator = "/workflow-run/";
+    private static readonly ConcurrentDictionary<string, AIWorkerRunnerLifetime> Lifetimes =
+        new(StringComparer.Ordinal);
+
+    internal static AIWorkerRunnerLifetime Prepare(NeuronId worker)
+    {
+        var lifetime = new AIWorkerRunnerLifetime();
+
+        if (!Lifetimes.TryAdd(worker.GrainKey, lifetime))
+        {
+            throw new InvalidOperationException($"Worker '{worker}' already has a runner lifetime probe.");
+        }
+
+        return lifetime;
+    }
+
+    internal static AIWorkerRunnerLifetime? TryEnter(GrainId runner, object? command)
+    {
+        var key = runner.Key.ToString();
+        var separator = key.IndexOf(RunnerSeparator, StringComparison.Ordinal);
+
+        if (separator <= 0
+            || !Lifetimes.TryGetValue(key[..separator], out var lifetime))
+        {
+            return null;
+        }
+
+        lifetime.Enter(RunId(command));
+        return lifetime;
+    }
+
+    internal static void Reset(NeuronId worker)
+        => Lifetimes.TryRemove(worker.GrainKey, out _);
+
+    private static Guid RunId(object? command)
+    {
+        var run = command?.GetType().GetProperty("Run")?.GetValue(command)
+            ?? throw new InvalidOperationException("The workflow runner command has no Run.");
+
+        return (Guid)(run.GetType().GetProperty("RunId")?.GetValue(run)
+            ?? throw new InvalidOperationException("The workflow run has no RunId."));
+    }
+}
+
+internal sealed class AIWorkerRunnerLifetime
+{
+    private readonly TaskCompletionSource<bool> _entered =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _completed =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    internal Task Entered => _entered.Task;
+
+    internal Task Completed => _completed.Task;
+
+    internal Guid RunId { get; private set; }
+
+    internal void Enter(Guid runId)
+    {
+        RunId = runId;
+        _entered.TrySetResult(true);
+    }
+
+    internal void Complete() => _completed.TrySetResult(true);
+}
+
+internal static class AIWorkerRunnerCancellationProbe
+{
+    private const string RunnerSeparator = "/workflow-run/";
+    private static readonly ConcurrentDictionary<string, AIWorkerRunnerCancellation> Cancellations =
+        new(StringComparer.Ordinal);
+
+    internal static AIWorkerRunnerCancellation Block(NeuronId worker)
+        => Prepare(worker, block: true, failure: null);
+
+    internal static AIWorkerRunnerCancellation Fail(NeuronId worker, string failure)
+        => Prepare(worker, block: false, failure);
+
+    internal static bool TryGet(GrainId runner, out AIWorkerRunnerCancellation cancellation)
+    {
+        var key = runner.Key.ToString();
+        var separator = key.IndexOf(RunnerSeparator, StringComparison.Ordinal);
+
+        if (separator > 0
+            && Cancellations.TryGetValue(key[..separator], out var found))
+        {
+            cancellation = found;
+            return true;
+        }
+
+        cancellation = null!;
+        return false;
+    }
+
+    internal static void Reset(NeuronId worker)
+        => Cancellations.TryRemove(worker.GrainKey, out _);
+
+    private static AIWorkerRunnerCancellation Prepare(
+        NeuronId worker,
+        bool block,
+        string? failure)
+    {
+        var cancellation = new AIWorkerRunnerCancellation(block, failure);
+
+        if (!Cancellations.TryAdd(worker.GrainKey, cancellation))
+        {
+            throw new InvalidOperationException($"Worker '{worker}' already has a runner cancellation probe.");
+        }
+
+        return cancellation;
+    }
+}
+
+internal sealed class AIWorkerRunnerCancellation(bool block, string? failure)
+{
+    private readonly TaskCompletionSource<bool> _entered =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _release =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _entryCount;
+
+    internal Task Entered => _entered.Task;
+
+    internal int EntryCount => Volatile.Read(ref _entryCount);
+
+    internal Guid RunId { get; private set; }
+
+    internal async Task EnterAsync(Guid runId)
+    {
+        RunId = runId;
+        Interlocked.Increment(ref _entryCount);
+        _entered.TrySetResult(true);
+
+        if (block)
+        {
+            await _release.Task;
+        }
+
+        if (failure is not null)
+        {
+            throw new InvalidOperationException(failure);
+        }
+    }
+
+    internal void Release() => _release.TrySetResult(true);
+}
+
 internal sealed class AIWorkerJournalStorageProvider : IJournalStorageProvider
 {
     private readonly VolatileJournalStorageProvider _inner = new();
@@ -1584,7 +3262,7 @@ internal sealed class AIWorkerJournalStorageProvider : IJournalStorageProvider
     private readonly ConcurrentDictionary<JournalId, int> _firedFailures = new();
     private readonly ConcurrentDictionary<JournalId, int> _writes = new();
     private readonly ConcurrentDictionary<JournalId, int> _completedWrites = new();
-    private readonly ConcurrentDictionary<JournalId, AIWorkerWriteGate> _blockedWrites = new();
+    private readonly ConcurrentDictionary<JournalId, AIWorkerScheduledWriteGate> _blockedWrites = new();
     private readonly object _failureLock = new();
 
     public IJournalStorage CreateStorage(JournalId journalId)
@@ -1622,10 +3300,19 @@ internal sealed class AIWorkerJournalStorageProvider : IJournalStorageProvider
         => _completedWrites.GetValueOrDefault(JournalId.FromGrainId(grain));
 
     internal AIWorkerWriteGate BlockNextWrite(GrainId grain)
-    {
-        var gate = new AIWorkerWriteGate();
+        => BlockWriteAfter(grain, completedWritesBeforeBlock: 0);
 
-        if (!_blockedWrites.TryAdd(JournalId.FromGrainId(grain), gate))
+    internal AIWorkerWriteGate BlockWriteAfter(
+        GrainId grain,
+        int completedWritesBeforeBlock)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(completedWritesBeforeBlock);
+        var gate = new AIWorkerWriteGate();
+        var scheduled = new AIWorkerScheduledWriteGate(
+            completedWritesBeforeBlock,
+            gate);
+
+        if (!_blockedWrites.TryAdd(JournalId.FromGrainId(grain), scheduled))
         {
             throw new InvalidOperationException($"Journal '{grain}' already has a blocked write.");
         }
@@ -1663,9 +3350,11 @@ internal sealed class AIWorkerJournalStorageProvider : IJournalStorageProvider
         JournalId journalId,
         CancellationToken cancellationToken)
     {
-        if (_blockedWrites.TryRemove(journalId, out var gate))
+        if (_blockedWrites.TryGetValue(journalId, out var scheduled)
+            && scheduled.ShouldBlock()
+            && _blockedWrites.TryRemove(journalId, out _))
         {
-            await gate.BlockAsync(cancellationToken);
+            await scheduled.Gate.BlockAsync(cancellationToken);
         }
     }
 
@@ -1673,6 +3362,30 @@ internal sealed class AIWorkerJournalStorageProvider : IJournalStorageProvider
         => _completedWrites.AddOrUpdate(journalId, 1, static (_, count) => count + 1);
 
     private sealed record InjectedFailure(int CompletedWritesBeforeFailure, string Message);
+
+    private sealed class AIWorkerScheduledWriteGate(
+        int completedWritesBeforeBlock,
+        AIWorkerWriteGate gate)
+    {
+        private readonly object _lock = new();
+        private int _remaining = completedWritesBeforeBlock;
+
+        internal AIWorkerWriteGate Gate { get; } = gate;
+
+        internal bool ShouldBlock()
+        {
+            lock (_lock)
+            {
+                if (_remaining == 0)
+                {
+                    return true;
+                }
+
+                _remaining--;
+                return false;
+            }
+        }
+    }
 
     private sealed class FaultingStorage(
         AIWorkerJournalStorageProvider owner,
@@ -1835,14 +3548,32 @@ internal interface ITaskGroupChat : IGroupChat
 
     [Alias("ReadWorkerState")]
     Task<byte[]> ReadWorkerStateAsync();
+
+    [Alias("ReadDurableWorker")]
+    Task<AIWorkerDurableObservation> ReadDurableWorkerAsync();
+
+    [Alias("DeactivateWorker")]
+    Task DeactivateWorkerAsync();
 }
+
+[GenerateSerializer]
+[Alias("db.test.ai-worker-durable-observation")]
+internal sealed record AIWorkerDurableObservation(
+    [property: Id(0)] Guid ActivationId,
+    [property: Id(1)] byte[] WorkerState,
+    [property: Id(2)] int OutboxCount,
+    [property: Id(3)] int CapturedCauseCount);
 
 internal sealed class TaskGroupChat : GroupChat, ITaskGroupChat
 {
     private const string DirectStateName = "ai.group-chat.session";
     private const string WorkerStateName = "ai.group-chat.worker";
+    private const string OutboxName = "outbox";
+    private const string CapturedCapabilityCausesName = "captured-capability-causes";
+    private readonly Guid _activationId = Guid.NewGuid();
 
-    protected override IReadOnlyList<Participant> Participants => [Participant<IAIWorkerModel>()];
+    protected override IReadOnlyList<Participant> Participants =>
+        [Participant<IAIWorkerModel>(AIWorkerDefinitionSource.NameFor(Id.Owner, Id.Name))];
 
     protected override IReadOnlyList<ChatMessage> CreateMessages(Goal goal)
     {
@@ -1862,8 +3593,43 @@ internal sealed class TaskGroupChat : GroupChat, ITaskGroupChat
     public Task<byte[]> ReadWorkerStateAsync()
         => Task.FromResult(ReadState(WorkerStateName));
 
+    public Task<AIWorkerDurableObservation> ReadDurableWorkerAsync()
+    {
+        var workerState = ReadState(WorkerStateName);
+        var outbox = ServiceProvider
+            .GetRequiredKeyedService<IDurableList<byte[]>>(OutboxName);
+        var capturedCauses = ServiceProvider
+            .GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(
+                CapturedCapabilityCausesName);
+
+        return Task.FromResult(new AIWorkerDurableObservation(
+            _activationId,
+            workerState,
+            outbox.Count,
+            capturedCauses.Count));
+    }
+
+    public Task DeactivateWorkerAsync()
+    {
+        DeactivateOnIdle();
+
+        return Task.CompletedTask;
+    }
+
     private byte[] ReadState(string name)
         => ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(name).Value?.ToArray() ?? [];
+}
+
+internal static class AIWorkerDefinitionSource
+{
+    private static readonly ConcurrentDictionary<OwnerId, string> Names = new();
+
+    internal static string NameFor(OwnerId owner, string fallback)
+        => Names.TryGetValue(owner, out var name) ? name : fallback;
+
+    internal static void Set(OwnerId owner, string name) => Names[owner] = name;
+
+    internal static void Reset(OwnerId owner) => Names.TryRemove(owner, out _);
 }
 
 [Alias("db.test.empty-task-group-chat")]
@@ -1921,6 +3687,12 @@ internal interface IAIWorkerProbe : INeuron
     [Alias("ReadWorkerState")]
     Task<byte[]> ReadWorkerStateAsync(NeuronId worker);
 
+    [Alias("ReadDurableWorker")]
+    Task<AIWorkerDurableObservation> ReadDurableWorkerAsync(NeuronId worker);
+
+    [Alias("DeactivateWorker")]
+    Task DeactivateWorkerAsync(NeuronId worker);
+
     [Alias("ReadJournal")]
     Task<JournalRead> ReadJournalAsync(NeuronId worker, JournalKind kind);
 }
@@ -1945,8 +3717,202 @@ internal sealed class AIWorkerProbe : Neuron, IAIWorkerProbe
     public Task<byte[]> ReadWorkerStateAsync(NeuronId worker)
         => GrainFactory.GetGrain<ITaskGroupChat>(worker.ToGrainId()).ReadWorkerStateAsync();
 
+    public Task<AIWorkerDurableObservation> ReadDurableWorkerAsync(NeuronId worker)
+        => GrainFactory.GetGrain<ITaskGroupChat>(worker.ToGrainId()).ReadDurableWorkerAsync();
+
+    public Task DeactivateWorkerAsync(NeuronId worker)
+        => GrainFactory.GetGrain<ITaskGroupChat>(worker.ToGrainId()).DeactivateWorkerAsync();
+
     public Task<JournalRead> ReadJournalAsync(NeuronId worker, JournalKind kind)
         => GrainFactory.GetGrain<INeuron>(worker.ToGrainId()).ReadJournalAsync(kind, afterSequence: 0);
+}
+
+[GenerateSerializer]
+[Alias("db.test.ai-checkpoint-rollback-observation")]
+internal sealed record AIWorkerCheckpointRollbackObservation(
+    [property: Id(0)] bool FailureObserved,
+    [property: Id(1)] int ChildrenAfterFailure,
+    [property: Id(2)] int ChildrenAfterRetry,
+    [property: Id(3)] bool RetryPayloadReadable);
+
+[Alias("db.test.ai-worker-checkpoint-harness")]
+[ClientEntryPoint]
+internal interface IAIWorkerCheckpointHarness : INeuron
+{
+    [Alias("FailThenRetry")]
+    Task<AIWorkerCheckpointRollbackObservation> FailThenRetryAsync(
+        NeuronId task,
+        NeuronId worker,
+        AttemptId attempt);
+
+    [Alias("CrossDefinitionReadFails")]
+    Task<bool> CrossDefinitionReadFailsAsync(
+        NeuronId task,
+        NeuronId worker,
+        AttemptId attempt,
+        string firstFingerprint,
+        string secondFingerprint);
+}
+
+internal sealed class AIWorkerCheckpointHarness : Neuron, IAIWorkerCheckpointHarness
+{
+    private static readonly Type CheckpointInterface = RequiredAIType(
+        "DigitalBrain.AI.IWorkflowCheckpointGrain");
+    private static readonly Type CheckpointWrite = RequiredAIType(
+        "DigitalBrain.AI.CheckpointWrite");
+    private static readonly Type CheckpointStore = RequiredAIType(
+        "DigitalBrain.AI.OrleansCheckpointStore");
+
+    public async Task<AIWorkerCheckpointRollbackObservation> FailThenRetryAsync(
+        NeuronId task,
+        NeuronId worker,
+        AttemptId attempt)
+    {
+        var (grain, sessionId) = Checkpoint(task, worker, attempt);
+        var failureObserved = false;
+
+        try
+        {
+            _ = await CreateAsync(grain, sessionId, [1, 2, 3]);
+        }
+        catch (InvalidOperationException failure)
+            when (failure.Message.Contains("injected checkpoint write failure", StringComparison.Ordinal))
+        {
+            failureObserved = true;
+        }
+
+        var afterFailure = await IndexAsync(grain);
+        var retry = await CreateAsync(grain, sessionId, [4, 5, 6]);
+        var afterRetry = await IndexAsync(grain);
+        var payload = await ReadAsync(grain, retry);
+
+        return new(
+            failureObserved,
+            afterFailure.Length,
+            afterRetry.Length,
+            payload.SequenceEqual(new byte[] { 4, 5, 6 }));
+    }
+
+    public async Task<bool> CrossDefinitionReadFailsAsync(
+        NeuronId task,
+        NeuronId worker,
+        AttemptId attempt,
+        string firstFingerprint,
+        string secondFingerprint)
+    {
+        var (grain, sessionId) = Checkpoint(task, worker, attempt);
+        var protector = ServiceProvider.GetRequiredService<IDurablePayloadProtector>();
+        var first = CreateStore(
+            grain,
+            sessionId,
+            protector,
+            ProtectionPurpose(sessionId, firstFingerprint));
+        var second = CreateStore(
+            grain,
+            sessionId,
+            protector,
+            ProtectionPurpose(sessionId, secondFingerprint));
+        var checkpoint = await first.CreateCheckpointAsync(
+            sessionId,
+            JsonSerializer.SerializeToElement(new { Value = "protected" }),
+            parent: null);
+
+        try
+        {
+            _ = await second.RetrieveCheckpointAsync(sessionId, checkpoint);
+            return false;
+        }
+        catch (CryptographicException)
+        {
+            return true;
+        }
+    }
+
+    private (object Grain, string SessionId) Checkpoint(
+        NeuronId task,
+        NeuronId worker,
+        AttemptId attempt)
+    {
+        var source = Encoding.UTF8.GetBytes($"v1\n{worker}\n{task}\n{attempt.Value:D}");
+        var hash = Convert.ToHexStringLower(SHA256.HashData(source));
+        var grain = GrainFactory.GetGrain(
+            CheckpointInterface,
+            IdSpan.Create($"{worker.GrainKey}/workflow-checkpoint/{hash}"));
+
+        return (grain, $"dbw_{hash}");
+    }
+
+    private static async Task<object> CreateAsync(
+        object grain,
+        string sessionId,
+        byte[] payload)
+    {
+        var command = Activator.CreateInstance(
+            CheckpointWrite,
+            sessionId,
+            payload,
+            null)
+            ?? throw new InvalidOperationException("The checkpoint command could not be constructed.");
+        var invocation = CheckpointInterface.GetMethod("CreateAsync")?.Invoke(grain, [command])
+            ?? throw new MissingMethodException(CheckpointInterface.FullName, "CreateAsync");
+        var task = (Task)invocation;
+        await task;
+
+        return task.GetType().GetProperty("Result")?.GetValue(task)
+            ?? throw new InvalidOperationException("Checkpoint creation returned no reference.");
+    }
+
+    private static async Task<object[]> IndexAsync(object grain)
+    {
+        var invocation = CheckpointInterface.GetMethod("IndexAsync")?.Invoke(grain, [null])
+            ?? throw new MissingMethodException(CheckpointInterface.FullName, "IndexAsync");
+        var task = (Task)invocation;
+        await task;
+        var result = task.GetType().GetProperty("Result")?.GetValue(task) as Array
+            ?? throw new InvalidOperationException("Checkpoint indexing returned no array.");
+
+        return [.. result.Cast<object>()];
+    }
+
+    private static async Task<byte[]> ReadAsync(object grain, object checkpoint)
+    {
+        var invocation = CheckpointInterface.GetMethod("ReadAsync")?.Invoke(grain, [checkpoint])
+            ?? throw new MissingMethodException(CheckpointInterface.FullName, "ReadAsync");
+        var task = (Task)invocation;
+        await task;
+
+        return (byte[])(task.GetType().GetProperty("Result")?.GetValue(task)
+            ?? throw new InvalidOperationException("Checkpoint reading returned no payload."));
+    }
+
+    private static JsonCheckpointStore CreateStore(
+        object grain,
+        string sessionId,
+        IDurablePayloadProtector protector,
+        string purpose)
+        => (JsonCheckpointStore)(Activator.CreateInstance(
+            CheckpointStore,
+            grain,
+            sessionId,
+            protector,
+            purpose)
+            ?? throw new InvalidOperationException("The checkpoint store could not be constructed."));
+
+    private static string ProtectionPurpose(string sessionId, string fingerprint)
+    {
+        var type = RequiredAIType("DigitalBrain.AI.WorkflowCheckpointProtection");
+        var purpose = type.GetMethod(
+            "Purpose",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(type.FullName, "Purpose");
+
+        return (string)(purpose.Invoke(null, [sessionId, fingerprint])
+            ?? throw new InvalidOperationException("The checkpoint protection purpose was null."));
+    }
+
+    private static Type RequiredAIType(string name)
+        => typeof(AIModule).Assembly.GetType(name, throwOnError: true)
+            ?? throw new InvalidOperationException($"AI type '{name}' could not be resolved.");
 }
 
 internal sealed class AIWorkerGate
@@ -2122,6 +4088,38 @@ internal sealed class AIWorkerGate
 
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
+}
+
+internal sealed class BlockingDisposalExecutor()
+    : Executor<string>("blocking-disposal-executor"), IAsyncDisposable
+{
+    private readonly TaskCompletionSource<bool> _disposalEntered = new(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _disposalCompletion = new(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+
+    internal Task DisposalEntered => _disposalEntered.Task;
+
+    internal Task DisposalCompleted => _disposalCompletion.Task;
+
+    public override ValueTask HandleAsync(
+        string message,
+        IWorkflowContext context,
+        CancellationToken cancellationToken = default)
+        => ValueTask.CompletedTask;
+
+    public ValueTask DisposeAsync()
+    {
+        _disposalEntered.TrySetResult(true);
+
+        return new ValueTask(_disposalCompletion.Task);
+    }
+
+    internal void FailDisposal(Exception failure)
+        => _disposalCompletion.TrySetException(failure);
+
+    internal void ReleaseDisposal()
+        => _disposalCompletion.TrySetResult(true);
 }
 
 [Alias("db.test.raw-workflow-runner")]

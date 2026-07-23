@@ -72,6 +72,8 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
 
         if (existing is not null)
         {
+            RequireCurrentDefinition(existing);
+
             if (existing.Cursor == cursor)
             {
                 return;
@@ -86,11 +88,7 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
 
         }
 
-        var participantSnapshot = OrchestrationParticipants.Snapshot(Id, Participants);
-
-        var definition = DirectOrchestrationShape
-            .CreateGroupChat(GetType(), participantSnapshot)
-            .Definition;
+        var definition = CurrentSupervisedDefinition();
         var replayInput = ChatMessageCopies.Clone(
             CreateMessages(request.Goal)
             ?? throw new InvalidOperationException("CreateMessages returned null."),
@@ -130,9 +128,9 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
         ValidateCursor(cursor);
         ValidateCapabilityCaller(cursor.Task);
 
-        var state = LoadWorkerState()
+        var state = RequireCurrentDefinition(LoadWorkerState()
             ?? throw new InvalidOperationException(
-                $"GroupChat '{Id}' has no supervised Attempt state.");
+                $"GroupChat '{Id}' has no supervised Attempt state."));
 
         if (cursor == state.Cursor)
         {
@@ -219,6 +217,20 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
                 $"GroupChat '{Id}'s active run does not match its persisted Attempt cursor.");
         }
 
+        if (state.Lifecycle != SupervisedAttemptLifecycle.Cancelling)
+        {
+            state = state with
+            {
+                Lifecycle = SupervisedAttemptLifecycle.Cancelling,
+            };
+            await SaveWorkerStateAsync(state);
+        }
+
+        if (state.ActiveRun is { } activeRun)
+        {
+            await TryCancelRunnerAsync(activeRun);
+        }
+
         StageWorkerState(state with
         {
             ActiveRun = null,
@@ -249,6 +261,13 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
             return;
         }
 
+        if (state.Lifecycle == SupervisedAttemptLifecycle.Cancelling)
+        {
+            await TryCancelRunnerAsync(active);
+            return;
+        }
+
+        RequireCurrentDefinition(state);
         var now = _clock.GetUtcNow();
 
         if (now < active.RecoverAfterUtc)
@@ -399,9 +418,9 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
 
     private AIWorkerState RequireActive(WorkflowRun run)
     {
-        var state = LoadWorkerState()
+        var state = RequireCurrentDefinition(LoadWorkerState()
             ?? throw new InvalidOperationException(
-                $"GroupChat '{Id}' has no supervised Attempt state.");
+                $"GroupChat '{Id}' has no supervised Attempt state."));
 
         if (!MatchesActive(state, run))
         {
@@ -413,7 +432,8 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
     }
 
     private static bool MatchesActive(AIWorkerState state, WorkflowRun run)
-        => state.ActiveRun is { } active
+        => state.Lifecycle == SupervisedAttemptLifecycle.Running
+            && state.ActiveRun is { } active
             && active.RunId == run.RunId
             && active.Cursor == run.Cursor
             && string.Equals(
@@ -465,15 +485,22 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
 
         var current = LoadWorkerState();
 
-        if (current is null || !MatchesActive(current, run))
+        if (current is null)
+        {
+            return;
+        }
+
+        RequireCurrentDefinition(current);
+
+        if (!MatchesActive(current, run))
         {
             return;
         }
 
         var command = new WorkflowRunCommand(
             run,
-            state.Definition,
-            ChatMessageCopies.Clone(state.ReplayInput, _messages));
+            current.Definition,
+            ChatMessageCopies.Clone(current.ReplayInput, _messages));
 
         await Runner(run).ExecuteAsync(command);
     }
@@ -481,6 +508,37 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
     private IWorkflowRunner Runner(WorkflowRun run)
         => GrainFactory.GetGrain<IWorkflowRunner>(
             IdSpan.Create(WorkflowRunnerIdentity.GrainKey(run)));
+
+    private OrchestrationDefinition CurrentSupervisedDefinition()
+        => DirectOrchestrationShape
+            .CreateGroupChat(
+                GetType(),
+                OrchestrationParticipants.Snapshot(Id, Participants))
+            .Definition;
+
+    private AIWorkerState RequireCurrentDefinition(AIWorkerState state)
+    {
+        OrchestrationDefinition.RequireMatch(
+            state.Definition,
+            CurrentSupervisedDefinition());
+
+        return state;
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "The durable cancellation fence must remain authoritative when cooperative runner signaling fails.")]
+    private async Task TryCancelRunnerAsync(WorkflowRun run)
+    {
+        try
+        {
+            await Runner(run).CancelAsync(run.RunId);
+        }
+        catch (Exception)
+        {
+        }
+    }
 
     private AIWorkerState? LoadWorkerState()
         => _workerState.Value is { Length: > 0 } serialized
