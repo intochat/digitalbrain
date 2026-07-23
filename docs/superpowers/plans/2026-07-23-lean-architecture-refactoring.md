@@ -618,7 +618,7 @@ In a disposable copy with `.codegraph` absent, build the production AppHost and 
 
 ```powershell
 dotnet test tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj --logger "console;verbosity=minimal"
-dotnet build hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj --logger "console;verbosity=minimal"
+dotnet build hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj -v:minimal
 npx -y @colbymchenry/codegraph@latest status -j .
 dotnet test --logger "console;verbosity=minimal"
 ```

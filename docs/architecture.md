@@ -95,15 +95,24 @@ DigitalBrain.Modules.<Name>
 DigitalBrain.Modules.<Name>.Aspire.Hosting   optional
 ```
 
-`.Contracts` references only `DigitalBrain.Abstractions` — never another module, never a provider SDK.
-The runtime package owns neurons, provider vocabulary, exact tool policy, and semantic result mapping.
+Most `.Contracts` packages reference only `DigitalBrain.Abstractions` — never a provider SDK.
+`DigitalBrain.Modules.AI.Contracts` is the one deliberate module-contract exception: its
+AI-to-Tasks.Contracts bridge references `DigitalBrain.Modules.Tasks.Contracts`, and the reverse
+reference is forbidden. The runtime package owns neurons and domain behavior. Provider runtimes also
+own their endpoint, scopes, exact tool policy, arguments, semantic mapping, and authority decisions.
 The Aspire hosting package owns resources, parameters, and projection into the silo. Cross-provider
 mechanics are deliberately deeper packages rather than copied module code:
 `DigitalBrain.Security` owns purpose-bound durable encryption, and
-`DigitalBrain.Integrations.Mcp` owns the official SDK transport, OAuth/token-cache mechanics, session
-lifetime, schema admission, and invocation. Provider runtimes depend inward on those mechanics; the
-shared packages never acquire Gmail or Salesforce vocabulary. This split is enforced by tests, not by
+`DigitalBrain.Integrations.Mcp` owns southbound official-SDK transport, OAuth/token-cache mechanics,
+callback-scoped session lifetime, structured-result checks, and canonical fingerprint mechanics.
+Provider runtimes depend inward on those mechanics; the shared packages never acquire Gmail or
+Salesforce vocabulary or decide which tools are safe. This split is enforced by tests, not by
 convention alone.
+
+That southbound package is unrelated to `hosts/DigitalBrain.Mcp`, the northbound MCP server that
+exposes selected Neurons through `IDigitalBrain`. The northbound host depends on public client and AI
+contracts plus MCP server packages; it does not depend on Gmail, Salesforce, or
+`DigitalBrain.Integrations.Mcp`.
 
 ### Namespaces are the vocabulary
 
@@ -247,6 +256,12 @@ restores state; a change to participants, prompts, providers, tools, orchestrati
 version preserves the old state and demands an explicit migration or reset instead of silently
 reusing it.
 
+For direct `Concurrent` and direct `GroupChat`, the internal `DirectAgentSession` is the only owner of
+MAF session create, restore, run, serialize, protect, commit, and failed-write rollback. Supervised
+Task/GroupChat execution does not reuse that envelope: `AIWorkerState`, the private `WorkflowRunner`,
+and `OrleansCheckpointStore` own its run identity, cancellation fence, and definition-bound checkpoint
+lineage. Direct `GroupChat` is refused while that supervised lifecycle is active.
+
 **A worker never runs a long MAF superstep on its Orleans turn.** It persists replayable input and one
 active run — a fresh run identity, the full attempt cursor, the definition fingerprint, the input
 checkpoint, and a recovery deadline — and returns. A private runner advances exactly one Lockstep
@@ -354,8 +369,9 @@ Status: Built
 `IGmail` is a semantic capability, not an MCP toolset. It means "Gmail behavior" — it does not mirror
 whatever a `tools/list` response happens to contain today. The module owns the official Gmail endpoint,
 read-only scope, exact admitted tools, arguments, and semantic result mapping. The shared internal MCP
-runtime owns the official SDK client, OAuth/token-cache mechanics, transport lifetime, schema
-fingerprinting, and invocation without exposing any of them as public application vocabulary.
+runtime owns official SDK transport, OAuth/token-cache mechanics, callback lifetime, structured-result
+checks, and canonical fingerprint mechanics without exposing any of them as public application
+vocabulary.
 Raw MCP clients, tool names, protocol DTOs, and tool dictionaries never cross the module interface,
 and an MCP tool name never becomes permanent public domain vocabulary just because a server exposes
 it.
@@ -364,10 +380,11 @@ The public surface is therefore small on purpose. A high-level typed method is a
 deterministic non-agent caller needs one, and today the whole of `IGmail` is one message read that
 returns an id, a subject, a sender, and a plaintext body.
 
-Behind that method the MCP boundary is private in the literal sense rather than the aspirational one:
-the shared client factory and client are `internal` and friend only provider runtimes and simulations.
-No contract package, behavior, or application caller can name them, let alone reach the SDK client
-they wrap. The neuron is the only semantic door.
+Behind that method the MCP boundary is private in the literal sense rather than the aspirational one.
+The concrete internal `McpRuntime` opens the official client only inside a bounded callback friend to
+provider runtimes and simulations. There is no DigitalBrain client interface, factory, returned
+session wrapper, or public redirect seam. No contract package, behavior, or application caller can
+name the runtime or let the SDK client escape its callback. The neuron is the only semantic door.
 
 Every operation opens a fresh authenticated MCP session, lists what the server advertises, and refuses
 to continue unless the exact tool it came for is there. Admission is a positive check rather than a
@@ -376,18 +393,24 @@ and its input schema must require the exact typed property the module intends to
 fails any of those throws instead of degrading into a best-effort call, because a Gmail server that
 has quietly changed what a name means is not a situation to muddle through.
 
-Schema drift between reading a tool and calling it is caught by fingerprint. The module hashes a
-canonicalized form of the advertised input schema — object properties written in ordinal order, so
-reformatting alone cannot change the hash — at admission, then re-reads and re-compares that
-fingerprint immediately before it invokes. A server that reshapes the tool between those two moments
-fails the call rather than sending arguments built for the old shape into a new contract.
+Gmail admits one exact `get_message` tool from the current catalog — name, input, output, and all four
+safety annotations — and calls that selected official `McpClientTool` immediately in the same
+session. A durable later invocation, such as an approved Salesforce mutation, instead stores a
+canonical schema-and-annotation fingerprint, opens a fresh session, re-lists, and compares before the
+call. Canonical fingerprinting is shared mechanics; the provider still owns the policy that accepts or
+rejects a tool.
 
 The module defines its OAuth client configuration and requested read-only Gmail scope; the shared MCP
 runtime performs the protocol and keeps tokens in the neuron's durable state under the shared
-purpose-bound protector. Production interactive authorization belongs at an authenticated edge and
-is supplied through `IMcpAuthorizationRedirect`. The default runtime refuses interactive redirection;
-a loopback HTTP listener exists only behind the explicit `LocalLoopbackDevelopment` mode. This keeps a
-server-side silo from silently turning a developer callback into its production authentication model.
+purpose-bound protector. Production interactive authorization belongs at an authenticated edge; the
+internal runtime fails closed unless the explicit `LocalLoopbackDevelopment` mode selects its private
+loopback listener. This keeps a server-side silo from silently turning a developer callback into its
+production authentication model.
+
+The `IGmail` Neuron name is the provider-account identity: conceptually,
+`IGmail("myemail@gmail.com")`. Each named grain owns its own durable token value, and the protection
+purpose includes the complete `NeuronId`, so separate names cannot share authorization/token state.
+Callers select the account explicitly; there is no account registry or routing layer.
 
 Google does not depend on AI. An application agent composes `IGmail` with a concrete LLM neuron;
 `IGmail` never composes a model.
@@ -696,6 +719,24 @@ a base64-encoded 256-bit durable-state key. It is projected only to the silo and
 silo in that brain. It encrypts MAF sessions, workflow checkpoints, and MCP OAuth tokens with distinct
 purposes; provider modules do not create their own keys or process-local key rings.
 
+The production AppHost also exposes this documentation through Aspire's official JavaScript resource
+lifecycle:
+
+```csharp
+builder.AddViteApp("website", "../../docs")
+    .WithExternalHttpEndpoints();
+```
+
+`Aspire.Hosting.JavaScript` owns dependency installation and the VitePress process. The resource is
+named `website`, its working directory is `docs`, and Aspire allocates its externally exposed HTTP
+endpoint; there is no custom npm installer or fixed port.
+
+Every normal production AppHost build runs the repository `RefreshCodeGraph` target. It initializes
+the graph when `.codegraph/codegraph.db` is absent and synchronizes it otherwise, and a command failure
+fails the build. Because `aspire start` and `aspire run` perform that AppHost build, the graph served by
+the configured project MCP is refreshed through the ordinary application lifecycle rather than a
+second checked-in dependency inventory.
+
 ### Observability
 
 Synapse journals are the durable causal truth. OpenTelemetry is a diagnostic projection and never the
@@ -804,8 +845,8 @@ letting the rule quietly soften.
 ### Integrations and MCP
 
 24. Public interfaces = semantic capabilities (`IGmail`, `ISalesforce`), not toolsets.
-25. Shared MCP infrastructure owns official SDK/OAuth/token/session/schema mechanics; providers own endpoint, scopes, exact policy, arguments, and semantic mapping.
-26. MCP stays internal behind positive admission and a fingerprint recheck immediately before invocation.
+25. Shared MCP infrastructure owns official SDK/OAuth/token/session/fingerprint mechanics; providers own endpoint, scopes, exact policy, arguments, authority, and semantic mapping.
+26. MCP stays internal behind positive admission; a durable fence is fingerprint-rechecked before its later invocation.
 27. Production interactive authorization is an authenticated-edge responsibility; silo loopback callbacks require explicit development mode.
 28. Human authority is explicit: proposal performs zero provider operations; exact approval evidence precedes catalog inspection and the durable mutation fence.
 29. Progressive tool disclosure remains token-budgeted with no raw string invoke escape hatch; capability roots expose no MCP-shaped methods.

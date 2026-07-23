@@ -27,7 +27,7 @@ export const MODULES = [
   },
   {
     id: 'google', label: 'Google', status: 'built', section: '#_4-3-google',
-    role: 'Gmail as a semantic capability root. The pinned MCP catalog stays module-private; the model sees only selected exact tools.',
+    role: 'Gmail as a semantic capability root. Exact hosted-MCP admission and mapping stay module-private; raw MCP types never cross IGmail.',
     neurons: ['IGmail'], synapses: [], mcp: true, ui: false,
     aspire: [{ res: 'Google OAuth', sub: 'loopback callback', model: '', params: ['google-client-id', 'google-client-secret', 'google-redirect-uri'] }],
   },
@@ -35,7 +35,7 @@ export const MODULES = [
     id: 'salesforce', label: 'Salesforce', status: 'built', section: '#_4-4-salesforce',
     role: 'Approved, reconciled external mutations bound to a CommandId. Never claims exactly-once effects.',
     neurons: ['ISalesforce'], synapses: [], mcp: true, ui: false,
-    aspire: [{ res: 'Salesforce OAuth', sub: 'external client app', model: '', params: ['salesforce-client-id', 'salesforce-client-secret', 'salesforce-redirect-uri'] }],
+    aspire: [{ res: 'Salesforce OAuth', sub: 'external client app', model: '', params: ['salesforce-client-id', 'salesforce-redirect-uri'] }],
   },
   {
     id: 'time', label: 'Time', status: 'designed', section: '#_4-5-time',

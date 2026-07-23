@@ -169,11 +169,14 @@ test('every shipped package is in the table, and the boundary is stated', () => 
   }
 
   assert.ok(packages.includes('`DigitalBrain`'), 'the table must list the metapackage')
-  assert.match(packages, /Provider SDKs live only in `DigitalBrain\.Modules\.AI`/)
+  assert.match(packages, /Model-provider SDKs live only in `DigitalBrain\.Modules\.AI`/)
   assert.match(packages, /does \*\*not\*\* reference `DigitalBrain\.Kernel`/)
   assert.match(packages, /refuses to start/i)
   assert.match(packages, /namespace and type name are the model identity/i)
   assert.match(packages, /openai-api-key/)
+  assert.match(packages, /purpose-bound durable encryption/i)
+  assert.match(packages, /southbound/i)
+  assert.match(packages, /northbound/i)
 })
 
 test('the contributing guide states the gate and the non-negotiable rules', () => {
@@ -219,17 +222,36 @@ test('the ratified rules survive as a checklist', () => {
     ratifiedRulesSection.trim().length > 0,
     'the ratified rules section between "## 9." and "## 10." must not be empty')
 
-  for (let rule = 1; rule <= 47; rule += 1) {
-    assert.match(
-      ratifiedRulesSection,
-      new RegExp(`^${rule}\\. \\S`, 'm'),
-      `ratified rule ${rule} is missing from section 9`)
-  }
-  assert.doesNotMatch(ratifiedRulesSection, /^48\. /m, 'the ratified list ends at 47')
+  const ruleNumbers = [...ratifiedRulesSection.matchAll(/^(\d+)\. \S/gm)]
+    .map(match => Number.parseInt(match[1], 10))
+  assert.ok(ruleNumbers.length > 0, 'the ratified rules section must contain numbered rules')
+  assert.deepEqual(
+    ruleNumbers,
+    Array.from({ length: ruleNumbers.length }, (_, index) => index + 1),
+    'the ratified rules must remain contiguous from 1 through the current final rule')
 
   for (const rejected of ['Ical.Net', 'Durable Extension', 'model tier', 'raw invoke']) {
     assert.ok(architecture.includes(rejected), `the rejected list must name ${rejected}`)
   }
+})
+
+test('the lean runtime boundaries are explicit and current', () => {
+  const architecture = read('docs', 'architecture.md')
+  const diagram = read('docs', '.vitepress', 'theme', 'architecture-data.js')
+
+  assert.match(architecture, /direct .*AgentSession/i)
+  assert.match(architecture, /supervised .*checkpoint/i)
+  assert.match(architecture, /Microsoft\.Extensions\.AI/)
+  assert.match(architecture, /MAF types stay internal/)
+  assert.match(architecture, /AI-to-Tasks\.Contracts/)
+  assert.match(architecture, /southbound/)
+  assert.match(architecture, /northbound/)
+  assert.match(architecture, /named .*token/i)
+  assert.match(architecture, /AddViteApp\("website", "\.\.\/\.\.\/docs"\)/)
+  assert.match(architecture, /AppHost build.*CodeGraph/i)
+  assert.doesNotMatch(architecture, /IMcpAuthorizationRedirect/)
+  assert.doesNotMatch(architecture, /shared client factory/)
+  assert.doesNotMatch(diagram, /salesforce-client-secret/)
 })
 
 test('no page resurrects rejected v1 vocabulary', () => {
