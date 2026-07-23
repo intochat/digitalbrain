@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Integrations.Mcp;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Salesforce;
 
@@ -12,5 +13,6 @@ public sealed class SalesforceModule : IModule
         ArgumentNullException.ThrowIfNull(builder);
 
         McpRuntimeHosting.Configure(builder.Services, builder.Configuration);
+        builder.Services.AddSingleton(SalesforceRuntimeOptions.Default);
     }
 }

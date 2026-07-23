@@ -6,16 +6,30 @@ using Orleans.Journaling;
 
 namespace DigitalBrain.Simulations;
 
-internal sealed class FakeMcpHttpServer(JsonElement structuredContent) : HttpMessageHandler
+internal sealed class FakeMcpHttpServer(
+    JsonElement structuredContent,
+    SalesforceCancellationProbe? salesforceCancellation = null) : HttpMessageHandler
 {
     private readonly ConcurrentQueue<string> _bearerTokens = new();
+    private readonly ConcurrentQueue<McpRequest> _requests = new();
     private readonly ConcurrentQueue<McpToolCall> _toolCalls = new();
     private readonly ConcurrentQueue<string> _requestMethods = new();
+    private int _connection;
     internal GmailToolFault GmailFault { get; init; }
 
-    internal bool AdvertiseInvalidSalesforceSchema { get; init; }
+    internal SalesforceToolFault SalesforceFault { get; set; }
+
+    internal SalesforceToolFault MutationConnectionFault { get; set; }
+
+    internal SalesforceToolFault ReconciliationConnectionFault { get; set; }
 
     internal bool FailUpdateCalls { get; set; }
+
+    internal bool BlockReconciliationUntilCancellation { get; set; }
+
+    internal Func<int>? DurableWrites { get; set; }
+
+    internal int? DurableWritesAtUpdate { get; private set; }
 
     internal string? ReconciliationDescription { get; set; }
 
@@ -23,7 +37,13 @@ internal sealed class FakeMcpHttpServer(JsonElement structuredContent) : HttpMes
 
     internal bool OmitStructuredContent { get; set; }
 
+    internal bool ReconciliationTokenCanBeCanceled { get; private set; }
+
+    internal bool ReconciliationCancellationObserved { get; private set; }
+
     internal IReadOnlyList<string> BearerTokens => [.. _bearerTokens];
+
+    internal IReadOnlyList<McpRequest> Requests => [.. _requests];
 
     internal IReadOnlyList<McpToolCall> ToolCalls => [.. _toolCalls];
 
@@ -62,7 +82,13 @@ internal sealed class FakeMcpHttpServer(JsonElement structuredContent) : HttpMes
                 return new HttpResponseMessage(HttpStatusCode.Accepted);
             }
 
+            if (methodName == "initialize")
+            {
+                Interlocked.Increment(ref _connection);
+            }
+
             _requestMethods.Enqueue(methodName!);
+            _requests.Enqueue(new(_connection, methodName!));
 
             var id = payload.RootElement.GetProperty("id").Clone();
             object result = methodName switch
@@ -80,7 +106,7 @@ internal sealed class FakeMcpHttpServer(JsonElement structuredContent) : HttpMes
                 {
                     tools = Tools(),
                 },
-                "tools/call" => ToolResult(request, payload.RootElement),
+                "tools/call" => await ToolResultAsync(request, payload.RootElement, cancellationToken),
                 _ => throw new InvalidOperationException($"Unexpected MCP method '{methodName}'."),
             };
 
@@ -92,11 +118,108 @@ internal sealed class FakeMcpHttpServer(JsonElement structuredContent) : HttpMes
         =>
         [
             GmailTool(),
-            AdvertiseInvalidSalesforceSchema
-                ? Tool("update_sobject_record", readOnly: false, "sobject-name", "id")
-                : Tool("update_sobject_record", readOnly: false, "sobject-name", "id", "body"),
-            Tool("soqlQuery", readOnly: true, "query"),
+            SalesforceTool(update: true),
+            SalesforceTool(update: false),
         ];
+
+    private object SalesforceTool(bool update)
+    {
+        var expectedName = update ? "updateSobjectRecord" : "soqlQuery";
+        var nameFault = update ? SalesforceToolFault.UpdateName : SalesforceToolFault.QueryName;
+        var inputFault = update ? SalesforceToolFault.UpdateInput : SalesforceToolFault.QueryInput;
+        var outputFault = update ? SalesforceToolFault.UpdateOutput : SalesforceToolFault.QueryOutput;
+        var annotationsFault = update
+            ? SalesforceToolFault.UpdateAnnotations
+            : SalesforceToolFault.QueryAnnotations;
+        var readOnlyFault = update
+            ? SalesforceToolFault.UpdateReadOnly
+            : SalesforceToolFault.QueryReadOnly;
+        var destructiveFault = update
+            ? SalesforceToolFault.UpdateDestructive
+            : SalesforceToolFault.QueryDestructive;
+        var idempotentFault = update
+            ? SalesforceToolFault.UpdateIdempotent
+            : SalesforceToolFault.QueryIdempotent;
+        var openWorldFault = update
+            ? SalesforceToolFault.UpdateOpenWorld
+            : SalesforceToolFault.QueryOpenWorld;
+        var fault = _connection switch
+        {
+            2 when MutationConnectionFault is not SalesforceToolFault.None
+                => MutationConnectionFault,
+            >= 3 when ReconciliationConnectionFault is not SalesforceToolFault.None
+                => ReconciliationConnectionFault,
+            _ => SalesforceFault,
+        };
+        var readOnly = !update;
+        var destructive = update;
+        var idempotent = !update;
+
+        return new
+        {
+            name = fault == nameFault ? $"wrong-{expectedName}" : expectedName,
+            inputSchema = SalesforceInputSchema(update, fault == inputFault),
+            outputSchema = SalesforceOutputSchema(update, fault == outputFault),
+            annotations = fault == annotationsFault
+                ? null
+                : new
+                {
+                    readOnlyHint = fault == readOnlyFault ? !readOnly : readOnly,
+                    destructiveHint = fault == destructiveFault ? !destructive : destructive,
+                    idempotentHint = fault == idempotentFault ? !idempotent : idempotent,
+                    openWorldHint = fault == openWorldFault,
+                },
+        };
+    }
+
+    private static object SalesforceInputSchema(bool update, bool invalid)
+    {
+        var properties = update
+            ? new Dictionary<string, object>(StringComparer.Ordinal)
+            {
+                ["sobject-name"] = new { type = "string" },
+                ["id"] = new { type = "string" },
+                ["body"] = new { type = invalid ? "string" : "object" },
+            }
+            : new Dictionary<string, object>(StringComparer.Ordinal)
+            {
+                ["query"] = new { type = invalid ? "number" : "string" },
+            };
+
+        return new
+        {
+            type = "object",
+            properties,
+            required = properties.Keys.ToArray(),
+        };
+    }
+
+    private static object SalesforceOutputSchema(bool update, bool invalid) =>
+        update
+            ? new
+            {
+                type = "object",
+                properties = new Dictionary<string, object>(StringComparer.Ordinal)
+                {
+                    ["success"] = new { type = invalid ? "string" : "boolean" },
+                },
+                required = new[] { "success" },
+            }
+            : new
+            {
+                type = "object",
+                properties = new Dictionary<string, object>(StringComparer.Ordinal)
+                {
+                    ["records"] = invalid
+                        ? new { type = "string" }
+                        : (object)new
+                        {
+                            type = "array",
+                            items = new { type = "object" },
+                        },
+                },
+                required = new[] { "records" },
+            };
 
     private object GmailTool() => new
     {
@@ -190,53 +313,67 @@ internal sealed class FakeMcpHttpServer(JsonElement structuredContent) : HttpMes
         properties[name] = new { type = fault == typeFault ? "number" : "string" };
     }
 
-    private static object Tool(string name, bool readOnly, params string[] properties) => new
-    {
-        name,
-        inputSchema = new
-        {
-            type = "object",
-            properties = properties.ToDictionary(
-                property => property,
-                property => (object)new { type = property == "body" ? "object" : "string" },
-                StringComparer.Ordinal),
-            required = properties,
-        },
-        annotations = new
-        {
-            readOnlyHint = readOnly,
-            destructiveHint = false,
-        },
-    };
-
-    private Dictionary<string, object?> ToolResult(
+    private async Task<Dictionary<string, object?>> ToolResultAsync(
         HttpRequestMessage request,
-        JsonElement payload)
+        JsonElement payload,
+        CancellationToken cancellationToken)
     {
         var parameters = payload.GetProperty("params");
         var tool = parameters.GetProperty("name").GetString()!;
         _toolCalls.Enqueue(new(
+            _connection,
             request.RequestUri!,
             request.Headers.Authorization?.Parameter,
             tool,
             parameters.GetProperty("arguments").Clone()));
 
-        if (tool == "update_sobject_record" && FailUpdateCalls)
+        if (tool == "updateSobjectRecord" && salesforceCancellation?.Caller is { } caller)
+        {
+            await caller.CancelAsync();
+        }
+
+        if (tool == "updateSobjectRecord")
+        {
+            DurableWritesAtUpdate = DurableWrites?.Invoke();
+        }
+
+        if (tool == "updateSobjectRecord" && FailUpdateCalls)
         {
             throw new HttpRequestException("Simulated loss after Salesforce invocation began.");
         }
 
+        if (tool == "soqlQuery")
+        {
+            ReconciliationTokenCanBeCanceled = cancellationToken.CanBeCanceled;
+
+            if (BlockReconciliationUntilCancellation)
+            {
+                try
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    ReconciliationCancellationObserved = true;
+                    throw;
+                }
+            }
+        }
+
         var content = tool switch
         {
-            "update_sobject_record" => JsonSerializer.SerializeToElement(new { success = true }),
+            "updateSobjectRecord" => JsonSerializer.SerializeToElement(new { success = true }),
             "soqlQuery" => ReconciliationDescription is null
-                ? JsonSerializer.SerializeToElement(Array.Empty<object>())
-                : JsonSerializer.SerializeToElement(new[]
+                ? JsonSerializer.SerializeToElement(new { records = Array.Empty<object>() })
+                : JsonSerializer.SerializeToElement(new
                 {
-                    new
+                    records = new[]
                     {
-                        Id = "001000000000042AAA",
-                        Description = ReconciliationDescription,
+                        new
+                        {
+                            Id = "001000000000042AAA",
+                            Description = ReconciliationDescription,
+                        },
                     },
                 }),
             _ => structuredContent,
@@ -281,10 +418,39 @@ internal sealed class CancellationProbeHandler : HttpMessageHandler
 }
 
 internal sealed record McpToolCall(
+    int Connection,
     Uri Endpoint,
     string? AccessToken,
     string Tool,
     JsonElement Arguments);
+
+internal sealed record McpRequest(int Connection, string Method);
+
+internal sealed class SalesforceCancellationProbe
+{
+    internal CancellationTokenSource? Caller { get; set; }
+}
+
+internal enum SalesforceToolFault
+{
+    None,
+    UpdateName,
+    UpdateInput,
+    UpdateOutput,
+    UpdateAnnotations,
+    UpdateReadOnly,
+    UpdateDestructive,
+    UpdateIdempotent,
+    UpdateOpenWorld,
+    QueryName,
+    QueryInput,
+    QueryOutput,
+    QueryAnnotations,
+    QueryReadOnly,
+    QueryDestructive,
+    QueryIdempotent,
+    QueryOpenWorld,
+}
 
 internal enum GmailToolFault
 {

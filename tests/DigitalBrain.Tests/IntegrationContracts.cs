@@ -2,6 +2,7 @@ using System.Reflection;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Google;
 using DigitalBrain.Salesforce;
+using Orleans.Serialization;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -88,6 +89,34 @@ public sealed class IntegrationContracts
 
         AssertProviderAgnostic(typeof(ISalesforce).Assembly);
         AssertProviderAgnostic(typeof(SalesforceModule).Assembly);
+    }
+
+    [Fact(DisplayName = "Salesforce mutation ledger preserves its deployed serializer field IDs")]
+    public void SalesforceMutationLedgerPreservesSerializerFieldIds()
+    {
+        var mutation = typeof(SalesforceModule).Assembly.GetType(
+            "DigitalBrain.Salesforce.Salesforce+MutationData",
+            throwOnError: true)!;
+        var fields = mutation
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(property => (property.Name, Id: property.GetCustomAttribute<IdAttribute>()?.Id))
+            .OrderBy(field => field.Id)
+            .ToArray();
+
+        Assert.Equal(
+            [
+                ("CommandId", (uint?)0),
+                ("Requester", (uint?)1),
+                ("AccountId", (uint?)2),
+                ("Description", (uint?)3),
+                ("Fingerprint", (uint?)4),
+                ("UpdateSchemaFingerprint", (uint?)5),
+                ("QuerySchemaFingerprint", (uint?)6),
+                ("Approval", (uint?)7),
+                ("ApprovalEvidence", (uint?)8),
+                ("Status", (uint?)9),
+            ],
+            fields);
     }
 
     private static void AssertProviderAgnostic(Assembly contracts)

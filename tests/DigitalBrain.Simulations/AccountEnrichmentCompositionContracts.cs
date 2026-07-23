@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AccountEnrichment;
 using DigitalBrain.Google;
@@ -57,6 +58,337 @@ public sealed class AccountEnrichmentCompositionContracts
                 .Order(StringComparer.Ordinal));
     }
 
+    [Fact(DisplayName = "Salesforce rejects every local tool-contract drift before mutation")]
+    public async Task SalesforceRejectsEveryLocalToolContractDriftBeforeMutation()
+    {
+        using var transport = GmailServer();
+        var cluster = await StartClusterAsync(transport);
+        var faults = Enum.GetValues<SalesforceToolFault>()
+            .Where(fault => fault is not (
+                SalesforceToolFault.None
+                or SalesforceToolFault.UpdateAnnotations
+                or SalesforceToolFault.UpdateDestructive))
+            .ToArray();
+
+        try
+        {
+            foreach (var fault in faults)
+            {
+                transport.SalesforceFault = fault;
+                var before = transport.Requests.Count;
+                var result = await ExerciseSalesforceAsync(
+                    cluster,
+                    $"salesforce-contract-{fault}",
+                    SalesforceProbeMode.Normal);
+
+                Assert.Null(result.Prepared.Failure);
+                Assert.NotNull(result.Verified.Failure);
+                Assert.Equal(
+                    [new McpRequest(before / 2 + 1, "initialize"), new McpRequest(before / 2 + 1, "tools/list")],
+                    transport.Requests.Skip(before));
+                Assert.DoesNotContain(
+                    transport.ToolCalls,
+                    call => call.Connection == before / 2 + 1);
+            }
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Theory(DisplayName = "Salesforce update admission requires destructive mutation authority")]
+    [InlineData((int)SalesforceToolFault.None, true)]
+    [InlineData((int)SalesforceToolFault.UpdateDestructive, false)]
+    [InlineData((int)SalesforceToolFault.UpdateAnnotations, false)]
+    public async Task SalesforceUpdateAdmissionRequiresDestructiveMutationAuthority(
+        int faultValue,
+        bool admitted)
+    {
+        var fault = (SalesforceToolFault)faultValue;
+        using var transport = GmailServer();
+        transport.SalesforceFault = fault;
+        var cluster = await StartClusterAsync(transport);
+
+        try
+        {
+            var result = await ExerciseSalesforceAsync(
+                cluster,
+                $"salesforce-destructive-authority-{fault}",
+                SalesforceProbeMode.Normal);
+
+            Assert.Null(result.Prepared.Failure);
+            Assert.Equal(admitted, result.Verified.Failure is null);
+            Assert.Equal(
+                admitted ? 1 : 0,
+                transport.ToolCalls.Count(call => call.Tool == "updateSobjectRecord"));
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "Salesforce cancellation before its durable fence makes no provider request")]
+    public async Task SalesforceCancellationBeforeFenceMakesNoProviderRequest()
+    {
+        using var transport = GmailServer();
+        var cluster = await StartClusterAsync(transport);
+
+        try
+        {
+            var result = await ExerciseSalesforceAsync(
+                cluster,
+                "salesforce-cancel-before-fence",
+                SalesforceProbeMode.CancelBeforeFence);
+
+            Assert.Null(result.Prepared.Failure);
+            Assert.Equal("OperationCanceledException", result.Verified.Failure);
+            Assert.Empty(transport.Requests);
+            Assert.Empty(transport.ToolCalls);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "Salesforce re-lists on a fresh mutation connection and fails closed on drift")]
+    public async Task SalesforceRelistsOnFreshMutationConnectionAndFailsClosedOnDrift()
+    {
+        using var transport = GmailServer();
+        transport.MutationConnectionFault = SalesforceToolFault.UpdateOutput;
+        var cluster = await StartClusterAsync(transport);
+
+        try
+        {
+            var result = await ExerciseSalesforceAsync(
+                cluster,
+                "salesforce-fresh-mutation-drift",
+                SalesforceProbeMode.Normal);
+
+            Assert.Null(result.Verified.Failure);
+            Assert.Equal(SalesforceMutationState.OutcomeUncertain, result.Verified.ApprovedState);
+            Assert.DoesNotContain(transport.ToolCalls, call => call.Tool == "updateSobjectRecord");
+            Assert.Equal(3, transport.Requests.Count(request => request.Method == "initialize"));
+            Assert.Equal(3, transport.Requests.Count(request => request.Method == "tools/list"));
+            Assert.Single(transport.ToolCalls, call => call.Tool == "soqlQuery");
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "Salesforce caller cancellation after the fence still runs one bounded fresh reconciliation")]
+    public async Task SalesforceCallerCancellationAfterFenceStillRunsOneBoundedFreshReconciliation()
+    {
+        var cancellation = new SalesforceCancellationProbe();
+        using var transport = GmailServer(cancellation);
+        transport.FailUpdateCalls = true;
+        transport.ReconciliationDescription = "Approved description";
+        var cluster = await StartClusterAsync(transport, cancellation);
+
+        try
+        {
+            var result = await ExerciseSalesforceAsync(
+                cluster,
+                "salesforce-cancel-after-fence",
+                SalesforceProbeMode.CancelAfterFence);
+
+            Assert.Equal("OperationCanceledException", result.Verified.Failure);
+            Assert.Equal(SalesforceMutationState.Completed, result.Verified.ApprovedState);
+            var update = Assert.Single(
+                transport.ToolCalls,
+                call => call.Tool == "updateSobjectRecord");
+            var query = Assert.Single(transport.ToolCalls, call => call.Tool == "soqlQuery");
+            Assert.Equal(2, update.Connection);
+            Assert.Equal(3, query.Connection);
+            Assert.True(transport.ReconciliationTokenCanBeCanceled);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "Salesforce bounded reconciliation cancellation and query drift become OutcomeUncertain")]
+    public async Task SalesforceBoundedReconciliationFailureBecomesOutcomeUncertain()
+    {
+        using var transport = GmailServer();
+        transport.FailUpdateCalls = true;
+        transport.BlockReconciliationUntilCancellation = true;
+        var cluster = await StartClusterAsync(
+            transport,
+            reconciliationTimeout: TimeSpan.FromMilliseconds(100));
+
+        try
+        {
+            var result = await ExerciseSalesforceAsync(
+                    cluster,
+                    "salesforce-reconciliation-timeout",
+                    SalesforceProbeMode.Normal)
+                .WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+
+            Assert.Null(result.Verified.Failure);
+            Assert.Equal(SalesforceMutationState.OutcomeUncertain, result.Verified.ApprovedState);
+            Assert.True(transport.ReconciliationTokenCanBeCanceled);
+            Assert.True(transport.ReconciliationCancellationObserved);
+            Assert.Single(transport.ToolCalls, call => call.Tool == "updateSobjectRecord");
+            Assert.Single(transport.ToolCalls, call => call.Tool == "soqlQuery");
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "Salesforce reconciliation schema drift becomes OutcomeUncertain without a query call")]
+    public async Task SalesforceReconciliationSchemaDriftBecomesOutcomeUncertain()
+    {
+        using var transport = GmailServer();
+        transport.FailUpdateCalls = true;
+        transport.ReconciliationConnectionFault = SalesforceToolFault.QueryOutput;
+        transport.ReconciliationDescription = "Approved description";
+        var cluster = await StartClusterAsync(transport);
+
+        try
+        {
+            var result = await ExerciseSalesforceAsync(
+                cluster,
+                "salesforce-reconciliation-drift",
+                SalesforceProbeMode.Normal);
+
+            Assert.Null(result.Verified.Failure);
+            Assert.Equal(SalesforceMutationState.OutcomeUncertain, result.Verified.ApprovedState);
+            Assert.Single(transport.ToolCalls, call => call.Tool == "updateSobjectRecord");
+            Assert.DoesNotContain(transport.ToolCalls, call => call.Tool == "soqlQuery");
+            Assert.Equal(3, transport.Requests.Count(request => request.Method == "tools/list"));
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Theory(DisplayName = "Salesforce error and malformed update results cannot become success")]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task SalesforceErrorAndMalformedUpdateResultsCannotBecomeSuccess(
+        bool isError,
+        bool omitStructuredContent)
+    {
+        using var transport = GmailServer();
+        transport.ToolResultIsError = isError;
+        transport.OmitStructuredContent = omitStructuredContent;
+        var cluster = await StartClusterAsync(transport);
+
+        try
+        {
+            var result = await ExerciseSalesforceAsync(
+                cluster,
+                $"salesforce-bad-result-{isError}-{omitStructuredContent}",
+                SalesforceProbeMode.Normal);
+
+            Assert.Null(result.Verified.Failure);
+            Assert.Equal(SalesforceMutationState.OutcomeUncertain, result.Verified.ApprovedState);
+            Assert.Single(transport.ToolCalls, call => call.Tool == "updateSobjectRecord");
+            Assert.Single(transport.ToolCalls, call => call.Tool == "soqlQuery");
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "Salesforce failed fence save rolls back before approval retry")]
+    public async Task SalesforceFailedFenceSaveRollsBackBeforeApprovalRetry()
+    {
+        var journals = new AIWorkerJournalStorageProvider();
+        using var transport = GmailServer();
+        var cluster = await StartClusterAsync(transport, journals: journals);
+        var owner = new OwnerId("salesforce-fence-write-rollback");
+        var salesforce = NeuronId.For<ISalesforce>(owner, "salesforce").ToGrainId();
+
+        try
+        {
+            var session = cluster.Client.GetGrain<ISessionNeuron>(
+                new NeuronId(ISessionNeuron.GrainTypeName, owner, "session").ToGrainId());
+            var verifier = NeuronId.For<SalesforceMutationVerifier>(owner, "verifier");
+            var command = CommandId.New();
+            await session.FireAsync(verifier, new VerifySalesforceMutation(
+                command,
+                "001000000000042AAA",
+                "Approved description",
+                SalesforceProbeMode.RetryAfterFailure));
+            var preparedDelivery = await ReadUntilAsync<SalesforceMutationPrepared>(session, verifier);
+            var prepared = Assert.IsType<SalesforceMutationPrepared>(preparedDelivery.Synapse);
+            Assert.Empty(transport.Requests);
+            Assert.Empty(transport.ToolCalls);
+            var writesAfterProposal = journals.CompletedWrites(salesforce);
+            transport.DurableWrites = () => journals.CompletedWrites(salesforce);
+            journals.FailWriteAfter(
+                salesforce,
+                completedWritesBeforeFailure: 0,
+                "Expected Salesforce invoking-fence write failure.");
+            var approval = Approval(owner, command, prepared.Fingerprint);
+
+            await session.FireAsync(verifier, approval);
+            var verifiedDelivery = await ReadUntilAsync<SalesforceMutationVerified>(session, verifier);
+            var verified = Assert.IsType<SalesforceMutationVerified>(verifiedDelivery.Synapse);
+
+            Assert.Equal(1, journals.FiredFailures(salesforce));
+            Assert.Equal(SalesforceMutationState.Completed, verified.ApprovedState);
+            Assert.Single(transport.ToolCalls, call => call.Tool == "updateSobjectRecord");
+            Assert.DoesNotContain(transport.ToolCalls, call => call.Tool == "soqlQuery");
+            Assert.True(transport.DurableWritesAtUpdate > writesAfterProposal);
+        }
+        finally
+        {
+            journals.ClearFailure(salesforce);
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "Salesforce rejects invalid Account IDs before any provider request")]
+    public async Task SalesforceRejectsInvalidAccountIdsBeforeAnyProviderRequest()
+    {
+        using var transport = GmailServer();
+        var cluster = await StartClusterAsync(transport);
+
+        try
+        {
+            var owner = new OwnerId("salesforce-invalid-account");
+            var verifier = NeuronId.For<SalesforceMutationVerifier>(owner, "verifier");
+            var session = cluster.Client.GetGrain<ISessionNeuron>(
+                new NeuronId(ISessionNeuron.GrainTypeName, owner, "session").ToGrainId());
+            await session.FireAsync(verifier, new VerifySalesforceMutation(
+                CommandId.New(),
+                "001' OR Name != '",
+                "Approved description"));
+            var preparedDelivery = await ReadUntilAsync<SalesforceMutationPrepared>(session, verifier);
+            var prepared = Assert.IsType<SalesforceMutationPrepared>(preparedDelivery.Synapse);
+
+            Assert.Equal("ArgumentException", prepared.Failure);
+            Assert.Empty(transport.Requests);
+            Assert.Empty(transport.ToolCalls);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
     [Theory(DisplayName = "Salesforce reconciles ambiguity and never repeats the update")]
     [InlineData(null, SalesforceMutationState.OutcomeUncertain)]
     [InlineData("Approved description", SalesforceMutationState.Completed)]
@@ -100,8 +432,14 @@ public sealed class AccountEnrichmentCompositionContracts
             Assert.Equal(expectedState, verified.ApprovedState);
             Assert.True(verified.DifferentEvidenceRejected);
             Assert.True(verified.ReplayReturnedSameReceipt);
-            Assert.Single(transport.ToolCalls, call => call.Tool == "update_sobject_record");
+            Assert.Null(verified.Failure);
+            var update = Assert.Single(
+                transport.ToolCalls,
+                call => call.Tool == "updateSobjectRecord");
             var query = Assert.Single(transport.ToolCalls, call => call.Tool == "soqlQuery");
+            Assert.Equal(2, update.Connection);
+            Assert.Equal(3, query.Connection);
+            Assert.Equal(3, transport.Requests.Count(request => request.Method == "tools/list"));
             Assert.Equal(
                 "SELECT Id, Description FROM Account WHERE Id = '001000000000042AAA' LIMIT 1",
                 query.Arguments.GetProperty("query").GetString());
@@ -144,7 +482,7 @@ public sealed class AccountEnrichmentCompositionContracts
             Assert.NotEqual(string.Empty, proposed.Fingerprint);
             Assert.DoesNotContain(
                 server.ToolCalls,
-                call => call.Tool == "update_sobject_record");
+                call => call.Tool == "updateSobjectRecord");
 
             var approval = new SalesforceMutationApproval(
                 Guid.Parse("509ab831-d9fd-4be9-ae1a-09e4bda9772f"),
@@ -166,7 +504,7 @@ public sealed class AccountEnrichmentCompositionContracts
                 delivery => delivery.Synapse is SalesforceMutationApproval);
             Assert.DoesNotContain(
                 server.ToolCalls,
-                call => call.Tool == "update_sobject_record");
+                call => call.Tool == "updateSobjectRecord");
 
             await session.FireAsync(composition, approval);
 
@@ -188,11 +526,11 @@ public sealed class AccountEnrichmentCompositionContracts
 
             var salesforceCall = Assert.Single(
                 server.ToolCalls,
-                call => call.Tool == "update_sobject_record");
+                call => call.Tool == "updateSobjectRecord");
             Assert.Equal(
                 new Uri("https://api.salesforce.com/platform/mcp/v1/platform/sobject-mutations"),
                 salesforceCall.Endpoint);
-            Assert.Equal("update_sobject_record", salesforceCall.Tool);
+            Assert.Equal("updateSobjectRecord", salesforceCall.Tool);
             Assert.Equal("Account", salesforceCall.Arguments.GetProperty("sobject-name").GetString());
             Assert.Equal(command.AccountId, salesforceCall.Arguments.GetProperty("id").GetString());
             Assert.Equal(
@@ -204,7 +542,7 @@ public sealed class AccountEnrichmentCompositionContracts
             await session.FireAsync(composition, approval);
             await ReadUntilCountAsync<AccountEnriched>(session, composition, expectedCount: 2);
 
-            Assert.Single(server.ToolCalls, call => call.Tool == "update_sobject_record");
+            Assert.Single(server.ToolCalls, call => call.Tool == "updateSobjectRecord");
         }
         finally
         {
@@ -213,10 +551,54 @@ public sealed class AccountEnrichmentCompositionContracts
         }
     }
 
+    private static async Task<(
+        SalesforceMutationPrepared Prepared,
+        SalesforceMutationVerified Verified)> ExerciseSalesforceAsync(
+        InProcessTestCluster cluster,
+        string ownerName,
+        SalesforceProbeMode mode)
+    {
+        var owner = new OwnerId(ownerName);
+        var verifier = NeuronId.For<SalesforceMutationVerifier>(owner, "verifier");
+        var session = cluster.Client.GetGrain<ISessionNeuron>(
+            new NeuronId(ISessionNeuron.GrainTypeName, owner, "session").ToGrainId());
+        var command = CommandId.New();
+        await session.FireAsync(verifier, new VerifySalesforceMutation(
+            command,
+            "001000000000042AAA",
+            "Approved description",
+            mode));
+        var preparedDelivery = await ReadUntilAsync<SalesforceMutationPrepared>(session, verifier);
+        var prepared = Assert.IsType<SalesforceMutationPrepared>(preparedDelivery.Synapse);
+        Assert.Null(prepared.Failure);
+
+        await session.FireAsync(
+            verifier,
+            Approval(owner, command, prepared.Fingerprint));
+        var verifiedDelivery = await ReadUntilAsync<SalesforceMutationVerified>(session, verifier);
+        var verified = Assert.IsType<SalesforceMutationVerified>(verifiedDelivery.Synapse);
+        return (prepared, verified);
+    }
+
+    private static SalesforceMutationApproval Approval(
+        OwnerId owner,
+        CommandId command,
+        string fingerprint) =>
+        new(
+            Guid.NewGuid(),
+            command,
+            fingerprint,
+            new NeuronId(ISessionNeuron.GrainTypeName, owner, "session"),
+            new DateTimeOffset(2026, 7, 23, 10, 0, 0, TimeSpan.Zero));
+
     private static async Task<InProcessTestCluster> StartClusterAsync(
-        FakeMcpHttpServer server)
+        FakeMcpHttpServer server,
+        SalesforceCancellationProbe? cancellation = null,
+        IJournalStorageProvider? journals = null,
+        TimeSpan? reconciliationTimeout = null)
     {
         var builder = new InProcessTestClusterBuilder(1);
+        cancellation ??= new SalesforceCancellationProbe();
 
         builder.ConfigureSilo((_, silo) =>
         {
@@ -232,9 +614,16 @@ public sealed class AccountEnrichmentCompositionContracts
             silo.AddDigitalBrain("account-enrichment");
             GoogleModule.Configure(silo);
             SalesforceModule.Configure(silo);
+            if (reconciliationTimeout is { } timeout)
+            {
+                silo.Services.AddSingleton(new SalesforceRuntimeOptions(timeout));
+            }
+
             silo.Services.AddSingleton<IHttpClientFactory>(new FakeHttpClientFactory(server));
+            silo.Services.AddSingleton(cancellation);
             silo.UseInMemoryReminderService();
-            silo.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
+            silo.Services.AddSingleton(
+                journals ?? new VolatileJournalStorageProvider());
         });
         builder.ConfigureClient(client =>
         {
@@ -248,14 +637,15 @@ public sealed class AccountEnrichmentCompositionContracts
         return cluster;
     }
 
-    private static FakeMcpHttpServer GmailServer() =>
+    private static FakeMcpHttpServer GmailServer(
+        SalesforceCancellationProbe? cancellation = null) =>
         new(JsonSerializer.SerializeToElement(new
         {
             id = "gmail-message-42",
             subject = "Pilot rollout",
             sender = "priya@northstar.example",
             plaintextBody = "We are ready to start the pilot on Monday.",
-        }));
+        }), cancellation);
 
     private static async Task AssertCapabilityLineageAsync(
         ISessionNeuron session,
@@ -391,7 +781,8 @@ internal static class FakeOAuth
 internal sealed record VerifySalesforceMutation(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] string AccountId,
-    [property: Id(2)] string Description) : Synapse;
+    [property: Id(2)] string Description,
+    [property: Id(3)] SalesforceProbeMode Mode = SalesforceProbeMode.Normal) : Synapse;
 
 [GenerateSerializer]
 [Alias("db.test.forge-salesforce-approval")]
@@ -442,7 +833,8 @@ internal static class ForgedDelivery
 internal sealed record SalesforceMutationPrepared(
     [property: Id(0)] SalesforceMutationState ProposedState,
     [property: Id(1)] string Fingerprint,
-    [property: Id(2)] bool DifferentArgumentsRejected) : Synapse;
+    [property: Id(2)] bool DifferentArgumentsRejected,
+    [property: Id(3)] string? Failure) : Synapse;
 
 [GenerateSerializer]
 [Alias("db.test.verify-approved-salesforce-mutation")]
@@ -457,9 +849,11 @@ internal sealed record SalesforceMutationVerified(
     [property: Id(2)] bool DifferentArgumentsRejected,
     [property: Id(3)] SalesforceMutationState ApprovedState,
     [property: Id(4)] bool ReplayReturnedSameReceipt,
-    [property: Id(5)] bool DifferentEvidenceRejected) : Synapse;
+    [property: Id(5)] bool DifferentEvidenceRejected,
+    [property: Id(6)] string? Failure) : Synapse;
 
-internal sealed class SalesforceMutationVerifier : Neuron,
+internal sealed class SalesforceMutationVerifier(
+    SalesforceCancellationProbe cancellationProbe) : Neuron,
     IHandle<VerifySalesforceMutation>,
     IHandle<SalesforceMutationApproval>,
     IHandle<VerifyApprovedSalesforceMutation>,
@@ -470,18 +864,37 @@ internal sealed class SalesforceMutationVerifier : Neuron,
     private SalesforceAccountDescriptionMutation? _proposal;
     private bool _differentArgumentsRejected;
 
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "The protocol probe reports the exact provider-boundary failure type.")]
     public async Task HandleAsync(
         VerifySalesforceMutation synapse,
         CancellationToken cancellationToken)
     {
         var salesforce = GrainFactory.GetGrain<ISalesforce>(
             NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
-        var proposal = await salesforce.ProposeAccountDescriptionAsync(
-            synapse.CommandId,
-            Id,
-            synapse.AccountId,
-            synapse.Description,
-            cancellationToken);
+        SalesforceAccountDescriptionMutation proposal;
+
+        try
+        {
+            proposal = await salesforce.ProposeAccountDescriptionAsync(
+                synapse.CommandId,
+                Id,
+                synapse.AccountId,
+                synapse.Description,
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            await EmitAsync(new SalesforceMutationPrepared(
+                SalesforceMutationState.AwaitingApproval,
+                string.Empty,
+                DifferentArgumentsRejected: false,
+                exception.GetType().Name));
+            return;
+        }
+
         var differentArgumentsRejected = await RejectsAsync(
             () => salesforce.ProposeAccountDescriptionAsync(
                 synapse.CommandId,
@@ -496,7 +909,8 @@ internal sealed class SalesforceMutationVerifier : Neuron,
         await EmitAsync(new SalesforceMutationPrepared(
             proposal.State,
             proposal.Fingerprint,
-            differentArgumentsRejected));
+            differentArgumentsRejected,
+            Failure: null));
     }
 
     public async Task HandleAsync(
@@ -506,6 +920,10 @@ internal sealed class SalesforceMutationVerifier : Neuron,
         await SendAsync(Id, new VerifyApprovedSalesforceMutation(synapse));
     }
 
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "The protocol probe reports the exact provider-boundary failure type.")]
     public async Task HandleAsync(
         VerifyApprovedSalesforceMutation synapse,
         CancellationToken cancellationToken)
@@ -527,27 +945,65 @@ internal sealed class SalesforceMutationVerifier : Neuron,
                 approval with { Fingerprint = "WRONG-FINGERPRINT" },
                 evidence,
                 cancellationToken));
-        var uncertain = await salesforce.ApproveAccountDescriptionAsync(
-            approval,
-            evidence,
-            cancellationToken);
-        var differentEvidenceRejected = await RejectsAuthorizationAsync(
-            () => salesforce.ApproveAccountDescriptionAsync(
+        SalesforceAccountDescriptionMutation? outcome = null;
+        string? failure = null;
+        using var callerCancellation = new CancellationTokenSource();
+
+        if (_request.Mode is SalesforceProbeMode.CancelBeforeFence)
+        {
+            await callerCancellation.CancelAsync();
+        }
+        else if (_request.Mode is SalesforceProbeMode.CancelAfterFence)
+        {
+            cancellationProbe.Caller = callerCancellation;
+        }
+
+        try
+        {
+            outcome = await salesforce.ApproveAccountDescriptionAsync(
                 approval,
-                ForgedDelivery.Create(approval, approval.Approver),
-                cancellationToken));
-        var replay = await salesforce.ApproveAccountDescriptionAsync(
-            approval,
-            evidence,
-            cancellationToken);
+                evidence,
+                callerCancellation.Token);
+        }
+        catch (Exception exception)
+        {
+            failure = exception.GetType().Name;
+        }
+        finally
+        {
+            cancellationProbe.Caller = null;
+        }
+
+        if (_request.Mode is SalesforceProbeMode.RetryAfterFailure or SalesforceProbeMode.CancelAfterFence
+            && failure is not null)
+        {
+            outcome = await salesforce.ApproveAccountDescriptionAsync(
+                approval,
+                evidence,
+                cancellationToken);
+        }
+
+        var differentEvidenceRejected = outcome is not null
+            && await RejectsAuthorizationAsync(
+                () => salesforce.ApproveAccountDescriptionAsync(
+                    approval,
+                    ForgedDelivery.Create(approval, approval.Approver),
+                    cancellationToken));
+        var replay = outcome is null
+            ? null
+            : await salesforce.ApproveAccountDescriptionAsync(
+                approval,
+                evidence,
+                cancellationToken);
 
         await EmitAsync(new SalesforceMutationVerified(
             proposal.State,
             wrongFingerprintRejected,
             _differentArgumentsRejected,
-            uncertain.State,
-            uncertain == replay,
-            differentEvidenceRejected));
+            outcome?.State ?? SalesforceMutationState.AwaitingApproval,
+            outcome == replay,
+            differentEvidenceRejected,
+            failure));
     }
 
     private static async Task<bool> RejectsAsync(Func<Task> action)
@@ -575,4 +1031,12 @@ internal sealed class SalesforceMutationVerifier : Neuron,
             return true;
         }
     }
+}
+
+internal enum SalesforceProbeMode
+{
+    Normal,
+    CancelBeforeFence,
+    CancelAfterFence,
+    RetryAfterFailure,
 }
