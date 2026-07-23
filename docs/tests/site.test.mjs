@@ -44,7 +44,8 @@ test('every documented page exists and nothing else claims to be documentation',
   for (const section of retiredSections) {
     assert.equal(existsSync(join(docsRoot, section)), false, `${section}/ must stay deleted`)
   }
-  assert.equal(existsSync(join(docsRoot, '.vitepress', 'theme')), false)
+  // the interactive architecture diagram lives in the site's one custom theme
+  assert.equal(existsSync(join(docsRoot, '.vitepress', 'theme')), true)
 })
 
 test('navigation and sidebar reach every page', () => {
