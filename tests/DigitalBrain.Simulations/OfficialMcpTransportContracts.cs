@@ -360,6 +360,10 @@ internal sealed class FakeMcpHttpServer(JsonElement structuredContent) : HttpMes
 
     internal bool ReorderGmailSchemaAfterAdmission { get; init; }
 
+    internal bool ToolResultIsError { get; init; }
+
+    internal bool OmitStructuredContent { get; init; }
+
     internal IReadOnlyList<string> BearerTokens => [.. _bearerTokens];
 
     internal IReadOnlyList<McpToolCall> ToolCalls => [.. _toolCalls];
@@ -484,19 +488,25 @@ internal sealed class FakeMcpHttpServer(JsonElement structuredContent) : HttpMes
         },
     };
 
-    private object ToolResult(JsonElement request)
+    private Dictionary<string, object?> ToolResult(JsonElement request)
     {
         var parameters = request.GetProperty("params");
         _toolCalls.Enqueue(new(
             parameters.GetProperty("name").GetString()!,
             parameters.GetProperty("arguments").Clone()));
 
-        return new
+        var result = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            content = Array.Empty<object>(),
-            structuredContent,
-            isError = false,
+            ["content"] = Array.Empty<object>(),
+            ["isError"] = ToolResultIsError,
         };
+
+        if (!OmitStructuredContent)
+        {
+            result["structuredContent"] = structuredContent;
+        }
+
+        return result;
     }
 
     private static HttpResponseMessage Json(object value) => new(HttpStatusCode.OK)

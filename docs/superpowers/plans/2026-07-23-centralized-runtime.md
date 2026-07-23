@@ -69,11 +69,11 @@
 **Interfaces:**
 - Produces: `IMcpClientFactory`, `IMcpClient`, `McpServerDefinition`, `McpToolContract`, and `McpToolHandle` as internal friend interfaces/types.
 
-- [ ] Replace provider-type assertions with failing shared-interface tests for configuration-only OAuth, durable encrypted token recreation, exact tool admission, order-insensitive fingerprints, structured results, errors, and cancellation.
-- [ ] Run the simulation project and observe missing shared types.
-- [ ] Implement a single `HttpClientTransport`/`McpClient` adapter that opens and disposes one official SDK session per operation.
-- [ ] Implement OAuth options from provider definitions and the SDK token cache; keep the browser callback in one development adapter with redirect-path/state validation.
-- [ ] Run the owning test project and keep it green.
+- [x] Replace provider-type assertions with failing shared-interface tests for configuration-only OAuth, durable encrypted token recreation, exact tool admission, order-insensitive fingerprints, structured results, errors, and cancellation.
+- [x] Run the simulation project and observe missing shared types.
+- [x] Implement a single `HttpClientTransport`/`McpClient` adapter that opens and disposes one official SDK session per operation.
+- [x] Implement OAuth options from provider definitions and the SDK token cache; keep the browser callback in one development adapter with redirect-path/state validation.
+- [x] Run the owning test project and keep it green.
 
 ### Task 4: Centralized MCP AppHost parameters
 
