@@ -472,7 +472,21 @@ public sealed class AIWorkerContracts
                     delivery.Synapse is CapabilityRequested request
                     && request.Target == workerId));
 
+            var directAfterCancellation = probe.RespondAsync(
+                workerId,
+                [new ChatMessage(ChatRole.User, "direct after cancellation")]);
             gate.ReleaseFirst();
+            await gate.SecondEntry.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            gate.ReleaseSecond();
+            var directResponse = await directAfterCancellation;
+            Assert.Contains(
+                "output that arrived after cancellation",
+                directResponse.Text,
+                StringComparison.Ordinal);
+            Assert.NotEmpty(await probe.ReadDirectStateAsync(workerId));
+
             await WaitUntilAsync(
                 () => AIWorkerLogProvider.Messages.Any(message =>
                     message.Contains("failed before adoption", StringComparison.Ordinal)),
@@ -804,9 +818,75 @@ public sealed class AIWorkerContracts
 
             gate.Release();
             _ = await ReadUntilAsync(task, snapshot => snapshot.State == TaskState.Succeeded);
+
+            var terminalDirect = await probe.RespondAsync(
+                workerId,
+                [new ChatMessage(ChatRole.User, "direct after terminal")]);
+
+            Assert.Contains("supervised answer", terminalDirect.Text, StringComparison.Ordinal);
+            Assert.Equal(2, gate.EntryCount);
+            Assert.NotEmpty(await probe.ReadDirectStateAsync(workerId));
         }
         finally
         {
+            gate.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "direct Respond remains rejected while a supervised Attempt awaits continuation")]
+    public async Task DirectRespondIsRejectedWhileASupervisedAttemptAwaitsContinuation()
+    {
+        var cluster = await StartWorkerClusterAsync();
+        var owner = new OwnerId("ai-worker-direct-awaiting-continuation");
+        var taskId = NeuronId.For<ITask>(owner, "task");
+        var workerId = NeuronId.For<ITaskGroupChat>(owner, "worker");
+        var mutation = AIWorkerContinuationMutationProbe.Prepare(workerId);
+        var driver = cluster.Client.GetGrain<ITaskDriver>(
+            NeuronId.For<TaskDriver>(owner, "ai-worker-driver").ToGrainId());
+        var task = new TaskTestClient(taskId, driver);
+        var probe = cluster.Client.GetGrain<IAIWorkerProbe>(
+            NeuronId.For<AIWorkerProbe>(owner, "probe").ToGrainId());
+        var gate = AIWorkerGate.Prepare(
+            owner,
+            "await continuation",
+            "must not enter before continuation");
+
+        try
+        {
+            _ = await task.StartAsync(new(
+                CommandId.New(),
+                new AIWorkerGoal("await continuation"),
+                workerId,
+                new TaskPolicy(1, TimeSpan.Zero, null)));
+            await mutation.Entered.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            var workerBefore = await probe.ReadWorkerStateAsync(workerId);
+            var directBefore = await probe.ReadDirectStateAsync(workerId);
+            var outgoing = await probe.ReadJournalAsync(workerId, JournalKind.Outgoing);
+            Assert.Single(
+                outgoing.Delta,
+                delivery => delivery.Synapse is AttemptAdvanced advanced
+                    && advanced.Revision == 0);
+            Assert.Equal(0, gate.EntryCount);
+
+            var direct = probe.RespondAsync(
+                workerId,
+                [new ChatMessage(ChatRole.User, "must remain fenced")]);
+            var firstCompleted = await Task.WhenAny(direct, gate.Entered)
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            Assert.Same(direct, firstCompleted);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => direct);
+            Assert.Equal(0, gate.EntryCount);
+            Assert.Equal(workerBefore, await probe.ReadWorkerStateAsync(workerId));
+            Assert.Equal(directBefore, await probe.ReadDirectStateAsync(workerId));
+        }
+        finally
+        {
+            AIWorkerContinuationMutationProbe.Reset(workerId);
             gate.Release();
             await cluster.StopAllSilosAsync();
             await cluster.DisposeAsync();

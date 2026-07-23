@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
@@ -82,6 +84,516 @@ public sealed class AIOrchestrationContracts
         }
     }
 
+    [Fact(DisplayName = "Concurrent enters both typed participants before either is released")]
+    public async Task ConcurrentParticipantsRunConcurrently()
+    {
+        var gate = new ConcurrentInvocationGate();
+        using var llama = new OrchestrationChatClient(
+            (_, cancellationToken) => gate.EnterAsync("llama-concurrent", cancellationToken));
+        using var gpt = new OrchestrationChatClient(
+            (_, cancellationToken) => gate.EnterAsync("gpt-concurrent", cancellationToken));
+        var cluster = await StartClusterAsync(llama, gpt);
+
+        try
+        {
+            var owner = new OwnerId("concurrent-execution");
+            var panelId = NeuronId.For<ITestConcurrent>(owner, "panel");
+            var probe = cluster.Client.GetGrain<IAIOrchestrationProbe>(
+                NeuronId.For<IAIOrchestrationProbe>(owner, "probe").ToGrainId());
+            var responseTask = probe.CallAsync(
+                panelId,
+                [new ChatMessage(ChatRole.User, "run-together")]);
+
+            try
+            {
+                await gate.BothEntered.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken);
+            }
+            finally
+            {
+                gate.Release();
+            }
+
+            var response = await responseTask;
+
+            Assert.Equal(2, gate.Entered);
+            Assert.Contains("llama-concurrent", response.Text, StringComparison.Ordinal);
+            Assert.Contains("gpt-concurrent", response.Text, StringComparison.Ordinal);
+        }
+        finally
+        {
+            gate.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "direct Concurrent rejects a foreign-owner participant before calls or state changes")]
+    public async Task DirectConcurrentRejectsForeignOwnerParticipant()
+    {
+        using var llama = new OrchestrationChatClient("must-not-run");
+        using var gpt = new OrchestrationChatClient("must-not-run");
+        var cluster = await StartClusterAsync(llama, gpt);
+
+        try
+        {
+            var owner = new OwnerId("concurrent-owner-fence");
+            var target = NeuronId.For<IForeignOwnerConcurrent>(owner, "panel");
+            var probe = cluster.Client.GetGrain<IAIOrchestrationProbe>(
+                NeuronId.For<IAIOrchestrationProbe>(owner, "probe").ToGrainId());
+            var before = await probe.ReadConcurrentStateAsync(target);
+
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => probe.CallAsync(
+                target,
+                [new ChatMessage(ChatRole.User, "must-not-cross-owner")]));
+
+            Assert.Contains("owner", failure.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Empty(llama.Calls);
+            Assert.Empty(gpt.Calls);
+            Assert.Equal(before, await probe.ReadConcurrentStateAsync(target));
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "direct GroupChat rejects a foreign-owner participant before calls or state changes")]
+    public async Task DirectGroupChatRejectsForeignOwnerParticipant()
+    {
+        using var llama = new OrchestrationChatClient("must-not-run");
+        using var gpt = new OrchestrationChatClient("must-not-run");
+        var cluster = await StartClusterAsync(llama, gpt);
+
+        try
+        {
+            var owner = new OwnerId("group-owner-fence");
+            var target = NeuronId.For<IForeignOwnerGroupChat>(owner, "council");
+            var probe = cluster.Client.GetGrain<IAIOrchestrationProbe>(
+                NeuronId.For<IAIOrchestrationProbe>(owner, "probe").ToGrainId());
+            var before = await probe.ReadGroupStateAsync(target);
+
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => probe.CallAsync(
+                target,
+                [new ChatMessage(ChatRole.User, "must-not-cross-owner")]));
+
+            Assert.Contains("owner", failure.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Empty(llama.Calls);
+            Assert.Empty(gpt.Calls);
+            Assert.Equal(before, await probe.ReadGroupStateAsync(target));
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "Concurrent resumes one protected MAF session after deactivation")]
+    public async Task ConcurrentResumesProtectedSessionAfterDeactivation()
+    {
+        using var llama = new OrchestrationChatClient("llama-independent");
+        using var gpt = new OrchestrationChatClient("gpt-independent");
+        var cluster = await StartClusterAsync(llama, gpt);
+
+        try
+        {
+            var owner = new OwnerId("concurrent-resume");
+            var panelId = NeuronId.For<ITestConcurrent>(owner, "panel");
+            var probe = cluster.Client.GetGrain<IAIOrchestrationProbe>(
+                NeuronId.For<IAIOrchestrationProbe>(owner, "probe").ToGrainId());
+
+            _ = await probe.CallAsync(
+                panelId,
+                [new ChatMessage(ChatRole.User, "first-question")]);
+            var protectedState = await probe.ReadConcurrentStateAsync(panelId);
+
+            Assert.NotEmpty(protectedState);
+            Assert.DoesNotContain(
+                "first-question",
+                System.Text.Encoding.UTF8.GetString(protectedState),
+                StringComparison.Ordinal);
+
+            await probe.DeactivateConcurrentAsync(panelId);
+            _ = await probe.CallAsync(
+                panelId,
+                [new ChatMessage(ChatRole.User, "second-question")]);
+
+            Assert.Equal(2, llama.Calls.Count);
+            Assert.Equal(2, gpt.Calls.Count);
+            Assert.Contains(llama.Calls[1], message => message.Text == "first-question");
+            Assert.Contains(llama.Calls[1], message => message.Text == "second-question");
+            Assert.Contains(gpt.Calls[1], message => message.Text == "first-question");
+            Assert.Contains(gpt.Calls[1], message => message.Text == "second-question");
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "direct Concurrent preserves prior real MAF session bytes when journal commit fails")]
+    public async Task DirectConcurrentDoesNotAdvanceWhenSessionCommitFails()
+    {
+        using var llama = new OrchestrationChatClient("llama");
+        using var gpt = new OrchestrationChatClient("gpt");
+        var journals = new AIWorkerJournalStorageProvider();
+        var cluster = await StartClusterAsync(llama, gpt, journals);
+
+        try
+        {
+            var owner = new OwnerId("concurrent-write-failure");
+            var panelId = NeuronId.For<ITestConcurrent>(owner, "panel");
+            var probe = cluster.Client.GetGrain<IAIOrchestrationProbe>(
+                NeuronId.For<IAIOrchestrationProbe>(owner, "probe").ToGrainId());
+
+            _ = await probe.CallAsync(
+                panelId,
+                [new ChatMessage(ChatRole.User, "establish-session")]);
+            var before = await probe.ReadConcurrentStateAsync(panelId);
+            Assert.NotEmpty(before);
+            journals.FailWriteAfter(
+                panelId.ToGrainId(),
+                completedWritesBeforeFailure: 0,
+                "injected direct-session write failure");
+
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => probe.CallAsync(
+                panelId,
+                [new ChatMessage(ChatRole.User, "must-not-commit")]));
+
+            Assert.Contains("write failure", failure.Message, StringComparison.Ordinal);
+            Assert.Equal(before, await probe.ReadConcurrentStateAsync(panelId));
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "direct-session compatibility binds every stable execution input")]
+    public void DirectSessionCompatibilityBindsEveryStableExecutionInput()
+    {
+        var owner = new OwnerId("definition-compatibility");
+        (string Contract, NeuronId NeuronId, string AgentId, string AgentName)[] participants =
+        [
+            ("first-contract", new NeuronId("first", owner, "one"), "first-id", "first-name"),
+            ("second-contract", new NeuronId("second", owner, "two"), "second-id", "second-name"),
+        ];
+        var baseline = CreateDefinition(
+            "stable-orchestration-type",
+            "group-chat",
+            "maf/1",
+            "in-process-lockstep",
+            "round-robin:2",
+            "none",
+            participants);
+        var byteIdenticalRebuild = CreateDefinition(
+            "stable-orchestration-type",
+            "group-chat",
+            "maf/1",
+            "in-process-lockstep",
+            "round-robin:2",
+            "none",
+            participants);
+        object[] incompatible =
+        [
+            WithDefinitionValue(baseline, "FormatVersion", 1),
+            WithDefinitionValue(baseline, "Fingerprint", "changed-fingerprint"),
+            WithDefinitionValue(baseline, "HostId", "changed-host-id"),
+            WithDefinitionValue(baseline, "HostName", "changed-host-name"),
+            CreateDefinition("stable-orchestration-type", "concurrent", "maf/1", "in-process-lockstep", "round-robin:2", "none", participants),
+            CreateDefinition("stable-orchestration-type", "group-chat", "maf/1", "in-process-lockstep", "round-robin:2", "none", [participants[1], participants[0]]),
+            CreateDefinition(
+                "stable-orchestration-type",
+                "group-chat",
+                "maf/1",
+                "in-process-lockstep",
+                "round-robin:2",
+                "none",
+                [("changed-contract", participants[0].NeuronId, participants[0].AgentId, participants[0].AgentName), participants[1]]),
+            CreateDefinition(
+                "stable-orchestration-type",
+                "group-chat",
+                "maf/1",
+                "in-process-lockstep",
+                "round-robin:2",
+                "none",
+                [(participants[0].Contract, new NeuronId("changed", owner, "one"), participants[0].AgentId, participants[0].AgentName), participants[1]]),
+            CreateDefinition(
+                "stable-orchestration-type",
+                "group-chat",
+                "maf/1",
+                "in-process-lockstep",
+                "round-robin:2",
+                "none",
+                [(participants[0].Contract, participants[0].NeuronId, "changed-agent-id", participants[0].AgentName), participants[1]]),
+            CreateDefinition(
+                "stable-orchestration-type",
+                "group-chat",
+                "maf/1",
+                "in-process-lockstep",
+                "round-robin:2",
+                "none",
+                [(participants[0].Contract, participants[0].NeuronId, participants[0].AgentId, "changed-agent-name"), participants[1]]),
+            CreateDefinition("changed-orchestration-type", "group-chat", "maf/1", "in-process-lockstep", "round-robin:2", "none", participants),
+            CreateDefinition("stable-orchestration-type", "group-chat", "maf/2", "in-process-lockstep", "round-robin:2", "none", participants),
+            CreateDefinition("stable-orchestration-type", "group-chat", "maf/1", "in-process-concurrent", "round-robin:2", "none", participants),
+            WithDefinitionValue(baseline, "Manager", "round-robin:3"),
+            CreateDefinition("stable-orchestration-type", "group-chat", "maf/1", "in-process-lockstep", "round-robin:2", "changed-aggregator", participants),
+        ];
+
+        Assert.Equal(2, Property<int>(baseline, "FormatVersion"));
+        Assert.Equal(Fingerprint(baseline), Fingerprint(byteIdenticalRebuild));
+
+        foreach (var changed in incompatible)
+        {
+            var failure = Assert.Throws<InvalidOperationException>(
+                () => RequireDefinitionMatch(baseline, changed));
+
+            Assert.Contains("migration", failure.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("reset", failure.Message, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact(DisplayName = "concrete direct definitions bind a stable application build identity")]
+    public void ConcreteDefinitionsBindStableApplicationBuildIdentity()
+    {
+        var owner = new OwnerId("application-identity");
+        Participant[] participants =
+        [
+            new Participant<ILlama32>(NeuronId.For<ILlama32>(owner, "model")),
+            new Participant<IGpt56>(NeuronId.For<IGpt56>(owner, "model")),
+        ];
+        var informationalVersion = typeof(TestConcurrent).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        Assert.False(string.IsNullOrWhiteSpace(informationalVersion));
+        var expectedVersion =
+            $"{typeof(TestConcurrent).Assembly.GetName().Name}/{informationalVersion}";
+
+        foreach (var factory in new[] { "CreateConcurrent", "CreateGroupChat" })
+        {
+            var orchestrationType = factory == "CreateConcurrent"
+                ? typeof(TestConcurrent)
+                : typeof(TestGroupChat);
+            var first = DescribeShapeDefinition(factory, orchestrationType, participants);
+            var repeated = DescribeShapeDefinition(factory, orchestrationType, participants);
+
+            Assert.Equal(expectedVersion, Property<string>(first, "ApplicationVersion"));
+            Assert.Equal(Fingerprint(first), Fingerprint(repeated));
+
+            var drifted = WithDefinitionValue(
+                first,
+                "ApplicationVersion",
+                $"{expectedVersion}-changed");
+            var failure = Assert.Throws<InvalidOperationException>(
+                () => RequireDefinitionMatch(first, drifted));
+
+            Assert.Contains("migration", failure.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("reset", failure.Message, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact(DisplayName = "application identity and fingerprint ignore MVID rebuild noise")]
+    public void ApplicationIdentityAndFingerprintIgnoreMvidRebuildNoise()
+    {
+        var owner = new OwnerId("mvid-independent-identity");
+        Participant[] participants =
+        [
+            new Participant<ILlama32>(NeuronId.For<ILlama32>(owner, "model")),
+        ];
+        var firstType = CreateDynamicOrchestrationType("1.2.3+same-source");
+        var rebuiltType = CreateDynamicOrchestrationType("1.2.3+same-source");
+        var changedType = CreateDynamicOrchestrationType("1.2.4+different-source");
+
+        Assert.Equal(firstType.AssemblyQualifiedName, rebuiltType.AssemblyQualifiedName);
+        Assert.NotEqual(
+            firstType.Module.ModuleVersionId,
+            rebuiltType.Module.ModuleVersionId);
+
+        var first = DescribeShapeDefinition("CreateConcurrent", firstType, participants);
+        var rebuilt = DescribeShapeDefinition("CreateConcurrent", rebuiltType, participants);
+        var changed = DescribeShapeDefinition("CreateConcurrent", changedType, participants);
+
+        Assert.Equal(
+            Property<string>(first, "ApplicationVersion"),
+            Property<string>(rebuilt, "ApplicationVersion"));
+        Assert.Equal(Fingerprint(first), Fingerprint(rebuilt));
+        Assert.NotEqual(
+            Property<string>(first, "ApplicationVersion"),
+            Property<string>(changed, "ApplicationVersion"));
+        var failure = Assert.Throws<InvalidOperationException>(
+            () => RequireDefinitionMatch(first, changed));
+        Assert.Contains("migration", failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("reset", failure.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static object CreateDefinition(
+        string orchestrationType,
+        string kind,
+        string mafVersion,
+        string executionEnvironment,
+        string manager,
+        string aggregator,
+        (string Contract, NeuronId NeuronId, string AgentId, string AgentName)[] participants)
+    {
+        var assembly = typeof(AIModule).Assembly;
+        var participantType = assembly.GetType(
+            "DigitalBrain.AI.OrchestrationParticipant",
+            throwOnError: true)!;
+        var definitionType = assembly.GetType(
+            "DigitalBrain.AI.OrchestrationDefinition",
+            throwOnError: true)!;
+        var participantArray = Array.CreateInstance(participantType, participants.Length);
+
+        for (var index = 0; index < participants.Length; index++)
+        {
+            var participant = participants[index];
+            participantArray.SetValue(
+                Activator.CreateInstance(
+                    participantType,
+                    participant.Contract,
+                    participant.NeuronId,
+                    participant.AgentId,
+                    participant.AgentName),
+                index);
+        }
+
+        var create = definitionType.GetMethod(
+            "Create",
+            BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(definitionType.FullName, "Create");
+        var identityType = assembly.GetType(
+            "DigitalBrain.AI.DirectOrchestrationIdentity",
+            throwOnError: true)!;
+        var identity = Activator.CreateInstance(
+            identityType,
+            Enum.Parse(
+                assembly.GetType("DigitalBrain.AI.DirectOrchestrationKind", throwOnError: true)!,
+                kind == "concurrent" ? "Concurrent" : "GroupChat"),
+            Enum.Parse(
+                assembly.GetType("DigitalBrain.AI.DirectExecutionEnvironment", throwOnError: true)!,
+                executionEnvironment == "in-process-concurrent" ? "Concurrent" : "Lockstep"),
+            Enum.Parse(
+                assembly.GetType("DigitalBrain.AI.DirectOrchestrationManager", throwOnError: true)!,
+                manager == "none" ? "None" : "RoundRobin"),
+            Enum.Parse(
+                assembly.GetType("DigitalBrain.AI.DirectOrchestrationAggregator", throwOnError: true)!,
+                aggregator == "none" ? "None" : "ConcurrentDefault"))!;
+
+        return create.Invoke(
+            null,
+            [orchestrationType, mafVersion, identity, participantArray, "application-test/1"])!;
+    }
+
+    private static object DescribeShapeDefinition(
+        string factoryName,
+        Type orchestrationType,
+        IReadOnlyList<Participant> participants)
+    {
+        var shapeType = typeof(AIModule).Assembly.GetType(
+            "DigitalBrain.AI.DirectOrchestrationShape",
+            throwOnError: true)!;
+        var factory = shapeType.GetMethod(
+            factoryName,
+            BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(shapeType.FullName, factoryName);
+        var shape = factory.Invoke(null, [orchestrationType, participants])
+            ?? throw new InvalidOperationException($"{factoryName} returned null.");
+
+        return shapeType.GetProperty(
+                "Definition",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+            ?.GetValue(shape)
+            ?? throw new MissingMemberException(shapeType.FullName, "Definition");
+    }
+
+    private static Type CreateDynamicOrchestrationType(string informationalVersion)
+    {
+        var assemblyName = new AssemblyName("DigitalBrain.Dynamic.Orchestration")
+        {
+            Version = new Version(1, 0, 0, 0),
+        };
+        var assembly = AssemblyBuilder.DefineDynamicAssembly(
+            assemblyName,
+            AssemblyBuilderAccess.Run);
+        var attribute = new CustomAttributeBuilder(
+            typeof(AssemblyInformationalVersionAttribute).GetConstructor([typeof(string)])!,
+            [informationalVersion]);
+        assembly.SetCustomAttribute(attribute);
+        var module = assembly.DefineDynamicModule("DigitalBrain.Dynamic.Orchestration.dll");
+
+        return module
+            .DefineType(
+                "DigitalBrain.Dynamic.TestOrchestration",
+                TypeAttributes.Public | TypeAttributes.Class)
+            .CreateType()!;
+    }
+
+    private static string Fingerprint(object definition)
+        => (string)(definition.GetType().GetProperty("Fingerprint")?.GetValue(definition)
+            ?? throw new MissingMemberException(definition.GetType().FullName, "Fingerprint"));
+
+    private static object WithDefinitionValue(object definition, string property, object value)
+    {
+        var type = definition.GetType();
+        string[] properties =
+        [
+            "FormatVersion",
+            "MafVersion",
+            "Fingerprint",
+            "Participants",
+            "HostId",
+            "HostName",
+            "Kind",
+            "OrchestrationType",
+            "ExecutionEnvironment",
+            "Manager",
+            "Aggregator",
+            "ApplicationVersion",
+        ];
+        var index = Array.IndexOf(properties, property);
+
+        if (index < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(property), property, "Unknown definition property.");
+        }
+
+        var arguments = properties
+            .Select(name => Property<object>(definition, name))
+            .ToArray();
+        arguments[index] = value;
+        var constructor = type.GetConstructors(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .Single(candidate => candidate.GetParameters().Length == properties.Length);
+
+        return constructor.Invoke(arguments);
+    }
+
+    private static T Property<T>(object instance, string name)
+        => (T)(instance.GetType().GetProperty(name)?.GetValue(instance)
+            ?? throw new MissingMemberException(instance.GetType().FullName, name));
+
+    private static void RequireDefinitionMatch(object stored, object current)
+    {
+        var method = stored.GetType().GetMethod(
+            "RequireMatch",
+            BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(stored.GetType().FullName, "RequireMatch");
+
+        try
+        {
+            _ = method.Invoke(null, [stored, current]);
+        }
+        catch (TargetInvocationException failure) when (failure.InnerException is not null)
+        {
+            throw failure.InnerException;
+        }
+    }
+
     [Fact(DisplayName = "orchestrations reject participant contracts that are not typed ILLM or IAgent capabilities")]
     public async Task InvalidParticipantContractsAreRejected()
     {
@@ -144,7 +656,7 @@ public sealed class AIOrchestrationContracts
             using (var envelope = System.Text.Json.JsonDocument.Parse(protectedState))
             {
                 Assert.Equal(
-                    ["Fingerprint", "FormatVersion", "MafVersion", "Participants", "ProtectedSession"],
+                    ["Definition", "EnvelopeVersion", "ProtectedSession"],
                     envelope.RootElement.EnumerateObject()
                         .Select(property => property.Name)
                         .Order(StringComparer.Ordinal));
@@ -231,7 +743,8 @@ public sealed class AIOrchestrationContracts
 
     private static async Task<InProcessTestCluster> StartClusterAsync(
         OrchestrationChatClient llama,
-        OrchestrationChatClient gpt)
+        OrchestrationChatClient gpt,
+        IJournalStorageProvider? journals = null)
     {
         var builder = new InProcessTestClusterBuilder(1);
 
@@ -242,7 +755,7 @@ public sealed class AIOrchestrationContracts
             silo.AddDigitalBrain("ai-orchestration-contracts");
             AIModule.Configure(silo);
             silo.UseInMemoryReminderService();
-            silo.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
+            silo.Services.AddSingleton(journals ?? new VolatileJournalStorageProvider());
             silo.Services.AddKeyedSingleton<IChatClient>(typeof(Llama32), llama);
             silo.Services.AddKeyedSingleton<IChatClient>(typeof(Gpt56), gpt);
         });
@@ -306,6 +819,12 @@ internal interface IAIOrchestrationProbe : INeuron
     [Alias("ReadGroupState")]
     Task<byte[]> ReadGroupStateAsync(NeuronId target);
 
+    [Alias("ReadConcurrentState")]
+    Task<byte[]> ReadConcurrentStateAsync(NeuronId target);
+
+    [Alias("DeactivateConcurrent")]
+    Task DeactivateConcurrentAsync(NeuronId target);
+
     [Alias("DeactivateGroup")]
     Task DeactivateGroupAsync(NeuronId target);
 
@@ -327,6 +846,12 @@ internal sealed class AIOrchestrationProbe : Neuron, IAIOrchestrationProbe
     public Task<byte[]> ReadGroupStateAsync(NeuronId target)
         => GrainFactory.GetGrain<ITestGroupChat>(target.ToGrainId()).ReadSessionStateAsync();
 
+    public Task<byte[]> ReadConcurrentStateAsync(NeuronId target)
+        => GrainFactory.GetGrain<ITestConcurrent>(target.ToGrainId()).ReadSessionStateAsync();
+
+    public Task DeactivateConcurrentAsync(NeuronId target)
+        => GrainFactory.GetGrain<ITestConcurrent>(target.ToGrainId()).DeactivateAsync();
+
     public Task DeactivateGroupAsync(NeuronId target)
         => GrainFactory.GetGrain<ITestGroupChat>(target.ToGrainId()).DeactivateAsync();
 
@@ -341,15 +866,66 @@ internal sealed class AIOrchestrationProbe : Neuron, IAIOrchestrationProbe
 }
 
 [Alias("db.test.concurrent")]
-internal interface ITestConcurrent : IAgent;
+internal interface ITestConcurrent : IAgent
+{
+    [Alias("ReadSessionState")]
+    Task<byte[]> ReadSessionStateAsync();
+
+    [Alias("Deactivate")]
+    Task DeactivateAsync();
+}
 
 internal sealed class TestConcurrent : Concurrent, ITestConcurrent
 {
+    private const string SessionStateName = "ai.concurrent.session";
+
     protected override IReadOnlyList<Participant> Participants =>
     [
         Participant<ILlama32>(),
         Participant<IGpt56>()
     ];
+
+    public Task<byte[]> ReadSessionStateAsync()
+    {
+        var state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(SessionStateName);
+
+        return Task.FromResult(state.Value?.ToArray() ?? []);
+    }
+
+    public Task DeactivateAsync()
+    {
+        DeactivateOnIdle();
+
+        return Task.CompletedTask;
+    }
+}
+
+[Alias("db.test.foreign-owner-concurrent")]
+internal interface IForeignOwnerConcurrent : ITestConcurrent;
+
+internal sealed class ForeignOwnerConcurrent : Concurrent, IForeignOwnerConcurrent
+{
+    private const string SessionStateName = "ai.concurrent.session";
+
+    protected override IReadOnlyList<Participant> Participants =>
+    [
+        new Participant<ILlama32>(
+            NeuronId.For<ILlama32>(new OwnerId("foreign-owner"), "model"))
+    ];
+
+    public Task<byte[]> ReadSessionStateAsync()
+    {
+        var state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(SessionStateName);
+
+        return Task.FromResult(state.Value?.ToArray() ?? []);
+    }
+
+    public Task DeactivateAsync()
+    {
+        DeactivateOnIdle();
+
+        return Task.CompletedTask;
+    }
 }
 
 [Alias("db.test.invalid-concurrent")]
@@ -417,6 +993,45 @@ internal sealed class TestGroupChat : GroupChat, ITestGroupChat
     public Task<Guid> ActivationAsync() => Task.FromResult(_activation);
 }
 
+[Alias("db.test.foreign-owner-group-chat")]
+internal interface IForeignOwnerGroupChat : ITestGroupChat;
+
+internal sealed class ForeignOwnerGroupChat : GroupChat, IForeignOwnerGroupChat
+{
+    private const string SessionStateName = "ai.group-chat.session";
+    private readonly Guid _activation = Guid.NewGuid();
+
+    protected override IReadOnlyList<Participant> Participants =>
+    [
+        new Participant<ILlama32>(
+            NeuronId.For<ILlama32>(new OwnerId("foreign-owner"), "model"))
+    ];
+
+    protected override IReadOnlyList<ChatMessage> CreateMessages(Goal goal)
+        => throw new NotSupportedException();
+
+    protected override Result CreateResult(IReadOnlyList<ChatMessage> messages)
+        => throw new NotSupportedException();
+
+    public Task<byte[]> ReadSessionStateAsync()
+    {
+        var state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(SessionStateName);
+
+        return Task.FromResult(state.Value?.ToArray() ?? []);
+    }
+
+    public Task DeactivateAsync()
+    {
+        DeactivateOnIdle();
+
+        return Task.CompletedTask;
+    }
+
+    public Task ChangeParticipantAsync(string? name) => Task.CompletedTask;
+
+    public Task<Guid> ActivationAsync() => Task.FromResult(_activation);
+}
+
 internal static class GroupDefinitionSource
 {
     private static readonly ConcurrentDictionary<OwnerId, string> Names = new();
@@ -440,21 +1055,27 @@ internal static class GroupDefinitionSource
 internal sealed class OrchestrationChatClient : IChatClient
 {
     private readonly ConcurrentQueue<IReadOnlyList<ChatMessage>> _calls = new();
-    private readonly Func<IReadOnlyList<ChatMessage>, string> _answer;
+    private readonly Func<IReadOnlyList<ChatMessage>, CancellationToken, Task<string>> _answer;
 
     internal OrchestrationChatClient(string answer)
-        : this(_ => answer)
+        : this((_, _) => Task.FromResult(answer))
     {
     }
 
     internal OrchestrationChatClient(Func<IReadOnlyList<ChatMessage>, string> answer)
+        : this((messages, _) => Task.FromResult(answer(messages)))
+    {
+    }
+
+    internal OrchestrationChatClient(
+        Func<IReadOnlyList<ChatMessage>, CancellationToken, Task<string>> answer)
     {
         _answer = answer;
     }
 
     internal IReadOnlyList<IReadOnlyList<ChatMessage>> Calls => [.. _calls];
 
-    public Task<ChatResponse> GetResponseAsync(
+    public async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
         CancellationToken cancellationToken = default)
@@ -462,7 +1083,9 @@ internal sealed class OrchestrationChatClient : IChatClient
         var request = messages.ToArray();
         _calls.Enqueue(request);
 
-        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, _answer(request))));
+        var answer = await _answer(request, cancellationToken);
+
+        return new ChatResponse(new ChatMessage(ChatRole.Assistant, answer));
     }
 
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -484,4 +1107,31 @@ internal sealed class OrchestrationChatClient : IChatClient
     public void Dispose()
     {
     }
+}
+
+internal sealed class ConcurrentInvocationGate
+{
+    private readonly TaskCompletionSource _bothEntered =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _release =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _entered;
+
+    internal Task BothEntered => _bothEntered.Task;
+
+    internal int Entered => Volatile.Read(ref _entered);
+
+    internal async Task<string> EnterAsync(string answer, CancellationToken cancellationToken)
+    {
+        if (Interlocked.Increment(ref _entered) == 2)
+        {
+            _bothEntered.TrySetResult();
+        }
+
+        await _release.Task.WaitAsync(cancellationToken);
+
+        return answer;
+    }
+
+    internal void Release() => _release.TrySetResult();
 }
