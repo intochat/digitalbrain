@@ -1,6 +1,6 @@
 export const KERNEL = {
   label: 'Kernel',
-  section: '#2-the-kernel',
+  section: '#_2-the-kernel',
   role: 'DigitalBrain.Kernel.Neuron mechanics only — receive and dispatch synapses, journal both directions, enforce owner and delivery invariants, mint the one opaque CapabilityDelegation. No AI, provider, integration, or memory concepts live here.',
   owns: ['Neuron', 'Synapse', 'CapabilityDelegation'],
   synapses: ['CapabilityRequested', 'CapabilityCompleted'],
@@ -8,7 +8,7 @@ export const KERNEL = {
 
 export const MODULES = [
   {
-    id: 'ai', label: 'AI', status: 'built', section: '#41-ai',
+    id: 'ai', label: 'AI', status: 'built', section: '#_4-1-ai',
     role: 'MAF-backed agents and orchestration over typed models. The public wire is Microsoft.Extensions.AI; MAF types stay internal.',
     neurons: ['ILLM', 'IAgent', 'IGroupChat', 'ILlama32', 'IGpt56'], synapses: [],
     mcp: false, ui: false,
@@ -19,38 +19,38 @@ export const MODULES = [
     example: true,
   },
   {
-    id: 'tasks', label: 'Tasks', status: 'built', section: '#42-tasks',
+    id: 'tasks', label: 'Tasks', status: 'built', section: '#_4-2-tasks',
     role: 'Durable desired-outcome identity. Exactly one Attempt is active at a time; a MAF workflow runs each attempt. Workers report typed facts.',
     neurons: ['ITask', 'IWorker'],
     synapses: ['AttemptSucceeded', 'AttemptFailed', 'AttemptWaiting', 'AttemptProgressed', 'AttemptOutcomeUncertain'],
     mcp: false, ui: false, aspire: [],
   },
   {
-    id: 'google', label: 'Google', status: 'built', section: '#43-google',
+    id: 'google', label: 'Google', status: 'built', section: '#_4-3-google',
     role: 'Gmail as a semantic capability root. The pinned MCP catalog stays module-private; the model sees only selected exact tools.',
     neurons: ['IGmail'], synapses: [], mcp: true, ui: false,
     aspire: [{ res: 'Google OAuth', sub: 'loopback callback', model: '', params: ['google-client-id', 'google-client-secret', 'google-redirect-uri'] }],
   },
   {
-    id: 'salesforce', label: 'Salesforce', status: 'built', section: '#44-salesforce',
+    id: 'salesforce', label: 'Salesforce', status: 'built', section: '#_4-4-salesforce',
     role: 'Approved, reconciled external mutations bound to a CommandId. Never claims exactly-once effects.',
     neurons: ['ISalesforce'], synapses: [], mcp: true, ui: false,
     aspire: [{ res: 'Salesforce OAuth', sub: 'external client app', model: '', params: ['salesforce-client-id', 'salesforce-client-secret', 'salesforce-redirect-uri'] }],
   },
   {
-    id: 'time', label: 'Time', status: 'designed', section: '#45-time',
+    id: 'time', label: 'Time', status: 'designed', section: '#_4-5-time',
     role: 'Durable one-shot and recurring schedules, separate from the kernel-private outbox timers. Reuses the shared kernel reminder provider — it adds no store of its own.',
     neurons: ['ICountdown', 'IReminder'],
     synapses: ['CountdownElapsed', 'ReminderElapsed', 'ReminderOverdue'],
     mcp: false, ui: false, aspire: [],
   },
   {
-    id: 'flutter', label: 'Flutter', status: 'designed', section: '#46-flutter',
+    id: 'flutter', label: 'Flutter', status: 'designed', section: '#_4-6-flutter',
     role: 'Flutter neurons and a contract drift guard. Outside the first executable proof.',
     neurons: ['IFlutter'], synapses: [], mcp: false, ui: true, aspire: [],
   },
   {
-    id: 'memory', label: 'Memory', status: 'scope', section: '#47-memory',
+    id: 'memory', label: 'Memory', status: 'scope', section: '#_4-7-memory',
     role: 'Deliberately out of scope. Designed independently around its own vocabulary, later.',
     neurons: [], synapses: [], mcp: false, ui: false, aspire: [],
   },

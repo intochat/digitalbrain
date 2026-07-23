@@ -28,6 +28,8 @@ Every install is a human-approved proposal, journaled and reversible. That is th
 feature of it, which is why the rest of this document spends so much effort keeping domain knowledge
 out of the kernel and keeping vocabulary typed.
 
+<ArchitectureMap />
+
 ## 2. The kernel
 
 `DigitalBrain.Kernel.Neuron` owns neuron mechanics and nothing else:

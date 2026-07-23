@@ -170,7 +170,7 @@ const toggle = key => { pinned.value = pinned.value === key ? null : key; hovere
           <div class="chips"><span v-for="t in activeBehavior.uses" :key="t" class="chip" :class="isSynapse(t) ? 'synapse' : 'neuron'">{{ t }}</span></div>
           <p class="p-sec">The whole file</p>
           <pre class="code">{{ activeBehavior.script }}</pre>
-          <a class="p-jump" href="#5-behaviors-and-scripting">Read Behaviors →</a>
+          <a class="p-jump" href="#_5-behaviors-and-scripting">Read Behaviors →</a>
         </template>
 
         <template v-else-if="activeActor">

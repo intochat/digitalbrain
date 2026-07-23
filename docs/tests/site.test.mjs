@@ -50,6 +50,7 @@ test('every documented page exists and nothing else claims to be documentation',
   const themeIndex = read('docs', '.vitepress', 'theme', 'index.js')
   assert.match(themeIndex, /extends:\s*DefaultTheme/)
   assert.match(themeIndex, /app\.component\('ArchitectureMap'/)
+  assert.match(read('docs', 'architecture.md'), /<ArchitectureMap\s*\/>/)
 })
 
 test('navigation and sidebar reach every page', () => {
