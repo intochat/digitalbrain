@@ -45,7 +45,11 @@ test('every documented page exists and nothing else claims to be documentation',
     assert.equal(existsSync(join(docsRoot, section)), false, `${section}/ must stay deleted`)
   }
   // the interactive architecture diagram lives in the site's one custom theme
-  assert.equal(existsSync(join(docsRoot, '.vitepress', 'theme')), true)
+  assert.equal(existsSync(join(docsRoot, '.vitepress', 'theme', 'index.js')), true)
+  assert.equal(existsSync(join(docsRoot, '.vitepress', 'theme', 'ArchitectureMap.vue')), true)
+  const themeIndex = read('docs', '.vitepress', 'theme', 'index.js')
+  assert.match(themeIndex, /extends:\s*DefaultTheme/)
+  assert.match(themeIndex, /app\.component\('ArchitectureMap'/)
 })
 
 test('navigation and sidebar reach every page', () => {
