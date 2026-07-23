@@ -4,6 +4,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Kernel;
+using DigitalBrain.Security;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
@@ -17,8 +18,8 @@ namespace DigitalBrain.Simulations;
 
 public sealed class AIAgentContracts
 {
-    [Fact(DisplayName = "LLM and ordinary Agent calls use typed models while Agent sessions remain stateless")]
-    public async Task TypedModelAndStatelessAgentSemantics()
+    [Fact(DisplayName = "LLM calls use the chat client keyed by the concrete model neuron")]
+    public async Task TypedModelSemantics()
     {
         using var chatClient = new TracingChatClient();
         var cluster = await StartClusterAsync(chatClient);
@@ -28,7 +29,6 @@ public sealed class AIAgentContracts
             var owner = new OwnerId("ai-agent-semantics");
             var probeId = NeuronId.For<IAIAgentProbe>(owner, "probe");
             var llamaId = NeuronId.For<ILlama32>(owner, "llama");
-            var agentId = NeuronId.For<ITracingAgent>(owner, "agent");
             var probe = cluster.Client.GetGrain<IAIAgentProbe>(probeId.ToGrainId());
 
             var direct = await probe.CallLlmAsync(llamaId, "direct llama");
@@ -37,25 +37,6 @@ public sealed class AIAgentContracts
             Assert.Equal("response:direct llama", direct);
             Assert.Equal(["direct llama"], directCall.Messages.Select(message => message.Text));
             Assert.Null(directCall.Options);
-
-            chatClient.Clear();
-
-            var first = await probe.CallAgentAsync(agentId, "first turn");
-            var second = await probe.CallAgentAsync(agentId, "second turn");
-            var calls = chatClient.Calls;
-
-            Assert.Equal("response:first turn", first);
-            Assert.Equal("response:second turn", second);
-            Assert.Equal(2, calls.Count);
-            Assert.All(calls, call =>
-            {
-                Assert.Contains(call.Messages, message => message.Text == TracingAgent.AgentInstructions);
-                Assert.Null(call.Options);
-            });
-            Assert.Contains(calls[0].Messages, message => message.Text == "first turn");
-            Assert.DoesNotContain(calls[0].Messages, message => message.Text == "second turn");
-            Assert.Contains(calls[1].Messages, message => message.Text == "second turn");
-            Assert.DoesNotContain(calls[1].Messages, message => message.Text == "first turn");
         }
         finally
         {
@@ -70,6 +51,8 @@ public sealed class AIAgentContracts
 
         builder.ConfigureSilo((_, silo) =>
         {
+            silo.Configuration[DurablePayloadProtector.ConfigurationKey] =
+                Convert.ToBase64String(new byte[32]);
             silo.AddDigitalBrain("ai-agent-contracts");
             AIModule.Configure(silo);
             silo.UseInMemoryReminderService();
@@ -95,9 +78,6 @@ internal interface IAIAgentProbe : INeuron
 {
     [Alias("CallLlm")]
     Task<string> CallLlmAsync(NeuronId target, string message);
-
-    [Alias("CallAgent")]
-    Task<string> CallAgentAsync(NeuronId target, string message);
 }
 
 internal sealed class AIAgentProbe : Neuron, IAIAgentProbe
@@ -109,36 +89,6 @@ internal sealed class AIAgentProbe : Neuron, IAIAgentProbe
             .RespondAsync([new ChatMessage(ChatRole.User, message)]);
 
         return response.Text;
-    }
-
-    public async Task<string> CallAgentAsync(NeuronId target, string message)
-    {
-        var response = await GrainFactory
-            .GetGrain<IAgent>(target.ToGrainId())
-            .RespondAsync([new ChatMessage(ChatRole.User, message)]);
-
-        return response.Text;
-    }
-}
-
-[Alias("db.test.tracing-agent")]
-internal interface ITracingAgent : IAgent;
-
-internal sealed class TracingAgent(IGrainFactory grains, IGrainContext context) :
-    Agent(ModelForOwner(grains, context)), ITracingAgent
-{
-    internal const string AgentInstructions = "Use the agent-owned instructions.";
-
-    protected override string Instructions => AgentInstructions;
-
-    private static ILlama32 ModelForOwner(IGrainFactory grains, IGrainContext context)
-    {
-        var owner = NeuronId.FromGrainKey(
-            context.GrainId.Type.ToString()!,
-            context.GrainId.Key.ToString()).Owner;
-        var model = NeuronId.For<ILlama32>(owner, "llama");
-
-        return grains.GetGrain<ILlama32>(model.ToGrainId());
     }
 }
 
@@ -182,6 +132,4 @@ internal sealed class TracingChatClient : IChatClient
     public void Dispose()
     {
     }
-
-    internal void Clear() => _calls.Clear();
 }

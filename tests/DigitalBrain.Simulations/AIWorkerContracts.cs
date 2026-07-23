@@ -5,6 +5,7 @@ using System.Text;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.Kernel;
+using DigitalBrain.Security;
 using DigitalBrain.Testing;
 using DigitalBrain.Tasks;
 using Microsoft.Extensions.AI;
@@ -1296,6 +1297,8 @@ public sealed class AIWorkerContracts
 
         builder.ConfigureSilo((_, silo) =>
         {
+            silo.Configuration[DurablePayloadProtector.ConfigurationKey] =
+                Convert.ToBase64String(new byte[32]);
             silo.AddDigitalBrain("ai-worker-contracts");
             AIModule.Configure(silo);
             silo.UseInMemoryReminderService();

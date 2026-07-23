@@ -86,6 +86,15 @@ public sealed class PackageBoundaryContracts
     }
 
     [Fact]
+    public void AiRuntimeUsesSharedSecurityInsteadOfProcessLocalDataProtection()
+    {
+        Assert.Contains("DigitalBrain.Security", DirectProjectReferencesOf("DigitalBrain.Modules.AI"));
+        Assert.DoesNotContain(
+            "Microsoft.AspNetCore.DataProtection",
+            DirectPackageReferencesOf("DigitalBrain.Modules.AI"));
+    }
+
+    [Fact]
     public void TheGuardsCoverEveryPackableProject()
     {
         var guarded = ConsumerPath

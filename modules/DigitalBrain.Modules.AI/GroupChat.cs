@@ -4,10 +4,10 @@ using System.Text;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
+using DigitalBrain.Security;
 using DigitalBrain.Tasks;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
@@ -274,9 +274,8 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
 
         var snapshot = Participants.ToArray();
         var definition = SessionCompatibility.Describe(GetType(), snapshot);
-        var protector = ServiceProvider
-            .GetRequiredService<IDataProtectionProvider>()
-            .CreateProtector(ProtectionPurpose, Id.ToString(), definition.Fingerprint);
+        var protector = ServiceProvider.GetRequiredService<IDurablePayloadProtector>();
+        var protectionPurpose = SessionProtectionPurpose(Id, definition.Fingerprint);
         var turnScheduler = TaskScheduler.Current;
         var participants = MafParticipantAdapter.CreateAll(GrainFactory, snapshot, turnScheduler);
         var workflow = GroupChatWorkflow.Create(participants);
@@ -288,11 +287,13 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
             includeExceptionDetails: false,
             includeWorkflowOutputsInResponse: false);
         var session = _state.Value is { Length: > 0 } serialized
-            ? await RestoreAsync(agent, serialized, definition, protector)
+            ? await RestoreAsync(agent, serialized, definition, protector, protectionPurpose)
             : await agent.CreateSessionAsync();
         var response = await agent.RunAsync(messages, session);
         var serializedSession = await agent.SerializeSessionAsync(session);
-        var protectedSession = protector.Protect(Encoding.UTF8.GetBytes(serializedSession.GetRawText()));
+        var protectedSession = protector.Protect(
+            protectionPurpose,
+            Encoding.UTF8.GetBytes(serializedSession.GetRawText()));
         var envelope = new OrchestrationState(
             definition.FormatVersion,
             definition.MafVersion,
@@ -629,7 +630,8 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
         AIAgent agent,
         byte[] serialized,
         OrchestrationDefinition definition,
-        IDataProtector protector)
+        IDurablePayloadProtector protector,
+        string protectionPurpose)
     {
         OrchestrationState stored;
 
@@ -647,7 +649,7 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
 
         try
         {
-            var sessionBytes = protector.Unprotect(stored.ProtectedSession);
+            var sessionBytes = protector.Unprotect(protectionPurpose, stored.ProtectedSession);
             using var sessionJson = JsonDocument.Parse(sessionBytes);
 
             return await agent.DeserializeSessionAsync(sessionJson.RootElement.Clone());
@@ -660,6 +662,9 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
             throw RecoveryRequired(failure);
         }
     }
+
+    private static string SessionProtectionPurpose(NeuronId id, string definitionFingerprint)
+        => $"{ProtectionPurpose}\n{id}\n{definitionFingerprint}";
 
     private static InvalidOperationException RecoveryRequired(Exception? failure = null)
         => new(

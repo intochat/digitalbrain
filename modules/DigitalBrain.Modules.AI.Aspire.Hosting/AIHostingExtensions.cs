@@ -28,6 +28,7 @@ public static class AIHostingExtensions
         var brain = BrainModuleHosting.BrainOf(module);
         var state = new AIHostingState(brain);
 
+        BrainModuleHosting.RequireStateProtection(brain);
         BrainModuleHosting.AddReference(brain, state);
 
         return state;

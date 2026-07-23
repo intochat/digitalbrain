@@ -1,8 +1,8 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
+using DigitalBrain.Security;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Agents.AI.Workflows.Checkpointing;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
@@ -40,7 +40,7 @@ internal interface IWorkflowRunCompletion : INeuron
 [GrainType("ai-workflow-runner")]
 internal sealed class WorkflowRunner(
     IGrainFactory grains,
-    IDataProtectionProvider dataProtection,
+    IDurablePayloadProtector payloadProtector,
     ILogger<WorkflowRunner> logger,
     Serializer<ChatMessage> messages) : Grain, IWorkflowRunner
 {
@@ -100,10 +100,12 @@ internal sealed class WorkflowRunner(
         var identity = WorkflowCheckpointIdentity.For(command.Run.Cursor);
         var checkpointGrain = grains.GetGrain<IWorkflowCheckpointGrain>(
             IdSpan.Create(identity.GrainKey));
-        var protector = dataProtection.CreateProtector(
-            CheckpointProtectionPurpose,
-            identity.SessionId);
-        var store = new OrleansCheckpointStore(checkpointGrain, identity.SessionId, protector);
+        var protectionPurpose = $"{CheckpointProtectionPurpose}\n{identity.SessionId}";
+        var store = new OrleansCheckpointStore(
+            checkpointGrain,
+            identity.SessionId,
+            payloadProtector,
+            protectionPurpose);
         var checkpoints = CheckpointManager.CreateJson(store);
         StreamingRun execution;
 

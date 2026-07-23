@@ -138,12 +138,12 @@
 - Consumes: `IDurablePayloadProtector`.
 - Preserves: MAF `AIAgent`, `AgentSession`, workflow, and checkpoint ownership.
 
-- [ ] Add failing tests that AI registers stable protection without ASP.NET Data Protection and that one chat-client adapter serves model, agent, and delegated calls.
-- [ ] Run the owning tests and observe the old registrations/adapters.
-- [ ] Protect serialized MAF sessions and JSON checkpoints with purpose-bound durable protection; derive purposes from owner/definition/lineage.
-- [ ] Make the Orleans checkpoint adapter inherit MAF `JsonCheckpointStore`.
-- [ ] Delete the consumerless abstract agent path and consolidate the duplicate `IChatClient` implementations.
-- [ ] Run all AI unit and simulation tests.
+- [x] Add failing tests that AI registers stable protection without ASP.NET Data Protection and that one chat-client adapter serves model, agent, and delegated calls.
+- [x] Run the owning tests and observe the old registrations/adapters.
+- [x] Protect serialized MAF sessions and JSON checkpoints with purpose-bound durable protection; derive purposes from owner/definition/lineage.
+- [x] Make the Orleans checkpoint adapter inherit MAF `JsonCheckpointStore`.
+- [x] Delete the consumerless abstract agent path and consolidate the duplicate `IChatClient` implementations.
+- [x] Run all AI unit and simulation tests.
 
 ### Task 7: Architecture and full verification
 

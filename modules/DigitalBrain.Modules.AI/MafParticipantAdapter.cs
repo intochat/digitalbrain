@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Abstractions;
@@ -91,7 +90,7 @@ internal static class MafParticipantAdapter
         return participant switch
         {
             ILLM model => new ChatClientAgent(new NeuronChatClient(model, turnScheduler), options),
-            IAgent agent => new ChatClientAgent(new NeuronAgentChatClient(agent, turnScheduler), options),
+            IAgent agent => new ChatClientAgent(new NeuronChatClient(agent, turnScheduler), options),
             _ => throw Unsupported(typeof(TNeuron)),
         };
     }
@@ -145,17 +144,16 @@ internal static class MafParticipantAdapter
             typeof(ILLM).IsAssignableFrom(contract)
                 ? grains.GetGrain<ILLM>(participant.NeuronId.ToGrainId()).RespondAsync
                 : grains.GetGrain<IAgent>(participant.NeuronId.ToGrainId()).RespondAsync;
-        var client = new DelegatedNeuronChatClient(
-            request => OnTurn(
-                async () =>
-                {
-                    var delegation = await authorize(participant);
+        var client = new NeuronChatClient(
+            async request =>
+            {
+                var delegation = await authorize(participant);
 
-                    return await DigitalBrainRuntime.InvokeAsync(
-                        delegation,
-                        () => invoke(request));
-                },
-                turnScheduler));
+                return await DigitalBrainRuntime.InvokeAsync(
+                    delegation,
+                    () => invoke(request));
+            },
+            turnScheduler);
 
         return new ChatClientAgent(
             client,
@@ -166,80 +164,4 @@ internal static class MafParticipantAdapter
             });
     }
 
-    private static Task<T> OnTurn<T>(Func<Task<T>> invoke, TaskScheduler turnScheduler)
-        => Task.Factory.StartNew(
-            invoke,
-            CancellationToken.None,
-            TaskCreationOptions.DenyChildAttach,
-            turnScheduler).Unwrap();
-
-    private sealed class NeuronAgentChatClient(IAgent agent, TaskScheduler turnScheduler) : IChatClient
-    {
-        public Task<ChatResponse> GetResponseAsync(
-            IEnumerable<ChatMessage> messages,
-            ChatOptions? options = null,
-            CancellationToken cancellationToken = default)
-        {
-            ArgumentNullException.ThrowIfNull(messages);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var request = messages as IReadOnlyList<ChatMessage> ?? messages.ToArray();
-            return OnTurn(() => agent.RespondAsync(request), turnScheduler);
-        }
-
-        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-            IEnumerable<ChatMessage> messages,
-            ChatOptions? options = null,
-            [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            var response = await GetResponseAsync(messages, options, cancellationToken);
-
-            foreach (var update in response.ToChatResponseUpdates())
-            {
-                yield return update;
-            }
-        }
-
-        public object? GetService(Type serviceType, object? serviceKey = null)
-            => serviceType.IsInstanceOfType(this) ? this : null;
-
-        public void Dispose()
-        {
-        }
-    }
-
-    private sealed class DelegatedNeuronChatClient(
-        Func<IReadOnlyList<ChatMessage>, Task<ChatResponse>> invoke) : IChatClient
-    {
-        public Task<ChatResponse> GetResponseAsync(
-            IEnumerable<ChatMessage> messages,
-            ChatOptions? options = null,
-            CancellationToken cancellationToken = default)
-        {
-            ArgumentNullException.ThrowIfNull(messages);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            return invoke(messages as IReadOnlyList<ChatMessage> ?? messages.ToArray());
-        }
-
-        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-            IEnumerable<ChatMessage> messages,
-            ChatOptions? options = null,
-            [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            var response = await GetResponseAsync(messages, options, cancellationToken);
-
-            foreach (var update in response.ToChatResponseUpdates())
-            {
-                yield return update;
-            }
-        }
-
-        public object? GetService(Type serviceType, object? serviceKey = null)
-            => serviceType.IsInstanceOfType(this) ? this : null;
-
-        public void Dispose()
-        {
-        }
-    }
 }

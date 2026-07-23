@@ -5,6 +5,7 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Kernel;
+using DigitalBrain.Security;
 using DigitalBrain.Tasks;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -236,6 +237,8 @@ public sealed class AIOrchestrationContracts
 
         builder.ConfigureSilo((_, silo) =>
         {
+            silo.Configuration[DurablePayloadProtector.ConfigurationKey] =
+                Convert.ToBase64String(new byte[32]);
             silo.AddDigitalBrain("ai-orchestration-contracts");
             AIModule.Configure(silo);
             silo.UseInMemoryReminderService();

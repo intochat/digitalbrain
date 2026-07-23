@@ -223,10 +223,7 @@ internal static class McpRuntimeHosting
         ArgumentNullException.ThrowIfNull(configuration);
 
         services.AddHttpClient(SdkMcpClient.HttpClientName);
-        services.TryAddSingleton<IDurablePayloadProtector>(_ => new DurablePayloadProtector(
-            configuration[DurablePayloadProtector.ConfigurationKey]
-            ?? throw new InvalidOperationException(
-                $"Missing shared durable state-protection key '{DurablePayloadProtector.ConfigurationKey}'.")));
+        DurablePayloadProtectionHosting.Configure(services, configuration);
         services.TryAddSingleton<IMcpAuthorizationRedirect>(_ =>
             string.Equals(
                 configuration[AuthorizationModeKey],

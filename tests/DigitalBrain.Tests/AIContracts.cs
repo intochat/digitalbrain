@@ -3,12 +3,12 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
+using DigitalBrain.Security;
 using DigitalBrain.Tasks;
-using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Agents.AI.Workflows.Checkpointing;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Xunit;
 
@@ -221,17 +221,48 @@ public sealed class AIContracts
             () => host.Services.GetRequiredKeyedService<IChatClient>(typeof(Gpt56)));
     }
 
-    [Fact(DisplayName = "AIModule preserves the host Data Protection application discriminator")]
-    public void ModulePreservesHostDataProtectionIsolation()
+    [Fact(DisplayName = "AIModule uses shared durable protection without process-local Data Protection")]
+    public void ModuleUsesSharedDurableProtection()
     {
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.AddDataProtection().SetApplicationName("brain-deployment");
+        builder.Configuration[DurablePayloadProtector.ConfigurationKey] =
+            Convert.ToBase64String(new byte[32]);
         builder.UseOrleans(AIModule.Configure);
 
         using var host = builder.Build();
-        var options = host.Services.GetRequiredService<IOptions<DataProtectionOptions>>().Value;
 
-        Assert.Equal("brain-deployment", options.ApplicationDiscriminator);
+        Assert.NotNull(host.Services.GetRequiredService<IDurablePayloadProtector>());
+        Assert.DoesNotContain(
+            Runtime.GetReferencedAssemblies(),
+            reference => reference.Name == "Microsoft.AspNetCore.DataProtection");
+    }
+
+    [Fact(DisplayName = "the AI runtime has one MEAI adapter for every MAF participant path")]
+    public void RuntimeUsesOneMafChatClientAdapter()
+    {
+        var adapters = Runtime.GetTypes()
+            .Where(type => type is { IsAbstract: false, IsInterface: false }
+                && typeof(IChatClient).IsAssignableFrom(type))
+            .ToArray();
+
+        Assert.Equal(["DigitalBrain.AI.NeuronChatClient"], adapters.Select(type => type.FullName));
+    }
+
+    [Fact(DisplayName = "MAF execution has no unused pseudo-agent layer")]
+    public void MafExecutionHasNoPseudoAgentLayer()
+    {
+        Assert.Null(Runtime.GetType("DigitalBrain.AI.Agent", throwOnError: false));
+        Assert.Null(Runtime.GetType("DigitalBrain.AI.MafAgentFactory", throwOnError: false));
+    }
+
+    [Fact(DisplayName = "Orleans checkpoints extend the MAF JSON checkpoint-store abstraction")]
+    public void OrleansCheckpointStoreUsesMafJsonBase()
+    {
+        var store = Assert.IsType<Type>(
+            Runtime.GetType("DigitalBrain.AI.OrleansCheckpointStore", throwOnError: false),
+            exactMatch: false);
+
+        Assert.Equal(typeof(JsonCheckpointStore), store.BaseType);
     }
 
     [Fact(DisplayName = "IChatClient injection is confined to concrete LLM neurons")]

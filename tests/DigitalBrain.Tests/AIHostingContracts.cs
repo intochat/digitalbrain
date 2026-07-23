@@ -26,6 +26,7 @@ public sealed class AIHostingContracts
         Assert.Single(builder.Resources, resource => resource.Name == "brain-ai-ollama");
         Assert.Single(builder.Resources, resource => resource.Name == "brain-ai-openai");
         Assert.Single(builder.Resources, resource => resource.Name == "openai-api-key");
+        Assert.Single(builder.Resources, resource => resource.Name == "brain-state-protection-key");
     }
 
     [Fact(DisplayName = "AppHost rejects duplicate AI modules and duplicate typed LLMs")]
@@ -69,15 +70,19 @@ public sealed class AIHostingContracts
             StringComparison.Ordinal);
     }
 
-    [Fact(DisplayName = "Ollama configuration creates no secret parameter")]
-    public void OllamaCreatesNoSecretParameter()
+    [Fact(DisplayName = "Ollama configuration creates only the shared durable-state secret")]
+    public void OllamaCreatesOnlySharedStateSecret()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddBrain("brain");
 
         brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
 
-        Assert.DoesNotContain(builder.Resources, resource => resource is ParameterResource);
+        var parameter = Assert.IsType<ParameterResource>(
+            Assert.Single(builder.Resources, resource => resource is ParameterResource));
+
+        Assert.Equal("brain-state-protection-key", parameter.Name);
+        Assert.True(parameter.Secret);
     }
 
     [Fact(DisplayName = "AI configuration is projected only to the silo reference")]
@@ -99,6 +104,7 @@ public sealed class AIHostingContracts
         Assert.Contains("DigitalBrain__Modules__0", siloEnvironment.Keys);
         Assert.Contains("DigitalBrain__AI__Ollama__Endpoint", siloEnvironment.Keys);
         Assert.Contains("DigitalBrain__AI__Ollama__Llama32__Model", siloEnvironment.Keys);
+        Assert.Contains("DigitalBrain__Security__StateProtectionKey", siloEnvironment.Keys);
         Assert.DoesNotContain(clientEnvironment.Keys, key => key.StartsWith("DigitalBrain__", StringComparison.Ordinal));
     }
 

@@ -1,10 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain.Security;
 using DigitalBrain.Tasks;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Agents.AI.Workflows.Checkpointing;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
@@ -124,11 +124,12 @@ internal sealed class WorkflowCheckpointGrain : DurableGrain, IWorkflowCheckpoin
 internal sealed class OrleansCheckpointStore(
     IWorkflowCheckpointGrain grain,
     string sessionId,
-    IDataProtector protector) : ICheckpointStore<JsonElement>
+    IDurablePayloadProtector protector,
+    string protectionPurpose) : JsonCheckpointStore
 {
     internal string SessionId { get; } = sessionId;
 
-    public async ValueTask<CheckpointInfo> CreateCheckpointAsync(
+    public override async ValueTask<CheckpointInfo> CreateCheckpointAsync(
         string sessionId,
         JsonElement checkpoint,
         CheckpointInfo? parent)
@@ -136,7 +137,9 @@ internal sealed class OrleansCheckpointStore(
         RequireSession(sessionId);
         var created = await grain.CreateAsync(new CheckpointWrite(
             sessionId,
-            protector.Protect(Encoding.UTF8.GetBytes(checkpoint.GetRawText())),
+            protector.Protect(
+                protectionPurpose,
+                Encoding.UTF8.GetBytes(checkpoint.GetRawText())),
             parent is null
                 ? null
                 : new WorkflowCheckpointReference(parent.SessionId, parent.CheckpointId)));
@@ -144,20 +147,20 @@ internal sealed class OrleansCheckpointStore(
         return new CheckpointInfo(created.SessionId, created.CheckpointId);
     }
 
-    public async ValueTask<JsonElement> RetrieveCheckpointAsync(
+    public override async ValueTask<JsonElement> RetrieveCheckpointAsync(
         string sessionId,
         CheckpointInfo checkpoint)
     {
         RequireSession(sessionId);
         var protectedPayload = await grain.ReadAsync(
             new WorkflowCheckpointReference(checkpoint.SessionId, checkpoint.CheckpointId));
-        var payload = protector.Unprotect(protectedPayload);
+        var payload = protector.Unprotect(protectionPurpose, protectedPayload);
         using var document = JsonDocument.Parse(payload);
 
         return document.RootElement.Clone();
     }
 
-    public async ValueTask<IEnumerable<CheckpointInfo>> RetrieveIndexAsync(
+    public override async ValueTask<IEnumerable<CheckpointInfo>> RetrieveIndexAsync(
         string sessionId,
         CheckpointInfo? parent)
     {
