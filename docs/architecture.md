@@ -156,6 +156,10 @@ and reminder providers and registers Aspire's keyed `TableServiceClient`s under 
 resource names. `AddDigitalBrainJournalStorage` still throws when no `journal` connection string is
 configured, so an incomplete hand-wired silo does not start.
 
+One brain is one homogeneous Orleans cluster. Executables with different grain/application catalogs
+must not reference the same brain and rely on placement luck; each gets its own brain identity and
+complete storage profile, even when those profiles share the same underlying Azure Storage account.
+
 Package reference means *available*. `AddModule<T>()` means *selected and configured*. Each module is
 added exactly once; a repeat call is a composition error, not a merge.
 
