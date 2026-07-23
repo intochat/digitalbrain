@@ -70,23 +70,23 @@ export const ACTORS = [
 export const BEHAVIORS = [
   {
     id: 'digest', label: 'Morning digest', status: 'designed', trigger: 'on ReminderElapsed',
-    uses: ['ReminderElapsed', 'IReminder', 'IGmail', 'ILLM'],
-    role: 'When the daily reminder elapses, read unread mail and summarise it with a local model. Composes Time, Google, and AI vocabulary — no new contract.',
+    uses: ['ReminderElapsed', 'IReminder', 'IGmail', 'ILlama32'],
+    role: 'When the daily reminder elapses, read a message and summarise it with a local model. Composes Time, Google, and AI vocabulary — no new contract.',
     script: `public sealed class MorningDigest(
     IReminder daily, IGmail gmail, ILlama32 llama)
     : Behavior, IHandle<ReminderElapsed>
 {
     public async Task HandleAsync(ReminderElapsed e, ...)
     {
-        var mail = await gmail.SearchAsync("is:unread");
-        await llama.RespondAsync(Digest(mail));
+        var message = await gmail.ReadMessageAsync(...);
+        await llama.RespondAsync(Summarise(message));
     }
 }`,
   },
   {
     id: 'lead', label: 'Lead follow-up', status: 'designed', trigger: 'on AttemptWaiting',
     uses: ['AttemptWaiting', 'ISalesforce', 'ICountdown'],
-    role: 'When an attempt reports it is waiting on approval, update the Salesforce record and set a follow-up countdown. Composes Tasks, Salesforce, and Time — the mutation stays behind the module\'s approval rail.',
+    role: 'When an attempt reports it is waiting on approval, propose a Salesforce update and set a follow-up countdown. Composes Tasks, Salesforce, and Time — the mutation stays behind the module\'s approval rail.',
     script: `public sealed class LeadFollowUp(
     ISalesforce crm, ICountdown followUp)
     : Behavior, IHandle<AttemptWaiting>
@@ -94,7 +94,7 @@ export const BEHAVIORS = [
     public async Task HandleAsync(AttemptWaiting a, ...)
     {
         if (a.Blocker is not ApprovalRequired) return;
-        await crm.UpdateAsync(...);
+        await crm.ProposeAccountDescriptionAsync(...);
         await followUp.StartAsync(TimeSpan.FromDays(2));
     }
 }`,

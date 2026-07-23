@@ -38,7 +38,7 @@ Three vertically stacked tiers, a detail panel to the right, and status color-co
 
 **Tier 02 — People & Agents.** Two actor cards. People (built) operate through the owner-bound client and hold approval authority; Agents (designed) are LLM-powered neurons that act under the same approval rail.
 
-**Tier 03 — Behaviors (scripting).** Behavior cards. **Selecting a behavior lights up, in tier 1, the exact neurons and synapses it composes** while everything else dims, and shows the behavior's single-file C# in the panel. This is the payoff interaction: it makes "a behavior composes existing typed vocabulary" literally visible. Two examples — *Morning digest* (composes `ReminderElapsed`, `IReminder`, `IGmail`, `ILLM`) and *Lead follow-up* (composes `ApprovalRequired`, `ISalesforce`, `ICountdown`).
+**Tier 03 — Behaviors (scripting).** Behavior cards. **Selecting a behavior lights up, in tier 1, the exact neurons and synapses it composes** while everything else dims, and shows the behavior's single-file C# in the panel. This is the payoff interaction: it makes "a behavior composes existing typed vocabulary" literally visible. Two examples — *Morning digest* (composes `ReminderElapsed`, `IReminder`, `IGmail`, `ILlama32`) and *Lead follow-up* (composes `AttemptWaiting`, `ISalesforce`, `ICountdown`, then inspects the waiting attempt's `ApprovalRequired` blocker).
 
 Connectors between tiers are labeled with the real flow (*actors operate ↑↓*, *author ↓*) and highlight on the active path.
 
@@ -99,7 +99,7 @@ The `uses` array on a behavior must contain exact chip strings that appear in ti
 The seven modules and their real data (verified against the repository during design):
 
 - **AI** (built): neurons `ILLM`, `IAgent`, `IGroupChat`, `ILlama32`, `IGpt56`; no synapses; no MCP; Aspire Ollama→`llama3.2` and OpenAI→`gpt-5.6` with secret `openai-api-key`; no UI; model-config example.
-- **Tasks** (built): neurons `ITask`, `IWorker`; synapses `AttemptSucceeded`, `AttemptFailed`, `AttemptWaiting`, `ApprovalRequired`, `AttemptOutcomeUncertain`; no other facets.
+- **Tasks** (built): neurons `ITask`, `IWorker`; synapses `AttemptSucceeded`, `AttemptFailed`, `AttemptWaiting`, `AttemptProgressed`, `AttemptOutcomeUncertain` (all `Synapse`-derived facts; `ApprovalRequired` is a `TaskBlocker` carried inside `AttemptWaiting`, not a synapse); no other facets.
 - **Google** (built): neuron `IGmail`; MCP yes; Aspire Google OAuth with `google-client-id`, `google-client-secret`, `google-redirect-uri`.
 - **Salesforce** (built): neuron `ISalesforce`; MCP yes; Aspire Salesforce OAuth with `salesforce-client-id`, `salesforce-client-secret`, `salesforce-redirect-uri`.
 - **Time** (designed): neurons `ICountdown`, `IReminder`; synapses `CountdownElapsed`, `ReminderElapsed`, `ReminderOverdue`.
