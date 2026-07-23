@@ -1,8 +1,7 @@
 using System.Text.Json;
+using DigitalBrain.Integrations.Mcp;
 using DigitalBrain.Kernel;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
-using ModelContextProtocol.Authentication;
 using Orleans.Journaling;
 
 namespace DigitalBrain.Google;
@@ -10,22 +9,24 @@ namespace DigitalBrain.Google;
 internal sealed class Gmail : Neuron, IGmail
 {
     private const string TokensName = "google.gmail.oauth";
-    private static readonly Uri Endpoint = new("https://gmailmcp.googleapis.com/mcp/v1");
-    private readonly IGoogleMcpAuthorization _authorization;
-    private readonly IGmailMcpTransport _transport;
-    private readonly ITokenCache _tokens;
+    private static readonly McpServerDefinition Server = new(
+        "google.gmail",
+        "DigitalBrain Gmail",
+        new Uri("https://gmailmcp.googleapis.com/mcp/v1"),
+        "DigitalBrain:Google:Gmail",
+        ["https://www.googleapis.com/auth/gmail.readonly"]);
+    private static readonly McpToolContract GetMessage = McpToolContract.ReadOnly(
+        "get_message",
+        new McpToolProperty("messageId", "string"));
+    private readonly IMcpClient _client;
 
-    public Gmail(
-        IGoogleMcpAuthorization authorization,
-        IGmailMcpTransport transport)
+    public Gmail(IMcpClientFactory clients)
     {
-        _authorization = authorization;
-        _transport = transport;
-        _tokens = new DurableMcpTokenCache(
+        _client = clients.Create(
+            Server,
             ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(TokensName),
             () => WriteStateAsync(),
-            ServiceProvider.GetRequiredService<IDataProtectionProvider>()
-                .CreateProtector("DigitalBrain.Google.Gmail.OAuth"));
+            Id.ToString());
     }
 
     public async Task<GmailMessage> ReadMessageAsync(
@@ -34,22 +35,14 @@ internal sealed class Gmail : Neuron, IGmail
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(messageId);
 
-        var authorization = _authorization.CreateOptions(_tokens);
-        var tool = await _transport.ReadToolAsync(
-            Endpoint,
-            authorization,
-            "get_message",
-            cancellationToken);
-        var content = await _transport.CallToolAsync(
-            Endpoint,
-            authorization,
-            "get_message",
+        var tool = await _client.InspectAsync(GetMessage, cancellationToken);
+        var content = await _client.InvokeAsync(
+            tool,
             new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["messageId"] = messageId,
                 ["messageFormat"] = "FULL_CONTENT",
             },
-            tool.SchemaFingerprint,
             cancellationToken);
 
         return new GmailMessage(

@@ -3,12 +3,11 @@ using System.Text;
 using System.Text.Json;
 using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Integrations.Mcp;
 using DigitalBrain.Kernel;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
-using ModelContextProtocol.Authentication;
 
 namespace DigitalBrain.Salesforce;
 
@@ -16,29 +15,35 @@ internal sealed class Salesforce : Neuron, ISalesforce
 {
     private const string MutationsName = "salesforce.mutations";
     private const string TokensName = "salesforce.oauth";
-    private static readonly Uri Endpoint = new(
-        "https://api.salesforce.com/platform/mcp/v1/platform/sobject-mutations");
+    private static readonly McpServerDefinition Server = new(
+        "salesforce",
+        "DigitalBrain Salesforce",
+        new Uri("https://api.salesforce.com/platform/mcp/v1/platform/sobject-mutations"),
+        "DigitalBrain:Salesforce",
+        ["mcp_api", "refresh_token"]);
+    private static readonly McpToolContract UpdateAccount = McpToolContract.Mutation(
+        "update_sobject_record",
+        new McpToolProperty("sobject-name", "string"),
+        new McpToolProperty("id", "string"),
+        new McpToolProperty("body", "object"));
+    private static readonly McpToolContract QueryAccount = McpToolContract.ReadOnly(
+        "soqlQuery",
+        new McpToolProperty("query", "string"));
 
-    private readonly ISalesforceMcpAuthorization _authorization;
-    private readonly ISalesforceMcpTransport _transport;
+    private readonly IMcpClient _client;
     private readonly IDurableDictionary<Guid, byte[]> _mutations;
     private readonly Serializer<MutationData> _states;
-    private readonly ITokenCache _tokens;
 
-    public Salesforce(
-        ISalesforceMcpAuthorization authorization,
-        ISalesforceMcpTransport transport)
+    public Salesforce(IMcpClientFactory clients)
     {
-        _authorization = authorization;
-        _transport = transport;
         _mutations = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(
             MutationsName);
         _states = ServiceProvider.GetRequiredService<Serializer<MutationData>>();
-        _tokens = new DurableMcpTokenCache(
+        _client = clients.Create(
+            Server,
             ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(TokensName),
             () => WriteStateAsync(),
-            ServiceProvider.GetRequiredService<IDataProtectionProvider>()
-                .CreateProtector("DigitalBrain.Salesforce.OAuth"));
+            Id.ToString());
     }
 
     public async Task<SalesforceAccountDescriptionMutation> ProposeAccountDescriptionAsync(
@@ -60,33 +65,18 @@ internal sealed class Salesforce : Neuron, ISalesforce
             return Receipt(existing);
         }
 
-        var authorization = _authorization.CreateOptions(_tokens);
-        var updateTool = await _transport.ReadToolAsync(
-            Endpoint,
-            authorization,
-            "update_sobject_record",
-            cancellationToken);
-        var queryTool = await _transport.ReadToolAsync(
-            Endpoint,
-            authorization,
-            "soqlQuery",
-            cancellationToken);
-
         var proposed = new MutationData(
             commandId,
             requester,
             accountId,
             description,
             fingerprint,
-            updateTool.SchemaFingerprint,
-            queryTool.SchemaFingerprint,
+            UpdateSchemaFingerprint: null,
+            QuerySchemaFingerprint: null,
             Approval: null,
             ApprovalEvidence: null,
-            MutationStatus.Proposed);
+            MutationStatus.AwaitingApproval);
         await SaveAsync(proposed, add: true);
-
-        proposed = proposed with { Status = MutationStatus.AwaitingApproval };
-        await SaveAsync(proposed);
 
         return Receipt(proposed);
     }
@@ -136,24 +126,23 @@ internal sealed class Salesforce : Neuron, ISalesforce
 
         ValidateApprovalEvidence(mutation, approval, approvalEvidence);
 
+        var updateTool = await _client.InspectAsync(UpdateAccount, cancellationToken);
+        var queryTool = await _client.InspectAsync(QueryAccount, cancellationToken);
         mutation = mutation with
         {
             Approval = approval,
             ApprovalEvidence = approvalEvidence.SynapseId,
-            Status = MutationStatus.Approved,
+            UpdateSchemaFingerprint = updateTool.SchemaFingerprint,
+            QuerySchemaFingerprint = queryTool.SchemaFingerprint,
+            Status = MutationStatus.Invoking,
         };
-        await SaveAsync(mutation);
-        mutation = mutation with { Status = MutationStatus.Invoking };
         await SaveAsync(mutation);
 
         try
         {
-            var content = await _transport.CallToolAsync(
-                Endpoint,
-                _authorization.CreateOptions(_tokens),
-                "update_sobject_record",
+            var content = await _client.InvokeAsync(
+                updateTool,
                 Arguments(mutation),
-                mutation.UpdateSchemaFingerprint,
                 cancellationToken);
             mutation = mutation with
             {
@@ -193,15 +182,14 @@ internal sealed class Salesforce : Neuron, ISalesforce
     {
         try
         {
-            var content = await _transport.CallToolAsync(
-                Endpoint,
-                _authorization.CreateOptions(_tokens),
-                "soqlQuery",
+            var content = await _client.InvokeAsync(
+                new McpToolHandle(
+                    QueryAccount,
+                    RequiredFingerprint(mutation.QuerySchemaFingerprint, QueryAccount.Name)),
                 new Dictionary<string, object?>(StringComparer.Ordinal)
                 {
                     ["query"] = $"SELECT Id, Description FROM Account WHERE Id = '{mutation.AccountId}' LIMIT 1",
                 },
-                mutation.QuerySchemaFingerprint,
                 cancellationToken);
 
             return mutation with
@@ -246,6 +234,12 @@ internal sealed class Salesforce : Neuron, ISalesforce
 
         return false;
     }
+
+    private static string RequiredFingerprint(string? fingerprint, string tool)
+        => !string.IsNullOrWhiteSpace(fingerprint)
+            ? fingerprint
+            : throw new InvalidOperationException(
+                $"The durable invoking fence carries no admitted schema fingerprint for '{tool}'.");
 
     private async Task SaveAsync(MutationData mutation, bool add = false)
     {
@@ -390,17 +384,15 @@ internal sealed class Salesforce : Neuron, ISalesforce
         [property: Id(2)] string AccountId,
         [property: Id(3)] string Description,
         [property: Id(4)] string Fingerprint,
-        [property: Id(5)] string UpdateSchemaFingerprint,
-        [property: Id(6)] string QuerySchemaFingerprint,
+        [property: Id(5)] string? UpdateSchemaFingerprint,
+        [property: Id(6)] string? QuerySchemaFingerprint,
         [property: Id(7)] SalesforceMutationApproval? Approval,
         [property: Id(8)] SynapseId? ApprovalEvidence,
         [property: Id(9)] MutationStatus Status);
 
     internal enum MutationStatus
     {
-        Proposed,
         AwaitingApproval,
-        Approved,
         Invoking,
         Completed,
         OutcomeUncertain,

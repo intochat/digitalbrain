@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
-using Microsoft.AspNetCore.DataProtection;
-using Microsoft.Extensions.DependencyInjection;
+using DigitalBrain.Integrations.Mcp;
 
 namespace DigitalBrain.Google;
 
@@ -12,10 +11,6 @@ public sealed class GoogleModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        builder.Services.AddDataProtection();
-        builder.Services.AddHttpClient(GmailMcpTransport.HttpClientName);
-        builder.Services.AddSingleton<IGoogleMcpAuthorization>(
-            _ => new GoogleMcpAuthorization(builder.Configuration));
-        builder.Services.AddSingleton<IGmailMcpTransport, GmailMcpTransport>();
+        McpRuntimeHosting.Configure(builder.Services, builder.Configuration);
     }
 }

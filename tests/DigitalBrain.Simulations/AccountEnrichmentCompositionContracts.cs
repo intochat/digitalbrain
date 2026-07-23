@@ -4,6 +4,7 @@ using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AccountEnrichment;
 using DigitalBrain.Google;
+using DigitalBrain.Integrations.Mcp;
 using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
 using Microsoft.Extensions.AI;
@@ -38,8 +39,8 @@ public sealed class AccountEnrichmentCompositionContracts
         string? reconciliationDescription,
         SalesforceMutationState expectedState)
     {
-        var gmail = new RecordingGmailTransport();
-        var transport = new RecordingSalesforceTransport
+        var gmail = new RecordingGmailClient();
+        var transport = new RecordingSalesforceClient
         {
             FailUpdateCalls = true,
             ReconciliationDescription = reconciliationDescription,
@@ -92,8 +93,8 @@ public sealed class AccountEnrichmentCompositionContracts
     [Fact(DisplayName = "compiled typed composition requires exact approval before enriching one Salesforce Account")]
     public async Task CompiledTypedCompositionRequiresExactApprovalBeforeEnrichingOneSalesforceAccount()
     {
-        var gmail = new RecordingGmailTransport();
-        var salesforce = new RecordingSalesforceTransport();
+        var gmail = new RecordingGmailClient();
+        var salesforce = new RecordingSalesforceClient();
         var cluster = await StartClusterAsync(gmail, salesforce);
 
         try
@@ -119,6 +120,7 @@ public sealed class AccountEnrichmentCompositionContracts
                 "Email from priya@northstar.example: Pilot rollout\nWe are ready to start the pilot on Monday.",
                 proposed.Description);
             Assert.NotEqual(string.Empty, proposed.Fingerprint);
+            Assert.Empty(salesforce.Operations);
             Assert.Empty(salesforce.Calls);
 
             var approval = new SalesforceMutationApproval(
@@ -187,8 +189,8 @@ public sealed class AccountEnrichmentCompositionContracts
     }
 
     private static async Task<InProcessTestCluster> StartClusterAsync(
-        RecordingGmailTransport gmail,
-        RecordingSalesforceTransport salesforce)
+        RecordingGmailClient gmail,
+        RecordingSalesforceClient salesforce)
     {
         var builder = new InProcessTestClusterBuilder(1);
 
@@ -197,12 +199,8 @@ public sealed class AccountEnrichmentCompositionContracts
             silo.AddDigitalBrain("account-enrichment");
             GoogleModule.Configure(silo);
             SalesforceModule.Configure(silo);
-            silo.Services.AddSingleton<IGoogleMcpAuthorization>(
-                new FakeGoogleAuthorization("fake-gmail-token"));
-            silo.Services.AddSingleton<IGmailMcpTransport>(gmail);
-            silo.Services.AddSingleton<ISalesforceMcpAuthorization>(
-                new FakeSalesforceAuthorization("fake-salesforce-token"));
-            silo.Services.AddSingleton<ISalesforceMcpTransport>(salesforce);
+            silo.Services.AddSingleton<IMcpClientFactory>(
+                new RecordingMcpClientFactory(gmail, salesforce));
             silo.UseInMemoryReminderService();
             silo.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
         });
@@ -322,16 +320,6 @@ public sealed class AccountEnrichmentCompositionContracts
     }
 }
 
-internal sealed class FakeGoogleAuthorization(string accessToken) : IGoogleMcpAuthorization
-{
-    public ClientOAuthOptions CreateOptions(ITokenCache tokenCache) => FakeOAuth.Options(accessToken);
-}
-
-internal sealed class FakeSalesforceAuthorization(string accessToken) : ISalesforceMcpAuthorization
-{
-    public ClientOAuthOptions CreateOptions(ITokenCache tokenCache) => FakeOAuth.Options(accessToken);
-}
-
 internal static class FakeOAuth
 {
     internal static ClientOAuthOptions Options(string accessToken) => new()
@@ -357,121 +345,108 @@ internal static class FakeOAuth
     }
 }
 
-internal sealed class RecordingGmailTransport : IGmailMcpTransport
+internal sealed class RecordingMcpClientFactory(
+    RecordingGmailClient gmail,
+    RecordingSalesforceClient salesforce) : IMcpClientFactory
 {
+    public IMcpClient Create(
+        McpServerDefinition server,
+        IDurableValue<byte[]> tokenState,
+        Func<ValueTask> commit,
+        string owner)
+        => server.Key switch
+        {
+            "google.gmail" => gmail,
+            "salesforce" => salesforce,
+            _ => throw new InvalidOperationException($"Unexpected MCP test server '{server.Key}'."),
+        };
+}
+
+internal sealed class RecordingGmailClient : IMcpClient
+{
+    private const string SchemaFingerprint = "GMAIL-GET-MESSAGE-V1";
     private readonly ConcurrentQueue<RecordedMcpCall> _calls = new();
-    private readonly DigitalBrain.Google.McpToolSnapshot _tool =
-        DigitalBrain.Google.McpToolSnapshot.Create(
-            "get_message",
-            JsonSerializer.SerializeToElement(new
-            {
-                type = "object",
-                properties = new
-                {
-                    messageId = new { type = "string" },
-                    messageFormat = new { type = "string" },
-                },
-                required = new[] { "messageId" },
-            }),
-            readOnly: true,
-            destructive: false);
 
     internal IReadOnlyList<RecordedMcpCall> Calls => [.. _calls];
 
-    public ValueTask<DigitalBrain.Google.McpToolSnapshot> ReadToolAsync(
-        Uri endpoint,
-        ClientOAuthOptions authorization,
-        string tool,
-        CancellationToken cancellationToken)
-        => ValueTask.FromResult(_tool);
-
-    public async ValueTask<JsonElement> CallToolAsync(
-        Uri endpoint,
-        ClientOAuthOptions authorization,
-        string tool,
-        IReadOnlyDictionary<string, object?> arguments,
-        string expectedSchemaFingerprint,
+    public ValueTask<McpToolHandle> InspectAsync(
+        McpToolContract contract,
         CancellationToken cancellationToken)
     {
-        Assert.Equal(_tool.SchemaFingerprint, expectedSchemaFingerprint);
-        var tokens = await authorization.TokenCache!.GetTokensAsync(cancellationToken);
-        _calls.Enqueue(new(endpoint, tokens!.AccessToken, tool, arguments));
+        Assert.Equal("get_message", contract.Name);
+        return ValueTask.FromResult(new McpToolHandle(contract, SchemaFingerprint));
+    }
 
-        return JsonSerializer.SerializeToElement(new
+    public ValueTask<JsonElement> InvokeAsync(
+        McpToolHandle tool,
+        IReadOnlyDictionary<string, object?> arguments,
+        CancellationToken cancellationToken)
+    {
+        Assert.Equal(SchemaFingerprint, tool.SchemaFingerprint);
+        _calls.Enqueue(new(
+            new Uri("https://gmailmcp.googleapis.com/mcp/v1"),
+            "fake-gmail-token",
+            tool.Contract.Name,
+            arguments));
+
+        return ValueTask.FromResult(JsonSerializer.SerializeToElement(new
         {
             id = "gmail-message-42",
             subject = "Pilot rollout",
             sender = "priya@northstar.example",
             plaintextBody = "We are ready to start the pilot on Monday.",
-        });
+        }));
     }
 }
 
-internal sealed class RecordingSalesforceTransport : ISalesforceMcpTransport
+internal sealed class RecordingSalesforceClient : IMcpClient
 {
+    private const string UpdateFingerprint = "SALESFORCE-UPDATE-V1";
+    private const string QueryFingerprint = "SALESFORCE-QUERY-V1";
     private readonly ConcurrentQueue<RecordedMcpCall> _calls = new();
-    private readonly DigitalBrain.Salesforce.McpToolSnapshot _update =
-        DigitalBrain.Salesforce.McpToolSnapshot.Create(
-            "update_sobject_record",
-            JsonSerializer.SerializeToElement(new
-            {
-                type = "object",
-                properties = new Dictionary<string, object>(StringComparer.Ordinal)
-                {
-                    ["sobject-name"] = new { type = "string" },
-                    ["id"] = new { type = "string" },
-                    ["body"] = new { type = "object" },
-                },
-                required = new[] { "sobject-name", "id", "body" },
-            }),
-            readOnly: false,
-            destructive: false);
-    private readonly DigitalBrain.Salesforce.McpToolSnapshot _query =
-        DigitalBrain.Salesforce.McpToolSnapshot.Create(
-            "soqlQuery",
-            JsonSerializer.SerializeToElement(new
-            {
-                type = "object",
-                properties = new { query = new { type = "string" } },
-                required = new[] { "query" },
-            }),
-            readOnly: true,
-            destructive: false);
+    private readonly ConcurrentQueue<string> _operations = new();
 
     internal IReadOnlyList<RecordedMcpCall> Calls => [.. _calls];
+
+    internal IReadOnlyList<string> Operations => [.. _operations];
 
     internal bool FailUpdateCalls { get; init; }
 
     internal string? ReconciliationDescription { get; init; }
 
-    public ValueTask<DigitalBrain.Salesforce.McpToolSnapshot> ReadToolAsync(
-        Uri endpoint,
-        ClientOAuthOptions authorization,
-        string tool,
-        CancellationToken cancellationToken)
-        => ValueTask.FromResult(tool == "soqlQuery" ? _query : _update);
-
-    public async ValueTask<JsonElement> CallToolAsync(
-        Uri endpoint,
-        ClientOAuthOptions authorization,
-        string tool,
-        IReadOnlyDictionary<string, object?> arguments,
-        string expectedSchemaFingerprint,
+    public ValueTask<McpToolHandle> InspectAsync(
+        McpToolContract contract,
         CancellationToken cancellationToken)
     {
-        var snapshot = tool == "soqlQuery" ? _query : _update;
-        Assert.Equal(snapshot.SchemaFingerprint, expectedSchemaFingerprint);
-        var tokens = await authorization.TokenCache!.GetTokensAsync(cancellationToken);
-        _calls.Enqueue(new(endpoint, tokens!.AccessToken, tool, arguments));
+        _operations.Enqueue($"inspect:{contract.Name}");
+        return ValueTask.FromResult(new McpToolHandle(
+            contract,
+            contract.Name == "soqlQuery" ? QueryFingerprint : UpdateFingerprint));
+    }
 
-        if (tool == "update_sobject_record" && FailUpdateCalls)
+    public ValueTask<JsonElement> InvokeAsync(
+        McpToolHandle tool,
+        IReadOnlyDictionary<string, object?> arguments,
+        CancellationToken cancellationToken)
+    {
+        _operations.Enqueue($"invoke:{tool.Contract.Name}");
+        Assert.Equal(
+            tool.Contract.Name == "soqlQuery" ? QueryFingerprint : UpdateFingerprint,
+            tool.SchemaFingerprint);
+        _calls.Enqueue(new(
+            new Uri("https://api.salesforce.com/platform/mcp/v1/platform/sobject-mutations"),
+            "fake-salesforce-token",
+            tool.Contract.Name,
+            arguments));
+
+        if (tool.Contract.Name == "update_sobject_record" && FailUpdateCalls)
         {
             throw new HttpRequestException("Simulated loss after Salesforce invocation began.");
         }
 
-        if (tool == "soqlQuery")
+        if (tool.Contract.Name == "soqlQuery")
         {
-            return ReconciliationDescription is null
+            return ValueTask.FromResult(ReconciliationDescription is null
                 ? JsonSerializer.SerializeToElement(Array.Empty<object>())
                 : JsonSerializer.SerializeToElement(new[]
                 {
@@ -480,10 +455,10 @@ internal sealed class RecordingSalesforceTransport : ISalesforceMcpTransport
                         Id = "001000000000042AAA",
                         Description = ReconciliationDescription,
                     },
-                });
+                }));
         }
 
-        return JsonSerializer.SerializeToElement(new { success = true });
+        return ValueTask.FromResult(JsonSerializer.SerializeToElement(new { success = true }));
     }
 }
 

@@ -6,12 +6,8 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812;CA2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.DataProtection" />
-    <PackageReference Include="Microsoft.Extensions.Http" />
-    <PackageReference Include="ModelContextProtocol.Core" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.Google.Contracts\DigitalBrain.Modules.Google.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Integrations.Mcp\DigitalBrain.Integrations.Mcp.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
   </ItemGroup>
 </Project>

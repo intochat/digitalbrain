@@ -31,6 +31,12 @@ public sealed class PackageBoundaryContracts
 
     public static TheoryData<string> PackagesThatMayHostNeurons { get; } = [.. NeuronHosting];
 
+    public static TheoryData<string> McpProviderRuntimePackages { get; } =
+    [
+        "DigitalBrain.Modules.Google",
+        "DigitalBrain.Modules.Salesforce",
+    ];
+
     [Theory]
     [MemberData(nameof(ConsumerPathPackages))]
     public void NothingOnTheConsumerPathCanReachAProviderSdk(string package)
@@ -65,6 +71,18 @@ public sealed class PackageBoundaryContracts
             .ToList();
 
         Assert.Empty(declared);
+    }
+
+    [Theory]
+    [MemberData(nameof(McpProviderRuntimePackages))]
+    public void McpProvidersDependOnSharedMechanicsInsteadOfDeclaringCopies(string package)
+    {
+        Assert.Contains("DigitalBrain.Integrations.Mcp", DirectProjectReferencesOf(package));
+        Assert.DoesNotContain(
+            DirectPackageReferencesOf(package),
+            dependency => dependency is "ModelContextProtocol.Core"
+                or "Microsoft.AspNetCore.DataProtection"
+                or "Microsoft.Extensions.Http");
     }
 
     [Fact]

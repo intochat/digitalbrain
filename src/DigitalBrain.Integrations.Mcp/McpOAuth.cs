@@ -104,7 +104,7 @@ internal static class McpOAuthOptions
     }
 }
 
-internal interface IMcpAuthorizationRedirect
+public interface IMcpAuthorizationRedirect
 {
     Task<string?> AuthorizeAsync(
         Uri authorizationUri,

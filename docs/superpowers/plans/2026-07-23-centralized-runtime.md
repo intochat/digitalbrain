@@ -111,11 +111,11 @@
 - Consumes: `IMcpClientFactory` and provider-independent tool contracts.
 - Preserves: `IGmail` and `ISalesforce` public interfaces.
 
-- [ ] Add a failing proof that a Salesforce proposal performs zero MCP operations and persists one `AwaitingApproval` receipt.
-- [ ] Run the simulation project and observe the current catalog calls during proposal.
-- [ ] Define provider endpoints/scopes/tool policies beside semantic mapping; construct the shared client once per neuron activation.
-- [ ] Remove the unobservable `Proposed`/`Approved` persistence hops; inspect admitted tools only after exact approval and before the durable `Invoking` fence.
-- [ ] Run the integration simulations and shared MCP transport contracts.
+- [x] Add a failing proof that a Salesforce proposal performs zero MCP operations and persists one `AwaitingApproval` receipt.
+- [x] Run the simulation project and observe the current catalog calls during proposal.
+- [x] Define provider endpoints/scopes/tool policies beside semantic mapping; construct the shared client once per neuron activation.
+- [x] Remove the unobservable `Proposed`/`Approved` persistence hops; inspect admitted tools only after exact approval and before the durable `Invoking` fence.
+- [x] Run the integration simulations and shared MCP transport contracts.
 
 ### Task 6: MAF adapters and durable MAF state
 
