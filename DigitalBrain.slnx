@@ -9,6 +9,7 @@
     <Project Path="src/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
     <Project Path="src/DigitalBrain.DevTools/DigitalBrain.DevTools.csproj" />
     <Project Path="src/DigitalBrain.SourceGeneration/DigitalBrain.SourceGeneration.csproj" />
+    <Project Path="src/DigitalBrain.Security/DigitalBrain.Security.csproj" />
   </Folder>
   <Folder Name="/hosts/">
     <Project Path="hosts/DigitalBrain.Host/DigitalBrain.Host.csproj" />

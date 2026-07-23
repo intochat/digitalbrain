@@ -73,6 +73,7 @@ public sealed class PackageBoundaryContracts
         var guarded = ConsumerPath
             .Concat(NeuronHosting)
             .Append("DigitalBrain.Kernel")
+            .Append("DigitalBrain.Security")
             .Append("DigitalBrain.Modules.AI")
             .Append("DigitalBrain.Modules.AI.Aspire.Hosting")
             .Append("DigitalBrain.Modules.Google")
