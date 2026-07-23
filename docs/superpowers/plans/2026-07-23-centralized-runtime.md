@@ -157,5 +157,5 @@
 
 - [x] Update the ratified module, MCP, AI durability, and hosting rules without adding progress prose.
 - [x] Run `aspire start --isolated --non-interactive`, wait for the silo resource, and inspect the application model/logs.
-- [ ] Run `dotnet test --logger "console;verbosity=minimal"` from the repository root.
-- [ ] Recheck `git rev-parse HEAD` and `git status --porcelain`, inspect the full diff, and stop if unrelated ground movement appeared.
+- [x] Run `dotnet test --logger "console;verbosity=minimal"` from the repository root.
+- [x] Recheck `git rev-parse HEAD` and `git status --porcelain`, inspect the full diff, and stop if unrelated ground movement appeared.
