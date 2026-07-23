@@ -75,6 +75,7 @@ public sealed class PackageBoundaryContracts
             .Append("DigitalBrain.Kernel")
             .Append("DigitalBrain.Security")
             .Append("DigitalBrain.Integrations.Mcp")
+            .Append("DigitalBrain.Integrations.Mcp.Aspire.Hosting")
             .Append("DigitalBrain.Modules.AI")
             .Append("DigitalBrain.Modules.AI.Aspire.Hosting")
             .Append("DigitalBrain.Modules.Google")

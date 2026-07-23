@@ -8,5 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.Salesforce\DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Integrations.Mcp.Aspire.Hosting\DigitalBrain.Integrations.Mcp.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

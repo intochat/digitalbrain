@@ -89,10 +89,10 @@
 - Consumes: `BrainModuleHosting.RequireStateProtection`.
 - Produces: one brain reference that registers provider OAuth parameters and projects them once.
 
-- [ ] Add failing tests for provider-scoped parameter names, exactly one shared protection key, duplicate registration rejection, and silo-only projection.
-- [ ] Run the owning test project and observe failures against the copied hosting states.
-- [ ] Implement the central conditional brain state and reduce each provider extension to one registration call.
-- [ ] Run the owning test project and keep it green.
+- [x] Add failing tests for provider-scoped parameter names, exactly one shared protection key, duplicate registration rejection, and silo-only projection.
+- [x] Run the owning test project and observe failures against the copied hosting states.
+- [x] Implement the central conditional brain state and reduce each provider extension to one registration call.
+- [x] Run the owning test project and keep it green.
 
 ### Task 5: Thin Google and Salesforce provider modules
 

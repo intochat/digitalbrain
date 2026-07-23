@@ -64,6 +64,9 @@ public sealed class IntegrationHostingContracts
         AssertParameter(builder, "salesforce-client-id", secret: false);
         AssertParameter(builder, "salesforce-client-secret", secret: true);
         AssertParameter(builder, "salesforce-redirect-uri", secret: false);
+        AssertParameter(builder, "mcp-authorization-mode", secret: false);
+        AssertParameter(builder, "brain-state-protection-key", secret: true);
+        Assert.Single(builder.Resources, resource => resource.Name == "brain-state-protection-key");
     }
 
     [Fact(DisplayName = "integration OAuth configuration is projected only to the silo")]
@@ -92,6 +95,12 @@ public sealed class IntegrationHostingContracts
         Assert.Contains("DigitalBrain__Google__Gmail__RedirectUri", siloEnvironment.Keys);
         Assert.Contains("DigitalBrain__Salesforce__ClientId", siloEnvironment.Keys);
         Assert.Contains("DigitalBrain__Salesforce__RedirectUri", siloEnvironment.Keys);
+        Assert.Same(
+            Parameter(builder, "brain-state-protection-key"),
+            siloEnvironment["DigitalBrain__Security__StateProtectionKey"]);
+        Assert.Same(
+            Parameter(builder, "mcp-authorization-mode"),
+            siloEnvironment["DigitalBrain__Integrations__Mcp__AuthorizationMode"]);
         Assert.DoesNotContain(
             clientEnvironment.Keys,
             key => key.StartsWith("DigitalBrain__", StringComparison.Ordinal));

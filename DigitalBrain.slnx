@@ -11,6 +11,7 @@
     <Project Path="src/DigitalBrain.SourceGeneration/DigitalBrain.SourceGeneration.csproj" />
     <Project Path="src/DigitalBrain.Security/DigitalBrain.Security.csproj" />
     <Project Path="src/DigitalBrain.Integrations.Mcp/DigitalBrain.Integrations.Mcp.csproj" />
+    <Project Path="src/DigitalBrain.Integrations.Mcp.Aspire.Hosting/DigitalBrain.Integrations.Mcp.Aspire.Hosting.csproj" />
   </Folder>
   <Folder Name="/hosts/">
     <Project Path="hosts/DigitalBrain.Host/DigitalBrain.Host.csproj" />
