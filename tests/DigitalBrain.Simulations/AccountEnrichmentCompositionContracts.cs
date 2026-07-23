@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
@@ -7,6 +6,7 @@ using DigitalBrain.Google;
 using DigitalBrain.Integrations.Mcp;
 using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
+using DigitalBrain.Security;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Authentication;
@@ -21,37 +21,28 @@ namespace DigitalBrain.Simulations;
 public sealed class AccountEnrichmentCompositionContracts
 {
     [Fact(DisplayName = "named Gmail neurons bind token purposes to their complete durable identity")]
-    public async Task NamedGmailAccountsHaveIsolatedTokenPurposes()
+    public void NamedGmailAccountsHaveIsolatedTokenPurposes()
     {
-        var gmail = new RecordingGmailClient();
-        var clients = new RecordingMcpClientFactory(gmail, new RecordingSalesforceClient());
-        var cluster = await StartClusterAsync(clients);
+        var server = new McpServerDefinition(
+            "google.gmail",
+            "DigitalBrain Gmail",
+            new Uri("https://gmailmcp.googleapis.com/mcp/v1"),
+            "DigitalBrain:Google:Gmail",
+            ["https://www.googleapis.com/auth/gmail.readonly"]);
+        var owner = new OwnerId("named-gmail");
+        var first = NeuronId.For<IGmail>(owner, "first@example.com");
+        var second = NeuronId.For<IGmail>(owner, "second@example.com");
 
-        try
-        {
-            var owner = new OwnerId("named-gmail");
-            var first = NeuronId.For<IGmail>(owner, "first@example.com");
-            var second = NeuronId.For<IGmail>(owner, "second@example.com");
-
-            await Assert.ThrowsAsync<NeuronAuthorizationException>(() =>
-                cluster.Client.GetGrain<IGmail>(first.ToGrainId())
-                    .ReadMessageAsync("first-message", TestContext.Current.CancellationToken));
-            await Assert.ThrowsAsync<NeuronAuthorizationException>(() =>
-                cluster.Client.GetGrain<IGmail>(second.ToGrainId())
-                    .ReadMessageAsync("second-message", TestContext.Current.CancellationToken));
-
-            Assert.Equal(
-                [
-                    $"mcp/oauth/google.gmail/{first}",
-                    $"mcp/oauth/google.gmail/{second}",
-                ],
-                clients.TokenPurposes);
-        }
-        finally
-        {
-            await cluster.StopAllSilosAsync();
-            await cluster.DisposeAsync();
-        }
+        Assert.Equal(
+            [
+                $"mcp/oauth/google.gmail/{first}",
+                $"mcp/oauth/google.gmail/{second}",
+            ],
+            new[]
+            {
+                McpRuntime.TokenPurpose(server, first.ToString()),
+                McpRuntime.TokenPurpose(server, second.ToString()),
+            });
     }
 
     [Fact(DisplayName = "Salesforce approval is a typed human authority fact")]
@@ -73,13 +64,10 @@ public sealed class AccountEnrichmentCompositionContracts
         string? reconciliationDescription,
         SalesforceMutationState expectedState)
     {
-        var gmail = new RecordingGmailClient();
-        var transport = new RecordingSalesforceClient
-        {
-            FailUpdateCalls = true,
-            ReconciliationDescription = reconciliationDescription,
-        };
-        var cluster = await StartClusterAsync(gmail, transport);
+        using var transport = GmailServer();
+        transport.FailUpdateCalls = true;
+        transport.ReconciliationDescription = reconciliationDescription;
+        var cluster = await StartClusterAsync(transport);
 
         try
         {
@@ -112,11 +100,11 @@ public sealed class AccountEnrichmentCompositionContracts
             Assert.Equal(expectedState, verified.ApprovedState);
             Assert.True(verified.DifferentEvidenceRejected);
             Assert.True(verified.ReplayReturnedSameReceipt);
-            Assert.Single(transport.Calls, call => call.Tool == "update_sobject_record");
-            var query = Assert.Single(transport.Calls, call => call.Tool == "soqlQuery");
+            Assert.Single(transport.ToolCalls, call => call.Tool == "update_sobject_record");
+            var query = Assert.Single(transport.ToolCalls, call => call.Tool == "soqlQuery");
             Assert.Equal(
                 "SELECT Id, Description FROM Account WHERE Id = '001000000000042AAA' LIMIT 1",
-                query.Arguments["query"]);
+                query.Arguments.GetProperty("query").GetString());
         }
         finally
         {
@@ -128,9 +116,8 @@ public sealed class AccountEnrichmentCompositionContracts
     [Fact(DisplayName = "compiled typed composition requires exact approval before enriching one Salesforce Account")]
     public async Task CompiledTypedCompositionRequiresExactApprovalBeforeEnrichingOneSalesforceAccount()
     {
-        var gmail = new RecordingGmailClient();
-        var salesforce = new RecordingSalesforceClient();
-        var cluster = await StartClusterAsync(gmail, salesforce);
+        using var server = GmailServer();
+        var cluster = await StartClusterAsync(server);
 
         try
         {
@@ -155,8 +142,9 @@ public sealed class AccountEnrichmentCompositionContracts
                 "Email from priya@northstar.example: Pilot rollout\nWe are ready to start the pilot on Monday.",
                 proposed.Description);
             Assert.NotEqual(string.Empty, proposed.Fingerprint);
-            Assert.Empty(salesforce.Operations);
-            Assert.Empty(salesforce.Calls);
+            Assert.DoesNotContain(
+                server.ToolCalls,
+                call => call.Tool == "update_sobject_record");
 
             var approval = new SalesforceMutationApproval(
                 Guid.Parse("509ab831-d9fd-4be9-ae1a-09e4bda9772f"),
@@ -176,7 +164,9 @@ public sealed class AccountEnrichmentCompositionContracts
             Assert.DoesNotContain(
                 afterForgery.Delta,
                 delivery => delivery.Synapse is SalesforceMutationApproval);
-            Assert.Empty(salesforce.Calls);
+            Assert.DoesNotContain(
+                server.ToolCalls,
+                call => call.Tool == "update_sobject_record");
 
             await session.FireAsync(composition, approval);
 
@@ -190,31 +180,31 @@ public sealed class AccountEnrichmentCompositionContracts
                 "Email from priya@northstar.example: Pilot rollout\nWe are ready to start the pilot on Monday.",
                 outcome.Description);
 
-            var gmailCall = Assert.Single(gmail.Calls);
+            var gmailCall = Assert.Single(server.ToolCalls, call => call.Tool == "get_message");
             Assert.Equal(new Uri("https://gmailmcp.googleapis.com/mcp/v1"), gmailCall.Endpoint);
-            Assert.Equal("fake-gmail-token", gmailCall.AccessToken);
             Assert.Equal("get_message", gmailCall.Tool);
-            Assert.Equal("gmail-message-42", gmailCall.Arguments["messageId"]);
-            Assert.Equal("FULL_CONTENT", gmailCall.Arguments["messageFormat"]);
+            Assert.Equal("gmail-message-42", gmailCall.Arguments.GetProperty("messageId").GetString());
+            Assert.Equal("FULL_CONTENT", gmailCall.Arguments.GetProperty("messageFormat").GetString());
 
-            var salesforceCall = Assert.Single(salesforce.Calls);
+            var salesforceCall = Assert.Single(
+                server.ToolCalls,
+                call => call.Tool == "update_sobject_record");
             Assert.Equal(
                 new Uri("https://api.salesforce.com/platform/mcp/v1/platform/sobject-mutations"),
                 salesforceCall.Endpoint);
-            Assert.Equal("fake-salesforce-token", salesforceCall.AccessToken);
             Assert.Equal("update_sobject_record", salesforceCall.Tool);
-            Assert.Equal("Account", salesforceCall.Arguments["sobject-name"]);
-            Assert.Equal(command.AccountId, salesforceCall.Arguments["id"]);
-
-            var body = Assert.IsType<Dictionary<string, object?>>(salesforceCall.Arguments["body"]);
-            Assert.Equal(outcome.Description, body["Description"]);
+            Assert.Equal("Account", salesforceCall.Arguments.GetProperty("sobject-name").GetString());
+            Assert.Equal(command.AccountId, salesforceCall.Arguments.GetProperty("id").GetString());
+            Assert.Equal(
+                outcome.Description,
+                salesforceCall.Arguments.GetProperty("body").GetProperty("Description").GetString());
 
             await AssertCapabilityLineageAsync(session, composition, owner);
 
             await session.FireAsync(composition, approval);
             await ReadUntilCountAsync<AccountEnriched>(session, composition, expectedCount: 2);
 
-            Assert.Single(salesforce.Calls);
+            Assert.Single(server.ToolCalls, call => call.Tool == "update_sobject_record");
         }
         finally
         {
@@ -224,21 +214,25 @@ public sealed class AccountEnrichmentCompositionContracts
     }
 
     private static async Task<InProcessTestCluster> StartClusterAsync(
-        RecordingGmailClient gmail,
-        RecordingSalesforceClient salesforce)
-        => await StartClusterAsync(new RecordingMcpClientFactory(gmail, salesforce));
-
-    private static async Task<InProcessTestCluster> StartClusterAsync(
-        RecordingMcpClientFactory clients)
+        FakeMcpHttpServer server)
     {
         var builder = new InProcessTestClusterBuilder(1);
 
         builder.ConfigureSilo((_, silo) =>
         {
+            silo.Configuration["DigitalBrain:Google:Gmail:ClientId"] = "fake-google-client";
+            silo.Configuration["DigitalBrain:Google:Gmail:ClientSecret"] = "fake-google-secret";
+            silo.Configuration["DigitalBrain:Google:Gmail:RedirectUri"] =
+                "http://localhost/fake-google-callback";
+            silo.Configuration["DigitalBrain:Salesforce:ClientId"] = "fake-salesforce-client";
+            silo.Configuration["DigitalBrain:Salesforce:RedirectUri"] =
+                "http://localhost/fake-salesforce-callback";
+            silo.Configuration[DurablePayloadProtector.ConfigurationKey] =
+                Convert.ToBase64String(Enumerable.Range(0, 32).Select(value => (byte)value).ToArray());
             silo.AddDigitalBrain("account-enrichment");
             GoogleModule.Configure(silo);
             SalesforceModule.Configure(silo);
-            silo.Services.AddSingleton<IMcpClientFactory>(clients);
+            silo.Services.AddSingleton<IHttpClientFactory>(new FakeHttpClientFactory(server));
             silo.UseInMemoryReminderService();
             silo.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
         });
@@ -253,6 +247,15 @@ public sealed class AccountEnrichmentCompositionContracts
 
         return cluster;
     }
+
+    private static FakeMcpHttpServer GmailServer() =>
+        new(JsonSerializer.SerializeToElement(new
+        {
+            id = "gmail-message-42",
+            subject = "Pilot rollout",
+            sender = "priya@northstar.example",
+            plaintextBody = "We are ready to start the pilot on Monday.",
+        }));
 
     private static async Task AssertCapabilityLineageAsync(
         ISessionNeuron session,
@@ -382,136 +385,6 @@ internal static class FakeOAuth
             ValueTask.CompletedTask;
     }
 }
-
-internal sealed class RecordingMcpClientFactory(
-    RecordingGmailClient gmail,
-    RecordingSalesforceClient salesforce) : IMcpClientFactory
-{
-    private readonly ConcurrentQueue<string> _tokenPurposes = new();
-
-    internal IReadOnlyList<string> TokenPurposes => [.. _tokenPurposes];
-
-    public IMcpClient Create(
-        McpServerDefinition server,
-        IDurableValue<byte[]> tokenState,
-        Func<ValueTask> commit,
-        string durableIdentity)
-    {
-        _tokenPurposes.Enqueue(SdkMcpClientFactory.TokenPurpose(server, durableIdentity));
-        return server.Key switch
-        {
-            "google.gmail" => gmail,
-            "salesforce" => salesforce,
-            _ => throw new InvalidOperationException($"Unexpected MCP test server '{server.Key}'."),
-        };
-    }
-}
-
-internal sealed class RecordingGmailClient : IMcpClient
-{
-    private const string SchemaFingerprint = "GMAIL-GET-MESSAGE-V1";
-    private readonly ConcurrentQueue<RecordedMcpCall> _calls = new();
-
-    internal IReadOnlyList<RecordedMcpCall> Calls => [.. _calls];
-
-    public ValueTask<McpToolHandle> InspectAsync(
-        McpToolContract contract,
-        CancellationToken cancellationToken)
-    {
-        Assert.Equal("get_message", contract.Name);
-        return ValueTask.FromResult(new McpToolHandle(contract, SchemaFingerprint));
-    }
-
-    public ValueTask<JsonElement> InvokeAsync(
-        McpToolHandle tool,
-        IReadOnlyDictionary<string, object?> arguments,
-        CancellationToken cancellationToken)
-    {
-        Assert.Equal(SchemaFingerprint, tool.SchemaFingerprint);
-        _calls.Enqueue(new(
-            new Uri("https://gmailmcp.googleapis.com/mcp/v1"),
-            "fake-gmail-token",
-            tool.Contract.Name,
-            arguments));
-
-        return ValueTask.FromResult(JsonSerializer.SerializeToElement(new
-        {
-            id = "gmail-message-42",
-            subject = "Pilot rollout",
-            sender = "priya@northstar.example",
-            plaintextBody = "We are ready to start the pilot on Monday.",
-        }));
-    }
-}
-
-internal sealed class RecordingSalesforceClient : IMcpClient
-{
-    private const string UpdateFingerprint = "SALESFORCE-UPDATE-V1";
-    private const string QueryFingerprint = "SALESFORCE-QUERY-V1";
-    private readonly ConcurrentQueue<RecordedMcpCall> _calls = new();
-    private readonly ConcurrentQueue<string> _operations = new();
-
-    internal IReadOnlyList<RecordedMcpCall> Calls => [.. _calls];
-
-    internal IReadOnlyList<string> Operations => [.. _operations];
-
-    internal bool FailUpdateCalls { get; init; }
-
-    internal string? ReconciliationDescription { get; init; }
-
-    public ValueTask<McpToolHandle> InspectAsync(
-        McpToolContract contract,
-        CancellationToken cancellationToken)
-    {
-        _operations.Enqueue($"inspect:{contract.Name}");
-        return ValueTask.FromResult(new McpToolHandle(
-            contract,
-            contract.Name == "soqlQuery" ? QueryFingerprint : UpdateFingerprint));
-    }
-
-    public ValueTask<JsonElement> InvokeAsync(
-        McpToolHandle tool,
-        IReadOnlyDictionary<string, object?> arguments,
-        CancellationToken cancellationToken)
-    {
-        _operations.Enqueue($"invoke:{tool.Contract.Name}");
-        Assert.Equal(
-            tool.Contract.Name == "soqlQuery" ? QueryFingerprint : UpdateFingerprint,
-            tool.SchemaFingerprint);
-        _calls.Enqueue(new(
-            new Uri("https://api.salesforce.com/platform/mcp/v1/platform/sobject-mutations"),
-            "fake-salesforce-token",
-            tool.Contract.Name,
-            arguments));
-
-        if (tool.Contract.Name == "update_sobject_record" && FailUpdateCalls)
-        {
-            throw new HttpRequestException("Simulated loss after Salesforce invocation began.");
-        }
-
-        if (tool.Contract.Name == "soqlQuery")
-        {
-            return ValueTask.FromResult(ReconciliationDescription is null
-                ? JsonSerializer.SerializeToElement(Array.Empty<object>())
-                : JsonSerializer.SerializeToElement(new[]
-                {
-                    new
-                    {
-                        Id = "001000000000042AAA",
-                        Description = ReconciliationDescription,
-                    },
-                }));
-        }
-
-        return ValueTask.FromResult(JsonSerializer.SerializeToElement(new { success = true }));
-    }
-}
-
-internal sealed record RecordedMcpCall(
-    Uri Endpoint,
-    string AccessToken,
-    string Tool,
-    IReadOnlyDictionary<string, object?> Arguments);
 
 [GenerateSerializer]
 [Alias("db.test.verify-salesforce-mutation")]

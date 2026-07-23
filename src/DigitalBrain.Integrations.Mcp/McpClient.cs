@@ -1,59 +1,127 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using DigitalBrain.Security;
 using Microsoft.Extensions.Configuration;
-using ModelContextProtocol.Authentication;
 using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
 using Orleans.Journaling;
 
 namespace DigitalBrain.Integrations.Mcp;
 
-internal interface IMcpClientFactory
+internal sealed class McpServerDefinition
 {
-    IMcpClient Create(
-        McpServerDefinition server,
-        IDurableValue<byte[]> tokenState,
-        Func<ValueTask> commit,
-        string durableIdentity);
+    internal McpServerDefinition(
+        string key,
+        string displayName,
+        Uri endpoint,
+        string configurationRoot,
+        IReadOnlyList<string> scopes,
+        bool requiresClientSecret = true)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+        ArgumentNullException.ThrowIfNull(endpoint);
+        ArgumentException.ThrowIfNullOrWhiteSpace(configurationRoot);
+        ArgumentNullException.ThrowIfNull(scopes);
+
+        if (!endpoint.IsAbsoluteUri || endpoint.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new ArgumentException("An MCP server endpoint must be an absolute HTTPS URI.", nameof(endpoint));
+        }
+
+        if (scopes.Count == 0 || scopes.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ArgumentException("An MCP server must declare its non-empty OAuth scopes.", nameof(scopes));
+        }
+
+        Key = key;
+        DisplayName = displayName;
+        Endpoint = endpoint;
+        ConfigurationRoot = configurationRoot;
+        Scopes = scopes.ToArray();
+        RequiresClientSecret = requiresClientSecret;
+    }
+
+    internal string Key { get; }
+
+    internal string DisplayName { get; }
+
+    internal Uri Endpoint { get; }
+
+    internal string ConfigurationRoot { get; }
+
+    internal IReadOnlyList<string> Scopes { get; }
+
+    internal bool RequiresClientSecret { get; }
 }
 
-internal interface IMcpClient
-{
-    ValueTask<McpToolHandle> InspectAsync(
-        McpToolContract contract,
-        CancellationToken cancellationToken);
-
-    ValueTask<JsonElement> InvokeAsync(
-        McpToolHandle tool,
-        IReadOnlyDictionary<string, object?> arguments,
-        CancellationToken cancellationToken);
-}
-
-internal sealed class SdkMcpClientFactory(
+internal sealed class McpRuntime(
     IConfiguration configuration,
     IHttpClientFactory httpClients,
-    IDurablePayloadProtector protector) : IMcpClientFactory
+    IDurablePayloadProtector protector)
 {
-    public IMcpClient Create(
+    internal const string HttpClientName = "DigitalBrain.Integrations.Mcp";
+
+    [SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "The official MCP client takes ownership of its transport and disposes it with the session.")]
+    internal async ValueTask<T> RunAsync<T>(
         McpServerDefinition server,
         IDurableValue<byte[]> tokenState,
         Func<ValueTask> commit,
-        string durableIdentity)
+        string durableIdentity,
+        Func<ModelContextProtocol.Client.McpClient, CancellationToken, ValueTask<T>> callback,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(tokenState);
         ArgumentNullException.ThrowIfNull(commit);
         ArgumentException.ThrowIfNullOrWhiteSpace(durableIdentity);
+        ArgumentNullException.ThrowIfNull(callback);
 
         var tokens = new DurableMcpTokenCache(
             tokenState,
             commit,
             protector,
             TokenPurpose(server, durableIdentity));
-        var oauth = McpOAuthOptions.Create(
-            server,
-            configuration,
-            tokens);
-        return new SdkMcpClient(server, oauth, httpClients);
+        var authorization = McpOAuthOptions.Create(server, configuration, tokens);
+        using var httpClient = httpClients.CreateClient(HttpClientName);
+        var transport = new HttpClientTransport(
+            new HttpClientTransportOptions
+            {
+                Endpoint = server.Endpoint,
+                Name = server.DisplayName,
+                OAuth = authorization,
+            },
+            httpClient,
+            loggerFactory: null,
+            ownsHttpClient: false);
+        await using var client = await ModelContextProtocol.Client.McpClient.CreateAsync(
+            transport,
+            cancellationToken: cancellationToken);
+
+        return await callback(client, cancellationToken);
+    }
+
+    internal static JsonElement RequireStructuredContent(
+        CallToolResult result,
+        McpServerDefinition server,
+        string toolName)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(server);
+        ArgumentException.ThrowIfNullOrWhiteSpace(toolName);
+
+        if (result.IsError is true)
+        {
+            throw new InvalidOperationException(
+                $"{server.DisplayName} MCP tool '{toolName}' reported an error.");
+        }
+
+        return result.StructuredContent?.Clone()
+            ?? throw new InvalidOperationException(
+                $"{server.DisplayName} MCP tool '{toolName}' returned no structured content.");
     }
 
     internal static string TokenPurpose(
@@ -63,125 +131,5 @@ internal sealed class SdkMcpClientFactory(
         ArgumentNullException.ThrowIfNull(server);
         ArgumentException.ThrowIfNullOrWhiteSpace(durableIdentity);
         return $"mcp/oauth/{server.Key}/{durableIdentity}";
-    }
-}
-
-internal sealed class SdkMcpClient(
-    McpServerDefinition server,
-    ClientOAuthOptions authorization,
-    IHttpClientFactory httpClients) : IMcpClient
-{
-    internal const string HttpClientName = "DigitalBrain.Integrations.Mcp";
-
-    public async ValueTask<McpToolHandle> InspectAsync(
-        McpToolContract contract,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(contract);
-
-        await using var session = await OpenAsync(cancellationToken);
-        var snapshot = await ReadAsync(session.Client, contract, cancellationToken);
-        contract.Admit(snapshot, server.DisplayName);
-        return new McpToolHandle(contract, snapshot.SchemaFingerprint);
-    }
-
-    public async ValueTask<JsonElement> InvokeAsync(
-        McpToolHandle tool,
-        IReadOnlyDictionary<string, object?> arguments,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(tool);
-        ArgumentNullException.ThrowIfNull(arguments);
-
-        await using var session = await OpenAsync(cancellationToken);
-        var snapshot = await ReadAsync(session.Client, tool.Contract, cancellationToken);
-
-        if (!string.Equals(snapshot.SchemaFingerprint, tool.SchemaFingerprint, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                $"{server.DisplayName} MCP tool '{tool.Contract.Name}' schema changed after admission.");
-        }
-
-        tool.Contract.Admit(snapshot, server.DisplayName);
-        var result = await session.Client.CallToolAsync(
-            tool.Contract.Name,
-            arguments,
-            cancellationToken: cancellationToken);
-
-        if (result.IsError is true)
-        {
-            throw new InvalidOperationException(
-                $"{server.DisplayName} MCP tool '{tool.Contract.Name}' reported an error.");
-        }
-
-        return result.StructuredContent?.Clone()
-            ?? throw new InvalidOperationException(
-                $"{server.DisplayName} MCP tool '{tool.Contract.Name}' returned no structured content.");
-    }
-
-    private async ValueTask<McpToolSnapshot> ReadAsync(
-        ModelContextProtocol.Client.McpClient client,
-        McpToolContract contract,
-        CancellationToken cancellationToken)
-    {
-        var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
-        var matches = tools
-            .Where(candidate => string.Equals(candidate.Name, contract.Name, StringComparison.Ordinal))
-            .ToArray();
-
-        if (matches.Length != 1)
-        {
-            throw new InvalidOperationException(
-                $"{server.DisplayName} MCP must advertise required tool '{contract.Name}' exactly once.");
-        }
-
-        var tool = matches[0];
-        return McpToolSnapshot.Create(
-            tool.Name,
-            tool.ProtocolTool.InputSchema,
-            tool.ProtocolTool.Annotations?.ReadOnlyHint,
-            tool.ProtocolTool.Annotations?.DestructiveHint);
-    }
-
-    private async ValueTask<McpSession> OpenAsync(CancellationToken cancellationToken)
-    {
-        var httpClient = httpClients.CreateClient(HttpClientName);
-        var transport = new HttpClientTransport(
-            new HttpClientTransportOptions
-            {
-                Endpoint = server.Endpoint,
-                Name = server.DisplayName,
-                OAuth = authorization,
-            },
-            httpClient);
-
-        try
-        {
-            var client = await ModelContextProtocol.Client.McpClient.CreateAsync(
-                transport,
-                cancellationToken: cancellationToken);
-            return new McpSession(httpClient, transport, client);
-        }
-        catch
-        {
-            await transport.DisposeAsync();
-            httpClient.Dispose();
-            throw;
-        }
-    }
-
-    private sealed class McpSession(
-        HttpClient httpClient,
-        HttpClientTransport transport,
-        ModelContextProtocol.Client.McpClient client) : IAsyncDisposable
-    {
-        internal ModelContextProtocol.Client.McpClient Client { get; } = client;
-
-        public async ValueTask DisposeAsync()
-        {
-            await Client.DisposeAsync();
-            await transport.DisposeAsync();
-            httpClient.Dispose();
-        }
     }
 }

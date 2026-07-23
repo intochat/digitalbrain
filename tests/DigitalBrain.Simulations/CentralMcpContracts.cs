@@ -1,9 +1,11 @@
 using System.Text;
 using System.Text.Json;
+using DigitalBrain.Google;
 using DigitalBrain.Integrations.Mcp;
 using DigitalBrain.Security;
 using Microsoft.Extensions.Configuration;
 using ModelContextProtocol.Authentication;
+using ModelContextProtocol.Client;
 using Xunit;
 
 namespace DigitalBrain.Simulations;
@@ -202,108 +204,111 @@ public sealed class CentralMcpContracts
             FakeOAuth.Options("owner-token").TokenCache!));
     }
 
-    [Theory(DisplayName = "one official MCP adapter serves read-only and mutation provider policies")]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task OneOfficialAdapterServesProviderPolicies(bool gmail)
+    [Fact(DisplayName = "one callback-scoped official MCP client sends its preloaded bearer and cannot escape alive")]
+    public async Task CallbackScopedRuntimeSendsBearerAndDisposesClient()
     {
-        using var server = new FakeMcpHttpServer(JsonSerializer.SerializeToElement(
-            gmail ? (object)new { id = "gmail-message-42" } : new { success = true }));
-        var definition = gmail
-            ? Server("google.gmail", "DigitalBrain:Google:Gmail", "https://gmailmcp.googleapis.com/mcp/v1", "gmail.readonly")
-            : Server("salesforce", "DigitalBrain:Salesforce", "https://api.salesforce.com/platform/mcp/v1/platform/sobject-mutations", "mcp_api");
-        var contract = gmail
-            ? McpToolContract.ReadOnly(
-                "get_message",
-                new McpToolProperty("messageId", "string"))
-            : McpToolContract.Mutation(
-                "update_sobject_record",
-                new McpToolProperty("sobject-name", "string"),
-                new McpToolProperty("id", "string"),
-                new McpToolProperty("body", "object"));
-        var client = new SdkMcpClient(
+        using var server = GmailServer();
+        var definition = GmailDefinition();
+        var state = new FakeDurableValue<byte[]>();
+        var protector = new DurablePayloadProtector(NewEncodedKey());
+        var cache = new DurableMcpTokenCache(
+            state,
+            () => ValueTask.CompletedTask,
+            protector,
+            McpRuntime.TokenPurpose(definition, "gmail:owner/account@example.com"));
+        var token = await FakeOAuth.Options("provider-token").TokenCache!
+            .GetTokensAsync(TestContext.Current.CancellationToken);
+        await cache.StoreTokensAsync(token!, TestContext.Current.CancellationToken);
+        var runtime = Runtime(server, definition, protector);
+        McpClient? escaped = null;
+
+        var result = await runtime.RunAsync(
             definition,
-            FakeOAuth.Options("provider-token"),
-            new FakeHttpClientFactory(server));
-
-        var admitted = await client.InspectAsync(contract, TestContext.Current.CancellationToken);
-        var result = await client.InvokeAsync(
-            admitted,
-            gmail
-                ? new Dictionary<string, object?> { ["messageId"] = "gmail-message-42" }
-                : new Dictionary<string, object?>
-                {
-                    ["sobject-name"] = "Account",
-                    ["id"] = "001000000000042AAA",
-                    ["body"] = new Dictionary<string, object?> { ["Description"] = "Ready" },
-                },
-            TestContext.Current.CancellationToken);
-
-        Assert.Equal(gmail ? "gmail-message-42" : "True", gmail
-            ? result.GetProperty("id").GetString()
-            : result.GetProperty("success").GetBoolean().ToString());
-        Assert.NotEmpty(server.BearerTokens);
-        Assert.All(server.BearerTokens, token => Assert.Equal("provider-token", token));
-        Assert.Equal(contract.Name, Assert.Single(server.ToolCalls).Tool);
-    }
-
-    [Fact(DisplayName = "shared MCP admission rejects incompatible and drifted schemas before invocation")]
-    public async Task AdmissionRejectsIncompatibleAndDriftedSchemas()
-    {
-        using var incompatible = new FakeMcpHttpServer(JsonSerializer.SerializeToElement(new { }))
-        {
-            AdvertiseInvalidGmailSchema = true,
-        };
-        var contract = McpToolContract.ReadOnly(
-            "get_message",
-            new McpToolProperty("messageId", "string"));
-        var incompatibleClient = Client(incompatible);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await incompatibleClient.InspectAsync(contract, TestContext.Current.CancellationToken));
-        Assert.Empty(incompatible.ToolCalls);
-
-        using var drifted = new FakeMcpHttpServer(JsonSerializer.SerializeToElement(new { }))
-        {
-            DriftGmailSchemaAfterAdmission = true,
-        };
-        var driftedClient = Client(drifted);
-        var admitted = await driftedClient.InspectAsync(contract, TestContext.Current.CancellationToken);
-
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await driftedClient.InvokeAsync(
-                admitted,
-                new Dictionary<string, object?> { ["messageId"] = "gmail-message-42" },
-                TestContext.Current.CancellationToken));
-
-        Assert.Contains("schema changed", failure.Message, StringComparison.Ordinal);
-        Assert.Empty(drifted.ToolCalls);
-    }
-
-    [Fact(DisplayName = "shared MCP fingerprints ignore JSON object property order")]
-    public async Task FingerprintsIgnoreObjectPropertyOrder()
-    {
-        using var server = new FakeMcpHttpServer(JsonSerializer.SerializeToElement(new
-        {
-            id = "gmail-message-42",
-        }))
-        {
-            ReorderGmailSchemaAfterAdmission = true,
-        };
-        var client = Client(server);
-        var admitted = await client.InspectAsync(
-            McpToolContract.ReadOnly(
-                "get_message",
-                new McpToolProperty("messageId", "string")),
-            TestContext.Current.CancellationToken);
-
-        var result = await client.InvokeAsync(
-            admitted,
-            new Dictionary<string, object?> { ["messageId"] = "gmail-message-42" },
+            state,
+            () => ValueTask.CompletedTask,
+            "gmail:owner/account@example.com",
+            async (client, cancellationToken) =>
+            {
+                escaped = client;
+                var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
+                var tool = Gmail.AdmitGetMessage(tools);
+                var called = await tool.CallAsync(
+                    new Dictionary<string, object?>
+                    {
+                        ["messageId"] = "gmail-message-42",
+                        ["messageFormat"] = "FULL_CONTENT",
+                    },
+                    cancellationToken: cancellationToken);
+                return McpRuntime.RequireStructuredContent(called, definition, tool.Name);
+            },
             TestContext.Current.CancellationToken);
 
         Assert.Equal("gmail-message-42", result.GetProperty("id").GetString());
-        Assert.Single(server.ToolCalls);
+        Assert.NotEmpty(server.BearerTokens);
+        Assert.All(server.BearerTokens, bearer => Assert.Equal("provider-token", bearer));
+        Assert.Equal("get_message", Assert.Single(server.ToolCalls).Tool);
+        var requestCount = server.RequestMethods.Count;
+        var escapedFailure = await Record.ExceptionAsync(async () =>
+            await escaped!.PingAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.NotNull(escapedFailure);
+        Assert.Equal(requestCount, server.RequestMethods.Count);
+    }
+
+    [Theory(DisplayName = "Gmail admits only the exact hosted get_message contract")]
+    [InlineData((int)GmailToolFault.Name)]
+    [InlineData((int)GmailToolFault.InputNonObject)]
+    [InlineData((int)GmailToolFault.MessageIdType)]
+    [InlineData((int)GmailToolFault.MessageFormatType)]
+    [InlineData((int)GmailToolFault.MessageFormatEnum)]
+    [InlineData((int)GmailToolFault.RequiredInputs)]
+    [InlineData((int)GmailToolFault.OutputSchemaMissing)]
+    [InlineData((int)GmailToolFault.OutputNonObject)]
+    [InlineData((int)GmailToolFault.OutputIdMissing)]
+    [InlineData((int)GmailToolFault.OutputIdType)]
+    [InlineData((int)GmailToolFault.OutputSubjectMissing)]
+    [InlineData((int)GmailToolFault.OutputSubjectType)]
+    [InlineData((int)GmailToolFault.OutputSenderMissing)]
+    [InlineData((int)GmailToolFault.OutputSenderType)]
+    [InlineData((int)GmailToolFault.OutputPlaintextBodyMissing)]
+    [InlineData((int)GmailToolFault.OutputPlaintextBodyType)]
+    [InlineData((int)GmailToolFault.AnnotationsMissing)]
+    [InlineData((int)GmailToolFault.ReadOnly)]
+    [InlineData((int)GmailToolFault.Destructive)]
+    [InlineData((int)GmailToolFault.Idempotent)]
+    [InlineData((int)GmailToolFault.OpenWorld)]
+    public async Task GmailRejectsHostedToolContractDrift(int faultValue)
+    {
+        using var server = GmailServer((GmailToolFault)faultValue);
+        var definition = GmailDefinition();
+        var runtime = Runtime(server, definition);
+
+        var rejection = await Record.ExceptionAsync(async () =>
+            await runtime.RunAsync(
+                definition,
+                new FakeDurableValue<byte[]>(),
+                () => ValueTask.CompletedTask,
+                "gmail:owner/account@example.com",
+                async (client, cancellationToken) =>
+                {
+                    var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
+                    _ = Gmail.AdmitGetMessage(tools);
+                    return true;
+                },
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.True(rejection is InvalidOperationException or ArgumentException);
+        Assert.Empty(server.ToolCalls);
+    }
+
+    [Fact(DisplayName = "shared MCP fingerprints ignore JSON object property order")]
+    public void FingerprintsIgnoreObjectPropertyOrder()
+    {
+        using var first = JsonDocument.Parse("""{"type":"object","properties":{"b":{"type":"string"},"a":{"type":"number"}}}""");
+        using var second = JsonDocument.Parse("""{"properties":{"a":{"type":"number"},"b":{"type":"string"}},"type":"object"}""");
+
+        Assert.Equal(
+            McpToolFingerprint.Create(first.RootElement, null, true, false, true, false),
+            McpToolFingerprint.Create(second.RootElement, null, true, false, true, false));
     }
 
     [Theory(DisplayName = "shared MCP calls reject protocol errors and missing structured content")]
@@ -311,23 +316,28 @@ public sealed class CentralMcpContracts
     [InlineData(false, true)]
     public async Task CallsRejectErrorsAndMissingStructuredContent(bool isError, bool omitStructuredContent)
     {
-        using var server = new FakeMcpHttpServer(JsonSerializer.SerializeToElement(new { }))
-        {
-            ToolResultIsError = isError,
-            OmitStructuredContent = omitStructuredContent,
-        };
-        var client = Client(server);
-        var admitted = await client.InspectAsync(
-            McpToolContract.ReadOnly(
-                "get_message",
-                new McpToolProperty("messageId", "string")),
-            TestContext.Current.CancellationToken);
+        using var server = GmailServer();
+        server.ToolResultIsError = isError;
+        server.OmitStructuredContent = omitStructuredContent;
+        var definition = GmailDefinition();
+        var runtime = Runtime(server, definition);
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await client.InvokeAsync(
-                admitted,
-                new Dictionary<string, object?> { ["messageId"] = "gmail-message-42" },
-                TestContext.Current.CancellationToken));
+            await runtime.RunAsync(
+                definition,
+                new FakeDurableValue<byte[]>(),
+                () => ValueTask.CompletedTask,
+                "gmail:owner/account@example.com",
+                async (client, cancellationToken) =>
+                {
+                    var tool = Gmail.AdmitGetMessage(
+                        await client.ListToolsAsync(cancellationToken: cancellationToken));
+                    var result = await tool.CallAsync(
+                        new Dictionary<string, object?> { ["messageId"] = "gmail-message-42" },
+                        cancellationToken: cancellationToken);
+                    return McpRuntime.RequireStructuredContent(result, definition, tool.Name);
+                },
+                TestContext.Current.CancellationToken).AsTask());
     }
 
     [Fact(DisplayName = "shared MCP cancellation reaches authenticated HTTP")]
@@ -335,18 +345,14 @@ public sealed class CentralMcpContracts
     {
         using var server = new CancellationProbeHandler();
         using var cancellation = new CancellationTokenSource();
-        var client = new SdkMcpClient(
-            Server(
-                "google.gmail",
-                "DigitalBrain:Google:Gmail",
-                "https://gmailmcp.googleapis.com/mcp/v1",
-                "gmail.readonly"),
-            FakeOAuth.Options("provider-token"),
-            new FakeHttpClientFactory(server));
-        var pending = client.InspectAsync(
-            McpToolContract.ReadOnly(
-                "get_message",
-                new McpToolProperty("messageId", "string")),
+        var definition = GmailDefinition();
+        var runtime = Runtime(server, definition);
+        var pending = runtime.RunAsync(
+            definition,
+            new FakeDurableValue<byte[]>(),
+            () => ValueTask.CompletedTask,
+            "gmail:owner/account@example.com",
+            static (_, _) => ValueTask.FromResult(true),
             cancellation.Token).AsTask();
 
         await server.Entered.Task.WaitAsync(
@@ -357,15 +363,37 @@ public sealed class CentralMcpContracts
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
     }
 
-    private static SdkMcpClient Client(HttpMessageHandler handler)
-        => new(
-            Server(
-                "google.gmail",
-                "DigitalBrain:Google:Gmail",
-                "https://gmailmcp.googleapis.com/mcp/v1",
-                "gmail.readonly"),
-            FakeOAuth.Options("provider-token"),
-            new FakeHttpClientFactory(handler));
+    private static FakeMcpHttpServer GmailServer(GmailToolFault fault = GmailToolFault.None)
+        => new(JsonSerializer.SerializeToElement(new
+        {
+            id = "gmail-message-42",
+            subject = "Pilot rollout",
+            sender = "priya@northstar.example",
+            plaintextBody = "We are ready to start the pilot on Monday.",
+        }))
+        {
+            GmailFault = fault,
+        };
+
+    private static McpServerDefinition GmailDefinition() =>
+        Server(
+            "google.gmail",
+            "DigitalBrain:Google:Gmail",
+            "https://gmailmcp.googleapis.com/mcp/v1",
+            "gmail.readonly");
+
+    private static McpRuntime Runtime(
+        HttpMessageHandler handler,
+        McpServerDefinition server,
+        DurablePayloadProtector? protector = null) =>
+        new(
+            Configuration(
+                server.ConfigurationRoot,
+                "fake-client",
+                "fake-secret",
+                "http://localhost/fake-callback"),
+            new FakeHttpClientFactory(handler),
+            protector ?? new DurablePayloadProtector(NewEncodedKey()));
 
     private static McpServerDefinition Server(
         string key,

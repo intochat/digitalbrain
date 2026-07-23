@@ -11,19 +11,17 @@ internal sealed class FakeMcpHttpServer(JsonElement structuredContent) : HttpMes
     private readonly ConcurrentQueue<string> _bearerTokens = new();
     private readonly ConcurrentQueue<McpToolCall> _toolCalls = new();
     private readonly ConcurrentQueue<string> _requestMethods = new();
-    private int _catalogReads;
-
-    internal bool AdvertiseInvalidGmailSchema { get; init; }
+    internal GmailToolFault GmailFault { get; init; }
 
     internal bool AdvertiseInvalidSalesforceSchema { get; init; }
 
-    internal bool DriftGmailSchemaAfterAdmission { get; init; }
+    internal bool FailUpdateCalls { get; set; }
 
-    internal bool ReorderGmailSchemaAfterAdmission { get; init; }
+    internal string? ReconciliationDescription { get; set; }
 
-    internal bool ToolResultIsError { get; init; }
+    internal bool ToolResultIsError { get; set; }
 
-    internal bool OmitStructuredContent { get; init; }
+    internal bool OmitStructuredContent { get; set; }
 
     internal IReadOnlyList<string> BearerTokens => [.. _bearerTokens];
 
@@ -82,7 +80,7 @@ internal sealed class FakeMcpHttpServer(JsonElement structuredContent) : HttpMes
                 {
                     tools = Tools(),
                 },
-                "tools/call" => ToolResult(payload.RootElement),
+                "tools/call" => ToolResult(request, payload.RootElement),
                 _ => throw new InvalidOperationException($"Unexpected MCP method '{methodName}'."),
             };
 
@@ -91,44 +89,106 @@ internal sealed class FakeMcpHttpServer(JsonElement structuredContent) : HttpMes
     }
 
     private object[] Tools()
-    {
-        var catalogRead = Interlocked.Increment(ref _catalogReads);
-        var invalidGmail = AdvertiseInvalidGmailSchema
-            || (DriftGmailSchemaAfterAdmission && catalogRead > 1);
-
-        return
+        =>
         [
-            invalidGmail
-                ? Tool("get_message", readOnly: true, "messageFormat")
-                : ReorderGmailSchemaAfterAdmission && catalogRead > 1
-                    ? ReorderedGmailTool()
-                    : Tool("get_message", readOnly: true, "messageId", "messageFormat"),
+            GmailTool(),
             AdvertiseInvalidSalesforceSchema
                 ? Tool("update_sobject_record", readOnly: false, "sobject-name", "id")
                 : Tool("update_sobject_record", readOnly: false, "sobject-name", "id", "body"),
             Tool("soqlQuery", readOnly: true, "query"),
         ];
+
+    private object GmailTool() => new
+    {
+        name = GmailFault is GmailToolFault.Name ? "wrong_get_message" : "get_message",
+        inputSchema = GmailInputSchema(),
+        outputSchema = GmailFault is GmailToolFault.OutputSchemaMissing ? null : GmailOutputSchema(),
+        annotations = GmailFault is GmailToolFault.AnnotationsMissing ? null : GmailAnnotations(),
+    };
+
+    private object GmailAnnotations() => new
+    {
+        readOnlyHint = GmailFault is not GmailToolFault.ReadOnly,
+        destructiveHint = GmailFault is GmailToolFault.Destructive,
+        idempotentHint = GmailFault is not GmailToolFault.Idempotent,
+        openWorldHint = GmailFault is GmailToolFault.OpenWorld,
+    };
+
+    private object GmailInputSchema() => new
+    {
+        type = GmailFault is GmailToolFault.InputNonObject ? "array" : "object",
+        properties = new Dictionary<string, object>(StringComparer.Ordinal)
+        {
+            ["messageId"] = new
+            {
+                type = GmailFault is GmailToolFault.MessageIdType ? "number" : "string",
+            },
+            ["messageFormat"] = new
+            {
+                type = GmailFault is GmailToolFault.MessageFormatType ? "number" : "string",
+                @enum = GmailFault is GmailToolFault.MessageFormatEnum
+                    ? new[]
+                    {
+                        "MESSAGE_FORMAT_UNSPECIFIED",
+                        "MINIMAL",
+                        "FULL_CONTENT",
+                        "RAW",
+                    }
+                    : new[]
+                    {
+                        "MESSAGE_FORMAT_UNSPECIFIED",
+                        "MINIMAL",
+                        "FULL_CONTENT",
+                        "METADATA_ONLY",
+                    },
+            },
+        },
+        required = GmailFault is GmailToolFault.RequiredInputs
+            ? new[] { "messageId", "messageFormat" }
+            : new[] { "messageId" },
+    };
+
+    private object GmailOutputSchema()
+    {
+        var properties = new Dictionary<string, object>(StringComparer.Ordinal);
+        AddOutputProperty(properties, "id", GmailToolFault.OutputIdMissing, GmailToolFault.OutputIdType);
+        AddOutputProperty(
+            properties,
+            "subject",
+            GmailToolFault.OutputSubjectMissing,
+            GmailToolFault.OutputSubjectType);
+        AddOutputProperty(
+            properties,
+            "sender",
+            GmailToolFault.OutputSenderMissing,
+            GmailToolFault.OutputSenderType);
+        AddOutputProperty(
+            properties,
+            "plaintextBody",
+            GmailToolFault.OutputPlaintextBodyMissing,
+            GmailToolFault.OutputPlaintextBodyType);
+
+        return new
+        {
+            type = GmailFault is GmailToolFault.OutputNonObject ? "array" : "object",
+            properties,
+        };
     }
 
-    private static object ReorderedGmailTool() => new
+    private void AddOutputProperty(
+        Dictionary<string, object> properties,
+        string name,
+        GmailToolFault missingFault,
+        GmailToolFault typeFault)
     {
-        name = "get_message",
-        inputSchema = new
+        var fault = GmailFault;
+        if (fault == missingFault)
         {
-            type = "object",
-            properties = new Dictionary<string, object>(StringComparer.Ordinal)
-            {
-                ["messageFormat"] = new { type = "string" },
-                ["messageId"] = new { type = "string" },
-            },
-            required = new[] { "messageId", "messageFormat" },
-        },
-        annotations = new
-        {
-            readOnlyHint = true,
-            destructiveHint = false,
-        },
-    };
+            return;
+        }
+
+        properties[name] = new { type = fault == typeFault ? "number" : "string" };
+    }
 
     private static object Tool(string name, bool readOnly, params string[] properties) => new
     {
@@ -149,12 +209,38 @@ internal sealed class FakeMcpHttpServer(JsonElement structuredContent) : HttpMes
         },
     };
 
-    private Dictionary<string, object?> ToolResult(JsonElement request)
+    private Dictionary<string, object?> ToolResult(
+        HttpRequestMessage request,
+        JsonElement payload)
     {
-        var parameters = request.GetProperty("params");
+        var parameters = payload.GetProperty("params");
+        var tool = parameters.GetProperty("name").GetString()!;
         _toolCalls.Enqueue(new(
-            parameters.GetProperty("name").GetString()!,
+            request.RequestUri!,
+            request.Headers.Authorization?.Parameter,
+            tool,
             parameters.GetProperty("arguments").Clone()));
+
+        if (tool == "update_sobject_record" && FailUpdateCalls)
+        {
+            throw new HttpRequestException("Simulated loss after Salesforce invocation began.");
+        }
+
+        var content = tool switch
+        {
+            "update_sobject_record" => JsonSerializer.SerializeToElement(new { success = true }),
+            "soqlQuery" => ReconciliationDescription is null
+                ? JsonSerializer.SerializeToElement(Array.Empty<object>())
+                : JsonSerializer.SerializeToElement(new[]
+                {
+                    new
+                    {
+                        Id = "001000000000042AAA",
+                        Description = ReconciliationDescription,
+                    },
+                }),
+            _ => structuredContent,
+        };
 
         var result = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
@@ -164,7 +250,7 @@ internal sealed class FakeMcpHttpServer(JsonElement structuredContent) : HttpMes
 
         if (!OmitStructuredContent)
         {
-            result["structuredContent"] = structuredContent;
+            result["structuredContent"] = content;
         }
 
         return result;
@@ -194,7 +280,37 @@ internal sealed class CancellationProbeHandler : HttpMessageHandler
     }
 }
 
-internal sealed record McpToolCall(string Tool, JsonElement Arguments);
+internal sealed record McpToolCall(
+    Uri Endpoint,
+    string? AccessToken,
+    string Tool,
+    JsonElement Arguments);
+
+internal enum GmailToolFault
+{
+    None,
+    Name,
+    InputNonObject,
+    MessageIdType,
+    MessageFormatType,
+    MessageFormatEnum,
+    RequiredInputs,
+    OutputSchemaMissing,
+    OutputNonObject,
+    OutputIdMissing,
+    OutputIdType,
+    OutputSubjectMissing,
+    OutputSubjectType,
+    OutputSenderMissing,
+    OutputSenderType,
+    OutputPlaintextBodyMissing,
+    OutputPlaintextBodyType,
+    AnnotationsMissing,
+    ReadOnly,
+    Destructive,
+    Idempotent,
+    OpenWorld,
+}
 
 internal sealed class FakeHttpClientFactory(HttpMessageHandler handler) : IHttpClientFactory
 {

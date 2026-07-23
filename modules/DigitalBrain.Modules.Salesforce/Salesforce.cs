@@ -6,6 +6,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Integrations.Mcp;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
+using ModelContextProtocol.Client;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
@@ -14,7 +15,9 @@ namespace DigitalBrain.Salesforce;
 internal sealed class Salesforce : Neuron, ISalesforce
 {
     private const string MutationsName = "salesforce.mutations";
+    private const string QueryAccountName = "soqlQuery";
     private const string TokensName = "salesforce.oauth";
+    private const string UpdateAccountName = "update_sobject_record";
     private static readonly McpServerDefinition Server = new(
         "salesforce",
         "DigitalBrain Salesforce",
@@ -22,29 +25,20 @@ internal sealed class Salesforce : Neuron, ISalesforce
         "DigitalBrain:Salesforce",
         ["mcp_api", "refresh_token"],
         requiresClientSecret: false);
-    private static readonly McpToolContract UpdateAccount = McpToolContract.Mutation(
-        "update_sobject_record",
-        new McpToolProperty("sobject-name", "string"),
-        new McpToolProperty("id", "string"),
-        new McpToolProperty("body", "object"));
-    private static readonly McpToolContract QueryAccount = McpToolContract.ReadOnly(
-        "soqlQuery",
-        new McpToolProperty("query", "string"));
-
-    private readonly IMcpClient _client;
+    private readonly string _durableIdentity;
     private readonly IDurableDictionary<Guid, byte[]> _mutations;
+    private readonly McpRuntime _runtime;
     private readonly Serializer<MutationData> _states;
+    private readonly IDurableValue<byte[]> _tokenState;
 
-    public Salesforce(IMcpClientFactory clients)
+    public Salesforce(McpRuntime runtime)
     {
+        _runtime = runtime;
         _mutations = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(
             MutationsName);
         _states = ServiceProvider.GetRequiredService<Serializer<MutationData>>();
-        _client = clients.Create(
-            Server,
-            ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(TokensName),
-            () => WriteStateAsync(),
-            Id.ToString());
+        _tokenState = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(TokensName);
+        _durableIdentity = Id.ToString();
     }
 
     public async Task<SalesforceAccountDescriptionMutation> ProposeAccountDescriptionAsync(
@@ -127,33 +121,58 @@ internal sealed class Salesforce : Neuron, ISalesforce
 
         ValidateApprovalEvidence(mutation, approval, approvalEvidence);
 
-        var updateTool = await _client.InspectAsync(UpdateAccount, cancellationToken);
-        var queryTool = await _client.InspectAsync(QueryAccount, cancellationToken);
-        mutation = mutation with
-        {
-            Approval = approval,
-            ApprovalEvidence = approvalEvidence.SynapseId,
-            UpdateSchemaFingerprint = updateTool.SchemaFingerprint,
-            QuerySchemaFingerprint = queryTool.SchemaFingerprint,
-            Status = MutationStatus.Invoking,
-        };
-        await SaveAsync(mutation);
-
+        var fenced = false;
         try
         {
-            var content = await _client.InvokeAsync(
-                updateTool,
-                Arguments(mutation),
+            mutation = await _runtime.RunAsync(
+                Server,
+                _tokenState,
+                () => WriteStateAsync(),
+                _durableIdentity,
+                async (client, callbackCancellation) =>
+                {
+                    var tools = await client.ListToolsAsync(cancellationToken: callbackCancellation);
+                    var updateTool = SelectTool(
+                        tools,
+                        UpdateAccountName,
+                        readOnly: false,
+                        ("sobject-name", "string"),
+                        ("id", "string"),
+                        ("body", "object"));
+                    var queryTool = SelectTool(
+                        tools,
+                        QueryAccountName,
+                        readOnly: true,
+                        ("query", "string"));
+                    mutation = mutation with
+                    {
+                        Approval = approval,
+                        ApprovalEvidence = approvalEvidence.SynapseId,
+                        UpdateSchemaFingerprint = updateTool.Fingerprint,
+                        QuerySchemaFingerprint = queryTool.Fingerprint,
+                        Status = MutationStatus.Invoking,
+                    };
+                    await SaveAsync(mutation);
+                    fenced = true;
+                    var result = await updateTool.Tool.CallAsync(
+                        Arguments(mutation),
+                        cancellationToken: callbackCancellation);
+                    var content = McpRuntime.RequireStructuredContent(
+                        result,
+                        Server,
+                        UpdateAccountName);
+
+                    return mutation with
+                    {
+                        Status = content.TryGetProperty("success", out var success)
+                            && success.ValueKind is JsonValueKind.True
+                                ? MutationStatus.Completed
+                                : MutationStatus.OutcomeUncertain,
+                    };
+                },
                 cancellationToken);
-            mutation = mutation with
-            {
-                Status = content.TryGetProperty("success", out var success)
-                    && success.ValueKind is JsonValueKind.True
-                        ? MutationStatus.Completed
-                        : MutationStatus.OutcomeUncertain,
-            };
         }
-        catch (Exception)
+        catch (Exception) when (fenced)
         {
             mutation = await ReconcileAsync(mutation, CancellationToken.None);
         }
@@ -183,13 +202,36 @@ internal sealed class Salesforce : Neuron, ISalesforce
     {
         try
         {
-            var content = await _client.InvokeAsync(
-                new McpToolHandle(
-                    QueryAccount,
-                    RequiredFingerprint(mutation.QuerySchemaFingerprint, QueryAccount.Name)),
-                new Dictionary<string, object?>(StringComparer.Ordinal)
+            var content = await _runtime.RunAsync(
+                Server,
+                _tokenState,
+                () => WriteStateAsync(),
+                _durableIdentity,
+                async (client, callbackCancellation) =>
                 {
-                    ["query"] = $"SELECT Id, Description FROM Account WHERE Id = '{mutation.AccountId}' LIMIT 1",
+                    var tools = await client.ListToolsAsync(cancellationToken: callbackCancellation);
+                    var queryTool = SelectTool(
+                        tools,
+                        QueryAccountName,
+                        readOnly: true,
+                        ("query", "string"));
+
+                    if (!string.Equals(
+                        queryTool.Fingerprint,
+                        RequiredFingerprint(mutation.QuerySchemaFingerprint, QueryAccountName),
+                        StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException(
+                            $"{Server.DisplayName} MCP tool '{QueryAccountName}' schema changed after admission.");
+                    }
+
+                    var result = await queryTool.Tool.CallAsync(
+                        new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["query"] = $"SELECT Id, Description FROM Account WHERE Id = '{mutation.AccountId}' LIMIT 1",
+                        },
+                        cancellationToken: callbackCancellation);
+                    return McpRuntime.RequireStructuredContent(result, Server, QueryAccountName);
                 },
                 cancellationToken);
 
@@ -241,6 +283,62 @@ internal sealed class Salesforce : Neuron, ISalesforce
             ? fingerprint
             : throw new InvalidOperationException(
                 $"The durable invoking fence carries no admitted schema fingerprint for '{tool}'.");
+
+    private static SelectedTool SelectTool(
+        IList<McpClientTool> tools,
+        string name,
+        bool readOnly,
+        params (string Name, string Type)[] requiredProperties)
+    {
+        var matches = tools
+            .Where(candidate => string.Equals(candidate.Name, name, StringComparison.Ordinal))
+            .ToArray();
+
+        if (matches.Length != 1)
+        {
+            throw Incompatible(name);
+        }
+
+        var tool = matches[0];
+        var annotations = tool.ProtocolTool.Annotations;
+        var effectMatches = readOnly
+            ? annotations?.ReadOnlyHint is true && annotations.DestructiveHint is not true
+            : annotations?.ReadOnlyHint is not true;
+
+        if (!effectMatches
+            || requiredProperties.Any(property => !HasRequiredProperty(
+                tool.ProtocolTool.InputSchema,
+                property.Name,
+                property.Type)))
+        {
+            throw Incompatible(tool.Name);
+        }
+
+        return new SelectedTool(
+            tool,
+            McpToolFingerprint.Create(
+                tool.ProtocolTool.InputSchema,
+                tool.ProtocolTool.OutputSchema,
+                annotations?.ReadOnlyHint,
+                annotations?.DestructiveHint,
+                annotations?.IdempotentHint,
+                annotations?.OpenWorldHint));
+    }
+
+    private static bool HasRequiredProperty(JsonElement schema, string name, string type) =>
+        schema.TryGetProperty("type", out var schemaType)
+        && string.Equals(schemaType.GetString(), "object", StringComparison.Ordinal)
+        && schema.TryGetProperty("properties", out var properties)
+        && properties.TryGetProperty(name, out var property)
+        && property.TryGetProperty("type", out var propertyType)
+        && string.Equals(propertyType.GetString(), type, StringComparison.Ordinal)
+        && schema.TryGetProperty("required", out var required)
+        && required.ValueKind is JsonValueKind.Array
+        && required.EnumerateArray().Any(candidate =>
+            string.Equals(candidate.GetString(), name, StringComparison.Ordinal));
+
+    private static InvalidOperationException Incompatible(string tool) =>
+        new($"{Server.DisplayName} MCP tool '{tool}' is incompatible with its admitted contract.");
 
     private async Task SaveAsync(MutationData mutation, bool add = false)
     {
@@ -392,6 +490,8 @@ internal sealed class Salesforce : Neuron, ISalesforce
         [property: Id(7)] SalesforceMutationApproval? Approval,
         [property: Id(8)] SynapseId? ApprovalEvidence,
         [property: Id(9)] MutationStatus Status);
+
+    private sealed record SelectedTool(McpClientTool Tool, string Fingerprint);
 
     internal enum MutationStatus
     {

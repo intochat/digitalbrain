@@ -8,6 +8,30 @@ namespace DigitalBrain.Tests;
 
 public sealed class IntegrationContracts
 {
+    [Fact(DisplayName = "MCP providers expose no imitation client seams")]
+    public void McpProvidersExposeNoImitationClientSeams()
+    {
+        var forbidden = new[]
+        {
+            "IMcpClient",
+            "IMcpClientFactory",
+            "SdkMcpClient",
+            "SdkMcpClientFactory",
+            "McpSession",
+            "McpToolContract",
+        };
+        var assemblies = new[]
+        {
+            Assembly.Load("DigitalBrain.Integrations.Mcp"),
+            typeof(IGmail).Assembly,
+            typeof(ISalesforce).Assembly,
+        };
+
+        Assert.DoesNotContain(
+            assemblies.SelectMany(assembly => assembly.GetTypes()),
+            type => forbidden.Contains(type.Name, StringComparer.Ordinal));
+    }
+
     [Fact(DisplayName = "Gmail exposes semantic message reading without MCP-shaped public types")]
     public void GmailContractIsSemanticAndProviderAgnostic()
     {
@@ -21,6 +45,7 @@ public sealed class IntegrationContracts
             read.GetParameters().Select(parameter => parameter.ParameterType));
 
         AssertProviderAgnostic(typeof(IGmail).Assembly);
+        AssertProviderAgnostic(typeof(GoogleModule).Assembly);
     }
 
     [Fact(DisplayName = "Salesforce exposes an exact two-phase Account mutation contract")]
@@ -62,6 +87,7 @@ public sealed class IntegrationContracts
                 .Order(StringComparer.Ordinal));
 
         AssertProviderAgnostic(typeof(ISalesforce).Assembly);
+        AssertProviderAgnostic(typeof(SalesforceModule).Assembly);
     }
 
     private static void AssertProviderAgnostic(Assembly contracts)
