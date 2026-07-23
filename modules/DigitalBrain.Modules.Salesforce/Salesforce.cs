@@ -296,7 +296,9 @@ internal sealed class Salesforce : Neuron, ISalesforce
     {
         if (evidence.Caller != approval.Approver
             || evidence.Synapse is not SalesforceMutationApproval recorded
-            || recorded != approval)
+            || recorded != approval
+            || (mutation.Approval is not null
+                && mutation.ApprovalEvidence != evidence.SynapseId))
         {
             throw new NeuronAuthorizationException(
                 $"Salesforce mutation '{mutation.CommandId}' has no exact durable human approval evidence.");

@@ -3,6 +3,7 @@ using System.Text.Json;
 using DigitalBrain.Integrations.Mcp;
 using DigitalBrain.Security;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Authentication;
 using Xunit;
 
@@ -10,6 +11,43 @@ namespace DigitalBrain.Simulations;
 
 public sealed class CentralMcpContracts
 {
+    [Fact(DisplayName = "MCP authorization is fail-closed unless the host owns an authenticated edge")]
+    public async Task AuthorizationIsFailClosedAndHostOwned()
+    {
+        var services = new ServiceCollection();
+        McpRuntimeHosting.Configure(services, new ConfigurationBuilder().Build());
+        await using var provider = services.BuildServiceProvider();
+        var redirect = provider.GetRequiredService<IMcpAuthorizationRedirect>();
+
+        Assert.Same(RejectingMcpAuthorizationRedirect.Instance, redirect);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => redirect.AuthorizeAsync(
+            new Uri("https://authorization.example/authorize?state=expected"),
+            new Uri("https://application.example/callback"),
+            TestContext.Current.CancellationToken));
+
+        var hostRedirect = new StubAuthorizationRedirect();
+        var hostServices = new ServiceCollection();
+        hostServices.AddSingleton<IMcpAuthorizationRedirect>(hostRedirect);
+        McpRuntimeHosting.Configure(hostServices, new ConfigurationBuilder().Build());
+        await using var hostProvider = hostServices.BuildServiceProvider();
+
+        Assert.Same(hostRedirect, hostProvider.GetRequiredService<IMcpAuthorizationRedirect>());
+    }
+
+    [Theory(DisplayName = "local MCP authorization accepts only explicit HTTP loopback callbacks with OAuth state")]
+    [InlineData("https://localhost:41001/callback", "https://authorization.example/authorize?state=expected")]
+    [InlineData("http://application.example/callback", "https://authorization.example/authorize?state=expected")]
+    [InlineData("http://localhost:41001/callback", "https://authorization.example/authorize")]
+    public async Task LocalAuthorizationRejectsUnsafeCallbacks(string redirect, string authorization)
+    {
+        var adapter = new LocalLoopbackMcpAuthorizationRedirect();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => adapter.AuthorizeAsync(
+            new Uri(authorization),
+            new Uri(redirect),
+            TestContext.Current.CancellationToken));
+    }
+
     [Fact(DisplayName = "shared OAuth options come only from a provider definition and projected configuration")]
     public void OAuthOptionsComeFromDefinitionAndConfiguration()
     {
@@ -258,4 +296,13 @@ public sealed class CentralMcpContracts
                 [$"{root}:RedirectUri"] = redirectUri,
             })
             .Build();
+
+    private sealed class StubAuthorizationRedirect : IMcpAuthorizationRedirect
+    {
+        public Task<string?> AuthorizeAsync(
+            Uri authorizationUri,
+            Uri redirectUri,
+            CancellationToken cancellationToken)
+            => Task.FromResult<string?>(null);
+    }
 }

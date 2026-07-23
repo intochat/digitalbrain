@@ -76,6 +76,7 @@ public sealed class AccountEnrichmentCompositionContracts
             Assert.True(verified.WrongFingerprintRejected);
             Assert.True(verified.DifferentArgumentsRejected);
             Assert.Equal(expectedState, verified.ApprovedState);
+            Assert.True(verified.DifferentEvidenceRejected);
             Assert.True(verified.ReplayReturnedSameReceipt);
             Assert.Single(transport.Calls, call => call.Tool == "update_sobject_record");
             var query = Assert.Single(transport.Calls, call => call.Tool == "soqlQuery");
@@ -538,7 +539,8 @@ internal sealed record SalesforceMutationVerified(
     [property: Id(1)] bool WrongFingerprintRejected,
     [property: Id(2)] bool DifferentArgumentsRejected,
     [property: Id(3)] SalesforceMutationState ApprovedState,
-    [property: Id(4)] bool ReplayReturnedSameReceipt) : Synapse;
+    [property: Id(4)] bool ReplayReturnedSameReceipt,
+    [property: Id(5)] bool DifferentEvidenceRejected) : Synapse;
 
 internal sealed class SalesforceMutationVerifier : Neuron,
     IHandle<VerifySalesforceMutation>,
@@ -612,6 +614,11 @@ internal sealed class SalesforceMutationVerifier : Neuron,
             approval,
             evidence,
             cancellationToken);
+        var differentEvidenceRejected = await RejectsAuthorizationAsync(
+            () => salesforce.ApproveAccountDescriptionAsync(
+                approval,
+                ForgedDelivery.Create(approval, approval.Approver),
+                cancellationToken));
         var replay = await salesforce.ApproveAccountDescriptionAsync(
             approval,
             evidence,
@@ -622,7 +629,8 @@ internal sealed class SalesforceMutationVerifier : Neuron,
             wrongFingerprintRejected,
             _differentArgumentsRejected,
             uncertain.State,
-            uncertain == replay));
+            uncertain == replay,
+            differentEvidenceRejected));
     }
 
     private static async Task<bool> RejectsAsync(Func<Task> action)
@@ -633,6 +641,19 @@ internal sealed class SalesforceMutationVerifier : Neuron,
             return false;
         }
         catch (InvalidOperationException)
+        {
+            return true;
+        }
+    }
+
+    private static async Task<bool> RejectsAuthorizationAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+            return false;
+        }
+        catch (NeuronAuthorizationException)
         {
             return true;
         }

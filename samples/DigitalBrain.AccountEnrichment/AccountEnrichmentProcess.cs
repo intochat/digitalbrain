@@ -117,7 +117,7 @@ public sealed class AccountEnrichmentProcess : Neuron,
         SalesforceMutationApproval approval)
     {
         var incoming = await ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
-        var evidence = incoming.Delta.LastOrDefault(delivery =>
+        var evidence = incoming.Delta.FirstOrDefault(delivery =>
             delivery.Caller == approval.Approver
             && delivery.Synapse is SalesforceMutationApproval recorded
             && recorded == approval);

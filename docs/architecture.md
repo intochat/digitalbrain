@@ -436,15 +436,15 @@ identity with different content is rejected. Human approval binds to the exact f
 approved payload cannot be swapped between the moment a person read it and the moment it is sent.
 
 The pause between proposal and approval is not machinery. Proposing a description performs zero MCP
-or provider operations, records the mutation once as `AwaitingApproval`, and returns a receipt;
-resuming it is a second ordinary
-interface call, `ISalesforce.ApproveAccountDescriptionAsync`, carrying the approval record together
-with the durable delivery that proves a human produced it. Nothing intercepts, wraps, or watches the
-neuron — which is precisely why the neuron has to do the checking itself, and does. It requires that
-the delivery's caller is the approver the approval names, that the synapse inside that delivery is
-that same approval record rather than merely one shaped like it, and that the approver is a session
-neuron belonging to this neuron's owner. A caller who skips the proposal, mints an approval, reuses
-someone else's evidence, or approves a fingerprint that no longer matches the stored payload is
+or provider operations, records the mutation once as `AwaitingApproval`, and returns a receipt.
+Resuming it is a second ordinary interface call, `ISalesforce.ApproveAccountDescriptionAsync`,
+carrying the approval record together with the durable delivery that proves a human produced it.
+Nothing intercepts, wraps, or watches the neuron — which is precisely why the neuron has to do the
+checking itself, and does. It requires that the delivery's caller is the approver the approval names,
+that the synapse inside that delivery is the same approval record, that terminal replays retain the
+originally committed delivery identity, and that the approver is a session neuron belonging to this
+neuron's owner. A caller who skips the proposal, mints an approval, reuses someone else's evidence,
+or approves a fingerprint that no longer matches the stored payload is
 refused before Salesforce is contacted at all. Only after that evidence passes does approval open an
 authenticated session and admit the exact read and mutation tools. The approval evidence, admitted
 schema fingerprints, and `Invoking` fence are committed in one durable save before the update call.
