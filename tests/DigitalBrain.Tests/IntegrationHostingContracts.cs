@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
@@ -12,6 +13,56 @@ namespace DigitalBrain.Tests;
 
 public sealed class IntegrationHostingContracts
 {
+    private static readonly string RepositoryRoot = LocateRepositoryRoot();
+
+    [Fact(DisplayName = "the AppHost build exclusively initializes or synchronizes CodeGraph")]
+    public void AppHostBuildOwnsCodeGraphRefresh()
+    {
+        var document = XDocument.Load(Path.Combine(RepositoryRoot, "Directory.Build.targets"));
+        var target = Assert.Single(
+            document.Descendants("Target"),
+            candidate => candidate
+                .Descendants("Exec")
+                .Any(exec => CommandOf(exec).Contains("@colbymchenry/codegraph", StringComparison.Ordinal)));
+        var executions = target.Descendants("Exec").ToArray();
+
+        Assert.Equal("Build", AttributeOf(target, "BeforeTargets"));
+        Assert.Equal(
+            "'$(IsAspireHost)' == 'true' And '$(MSBuildProjectFullPath)' == '$(_CodeGraphAppHostProject)'",
+            AttributeOf(target, "Condition").Trim());
+        Assert.Equal(2, executions.Length);
+
+        var initialize = Assert.Single(executions, exec =>
+            CommandOf(exec).Contains(" init ", StringComparison.Ordinal));
+        var synchronize = Assert.Single(executions, exec =>
+            CommandOf(exec).Contains(" sync ", StringComparison.Ordinal));
+
+        Assert.Equal("!Exists('$(_CodeGraphDatabase)')", AttributeOf(initialize, "Condition"));
+        Assert.Equal("Exists('$(_CodeGraphDatabase)')", AttributeOf(synchronize, "Condition"));
+        Assert.All(executions, exec =>
+        {
+            var command = CommandOf(exec);
+
+            Assert.StartsWith("npx -y @colbymchenry/codegraph@latest ", command, StringComparison.Ordinal);
+            Assert.EndsWith(" \"$(_CodeGraphRepositoryRoot)\"", command, StringComparison.Ordinal);
+            Assert.Null(exec.Attribute("ContinueOnError"));
+        });
+
+        var repositoryRoot = Assert.Single(document.Descendants("_CodeGraphRepositoryRoot")).Value;
+        var appHostProject = Assert.Single(document.Descendants("_CodeGraphAppHostProject")).Value;
+        var database = Assert.Single(document.Descendants("_CodeGraphDatabase")).Value;
+        var serialized = document.ToString();
+
+        Assert.Contains("NormalizePath", repositoryRoot, StringComparison.Ordinal);
+        Assert.Contains("MSBuildThisFileDirectory", repositoryRoot, StringComparison.Ordinal);
+        Assert.Contains("_CodeGraphRepositoryRoot", appHostProject, StringComparison.Ordinal);
+        Assert.Contains("DigitalBrain.AppHost.csproj", appHostProject, StringComparison.Ordinal);
+        Assert.Contains("_CodeGraphRepositoryRoot", database, StringComparison.Ordinal);
+        Assert.Contains(".codegraph", database, StringComparison.Ordinal);
+        Assert.Contains("codegraph.db", database, StringComparison.Ordinal);
+        Assert.DoesNotContain(".codegraph-initialized", serialized, StringComparison.Ordinal);
+    }
+
     [Fact(DisplayName = "one durable brain profile owns Orleans tables, journal readiness, and silo-only protection")]
     public async Task DurableBrainProfileIsCompleteAndSiloOnly()
     {
@@ -138,6 +189,25 @@ public sealed class IntegrationHostingContracts
     private static ParameterResource Parameter(IDistributedApplicationBuilder builder, string name)
         => Assert.IsType<ParameterResource>(
             Assert.Single(builder.Resources, resource => resource.Name == name));
+
+    private static string AttributeOf(XElement element, string name) =>
+        element.Attribute(name)?.Value
+        ?? throw new InvalidOperationException($"{element.Name.LocalName} carries no {name} attribute.");
+
+    private static string CommandOf(XElement exec) => AttributeOf(exec, "Command");
+
+    private static string LocateRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName
+            ?? throw new InvalidOperationException("DigitalBrain.slnx was not found above the test assembly.");
+    }
 
     private static async Task<Dictionary<string, object>> ProjectAsync(IResourceWithEnvironment resource)
     {
