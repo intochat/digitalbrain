@@ -250,7 +250,7 @@ node tools/render-specification.mjs
 node --test tests/*.test.mjs
 Set-Location ..
 ```
-Expected: the 16 existing tests plus the 3 new ones pass. The `.vitepress/theme` must-not-exist assertion (site.test.mjs) still passes — only the data file and `tests/` were added, not the theme dir. Quote the pass count.
+Expected: the data file now lives in `docs/.vitepress/theme/`, so that directory exists and the site test's old "theme must not exist" assertion would fail. As part of this task, flip that one line in `docs/tests/site.test.mjs` from `false` to `true` (assert the theme directory exists) with a `// the interactive architecture diagram lives in the site's one custom theme` comment above it, so the boundary stays green. Task 2 strengthens it to require the component files. Then the 16 existing tests plus the 3 new ones pass — quote the pass count. Commit the site.test.mjs edit with the two new files.
 
 - [ ] **Step 7: Commit**
 
@@ -272,15 +272,16 @@ git commit -m "docs: add the architecture diagram data and its integrity guard"
 - Consumes: `KERNEL`, `MODULES`, `ACTORS`, `BEHAVIORS` from `architecture-data.js` (Task 1).
 - Produces: a globally registered `<ArchitectureMap />` component. Task 3 embeds the tag.
 
-- [ ] **Step 1: Flip the theme guard to a failing positive assertion**
+- [ ] **Step 1: Strengthen the theme guard to a failing positive assertion**
 
-In `docs/tests/site.test.mjs`, replace the single line inside the `every documented page exists…` test:
+Task 1 already flipped the guard to `assert.equal(existsSync(join(docsRoot, '.vitepress', 'theme')), true)` (with a `// the interactive architecture diagram lives in the site's one custom theme` comment). In `docs/tests/site.test.mjs`, replace those two lines inside the `every documented page exists…` test:
 
 ```javascript
-  assert.equal(existsSync(join(docsRoot, '.vitepress', 'theme')), false)
+  // the interactive architecture diagram lives in the site's one custom theme
+  assert.equal(existsSync(join(docsRoot, '.vitepress', 'theme')), true)
 ```
 
-with:
+with the stronger assertions:
 
 ```javascript
   // the interactive architecture diagram lives in the site's one custom theme
