@@ -7,7 +7,8 @@ namespace DigitalBrain.AccountEnrichment;
 public sealed record EnrichAccountFromEmail(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] string MessageId,
-    [property: Id(2)] string AccountId) : Synapse;
+    [property: Id(2)] string AccountId,
+    [property: Id(3)] string GmailAccount) : Synapse;
 
 [GenerateSerializer]
 [Alias("db.account-enrichment.proposed")]
@@ -25,6 +26,11 @@ public sealed record AccountEnriched(
     [property: Id(1)] string MessageId,
     [property: Id(2)] string AccountId,
     [property: Id(3)] string Description) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.account-enrichment.continue")]
+internal sealed record ContinueAccountEnrichment(
+    [property: Id(0)] CommandId CommandId) : Synapse;
 
 [GenerateSerializer]
 [Alias("db.account-enrichment.execute-approved")]

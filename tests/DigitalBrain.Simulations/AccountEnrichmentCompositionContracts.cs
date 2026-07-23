@@ -8,6 +8,7 @@ using DigitalBrain.Integrations.Mcp;
 using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Security;
+using DigitalBrain.Testing;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Authentication;
@@ -21,6 +22,29 @@ namespace DigitalBrain.Simulations;
 
 public sealed class AccountEnrichmentCompositionContracts
 {
+    [Fact(DisplayName = "account enrichment appends the named Gmail account to its public wire contract")]
+    public void AccountEnrichmentAppendsTheNamedGmailAccountToItsPublicWireContract()
+    {
+        var members = typeof(EnrichAccountFromEmail)
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Select(property => (
+                property.Name,
+                Id: property.GetCustomAttribute<IdAttribute>()?.Id))
+            .Where(member => member.Id.HasValue)
+            .OrderBy(member => member.Id)
+            .Select(member => (member.Name, member.Id!.Value))
+            .ToArray();
+
+        Assert.Equal(
+            [
+                ("CommandId", 0u),
+                ("MessageId", 1u),
+                ("AccountId", 2u),
+                ("GmailAccount", 3u),
+            ],
+            members);
+    }
+
     [Fact(DisplayName = "named Gmail neurons bind token purposes to their complete durable identity")]
     public void NamedGmailAccountsHaveIsolatedTokenPurposes()
     {
@@ -44,6 +68,384 @@ public sealed class AccountEnrichmentCompositionContracts
                 McpRuntime.TokenPurpose(server, first.ToString()),
                 McpRuntime.TokenPurpose(server, second.ToString()),
             });
+    }
+
+    [Fact(DisplayName = "account enrichment rejects empty provider identifiers before provider access")]
+    public async Task AccountEnrichmentRejectsEmptyProviderIdentifiersBeforeProviderAccess()
+    {
+        using var server = GmailServer();
+        var cluster = await StartClusterAsync(server);
+
+        try
+        {
+            var owner = new OwnerId("account-enrichment-empty-identifiers");
+            var composition = NeuronId.For<AccountEnrichmentProcess>(owner, "enrich-account");
+            var caller = new NeuronId(ISessionNeuron.GrainTypeName, owner, "session");
+            var session = cluster.Client.GetGrain<ISessionNeuron>(caller.ToGrainId());
+            var probe = NeuronId.For<AccountEnrichmentDeliveryProbe>(owner, "delivery-probe");
+            var command = EnrichmentRequest(
+                CommandId.New(),
+                "account-enrichment@example.com");
+            var invalid = new[]
+            {
+                command with { GmailAccount = " " },
+                command with { MessageId = " " },
+                command with { AccountId = " " },
+            };
+
+            foreach (var candidate in invalid)
+            {
+                var result = await ProbeDeliveryAsync(
+                    session,
+                    probe,
+                    composition,
+                    candidate,
+                    caller);
+                Assert.Equal("ArgumentException", result.Failure);
+            }
+
+            Assert.Empty(server.Requests);
+            Assert.Empty(server.ToolCalls);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Theory(DisplayName = "invalid Gmail identities do not poison an enrichment command")]
+    [InlineData("account/enrichment@example.com")]
+    [InlineData("account enrichment@example.com")]
+    public async Task InvalidGmailIdentitiesDoNotPoisonAnEnrichmentCommand(
+        string invalidGmailAccount)
+    {
+        var journals = new AIWorkerJournalStorageProvider();
+        using var server = GmailServer();
+        var cluster = await StartClusterAsync(server, journals: journals);
+        var owner = new OwnerId("account-enrichment-invalid-gmail-identity");
+        var composition = NeuronId.For<AccountEnrichmentProcess>(owner, "enrich-account");
+        var process = composition.ToGrainId();
+
+        try
+        {
+            var caller = new NeuronId(ISessionNeuron.GrainTypeName, owner, "session");
+            var session = cluster.Client.GetGrain<ISessionNeuron>(caller.ToGrainId());
+            var probe = NeuronId.For<AccountEnrichmentDeliveryProbe>(owner, "delivery-probe");
+            var command = EnrichmentRequest(CommandId.New(), invalidGmailAccount);
+
+            Assert.Throws<ArgumentException>(
+                () => NeuronId.For<IGmail>(owner, invalidGmailAccount));
+
+            var rejected = await ProbeDeliveryAsync(
+                session,
+                probe,
+                composition,
+                command,
+                caller);
+            var outgoingAfterRejection = await session.ReadNeuronJournalAsync(
+                composition,
+                JournalKind.Outgoing,
+                afterSequence: 0);
+
+            Assert.Equal("ArgumentException", rejected.Failure);
+            Assert.Equal(0, journals.CompletedWrites(process));
+            Assert.DoesNotContain(
+                outgoingAfterRejection.Delta,
+                delivery => delivery.Synapse.GetType().Name
+                    == "ContinueAccountEnrichment");
+            Assert.Empty(server.Requests);
+            Assert.Empty(server.ToolCalls);
+
+            const string validGmailAccount = "account-enrichment@example.com";
+            await session.FireAsync(
+                composition,
+                command with { GmailAccount = validGmailAccount });
+            await ReadUntilAsync<AccountEnrichmentProposed>(session, composition);
+            var namedGmailIncoming = await session.ReadNeuronJournalAsync(
+                NeuronId.For<IGmail>(owner, validGmailAccount),
+                JournalKind.Incoming,
+                afterSequence: 0);
+
+            Assert.Single(
+                namedGmailIncoming.Delta,
+                delivery => delivery.Synapse is CapabilityRequested request
+                    && request.Method == nameof(IGmail.ReadMessageAsync));
+            Assert.Equal(
+                1,
+                await CountOutgoingAsync<AccountEnrichmentProposed>(
+                    session,
+                    composition));
+            Assert.Equal(
+                1,
+                await CountOutgoingAsync(
+                    session,
+                    composition,
+                    "ContinueAccountEnrichment"));
+            Assert.Equal(
+                1,
+                server.ToolCalls.Count(call => call.Tool == "get_message"));
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "account enrichment resolves each exact named Gmail neuron")]
+    public async Task AccountEnrichmentResolvesEachExactNamedGmailNeuron()
+    {
+        using var server = GmailServer();
+        var cluster = await StartClusterAsync(server);
+
+        try
+        {
+            var owner = new OwnerId("account-enrichment-named-gmail");
+            var composition = NeuronId.For<AccountEnrichmentProcess>(owner, "enrich-account");
+            var session = cluster.Client.GetGrain<ISessionNeuron>(
+                new NeuronId(ISessionNeuron.GrainTypeName, owner, "session").ToGrainId());
+            var accounts = new[]
+            {
+                "first@example.com",
+                "second@example.com",
+            };
+
+            foreach (var account in accounts)
+            {
+                await session.FireAsync(
+                    composition,
+                    EnrichmentRequest(CommandId.New(), account));
+            }
+
+            await ReadUntilCountAsync<AccountEnrichmentProposed>(
+                session,
+                composition,
+                expectedCount: accounts.Length);
+            var outgoing = await session.ReadNeuronJournalAsync(
+                composition,
+                JournalKind.Outgoing,
+                afterSequence: 0);
+            var targets = outgoing.Delta
+                .Select(delivery => delivery.Synapse)
+                .OfType<CapabilityRequested>()
+                .Where(request => request.Contract == typeof(IGmail).FullName)
+                .Select(request => request.Target)
+                .ToArray();
+
+            Assert.Equal(
+                accounts
+                    .Select(account => NeuronId.For<IGmail>(owner, account))
+                    .OrderBy(identity => identity.ToString(), StringComparer.Ordinal),
+                targets.OrderBy(identity => identity.ToString(), StringComparer.Ordinal));
+
+            foreach (var account in accounts)
+            {
+                var incoming = await session.ReadNeuronJournalAsync(
+                    NeuronId.For<IGmail>(owner, account),
+                    JournalKind.Incoming,
+                    afterSequence: 0);
+                Assert.Single(
+                    incoming.Delta,
+                    delivery => delivery.Synapse is CapabilityRequested request
+                        && request.Method == nameof(IGmail.ReadMessageAsync));
+            }
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Theory(DisplayName = "failed enrichment fence or proposal writes restore state and retry cleanly")]
+    [InlineData(0, 1)]
+    [InlineData(5, 2)]
+    public async Task FailedEnrichmentWritesRestoreStateAndRetryCleanly(
+        int completedWritesBeforeFailure,
+        int expectedGmailReads)
+    {
+        var journals = new AIWorkerJournalStorageProvider();
+        using var server = GmailServer();
+        var cluster = await StartClusterAsync(server, journals: journals);
+        var owner = new OwnerId($"account-enrichment-write-{completedWritesBeforeFailure}");
+        var composition = NeuronId.For<AccountEnrichmentProcess>(owner, "enrich-account");
+        var process = composition.ToGrainId();
+
+        try
+        {
+            var caller = new NeuronId(ISessionNeuron.GrainTypeName, owner, "session");
+            var session = cluster.Client.GetGrain<ISessionNeuron>(caller.ToGrainId());
+            var command = EnrichmentRequest(
+                CommandId.New(),
+                "account-enrichment@example.com");
+            journals.FailWriteAfter(
+                process,
+                completedWritesBeforeFailure,
+                "Expected account-enrichment write failure.");
+
+            await session.FireAsync(composition, command);
+
+            if (completedWritesBeforeFailure == 5)
+            {
+                await WaitUntilAsync(
+                    () => journals.FiredFailures(process) == 1,
+                    "The injected proposal commit failure did not fire.");
+                await WaitUntilAsync(
+                    () => journals.CompletedWrites(process) == 6,
+                    "The failed proposal turn did not durably preserve its pending self-delivery.");
+                var outgoing = await session.ReadNeuronJournalAsync(
+                    composition,
+                    JournalKind.Outgoing,
+                    afterSequence: 0);
+                var continuation = Assert.Single(
+                    outgoing.Delta,
+                    delivery => delivery.Synapse.GetType().Name
+                        == "ContinueAccountEnrichment");
+
+                Assert.DoesNotContain(
+                    outgoing.Delta,
+                    delivery => delivery.Synapse is AccountEnrichmentProposed);
+                Assert.Equal(
+                    1,
+                    server.ToolCalls.Count(call => call.Tool == "get_message"));
+
+                await session.FireAsync(composition, continuation.Synapse);
+            }
+
+            await ReadUntilAsync<AccountEnrichmentProposed>(session, composition);
+
+            Assert.Equal(1, journals.FiredFailures(process));
+            Assert.Equal(
+                expectedGmailReads,
+                server.ToolCalls.Count(call => call.Tool == "get_message"));
+            Assert.Equal(
+                1,
+                await CountOutgoingAsync<AccountEnrichmentProposed>(session, composition));
+        }
+        finally
+        {
+            journals.ClearFailure(process);
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "account enrichment commits its request fence before any provider call")]
+    public async Task AccountEnrichmentCommitsItsRequestFenceBeforeAnyProviderCall()
+    {
+        var journals = new AIWorkerJournalStorageProvider();
+        using var server = GmailServer();
+        var cluster = await StartClusterAsync(server, journals: journals);
+        var owner = new OwnerId("account-enrichment-fence-order");
+        var composition = NeuronId.For<AccountEnrichmentProcess>(owner, "enrich-account");
+        var gate = journals.BlockNextWrite(composition.ToGrainId());
+
+        try
+        {
+            var session = cluster.Client.GetGrain<ISessionNeuron>(
+                new NeuronId(ISessionNeuron.GrainTypeName, owner, "session").ToGrainId());
+
+            await session.FireAsync(
+                composition,
+                EnrichmentRequest(CommandId.New(), "account-enrichment@example.com"));
+            await gate.Entered.WaitAsync(
+                TimeSpan.FromSeconds(2),
+                TestContext.Current.CancellationToken);
+
+            Assert.Empty(server.Requests);
+            Assert.Empty(server.ToolCalls);
+
+            gate.Release();
+            await ReadUntilAsync<AccountEnrichmentProposed>(session, composition);
+            var outgoing = await session.ReadNeuronJournalAsync(
+                composition,
+                JournalKind.Outgoing,
+                afterSequence: 0);
+
+            Assert.Equal(
+                "ContinueAccountEnrichment",
+                outgoing.Delta[0].Synapse.GetType().Name);
+            Assert.Contains(
+                outgoing.Delta.Skip(1),
+                delivery => delivery.Synapse is CapabilityRequested request
+                    && request.Contract == typeof(IGmail).FullName);
+        }
+        finally
+        {
+            gate.Release();
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact(DisplayName = "account enrichment rejects changed replay before providers and exact replay is inert")]
+    public async Task AccountEnrichmentRejectsChangedReplayBeforeProvidersAndExactReplayIsInert()
+    {
+        using var server = GmailServer();
+        var cluster = await StartClusterAsync(server);
+
+        try
+        {
+            var owner = new OwnerId("account-enrichment-replay");
+            var composition = NeuronId.For<AccountEnrichmentProcess>(owner, "enrich-account");
+            var caller = new NeuronId(ISessionNeuron.GrainTypeName, owner, "session");
+            var session = cluster.Client.GetGrain<ISessionNeuron>(caller.ToGrainId());
+            var probe = NeuronId.For<AccountEnrichmentDeliveryProbe>(owner, "delivery-probe");
+            var command = EnrichmentRequest(
+                CommandId.New(),
+                "account-enrichment@example.com");
+
+            await session.FireAsync(composition, command);
+            await ReadUntilAsync<AccountEnrichmentProposed>(session, composition);
+            var requestsBeforeReplay = server.Requests.Count;
+            var callsBeforeReplay = server.ToolCalls.Count;
+
+            var replay = await ProbeDeliveryAsync(
+                session,
+                probe,
+                composition,
+                command,
+                caller);
+
+            Assert.Null(replay.Failure);
+            Assert.Equal(requestsBeforeReplay, server.Requests.Count);
+            Assert.Equal(callsBeforeReplay, server.ToolCalls.Count);
+            Assert.Equal(
+                1,
+                await CountOutgoingAsync<AccountEnrichmentProposed>(session, composition));
+            Assert.Equal(
+                1,
+                await CountOutgoingAsync(
+                    session,
+                    composition,
+                    "ContinueAccountEnrichment"));
+
+            var changed = new[]
+            {
+                command with { GmailAccount = "different@example.com" },
+                command with { MessageId = "different-message" },
+                command with { AccountId = "001000000000043AAA" },
+            };
+
+            foreach (var candidate in changed)
+            {
+                var result = await ProbeDeliveryAsync(
+                    session,
+                    probe,
+                    composition,
+                    candidate,
+                    caller);
+                Assert.Equal("InvalidOperationException", result.Failure);
+                Assert.Equal(requestsBeforeReplay, server.Requests.Count);
+                Assert.Equal(callsBeforeReplay, server.ToolCalls.Count);
+            }
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
     }
 
     [Fact(DisplayName = "Salesforce approval is a typed human authority fact")]
@@ -451,6 +853,60 @@ public sealed class AccountEnrichmentCompositionContracts
         }
     }
 
+    [Fact(DisplayName = "failed account enrichment completion writes restore state and emit once")]
+    public async Task FailedAccountEnrichmentCompletionWritesRestoreStateAndEmitOnce()
+    {
+        var journals = new AIWorkerJournalStorageProvider();
+        using var server = GmailServer();
+        var cluster = await StartClusterAsync(server, journals: journals);
+        var owner = new OwnerId("account-enrichment-completion-write");
+        var composition = NeuronId.For<AccountEnrichmentProcess>(owner, "enrich-account");
+        var processId = composition.ToGrainId();
+
+        try
+        {
+            var caller = new NeuronId(ISessionNeuron.GrainTypeName, owner, "session");
+            var session = cluster.Client.GetGrain<ISessionNeuron>(caller.ToGrainId());
+            var probe = NeuronId.For<AccountEnrichmentDeliveryProbe>(owner, "delivery-probe");
+            var command = EnrichmentRequest(
+                CommandId.New(),
+                "account-enrichment@example.com");
+            await session.FireAsync(composition, command);
+            var proposedDelivery = await ReadUntilAsync<AccountEnrichmentProposed>(
+                session,
+                composition);
+            var proposed = Assert.IsType<AccountEnrichmentProposed>(proposedDelivery.Synapse);
+            var approval = Approval(owner, command.CommandId, proposed.Fingerprint);
+            journals.FailWriteAfter(
+                processId,
+                completedWritesBeforeFailure: 1,
+                "Expected account-enrichment completion write failure.");
+
+            var approvalResult = await ProbeDeliveryAsync(
+                session,
+                probe,
+                composition,
+                approval,
+                caller);
+            Assert.Null(approvalResult.Failure);
+            await ReadUntilAsync<AccountEnriched>(session, composition);
+
+            Assert.Equal(1, journals.FiredFailures(processId));
+            Assert.Equal(
+                1,
+                await CountOutgoingAsync<AccountEnriched>(session, composition));
+            Assert.Single(
+                server.ToolCalls,
+                call => call.Tool == "updateSobjectRecord");
+        }
+        finally
+        {
+            journals.ClearFailure(processId);
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
     [Fact(DisplayName = "compiled typed composition requires exact approval before enriching one Salesforce Account")]
     public async Task CompiledTypedCompositionRequiresExactApprovalBeforeEnrichingOneSalesforceAccount()
     {
@@ -466,7 +922,8 @@ public sealed class AccountEnrichmentCompositionContracts
             var command = new EnrichAccountFromEmail(
                 new CommandId(Guid.Parse("2f65dd7a-c6fd-413b-8b38-16062368de2c")),
                 "gmail-message-42",
-                "001000000000042AAA");
+                "001000000000042AAA",
+                "account-enrichment@example.com");
 
             await session.FireAsync(composition, command);
 
@@ -537,11 +994,56 @@ public sealed class AccountEnrichmentCompositionContracts
                 outcome.Description,
                 salesforceCall.Arguments.GetProperty("body").GetProperty("Description").GetString());
 
-            await AssertCapabilityLineageAsync(session, composition, owner);
+            await AssertCapabilityLineageAsync(
+                session,
+                composition,
+                owner,
+                command.GmailAccount);
+            var incoming = await session.ReadNeuronJournalAsync(
+                composition,
+                JournalKind.Incoming,
+                afterSequence: 0);
+            Assert.Single(
+                incoming.Delta,
+                delivery => delivery.Caller == approval.Approver
+                    && delivery.Synapse is SalesforceMutationApproval recorded
+                    && recorded == approval);
+            var providerRequests = server.Requests.Count;
+            var providerCalls = server.ToolCalls.Count;
+            var probe = NeuronId.For<AccountEnrichmentDeliveryProbe>(owner, "delivery-probe");
 
-            await session.FireAsync(composition, approval);
-            await ReadUntilCountAsync<AccountEnriched>(session, composition, expectedCount: 2);
+            var requestReplay = await ProbeDeliveryAsync(
+                session,
+                probe,
+                composition,
+                command,
+                approval.Approver);
+            var approvalReplay = await ProbeDeliveryAsync(
+                session,
+                probe,
+                composition,
+                approval,
+                approval.Approver);
 
+            Assert.Null(requestReplay.Failure);
+            Assert.Null(approvalReplay.Failure);
+            Assert.Equal(providerRequests, server.Requests.Count);
+            Assert.Equal(providerCalls, server.ToolCalls.Count);
+            Assert.Equal(
+                1,
+                await CountOutgoingAsync<AccountEnriched>(session, composition));
+            Assert.Equal(
+                1,
+                await CountOutgoingAsync(
+                    session,
+                    composition,
+                    "ContinueAccountEnrichment"));
+            Assert.Equal(
+                1,
+                await CountOutgoingAsync(
+                    session,
+                    composition,
+                    "ExecuteApprovedAccountEnrichment"));
             Assert.Single(server.ToolCalls, call => call.Tool == "updateSobjectRecord");
         }
         finally
@@ -580,6 +1082,62 @@ public sealed class AccountEnrichmentCompositionContracts
         return (prepared, verified);
     }
 
+    private static async Task<AccountEnrichmentDeliveryProbed> ProbeDeliveryAsync(
+        ISessionNeuron session,
+        NeuronId probe,
+        NeuronId target,
+        Synapse synapse,
+        NeuronId caller)
+    {
+        var probeId = Guid.NewGuid();
+        await session.FireAsync(
+            probe,
+            new ProbeAccountEnrichmentDelivery(
+                probeId,
+                target,
+                synapse,
+                caller));
+
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            var outgoing = await session.ReadNeuronJournalAsync(
+                probe,
+                JournalKind.Outgoing,
+                afterSequence: 0);
+            var result = outgoing.Delta
+                .Select(delivery => delivery.Synapse)
+                .OfType<AccountEnrichmentDeliveryProbed>()
+                .FirstOrDefault(candidate => candidate.ProbeId == probeId);
+
+            if (result is not null)
+            {
+                return result;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(10), TestContext.Current.CancellationToken);
+        }
+
+        throw new TimeoutException(
+            $"Delivery probe '{probeId}' did not report a result for '{target}'.");
+    }
+
+    private static async Task WaitUntilAsync(
+        Func<bool> condition,
+        string timeoutMessage)
+    {
+        for (var attempt = 0; attempt < 200; attempt++)
+        {
+            if (condition())
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(10), TestContext.Current.CancellationToken);
+        }
+
+        throw new TimeoutException(timeoutMessage);
+    }
+
     private static SalesforceMutationApproval Approval(
         OwnerId owner,
         CommandId command,
@@ -590,6 +1148,15 @@ public sealed class AccountEnrichmentCompositionContracts
             fingerprint,
             new NeuronId(ISessionNeuron.GrainTypeName, owner, "session"),
             new DateTimeOffset(2026, 7, 23, 10, 0, 0, TimeSpan.Zero));
+
+    private static EnrichAccountFromEmail EnrichmentRequest(
+        CommandId command,
+        string gmailAccount) =>
+        new(
+            command,
+            "gmail-message-42",
+            "001000000000042AAA",
+            gmailAccount);
 
     private static async Task<InProcessTestCluster> StartClusterAsync(
         FakeMcpHttpServer server,
@@ -650,7 +1217,8 @@ public sealed class AccountEnrichmentCompositionContracts
     private static async Task AssertCapabilityLineageAsync(
         ISessionNeuron session,
         NeuronId composition,
-        OwnerId owner)
+        OwnerId owner,
+        string gmailAccount)
     {
         var outgoing = await session.ReadNeuronJournalAsync(
             composition,
@@ -672,7 +1240,7 @@ public sealed class AccountEnrichmentCompositionContracts
             && request.Contract == typeof(ISalesforce).FullName
             && request.Method == nameof(ISalesforce.ApproveAccountDescriptionAsync));
         var gmailIncoming = await session.ReadNeuronJournalAsync(
-            NeuronId.For<IGmail>(owner, "gmail"),
+            NeuronId.For<IGmail>(owner, gmailAccount),
             JournalKind.Incoming,
             afterSequence: 0);
         var salesforceIncoming = await session.ReadNeuronJournalAsync(
@@ -749,6 +1317,33 @@ public sealed class AccountEnrichmentCompositionContracts
         throw new TimeoutException(
             $"Neuron '{neuron}' did not emit {expectedCount} {typeof(TSynapse).Name} facts.");
     }
+
+    private static async Task<int> CountOutgoingAsync<TSynapse>(
+        ISessionNeuron session,
+        NeuronId neuron)
+        where TSynapse : Synapse
+    {
+        var outgoing = await session.ReadNeuronJournalAsync(
+            neuron,
+            JournalKind.Outgoing,
+            afterSequence: 0);
+        return outgoing.Delta.Count(delivery => delivery.Synapse is TSynapse);
+    }
+
+    private static async Task<int> CountOutgoingAsync(
+        ISessionNeuron session,
+        NeuronId neuron,
+        string synapseType)
+    {
+        var outgoing = await session.ReadNeuronJournalAsync(
+            neuron,
+            JournalKind.Outgoing,
+            afterSequence: 0);
+        return outgoing.Delta.Count(delivery => string.Equals(
+            delivery.Synapse.GetType().Name,
+            synapseType,
+            StringComparison.Ordinal));
+    }
 }
 
 internal static class FakeOAuth
@@ -793,6 +1388,48 @@ internal sealed record ForgeSalesforceApproval(
 [GenerateSerializer]
 [Alias("db.test.salesforce-approval-forgery-attempted")]
 internal sealed record ApprovalForgeryAttempted : Synapse;
+
+[GenerateSerializer]
+[Alias("db.test.probe-account-enrichment-delivery")]
+internal sealed record ProbeAccountEnrichmentDelivery(
+    [property: Id(0)] Guid ProbeId,
+    [property: Id(1)] NeuronId Target,
+    [property: Id(2)] Synapse Synapse,
+    [property: Id(3)] NeuronId Caller) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.test.account-enrichment-delivery-probed")]
+internal sealed record AccountEnrichmentDeliveryProbed(
+    [property: Id(0)] Guid ProbeId,
+    [property: Id(1)] string? Failure) : Synapse;
+
+internal sealed class AccountEnrichmentDeliveryProbe : Neuron,
+    IHandle<ProbeAccountEnrichmentDelivery>,
+    IEmit<AccountEnrichmentDeliveryProbed>
+{
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "The delivery probe reports the exact process-boundary failure type.")]
+    public async Task HandleAsync(
+        ProbeAccountEnrichmentDelivery synapse,
+        CancellationToken cancellationToken)
+    {
+        string? failure = null;
+
+        try
+        {
+            var target = GrainFactory.GetGrain<INeuron>(synapse.Target.ToGrainId());
+            await target.DeliverAsync(ForgedDelivery.Create(synapse.Synapse, synapse.Caller));
+        }
+        catch (Exception exception)
+        {
+            failure = exception.GetType().Name;
+        }
+
+        await EmitAsync(new AccountEnrichmentDeliveryProbed(synapse.ProbeId, failure));
+    }
+}
 
 internal sealed class ApprovalForger : Neuron,
     IHandle<ForgeSalesforceApproval>,
