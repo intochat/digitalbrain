@@ -8,11 +8,14 @@ namespace DigitalBrain.AI;
 
 public sealed partial class AIModule : IModule
 {
+    static partial void ConfigureSerialization(IServiceCollection services)
+        => services.AddSerializer(
+            serializer => serializer.AddJsonSerializer(IsMeaiContractType));
+
     static partial void ConfigureRuntime(ISiloBuilder builder)
     {
         DurablePayloadProtectionHosting.Configure(builder.Services, builder.Configuration);
         AIClients.Add(builder.Services);
-        builder.Services.AddSerializer(serializer => serializer.AddJsonSerializer(IsMeaiContractType));
     }
 
     private static bool IsMeaiContractType(Type type)

@@ -331,6 +331,10 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         source.AppendLine("    global::DigitalBrain.Abstractions.ModuleId");
         source.AppendLine("        global::DigitalBrain.Kernel.ICompiledModule.Id => Id;");
         source.AppendLine();
+        source.AppendLine("    void global::DigitalBrain.Kernel.ICompiledModule.PrepareSerialization(");
+        source.AppendLine("        global::Microsoft.Extensions.DependencyInjection.IServiceCollection services)");
+        source.AppendLine("        => ConfigureSerialization(services);");
+        source.AppendLine();
         source.AppendLine("    void global::DigitalBrain.Kernel.ICompiledModule.Activate(");
         source.AppendLine("        global::Orleans.Hosting.ISiloBuilder builder)");
         source.AppendLine("    {");
@@ -338,6 +342,9 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         source.AppendLine("        global::DigitalBrain.Kernel.DigitalBrainSiloBuilderExtensions.AddBroadcastHandlers(");
         source.AppendLine($"            builder, typeof(global::{module.FullName}).Assembly);");
         source.AppendLine("    }");
+        source.AppendLine();
+        source.AppendLine("    static partial void ConfigureSerialization(");
+        source.AppendLine("        global::Microsoft.Extensions.DependencyInjection.IServiceCollection services);");
         source.AppendLine();
         source.AppendLine("    static partial void ConfigureRuntime(global::Orleans.Hosting.ISiloBuilder builder);");
         source.AppendLine("}");

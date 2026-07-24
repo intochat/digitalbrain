@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 
 namespace DigitalBrain.Kernel;
@@ -8,6 +9,8 @@ namespace DigitalBrain.Kernel;
 public interface ICompiledModule
 {
     ModuleId Id { get; }
+
+    void PrepareSerialization(IServiceCollection services);
 
     void Activate(ISiloBuilder builder);
 }

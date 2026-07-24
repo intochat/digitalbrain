@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Xml.Linq;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Azure;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
@@ -129,6 +130,67 @@ public sealed class IntegrationHostingContracts
         Assert.DoesNotContain("WithAzureStorage", publicNames);
         Assert.DoesNotContain("WithDevelopmentStores", publicNames);
         Assert.DoesNotContain("BrainModuleHosting", exported.Select(type => type.Name));
+    }
+
+    [Fact(DisplayName = "AddDigitalBrain owns one complete durable profile")]
+    public async Task AddDigitalBrainOwnsOneCompleteDurableProfile()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddDigitalBrain("orders");
+
+        brain.AddModule<GoogleModule>(google => google.WithGmail());
+
+        var silo = builder.AddResource(new ProjectionProbe("silo")).WithReference(brain);
+        var client = builder.AddResource(new ProjectionProbe("client")).WithReference(brain.AsClient());
+        var storage = Assert.IsType<AzureStorageResource>(
+            Assert.Single(builder.Resources, resource => resource.Name == "orders-storage"));
+        var clustering = Assert.IsType<AzureTableStorageResource>(
+            Assert.Single(builder.Resources, resource => resource.Name == "orders-clustering"));
+        var reminders = Assert.IsType<AzureTableStorageResource>(
+            Assert.Single(builder.Resources, resource => resource.Name == "orders-reminders"));
+        var journal = Assert.IsType<AzureBlobStorageResource>(
+            Assert.Single(builder.Resources, resource => resource.Name == "orders-journal"));
+        var protectionKey = Parameter(builder, "orders-state-protection-key");
+        var siloEnvironment = await ProjectAsync(silo.Resource);
+        var clientEnvironment = await ProjectAsync(client.Resource);
+        var siloWaits = silo.Resource.Annotations.OfType<WaitAnnotation>().ToList();
+        var durableResources = new IResource[] { storage, clustering, reminders, journal };
+
+        Assert.True(storage.IsEmulator);
+        Assert.Same(storage, clustering.Parent);
+        Assert.Same(storage, reminders.Parent);
+        Assert.Same(storage, journal.Parent);
+        Assert.True(protectionKey.Secret);
+        Assert.Single(builder.Resources, resource => resource.Name == "orders-state-protection-key");
+        Assert.Same(
+            protectionKey,
+            siloEnvironment["DigitalBrain__Security__StateProtectionKey"]);
+        Assert.Contains("ConnectionStrings__orders-clustering", siloEnvironment.Keys);
+        Assert.Contains("ConnectionStrings__orders-reminders", siloEnvironment.Keys);
+        Assert.Contains("ConnectionStrings__journal", siloEnvironment.Keys);
+        Assert.Contains("ConnectionStrings__orders-clustering", clientEnvironment.Keys);
+        Assert.DoesNotContain("DigitalBrain__Security__StateProtectionKey", clientEnvironment.Keys);
+        Assert.DoesNotContain("ConnectionStrings__orders-reminders", clientEnvironment.Keys);
+        Assert.DoesNotContain("ConnectionStrings__journal", clientEnvironment.Keys);
+        Assert.All(
+            durableResources,
+            resource => Assert.Contains(
+                siloWaits,
+                wait => ReferenceEquals(wait.Resource, resource)
+                    && wait.WaitType == WaitType.WaitUntilHealthy));
+        Assert.DoesNotContain(
+            client.Resource.Annotations.OfType<WaitAnnotation>(),
+            wait => durableResources.Contains(wait.Resource));
+
+        var hostingSource = await File.ReadAllTextAsync(Path.Combine(
+            RepositoryRoot,
+            "src",
+            "DigitalBrain.Aspire.Hosting",
+            "DigitalBrainHostingExtensions.cs"),
+            TestContext.Current.CancellationToken);
+        Assert.DoesNotContain("WithDevelopmentClustering", hostingSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("WithMemoryGrainStorage", hostingSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("WithMemoryReminders", hostingSource, StringComparison.Ordinal);
     }
 
     [Fact(DisplayName = "AppHost prompts only for provider-required OAuth parameters")]

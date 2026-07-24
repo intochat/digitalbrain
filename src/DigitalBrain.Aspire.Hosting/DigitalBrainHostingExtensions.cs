@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
 using DigitalBrain.Abstractions;
 
@@ -14,13 +15,24 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
+        var storage = builder
+            .AddAzureStorage($"{name}-storage")
+            .RunAsEmulator();
+        var clustering = storage.AddTables($"{name}-clustering");
+        var reminders = storage.AddTables($"{name}-reminders");
+        var journal = storage.AddBlobs($"{name}-journal");
         var orleans = builder
             .AddOrleans(name)
-            .WithDevelopmentClustering()
-            .WithMemoryGrainStorage("journal")
-            .WithMemoryReminders();
+            .WithClustering(clustering)
+            .WithReminders(reminders);
+        var brain = new DigitalBrainBuilder(builder, name, orleans);
 
-        return new DigitalBrainBuilder(builder, name, orleans);
+        brain.SetJournal(journal);
+        brain.RequireHealthyBeforeStart(storage.Resource);
+        brain.RequireHealthyBeforeStart(clustering.Resource);
+        brain.RequireHealthyBeforeStart(reminders.Resource);
+        brain.RequireHealthyBeforeStart(journal.Resource);
+        return brain;
     }
 
     public static DigitalBrainBuilder AddModule<TModule>(this DigitalBrainBuilder brain)

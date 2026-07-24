@@ -5,6 +5,7 @@ using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -39,5 +40,15 @@ public sealed class CompiledModuleContracts
             .Single();
 
         Assert.Equal(EditorBrowsableState.Never, attribute.State);
+    }
+
+    [Fact]
+    public void SerializationPreparationIsReusableBySilosAndClients()
+    {
+        var method = typeof(ICompiledModule).GetMethod(nameof(ICompiledModule.PrepareSerialization));
+        Assert.NotNull(method);
+        var parameter = Assert.Single(method.GetParameters());
+
+        Assert.Equal(typeof(IServiceCollection), parameter.ParameterType);
     }
 }

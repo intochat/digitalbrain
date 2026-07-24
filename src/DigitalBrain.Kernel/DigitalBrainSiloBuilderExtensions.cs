@@ -57,6 +57,11 @@ public static class DigitalBrainRuntime
             return catalog;
         });
 
+        foreach (var module in availableModules)
+        {
+            module.PrepareSerialization(builder.Services);
+        }
+
         foreach (var module in availableModules.Where(module => selectedModules.Contains(module.Id)))
         {
             module.Activate(builder);

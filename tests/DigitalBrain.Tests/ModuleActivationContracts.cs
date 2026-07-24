@@ -10,8 +10,8 @@ namespace DigitalBrain.Tests;
 
 public sealed class ModuleActivationContracts
 {
-    [Fact(DisplayName = "an available module contributes nothing until its capsule is selected")]
-    public void AvailableModuleIsNotAutomaticallySelected()
+    [Fact(DisplayName = "an available module prepares serializers without activating runtime services")]
+    public void AvailableModulePreparesSerializationWithoutRuntimeActivation()
     {
         var builder = Host.CreateApplicationBuilder();
 
@@ -20,9 +20,12 @@ public sealed class ModuleActivationContracts
         Assert.DoesNotContain(builder.Services, IsChatClient);
 
         using var host = builder.Build();
+        var message = new ChatMessage(ChatRole.User, "wire contract");
         var serializer = host.Services.GetRequiredService<Serializer<ChatMessage>>();
-        Assert.Throws<CodecNotFoundException>(
-            () => serializer.SerializeToArray(new ChatMessage(ChatRole.User, "wire contract")));
+
+        Assert.Equal(
+            message.Text,
+            serializer.Deserialize(serializer.SerializeToArray(message)).Text);
     }
 
     [Fact(DisplayName = "AppHost selection activates the generated silo module")]
