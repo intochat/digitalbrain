@@ -25,6 +25,8 @@ public sealed class ModuleTemplateContracts
         "Simulation",
         "Scenario",
         "ConcurrentDictionary",
+        "DisableTestParallelization",
+        "CA1062",
     ];
 
     [Fact(DisplayName = "module .Contracts packages are leaves with only approved public vocabulary dependencies")]
