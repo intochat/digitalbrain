@@ -47,6 +47,8 @@ public sealed class TestingFixture : DigitalBrainFixture
 
     internal EdgeScriptProbe EdgeScript { get; } = new();
 
+    internal McpScriptProbe McpScript { get; } = new();
+
     internal void AddProbeModuleAfterInitialization()
         => Composition().AddModule<TestingProbeModule>();
 
@@ -56,6 +58,7 @@ public sealed class TestingFixture : DigitalBrainFixture
         _composition = brain;
         brain.AddModule<TestingProbeModule>();
         brain.ConfigureProbeChat(EdgeScript);
+        brain.ConfigureProbeMcp(McpScript);
     }
 
     private DigitalBrainTestBuilder Composition()

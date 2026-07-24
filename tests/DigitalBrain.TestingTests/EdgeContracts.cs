@@ -1,15 +1,24 @@
 using System.ComponentModel;
 using System.Reflection;
+using DigitalBrain.Abstractions;
+using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DigitalBrain.TestingTests;
 
 public sealed class EdgeContracts(TestingFixture fixture)
 {
+    private const string OAuthClientId =
+        "DigitalBrain:Salesforce:ClientId";
+
     private static readonly HashSet<string> ForbiddenTypes =
     [
         "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+        "Microsoft.Extensions.Configuration.IConfiguration",
+        "Microsoft.Extensions.Configuration.IConfigurationBuilder",
         "System.IServiceProvider",
         "Orleans.Hosting.ISiloBuilder",
         "Microsoft.Extensions.Hosting.IHostBuilder",
@@ -189,6 +198,97 @@ public sealed class EdgeContracts(TestingFixture fixture)
         Assert.Throws<ObjectDisposedException>(
             () => stale.OAuthParameter("client-id"));
         Assert.Null(current.OAuthParameter("client-id"));
+        var configuration = current
+            .Neuron<IConfigurationEdgeProbeNeuron>("stale-oauth");
+        Assert.Null(await configuration.Reference.Read(OAuthClientId));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RuntimeResolvesConfiguredChatAlias(bool firstAlias)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test =
+            await fixture.CreateBrainAsync(cancellationToken);
+        var value = firstAlias ? "first" : "second";
+        var alias = firstAlias
+            ? nameof(FirstChatEdgeProbeNeuron)
+            : nameof(SecondChatEdgeProbeNeuron);
+
+        var response = firstAlias
+            ? await test
+                .Neuron<IFirstChatEdgeProbeNeuron>(value)
+                .Reference
+                .Invoke(value)
+            : await test
+                .Neuron<ISecondChatEdgeProbeNeuron>(value)
+                .Reference
+                .Invoke(value);
+
+        Assert.Equal($"chat:{alias}:{value}", response);
+        Assert.Contains(
+            $"{alias}:{value}",
+            test.ProbeChat().Invocations);
+    }
+
+    [Fact]
+    public async Task RuntimeResolvesUnkeyedMcpTransport()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test =
+            await fixture.CreateBrainAsync(cancellationToken);
+        var probe = test.Neuron<IMcpEdgeProbeNeuron>("mcp");
+
+        var response = await probe.Reference.Invoke("tools/list");
+
+        Assert.Equal("mcp:tools/list", response);
+        Assert.Equal(
+            ["tools/list"],
+            test.ProbeMcp().Invocations);
+    }
+
+    [Fact]
+    public async Task RuntimeConfigurationObservesOAuthChanges()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test =
+            await fixture.CreateBrainAsync(cancellationToken);
+        var probe = test
+            .Neuron<IConfigurationEdgeProbeNeuron>("oauth-dynamic");
+
+        test.SetOAuthParameter(OAuthClientId, "first-client");
+        Assert.Equal(
+            "first-client",
+            await probe.Reference.Read(OAuthClientId));
+
+        test.SetOAuthParameter(OAuthClientId, "replacement-client");
+        Assert.Equal(
+            "replacement-client",
+            await probe.Reference.Read(OAuthClientId));
+    }
+
+    [Fact]
+    public async Task RuntimeConfigurationClearsOAuthBeforeNextMethod()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using (var first =
+            await fixture.CreateBrainAsync(cancellationToken))
+        {
+            first.SetOAuthParameter(OAuthClientId, "must not cross");
+            var firstProbe = first
+                .Neuron<IConfigurationEdgeProbeNeuron>("oauth-first");
+            Assert.Equal(
+                "must not cross",
+                await firstProbe.Reference.Read(OAuthClientId));
+        }
+
+        await using var second =
+            await fixture.CreateBrainAsync(cancellationToken);
+        var secondProbe = second
+            .Neuron<IConfigurationEdgeProbeNeuron>("oauth-second");
+
+        Assert.Null(await secondProbe.Reference.Read(OAuthClientId));
     }
 
     private static void AssertEditorHidden(
@@ -249,10 +349,10 @@ internal static class ProbeEdgeExtensions
             IProbeChatAdapter,
             EdgeScriptProbe>(
             [
-                typeof(ProbeEdgeNeuron),
-                typeof(SecondProbeEdgeNeuron),
+                typeof(FirstChatEdgeProbeNeuron),
+                typeof(SecondChatEdgeProbeNeuron),
             ],
-            new ProbeChatAdapter(),
+            new ProbeChatAdapter(script),
             script,
             static value => value.Reset());
 
@@ -264,17 +364,50 @@ internal static class ProbeEdgeExtensions
             IProbeChatAdapter,
             EdgeScriptProbe>(
             neuronAliases,
-            new ProbeChatAdapter(),
+            new ProbeChatAdapter(script),
+            script,
+            static value => value.Reset());
+
+    internal static void ConfigureProbeMcp(
+        this DigitalBrainTestBuilder builder,
+        McpScriptProbe script)
+        => builder.ConfigureSouthboundMcpTransport<
+            IProbeMcpTransport,
+            McpScriptProbe>(
+            new ProbeMcpTransport(script),
             script,
             static value => value.Reset());
 
     internal static EdgeScriptProbe ProbeChat(this TestBrain brain)
         => brain.ChatClientScript<EdgeScriptProbe>();
+
+    internal static McpScriptProbe ProbeMcp(this TestBrain brain)
+        => brain.SouthboundMcpTransportScript<McpScriptProbe>();
 }
 
-internal interface IProbeChatAdapter;
+internal interface IProbeChatAdapter
+{
+    string Invoke(string alias, string value);
+}
 
-internal sealed class ProbeChatAdapter : IProbeChatAdapter;
+internal sealed class ProbeChatAdapter(EdgeScriptProbe script) :
+    IProbeChatAdapter
+{
+    public string Invoke(string alias, string value)
+        => script.Invoke(alias, value);
+}
+
+internal interface IProbeMcpTransport
+{
+    string Invoke(string value);
+}
+
+internal sealed class ProbeMcpTransport(McpScriptProbe script) :
+    IProbeMcpTransport
+{
+    public string Invoke(string value)
+        => script.Invoke(value);
+}
 
 internal sealed class ProbeEdgeNeuron;
 
@@ -282,7 +415,10 @@ internal sealed class SecondProbeEdgeNeuron;
 
 internal sealed class EdgeScriptProbe
 {
+    private readonly List<string> _invocations = [];
     private readonly List<string> _replies = [];
+
+    internal IReadOnlyList<string> Invocations => _invocations;
 
     internal IReadOnlyList<string> Replies => _replies;
 
@@ -291,9 +427,124 @@ internal sealed class EdgeScriptProbe
     internal void Enqueue(string reply)
         => _replies.Add(reply);
 
+    internal string Invoke(string alias, string value)
+    {
+        _invocations.Add($"{alias}:{value}");
+        return $"chat:{alias}:{value}";
+    }
+
     internal void Reset()
     {
         ResetCount++;
+        _invocations.Clear();
         _replies.Clear();
     }
+}
+
+internal sealed class McpScriptProbe
+{
+    private readonly List<string> _invocations = [];
+
+    internal IReadOnlyList<string> Invocations => _invocations;
+
+    internal string Invoke(string value)
+    {
+        _invocations.Add(value);
+        return $"mcp:{value}";
+    }
+
+    internal void Reset()
+        => _invocations.Clear();
+}
+
+#pragma warning disable CA1515 // Public probe interfaces model an external consumer assembly.
+[ClientEntryPoint]
+public partial interface IFirstChatEdgeProbeNeuron : INeuron
+{
+    [Alias(nameof(Invoke))]
+    Task<string> Invoke(string value);
+}
+
+[ClientEntryPoint]
+public partial interface ISecondChatEdgeProbeNeuron : INeuron
+{
+    [Alias(nameof(Invoke))]
+    Task<string> Invoke(string value);
+}
+
+[ClientEntryPoint]
+public partial interface IMcpEdgeProbeNeuron : INeuron
+{
+    [Alias(nameof(Invoke))]
+    Task<string> Invoke(string value);
+}
+
+[ClientEntryPoint]
+public partial interface IConfigurationEdgeProbeNeuron : INeuron
+{
+    [Alias(nameof(Read))]
+    Task<string?> Read(string name);
+}
+#pragma warning restore CA1515
+
+internal sealed class FirstChatEdgeProbeNeuron :
+    Neuron,
+    IFirstChatEdgeProbeNeuron
+{
+    private readonly IProbeChatAdapter _chat;
+
+    public FirstChatEdgeProbeNeuron()
+        => _chat = ServiceProvider
+            .GetRequiredKeyedService<IProbeChatAdapter>(
+                typeof(FirstChatEdgeProbeNeuron));
+
+    public Task<string> Invoke(string value)
+        => Task.FromResult(_chat.Invoke(
+            nameof(FirstChatEdgeProbeNeuron),
+            value));
+}
+
+internal sealed class SecondChatEdgeProbeNeuron :
+    Neuron,
+    ISecondChatEdgeProbeNeuron
+{
+    private readonly IProbeChatAdapter _chat;
+
+    public SecondChatEdgeProbeNeuron()
+        => _chat = ServiceProvider
+            .GetRequiredKeyedService<IProbeChatAdapter>(
+                typeof(SecondChatEdgeProbeNeuron));
+
+    public Task<string> Invoke(string value)
+        => Task.FromResult(_chat.Invoke(
+            nameof(SecondChatEdgeProbeNeuron),
+            value));
+}
+
+internal sealed class McpEdgeProbeNeuron :
+    Neuron,
+    IMcpEdgeProbeNeuron
+{
+    private readonly IProbeMcpTransport _transport;
+
+    public McpEdgeProbeNeuron()
+        => _transport = ServiceProvider
+            .GetRequiredService<IProbeMcpTransport>();
+
+    public Task<string> Invoke(string value)
+        => Task.FromResult(_transport.Invoke(value));
+}
+
+internal sealed class ConfigurationEdgeProbeNeuron :
+    Neuron,
+    IConfigurationEdgeProbeNeuron
+{
+    private readonly IConfiguration _configuration;
+
+    public ConfigurationEdgeProbeNeuron()
+        => _configuration = ServiceProvider
+            .GetRequiredService<IConfiguration>();
+
+    public Task<string?> Read(string name)
+        => Task.FromResult(_configuration[name]);
 }
