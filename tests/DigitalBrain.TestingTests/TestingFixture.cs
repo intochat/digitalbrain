@@ -20,10 +20,21 @@ internal sealed class EchoNeuron : Neuron, IEchoNeuron
 
 public sealed class TestingFixture : DigitalBrainFixture
 {
+    private DigitalBrainTestBuilder? _composition;
+
+    internal void AddProbeModuleAfterInitialization()
+        => Composition().AddModule<TestingProbeModule>();
+
     protected override void Configure(DigitalBrainTestBuilder brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
+        _composition = brain;
         brain.AddModule<TestingProbeModule>();
     }
+
+    private DigitalBrainTestBuilder Composition()
+        => _composition
+            ?? throw new InvalidOperationException(
+                "The test fixture composition has not been initialized.");
 }
 #pragma warning restore CA1515
