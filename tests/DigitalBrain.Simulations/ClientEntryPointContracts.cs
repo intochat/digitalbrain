@@ -39,4 +39,3 @@ public sealed class ClientEntryPointContracts
         Assert.NotNull(typeof(DigitalBrain.AI.ILLM).GetCustomAttribute<ClientEntryPointAttribute>());
     }
 }
-

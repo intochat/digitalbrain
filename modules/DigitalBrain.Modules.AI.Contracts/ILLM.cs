@@ -10,4 +10,3 @@ public interface ILLM : INeuron
     [Alias("Ask")]
     Task<ChatResponse> RespondAsync(IReadOnlyList<ChatMessage> messages);
 }
-

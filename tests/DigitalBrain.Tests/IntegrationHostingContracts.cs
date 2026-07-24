@@ -105,6 +105,58 @@ public sealed class IntegrationHostingContracts
         Assert.DoesNotContain("ConnectionStrings__journal", clientEnvironment.Keys);
     }
 
+    [Fact(DisplayName = "Azure run mode requires an explicit shared state-protection key")]
+    public async Task AzureRunModeRequiresExplicitStateProtectionKey()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var storage = builder.AddAzureStorage("storage");
+        var brain = builder.AddBrain("brain").WithAzureStorage(storage);
+
+        BrainModuleHosting.RequireStateProtection(brain);
+
+        var protectionKey = Parameter(builder, "brain-state-protection-key");
+
+        Assert.True(builder.ExecutionContext.IsRunMode);
+        Assert.True(protectionKey.Secret);
+        Assert.Null(protectionKey.Default);
+        await Assert.ThrowsAsync<MissingParameterValueException>(
+            () => protectionKey.GetValueAsync(TestContext.Current.CancellationToken).AsTask());
+    }
+
+    [Fact(DisplayName = "each development model generates one fresh shared state-protection key")]
+    public async Task DevelopmentRunGeneratesOneFreshSharedStateProtectionKey()
+    {
+        var firstBuilder = DistributedApplication.CreateBuilder();
+        var firstBrain = firstBuilder.AddBrain("brain").WithDevelopmentStores();
+        BrainModuleHosting.RequireStateProtection(firstBrain);
+        var firstKey = Parameter(firstBuilder, "brain-state-protection-key");
+        var firstValue = await firstKey.GetValueAsync(TestContext.Current.CancellationToken);
+        var firstSilo = firstBuilder.AddResource(new ProjectionProbe("first-silo")).WithReference(firstBrain);
+        var secondSilo = firstBuilder.AddResource(new ProjectionProbe("second-silo")).WithReference(firstBrain);
+
+        var firstEnvironment = await ProjectAsync(firstSilo.Resource);
+        var secondEnvironment = await ProjectAsync(secondSilo.Resource);
+
+        Assert.Same(firstKey, firstEnvironment["DigitalBrain__Security__StateProtectionKey"]);
+        Assert.Same(firstKey, secondEnvironment["DigitalBrain__Security__StateProtectionKey"]);
+        Assert.Equal(firstValue, await firstKey.GetValueAsync(TestContext.Current.CancellationToken));
+        Assert.NotNull(firstValue);
+        var decoded = Convert.FromBase64String(firstValue);
+        Assert.Equal(32, decoded.Length);
+        Assert.False(decoded.SequenceEqual(new byte[32]));
+
+        var secondBuilder = DistributedApplication.CreateBuilder();
+        var secondBrain = secondBuilder.AddBrain("brain").WithDevelopmentStores();
+        BrainModuleHosting.RequireStateProtection(secondBrain);
+        var secondKey = Parameter(secondBuilder, "brain-state-protection-key");
+
+        Assert.True(firstBuilder.ExecutionContext.IsRunMode);
+        Assert.True(secondBuilder.ExecutionContext.IsRunMode);
+        Assert.NotEqual(
+            firstValue,
+            await secondKey.GetValueAsync(TestContext.Current.CancellationToken));
+    }
+
     [Fact(DisplayName = "AppHost prompts only for provider-required OAuth parameters")]
     public void AppHostPromptsOnceForOfficialOAuthParameters()
     {

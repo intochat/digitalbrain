@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
@@ -73,14 +74,14 @@ public sealed class BrainService
             return;
         }
 
-        // Local run must not block on an interactive secret prompt (agents / aspire start --non-interactive).
-        // Publish/deploy still requires an explicit secret parameter.
+        var parameterName = $"{Name}-state-protection-key";
         _stateProtectionKey = Builder.ExecutionContext.IsRunMode
-            ? Builder.AddParameter(
-                $"{Name}-state-protection-key",
-                Convert.ToBase64String(new byte[32]),
-                secret: true)
-            : Builder.AddParameter($"{Name}-state-protection-key", secret: true);
+            && _storageProfile is "development"
+                ? Builder.AddParameter(
+                    parameterName,
+                    Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+                    secret: true)
+                : Builder.AddParameter(parameterName, secret: true);
 
         _stateProtectionKey.WithDescription(
             "Base64-encoded 256-bit key shared by every silo that recovers encrypted durable module state.");
