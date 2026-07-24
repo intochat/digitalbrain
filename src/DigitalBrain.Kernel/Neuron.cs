@@ -88,7 +88,6 @@ public abstract class Neuron :
         }
         else
         {
-            await Wakeup().Disarm();
             _wakeUpRegistered = false;
         }
 
@@ -910,8 +909,11 @@ public abstract class Neuron :
         _wakeUpRegistered = false;
     }
 
-    Task IOutboxDrain.Drain()
-        => DrainAsync(CancellationToken.None);
+    async Task IOutboxDrain.Drain()
+    {
+        _wakeUpRegistered = true;
+        await DrainAsync(CancellationToken.None);
+    }
 
     private IOutboxWakeup Wakeup()
         => GrainFactory.GetGrain<IOutboxWakeup>(Id.ToString());

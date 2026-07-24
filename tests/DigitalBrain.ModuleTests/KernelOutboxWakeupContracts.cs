@@ -104,6 +104,13 @@ public sealed class KernelOutboxWakeupContracts(ModuleFixture fixture)
                 "GroupChat.cs"),
             "GroupChat",
             violations);
+        ValidateNeuronWakeupComposition(
+            Path.Combine(
+                RepositoryRoot,
+                "src",
+                "DigitalBrain.Kernel",
+                "Neuron.cs"),
+            violations);
 
         if (violations.Count != 0)
         {
@@ -273,6 +280,58 @@ public sealed class KernelOutboxWakeupContracts(ModuleFixture fixture)
             violations.Add(
                 $"{className} must reject an unknown private reminder.");
         }
+    }
+
+    private static void ValidateNeuronWakeupComposition(
+        string path,
+        List<string> violations)
+    {
+        var source = File.ReadAllText(path);
+        var activation = Region(
+            source,
+            "public sealed override async Task OnActivateAsync",
+            "public async Task Deliver");
+        if (activation.Contains(
+                "Wakeup().Disarm()",
+                StringComparison.Ordinal))
+        {
+            violations.Add(
+                "Empty Neuron activation still creates a helper turn by calling Wakeup().Disarm().");
+        }
+
+        var drain = Region(
+            source,
+            "Task IOutboxDrain.Drain()",
+            "private IOutboxWakeup Wakeup()");
+        var adoptsReminder = drain.IndexOf(
+            "_wakeUpRegistered = true",
+            StringComparison.Ordinal);
+        var beginsDrain = drain.IndexOf(
+            "DrainAsync(CancellationToken.None)",
+            StringComparison.Ordinal);
+        if (adoptsReminder < 0
+            || beginsDrain < 0
+            || adoptsReminder > beginsDrain)
+        {
+            violations.Add(
+                "IOutboxDrain.Drain must mark the helper reminder as registered before draining so an orphan reminder is disarmed when the outbox is empty.");
+        }
+    }
+
+    private static string Region(
+        string source,
+        string startMarker,
+        string endMarker)
+    {
+        var start = source.IndexOf(
+            startMarker,
+            StringComparison.Ordinal);
+        var end = source.IndexOf(
+            endMarker,
+            start,
+            StringComparison.Ordinal);
+
+        return source[start..end];
     }
 
     private static string? AttributeArgument(
