@@ -33,10 +33,12 @@ public sealed class ClockAndFaultContracts(TestingFixture fixture)
         await using var test =
             await fixture.CreateBrainAsync(TestContext.Current.CancellationToken);
 
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+        var failure = await Assert.ThrowsAsync<BrainTestFailureException>(
             () => test.Clock.AdvanceAsync(
                 TimeSpan.FromTicks(-1),
                 TestContext.Current.CancellationToken));
+        Assert.IsType<ArgumentOutOfRangeException>(
+            failure.InnerException);
     }
 
     [Fact]
@@ -295,10 +297,11 @@ public sealed class ClockAndFaultContracts(TestingFixture fixture)
         await using var second = await fixture.CreateBrainAsync(cancellationToken);
 
         Assert.Throws<ObjectDisposedException>(() => priorClock.UtcNow);
-        await Assert.ThrowsAsync<ObjectDisposedException>(
+        var failure = await Assert.ThrowsAsync<BrainTestFailureException>(
             () => priorClock.AdvanceAsync(
                 TimeSpan.FromHours(1),
                 cancellationToken));
+        Assert.IsType<ObjectDisposedException>(failure.InnerException);
         Assert.Equal(FixedEpoch, second.Clock.UtcNow);
     }
 
@@ -361,13 +364,15 @@ public sealed class ClockAndFaultContracts(TestingFixture fixture)
         var echo = test.Neuron<IEchoNeuron>("fault-leaked");
         _ = echo.FailNextJournalCommit("unconsumed commit failure");
 
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+        var failure = await Assert.ThrowsAsync<BrainTestFailureException>(
             async () => await test.DisposeAsync());
+        var cleanup = Assert.IsType<InvalidOperationException>(
+            failure.InnerException);
 
-        Assert.Contains(echo.Id.ToString(), failure.Message, StringComparison.Ordinal);
+        Assert.Contains(echo.Id.ToString(), cleanup.Message, StringComparison.Ordinal);
         Assert.Contains(
             "unconsumed commit failure",
-            failure.Message,
+            cleanup.Message,
             StringComparison.Ordinal);
     }
 

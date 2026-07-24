@@ -5,17 +5,19 @@ namespace DigitalBrain.Testing;
 internal sealed class TestReminderDriver
 {
     private readonly ITestReminderDeliveryCaller _caller;
-    private readonly List<DeliveredReminder> _diagnostics = [];
+    private readonly BrainTestDiagnostics _diagnostics;
     private readonly string _scope;
     private readonly VolatileReminderTable _table;
 
     internal TestReminderDriver(
         VolatileReminderTable table,
         IGrainFactory grains,
-        string scope)
+        string scope,
+        BrainTestDiagnostics diagnostics)
     {
         _table = table;
         _scope = scope;
+        _diagnostics = diagnostics;
 
         var caller = NeuronId.For<ITestReminderDeliveryCaller>(
             new OwnerId($"{scope}-reminder-driver"),
@@ -53,22 +55,17 @@ internal sealed class TestReminderDriver
             due.Due.UtcDateTime);
 
         _table.CompleteDelivery(due);
-        _diagnostics.Add(new(
-            target,
-            due.ReminderName,
-            due.Due,
-            due.Period,
-            due.ETag));
+        _diagnostics.RecordEvent(
+            "reminder.deliver",
+            "succeeded",
+            ("target", target.ToString()),
+            ("reminder.name", due.ReminderName),
+            ("due", due.Due.ToString("O")),
+            ("period", due.Period.ToString("c")),
+            ("etag", due.ETag));
         return true;
     }
 
     internal string DescribePendingAtOrBefore(DateTimeOffset target)
         => _table.DescribePendingAtOrBefore(target, _scope);
-
-    private sealed record DeliveredReminder(
-        NeuronId Target,
-        string Name,
-        DateTimeOffset Due,
-        TimeSpan Period,
-        string ETag);
 }

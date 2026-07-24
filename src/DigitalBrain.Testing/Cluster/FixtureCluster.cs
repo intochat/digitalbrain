@@ -75,13 +75,29 @@ internal sealed class FixtureCluster : IAsyncDisposable
         JournalFaultRegistration registration)
         => _journalStorage.DisarmFault(registration);
 
-    internal async Task<TestClock> PrepareMethodAsync(string scope)
+    internal BrainTestDiagnostics CreateDiagnostics(
+        string fixtureId,
+        string scope)
+        => new(
+            fixtureId,
+            scope,
+            _modules.Select(module => module.Id.Value),
+            FixedEpoch);
+
+    internal async Task<TestClock> PrepareMethodAsync(
+        string scope,
+        BrainTestDiagnostics diagnostics)
     {
         _clock.Reset();
         await _reminderTable.TestOnlyClearTable();
         return new TestClock(
             _clock,
-            new TestReminderDriver(_reminderTable, Client, scope));
+            new TestReminderDriver(
+                _reminderTable,
+                Client,
+                scope,
+                diagnostics),
+            diagnostics);
     }
 
     internal static string LabelOf(string siloName)

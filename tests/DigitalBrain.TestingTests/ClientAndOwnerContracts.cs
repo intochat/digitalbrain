@@ -1,4 +1,5 @@
 using DigitalBrain.Client;
+using DigitalBrain.Testing;
 using Xunit;
 
 namespace DigitalBrain.TestingTests;
@@ -71,7 +72,10 @@ public sealed class ClientAndOwnerContracts(TestingFixture fixture)
         await using var test =
             await fixture.CreateBrainAsync(TestContext.Current.CancellationToken);
 
-        Assert.Throws<ArgumentException>(() => test.Owner(label));
+        var failure = Assert.Throws<BrainTestFailureException>(
+            () => test.Owner(label));
+        Assert.IsAssignableFrom<ArgumentException>(
+            failure.InnerException);
     }
 
     [Fact]
@@ -81,9 +85,12 @@ public sealed class ClientAndOwnerContracts(TestingFixture fixture)
             await fixture.CreateBrainAsync(TestContext.Current.CancellationToken);
         test.Owner("Alice");
 
-        var failure = Assert.Throws<ArgumentException>(() => test.Owner("alice"));
+        var failure = Assert.Throws<BrainTestFailureException>(
+            () => test.Owner("alice"));
+        var collision = Assert.IsType<ArgumentException>(
+            failure.InnerException);
 
-        Assert.Contains("Alice", failure.Message, StringComparison.Ordinal);
-        Assert.Contains("alice", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("Alice", collision.Message, StringComparison.Ordinal);
+        Assert.Contains("alice", collision.Message, StringComparison.Ordinal);
     }
 }

@@ -13,6 +13,7 @@ namespace DigitalBrain.Testing;
 public sealed class TestJournal
 {
     private readonly FixtureCluster _cluster;
+    private readonly BrainTestDiagnostics _diagnostics;
     private readonly JournalKind _direction;
     private readonly SemaphoreSlim _nextGate = new(1, 1);
     private readonly List<SynapseDelivery> _pending = [];
@@ -28,11 +29,13 @@ public sealed class TestJournal
     internal TestJournal(
         FixtureCluster cluster,
         NeuronId subject,
-        JournalKind direction)
+        JournalKind direction,
+        BrainTestDiagnostics diagnostics)
     {
         _cluster = cluster;
         _subject = subject;
         _direction = direction;
+        _diagnostics = diagnostics;
         _session = cluster.Client.GetGrain<ISessionNeuron>(
             new NeuronId(
                 ISessionNeuron.GrainTypeName,
@@ -42,6 +45,32 @@ public sealed class TestJournal
 
     public async Task<ObservedSynapse<TSynapse>> NextAsync<TSynapse>(
         CancellationToken cancellationToken = default)
+        where TSynapse : Synapse
+    {
+        try
+        {
+            var observed =
+                await NextCoreAsync<TSynapse>(cancellationToken);
+            _diagnostics.RecordEvent(
+                "journal.next",
+                "succeeded",
+                ("subject", _subject.ToString()),
+                ("direction", _direction.ToString()),
+                ("synapse.type", typeof(TSynapse).FullName ?? typeof(TSynapse).Name),
+                ("sequence", observed.Sequence.ToString(CultureInfo.InvariantCulture)));
+            return observed;
+        }
+        catch (Exception failure)
+            when (failure is not BrainTestFailureException)
+        {
+            throw _diagnostics.CaptureFailure(
+                "journal.next",
+                failure);
+        }
+    }
+
+    private async Task<ObservedSynapse<TSynapse>> NextCoreAsync<TSynapse>(
+        CancellationToken cancellationToken)
         where TSynapse : Synapse
     {
         await _nextGate.WaitAsync(cancellationToken);
@@ -93,9 +122,36 @@ public sealed class TestJournal
         CancellationToken cancellationToken = default)
         where TSynapse : Synapse
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
-        ThrowIfDisposed();
+        try
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
+            var observed = await ReadCoreAsync<TSynapse>(
+                afterSequence,
+                cancellationToken);
+            _diagnostics.RecordEvent(
+                "journal.read",
+                "succeeded",
+                ("subject", _subject.ToString()),
+                ("direction", _direction.ToString()),
+                ("synapse.type", typeof(TSynapse).FullName ?? typeof(TSynapse).Name),
+                ("count", observed.Count.ToString(CultureInfo.InvariantCulture)));
+            return observed;
+        }
+        catch (Exception failure)
+            when (failure is not BrainTestFailureException)
+        {
+            throw _diagnostics.CaptureFailure(
+                "journal.read",
+                failure);
+        }
+    }
 
+    private async Task<IReadOnlyList<ObservedSynapse<TSynapse>>> ReadCoreAsync<TSynapse>(
+        long afterSequence,
+        CancellationToken cancellationToken)
+        where TSynapse : Synapse
+    {
+        ThrowIfDisposed();
         var read = await _session
             .ReadNeuronJournal(_subject, _direction, afterSequence)
             .WaitAsync(cancellationToken);

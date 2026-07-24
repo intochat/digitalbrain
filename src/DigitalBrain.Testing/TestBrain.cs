@@ -18,6 +18,7 @@ public sealed class TestBrain : IAsyncDisposable
         _journals = [];
     private readonly Lock _faultGate = new();
     private readonly HashSet<JournalFaultHandle> _faults = [];
+    private readonly BrainTestDiagnostics _diagnostics;
     private readonly string _scope;
     private readonly TestOwner _defaultOwner;
     private Action? _release;
@@ -26,12 +27,14 @@ public sealed class TestBrain : IAsyncDisposable
         FixtureCluster cluster,
         string scope,
         TestClock clock,
+        BrainTestDiagnostics diagnostics,
         Action release)
     {
         Cluster = cluster;
         _scope = scope;
         _release = release;
         Clock = clock;
+        _diagnostics = diagnostics;
 
         var owner = CreateOwner(DefaultOwnerLabel);
         _labelSpellings.Add(DefaultOwnerLabel, DefaultOwnerLabel);
@@ -50,8 +53,9 @@ public sealed class TestBrain : IAsyncDisposable
         FixtureCluster cluster,
         string scope,
         TestClock clock,
+        BrainTestDiagnostics diagnostics,
         Action release)
-        => new(cluster, scope, clock, release);
+        => new(cluster, scope, clock, diagnostics, release);
 
     public TestNeuron<TNeuron> Neuron<TNeuron>(string name = "default")
         where TNeuron : class, INeuron
@@ -59,26 +63,41 @@ public sealed class TestBrain : IAsyncDisposable
 
     public TestOwner Owner(string label)
     {
-        var validated = IdentityLabel.Validate(label);
-
-        lock (_ownerGate)
+        try
         {
-            if (_owners.TryGetValue(validated, out var owner))
+            var validated = IdentityLabel.Validate(label);
+
+            lock (_ownerGate)
             {
+                if (_owners.TryGetValue(validated, out var owner))
+                {
+                    return owner;
+                }
+
+                if (_labelSpellings.TryGetValue(validated, out var existing))
+                {
+                    throw new ArgumentException(
+                        $"Owner label '{validated}' differs only by casing from already used label '{existing}'.",
+                        nameof(label));
+                }
+
+                owner = CreateOwner(validated);
+                _labelSpellings.Add(validated, validated);
+                _owners.Add(validated, owner);
+                _diagnostics.RecordEvent(
+                    "owner.open",
+                    "succeeded",
+                    ("label", validated),
+                    ("owner", owner.Id.Value));
                 return owner;
             }
-
-            if (_labelSpellings.TryGetValue(validated, out var existing))
-            {
-                throw new ArgumentException(
-                    $"Owner label '{validated}' differs only by casing from already used label '{existing}'.",
-                    nameof(label));
-            }
-
-            owner = CreateOwner(validated);
-            _labelSpellings.Add(validated, validated);
-            _owners.Add(validated, owner);
-            return owner;
+        }
+        catch (Exception failure)
+            when (failure is not BrainTestFailureException)
+        {
+            throw _diagnostics.CaptureFailure(
+                "owner.open",
+                failure);
         }
     }
 
@@ -95,6 +114,7 @@ public sealed class TestBrain : IAsyncDisposable
         }
 
         List<Exception> failures = [];
+        InvalidOperationException? faultCleanupFailure = null;
 
         try
         {
@@ -109,6 +129,7 @@ public sealed class TestBrain : IAsyncDisposable
 
             if (CleanupJournalFaults() is { } faultFailure)
             {
+                faultCleanupFailure = faultFailure;
                 failures.Add(faultFailure);
             }
 
@@ -126,16 +147,24 @@ public sealed class TestBrain : IAsyncDisposable
             release();
         }
 
-        if (failures.Count == 1)
+        if (failures.Count > 0)
         {
-            throw failures[0];
-        }
+            var failure = failures.Count == 1
+                ? failures[0]
+                : new AggregateException(
+                    "One or more DigitalBrain test resources failed to clean up.",
+                    failures);
+            var cleanupStage = failures.Count == 1
+                && ReferenceEquals(
+                    failure,
+                    faultCleanupFailure)
+                    ? "fault-cleanup"
+                    : "method-cleanup";
 
-        if (failures.Count > 1)
-        {
-            throw new AggregateException(
-                "One or more DigitalBrain test resources failed to clean up.",
-                failures);
+            throw _diagnostics.CaptureFailure(
+                "brain.cleanup",
+                failure,
+                cleanupStage);
         }
     }
 
@@ -146,19 +175,30 @@ public sealed class TestBrain : IAsyncDisposable
     {
         lock (_faultGate)
         {
-            ObjectDisposedException.ThrowIf(
-                Volatile.Read(ref _release) is null,
-                this);
-
-            var registration = Cluster.ArmJournalFault(
-                target,
-                completedWrites,
-                message);
-            var handle = new JournalFaultHandle(
-                registration,
-                RetireJournalFault);
-            _faults.Add(handle);
-            return handle;
+            try
+            {
+                ObjectDisposedException.ThrowIf(
+                    Volatile.Read(ref _release) is null,
+                    this);
+                var registration = Cluster.ArmJournalFault(
+                    target,
+                    completedWrites,
+                    message);
+                var handle = new JournalFaultHandle(
+                    registration,
+                    RetireJournalFault,
+                    _diagnostics);
+                _faults.Add(handle);
+                _diagnostics.TrackFault(handle, target.ToString());
+                return handle;
+            }
+            catch (Exception failure)
+                when (failure is not BrainTestFailureException)
+            {
+                throw _diagnostics.CaptureFailure(
+                    "fault.arm",
+                    failure);
+            }
         }
     }
 
@@ -173,7 +213,11 @@ public sealed class TestBrain : IAsyncDisposable
             var key = (subject, direction);
             if (!_journals.TryGetValue(key, out var journal))
             {
-                journal = new TestJournal(Cluster, subject, direction);
+                journal = new TestJournal(
+                    Cluster,
+                    subject,
+                    direction,
+                    _diagnostics);
                 _journals.Add(key, journal);
             }
 
@@ -181,27 +225,65 @@ public sealed class TestBrain : IAsyncDisposable
         }
     }
 
-    internal Task RestartHostAsync(
+    internal async Task RestartHostAsync(
         NeuronId target,
         CancellationToken cancellationToken)
     {
-        ObjectDisposedException.ThrowIf(
-            Volatile.Read(ref _release) is null,
-            this);
-        return Cluster.RestartHostAsync(target, cancellationToken);
+        try
+        {
+            ObjectDisposedException.ThrowIf(
+                Volatile.Read(ref _release) is null,
+                this);
+            _diagnostics.RecordEvent(
+                "neuron.restart",
+                "started",
+                ("target", target.ToString()));
+            await Cluster.RestartHostAsync(target, cancellationToken);
+            _diagnostics.RecordEvent(
+                "neuron.restart",
+                "succeeded",
+                ("target", target.ToString()));
+        }
+        catch (Exception failure)
+            when (failure is not BrainTestFailureException)
+        {
+            throw _diagnostics.CaptureFailure(
+                "neuron.restart",
+                failure);
+        }
     }
 
     private TestOwner CreateOwner(string label)
-        => TestOwner.Create(
+    {
+        var owner = TestOwner.Create(
             this,
             new($"{_scope}-{label}"));
+        _diagnostics.RecordOwner(label, owner.Id.Value);
+        return owner;
+    }
+
+    internal BrainTestFailureException CaptureFailure(
+        string operation,
+        Exception failure)
+        => _diagnostics.CaptureFailure(operation, failure);
+
+    internal void RecordNeuron(NeuronId target)
+        => _diagnostics.RecordEvent(
+            "neuron.open",
+            "succeeded",
+            ("target", target.ToString()));
 
     private bool RetireJournalFault(JournalFaultHandle fault)
     {
         lock (_faultGate)
         {
             _faults.Remove(fault);
-            return Cluster.DisarmJournalFault(fault.Registration);
+            var disarmed =
+                Cluster.DisarmJournalFault(fault.Registration);
+            _diagnostics.RetireFault(
+                fault,
+                disarmed ? "succeeded" : "inactive");
+            return disarmed;
         }
     }
 
@@ -229,6 +311,7 @@ public sealed class TestBrain : IAsyncDisposable
                 continue;
             }
 
+            _diagnostics.RecordCleanupLeak(fault);
             (leaks ??= []).Add(
                 $"neuron='{fault.Target}', message='{fault.Message}'");
         }

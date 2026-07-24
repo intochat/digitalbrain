@@ -1,5 +1,6 @@
 using System.Globalization;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Testing;
 using Xunit;
 
 namespace DigitalBrain.TestingTests;
@@ -108,24 +109,26 @@ public sealed class JournalContracts(TestingFixture fixture)
             new EchoRequested("retained"));
         var observed = await committed;
 
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+        var failure = await Assert.ThrowsAsync<BrainTestFailureException>(
             () => echo.Outgoing.ReadAsync<Echoed>(
                 long.MaxValue,
                 cancellationToken));
+        var journal = Assert.IsType<InvalidOperationException>(
+            failure.InnerException);
 
-        Assert.Contains(echo.Id.ToString(), failure.Message, StringComparison.Ordinal);
-        Assert.Contains(nameof(JournalKind.Outgoing), failure.Message, StringComparison.Ordinal);
+        Assert.Contains(echo.Id.ToString(), journal.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(JournalKind.Outgoing), journal.Message, StringComparison.Ordinal);
         Assert.Contains(
             long.MaxValue.ToString(CultureInfo.InvariantCulture),
-            failure.Message,
+            journal.Message,
             StringComparison.Ordinal);
         Assert.Contains(
             observed.Sequence.ToString(CultureInfo.InvariantCulture),
-            failure.Message,
+            journal.Message,
             StringComparison.Ordinal);
-        Assert.Contains("retained=1", failure.Message, StringComparison.Ordinal);
-        Assert.Contains("dropped=0", failure.Message, StringComparison.Ordinal);
-        Assert.Contains(typeof(Echoed).FullName!, failure.Message, StringComparison.Ordinal);
+        Assert.Contains("retained=1", journal.Message, StringComparison.Ordinal);
+        Assert.Contains("dropped=0", journal.Message, StringComparison.Ordinal);
+        Assert.Contains(typeof(Echoed).FullName!, journal.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -167,17 +170,19 @@ public sealed class JournalContracts(TestingFixture fixture)
                 .WaitAsync(DeadlockGuard, cancellationToken);
         }
 
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+        var failure = await Assert.ThrowsAsync<BrainTestFailureException>(
             () => echo.Outgoing
                 .NextAsync<EchoRequested>(cancellationToken)
                 .WaitAsync(DeadlockGuard, cancellationToken));
+        var journal = Assert.IsType<InvalidOperationException>(
+            failure.InnerException);
 
-        Assert.Contains("overflow", failure.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(echo.Id.ToString(), failure.Message, StringComparison.Ordinal);
-        Assert.Contains(nameof(JournalKind.Outgoing), failure.Message, StringComparison.Ordinal);
+        Assert.Contains("overflow", journal.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(echo.Id.ToString(), journal.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(JournalKind.Outgoing), journal.Message, StringComparison.Ordinal);
         Assert.Contains(
             EvidenceLimit.ToString(CultureInfo.InvariantCulture),
-            failure.Message,
+            journal.Message,
             StringComparison.Ordinal);
     }
 
@@ -193,17 +198,19 @@ public sealed class JournalContracts(TestingFixture fixture)
             await echo.Reference.Publish($"historical-{index}");
         }
 
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+        var failure = await Assert.ThrowsAsync<BrainTestFailureException>(
             () => echo.Outgoing
                 .NextAsync<EchoRequested>(cancellationToken)
                 .WaitAsync(DeadlockGuard, cancellationToken));
+        var journal = Assert.IsType<InvalidOperationException>(
+            failure.InnerException);
 
-        Assert.Contains("overflow", failure.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(echo.Id.ToString(), failure.Message, StringComparison.Ordinal);
-        Assert.Contains(nameof(JournalKind.Outgoing), failure.Message, StringComparison.Ordinal);
+        Assert.Contains("overflow", journal.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(echo.Id.ToString(), journal.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(JournalKind.Outgoing), journal.Message, StringComparison.Ordinal);
         Assert.Contains(
             EvidenceLimit.ToString(CultureInfo.InvariantCulture),
-            failure.Message,
+            journal.Message,
             StringComparison.Ordinal);
     }
 

@@ -12,16 +12,19 @@ public sealed class TestClock
     private const int MaximumDrainOperations = 1024;
 
     private readonly SemaphoreSlim _advanceGate = new(1, 1);
+    private readonly BrainTestDiagnostics _diagnostics;
     private readonly ControllableTimeProvider _provider;
     private readonly TestReminderDriver _reminders;
     private bool _disposed;
 
     internal TestClock(
         ControllableTimeProvider provider,
-        TestReminderDriver reminders)
+        TestReminderDriver reminders,
+        BrainTestDiagnostics diagnostics)
     {
         _provider = provider;
         _reminders = reminders;
+        _diagnostics = diagnostics;
     }
 
     public DateTimeOffset UtcNow
@@ -39,8 +42,33 @@ public sealed class TestClock
         TimeSpan duration,
         CancellationToken cancellationToken = default)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(duration, TimeSpan.Zero);
+        try
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(
+                duration,
+                TimeSpan.Zero);
+            await AdvanceCoreAsync(duration, cancellationToken);
+            _diagnostics.SetClock(_provider.GetUtcNow());
+            _diagnostics.RecordEvent(
+                "clock.advance",
+                "succeeded",
+                ("duration", duration.ToString("c")),
+                ("utc", _provider.GetUtcNow().ToString("O")));
+        }
+        catch (Exception failure)
+            when (failure is not BrainTestFailureException)
+        {
+            _diagnostics.SetClock(_provider.GetUtcNow());
+            throw _diagnostics.CaptureFailure(
+                "clock.advance",
+                failure);
+        }
+    }
 
+    private async Task AdvanceCoreAsync(
+        TimeSpan duration,
+        CancellationToken cancellationToken)
+    {
         await _advanceGate.WaitAsync(cancellationToken);
         try
         {
