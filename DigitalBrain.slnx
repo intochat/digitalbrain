@@ -36,6 +36,8 @@
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/DigitalBrain.AccountEnrichment/DigitalBrain.AccountEnrichment.csproj" />
+    <Project Path="samples/DigitalBrain.Quickstart.Contracts/DigitalBrain.Quickstart.Contracts.csproj" />
+    <Project Path="samples/DigitalBrain.Quickstart/DigitalBrain.Quickstart.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />

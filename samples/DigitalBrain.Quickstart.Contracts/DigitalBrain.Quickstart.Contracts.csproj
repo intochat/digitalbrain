@@ -1,13 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Quickstart module: the minimal greeter neuron implementation.</Description>
+    <Description>Quickstart neuron and synapse contracts.</Description>
     <RootNamespace>DigitalBrain.Quickstart</RootNamespace>
-    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DigitalBrain.Quickstart.Contracts\DigitalBrain.Quickstart.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"
