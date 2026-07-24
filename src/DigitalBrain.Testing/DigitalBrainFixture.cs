@@ -23,9 +23,12 @@ public abstract class DigitalBrainFixture : IAsyncLifetime
         try
         {
             var scope = $"test-{Guid.NewGuid():N}";
+            var cluster = Cluster();
+            var clock = await cluster.PrepareMethodAsync(scope);
             return TestBrain.Create(
-                Cluster(),
+                cluster,
                 scope,
+                clock,
                 () => _methodLease.Release());
         }
         catch

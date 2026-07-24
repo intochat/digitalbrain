@@ -3,7 +3,9 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Kernel;
 
-internal sealed class OwnerBoundCallFilter : IIncomingGrainCallFilter
+internal sealed class OwnerBoundCallFilter(
+    IEnumerable<ReminderSourceAllowlist> additionalReminderSources) :
+    IIncomingGrainCallFilter
 {
     public Task Invoke(IIncomingGrainCallContext context)
     {
@@ -17,7 +19,18 @@ internal sealed class OwnerBoundCallFilter : IIncomingGrainCallFilter
             }
 
             throw new NeuronAuthorizationException(
-                $"'{nameof(IRemindable.ReceiveReminder)}' can be called only by the Orleans reminder provider.");
+                $"'{nameof(IRemindable.ReceiveReminder)}' can be called only by the Orleans reminder provider. Source: '{context.SourceId?.ToString() ?? "unattributed"}'.");
+        }
+
+        if (IsClockBarrierCall(context))
+        {
+            if (IsAdditionalTrustedSource(context.SourceId))
+            {
+                return context.Invoke();
+            }
+
+            throw new NeuronAuthorizationException(
+                $"'{nameof(IClockTurnBarrier.Barrier)}' can be called only by an explicitly trusted fixture service. Source: '{context.SourceId?.ToString() ?? "unattributed"}'.");
         }
 
         if (OwnerOf(context.SourceId) is not { } caller)
@@ -56,9 +69,22 @@ internal sealed class OwnerBoundCallFilter : IIncomingGrainCallFilter
         => context.InterfaceMethod?.DeclaringType == typeof(IRemindable)
             && context.InterfaceMethod?.Name == nameof(IRemindable.ReceiveReminder);
 
-    private static bool IsTrustedReminderProvider(GrainId? source)
-        => source?.Type.ToString() is { } sourceType
-            && string.Equals(sourceType, ReminderGrainServiceType, StringComparison.Ordinal);
+    private static bool IsClockBarrierCall(IIncomingGrainCallContext context)
+        => context.InterfaceMethod?.DeclaringType == typeof(IClockTurnBarrier)
+            && context.InterfaceMethod?.Name == nameof(IClockTurnBarrier.Barrier);
+
+    private bool IsTrustedReminderProvider(GrainId? source)
+        => source is { } identified
+            && (string.Equals(
+                    identified.Type.ToString(),
+                    ReminderGrainServiceType,
+                    StringComparison.Ordinal)
+                || IsAdditionalTrustedSource(identified));
+
+    private bool IsAdditionalTrustedSource(GrainId? source)
+        => source is { } identified
+            && additionalReminderSources.Any(
+                allowlist => allowlist.Contains(identified));
 
     private static bool IsClientEntryPoint(MethodInfo? method)
         => method?.DeclaringType?.GetCustomAttribute<ClientEntryPointAttribute>() is not null;

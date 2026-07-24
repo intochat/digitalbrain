@@ -91,6 +91,9 @@ internal static class SimulationClusterHost
                     reminders.RefreshReminderListPeriod = TimeSpan.FromMilliseconds(50);
                 });
                 silo.Services.AddSingleton<IJournalStorageProvider>(journalStorage);
+                silo.Services.AddKeyedSingleton<TimeProvider>(
+                    NeuronTime.ServiceKey,
+                    clock);
                 silo.Services.AddSingleton<TimeProvider>(clock);
             });
             builder.ConfigureClient(client =>

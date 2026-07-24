@@ -6,7 +6,12 @@ using Orleans.Serialization;
 
 namespace DigitalBrain.Kernel;
 
-public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDelegationAuthority
+public abstract class Neuron :
+    DurableGrain,
+    INeuron,
+    IRemindable,
+    ICapabilityDelegationAuthority,
+    IClockTurnBarrier
 {
     private const string IncomingJournalName = "incoming";
     private const string OutgoingJournalName = "outgoing";
@@ -43,8 +48,6 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDe
     private readonly Serializer<Synapse> _synapses;
     private readonly Serializer<CapabilityDelegationState> _delegationStates;
     private readonly Serializer<SynapseDelivery> _deliveries;
-    private readonly TimeProvider _clock;
-
     private SynapseDelivery? _handling;
     private int _handlingDepth;
     private TurnCheckpoint? _turnCheckpoint;
@@ -66,10 +69,20 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDe
         _synapses = ServiceProvider.GetRequiredService<Serializer<Synapse>>();
         _delegationStates = ServiceProvider.GetRequiredService<Serializer<CapabilityDelegationState>>();
         _deliveries = ServiceProvider.GetRequiredService<Serializer<SynapseDelivery>>();
-        _clock = ServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
+        var timeProvider =
+            ServiceProvider.GetKeyedService<TimeProvider>(NeuronTime.ServiceKey)
+            ?? System.TimeProvider.System;
+        TimeProvider = new NeuronTimeProvider(
+            timeProvider,
+            this.GetGrainId());
     }
 
     public NeuronId Id => NeuronId.FromGrainKey(this.GetGrainId().Type.ToString()!, this.GetPrimaryKeyString());
+
+    protected TimeProvider TimeProvider { get; }
+
+    Task IClockTurnBarrier.Barrier()
+        => Task.CompletedTask;
 
     public sealed override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -383,7 +396,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDe
             Id,
             sequence,
             causation,
-            _clock);
+            TimeProvider);
         var delegation = new CapabilityDelegation(
             Guid.NewGuid(),
             request,
@@ -484,7 +497,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDe
             Id,
             sequence,
             _handling,
-            _clock);
+            TimeProvider);
 
         StageInboundCause();
         FlushOutgoing();
@@ -517,7 +530,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDe
             Id,
             sequence,
             request,
-            _clock);
+            TimeProvider);
 
         FlushOutgoing();
         _outgoing.Append(delivery);
@@ -615,7 +628,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDe
             Id,
             sequence,
             delegation.Request,
-            _clock);
+            TimeProvider);
         var delegationCheckpoint = SnapshotDelegations();
         var outgoingCheckpoint = _outgoing.Checkpoint();
 
@@ -834,7 +847,13 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDe
     {
         var sequence = _outgoing.NextSequence
             + (_handling is null ? 0 : _firedWhileHandling.Count);
-        var delivery = SynapseDelivery.Create(Snapshot(synapse), Id, sequence, causation, _clock, correlation);
+        var delivery = SynapseDelivery.Create(
+            Snapshot(synapse),
+            Id,
+            sequence,
+            causation,
+            TimeProvider,
+            correlation);
 
         if (_handling is null)
         {
@@ -1001,7 +1020,8 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDe
 
     private bool Exhausted(OutboxEntry entry)
         => entry.Attempts >= DeliveryPolicy.MaximumAttempts
-        || _clock.GetUtcNow() - entry.Delivery.Timestamp > DeliveryPolicy.RetryHorizon;
+        || TimeProvider.GetUtcNow() - entry.Delivery.Timestamp
+            > DeliveryPolicy.RetryHorizon;
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Design",

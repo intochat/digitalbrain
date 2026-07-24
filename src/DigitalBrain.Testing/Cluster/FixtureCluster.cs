@@ -1,7 +1,6 @@
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
-using Orleans.Runtime;
 using Orleans.Runtime.Services;
 using Orleans.TestingHost;
 
@@ -10,12 +9,14 @@ namespace DigitalBrain.Testing;
 internal sealed class FixtureCluster : IAsyncDisposable
 {
     private const int SiloCount = 3;
+    private static readonly DateTimeOffset FixedEpoch =
+        new(2040, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     private readonly RecordingJournalStorageProvider _journalStorage =
         new(new VolatileJournalStorageProvider());
     private readonly IReadOnlyCollection<ICompiledModule> _modules;
     private readonly VolatileReminderTable _reminderTable = new();
-    private readonly ScenarioClock _clock = new();
+    private readonly ControllableTimeProvider _clock = new(FixedEpoch);
 #pragma warning disable CA2213 // The cluster is disposed asynchronously in DisposeAsync.
     private InProcessTestCluster? _cluster;
 #pragma warning restore CA2213
@@ -58,6 +59,15 @@ internal sealed class FixtureCluster : IAsyncDisposable
         => _cluster?.Client
             ?? throw new InvalidOperationException(
                 "The DigitalBrain fixture cluster is not running.");
+
+    internal async Task<TestClock> PrepareMethodAsync(string scope)
+    {
+        _clock.Reset();
+        await _reminderTable.TestOnlyClearTable();
+        return new TestClock(
+            _clock,
+            new TestReminderDriver(_reminderTable, Client, scope));
+    }
 
     internal static string LabelOf(string siloName)
     {
@@ -105,18 +115,18 @@ internal sealed class FixtureCluster : IAsyncDisposable
             }
 
             DigitalBrainRuntime.Add(silo, FixtureCluster.LabelOf(options.SiloName), _modules);
-            silo.UseInMemoryReminderService();
-            silo.Services.AddGrainService<SpoofReminderService>();
-            silo.Services.AddSingleton<ISpoofReminderServiceClient, SpoofReminderServiceClient>();
-            silo.Services.AddSingleton<IReminderTable>(_reminderTable);
-            silo.Services.Configure<ReminderOptions>(reminders =>
-            {
-                reminders.InitializationTimeout = TimeSpan.FromSeconds(1);
-                reminders.MinimumReminderPeriod = TimeSpan.FromMilliseconds(50);
-                reminders.RefreshReminderListPeriod = TimeSpan.FromMilliseconds(50);
-            });
+            silo.Services.AddSingleton(new ReminderSourceAllowlist(
+                [TestReminderDeliveryService.SourceType]));
+            silo.Services.AddGrainService<TestReminderDeliveryService>();
+            silo.Services.AddSingleton<
+                ITestReminderDeliveryServiceClient,
+                TestReminderDeliveryServiceClient>();
+            silo.Services.AddSingleton<Orleans.Timers.IReminderRegistry>(
+                new TestReminderRegistry(_reminderTable, _clock));
             silo.Services.AddSingleton<IJournalStorageProvider>(_journalStorage);
-            silo.Services.AddSingleton<TimeProvider>(_clock);
+            silo.Services.AddKeyedSingleton<TimeProvider>(
+                NeuronTime.ServiceKey,
+                _clock);
         });
         builder.ConfigureClient(client =>
         {

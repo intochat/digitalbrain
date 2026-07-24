@@ -20,11 +20,16 @@ public sealed class TestBrain : IAsyncDisposable
     private readonly TestOwner _defaultOwner;
     private Action? _release;
 
-    private TestBrain(FixtureCluster cluster, string scope, Action release)
+    private TestBrain(
+        FixtureCluster cluster,
+        string scope,
+        TestClock clock,
+        Action release)
     {
         Cluster = cluster;
         _scope = scope;
         _release = release;
+        Clock = clock;
 
         var owner = CreateOwner(DefaultOwnerLabel);
         _labelSpellings.Add(DefaultOwnerLabel, DefaultOwnerLabel);
@@ -35,13 +40,16 @@ public sealed class TestBrain : IAsyncDisposable
 
     public IDigitalBrain Client { get; }
 
+    public TestClock Clock { get; }
+
     internal FixtureCluster Cluster { get; }
 
     internal static TestBrain Create(
         FixtureCluster cluster,
         string scope,
+        TestClock clock,
         Action release)
-        => new(cluster, scope, release);
+        => new(cluster, scope, clock, release);
 
     public TestNeuron<TNeuron> Neuron<TNeuron>(string name = "default")
         where TNeuron : class, INeuron
@@ -82,6 +90,7 @@ public sealed class TestBrain : IAsyncDisposable
 
         try
         {
+            await Clock.InvalidateAsync();
             await DisposeJournalsAsync();
         }
         finally
