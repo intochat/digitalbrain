@@ -128,7 +128,36 @@ public sealed class TestingFrameworkContracts
         Assert.Contains("still armed", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact(DisplayName = "disposing FaultHandle then Scenario succeeds")]
+    [Fact(DisplayName = "Dispose after Open/AdvanceClock/Arm with leftover fault attaches artifact with Owner and stages")]
+    public async Task DisposeArmedFaultAttachesArtifactWithOwnerAndStages()
+    {
+        var scenario = await Simulations.OpenAsync(TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
+        scenario.AdvanceClock(TimeSpan.FromMinutes(2));
+
+        var grain = new NeuronId(ISessionNeuron.GrainTypeName, owner, "artifact").ToGrainId();
+        _ = scenario.Arm(new JournalCommitAfter(
+            grain,
+            CompletedWritesBeforeFailure: 0,
+            Message: "artifact armed fault"));
+
+        var error = await Assert.ThrowsAsync<SimulationAssertionException>(async () =>
+            await scenario.DisposeAsync());
+
+        Assert.NotNull(error.Artifact);
+        Assert.Equal(owner, error.Artifact.Owner);
+        Assert.Contains(ScenarioStages.Open, error.Artifact.Stages);
+        Assert.Contains(ScenarioStages.AdvanceClock, error.Artifact.Stages);
+        Assert.Contains(ScenarioStages.Arm, error.Artifact.Stages);
+        Assert.Contains(ScenarioStages.Dispose, error.Artifact.Stages);
+        Assert.True(error.Artifact.ArmedFaultCount >= 1);
+        Assert.NotEmpty(error.Artifact.ArmedFaultDescriptions);
+        Assert.Contains(owner.Value, error.Message, StringComparison.Ordinal);
+        Assert.Contains(ScenarioStages.AdvanceClock, error.Message, StringComparison.Ordinal);
+        Assert.Contains(ScenarioStages.Arm, error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "disposing FaultHandle then Scenario succeeds without throwing or requiring an artifact")]
     public async Task DisposeAfterDisarmSucceeds()
     {
         var scenario = await Simulations.OpenAsync(TestContext.Current.CancellationToken);

@@ -2,10 +2,12 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Testing;
 
+internal readonly record struct ArmedFaultSnapshot(int Count, IReadOnlyList<string> Descriptions);
+
 internal sealed class ScenarioFaults
 {
     private readonly object _gate = new();
-    private readonly HashSet<FaultHandle> _armed = [];
+    private readonly Dictionary<FaultHandle, string> _armed = [];
 
     public FaultHandle Arm(FaultPoint point)
     {
@@ -25,9 +27,12 @@ internal sealed class ScenarioFaults
                 FaultHandle? handle = null;
                 handle = new FaultHandle(() => Disarm(handle!, journal.Grain));
 
+                var description = BoundDescription(
+                    $"{nameof(JournalCommitAfter)} grain={journal.Grain} after={journal.CompletedWritesBeforeFailure} message={journal.Message}");
+
                 lock (_gate)
                 {
-                    _armed.Add(handle);
+                    _armed[handle] = description;
                 }
 
                 return handle;
@@ -40,12 +45,14 @@ internal sealed class ScenarioFaults
         }
     }
 
-    public async ValueTask DisarmLeftoversAndThrowIfAnyAsync()
+    public async ValueTask<ArmedFaultSnapshot> DisarmLeftoversAsync()
     {
         FaultHandle[] leftovers;
+        ArmedFaultSnapshot snapshot;
         lock (_gate)
         {
-            leftovers = [.. _armed];
+            leftovers = [.. _armed.Keys];
+            snapshot = SnapshotUnlocked();
         }
 
         foreach (var handle in leftovers)
@@ -53,12 +60,21 @@ internal sealed class ScenarioFaults
             await handle.DisposeAsync();
         }
 
-        if (leftovers.Length > 0)
+        return snapshot;
+    }
+
+    public ArmedFaultSnapshot SnapshotArmed()
+    {
+        lock (_gate)
         {
-            throw new SimulationAssertionException(
-                $"Scenario disposed with {leftovers.Length} fault(s) still armed. Dispose each FaultHandle before disposing the Scenario.");
+            return SnapshotUnlocked();
         }
     }
+
+    private ArmedFaultSnapshot SnapshotUnlocked()
+        => new(
+            Count: _armed.Count,
+            Descriptions: [.. _armed.Values.Take(ScenarioFailureArtifact.MaxFaultDescriptions)]);
 
     private void Disarm(FaultHandle handle, GrainId grain)
     {
@@ -68,5 +84,15 @@ internal sealed class ScenarioFaults
         {
             _armed.Remove(handle);
         }
+    }
+
+    private static string BoundDescription(string description)
+    {
+        if (description.Length <= ScenarioFailureArtifact.MaxFaultDescriptionLength)
+        {
+            return description;
+        }
+
+        return description[..ScenarioFailureArtifact.MaxFaultDescriptionLength];
     }
 }
