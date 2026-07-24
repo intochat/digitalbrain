@@ -79,6 +79,33 @@ test('the site is configured for the digitalbrain.tech GitHub Pages apex', () =>
   assert.match(pagesWorkflow, /actions\/upload-pages-artifact@v5/)
   assert.match(pagesWorkflow, /actions\/deploy-pages@v5/)
   assert.match(pagesWorkflow, /path:\s*docs\/\.vitepress\/dist/)
+  assert.match(pagesWorkflow, /cancel-in-progress:\s*false/)
+  assert.match(pagesWorkflow, /branches:\s*\[master\]/)
+})
+
+test('CI keeps framework on every master event and docs only on pull requests', () => {
+  const ci = read('.github', 'workflows', 'ci.yml')
+  const pages = read('.github', 'workflows', 'docs-pages.yml')
+  const dependabot = read('.github', 'dependabot.yml')
+
+  assert.match(ci, /^ {2}framework:/m)
+  assert.match(ci, /dotnet test DigitalBrain\.slnx -c Release/)
+  assert.match(ci, /if:\s*github\.event_name\s*==\s*'pull_request'/)
+  assert.match(ci, /npm test/)
+  assert.match(ci, /npm run build/)
+  assert.match(ci, /cache-dependency-path:\s*docs\/package-lock\.json/)
+  assert.doesNotMatch(ci, /deploy-pages/)
+  assert.doesNotMatch(ci, /nuget\.org|dotnet nuget push|dotnet pack/i)
+
+  assert.match(pages, /npm ci --no-audit --no-fund/)
+  assert.match(pages, /npm test/)
+  assert.match(pages, /npm run build/)
+  assert.doesNotMatch(pages, /dotnet test/)
+
+  assert.match(dependabot, /package-ecosystem:\s*github-actions/)
+  assert.match(dependabot, /package-ecosystem:\s*npm/)
+  assert.match(dependabot, /directory:\s*\/docs/)
+  assert.match(dependabot, /package-ecosystem:\s*nuget/)
 })
 
 test('the homepage tells the neurons, synapses, and simulations story', () => {
@@ -212,6 +239,10 @@ test('the contributing guide states the gate and the non-negotiable rules', () =
   assert.match(contributing, /digitalbrain\.tech/)
   assert.match(contributing, /docs-pages\.yml/)
   assert.match(contributing, /GitHub Actions/)
+  assert.match(contributing, /CI and CD/)
+  assert.match(contributing, /pull requests only/i)
+  assert.match(contributing, /does \*\*not\*\* wait on the framework/)
+  assert.match(contributing, /dependabot\.yml/)
 })
 
 test('the open debts are disclosed rather than buried', () => {
