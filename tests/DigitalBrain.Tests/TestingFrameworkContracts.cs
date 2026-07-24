@@ -66,27 +66,30 @@ public sealed class TestingFrameworkContracts
         Assert.NotSame(TimeProvider.System, scenario.Clock);
     }
 
-    [Fact(DisplayName = "Scenario.Clock starts at a recorded instant and stays put until AdvanceClock")]
-    public async Task ClockStartsAtRecordedInstant()
+    [Fact(DisplayName = "Scenario.Clock tracks wall time so reminders and real liveness keep progressing")]
+    public async Task ClockTracksWallTimeBetweenReads()
     {
         await using var scenario = await Simulations.OpenAsync(TestContext.Current.CancellationToken);
 
         var first = scenario.Clock.GetUtcNow();
+        await Task.Delay(TimeSpan.FromMilliseconds(20), TestContext.Current.CancellationToken);
         var second = scenario.Clock.GetUtcNow();
 
-        Assert.Equal(first, second);
+        Assert.True(second >= first);
         Assert.NotEqual(default, first);
     }
 
-    [Fact(DisplayName = "Scenario.AdvanceClock moves GetUtcNow by the requested delta without wall-clock sleep")]
+    [Fact(DisplayName = "Scenario.AdvanceClock adds a jump on top of wall time without sleeping the jump")]
     public async Task AdvanceClockMovesGetUtcNow()
     {
         await using var scenario = await Simulations.OpenAsync(TestContext.Current.CancellationToken);
 
         var before = scenario.Clock.GetUtcNow();
         scenario.AdvanceClock(TimeSpan.FromMinutes(5));
+        var after = scenario.Clock.GetUtcNow();
 
-        Assert.Equal(before + TimeSpan.FromMinutes(5), scenario.Clock.GetUtcNow());
+        Assert.True(after >= before + TimeSpan.FromMinutes(5) - TimeSpan.FromSeconds(1));
+        Assert.True(after < before + TimeSpan.FromMinutes(5) + TimeSpan.FromSeconds(2));
     }
 
     [Fact(DisplayName = "host ScenarioClock is registered in silo DI so neuron journal stamps follow AdvanceClock")]
@@ -94,9 +97,8 @@ public sealed class TestingFrameworkContracts
     {
         await using var scenario = await Simulations.OpenAsync(TestContext.Current.CancellationToken);
 
-        var before = scenario.Clock.GetUtcNow();
         scenario.AdvanceClock(TimeSpan.FromHours(3));
-        var expected = before + TimeSpan.FromHours(3);
+        var expected = scenario.Clock.GetUtcNow();
 
         var sessionId = new NeuronId(ISessionNeuron.GrainTypeName, scenario.Owner, "session");
         var peerId = new NeuronId(ISessionNeuron.GrainTypeName, scenario.Owner, "peer");
@@ -107,7 +109,9 @@ public sealed class TestingFrameworkContracts
         var journal = await session.ReadNeuronJournalAsync(sessionId, JournalKind.Outgoing, afterSequence: 0);
         var stamped = Assert.Single(journal.Delta);
 
-        Assert.Equal(expected, stamped.Timestamp);
+        Assert.True(stamped.Timestamp >= expected - TimeSpan.FromSeconds(2));
+        Assert.True(stamped.Timestamp <= scenario.Clock.GetUtcNow() + TimeSpan.FromSeconds(2));
+        Assert.True(stamped.Timestamp >= DateTimeOffset.UtcNow + TimeSpan.FromHours(2));
     }
 
     [Fact(DisplayName = "Scenario.Arm journal commit fault fails the next write without FailJournalWriteAfter")]

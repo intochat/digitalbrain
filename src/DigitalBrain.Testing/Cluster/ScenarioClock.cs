@@ -3,26 +3,23 @@ namespace DigitalBrain.Testing;
 public sealed class ScenarioClock : TimeProvider
 {
     private readonly object _gate = new();
-    private DateTimeOffset _utcNow;
-
-    public ScenarioClock(DateTimeOffset? startUtc = null)
-    {
-        _utcNow = startUtc ?? DateTimeOffset.UtcNow;
-    }
+    private TimeSpan _offset;
 
     public override DateTimeOffset GetUtcNow()
     {
         lock (_gate)
         {
-            return _utcNow;
+            return DateTimeOffset.UtcNow + _offset;
         }
     }
 
     public void Advance(TimeSpan delta)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(delta, TimeSpan.Zero);
+
         lock (_gate)
         {
-            _utcNow += delta;
+            _offset += delta;
         }
     }
 }
