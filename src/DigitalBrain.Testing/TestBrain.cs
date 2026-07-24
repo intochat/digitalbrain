@@ -156,7 +156,7 @@ public sealed class TestBrain : IAsyncDisposable
                 message);
             var handle = new JournalFaultHandle(
                 registration,
-                Cluster.DisarmJournalFault);
+                RetireJournalFault);
             _faults.Add(handle);
             return handle;
         }
@@ -195,6 +195,15 @@ public sealed class TestBrain : IAsyncDisposable
         => TestOwner.Create(
             this,
             new($"{_scope}-{label}"));
+
+    private bool RetireJournalFault(JournalFaultHandle fault)
+    {
+        lock (_faultGate)
+        {
+            _faults.Remove(fault);
+            return Cluster.DisarmJournalFault(fault.Registration);
+        }
+    }
 
     private InvalidOperationException? CleanupJournalFaults()
     {

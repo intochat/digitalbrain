@@ -4,11 +4,11 @@ namespace DigitalBrain.Testing;
 
 public sealed class JournalFaultHandle : IAsyncDisposable
 {
-    private Func<JournalFaultRegistration, bool>? _disarm;
+    private Func<JournalFaultHandle, bool>? _disarm;
 
     internal JournalFaultHandle(
         JournalFaultRegistration registration,
-        Func<JournalFaultRegistration, bool> disarm)
+        Func<JournalFaultHandle, bool> disarm)
     {
         Registration = registration;
         _disarm = disarm;
@@ -30,6 +30,6 @@ public sealed class JournalFaultHandle : IAsyncDisposable
 
     internal bool Disarm()
         => Interlocked.Exchange(ref _disarm, null)
-            ?.Invoke(Registration)
+            ?.Invoke(this)
             ?? false;
 }

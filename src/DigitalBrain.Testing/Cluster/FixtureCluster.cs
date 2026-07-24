@@ -119,7 +119,11 @@ internal sealed class FixtureCluster : IAsyncDisposable
         var host = cluster.Silos.Single(silo =>
             silo.SiloAddress.Equals(hosting));
 
-        await cluster.RestartSiloAsync(host).WaitAsync(cancellationToken);
+        // Restart mutates assembly-scoped topology. Cancellation may prevent it
+        // from starting, but cannot detach this method from an in-flight restart
+        // and let the fixture lease expose an unstable cluster to the next test.
+        cancellationToken.ThrowIfCancellationRequested();
+        await cluster.RestartSiloAsync(host);
         _ = await management.GetHosts().WaitAsync(cancellationToken);
     }
 
