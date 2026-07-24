@@ -15,6 +15,25 @@ public sealed class TestingFrameworkContracts
         Assert.False(string.IsNullOrWhiteSpace(scenario.Owner.Value));
     }
 
+    [Fact(DisplayName = "Simulations.OpenAsync(OwnerId) preserves the specified Owner")]
+    public async Task OpenAsyncWithOwnerPreservesOwner()
+    {
+        var owner = new OwnerId("gherkin-specified-owner");
+        await using var scenario = await Simulations.OpenAsync(owner, TestContext.Current.CancellationToken);
+
+        Assert.Equal(owner, scenario.Owner);
+    }
+
+    [Fact(DisplayName = "Simulations.OpenAsync(string) preserves the specified Owner value")]
+    public async Task OpenAsyncWithStringOwnerPreservesOwner()
+    {
+        await using var scenario = await Simulations.OpenAsync(
+            "gherkin-string-owner",
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(new OwnerId("gherkin-string-owner"), scenario.Owner);
+    }
+
     [Fact(DisplayName = "sequential Simulations.OpenAsync calls receive different Owners")]
     public async Task SequentialOpensReceiveDifferentOwners()
     {

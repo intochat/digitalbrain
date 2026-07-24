@@ -4,16 +4,38 @@ using Reqnroll;
 namespace DigitalBrain.Testing;
 
 [Binding]
-public sealed class NeuronSteps(Simulation simulation)
+public sealed class ScenarioSteps(Simulation simulation)
 {
-    [BeforeTestRun]
-    public static Task StartCluster() => SimulationCluster.StartAsync();
+    private Scenario? _scenario;
 
-    [AfterTestRun]
-    public static Task StopCluster() => SimulationCluster.StopAsync();
+    [BeforeTestRun]
+    public static Task EnsureCluster() => SimulationCluster.StartAsync();
+
+    [AfterScenario]
+    public async Task DisposeScenario()
+    {
+        if (_scenario is null)
+        {
+            return;
+        }
+
+        var scenario = _scenario;
+        _scenario = null;
+        await scenario.DisposeAsync();
+    }
 
     [Given("a brain for owner {string}")]
-    public void GivenABrainForOwner(string owner) => simulation.OpenBrain(owner);
+    public async Task GivenABrainForOwner(string owner)
+    {
+        if (_scenario is not null)
+        {
+            throw new InvalidOperationException(
+                "A brain is already open for this scenario. Open exactly one method-scoped Scenario per Gherkin scenario.");
+        }
+
+        _scenario = await Simulations.OpenAsync(owner);
+        simulation.OpenBrain(_scenario.Owner.Value);
+    }
 
     [When("the client fires {word} at the {word} neuron named {string}")]
     public Task WhenTheClientFires(string synapseType, string neuronType, string name)
@@ -95,7 +117,7 @@ public sealed class NeuronSteps(Simulation simulation)
 
         if (occurrences != 1)
         {
-            throw new SimulationAssertionException(
+            throw Fail(
                 $"Expected exactly one {synapseType} in the {kind} journal of {neuronType} '{name}', but found {occurrences}.");
         }
     }
@@ -119,7 +141,7 @@ public sealed class NeuronSteps(Simulation simulation)
 
         if (recorded > 0)
         {
-            throw new SimulationAssertionException(
+            throw Fail(
                 $"Expected the incoming journal of {neuronType} '{name}' to be empty, but it recorded {recorded} synapse(s).");
         }
     }
@@ -157,7 +179,7 @@ public sealed class NeuronSteps(Simulation simulation)
 
         if (settled >= limit)
         {
-            throw new SimulationAssertionException(
+            throw Fail(
                 $"Expected the incoming journal of {neuronType} '{name}' to settle below {limit} synapses, but it reached {settled}.");
         }
     }
@@ -178,7 +200,7 @@ public sealed class NeuronSteps(Simulation simulation)
 
         if (silos != 2)
         {
-            throw new SimulationAssertionException(
+            throw Fail(
                 $"Expected {first} and {second} to be pinned to different silos, but they resolve to {silos} distinct silo(s).");
         }
     }
@@ -194,7 +216,7 @@ public sealed class NeuronSteps(Simulation simulation)
 
         if (actual != expected)
         {
-            throw new SimulationAssertionException(
+            throw Fail(
                 $"Expected the subscriber count for {synapseType} to have grown by {expected}, but it is {actual}.");
         }
     }
@@ -206,7 +228,7 @@ public sealed class NeuronSteps(Simulation simulation)
 
         if (actual != expected)
         {
-            throw new SimulationAssertionException(
+            throw Fail(
                 $"Expected the subscriber count for {synapseType} to be {expected}, but it is {actual}.");
         }
     }
@@ -251,7 +273,7 @@ public sealed class NeuronSteps(Simulation simulation)
                 return;
             }
 
-            throw new SimulationAssertionException(
+            throw Fail(
                 $"Expected the {kind} journal of {neuronType} '{name}' to contain {synapseType}, but its snapshot recorded no such synapse.");
         }
 
@@ -261,10 +283,15 @@ public sealed class NeuronSteps(Simulation simulation)
                 ? "nothing"
                 : string.Join(", ", journal.Delta.Select(delivery => delivery.Synapse.GetType().Name));
 
-            throw new SimulationAssertionException(
+            throw Fail(
                 $"Expected the {kind} journal of {neuronType} '{name}' to contain {synapseType}, but it recorded {recorded}.");
         }
     }
+
+    private SimulationAssertionException Fail(string reason)
+        => _scenario is { } scenario
+            ? scenario.CaptureFailure(reason)
+            : new SimulationAssertionException(reason);
 
     private static bool Contains(JournalRead journal, Type expected)
         => journal.ResetSnapshot?.RecordedOf(expected.FullName!) > 0
