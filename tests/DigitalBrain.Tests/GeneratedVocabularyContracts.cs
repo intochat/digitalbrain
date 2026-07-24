@@ -201,6 +201,114 @@ public sealed class GeneratedVocabularyContracts
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void MutablePropertyFactoriesParseTheCapturedValue()
+    {
+        var generated = Generate("""
+            namespace Alpha
+            {
+                public sealed record Mutable :
+                    DigitalBrain.Abstractions.Synapse
+                {
+                    public int Count { get; set; }
+                }
+            }
+            """);
+
+        Assert.Contains(
+            "global::System.Int32.Parse(valueCount, global::System.Globalization.CultureInfo.InvariantCulture)",
+            generated.Source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "Argument(arguments, \"valueCount\")",
+            generated.Source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UnsupportedWritablePropertyShapesFailExplicitly()
+    {
+        var generated = Generate("""
+            namespace Alpha
+            {
+                public sealed record InitOnly :
+                    DigitalBrain.Abstractions.Synapse
+                {
+                    public string Value { get; init; } = "";
+                }
+
+                public sealed record OpaqueProperty :
+                    DigitalBrain.Abstractions.Synapse
+                {
+                    public object Value { get; set; } = new object();
+                }
+
+                public sealed record Indexed :
+                    DigitalBrain.Abstractions.Synapse
+                {
+                    public string this[int index]
+                    {
+                        get => "";
+                        set { }
+                    }
+                }
+            }
+            """);
+
+        Assert.Contains(
+            "Cannot construct synapse 'Alpha.InitOnly'",
+            generated.Source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Cannot construct synapse 'Alpha.OpaqueProperty'",
+            generated.Source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Cannot construct synapse 'Alpha.Indexed'",
+            generated.Source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void VocabularyIncludesOnlyEffectivelyPublicClosedTypes()
+    {
+        var generated = Generate("""
+            namespace Alpha
+            {
+                internal static class HiddenContainer
+                {
+                    public sealed record HiddenSignal :
+                        DigitalBrain.Abstractions.Synapse;
+                }
+
+                public static class GenericContainer<T>
+                {
+                    public sealed record GenericSignal :
+                        DigitalBrain.Abstractions.Synapse;
+                }
+
+                public static class PublicContainer
+                {
+                    public sealed record VisibleSignal :
+                        DigitalBrain.Abstractions.Synapse;
+                }
+            }
+            """);
+
+        Assert.DoesNotContain(
+            "HiddenSignal",
+            generated.Source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "GenericSignal",
+            generated.Source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "VisibleSignal",
+            generated.Source,
+            StringComparison.Ordinal);
+    }
+
     private static GeneratedVocabulary Generate(string vocabulary)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(

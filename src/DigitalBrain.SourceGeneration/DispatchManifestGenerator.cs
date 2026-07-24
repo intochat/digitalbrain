@@ -439,8 +439,7 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         var visibleTypes = compilation.SourceModule.ReferencedAssemblySymbols
             .Append(compilation.Assembly)
             .SelectMany(static assembly => TypesIn(assembly.GlobalNamespace))
-            .Where(static type => type.DeclaredAccessibility == Accessibility.Public)
-            .Where(static type => type.TypeParameters.Length == 0)
+            .Where(static type => IsEffectivelyPublicClosed(type))
             .GroupBy(
                 static type => type.ToDisplayString(FullName),
                 StringComparer.Ordinal)
@@ -525,6 +524,22 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         return false;
     }
 
+    private static bool IsEffectivelyPublicClosed(INamedTypeSymbol type)
+    {
+        for (var current = type;
+            current is not null;
+            current = current.ContainingType)
+        {
+            if (current.DeclaredAccessibility != Accessibility.Public
+                || current.TypeParameters.Length > 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static string SynapseFactory(INamedTypeSymbol synapse)
     {
         var constructors = synapse.InstanceConstructors
@@ -559,27 +574,35 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
             constructors.Constructor.Parameters
                 .Select(static parameter => parameter.Name),
             StringComparer.OrdinalIgnoreCase);
-        var settableProperties = synapse.GetMembers()
+        var writableProperties = synapse.GetMembers()
             .OfType<IPropertySymbol>()
             .Where(static property => !property.IsStatic
                 && property.DeclaredAccessibility == Accessibility.Public
-                && property.SetMethod is
-                {
-                    DeclaredAccessibility: Accessibility.Public,
-                    IsInitOnly: false,
-                })
+                && property.SetMethod is not null)
             .Where(property =>
                 !constructorParameterNames.Contains(property.Name))
             .Select(property => new
             {
                 Property = property,
-                Expression = ArgumentExpression(
+                Expression = ParseExpression(
                     property.Type,
                     $"value{property.Name}"),
             })
-            .Where(static property => property.Expression is not null)
             .OrderBy(static property => property.Property.Name, StringComparer.Ordinal)
             .ToArray();
+        if (writableProperties.Any(static property =>
+                property.Property.IsIndexer
+                || property.Property.SetMethod is not
+                {
+                    DeclaredAccessibility: Accessibility.Public,
+                    IsInitOnly: false,
+                }
+                || property.Expression is null))
+        {
+            return UnsupportedFactory(synapse);
+        }
+
+        var settableProperties = writableProperties;
         var arguments = string.Join(
             ", ",
             constructors.Arguments.Select(static argument => argument!));
@@ -623,50 +646,52 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
     private static string? ArgumentExpression(
         ITypeSymbol type,
         string argumentName)
-    {
-        var argument =
-            $"Argument(arguments, \"{StringLiteral(argumentName)}\")";
+        => ParseExpression(
+            type,
+            $"Argument(arguments, \"{StringLiteral(argumentName)}\")");
 
-        return type.SpecialType switch
+    private static string? ParseExpression(
+        ITypeSymbol type,
+        string expression)
+        => type.SpecialType switch
         {
-            SpecialType.System_String => argument,
+            SpecialType.System_String => expression,
             SpecialType.System_Boolean =>
-                $"global::System.Boolean.Parse({argument})",
+                $"global::System.Boolean.Parse({expression})",
             SpecialType.System_Byte =>
-                $"global::System.Byte.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+                $"global::System.Byte.Parse({expression}, global::System.Globalization.CultureInfo.InvariantCulture)",
             SpecialType.System_SByte =>
-                $"global::System.SByte.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+                $"global::System.SByte.Parse({expression}, global::System.Globalization.CultureInfo.InvariantCulture)",
             SpecialType.System_Int16 =>
-                $"global::System.Int16.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+                $"global::System.Int16.Parse({expression}, global::System.Globalization.CultureInfo.InvariantCulture)",
             SpecialType.System_UInt16 =>
-                $"global::System.UInt16.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+                $"global::System.UInt16.Parse({expression}, global::System.Globalization.CultureInfo.InvariantCulture)",
             SpecialType.System_Int32 =>
-                $"global::System.Int32.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+                $"global::System.Int32.Parse({expression}, global::System.Globalization.CultureInfo.InvariantCulture)",
             SpecialType.System_UInt32 =>
-                $"global::System.UInt32.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+                $"global::System.UInt32.Parse({expression}, global::System.Globalization.CultureInfo.InvariantCulture)",
             SpecialType.System_Int64 =>
-                $"global::System.Int64.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+                $"global::System.Int64.Parse({expression}, global::System.Globalization.CultureInfo.InvariantCulture)",
             SpecialType.System_UInt64 =>
-                $"global::System.UInt64.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+                $"global::System.UInt64.Parse({expression}, global::System.Globalization.CultureInfo.InvariantCulture)",
             SpecialType.System_Single =>
-                $"global::System.Single.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+                $"global::System.Single.Parse({expression}, global::System.Globalization.CultureInfo.InvariantCulture)",
             SpecialType.System_Double =>
-                $"global::System.Double.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+                $"global::System.Double.Parse({expression}, global::System.Globalization.CultureInfo.InvariantCulture)",
             SpecialType.System_Decimal =>
-                $"global::System.Decimal.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+                $"global::System.Decimal.Parse({expression}, global::System.Globalization.CultureInfo.InvariantCulture)",
             _ when type.TypeKind == TypeKind.Enum =>
-                $"global::System.Enum.Parse<global::{type.ToDisplayString(FullName)}>({argument}, ignoreCase: true)",
+                $"global::System.Enum.Parse<global::{type.ToDisplayString(FullName)}>({expression}, ignoreCase: true)",
             _ when type.ToDisplayString(FullName) == "System.Guid" =>
-                $"global::System.Guid.Parse({argument})",
+                $"global::System.Guid.Parse({expression})",
             _ when type.ToDisplayString(FullName) == "System.DateTime" =>
-                $"global::System.DateTime.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+                $"global::System.DateTime.Parse({expression}, global::System.Globalization.CultureInfo.InvariantCulture)",
             _ when type.ToDisplayString(FullName) == "System.DateTimeOffset" =>
-                $"global::System.DateTimeOffset.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+                $"global::System.DateTimeOffset.Parse({expression}, global::System.Globalization.CultureInfo.InvariantCulture)",
             _ when type.ToDisplayString(FullName) == "System.TimeSpan" =>
-                $"global::System.TimeSpan.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+                $"global::System.TimeSpan.Parse({expression}, global::System.Globalization.CultureInfo.InvariantCulture)",
             _ => null,
         };
-    }
 
     private static string EscapeIdentifier(string value)
         => SyntaxFacts.GetKeywordKind(value) == SyntaxKind.None

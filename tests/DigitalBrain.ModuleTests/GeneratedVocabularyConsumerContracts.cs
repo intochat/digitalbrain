@@ -36,6 +36,24 @@ namespace DigitalBrain.ModuleTests
         }
 
         [Fact]
+        public void CompiledSynapseFactoryParsesMutableProperties()
+        {
+            var created = GeneratedTestVocabulary.TryCreateSynapse(
+                typeof(MutableVocabularySynapse).FullName!,
+                new Dictionary<string, string>(
+                    StringComparer.OrdinalIgnoreCase)
+                {
+                    [nameof(MutableVocabularySynapse.Count)] = "42",
+                },
+                out var synapse);
+
+            Assert.True(created);
+            Assert.Equal(
+                42,
+                Assert.IsType<MutableVocabularySynapse>(synapse).Count);
+        }
+
+        [Fact]
         public void AmbiguousShortSynapseNameNeverSelectsACandidate()
         {
             Assert.False(GeneratedTestVocabulary.TryResolveSynapse(
@@ -68,4 +86,13 @@ namespace AmbiguousBeta
 {
     public sealed record VocabularyCollision :
         DigitalBrain.Abstractions.Synapse;
+}
+
+namespace DigitalBrain.ModuleTests
+{
+    public sealed record MutableVocabularySynapse :
+        DigitalBrain.Abstractions.Synapse
+    {
+        public int Count { get; set; }
+    }
 }
