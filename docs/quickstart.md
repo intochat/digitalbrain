@@ -1,105 +1,149 @@
----
-title: Quickstart
----
-
 # Quickstart
 
-The checked-in quickstart runs a typed neuron on a local Orleans silo.
+The quickstart keeps public vocabulary, compiled behavior, hosting, and testing in separate projects. Consumers reference the contracts package; hosts compile the runtime module; Aspire owns the infrastructure topology.
 
-::: warning Nothing is published yet
-Produce the packages locally with `dotnet pack DigitalBrain.slnx -o artifacts/packages`. The sample
-under `samples/DigitalBrain.Quickstart` restores only from `artifacts/packages` and NuGet.org.
-:::
+## 1. Define leaf contracts
 
-## Declare a typed neuron
+`DigitalBrain.Quickstart.Contracts` is a leaf package. It exposes the public neuron contract `IGreeter` and the public durable facts `SayHello` and `Greeted`:
 
 ```csharp
-public partial interface IGreeter : INeuron
-{
-    [Alias(nameof(Greet))]
-    Task<string> Greet(string name);
-}
+using DigitalBrain.Abstractions;
+
+namespace DigitalBrain.Quickstart;
+
+public partial interface IGreeter : INeuron;
 
 [GenerateSerializer]
 [Alias("quickstart.say-hello")]
-internal sealed record SayHello : Synapse;
+public sealed record SayHello(
+    [property: Id(0)] string Name) : Synapse;
 
 [GenerateSerializer]
 [Alias("quickstart.greeted")]
-internal sealed record Greeted : Synapse;
+public sealed record Greeted(
+    [property: Id(0)] string Message) : Synapse;
+```
 
-internal sealed class Greeter : Neuron, IGreeter, IHandle<SayHello>, IEmit<Greeted>
+Synapses are durable facts, so every synapse type has an explicit, stable string alias. If a neuron contract gains semantic methods, use domain names without an `Async` suffix and add `[Alias(nameof(Method))]`. Infrastructure lifecycle APIs keep their `Async` suffixes.
+
+## 2. Compile the module behavior
+
+The packable `DigitalBrain.Quickstart` runtime declares a partial `QuickstartModule` and keeps its `Greeter` handler internal:
+
+```csharp
+using DigitalBrain.Abstractions;
+
+namespace DigitalBrain.Quickstart;
+
+public sealed partial class QuickstartModule : IModule;
+```
+
+```csharp
+using DigitalBrain.Abstractions;
+using DigitalBrain.Kernel;
+
+namespace DigitalBrain.Quickstart;
+
+internal sealed class Greeter :
+    Neuron,
+    IGreeter,
+    IHandle<SayHello>,
+    IEmit<Greeted>
 {
-    public Task<string> Greet(string name)
-        => Task.FromResult($"Hello, {name}!");
-
-    public Task HandleAsync(SayHello synapse, CancellationToken cancellationToken)
-        => EmitAsync(new Greeted());
+    public Task HandleAsync(
+        SayHello request,
+        CancellationToken cancellationToken)
+        => EmitAsync(new Greeted($"Hello, {request.Name}."));
 }
 ```
 
-The partial interface names the neuron capability; its generated identity is the fully qualified
-interface name. Capability methods use ordinary non-`Async` domain verbs and
-`[Alias(nameof(Method))]`. Explicit string aliases remain on durable synapse and state records:
-`SayHello` is an incoming fact and `Greeted` is an emitted fact.
+The source generator discovers the internal handler and emits the module capsule. Application projects select that capsule instead of reconstructing its behavior or infrastructure.
 
-## Start the silo
+## 3. Host it with one Aspire composition call
+
+The Quickstart AppHost is intentionally thin:
 
 ```csharp
-var builder = Host.CreateApplicationBuilder(args);
+using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Quickstart;
 
-builder.UseOrleans(silo => silo
-    .UseLocalhostClustering()
-    .UseInMemoryReminderService()
-    .AddDigitalBrain()
-    .AddDevelopmentJournalStorage());
+var builder = DistributedApplication.CreateBuilder(args);
+
+var brain = builder.AddDigitalBrain("quickstart")
+    .AddModule<QuickstartModule>();
+
+builder.AddProject<Projects.DigitalBrain_Quickstart_Host>("host")
+    .WithReference(brain);
+
+builder.Build().Run();
+```
+
+`AddDigitalBrain` owns storage, clustering, reminders, and journal provisioning. `AddModule<T>()` is typed application composition, and `WithReference(brain)` connects the compiled host to those resources.
+
+Run the complete topology from the repository root:
+
+```powershell
+dotnet run --project hosts/DigitalBrain.Quickstart.AppHost
+```
+
+The compiled host exposes `/health`.
+
+## 4. Prove behavior and durability
+
+Tests subclass `DigitalBrainFixture`, select the same compiled capsule once, and interact through the production client:
+
+```csharp
+public sealed class QuickstartFixture : DigitalBrainFixture
+{
+    protected override void Configure(DigitalBrainTestBuilder brain)
+    {
+        ArgumentNullException.ThrowIfNull(brain);
+        brain.AddModule<QuickstartModule>();
+    }
+}
+```
+
+The behavior test sends a typed fact, observes the emitted fact, calls `RestartHostAsync`, then uses `ReadAsync<Greeted>` to prove the same journal record survives its hosting silo restart:
+
+```csharp
+await using var test = await fixture.CreateBrainAsync(cancellationToken);
+var greeter = test.Neuron<IGreeter>("welcome");
+
+await test.Client.SendAsync<IGreeter>("welcome", new SayHello("Ada"));
+
+var first = await greeter.Outgoing.NextAsync<Greeted>(cancellationToken);
+Assert.Equal("Hello, Ada.", first.Synapse.Message);
+
+await greeter.RestartHostAsync(cancellationToken);
+
+var committed = await greeter.Outgoing.ReadAsync<Greeted>(
+    afterSequence: 0,
+    cancellationToken);
+Assert.Single(committed);
+Assert.Equal(first.SynapseId, committed[0].SynapseId);
+```
+
+This is durable restart and journal evidence, not a timing-based assertion.
+
+## 5. Connect a production client
+
+In a consuming application, call `AddDigitalBrainClient(owner)` during host setup and inject `IDigitalBrain`:
+
+```csharp
+using DigitalBrain.Aspire;
+using DigitalBrain.Client;
+using DigitalBrain.Quickstart;
+
+var builder = Host.CreateApplicationBuilder(args);
+var owner = "contoso";
+
+builder.AddDigitalBrainClient(owner);
 
 using var host = builder.Build();
 await host.StartAsync();
+
+var brain = host.Services.GetRequiredService<IDigitalBrain>();
+await brain.SendAsync<IGreeter>("welcome", new SayHello("Ada"));
 ```
 
-`AddDigitalBrain()` composes the kernel and all AppHost-selected modules known to this silo.
-`AddDevelopmentJournalStorage()` is an in-memory development store.
-
-## Send through the owner-bound client
-
-```csharp
-var grains = host.Services.GetRequiredService<IGrainFactory>();
-var brain = DigitalBrainClient.Connect(grains, "quickstart");
-
-await brain.SendAsync<IGreeter>("first", new SayHello());
-var greeting = await brain.Get<IGreeter>("first").Greet("Ada");
-```
-
-`IDigitalBrain` is the owner-scoped client contract and `DigitalBrainClient` is its implementation.
-`SendAsync<TNeuron>()` derives neuron identity from the interface type and routes through the session
-neuron, the kernel's deliberate external entry point. There is no concrete brain neuron or
-addressable root neuron; the hosting brain and the owner-bound client are separate concepts.
-
-## Add AI through AppHost
-
-The production distributed AppHost configures local Ollama without changing the silo code:
-
-```csharp
-var brain = builder.AddDigitalBrain("brain");
-
-brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
-
-builder.AddProject<Projects.DigitalBrain_Host>("silo")
-    .WithReference(brain);
-```
-
-`AddDigitalBrain("brain")` is one-call durable hosting: it owns the Azure Storage resource used for
-Orleans clustering and reminders and for Blob-backed journals. Aspire run mode starts Azurite for
-that same durable profile; a publish uses Azure Storage. The silo project remains explicit because
-its compiled executable contains the generated typed module catalog. The AI module owns the Ollama
-resource and projects its endpoint and model into that silo. Switching to OpenAI is a typed AppHost
-choice:
-
-```csharp
-brain.AddModule<AIModule>(ai => ai.WithLlm<Gpt56>());
-```
-
-That selection creates a secret `<brain-name>-ai-openai-api-key` Aspire parameter with a direct link
-to the OpenAI Platform. Do not add both `AddModule<AIModule>` calls; configure a module exactly once
-and chain its models in one callback.
+`IDigitalBrain` is an owner-scoped local facade over the connected client. It is neither a root neuron nor a status object. Consumers address typed neuron contracts by name and exchange typed synapses; hosting and transport details stay behind the facade.

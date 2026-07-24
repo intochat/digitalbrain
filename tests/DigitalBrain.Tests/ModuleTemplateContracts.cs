@@ -28,6 +28,35 @@ public sealed class ModuleTemplateContracts
         "DisableTestParallelization",
         "CA1062",
     ];
+    private static readonly string[] QuickstartHostPackages =
+    [
+        "Aspire.Azure.Data.Tables",
+        "Microsoft.Orleans.Clustering.AzureStorage",
+        "Microsoft.Orleans.Journaling.AzureStorage",
+        "Microsoft.Orleans.Reminders.AzureStorage",
+        "Microsoft.Orleans.Server",
+    ];
+    private static readonly string[] QuickstartHostProjects =
+    [
+        "DigitalBrain.Kernel",
+        "DigitalBrain.Quickstart",
+        "DigitalBrain.SourceGeneration",
+    ];
+    private static readonly string[] QuickstartForbiddenLiveVocabulary =
+    [
+        "UseLocalhostClustering",
+        "UseInMemoryReminderService",
+        "IGrainFactory",
+        "NeuronId",
+        "FirstMatchWatch",
+        "AwaitMatchAsync",
+        "Task.Delay",
+        "AddAzureStorage",
+        "RunAsEmulator",
+        "WithAzureStorage",
+        "WithDevelopmentStores",
+        "StorageProfile",
+    ];
 
     [Fact(DisplayName = "module .Contracts packages are leaves with only approved public vocabulary dependencies")]
     public void ModuleContractsPackagesAreLeaves()
@@ -247,6 +276,435 @@ public sealed class ModuleTemplateContracts
         }
     }
 
+    [Fact(DisplayName = "Quickstart hosting composes the compiled module through one Aspire entry point")]
+    public void QuickstartHostingComposesTheCompiledModuleThroughOneAspireEntryPoint()
+    {
+        var hostDirectory = Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.Quickstart.Host");
+        var appHostDirectory = Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.Quickstart.AppHost");
+        var hostProject = Path.Combine(
+            hostDirectory,
+            "DigitalBrain.Quickstart.Host.csproj");
+        var appHostProject = Path.Combine(
+            appHostDirectory,
+            "DigitalBrain.Quickstart.AppHost.csproj");
+        var violations = new List<string>();
+
+        ValidateQuickstartHost(hostDirectory, hostProject, violations);
+        ValidateQuickstartAppHost(appHostDirectory, appHostProject, violations);
+
+        var obsoleteNuGetConfig = Path.Combine(
+            RepositoryRoot,
+            "samples",
+            "DigitalBrain.Quickstart",
+            "nuget.config");
+        if (File.Exists(obsoleteNuGetConfig))
+        {
+            violations.Add(
+                $"{Path.GetRelativePath(RepositoryRoot, obsoleteNuGetConfig)} is obsolete.");
+        }
+
+        var obsoleteProgram = Path.Combine(
+            RepositoryRoot,
+            "samples",
+            "DigitalBrain.Quickstart",
+            "Program.cs");
+        if (File.Exists(obsoleteProgram))
+        {
+            violations.Add(
+                $"{Path.GetRelativePath(RepositoryRoot, obsoleteProgram)} must stay deleted.");
+        }
+
+        ValidateQuickstartDocumentation(violations);
+
+        var solution = File.ReadAllText(
+            Path.Combine(RepositoryRoot, "DigitalBrain.slnx"));
+        foreach (var project in new[] { hostProject, appHostProject })
+        {
+            if (File.Exists(project))
+            {
+                var relativePath = Path.GetRelativePath(RepositoryRoot, project)
+                    .Replace('\\', '/');
+                if (!solution.Contains(relativePath, StringComparison.Ordinal))
+                {
+                    violations.Add(
+                        $"DigitalBrain.slnx does not include {relativePath}.");
+                }
+            }
+        }
+
+        var forbiddenHostingProjects = Directory
+            .EnumerateFiles(
+                RepositoryRoot,
+                "DigitalBrain.Quickstart.Aspire.Hosting.csproj",
+                SearchOption.AllDirectories)
+            .Where(path => !IsBuildOutput(RepositoryRoot, path))
+            .Select(path => Path.GetRelativePath(RepositoryRoot, path))
+            .ToArray();
+        if (forbiddenHostingProjects.Length != 0)
+        {
+            violations.Add(
+                "Quickstart must not create an Aspire.Hosting project: "
+                + $"{string.Join(", ", forbiddenHostingProjects)}.");
+        }
+
+        if (violations.Count != 0)
+        {
+            Assert.Fail(string.Join(Environment.NewLine, violations));
+        }
+    }
+
+    private static void ValidateQuickstartHost(
+        string directory,
+        string project,
+        List<string> violations)
+    {
+        var relativeProject = Path.GetRelativePath(RepositoryRoot, project);
+        if (!File.Exists(project))
+        {
+            violations.Add($"{relativeProject} does not exist.");
+            return;
+        }
+
+        var document = XDocument.Load(project);
+        var sdk = (string?)document.Root?.Attribute("Sdk");
+        if (!string.Equals(sdk, "Microsoft.NET.Sdk.Web", StringComparison.Ordinal))
+        {
+            violations.Add(
+                $"{relativeProject} must use Microsoft.NET.Sdk.Web.");
+        }
+
+        if (!string.Equals(
+                document.Descendants("OutputType").SingleOrDefault()?.Value,
+                "Exe",
+                StringComparison.Ordinal))
+        {
+            violations.Add($"{relativeProject} must be executable.");
+        }
+
+        var packages = document.Descendants("PackageReference")
+            .Select(ReferenceName)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (!packages.SequenceEqual(QuickstartHostPackages, StringComparer.Ordinal))
+        {
+            violations.Add(
+                $"{relativeProject} directly references [{string.Join(", ", packages)}], "
+                + $"expected [{string.Join(", ", QuickstartHostPackages)}].");
+        }
+
+        var projects = document.Descendants("ProjectReference")
+            .Select(ReferenceName)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (!projects.SequenceEqual(QuickstartHostProjects, StringComparer.Ordinal))
+        {
+            violations.Add(
+                $"{relativeProject} directly references [{string.Join(", ", projects)}], "
+                + $"expected [{string.Join(", ", QuickstartHostProjects)}].");
+        }
+
+        var generator = document.Descendants("ProjectReference")
+            .SingleOrDefault(reference => string.Equals(
+                ReferenceName(reference),
+                "DigitalBrain.SourceGeneration",
+                StringComparison.Ordinal));
+        if (generator is null
+            || !string.Equals(
+                (string?)generator.Attribute("OutputItemType"),
+                "Analyzer",
+                StringComparison.Ordinal)
+            || !string.Equals(
+                (string?)generator.Attribute("ReferenceOutputAssembly"),
+                "false",
+                StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(
+                (string?)generator.Attribute("PrivateAssets"),
+                "all",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            violations.Add(
+                $"{relativeProject} must keep DigitalBrain.SourceGeneration analyzer-only and private.");
+        }
+
+        var program = Path.Combine(directory, "Program.cs");
+        if (!File.Exists(program))
+        {
+            violations.Add(
+                $"{Path.GetRelativePath(RepositoryRoot, program)} does not exist.");
+            return;
+        }
+
+        var source = File.ReadAllText(program);
+        const string expectedSource =
+            """
+            using DigitalBrain.Kernel;
+
+            var builder = WebApplication.CreateBuilder(args);
+
+            builder.AddKeyedAzureTableServiceClient("quickstart-clustering");
+            builder.AddKeyedAzureTableServiceClient("quickstart-reminders");
+            builder.UseOrleans(silo => silo
+                .AddDigitalBrain()
+                .AddDigitalBrainJournalStorage(builder.Configuration));
+
+            var app = builder.Build();
+            app.MapGet("/health", () => Results.Ok("healthy"));
+            app.Run();
+            """;
+        if (!string.Equals(
+                NormalizeSource(source),
+                NormalizeSource(expectedSource),
+                StringComparison.Ordinal))
+        {
+            violations.Add(
+                $"{Path.GetRelativePath(RepositoryRoot, program)} must keep the canonical compiled-host shape.");
+        }
+
+        ValidateForbiddenVocabulary(directory, violations);
+    }
+
+    private static void ValidateQuickstartAppHost(
+        string directory,
+        string project,
+        List<string> violations)
+    {
+        var relativeProject = Path.GetRelativePath(RepositoryRoot, project);
+        if (!File.Exists(project))
+        {
+            violations.Add($"{relativeProject} does not exist.");
+            return;
+        }
+
+        var document = XDocument.Load(project);
+        var sdk = (string?)document.Root?.Attribute("Sdk");
+        if (!string.Equals(
+                sdk,
+                "Aspire.AppHost.Sdk/13.4.6",
+                StringComparison.Ordinal))
+        {
+            violations.Add(
+                $"{relativeProject} must use Aspire.AppHost.Sdk/13.4.6.");
+        }
+
+        if (!string.Equals(
+                document.Descendants("IsPackable").SingleOrDefault()?.Value,
+                "false",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            violations.Add($"{relativeProject} must not be packable.");
+        }
+
+        var packages = document.Descendants("PackageReference")
+            .Select(ReferenceName)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (!packages.SequenceEqual(
+                ["Aspire.Hosting.Azure.Storage"],
+                StringComparer.Ordinal))
+        {
+            violations.Add(
+                $"{relativeProject} directly references [{string.Join(", ", packages)}], "
+                + "expected [Aspire.Hosting.Azure.Storage].");
+        }
+
+        var projectReferences = document.Descendants("ProjectReference")
+            .ToArray();
+        var projects = projectReferences
+            .Select(ReferenceName)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var expectedProjects = new[]
+        {
+            "DigitalBrain.Aspire.Hosting",
+            "DigitalBrain.Quickstart",
+            "DigitalBrain.Quickstart.Host",
+        };
+        if (!projects.SequenceEqual(expectedProjects, StringComparer.Ordinal))
+        {
+            violations.Add(
+                $"{relativeProject} directly references [{string.Join(", ", projects)}], "
+                + $"expected [{string.Join(", ", expectedProjects)}].");
+        }
+
+        var resources = projectReferences
+            .Where(reference => !string.Equals(
+                (string?)reference.Attribute("IsAspireProjectResource"),
+                "false",
+                StringComparison.OrdinalIgnoreCase))
+            .Select(ReferenceName)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (!resources.SequenceEqual(
+                ["DigitalBrain.Quickstart.Host"],
+                StringComparer.Ordinal))
+        {
+            violations.Add(
+                $"{relativeProject} exposes [{string.Join(", ", resources)}] as project resources, "
+                + "expected [DigitalBrain.Quickstart.Host].");
+        }
+
+        foreach (var nonResource in new[]
+                 {
+                     "DigitalBrain.Aspire.Hosting",
+                     "DigitalBrain.Quickstart",
+                 })
+        {
+            var reference = projectReferences.SingleOrDefault(item =>
+                string.Equals(
+                    ReferenceName(item),
+                    nonResource,
+                    StringComparison.Ordinal));
+            if (reference is null
+                || !string.Equals(
+                    (string?)reference.Attribute("IsAspireProjectResource"),
+                    "false",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                violations.Add(
+                    $"{relativeProject} must mark {nonResource} as a non-resource reference.");
+            }
+        }
+
+        var appHost = Path.Combine(directory, "AppHost.cs");
+        if (!File.Exists(appHost))
+        {
+            violations.Add(
+                $"{Path.GetRelativePath(RepositoryRoot, appHost)} does not exist.");
+            return;
+        }
+
+        var source = File.ReadAllText(appHost);
+        const string expectedSource =
+            """
+            using DigitalBrain.Aspire.Hosting;
+            using DigitalBrain.Quickstart;
+
+            var builder = DistributedApplication.CreateBuilder(args);
+
+            var brain = builder.AddDigitalBrain("quickstart")
+                .AddModule<QuickstartModule>();
+
+            builder.AddProject<Projects.DigitalBrain_Quickstart_Host>("host")
+                .WithReference(brain);
+
+            builder.Build().Run();
+            """;
+        if (!string.Equals(
+                NormalizeSource(source),
+                NormalizeSource(expectedSource),
+                StringComparison.Ordinal))
+        {
+            violations.Add(
+                $"{Path.GetRelativePath(RepositoryRoot, appHost)} must keep the canonical one-call composition.");
+        }
+
+        if (CountOccurrences(
+                source,
+                "builder.AddDigitalBrain(\"quickstart\")") != 1
+            || CountOccurrences(
+                source,
+                ".AddModule<QuickstartModule>()") != 1
+            || CountOccurrences(
+                source,
+                "builder.AddProject<Projects.DigitalBrain_Quickstart_Host>(\"host\")") != 1
+            || CountOccurrences(source, ".WithReference(brain)") != 1)
+        {
+            violations.Add(
+                $"{Path.GetRelativePath(RepositoryRoot, appHost)} must compose one brain, one module, and one host reference.");
+        }
+
+        ValidateForbiddenVocabulary(directory, violations);
+    }
+
+    private static void ValidateForbiddenVocabulary(
+        string directory,
+        List<string> violations)
+    {
+        foreach (var path in Directory
+                     .EnumerateFiles(directory, "*", SearchOption.AllDirectories)
+                     .Where(path => !IsBuildOutput(directory, path)))
+        {
+            var source = File.ReadAllText(path);
+            foreach (var token in QuickstartForbiddenLiveVocabulary)
+            {
+                if (source.Contains(token, StringComparison.Ordinal))
+                {
+                    violations.Add(
+                        $"{Path.GetRelativePath(RepositoryRoot, path)} contains forbidden token '{token}'.");
+                }
+            }
+        }
+    }
+
+    private static void ValidateQuickstartDocumentation(
+        List<string> violations)
+    {
+        var path = Path.Combine(RepositoryRoot, "docs", "quickstart.md");
+        if (!File.Exists(path))
+        {
+            violations.Add("docs/quickstart.md is missing.");
+            return;
+        }
+
+        var source = File.ReadAllText(path);
+        var obsoleteVocabulary = new[]
+        {
+            "Nothing is published yet",
+            "artifacts/packages",
+            "UseLocalhostClustering",
+            "UseInMemoryReminderService",
+            "IGrainFactory",
+            "DigitalBrainClient.Connect",
+            "FirstMatchWatch",
+            "AwaitMatchAsync",
+            "Task.Delay",
+        };
+        var orderedVocabulary = new[]
+        {
+            "`IGreeter`",
+            "`SayHello`",
+            "`Greeted`",
+            "`QuickstartModule`",
+            "`Greeter`",
+            "builder.AddDigitalBrain(\"quickstart\")",
+            ".AddModule<QuickstartModule>()",
+            "`DigitalBrainFixture`",
+            "`RestartHostAsync`",
+            "`ReadAsync<Greeted>`",
+            "`AddDigitalBrainClient(owner)`",
+            "`IDigitalBrain`",
+        };
+        var stale = obsoleteVocabulary.Any(token =>
+            source.Contains(token, StringComparison.Ordinal));
+        var offset = 0;
+        foreach (var token in orderedVocabulary)
+        {
+            var found = source.IndexOf(
+                token,
+                offset,
+                StringComparison.Ordinal);
+            if (found < 0)
+            {
+                stale = true;
+                break;
+            }
+
+            offset = found + token.Length;
+        }
+
+        if (stale)
+        {
+            violations.Add(
+                "docs/quickstart.md still teaches the obsolete manual-hosting workflow.");
+        }
+    }
+
     private static void ValidateQuickstartProject(
         string path,
         string[] expectedConsumerDependencies,
@@ -371,6 +829,9 @@ public sealed class ModuleTemplateContracts
             .Any(segment =>
                 segment.Equals("bin", StringComparison.OrdinalIgnoreCase)
                 || segment.Equals("obj", StringComparison.OrdinalIgnoreCase));
+
+    private static string NormalizeSource(string source)
+        => source.Replace("\r\n", "\n", StringComparison.Ordinal).Trim();
 
     private static int CountOccurrences(string source, string value)
     {

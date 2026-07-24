@@ -1,0 +1,14 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Azure.Storage" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\samples\DigitalBrain.Quickstart\DigitalBrain.Quickstart.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\DigitalBrain.Quickstart.Host\DigitalBrain.Quickstart.Host.csproj" />
+  </ItemGroup>
+</Project>
