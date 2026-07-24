@@ -1,3 +1,4 @@
+using DigitalBrain.Testing;
 using Xunit;
 
 namespace DigitalBrain.HostTests;
@@ -27,9 +28,10 @@ public sealed class HostedResourceContracts(TestingAppHostFixture fixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var host = await fixture.StartAsync(cancellationToken);
 
-        var failure = Assert.Throws<InvalidOperationException>(
+        var failure = Assert.Throws<AppHostTestFailureException>(
             () => host.Resource("missing"));
 
+        Assert.IsType<InvalidOperationException>(failure.InnerException);
         Assert.Contains("missing", failure.Message, StringComparison.Ordinal);
 
         const string prefix = "Known resources: ";

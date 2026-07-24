@@ -49,6 +49,10 @@ public abstract class DigitalBrainAppHostFixture<TAppHost> : IAsyncLifetime
         "Design",
         "CA1031:Do not catch general exception types",
         Justification = "Failed startup must preserve its original exception while best-effort cleanup releases the graph and exclusive lease.")]
+    [SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "The lease is disposed in the failure path or transferred to RunningAppHost and nulled immediately after successful registration.")]
     private async Task<RunningAppHost> StartCoreAsync(
         CancellationToken cancellationToken)
     {
