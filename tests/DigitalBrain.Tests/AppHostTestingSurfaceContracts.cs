@@ -25,8 +25,7 @@ public sealed class AppHostTestingSurfaceContracts
     [Fact]
     public void PublicL2MembersDoNotLeakAspireRuntimeObjects()
     {
-        var exposed = typeof(RunningAppHost).Assembly
-            .GetExportedTypes()
+        var exposed = L2SurfaceTypes()
             .SelectMany(type => type.GetMembers(BindingFlags.Instance | BindingFlags.Public))
             .SelectMany(MemberTypes)
             .SelectMany(Expand)
@@ -36,6 +35,43 @@ public sealed class AppHostTestingSurfaceContracts
             .ToArray();
 
         Assert.Empty(exposed);
+    }
+
+    [Fact]
+    public void PublicL2MembersDoNotExposeGenericRuntimeControl()
+    {
+        var forbiddenNames = new[]
+        {
+            "Application",
+            "ExecuteCommand",
+            "Notifications",
+            "ResourceCommands",
+            "ResourceNotifications",
+            "Services",
+            "State",
+            "SetResourceState",
+            "UpdateResourceState",
+        };
+        var exposed = L2SurfaceTypes()
+            .SelectMany(type => type.GetMembers(
+                BindingFlags.Instance
+                | BindingFlags.Public
+                | BindingFlags.DeclaredOnly))
+            .Where(member => forbiddenNames.Any(
+                forbidden => member.Name.Contains(
+                    forbidden,
+                    StringComparison.Ordinal)))
+            .Select(member => member.Name)
+            .ToArray();
+
+        Assert.Empty(exposed);
+    }
+
+    private static IEnumerable<Type> L2SurfaceTypes()
+    {
+        yield return typeof(DigitalBrainAppHostFixture<>);
+        yield return typeof(RunningAppHost);
+        yield return typeof(HostedResource);
     }
 
     private static IEnumerable<Type> MemberTypes(MemberInfo member) => member switch
