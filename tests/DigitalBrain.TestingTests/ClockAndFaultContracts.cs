@@ -86,13 +86,13 @@ public sealed class ClockAndFaultContracts(TestingFixture fixture)
     }
 
     [Fact]
-    public async Task AdvanceWaitsForFireAndForgetSelfProxyWork()
+    public async Task AdvanceWaitsForSynchronouslyCompletedSelfProxyWork()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var probe = test.Neuron<IClockProbeNeuron>("fire-and-forget");
 
-        await probe.Reference.ArmFireAndForgetTimer(
+        await probe.Reference.ArmSynchronouslyCompletedTimer(
             "queued",
             TimeSpan.FromHours(1));
 
@@ -332,8 +332,8 @@ public partial interface IClockProbeNeuron : INeuron
     [Alias(nameof(ArmEqualTimers))]
     Task ArmEqualTimers(string first, string second, TimeSpan dueTime);
 
-    [Alias(nameof(ArmFireAndForgetTimer))]
-    Task ArmFireAndForgetTimer(string value, TimeSpan dueTime);
+    [Alias(nameof(ArmSynchronouslyCompletedTimer))]
+    Task ArmSynchronouslyCompletedTimer(string value, TimeSpan dueTime);
 
     [Alias(nameof(ArmPeriodicTimer))]
     Task ArmPeriodicTimer(
@@ -437,12 +437,14 @@ internal sealed class ClockProbeNeuron :
         return Task.CompletedTask;
     }
 
-    public Task ArmFireAndForgetTimer(string value, TimeSpan dueTime)
+    public Task ArmSynchronouslyCompletedTimer(
+        string value,
+        TimeSpan dueTime)
     {
         var self = GrainFactory.GetGrain<IClockProbeTimerCallback>(
             this.GetGrainId());
         _timers.Add(value, TimeProvider.CreateTimer(
-            _ => _ = self.TimerElapsed(value),
+            _ => self.TimerElapsed(value).GetAwaiter().GetResult(),
             state: null,
             dueTime,
             Timeout.InfiniteTimeSpan));

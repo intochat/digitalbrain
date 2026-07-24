@@ -10,8 +10,7 @@ public abstract class Neuron :
     DurableGrain,
     INeuron,
     IRemindable,
-    ICapabilityDelegationAuthority,
-    IClockTurnBarrier
+    ICapabilityDelegationAuthority
 {
     private const string IncomingJournalName = "incoming";
     private const string OutgoingJournalName = "outgoing";
@@ -69,20 +68,14 @@ public abstract class Neuron :
         _synapses = ServiceProvider.GetRequiredService<Serializer<Synapse>>();
         _delegationStates = ServiceProvider.GetRequiredService<Serializer<CapabilityDelegationState>>();
         _deliveries = ServiceProvider.GetRequiredService<Serializer<SynapseDelivery>>();
-        var timeProvider =
+        TimeProvider =
             ServiceProvider.GetKeyedService<TimeProvider>(NeuronTime.ServiceKey)
             ?? System.TimeProvider.System;
-        TimeProvider = new NeuronTimeProvider(
-            timeProvider,
-            this.GetGrainId());
     }
 
     public NeuronId Id => NeuronId.FromGrainKey(this.GetGrainId().Type.ToString()!, this.GetPrimaryKeyString());
 
     protected TimeProvider TimeProvider { get; }
-
-    Task IClockTurnBarrier.Barrier()
-        => Task.CompletedTask;
 
     public sealed override async Task OnActivateAsync(CancellationToken cancellationToken)
     {

@@ -3,9 +3,7 @@ using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Testing;
 
-internal sealed class ControllableTimeProvider :
-    TimeProvider,
-    INeuronTimerRegistrationSource
+internal sealed class ControllableTimeProvider : TimeProvider
 {
     private readonly Lock _gate = new();
     private readonly DateTimeOffset _origin;
@@ -40,32 +38,6 @@ internal sealed class ControllableTimeProvider :
         object? state,
         TimeSpan dueTime,
         TimeSpan period)
-        => CreateTimerCore(
-            registrationOwner: null,
-            callback,
-            state,
-            dueTime,
-            period);
-
-    ITimer INeuronTimerRegistrationSource.CreateTimer(
-        GrainId registrationOwner,
-        TimerCallback callback,
-        object? state,
-        TimeSpan dueTime,
-        TimeSpan period)
-        => CreateTimerCore(
-            registrationOwner,
-            callback,
-            state,
-            dueTime,
-            period);
-
-    private Registration CreateTimerCore(
-        GrainId? registrationOwner,
-        TimerCallback callback,
-        object? state,
-        TimeSpan dueTime,
-        TimeSpan period)
     {
         ArgumentNullException.ThrowIfNull(callback);
         ValidateTimerValue(dueTime, nameof(dueTime));
@@ -77,7 +49,6 @@ internal sealed class ControllableTimeProvider :
                 this,
                 callback,
                 state,
-                registrationOwner,
                 _nextSequence++);
             registration.ChangeUnderLock(dueTime, period);
             _registrations.Add(registration);
@@ -108,9 +79,7 @@ internal sealed class ControllableTimeProvider :
         }
     }
 
-    internal bool TryFireNextDue(
-        DateTimeOffset now,
-        out GrainId? registrationOwner)
+    internal bool TryFireNextDue(DateTimeOffset now)
     {
         Registration? selected;
 
@@ -126,7 +95,6 @@ internal sealed class ControllableTimeProvider :
 
             if (selected is null)
             {
-                registrationOwner = null;
                 return false;
             }
 
@@ -137,7 +105,6 @@ internal sealed class ControllableTimeProvider :
         }
 
         selected.Invoke();
-        registrationOwner = selected.RegistrationOwner;
         return true;
     }
 
@@ -228,7 +195,6 @@ internal sealed class ControllableTimeProvider :
         ControllableTimeProvider owner,
         TimerCallback callback,
         object? state,
-        GrainId? registrationOwner,
         long sequence) : ITimer
     {
         private bool _disposed;
@@ -238,8 +204,6 @@ internal sealed class ControllableTimeProvider :
         internal ControllableTimeProvider Owner { get; } = owner;
 
         internal TimeSpan? Period { get; private set; }
-
-        internal GrainId? RegistrationOwner { get; } = registrationOwner;
 
         internal long Sequence { get; } = sequence;
 

@@ -65,22 +65,6 @@ internal sealed class TestReminderDriver
     internal string DescribePendingAtOrBefore(DateTimeOffset target)
         => _table.DescribePendingAtOrBefore(target, _scope);
 
-    internal async Task BarrierAsync(
-        GrainId registrationOwner,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var target = NeuronId.FromGrainKey(
-            registrationOwner.Type.ToString()
-                ?? throw new InvalidOperationException(
-                    "A timer registration owner has no grain type."),
-            registrationOwner.Key.ToString());
-
-        await _caller.Barrier(target);
-        cancellationToken.ThrowIfCancellationRequested();
-    }
-
     private sealed record DeliveredReminder(
         NeuronId Target,
         string Name,

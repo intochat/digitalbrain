@@ -17,7 +17,6 @@ internal interface ITestReminderDeliveryService : IGrainService
         TimeSpan period,
         DateTime currentTickTime);
 
-    Task Barrier(NeuronId target);
 }
 
 internal sealed class TestReminderDeliveryService :
@@ -59,10 +58,6 @@ internal sealed class TestReminderDeliveryService :
                 reminderName,
                 new TickStatus(firstTickTime, period, currentTickTime));
 
-    public Task Barrier(NeuronId target)
-        => _grains
-            .GetGrain<IClockTurnBarrier>(target.ToGrainId())
-            .Barrier();
 }
 
 internal interface ITestReminderDeliveryServiceClient :
@@ -88,9 +83,6 @@ internal sealed class TestReminderDeliveryServiceClient(
                 period,
                 currentTickTime);
 
-    public Task Barrier(NeuronId target)
-        => GetGrainService(CurrentGrainReference.GrainId)
-            .Barrier(target);
 }
 
 [Alias("db.test.reminder-delivery-caller")]
@@ -105,8 +97,6 @@ internal partial interface ITestReminderDeliveryCaller : INeuron
         TimeSpan period,
         DateTime currentTickTime);
 
-    [Alias(nameof(Barrier))]
-    Task Barrier(NeuronId target);
 }
 
 internal sealed class TestReminderDeliveryCaller :
@@ -134,6 +124,4 @@ internal sealed class TestReminderDeliveryCaller :
             period,
             currentTickTime);
 
-    public Task Barrier(NeuronId target)
-        => _service.Barrier(target);
 }

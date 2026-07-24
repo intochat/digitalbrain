@@ -61,20 +61,12 @@ public sealed class TestClock
 
                 if (_provider.NextDueAtOrBefore(due) is not null)
                 {
-                    if (!_provider.TryFireNextDue(
-                        due,
-                        out var registrationOwner))
+                    if (!_provider.TryFireNextDue(due))
                     {
                         throw new InvalidOperationException(
                             "A deterministic timer disappeared before it could be fired.");
                     }
 
-                    if (registrationOwner is { } owner)
-                    {
-                        await _reminders.BarrierAsync(
-                            owner,
-                            cancellationToken);
-                    }
                 }
                 else if (!await _reminders.TryDeliverNextDueAsync(
                     due,
@@ -85,6 +77,7 @@ public sealed class TestClock
                 }
 
                 operations++;
+                await Task.Yield();
                 cancellationToken.ThrowIfCancellationRequested();
             }
 

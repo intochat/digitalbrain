@@ -22,17 +22,6 @@ internal sealed class OwnerBoundCallFilter(
                 $"'{nameof(IRemindable.ReceiveReminder)}' can be called only by the Orleans reminder provider. Source: '{context.SourceId?.ToString() ?? "unattributed"}'.");
         }
 
-        if (IsClockBarrierCall(context))
-        {
-            if (IsAdditionalTrustedSource(context.SourceId))
-            {
-                return context.Invoke();
-            }
-
-            throw new NeuronAuthorizationException(
-                $"'{nameof(IClockTurnBarrier.Barrier)}' can be called only by an explicitly trusted fixture service. Source: '{context.SourceId?.ToString() ?? "unattributed"}'.");
-        }
-
         if (OwnerOf(context.SourceId) is not { } caller)
         {
             if (context.Grain is SubscriptionRegistry unattributedRegistry)
@@ -68,10 +57,6 @@ internal sealed class OwnerBoundCallFilter(
     private static bool IsReminderCall(IIncomingGrainCallContext context)
         => context.InterfaceMethod?.DeclaringType == typeof(IRemindable)
             && context.InterfaceMethod?.Name == nameof(IRemindable.ReceiveReminder);
-
-    private static bool IsClockBarrierCall(IIncomingGrainCallContext context)
-        => context.InterfaceMethod?.DeclaringType == typeof(IClockTurnBarrier)
-            && context.InterfaceMethod?.Name == nameof(IClockTurnBarrier.Barrier);
 
     private bool IsTrustedReminderProvider(GrainId? source)
         => source is { } identified
