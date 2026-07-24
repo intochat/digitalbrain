@@ -3,8 +3,12 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: 'DigitalBrain',
   description: 'Neurons, synapses, and simulations — durable agents for .NET on Orleans and Aspire',
+  base: '/',
   cleanUrls: true,
   srcExclude: ['superpowers/**'],
+  sitemap: {
+    hostname: 'https://digitalbrain.tech'
+  },
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
     ['meta', { name: 'theme-color', content: '#080a12' }]

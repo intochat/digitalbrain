@@ -111,3 +111,42 @@ Never tick a box that is not fully met, and never describe something as proven w
 implemented. Where a guarantee is incomplete, say so plainly — the [Architecture](/architecture)
 page's "Known limitations" section (§8) tracks the open debts, and a limitation a user discovers
 themselves costs far more than one you wrote down.
+
+## Documentation site on GitHub Pages
+
+The VitePress site under `docs/` is published to **https://digitalbrain.tech** by
+[`.github/workflows/docs-pages.yml`](https://github.com/intochat/digitalbrain/blob/master/.github/workflows/docs-pages.yml).
+On every push to `master` (and on manual `workflow_dispatch`), that workflow runs the same docs gate
+as CI (`npm ci`, `npm test`, `npm run build` in `docs/`), uploads `docs/.vitepress/dist`, and deploys
+with `actions/deploy-pages`.
+
+Publishing source must be **GitHub Actions** (not a branch/`gh-pages` folder). Set that under
+**Settings → Pages → Build and deployment → Source**.
+
+### Custom domain
+
+1. In **Settings → Pages → Custom domain**, set `digitalbrain.tech` and enable **Enforce HTTPS**
+   once DNS has propagated (can take up to 24 hours).
+2. Keep `docs/public/CNAME` as a single line `digitalbrain.tech` so the published artifact records
+   the apex host. Domain ownership is still configured in the GitHub UI (or Pages API); the file
+   alone does not bind the domain.
+3. VitePress `base` stays `/` because the site is served at the apex root, not under
+   `/digitalbrain/`.
+
+### DNS records (at the domain registrar)
+
+| Host | Type | Value |
+| --- | --- | --- |
+| `@` (apex `digitalbrain.tech`) | `A` | `185.199.108.153` |
+| `@` | `A` | `185.199.109.153` |
+| `@` | `A` | `185.199.110.153` |
+| `@` | `A` | `185.199.111.153` |
+| `@` | `AAAA` | `2606:50c0:8000::153` |
+| `@` | `AAAA` | `2606:50c0:8001::153` |
+| `@` | `AAAA` | `2606:50c0:8002::153` |
+| `@` | `AAAA` | `2606:50c0:8003::153` |
+| `www` | `CNAME` | `intochat.github.io` |
+
+GitHub Pages will redirect `www.digitalbrain.tech` ↔ `digitalbrain.tech` when both are configured.
+Prefer verifying the domain under organization settings before pointing DNS, to reduce takeover risk.
+Do not put DNS verification tokens in this repository.

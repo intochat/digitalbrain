@@ -80,6 +80,9 @@ node --test tests/*.test.mjs
 
 Every commit keeps the gate green.
 
+Published docs: **https://digitalbrain.tech** (GitHub Pages via `.github/workflows/docs-pages.yml`).
+Domain and DNS steps live in [docs/contributing.md](docs/contributing.md#documentation-site-on-github-pages).
+
 ## Way of working
 
 [CLAUDE.md](CLAUDE.md) is the canonical working discipline for every agent and contributor, and
