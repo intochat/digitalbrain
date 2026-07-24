@@ -5,8 +5,14 @@ namespace DigitalBrain.Testing;
 
 public sealed class TestOwner
 {
-    private TestOwner(OwnerId id, IDigitalBrain client)
+    private readonly TestBrain _brain;
+
+    private TestOwner(
+        TestBrain brain,
+        OwnerId id,
+        IDigitalBrain client)
     {
+        _brain = brain;
         Id = id;
         Client = client;
     }
@@ -15,8 +21,23 @@ public sealed class TestOwner
 
     public IDigitalBrain Client { get; }
 
-    internal static TestOwner Create(FixtureCluster cluster, OwnerId id)
-        => new(id, DigitalBrainClient.Connect(cluster.Client, id.Value));
+    public TestNeuron<TNeuron> Neuron<TNeuron>(string name = "default")
+        where TNeuron : class, INeuron
+    {
+        var id = NeuronId.For<TNeuron>(Id, name);
+
+        return new(
+            id,
+            Client.Get<TNeuron>(name),
+            _brain.Journal(id, JournalKind.Incoming),
+            _brain.Journal(id, JournalKind.Outgoing));
+    }
+
+    internal static TestOwner Create(TestBrain brain, OwnerId id)
+        => new(
+            brain,
+            id,
+            DigitalBrainClient.Connect(brain.Cluster.Client, id.Value));
 }
 
 internal static class IdentityLabel

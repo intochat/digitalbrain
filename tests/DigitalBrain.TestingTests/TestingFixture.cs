@@ -14,9 +14,26 @@ public partial interface IEchoNeuron : INeuron
     Task<string> Echo(string value);
 }
 
-internal sealed class EchoNeuron : Neuron, IEchoNeuron
+[GenerateSerializer]
+[Alias("tests.echo-requested")]
+internal sealed record EchoRequested([property: Id(0)] string Value) : Synapse;
+
+[GenerateSerializer]
+[Alias("tests.echoed")]
+internal sealed record Echoed([property: Id(0)] string Value) : Synapse;
+
+internal sealed class EchoNeuron :
+    Neuron,
+    IEchoNeuron,
+    IHandle<EchoRequested>,
+    IEmit<Echoed>
 {
     public Task<string> Echo(string value) => Task.FromResult(value);
+
+    public Task HandleAsync(
+        EchoRequested request,
+        CancellationToken cancellationToken)
+        => EmitAsync(new Echoed(request.Value));
 }
 
 public sealed class TestingFixture : DigitalBrainFixture
