@@ -27,14 +27,16 @@ public abstract class DigitalBrainFixture : IAsyncLifetime
             var diagnostics = cluster.CreateDiagnostics(
                 GetType().FullName ?? GetType().Name,
                 scope);
-            var clock = await cluster.PrepareMethodAsync(
+            var method = await cluster.PrepareMethodAsync(
                 scope,
                 diagnostics);
             return TestBrain.Create(
                 cluster,
                 scope,
-                clock,
+                method.Clock,
                 diagnostics,
+                cluster.Edges,
+                method.EdgeGeneration,
                 () => _methodLease.Release());
         }
         catch

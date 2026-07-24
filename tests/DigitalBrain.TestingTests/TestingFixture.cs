@@ -45,6 +45,8 @@ public sealed class TestingFixture : DigitalBrainFixture
 {
     private DigitalBrainTestBuilder? _composition;
 
+    internal EdgeScriptProbe EdgeScript { get; } = new();
+
     internal void AddProbeModuleAfterInitialization()
         => Composition().AddModule<TestingProbeModule>();
 
@@ -53,6 +55,7 @@ public sealed class TestingFixture : DigitalBrainFixture
         ArgumentNullException.ThrowIfNull(brain);
         _composition = brain;
         brain.AddModule<TestingProbeModule>();
+        brain.ConfigureProbeChat(EdgeScript);
     }
 
     private DigitalBrainTestBuilder Composition()

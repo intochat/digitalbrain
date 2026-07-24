@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
@@ -19,6 +20,8 @@ public sealed class TestBrain : IAsyncDisposable
     private readonly Lock _faultGate = new();
     private readonly HashSet<JournalFaultHandle> _faults = [];
     private readonly BrainTestDiagnostics _diagnostics;
+    private readonly TestEdgeRegistry _edges;
+    private readonly long _edgeGeneration;
     private readonly string _scope;
     private readonly TestOwner _defaultOwner;
     private Action? _release;
@@ -28,6 +31,8 @@ public sealed class TestBrain : IAsyncDisposable
         string scope,
         TestClock clock,
         BrainTestDiagnostics diagnostics,
+        TestEdgeRegistry edges,
+        long edgeGeneration,
         Action release)
     {
         Cluster = cluster;
@@ -35,6 +40,8 @@ public sealed class TestBrain : IAsyncDisposable
         _release = release;
         Clock = clock;
         _diagnostics = diagnostics;
+        _edges = edges;
+        _edgeGeneration = edgeGeneration;
 
         var owner = CreateOwner(DefaultOwnerLabel);
         _labelSpellings.Add(DefaultOwnerLabel, DefaultOwnerLabel);
@@ -54,8 +61,58 @@ public sealed class TestBrain : IAsyncDisposable
         string scope,
         TestClock clock,
         BrainTestDiagnostics diagnostics,
+        TestEdgeRegistry edges,
+        long edgeGeneration,
         Action release)
-        => new(cluster, scope, clock, diagnostics, release);
+        => new(
+            cluster,
+            scope,
+            clock,
+            diagnostics,
+            edges,
+            edgeGeneration,
+            release);
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public TScript ChatClientScript<TScript>()
+        where TScript : class
+    {
+        ThrowIfDisposed();
+        return _edges.Script<TScript>(
+            TestEdgeKind.ChatClient,
+            _edgeGeneration);
+    }
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public TScript SouthboundMcpTransportScript<TScript>()
+        where TScript : class
+    {
+        ThrowIfDisposed();
+        return _edges.Script<TScript>(
+            TestEdgeKind.SouthboundMcpTransport,
+            _edgeGeneration);
+    }
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public void SetOAuthParameter(
+        string name,
+        string? value)
+    {
+        ThrowIfDisposed();
+        _edges.SetOAuthParameter(
+            name,
+            value,
+            _edgeGeneration);
+    }
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public string? OAuthParameter(string name)
+    {
+        ThrowIfDisposed();
+        return _edges.OAuthParameter(
+            name,
+            _edgeGeneration);
+    }
 
     public TestNeuron<TNeuron> Neuron<TNeuron>(string name = "default")
         where TNeuron : class, INeuron
@@ -261,6 +318,11 @@ public sealed class TestBrain : IAsyncDisposable
         _diagnostics.RecordOwner(label, owner.Id.Value);
         return owner;
     }
+
+    private void ThrowIfDisposed()
+        => ObjectDisposedException.ThrowIf(
+            Volatile.Read(ref _release) is null,
+            this);
 
     internal BrainTestFailureException CaptureFailure(
         string operation,

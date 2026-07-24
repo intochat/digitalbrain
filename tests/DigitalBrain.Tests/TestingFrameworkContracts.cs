@@ -195,21 +195,27 @@ public sealed class TestingFrameworkContracts
         await scenario.DisposeAsync();
     }
 
-    [Fact(DisplayName = "TestingEdges.Closed is the locked external substitute list")]
-    public void TestingEdgesClosedListIsLocked()
+    [Fact(DisplayName = "test edge kinds are internal and closed")]
+    public void TestEdgeKindsAreInternalAndClosed()
     {
+        var assembly = typeof(DigitalBrainFixture).Assembly;
+        Assert.DoesNotContain(
+            assembly.GetExportedTypes(),
+            type => type.Name == "TestingEdges");
+
+        var edgeKind = assembly.GetType(
+            "DigitalBrain.Testing.TestEdgeKind",
+            throwOnError: true)!;
+
+        Assert.True(edgeKind.IsEnum);
+        Assert.False(edgeKind.IsPublic);
         Assert.Equal(
             [
-                TestingEdges.ChatClient,
-                TestingEdges.SouthboundMcpTransport,
-                TestingEdges.OAuthAndParams,
-                TestingEdges.TimeProvider,
+                "ChatClient",
+                "SouthboundMcpTransport",
+                "OAuthParameters",
+                "TimeProvider",
             ],
-            TestingEdges.Closed);
-
-        Assert.Equal("IChatClient", TestingEdges.ChatClient);
-        Assert.Equal("southbound MCP transport", TestingEdges.SouthboundMcpTransport);
-        Assert.Equal("OAuth/params", TestingEdges.OAuthAndParams);
-        Assert.Equal("TimeProvider", TestingEdges.TimeProvider);
+            Enum.GetNames(edgeKind));
     }
 }

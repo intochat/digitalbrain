@@ -19,20 +19,25 @@ internal sealed class FixtureCluster : IAsyncDisposable
     private readonly IReadOnlyCollection<ICompiledModule> _modules;
     private readonly VolatileReminderTable _reminderTable = new();
     private readonly ControllableTimeProvider _clock = new(FixedEpoch);
+    private readonly TestEdgeRegistry _edges;
 #pragma warning disable CA2213 // The cluster is disposed asynchronously in DisposeAsync.
     private InProcessTestCluster? _cluster;
 #pragma warning restore CA2213
 
-    private FixtureCluster(IReadOnlyCollection<ICompiledModule> modules)
+    private FixtureCluster(TestFixtureComposition composition)
     {
-        ArgumentNullException.ThrowIfNull(modules);
-        _modules = modules.ToArray();
+        ArgumentNullException.ThrowIfNull(composition);
+        _modules = composition.Modules.ToArray();
+        _edges = composition.Edges;
+        _edges.AttachTimeProvider(
+            _clock,
+            _clock.Reset);
     }
 
     internal static async Task<FixtureCluster> StartAsync(
-        IReadOnlyCollection<ICompiledModule> modules)
+        TestFixtureComposition composition)
     {
-        var fixture = new FixtureCluster(modules);
+        var fixture = new FixtureCluster(composition);
 
         try
         {
@@ -62,6 +67,8 @@ internal sealed class FixtureCluster : IAsyncDisposable
             ?? throw new InvalidOperationException(
                 "The DigitalBrain fixture cluster is not running.");
 
+    internal TestEdgeRegistry Edges => _edges;
+
     internal JournalFaultRegistration ArmJournalFault(
         NeuronId target,
         int completedWrites,
@@ -84,20 +91,22 @@ internal sealed class FixtureCluster : IAsyncDisposable
             _modules.Select(module => module.Id.Value),
             FixedEpoch);
 
-    internal async Task<TestClock> PrepareMethodAsync(
+    internal async Task<(TestClock Clock, long EdgeGeneration)> PrepareMethodAsync(
         string scope,
         BrainTestDiagnostics diagnostics)
     {
-        _clock.Reset();
+        var edgeGeneration = _edges.ResetMethodScope();
         await _reminderTable.TestOnlyClearTable();
-        return new TestClock(
-            _clock,
-            new TestReminderDriver(
-                _reminderTable,
-                Client,
-                scope,
+        return (
+            new TestClock(
+                _clock,
+                new TestReminderDriver(
+                    _reminderTable,
+                    Client,
+                    scope,
+                    diagnostics),
                 diagnostics),
-            diagnostics);
+            edgeGeneration);
     }
 
     internal static string LabelOf(string siloName)
@@ -183,9 +192,7 @@ internal sealed class FixtureCluster : IAsyncDisposable
             silo.Services.AddSingleton<Orleans.Timers.IReminderRegistry>(
                 new TestReminderRegistry(_reminderTable, _clock));
             silo.Services.AddSingleton<IJournalStorageProvider>(_journalStorage);
-            silo.Services.AddKeyedSingleton<TimeProvider>(
-                NeuronTime.ServiceKey,
-                _clock);
+            _edges.ConfigureServices(silo.Services);
         });
         builder.ConfigureClient(client =>
         {

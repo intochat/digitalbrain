@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 
@@ -5,17 +6,14 @@ namespace DigitalBrain.Testing;
 
 public sealed class DigitalBrainTestBuilder
 {
+    private readonly TestEdgeRegistry _edges = new();
     private readonly Dictionary<ModuleId, ICompiledModule> _modules = [];
     private bool _sealed;
 
     public void AddModule<TModule>()
         where TModule : class, IModule, new()
     {
-        if (_sealed)
-        {
-            throw new InvalidOperationException(
-                "The DigitalBrain test composition is already sealed.");
-        }
+        ThrowIfSealed();
 
         var compiled = (ICompiledModule)new TModule();
         if (!_modules.TryAdd(compiled.Id, compiled))
@@ -25,9 +23,57 @@ public sealed class DigitalBrainTestBuilder
         }
     }
 
-    internal IReadOnlyCollection<ICompiledModule> Seal()
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public void ConfigureChatClient<TService, TScript>(
+        IReadOnlyCollection<Type> neuronAliases,
+        TService adapter,
+        TScript script,
+        Action<TScript> reset)
+        where TService : class
+        where TScript : class
+    {
+        ThrowIfSealed();
+        _edges.ConfigureChatClient(
+            neuronAliases,
+            adapter,
+            script,
+            reset);
+    }
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public void ConfigureSouthboundMcpTransport<TService, TScript>(
+        TService adapter,
+        TScript script,
+        Action<TScript> reset)
+        where TService : class
+        where TScript : class
+    {
+        ThrowIfSealed();
+        _edges.ConfigureSouthboundMcpTransport(
+            adapter,
+            script,
+            reset);
+    }
+
+    internal TestFixtureComposition Seal()
     {
         _sealed = true;
-        return _modules.Values.ToArray();
+        _edges.Seal();
+        return new(
+            _modules.Values.ToArray(),
+            _edges);
+    }
+
+    private void ThrowIfSealed()
+    {
+        if (_sealed)
+        {
+            throw new InvalidOperationException(
+                "The DigitalBrain test composition is already sealed.");
+        }
     }
 }
+
+internal sealed record TestFixtureComposition(
+    IReadOnlyCollection<ICompiledModule> Modules,
+    TestEdgeRegistry Edges);
