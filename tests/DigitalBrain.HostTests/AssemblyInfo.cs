@@ -1,3 +1,5 @@
+using DigitalBrain.HostTests;
 using Xunit;
 
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
+[assembly: AssemblyFixture(typeof(TestingAppHostFixture))]
+[assembly: AssemblyFixture(typeof(ProductionAppHostFixture))]
