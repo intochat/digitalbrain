@@ -93,6 +93,60 @@ public sealed class HostedScenario : IAsyncDisposable
         }
     }
 
+    public async Task WaitHttpReadyAsync(
+        string resourceName,
+        string path = "/health",
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(resourceName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        await WaitHealthyAsync(resourceName, cancellationToken);
+
+        var endpoint = TryDescribeEndpoint(resourceName);
+        var deadline = DateTimeOffset.UtcNow + _startupTimeout;
+        Exception? lastFailure = null;
+
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                using var client = CreateHttpClient(resourceName);
+                client.Timeout = TimeSpan.FromSeconds(5);
+                using var response = await client.GetAsync(new Uri(path, UriKind.Relative), cancellationToken);
+                if (response.IsSuccessStatusCode)
+                {
+                    return;
+                }
+
+                lastFailure = new InvalidOperationException(
+                    $"HTTP {(int)response.StatusCode} from {resourceName}{path} at {endpoint}.");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || cancellationToken.IsCancellationRequested)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+
+                lastFailure = ex;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
+        }
+
+        throw new TimeoutException(
+            FormatReadiness(
+                $"HTTP path '{path}' did not become ready within {_startupTimeout}",
+                resourceName,
+                endpointName: null,
+                endpointDisplay: endpoint),
+            lastFailure);
+    }
+
     [SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
