@@ -149,7 +149,12 @@ internal sealed class FixtureCluster : IAsyncDisposable
         // and let the fixture lease expose an unstable cluster to the next test.
         cancellationToken.ThrowIfCancellationRequested();
         await cluster.RestartSiloAsync(host);
-        _ = await management.GetHosts().WaitAsync(cancellationToken);
+        await cluster
+            .WaitForLivenessToStabilizeAsync(didKill: true)
+            .WaitAsync(cancellationToken);
+        await cluster
+            .WaitForClusterManifestToStabilizeAsync(didKill: true)
+            .WaitAsync(cancellationToken);
     }
 
     public async ValueTask DisposeAsync()
