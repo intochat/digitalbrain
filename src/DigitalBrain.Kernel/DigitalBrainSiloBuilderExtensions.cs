@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Reflection;
+using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Journaling;
@@ -21,10 +22,10 @@ public static class DigitalBrainRuntime
         return CapabilityRequestContext.InvokeAsync(delegation, invoke);
     }
 
-    public static IReadOnlySet<string> Add(
+    public static IReadOnlySet<ModuleId> Add(
         ISiloBuilder builder,
         string? siloLabel,
-        IReadOnlyCollection<string> availableModules)
+        IReadOnlyCollection<ICompiledModule> availableModules)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(availableModules);
@@ -56,43 +57,42 @@ public static class DigitalBrainRuntime
             return catalog;
         });
 
+        foreach (var module in availableModules.Where(module => selectedModules.Contains(module.Id)))
+        {
+            module.Activate(builder);
+        }
+
         return selectedModules;
     }
 
-    private static HashSet<string> SelectModules(
+    private static HashSet<ModuleId> SelectModules(
         ISiloBuilder builder,
-        IReadOnlyCollection<string> availableModules)
+        IReadOnlyCollection<ICompiledModule> availableModules)
     {
         var hostContext = builder.Services
             .LastOrDefault(descriptor => descriptor.ServiceType == typeof(HostBuilderContext))
             ?.ImplementationInstance as HostBuilderContext
             ?? throw new InvalidOperationException(
                 "DigitalBrain requires the .NET Generic Host so the AppHost module manifest can be validated.");
-        var declaredModules = hostContext.Configuration
+        var declared = hostContext.Configuration
             .GetSection("DigitalBrain:Modules")
             .GetChildren()
-            .Select(section => section.Value)
+            .Select(section => new ModuleId(section.Value
+                ?? throw new InvalidOperationException(
+                    "DigitalBrain:Modules contains an empty module identity.")))
             .ToArray();
 
-        if (declaredModules.Any(string.IsNullOrWhiteSpace))
-        {
-            throw new InvalidOperationException(
-                "DigitalBrain:Modules contains an empty module identity. Configure modules through brain.AddModule<TModule>(...).");
-        }
+        var selectedModules = declared.ToHashSet();
 
-        var selectedModules = declaredModules
-            .Select(module => module!)
-            .ToHashSet(StringComparer.Ordinal);
-
-        if (selectedModules.Count != declaredModules.Length)
+        if (selectedModules.Count != declared.Length)
         {
             throw new InvalidOperationException(
                 "DigitalBrain:Modules contains a duplicate module. Configure each module exactly once.");
         }
 
         var unavailableModules = selectedModules
-            .Except(availableModules, StringComparer.Ordinal)
-            .OrderBy(module => module, StringComparer.Ordinal)
+            .Except(availableModules.Select(module => module.Id))
+            .OrderBy(module => module.Value, StringComparer.Ordinal)
             .ToArray();
 
         if (unavailableModules.Length > 0)

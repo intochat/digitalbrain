@@ -1,5 +1,6 @@
 using System.Reflection;
 using DigitalBrain.Abstractions;
+using DigitalBrain.AI;
 using DigitalBrain.Kernel;
 using Xunit;
 
@@ -13,16 +14,20 @@ public sealed class DispatchManifestContracts
     public void ManifestIsGeneratedForThisAssembly()
         => Assert.True(SynapseWiring.TryGetManifest(Probed, out _));
 
-    [Fact(DisplayName = "the generated module catalog includes modules available through project references")]
-    public void ModuleCatalogIncludesReferencedModules()
+    [Fact]
+    public void GeneratedCompositionContainsTypedCompiledModules()
     {
-        var catalog = Probed.GetType("DigitalBrain.Generated.ModuleCatalog", throwOnError: false);
-        var modules = catalog?
-            .GetField("Modules", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)?
-            .GetValue(null) as IEnumerable<string>;
+        var composition = Probed.GetType(
+            "DigitalBrain.Generated.CompiledModuleCatalog",
+            throwOnError: true)!;
+        var modules = (IReadOnlyList<ICompiledModule>)composition
+            .GetProperty("Modules", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!
+            .GetValue(null)!;
 
-        Assert.NotNull(modules);
-        Assert.Contains("DigitalBrain.AI.AIModule", modules);
+        Assert.Contains(modules, module => module.Id == AIModule.Id);
+        Assert.DoesNotContain(
+            composition.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic),
+            field => field.FieldType == typeof(string[]));
     }
 
     [Fact]

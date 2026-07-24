@@ -29,7 +29,7 @@ public sealed class ModuleActivationContracts
     public void SelectedModuleIsConfigured()
     {
         var builder = Host.CreateApplicationBuilder();
-        builder.Configuration["DigitalBrain:Modules:0"] = typeof(AIModule).FullName;
+        builder.Configuration["DigitalBrain:Modules:0"] = AIModule.Id.Value;
 
         builder.UseOrleans(silo => silo.AddDigitalBrain());
 

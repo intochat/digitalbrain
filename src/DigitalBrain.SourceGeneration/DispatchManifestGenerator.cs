@@ -14,6 +14,7 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
     private const string EmitInterface = "DigitalBrain.Abstractions.IEmit<TSynapse>";
     private const string NeuronInterface = "DigitalBrain.Abstractions.INeuron";
     private const string ModuleInterface = "DigitalBrain.Abstractions.IModule";
+    private const string CompiledModuleInterface = "DigitalBrain.Kernel.ICompiledModule";
     private const string SiloBuilder = "Orleans.Hosting.ISiloBuilder";
     private const string DigitalBrainRuntime = "DigitalBrain.Kernel.DigitalBrainRuntime";
 
@@ -102,7 +103,12 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
             .Select(static (compilation, _) => CompositionOf(compilation));
 
         context.RegisterSourceOutput(composition, static (production, model) =>
-            production.AddSource("DigitalBrainComposition.g.cs", Composition(model)));
+        {
+            if (model.EmitCatalog)
+            {
+                production.AddSource("DigitalBrainComposition.g.cs", Composition(model));
+            }
+        });
     }
 
     private static ImmutableArray<Wiring> Wirings(GeneratorSyntaxContext syntax)
@@ -369,10 +375,11 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
     private static CompositionModel CompositionOf(Compilation compilation)
     {
         var moduleContract = compilation.GetTypeByMetadataName(ModuleInterface);
+        var compiledModuleContract = compilation.GetTypeByMetadataName(CompiledModuleInterface);
 
-        if (moduleContract is null)
+        if (moduleContract is null || compiledModuleContract is null)
         {
-            return new CompositionModel([], emitExtension: false);
+            return new CompositionModel([], emitCatalog: false, emitExtension: false);
         }
 
         var siloBuilder = compilation.GetTypeByMetadataName(SiloBuilder);
@@ -401,7 +408,7 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
             && siloBuilder is not null
             && compilation.GetTypeByMetadataName(DigitalBrainRuntime) is not null;
 
-        return new CompositionModel(modules, emitExtension);
+        return new CompositionModel(modules, emitCatalog: emitExtension, emitExtension);
     }
 
     private static IEnumerable<INamedTypeSymbol> TypesIn(INamespaceSymbol scope)
@@ -448,14 +455,15 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         source.AppendLine("namespace DigitalBrain.Generated");
         source.AppendLine("{");
         source.AppendLine("    [ExcludeFromCodeCoverage]");
-        source.AppendLine("    internal static class ModuleCatalog");
+        source.AppendLine("    internal static class CompiledModuleCatalog");
         source.AppendLine("    {");
-        source.AppendLine("        internal static readonly string[] Modules =");
+        source.AppendLine("        internal static global::System.Collections.Generic.IReadOnlyList<");
+        source.AppendLine("            global::DigitalBrain.Kernel.ICompiledModule> Modules { get; } =");
         source.AppendLine("        [");
 
         foreach (var module in model.Modules)
         {
-            source.AppendLine($"            \"{module.Name}\",");
+            source.AppendLine($"            new global::{module.Name}(),");
         }
 
         source.AppendLine("        ];");
@@ -481,28 +489,10 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         source.AppendLine("            this global::Orleans.Hosting.ISiloBuilder builder,");
         source.AppendLine("            string? siloLabel)");
         source.AppendLine("        {");
-        source.AppendLine("            var selectedModules = global::DigitalBrain.Kernel.DigitalBrainRuntime.Add(");
+        source.AppendLine("            global::DigitalBrain.Kernel.DigitalBrainRuntime.Add(");
         source.AppendLine("                builder,");
         source.AppendLine("                siloLabel,");
-        source.AppendLine("                new string[]");
-        source.AppendLine("                {");
-
-        foreach (var module in model.Modules)
-        {
-            source.AppendLine($"                    \"{module.Name}\",");
-        }
-
-        source.AppendLine("                });");
-
-        foreach (var module in model.Modules)
-        {
-            source.AppendLine();
-            source.AppendLine($"            if (selectedModules.Contains(\"{module.Name}\"))");
-            source.AppendLine("            {");
-            source.AppendLine("                ((global::DigitalBrain.Kernel.ICompiledModule)");
-            source.AppendLine($"                    new global::{module.Name}()).Activate(builder);");
-            source.AppendLine("            }");
-        }
+        source.AppendLine("                global::DigitalBrain.Generated.CompiledModuleCatalog.Modules);");
 
         source.AppendLine();
         source.AppendLine("            return builder;");
@@ -578,9 +568,14 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         public string Name { get; } = name;
     }
 
-    private readonly struct CompositionModel(ImmutableArray<ModuleModel> modules, bool emitExtension)
+    private readonly struct CompositionModel(
+        ImmutableArray<ModuleModel> modules,
+        bool emitCatalog,
+        bool emitExtension)
     {
         public ImmutableArray<ModuleModel> Modules { get; } = modules;
+
+        public bool EmitCatalog { get; } = emitCatalog;
 
         public bool EmitExtension { get; } = emitExtension;
     }
