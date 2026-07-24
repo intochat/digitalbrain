@@ -24,11 +24,12 @@ public sealed class PackageBoundaryContracts
         "DigitalBrain.Modules.Salesforce.Contracts",
         "DigitalBrain.Modules.Tasks.Contracts",
         "DigitalBrain.Modules.Time.Contracts",
+        "DigitalBrain.Quickstart.Contracts",
     ];
 
     private static readonly string[] NeuronHosting = ["DigitalBrain.Testing", "DigitalBrain.DevTools"];
 
-    private static readonly string[] ProductionRoots = ["src", "modules"];
+    private static readonly string[] ProductionRoots = ["src", "modules", "samples"];
 
     public static TheoryData<string> ConsumerPathPackages { get; } = [.. ConsumerPath];
 
@@ -193,6 +194,7 @@ public sealed class PackageBoundaryContracts
             .Append("DigitalBrain.Modules.Salesforce.Aspire.Hosting")
             .Append("DigitalBrain.Modules.Tasks")
             .Append("DigitalBrain.Modules.Time")
+            .Append("DigitalBrain.Quickstart")
             .ToHashSet(StringComparer.Ordinal);
 
         var packable = ProductionRoots

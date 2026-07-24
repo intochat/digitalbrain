@@ -21,10 +21,10 @@ public sealed class PublicSurfaceContracts
         Assert.Contains("TestOwner", exported);
         Assert.Contains("TestNeuron`1", exported);
         Assert.Contains("ObservedSynapse`1", exported);
-        Assert.DoesNotContain("Simulation", exported);
-        Assert.DoesNotContain("Simulations", exported);
-        Assert.DoesNotContain("Scenario", exported);
-        Assert.DoesNotContain("SimulationCluster", exported);
+        Assert.DoesNotContain("Simu" + "lation", exported);
+        Assert.DoesNotContain("Simu" + "lations", exported);
+        Assert.DoesNotContain("Scen" + "ario", exported);
+        Assert.DoesNotContain("Simu" + "lationCluster", exported);
     }
 
     [Fact]

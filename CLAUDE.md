@@ -7,8 +7,9 @@ any harness — Claude Code, Codex, Grok — with nothing but a shell and this r
 
 ## 1. What is being built
 
-DigitalBrain is a .NET framework for durable agents on Orleans and Aspire. The paradigm is
-**neurons, synapses, and simulations**. The thing that makes it worth building is the last part:
+DigitalBrain is an AI-native operating system for durable agents on Orleans and Aspire. Its
+ready-to-use primitives are **neurons and synapses**; users compose them in C# today and ultimately
+describe behaviors in natural language. The thing that makes it worth building is:
 
 > **A brain you program by writing ordinary C#, and that can program itself.**
 
@@ -18,10 +19,10 @@ The architecture in six lines:
 - **A synapse is a fact** — a thin record, broadcast, no reply. **An interface method is a request** —
   directed at a capability, replies. Both are journaled; neither is privileged.
 - **Modules own vocabulary** — synapse records and neuron interfaces. Compile-time, needs a rebuild.
-- **Behaviors own logic** — single-file C# scripts. Runtime, needs only approval.
+- **Behaviors will own logic** — single-file C# scripts behind a designed, unbuilt approval rail.
 - **The client API is the programming model.** The same file runs outside the cluster as a script and
   installs inside it as a behavior.
-- **Every install is a human-approved proposal**, journaled and reversible.
+- **Every future install is a human-approved proposal**, journaled and reversible.
 
 `docs/architecture.md` is the plan of record. Read its ratified architecture before changing
 framework code. Do not silently reverse its decisions. If evidence invalidates one, record the
@@ -152,18 +153,19 @@ this repository’s harness and do not depend on it.
 **The root gate, every phase, no exceptions:**
 
 ```
-dotnet test --logger "console;verbosity=minimal"
+dotnet build DigitalBrain.slnx -c Release
+dotnet test DigitalBrain.slnx -c Release --logger "console;verbosity=minimal"
 ```
 
-**Never `--filter`.** Run it in the background and poll. A project-scoped run has already missed a
+**Never `--filter` for the completion gate.** Run it with a long timeout and poll. A project-scoped run has already missed a
 failing contract that the root run caught. During TDD you may run the smallest owning project in the
 foreground, but the root gate is what permits a completion claim.
 
-**The website gate** runs `node` directly, not `npm` — npm's cmd children lose the nodejs PATH here:
+**The website package scripts invoke the direct Node proofs:**
 
 ```
-node tools/render-specification.mjs
-node --test tests/*.test.mjs
+npm --prefix docs test
+npm --prefix docs run build
 ```
 
 One guard fails the build by design, and that is correct:
@@ -199,15 +201,20 @@ and the public surface should stop changing without review.
 
 ## 7. Where things stand
 
-The durable neuron and synapse foundation, generated module activation, typed AI neurons, and
-AI-owned Aspire integration are proven. The next approved architecture is frozen in
+The durable neuron and synapse foundation, owner-scoped client facade, generated module activation,
+one-call durable AppHost composition, public testing path, and typed AI, Tasks, Google, Salesforce,
+and Quickstart families are built and proven. Time is built only through the durable one-shot
+`ICountdown` capability and its deterministic recovery tests. Reminder, recurring interval/calendar
+scheduling, DST records, and recurrence-library selection remain designed or open and unbuilt.
+
+Behavior proposal, approval, installation, execution, and rollback also remain designed and unbuilt;
+there is no behavior execution framework or public behavior test interface. The approved architecture is frozen in
 `docs/superpowers/specs/2026-07-24-digitalbrain-hosting-and-testing-design.md`. Its executable
 four-stage order, linked red-green plans, and completion gates are in
 `docs/superpowers/plans/2026-07-24-digitalbrain-hosting-testing-program.md`.
 
 One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
-That benchmark and the behavior proposal/install rail remain deliberately outside the Foundation
-PoC. Do not pull them forward while Tasks, AI/MAF, Google, Salesforce, Time, and the hosted restart
-story are being proven.
+That benchmark and the behavior proposal/install rail remain deliberately outside the built
+foundation. Do not describe designed behavior execution or recurring/calendar Time as shipped.
 
 Update this file through the same rail as everything else, and only when the loop actually improves.

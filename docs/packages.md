@@ -4,9 +4,9 @@ title: Packages
 
 # Packages
 
-DigitalBrain separates its domain-neutral runtime from independently shipped domain modules. This
-table is the single source of truth for what ships and what each package may depend on — replacing
-the twelve separate pages that used to describe them one at a time.
+DigitalBrain is an AI-native operating system of ready-to-use neurons and synapses. It separates its
+domain-neutral runtime from independently shipped domain modules. This table is the source of truth
+for what ships and what each package may depend on.
 
 | Package | Contains | Depends on |
 | --- | --- | --- |
@@ -32,9 +32,22 @@ the twelve separate pages that used to describe them one at a time.
 | `DigitalBrain.Modules.Salesforce.Aspire.Hosting` | Salesforce module AppHost integration | Salesforce, Aspire.Hosting, Integrations.Mcp.Aspire.Hosting |
 | `DigitalBrain.Modules.Tasks.Contracts` | Durable task, worker, attempt, and blocker vocabulary | Abstractions |
 | `DigitalBrain.Modules.Tasks` | Durable task lifecycle and worker attempt coordination | Tasks.Contracts, Kernel |
+| `DigitalBrain.Modules.Time.Contracts` | Built one-shot Countdown vocabulary | Abstractions |
+| `DigitalBrain.Modules.Time` | Built durable Countdown runtime; no Reminder or recurrence implementation | Time.Contracts, Kernel |
+| `DigitalBrain.Quickstart.Contracts` | Built Greeter neuron and greeting facts for external authors | Abstractions |
+| `DigitalBrain.Quickstart` | Built compiled Quickstart module | Quickstart.Contracts, Kernel |
 
-`DigitalBrain.Modules.Tasks` has no `Aspire.Hosting` package — the Tasks module needs no AppHost
-resources of its own, unlike AI, Google, and Salesforce.
+| Family | Contracts | Runtime | Module hosting package | Semantic proof | Status |
+| --- | --- | --- | --- | --- | --- |
+| Quickstart | yes | yes | no | `DigitalBrain.Quickstart.Tests` + Quickstart AppHost | Built |
+| AI | yes | yes | yes | `DigitalBrain.ModuleTests` + production AppHost | Built |
+| Tasks | yes | yes | no | `DigitalBrain.ModuleTests` | Built |
+| Time | yes | yes | no | `DigitalBrain.Time.Tests` | Built: Countdown only |
+| Google | yes | yes | yes | `DigitalBrain.ModuleTests` + production AppHost | Built |
+| Salesforce | yes | yes | yes | `DigitalBrain.ModuleTests` + production AppHost | Built |
+
+Quickstart, Tasks, and Time have no module `Aspire.Hosting` package because they need no
+module-specific AppHost resources. AI, Google, and Salesforce do.
 
 ## Boundary rules
 

@@ -388,7 +388,7 @@ public sealed class ArchitectureCutContracts
         {
             var name = Path.GetFileNameWithoutExtension(path);
             if (name.Contains(".Tests", StringComparison.Ordinal)
-                || name.Contains(".Simulations", StringComparison.Ordinal)
+                || name.Contains(".Simu" + "lations", StringComparison.Ordinal)
                 || name.Contains(".HostTests", StringComparison.Ordinal))
             {
                 continue;

@@ -6,6 +6,69 @@ namespace DigitalBrain.Tests;
 public sealed class ModuleTemplateContracts
 {
     private static readonly string RepositoryRoot = LocateRepositoryRoot();
+    private static readonly ModuleFamily[] ModuleFamilies =
+    [
+        new(
+            "Quickstart",
+            "samples/DigitalBrain.Quickstart.Contracts/DigitalBrain.Quickstart.Contracts.csproj",
+            "samples/DigitalBrain.Quickstart/DigitalBrain.Quickstart.csproj",
+            null,
+            "QuickstartModule",
+            "tests/DigitalBrain.Quickstart.Tests/DigitalBrain.Quickstart.Tests.csproj",
+            [
+                "tests/DigitalBrain.Quickstart.Tests/QuickstartFixture.cs",
+                "hosts/DigitalBrain.Quickstart.AppHost/AppHost.cs",
+            ]),
+        new(
+            "AI",
+            "modules/DigitalBrain.Modules.AI.Contracts/DigitalBrain.Modules.AI.Contracts.csproj",
+            "modules/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj",
+            "modules/DigitalBrain.Modules.AI.Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj",
+            "AIModule",
+            "tests/DigitalBrain.ModuleTests/DigitalBrain.ModuleTests.csproj",
+            [
+                "tests/DigitalBrain.ModuleTests/ModuleFixture.cs",
+                "hosts/DigitalBrain.AppHost/AppHost.cs",
+            ]),
+        new(
+            "Tasks",
+            "modules/DigitalBrain.Modules.Tasks.Contracts/DigitalBrain.Modules.Tasks.Contracts.csproj",
+            "modules/DigitalBrain.Modules.Tasks/DigitalBrain.Modules.Tasks.csproj",
+            null,
+            "TasksModule",
+            "tests/DigitalBrain.ModuleTests/DigitalBrain.ModuleTests.csproj",
+            ["tests/DigitalBrain.ModuleTests/ModuleFixture.cs"]),
+        new(
+            "Time",
+            "modules/DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj",
+            "modules/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj",
+            null,
+            "TimeModule",
+            "tests/DigitalBrain.Time.Tests/DigitalBrain.Time.Tests.csproj",
+            ["tests/DigitalBrain.Time.Tests/TimeFixture.cs"]),
+        new(
+            "Google",
+            "modules/DigitalBrain.Modules.Google.Contracts/DigitalBrain.Modules.Google.Contracts.csproj",
+            "modules/DigitalBrain.Modules.Google/DigitalBrain.Modules.Google.csproj",
+            "modules/DigitalBrain.Modules.Google.Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj",
+            "GoogleModule",
+            "tests/DigitalBrain.ModuleTests/DigitalBrain.ModuleTests.csproj",
+            [
+                "tests/DigitalBrain.ModuleTests/ModuleFixture.cs",
+                "hosts/DigitalBrain.AppHost/AppHost.cs",
+            ]),
+        new(
+            "Salesforce",
+            "modules/DigitalBrain.Modules.Salesforce.Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj",
+            "modules/DigitalBrain.Modules.Salesforce/DigitalBrain.Modules.Salesforce.csproj",
+            "modules/DigitalBrain.Modules.Salesforce.Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj",
+            "SalesforceModule",
+            "tests/DigitalBrain.ModuleTests/DigitalBrain.ModuleTests.csproj",
+            [
+                "tests/DigitalBrain.ModuleTests/ModuleFixture.cs",
+                "hosts/DigitalBrain.AppHost/AppHost.cs",
+            ]),
+    ];
     private static readonly string[] ExpectedModuleContractProjects =
     [
         "DigitalBrain.Modules.AI.Contracts",
@@ -27,9 +90,9 @@ public sealed class ModuleTemplateContracts
     [
         "Orleans",
         "Aspire",
-        "IGrainFactory",
+        "IGrain" + "Factory",
         "GrainId",
-        "NeuronId",
+        "Neuron" + "Id",
         "Simu" + "lation",
         "Scen" + "ario",
         "ConcurrentDictionary",
@@ -52,10 +115,10 @@ public sealed class ModuleTemplateContracts
     ];
     private static readonly string[] QuickstartForbiddenLiveVocabulary =
     [
-        "UseLocalhostClustering",
+        "UseLocalhost" + "Clustering",
         "UseInMemoryReminderService",
-        "IGrainFactory",
-        "NeuronId",
+        "IGrain" + "Factory",
+        "Neuron" + "Id",
         "FirstMatchWatch",
         "AwaitMatchAsync",
         "Task.Delay",
@@ -65,6 +128,147 @@ public sealed class ModuleTemplateContracts
         "WithDevelopment" + "Stores",
         "StorageProfile",
     ];
+    private static readonly string[] SelectionRoots =
+    [
+        "hosts",
+        "tests/DigitalBrain.ModuleTests",
+        "tests/DigitalBrain.Quickstart.Tests",
+        "tests/DigitalBrain.Time.Tests",
+    ];
+    private static readonly string[] ProductionProjectRoots = ["src", "modules", "samples"];
+
+    [Fact(DisplayName = "the six module families have one explicit proof topology")]
+    public void SixModuleFamiliesHaveOneExplicitProofTopology()
+    {
+        Assert.Equal(
+            ["AI", "Google", "Quickstart", "Salesforce", "Tasks", "Time"],
+            ModuleFamilies.Select(family => family.Name).Order(StringComparer.Ordinal));
+        Assert.Equal(
+            ModuleFamilies.Length,
+            ModuleFamilies.Select(family => family.Marker).Distinct(StringComparer.Ordinal).Count());
+
+        var expectedHostingProjects = ModuleFamilies
+            .Where(family => family.HostingProject is not null)
+            .Select(family => Path.GetFileNameWithoutExtension(family.HostingProject))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var actualHostingProjects = Directory
+            .EnumerateFiles(Path.Combine(RepositoryRoot, "modules"), "*.Aspire.Hosting.csproj", SearchOption.AllDirectories)
+            .Select(Path.GetFileNameWithoutExtension)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(expectedHostingProjects, actualHostingProjects);
+        Assert.All(
+            ModuleFamilies.Where(family => family.HostingProject is not null),
+            family => Assert.NotEmpty(
+                Directory.EnumerateFiles(
+                    Path.GetDirectoryName(Path.Combine(RepositoryRoot, family.HostingProject!))!,
+                    "*.cs",
+                    SearchOption.TopDirectoryOnly)));
+
+        var productionProjects = ProductionProjectRoots
+            .SelectMany(root => Directory.EnumerateFiles(
+                Path.Combine(RepositoryRoot, root),
+                "*.csproj",
+                SearchOption.AllDirectories))
+            .Select(Path.GetFileNameWithoutExtension)
+            .ToArray();
+
+        foreach (var family in ModuleFamilies)
+        {
+            var contractsPath = Path.Combine(RepositoryRoot, family.ContractsProject);
+            var runtimePath = Path.Combine(RepositoryRoot, family.RuntimeProject);
+            Assert.True(File.Exists(contractsPath), $"{family.Name} contracts project is missing.");
+            Assert.True(File.Exists(runtimePath), $"{family.Name} runtime project is missing.");
+
+            var contractsName = Path.GetFileNameWithoutExtension(contractsPath);
+            var runtimeName = Path.GetFileNameWithoutExtension(runtimePath);
+            Assert.Single(productionProjects, project => project == contractsName);
+            Assert.Single(productionProjects, project => project == runtimeName);
+
+            var runtime = XDocument.Load(runtimePath);
+            var runtimeReferences = runtime.Descendants("ProjectReference").ToArray();
+
+            Assert.Single(runtimeReferences, reference => ReferenceName(reference) == contractsName);
+            Assert.Single(runtimeReferences, reference => ReferenceName(reference) == "DigitalBrain.Kernel");
+            var generator = Assert.Single(
+                runtimeReferences,
+                reference => ReferenceName(reference) == "DigitalBrain.SourceGeneration");
+            Assert.Equal("Analyzer", (string?)generator.Attribute("OutputItemType"));
+            Assert.Equal("false", (string?)generator.Attribute("ReferenceOutputAssembly"));
+            Assert.Equal("all", (string?)generator.Attribute("PrivateAssets"));
+
+            Assert.Single(
+                Directory.EnumerateFiles(
+                    Path.GetDirectoryName(runtimePath)!,
+                    $"{family.Marker}.cs",
+                    SearchOption.TopDirectoryOnly));
+
+            var test = XDocument.Load(Path.Combine(RepositoryRoot, family.TestProject));
+            Assert.Single(
+                test.Descendants("ProjectReference"),
+                reference => ReferenceName(reference) == "DigitalBrain.Testing");
+            Assert.DoesNotContain(
+                test.Descendants("PackageReference").Select(ReferenceName),
+                package => package.Contains("Orleans", StringComparison.OrdinalIgnoreCase)
+                    || package.Contains("Aspire", StringComparison.OrdinalIgnoreCase));
+
+            var expectedSelections = family.SelectionSources
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            var actualSelections = SelectionRoots
+                .SelectMany(root => Directory.EnumerateFiles(
+                    Path.Combine(RepositoryRoot, root),
+                    "*.cs",
+                    SearchOption.AllDirectories))
+                .Where(path => !IsBuildOutput(RepositoryRoot, path))
+                .Where(path => CountOccurrences(
+                    File.ReadAllText(path),
+                    $"AddModule<{family.Marker}>") != 0)
+                .Select(path => Path.GetRelativePath(RepositoryRoot, path).Replace('\\', '/'))
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.Equal(expectedSelections, actualSelections);
+            Assert.All(
+                actualSelections,
+                sourcePath => Assert.Equal(
+                    1,
+                    CountOccurrences(
+                        File.ReadAllText(Path.Combine(RepositoryRoot, sourcePath)),
+                        $"AddModule<{family.Marker}>")));
+        }
+    }
+
+    [Fact(DisplayName = "the six module families are all covered by pack and capsule registries")]
+    public void SixModuleFamiliesAreCoveredByPackAndCapsuleRegistries()
+    {
+        var expectedPackableProjects = ModuleFamilies
+            .SelectMany(family => new[]
+            {
+                Path.GetFileNameWithoutExtension(family.ContractsProject),
+                Path.GetFileNameWithoutExtension(family.RuntimeProject),
+            })
+            .ToArray();
+
+        Assert.All(
+            expectedPackableProjects,
+            project => Assert.Equal(1, PackableProjects.Names.Count(name => name == project)));
+
+        var testProject = XDocument.Load(
+            Path.Combine(RepositoryRoot, "tests", "DigitalBrain.Tests", "DigitalBrain.Tests.csproj"));
+        var referencedProjects = testProject.Descendants("ProjectReference")
+            .Select(ReferenceName)
+            .ToArray();
+
+        Assert.All(
+            ModuleFamilies,
+            family => Assert.Equal(
+                1,
+                referencedProjects.Count(
+                    project => project == Path.GetFileNameWithoutExtension(family.RuntimeProject))));
+    }
 
     [Fact(DisplayName = "module .Contracts packages are leaves with only approved public vocabulary dependencies")]
     public void ModuleContractsPackagesAreLeaves()
@@ -670,9 +874,9 @@ public sealed class ModuleTemplateContracts
         {
             "Nothing is published yet",
             "artifacts/packages",
-            "UseLocalhostClustering",
+            "UseLocalhost" + "Clustering",
             "UseInMemoryReminderService",
-            "IGrainFactory",
+            "IGrain" + "Factory",
             "DigitalBrainClient.Connect",
             "Host.CreateApplicationBuilder",
             "GetRequiredService",
@@ -901,4 +1105,13 @@ public sealed class ModuleTemplateContracts
         return directory?.FullName
             ?? throw new InvalidOperationException("DigitalBrain.slnx was not found above the test assembly.");
     }
+
+    private sealed record ModuleFamily(
+        string Name,
+        string ContractsProject,
+        string RuntimeProject,
+        string? HostingProject,
+        string Marker,
+        string TestProject,
+        string[] SelectionSources);
 }

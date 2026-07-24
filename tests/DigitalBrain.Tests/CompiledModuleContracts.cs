@@ -3,6 +3,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
+using DigitalBrain.Quickstart;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Tasks;
 using DigitalBrain.Time;
@@ -20,6 +21,7 @@ public sealed class CompiledModuleContracts
         typeof(TimeModule),
         typeof(GoogleModule),
         typeof(SalesforceModule),
+        typeof(QuickstartModule),
     ];
 
     [Fact]

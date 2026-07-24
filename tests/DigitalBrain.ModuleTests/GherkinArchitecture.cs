@@ -10,7 +10,7 @@ public sealed class GherkinArchitecture
     [
         "IGrain" + "Factory",
         "Grain" + "Id",
-        "Simulation" + "Cluster",
+        "Simu" + "lationCluster",
         "App" + "Domain",
         "Assembly." + "GetTypes",
         "Neuron" + "Catalog",

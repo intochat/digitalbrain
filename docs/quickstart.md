@@ -4,6 +4,8 @@ title: Quickstart
 
 # Quickstart
 
+Status: Built
+
 The quickstart keeps public vocabulary, compiled behavior, hosting, and testing in separate projects. Consumers reference the contracts package; hosts compile the runtime module; Aspire owns the infrastructure topology.
 
 ## 1. Define leaf contracts

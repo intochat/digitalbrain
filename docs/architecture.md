@@ -1,8 +1,9 @@
 # Architecture
 
-DigitalBrain is a small durable neuron kernel plus independently shipped domain modules. This page is
-organized the way the code is: the kernel first, then the rule every module obeys, then one section
-per module, then the three cross-cutting rails — behaviors, discovery, and hosting.
+DigitalBrain is an AI-native operating system built around ready-to-use durable neurons and typed
+synapses. Users compose that vocabulary in C# today; the intended product lets them describe
+behaviors in natural language and installs the resulting logic only through human approval. This
+page separates that destination from what is built in the repository.
 
 ## 1. The vision
 
@@ -523,7 +524,7 @@ Read-only operations stay retryable and do not touch it.
 
 ### 4.5 Time
 
-Status: Designed
+Status: Built — Countdown only
 
 Time separates *public scheduled behavior* from *private kernel scheduling*, and that separation is
 the entire point of the module. Kernel timers and reminders maintain outbox delivery, run recovery,
@@ -535,10 +536,16 @@ all, which is why the AI orchestration keys are `ai.*`. Time neurons, by contras
 schedules that behaviors, Tasks, and modules may talk to. A behavior must never see `IGrainTimer`,
 `IGrainReminder`, `TickStatus`, or a raw reminder name.
 
-The public vocabulary is `DigitalBrain.Time.ICountdown` for a one-shot duration and
-`DigitalBrain.Time.IReminder` for an absolute or recurring schedule. It is `ICountdown` and not
-`ITimer` because .NET 10 already defines `System.Threading.ITimer` and this repository enables
-implicit usings — an ambiguous name in a single-file script is a real cost.
+The implemented public vocabulary is `DigitalBrain.Time.ICountdown`, a durable one-shot duration.
+Its Contracts and runtime packages, deterministic `TimeProvider` test edge, local-timer plus durable
+reminder recovery, revision fencing, idempotent commands, cancellation, restart, and committed
+`CountdownElapsed` delivery are exercised in `DigitalBrain.Time.Tests`. It is `ICountdown` and not
+`ITimer` because .NET 10 already defines `System.Threading.ITimer`.
+
+Everything beyond Countdown remains designed or open and unbuilt: `IReminder`, absolute reminders,
+recurring interval and calendar schedules, DST handling, recurrence records, and the recurrence
+library. There is no `ScheduleReminder` or `ReminderSnapshot` contract in the repository, and this
+document does not freeze either shape.
 
 What is settled, and why each rule is there:
 
@@ -552,12 +559,12 @@ What is settled, and why each rule is there:
   answers, which is what keeps delivery to another owner from becoming an accident — it requires an
   explicit grant that does not exist yet.
 - **Scheduling is obtained by addressing a schedule, never by inheriting a hook.** There is no
-  inheritance-based reminder handling in this architecture. `ICountdown` and `IReminder` are separate
-  neurons and they are the only types that encapsulate the Orleans reminder and timer implementation;
-  a module reaches scheduled behavior by talking to one of them, and a module's own private timing
-  stays inside that module rather than being obtained by overriding an inherited callback.
-  `ReceiveReminder` is not part of the public neuron surface — today's kernel deviates from that rule;
-  see the known deviation in §10. The alternative is worse than it looks:
+  inheritance-based reminder handling in this architecture. `ICountdown` is the implemented schedule
+  neuron; a future `IReminder` will be separate. A module reaches public scheduled behavior by talking
+  to a schedule neuron, while its own private timing stays inside that module.
+  `ReceiveReminder` is not part of the public neuron surface. Base `Neuron` does not implement
+  `IRemindable`; the kernel outbox wakeup is composed, and Tasks, AI, and Time each own private
+  reminder names and reject unknown names. The alternative is worse than it looks:
   once a base class exposes a reminder hook, every subclass that wants a wake-up overrides it, each
   one has to know which names its ancestors already claimed and chain to `base` for the rest, and the
   answer to "whose reminder is this?" ends up spread along an inheritance chain instead of living in
@@ -593,17 +600,18 @@ What is settled, and why each rule is there:
   count, recovery time, and revision, and the schedule then advances to the next future occurrence. A
   Reminder is a wake-up, not a durable job queue; work that must happen for every occurrence belongs
   in Tasks, which is the module built not to lose things.
-- **The registry indexes schedule contracts, never live schedules.** `ICountdown` and `IReminder` are
-  what discovery resolves against. A running schedule is neuron state, and indexing every instance
-  would turn a compile-time vocabulary into a runtime directory that drifts.
+- **The registry indexes schedule contracts, never live schedules.** It indexes the implemented
+  `ICountdown` contract and will index a future `IReminder` contract only once that vocabulary exists.
+  A running schedule is neuron state, and indexing every instance would turn a compile-time
+  vocabulary into a runtime directory that drifts.
 - **One reminder provider, because the kernel already requires one.** The outbox needs a durable
   Orleans reminder provider whether or not this module is selected, so Time reuses it and must not add
   a second store. In-memory reminders stay development and test only.
 - **Tests must never wait on a clock.** Schedules are driven through `TimeProvider` plus a
   deterministic driver, so a `TestBrain` can advance a week while no wall-clock time passes.
 
-Explicitly still open: the internal calendar recurrence library and the exact recurring and calendar
-record shapes. Do not implement those as though they were settled.
+Explicitly still open: the internal calendar recurrence library and the exact reminder, recurring,
+calendar, and DST record shapes. Do not implement those as though they were settled.
 
 ### 4.6 Flutter
 
@@ -627,12 +635,14 @@ project synapse journals, but it may never reconstruct truth by scraping traces.
 
 ## 5. Behaviors and scripting
 
-Modules create vocabulary and need a rebuild. Behaviors create logic and need only approval. A working
-C# file creates live behavior by composing existing typed vocabulary — it does not invent new public
-neuron contracts at runtime, and it cannot introduce a new Orleans grain type. When a behavior needs a
-permanent typed contract, it is promoted into a module.
+Status: Designed
 
-Each working file contains exactly one public `Behavior` class; namespace plus class name is its
+Behavior proposal, approval, installation, execution, and rollback are unbuilt. No `IBehavior`,
+`IBehaviorTest`, behavior runner, or behavior execution framework exists. Those names are not
+ratified implementation contracts. The intended rail composes existing typed vocabulary without
+inventing public neuron contracts or Orleans grain types at runtime.
+
+The design calls for one public `Behavior` class per proposed file; namespace plus class name is its
 identity, and a replacement is the same identity at a new approved revision. That keeps a single
 proposal from smuggling several behaviors past one approval.
 
@@ -922,9 +932,9 @@ letting the rule quietly soften.
 ### Time and hosting
 
 41. Semantic Time ≠ Kernel private timing.
-42. Public names: `ICountdown`, `IReminder` (not `ITimer`).
+42. Public schedule names: built `ICountdown`; designed `IReminder` (not `ITimer`).
 43. One schedule per neuron; explicit destination; revision + CommandId.
-44. Interval vs Calendar schedules; deterministic DST; coalesce overdue recurrence.
+44. Designed and unbuilt: Interval vs Calendar schedules; deterministic DST; coalesce overdue recurrence.
 45. Persisted Time state authoritative; shared Kernel reminder store.
 46. `AddDigitalBrain(name)` owns one complete durable Azure Storage profile per brain; run mode uses Azurite.
 47. One silo-only brain key protects durable AI and MCP payloads with distinct purposes.
@@ -941,26 +951,18 @@ taken, and do not infer a shape for it from a neighbouring module.
   was raised and never argued to a conclusion. §4.5 settles the behavior a recurrence engine has to
   produce — deterministic DST resolution, coalesced overdue occurrences — and deliberately leaves open
   what produces it.
-- **The recurring and calendar Time record shapes.** Only those. The one-shot shapes are frozen —
-  `StartCountdown`, `ScheduleReminder`, `CountdownSnapshot`, and `ReminderSnapshot` — and so are the
-  names `ICountdown` and `IReminder`. This matches §4.5, which leaves open the recurring and calendar
-  shapes and nothing else.
+- **Reminder, recurring, calendar, and DST record shapes.** Countdown is built and its one-shot
+  records are executable contracts. Reminder vocabulary and record shapes are not implemented or
+  frozen.
 - **Memory architecture.** Out of scope entirely, for the reasons in §4.7.
 - **The exact CLR records for the capability-tool seam.** §4.3 ratifies that seam's architecture and
   its exclusions; the records and interfaces that would express it are unwritten.
 
 ### Known deviations
 
-One ratified rule and the code disagree today, and it is the rule that stands. §4.5 settles that no
-module obtains scheduling by inheriting or overriding a reminder hook, and that `ReceiveReminder`
-therefore does not belong on the public neuron surface. The kernel exposes it publicly all the same —
-`Neuron` in `src/DigitalBrain.Kernel/Neuron.cs` implements `IRemindable` with a public
-`ReceiveReminder` that drains the outbox — and both `TaskNeuron`
-(`modules/DigitalBrain.Modules.Tasks/TaskNeuron.cs`) and `GroupChat`
-(`modules/DigitalBrain.Modules.AI/GroupChat.cs`) implement `IRemindable.ReceiveReminder`, claim the
-reminder names each of them owns, and chain to `base` for every other name. That is a deviation to
-close, not a decision to reverse. Closing it belongs with the Time module work, because it is that work
-that builds the schedule neurons the inherited hook is currently standing in for.
+The inherited reminder deviation is closed. Base `Neuron` has no `IRemindable` surface; the outbox
+wakeup is composed, and Tasks, AI, and Time own only their private reminder names and reject unknown
+names.
 
 ### Rejected
 
@@ -989,8 +991,7 @@ not a configuration choice.
 
 ## 11. Build order
 
-After the ratified AI, Tasks, behavior, integration, and Time foundations are proven, the remaining
-work has a dependency order, and this is it:
+The remaining designed work has a dependency order:
 
 1. Complete owner-safe client scripting and the proposal, approval, install, and rollback rail.
 2. Generate the canonical neuron catalog from public contracts and method and synapse vocabulary.

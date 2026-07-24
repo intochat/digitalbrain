@@ -1,6 +1,7 @@
 # Concepts
 
-DigitalBrain is built from neurons, synapses, modules, and executable tests.
+DigitalBrain is an AI-native operating system built from ready-to-use neurons, synapses, modules,
+and executable tests. Its natural-language behavior rail is designed but not implemented.
 
 ## Neuron
 
@@ -67,7 +68,8 @@ An independently shipped domain vocabulary and its runtime implementation.
 _Avoid_: Plugin, feature flag
 
 **Behavior**:
-A human-approved runtime C# composition of existing typed vocabulary.
+A designed, unbuilt human-approved runtime C# composition of existing typed vocabulary. There is no
+behavior execution framework or public behavior interface today.
 _Avoid_: Dynamic neuron type, script-generated contract
 
 **Registry**:
@@ -145,17 +147,18 @@ A durable one-shot schedule expressed as a duration.
 _Avoid_: Timer, reminder
 
 **Reminder**:
-A durable absolute or recurring schedule.
+A designed, unbuilt durable absolute or recurring schedule. Only Countdown is implemented.
 _Avoid_: Countdown, job queue
 
 **Interval schedule**:
-A recurrence based on elapsed duration from an instant.
+A designed, unbuilt recurrence based on elapsed duration from an instant.
 _Avoid_: Calendar schedule
 
 **Calendar schedule**:
-A wall-clock recurrence interpreted in an IANA time zone.
+A designed, unbuilt wall-clock recurrence interpreted in an IANA time zone; its DST records and
+library choice remain open.
 _Avoid_: Interval schedule, cron string
 
 **Occurrence**:
-One due instance of a Countdown or Reminder schedule.
+One due instance of a Countdown, or of the designed Reminder schedule.
 _Avoid_: Task, Orleans tick

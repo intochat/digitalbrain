@@ -27,5 +27,7 @@ internal static class PackableProjects
         "DigitalBrain.Modules.Tasks",
         "DigitalBrain.Modules.Time.Contracts",
         "DigitalBrain.Modules.Time",
+        "DigitalBrain.Quickstart.Contracts",
+        "DigitalBrain.Quickstart",
     ];
 }
