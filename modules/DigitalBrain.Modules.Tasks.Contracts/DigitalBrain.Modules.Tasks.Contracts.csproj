@@ -5,6 +5,7 @@
     <RootNamespace>DigitalBrain.Tasks</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
     <ProjectReference Include="..\..\src\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
   </ItemGroup>
 </Project>
