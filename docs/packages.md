@@ -14,7 +14,7 @@ the twelve separate pages that used to describe them one at a time.
 | `DigitalBrain.Abstractions` | Leaf neuron and synapse contracts | nothing |
 | `DigitalBrain.Kernel` | Domain-neutral silo runtime | Abstractions |
 | `DigitalBrain.Client` | Typed owner-bound client | Abstractions |
-| `DigitalBrain.Testing` | Development-only L1 Scenario, thin Gherkin, exclusive L2 hosting | Kernel |
+| `DigitalBrain.Testing` | Development-only real multi-silo fixtures, method-scoped `TestBrain`, deterministic time, typed journal evidence, closed durability faults, and exclusive Aspire hosting | Kernel |
 | `DigitalBrain.Aspire` | Client Generic Host integration | Client |
 | `DigitalBrain.Aspire.Hosting` | One-call durable AppHost brain composition | Abstractions |
 | `DigitalBrain.DevTools` | Development journals and dashboard | nothing |

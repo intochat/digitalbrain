@@ -108,13 +108,13 @@ test('CI keeps framework on every master event and docs only on pull requests', 
   assert.match(dependabot, /package-ecosystem:\s*nuget/)
 })
 
-test('the homepage tells the neurons, synapses, and simulations story', () => {
+test('the homepage tells the neurons, synapses, and executable tests story', () => {
   const homepage = read('docs', 'index.md')
 
   assert.match(homepage, /layout: home/)
   assert.match(homepage, /Neurons/)
   assert.match(homepage, /Synapses/)
-  assert.match(homepage, /Simulations/)
+  assert.match(homepage, /TestBrain/)
   assert.match(homepage, /Orleans/)
   assert.match(homepage, /Aspire/)
 })
@@ -126,7 +126,7 @@ test('concepts define the three primitives and the whole vocabulary', () => {
   assert.match(concepts, /IEmit<TSynapse>/)
   assert.match(concepts, /journaled grain/)
   assert.match(concepts, /correlation and causation lineage/)
-  assert.match(concepts, /dev-only/)
+  assert.match(concepts, /method-scoped development testing primitive/)
 
   const glossaryTerms = [
     'Neuron', 'Synapse', 'Capability request', 'Module', 'Behavior', 'Registry',
@@ -153,10 +153,10 @@ test('the architecture page is module-organized and states each status once', ()
     assert.ok(architecture.includes(heading), `architecture must have a ${heading} section`)
   }
 
-  assert.match(architecture, /method-scoped typed `Scenario`/)
+  assert.match(architecture, /one active method-scoped `TestBrain`/)
   assert.match(architecture, /exclusive Aspire HostedScenario/)
   assert.match(architecture, /TestingEdges/)
-  assert.match(architecture, /Behavior is not a Neuron/)
+  assert.match(architecture, /Runtime behavior is not a Neuron/)
 
   for (const module of ['AI', 'Tasks', 'Google', 'Salesforce', 'Time', 'Flutter', 'Memory']) {
     assert.ok(
@@ -193,14 +193,14 @@ test('the quickstart matches the sample that CI actually runs', () => {
 })
 
 test('the specification publishes every Tier-1 feature file verbatim', () => {
-  const simulations = join(repositoryRoot, 'tests', 'DigitalBrain.Simulations')
-  const features = readdirSync(simulations).filter(entry => entry.endsWith('.feature'))
+  const featuresDirectory = join(repositoryRoot, 'tests', 'DigitalBrain.ModuleTests', 'Features')
+  const features = readdirSync(featuresDirectory).filter(entry => entry.endsWith('.feature'))
   const specification = read('docs', 'specification.md')
 
   assert.ok(features.length > 0, 'there must be Tier-1 feature files to publish')
 
   for (const feature of features) {
-    const source = readFileSync(join(simulations, feature), 'utf8').trimEnd()
+    const source = readFileSync(join(featuresDirectory, feature), 'utf8').trimEnd()
     assert.ok(specification.includes(source), `${feature} must be published verbatim`)
   }
 })

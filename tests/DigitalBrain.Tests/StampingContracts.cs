@@ -1,5 +1,4 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Testing;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -66,14 +65,6 @@ public sealed class StampingContracts
     {
         Assert.Throws<ArgumentOutOfRangeException>(
             () => SynapseDelivery.Create(new DeliveryProbe(), Caller, sequence: 0));
-    }
-
-    [Fact]
-    public void SimulationCallerHandsTheKernelOnlyAPlainSynapse()
-    {
-        var stimulus = typeof(ISimulationNeuron).GetMethod(nameof(ISimulationNeuron.StimulateAsync))!;
-
-        Assert.Equal(typeof(Synapse), stimulus.GetParameters()[1].ParameterType);
     }
 
     private sealed record DeliveryProbe : Synapse;

@@ -1,7 +1,9 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Text.RegularExpressions;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
+using DigitalBrain.Testing;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -47,6 +49,46 @@ public sealed class ArchitectureCutContracts
         "Module" + "Descriptor",
         "Module" + "Composition",
         "Module" + "Wiring",
+    ];
+
+    private static readonly HashSet<string> RejectedTestingTypeNames =
+    [
+        "Simu" + "lation",
+        "Simu" + "lations",
+        "Scen" + "ario",
+        "Simu" + "lationCluster",
+        "Scen" + "arioClock",
+        "Scen" + "arioStages",
+        "Simu" + "lationAssertionException",
+        "ISimu" + "lationNeuron",
+        "IBeh" + "avior",
+        "IBeh" + "aviorTest",
+        "Beh" + "aviorFixture",
+        "Fault" + "Point",
+        "Fault" + "Handle",
+        "Scen" + "arioFailureArtifact",
+    ];
+
+    private static readonly string[] RejectedTestingSourcePatterns =
+    [
+        @"\bSimu" + @"lation\b",
+        @"\bSimu" + @"lations\b",
+        @"\bScen" + @"ario\b",
+        @"\bSimu" + "lationCluster\b",
+        @"\bScen" + "arioClock\b",
+        @"\bScen" + "arioStages\b",
+        @"\bScen" + "arioFaults\b",
+        @"\bScen" + "arioFailureArtifact\b",
+        @"\bSimu" + "lationAssertionException\b",
+        @"\bSimu" + "lationNeuron\b",
+        @"\bISimu" + "lationNeuron\b",
+        @"\bNeuron" + "Catalog\b",
+        @"\bSynapse" + "Observer\b",
+        @"\bIBeh" + "avior\b",
+        @"\bIBeh" + "aviorTest\b",
+        @"\bBeh" + "aviorFixture\b",
+        @"\bFault" + "Point\b",
+        @"\bFault" + "Handle\b",
     ];
 
     [Fact(DisplayName = "a module is a marker, not a second configuration language")]
@@ -156,6 +198,95 @@ public sealed class ArchitectureCutContracts
         Assert.Empty(violations);
     }
 
+    [Fact(DisplayName = "the testing product exports no obsolete L1 surface")]
+    public void TestingProductExportsNoObsoleteL1Surface()
+    {
+        var exported = typeof(DigitalBrainFixture).Assembly
+            .GetExportedTypes();
+        var typeOffenders = exported
+            .Where(type => RejectedTestingTypeNames.Contains(type.Name))
+            .Select(type => type.FullName)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var memberOffenders = exported
+            .SelectMany(type => type.GetMembers(
+                BindingFlags.Public
+                | BindingFlags.Instance
+                | BindingFlags.Static))
+            .Where(IsRejectedTestingMember)
+            .Select(member =>
+                $"{member.DeclaringType?.FullName}.{member.Name}")
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(typeOffenders);
+        Assert.Empty(memberOffenders);
+        Assert.Contains(
+            exported,
+            type => type.Name == "Hosted" + "Scenario");
+    }
+
+    [Fact(DisplayName = "repository source and durable docs contain no obsolete L1 testing vocabulary")]
+    public void RepositoryContainsNoObsoleteL1TestingVocabulary()
+    {
+        string[] sourceRoots = ["src", "modules", "hosts", "samples", "tests"];
+        string[] durableDocs =
+        [
+            "architecture.md",
+            "concepts.md",
+            "index.md",
+            "packages.md",
+        ];
+        var excludedGuards = new HashSet<string>(
+            StringComparer.OrdinalIgnoreCase)
+        {
+            Path.GetFullPath(Path.Combine(
+                RepositoryRoot,
+                "tests",
+                "DigitalBrain.Tests",
+                nameof(ArchitectureCutContracts) + ".cs")),
+            Path.GetFullPath(Path.Combine(
+                RepositoryRoot,
+                "tests",
+                "DigitalBrain.TestingTests",
+                "PublicSurfaceContracts.cs")),
+            Path.GetFullPath(Path.Combine(
+                RepositoryRoot,
+                "tests",
+                "DigitalBrain.ModuleTests",
+                "GherkinArchitecture.cs")),
+        };
+
+        var files = sourceRoots
+            .SelectMany(root => Directory.EnumerateFiles(
+                Path.Combine(RepositoryRoot, root),
+                "*",
+                SearchOption.AllDirectories))
+            .Concat(durableDocs.Select(document =>
+                Path.Combine(RepositoryRoot, "docs", document)));
+        var violations = files
+            .Where(file => Path.GetExtension(file)
+                is ".cs" or ".csproj" or ".md")
+            .Where(file => !file.Contains(
+                $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal))
+            .Where(file => !file.Contains(
+                $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal))
+            .Where(file => !excludedGuards.Contains(Path.GetFullPath(file)))
+            .SelectMany(file => RejectedTestingSourcePatterns
+                .Where(pattern => Regex.IsMatch(
+                    File.ReadAllText(file),
+                    pattern,
+                    RegexOptions.CultureInvariant))
+                .Select(pattern =>
+                    $"{Path.GetRelativePath(RepositoryRoot, file)}: {pattern}"))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(violations);
+    }
+
     [Fact(DisplayName = "production projects contain no source-like scratch artifacts")]
     public void ProductionProjectsContainNoSourceLikeScratchArtifacts()
     {
@@ -208,5 +339,28 @@ public sealed class ArchitectureCutContracts
 
             yield return AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.GetFullPath(path));
         }
+    }
+
+    private static bool IsRejectedTestingMember(MemberInfo member)
+    {
+        if (member.Name == "Grains"
+            || member.Name == "Add" + "JsonSerializer"
+            || member.Name.StartsWith("Expect", StringComparison.Ordinal)
+            || member.Name.StartsWith("Should", StringComparison.Ordinal)
+            || member.Name.StartsWith("Match", StringComparison.Ordinal)
+            || member.Name.Contains("Matcher", StringComparison.Ordinal)
+            || member.Name.StartsWith("Settle", StringComparison.Ordinal)
+            || member.Name.Contains("Eventually", StringComparison.Ordinal)
+            || member.Name.StartsWith("Delay", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return member is MethodInfo
+            {
+                Name: "StartAsync" or "StopAsync",
+                DeclaringType.Name: var typeName,
+            }
+            && typeName.Contains("Cluster", StringComparison.Ordinal);
     }
 }

@@ -7,8 +7,9 @@ per module, then the three cross-cutting rails — behaviors, discovery, and hos
 ## 1. The vision
 
 Neurons are durable Orleans-journaled agents. Synapses are typed messages carrying full lineage.
-Simulations fire synapses into a real in-process cluster and assert on the resulting timeline. Those
-three primitives are the whole substrate. What makes them worth building is what sits on top:
+Method-scoped `TestBrain` instances fire synapses into a real in-process cluster and assert on typed
+committed-journal evidence. Those three primitives are the whole substrate. What makes them worth
+building is what sits on top:
 
 > A brain you program by writing ordinary C#, and that can program itself.
 
@@ -393,7 +394,7 @@ returns an id, a subject, a sender, and a plaintext body.
 
 Behind that method the MCP boundary is private in the literal sense rather than the aspirational one.
 The concrete internal `McpRuntime` opens the official client only inside a bounded callback friend to
-provider runtimes and simulations. There is no DigitalBrain client interface, factory, returned
+provider runtimes and test fixtures. There is no DigitalBrain client interface, factory, returned
 session wrapper, or public redirect seam. No contract package, behavior, or application caller can
 name the runtime or let the SDK client escape its callback. The neuron is the only semantic door.
 
@@ -507,8 +508,7 @@ repository's own consumer makes it bluntly: `AccountEnrichmentProcess` throws
 
 Ratified but not built: parking the owning Task on an `OutcomeUncertain` blocker rather than letting
 the uncertainty surface as a caller-side exception. `AttemptOutcomeUncertain` has no producer under
-`modules/`, `src/`, or `samples/`; its only construction anywhere is a scripted fake worker in the
-simulations.
+`modules/`, `src/`, or `samples/`; it has no production producer.
 
 The command identity travels as the provider idempotency key wherever a provider offers one;
 Salesforce's update tool does not, which is why reconciliation and not the key is what carries this
@@ -600,7 +600,7 @@ What is settled, and why each rule is there:
   Orleans reminder provider whether or not this module is selected, so Time reuses it and must not add
   a second store. In-memory reminders stay development and test only.
 - **Tests must never wait on a clock.** Schedules are driven through `TimeProvider` plus a
-  deterministic driver, so a simulation can advance a week while no wall-clock time passes.
+  deterministic driver, so a `TestBrain` can advance a week while no wall-clock time passes.
 
 Explicitly still open: the internal calendar recurrence library and the exact recurring and calendar
 record shapes. Do not implement those as though they were settled.
@@ -772,20 +772,25 @@ run at three tiers; there is no parallel fake runtime:
 
 ```text
 L0  Compiler/shape     DigitalBrain.Tests (contracts, packages, generators)
-L1  Kernel simulation  assembly multi-silo + method-scoped Scenario (+ Gherkin)
+L1  Kernel test        assembly-owned multi-silo fixture + method-scoped TestBrain
 L2  Hosted OS          exclusive Aspire HostedScenario fixture
 ```
 
-**L1** is the default depth for module semantic and durable behavior: an assembly-owned multi-silo
-cluster shared by tests, with a method-scoped typed `Scenario` as the isolation unit (owner namespace,
-controllable clock, closed durability faults, always-on failure artifacts). **L2** is exclusive — one
-full AppHost at a time — and is only for hosting, process restart, endpoints, and multi-resource
-composition. Gherkin is core authoring surface but stays thin over typed Scenario; generation may
-compose only existing vocabulary, never invent neuron or synapse types.
+**L1** is the default depth for module semantics and durability. One `DigitalBrainFixture` owns one
+real three-silo cluster and permits one active method-scoped `TestBrain` at a time. Tests therefore
+serialize within a fixture, while separate test assemblies may run in parallel. Each `TestBrain`
+receives an isolated owner namespace, deterministic clock, closed durability faults, typed
+committed-journal evidence, and always-on failure artifacts. `TestOwner` is the isolated owner
+identity, and `TestNeuron<T>` is its typed neuron handle. **L2** is exclusive — one full AppHost at a
+time — and is only for hosting, process restart, endpoints, and multi-resource composition. Gherkin
+remains a thin generated vocabulary over the same `TestBrain`; generation may compose only existing
+vocabulary, never invent neuron or synapse types.
 
 Substitutes stop at the closed external edges named by `TestingEdges`: `IChatClient`, southbound MCP
 protocol transport, OAuth/params, and the shared `TimeProvider` already registered on every L1
-Scenario. Neurons, journals, filters, and module logic stay real. Behavior is not a Neuron (see §5).
+test. Neurons, journals, filters, and module logic stay real. `Behavior` remains the name of a
+user-authored ordinary-test concept; the testing framework adds no behavior interfaces or behavior
+fixture hierarchy. Runtime behavior is not a Neuron (see §5).
 
 ## 8. Known limitations
 
@@ -818,7 +823,7 @@ correlation rather than a standing subscriber. Those instances are where the tra
 which is what a future identity-wide feed will have to account for.
 
 **Client observation is not the final timeline stream.** Journal reads take an `afterSequence` cursor
-and can be resumed or watched, which is enough for a simulation to assert on what happened. The client
+and can be resumed or watched, which is enough for a test to assert on what happened. The client
 facade itself has no observation surface — it sends and it emits. A durable per-owner timeline and a
 reconnect lifecycle are not built.
 
@@ -905,7 +910,7 @@ letting the rule quietly soften.
 45. Persisted Time state authoritative; shared Kernel reminder store.
 46. `AddDigitalBrain(name)` owns one complete durable Azure Storage profile per brain; run mode uses Azurite.
 47. One silo-only brain key protects durable AI and MCP payloads with distinct purposes.
-48. Deterministic test time via `TimeProvider` + simulation driver.
+48. Deterministic test time via `TimeProvider` + the `TestBrain` driver.
 
 ## 10. Still open, known deviations, and rejected
 

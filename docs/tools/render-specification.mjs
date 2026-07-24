@@ -4,9 +4,15 @@ import { fileURLToPath } from 'node:url'
 
 const toolsDirectory = dirname(fileURLToPath(import.meta.url))
 const docsRoot = resolve(toolsDirectory, '..')
-const simulations = resolve(docsRoot, '..', 'tests', 'DigitalBrain.Simulations')
+const featuresDirectory = resolve(
+  docsRoot,
+  '..',
+  'tests',
+  'DigitalBrain.ModuleTests',
+  'Features',
+)
 
-const featureFiles = readdirSync(simulations)
+const featureFiles = readdirSync(featuresDirectory)
   .filter(entry => entry.endsWith('.feature'))
   .sort()
 
@@ -16,7 +22,7 @@ const titleOf = source => {
 }
 
 const sections = featureFiles.map(file => {
-  const source = readFileSync(join(simulations, file), 'utf8').trimEnd()
+  const source = readFileSync(join(featuresDirectory, file), 'utf8').trimEnd()
   return `## ${titleOf(source)}\n\n\`\`\`gherkin\n${source}\n\`\`\`\n`
 })
 
@@ -26,12 +32,12 @@ title: Specification
 
 # Specification
 
-Every behaviour DigitalBrain guarantees is written as a Tier-1 simulation: a scenario fired into a real
-three-silo in-process Orleans cluster, asserted against real journals. These files are not
-illustrations of the framework — they are the executable specification, and the root gate
+Every behaviour DigitalBrain guarantees is written as a Tier-1 feature: a test fired into a real
+three-silo in-process Orleans cluster and asserted against typed committed-journal evidence. These
+files are not illustrations of the framework — they are the executable specification, and the root gate
 \`dotnet test .\\DigitalBrain.slnx -c Release\` fails if any of them stops holding.
 
-This page is generated from \`tests/DigitalBrain.Simulations/*.feature\` at build time, so it cannot
+This page is generated from \`tests/DigitalBrain.ModuleTests/Features/*.feature\` at build time, so it cannot
 drift from what actually passes.
 
 ${sections.join('\n')}`

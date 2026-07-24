@@ -1,6 +1,6 @@
 # Concepts
 
-DigitalBrain is built from neurons, synapses, modules, and simulations.
+DigitalBrain is built from neurons, synapses, modules, and executable tests.
 
 ## Neuron
 
@@ -32,10 +32,14 @@ DigitalBrain.Modules.AI.Aspire.Hosting
 
 AppHost selects modules. Source generation composes them into `silo.AddDigitalBrain()`.
 
-## Simulation
+## TestBrain
 
-A simulation is the dev-only testing primitive. It runs real neurons on a three-silo in-process
-cluster and asserts on journals and telemetry. The feature files published under
+`TestBrain` is the method-scoped development testing primitive. A `DigitalBrainFixture` owns one
+real three-silo in-process cluster and permits one active `TestBrain` at a time; tests serialize
+within that fixture while separate test assemblies may run in parallel. A test advances deterministic
+time, controls only closed durability faults and external edges, and asserts on typed committed-journal
+evidence. `TestOwner` supplies the method's isolated owner identity, and `TestNeuron<T>` addresses one
+typed neuron while exposing only test evidence and closed controls. The feature files published under
 [Specification](/specification) are executable guarantees, not examples.
 
 ## Vocabulary
