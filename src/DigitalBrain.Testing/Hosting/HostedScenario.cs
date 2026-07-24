@@ -2,7 +2,9 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Testing;
 
@@ -90,7 +92,8 @@ public sealed class HostedScenario : IAsyncDisposable
                     resourceName,
                     endpointName: null,
                     endpointDisplay: TryDescribeEndpoint(resourceName),
-                    resourceState: TryDescribeResourceState(resourceName)),
+                    resourceState: TryDescribeResourceState(resourceName),
+                    resourceLogs: await TryCaptureResourceLogsAsync(resourceName, cancellationToken)),
                 ex);
         }
     }
@@ -291,12 +294,76 @@ public sealed class HostedScenario : IAsyncDisposable
         }
     }
 
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Log capture is best-effort diagnostics attached to readiness failures.")]
+    private async Task<string> TryCaptureResourceLogsAsync(
+        string resourceName,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var logService = _application.Services.GetService<ResourceLoggerService>();
+            if (logService is null)
+            {
+                return "logs unavailable (no ResourceLoggerService)";
+            }
+
+            var lines = new List<string>(capacity: 64);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(2));
+
+            await foreach (var batch in logService.WatchAsync(resourceName).WithCancellation(timeout.Token))
+            {
+                foreach (var line in batch)
+                {
+                    var prefix = line.IsErrorMessage ? "ERR " : "OUT ";
+                    lines.Add(prefix + line.Content);
+                    if (lines.Count >= 80)
+                    {
+                        break;
+                    }
+                }
+
+                if (lines.Count >= 80)
+                {
+                    break;
+                }
+
+                // Backlog often arrives in the first batches; stop once we have content and the watch idles.
+                if (lines.Count > 0)
+                {
+                    break;
+                }
+            }
+
+            if (lines.Count == 0)
+            {
+                return "logs empty";
+            }
+
+            // Keep the tail — crash reasons are usually last.
+            var start = Math.Max(0, lines.Count - 40);
+            return string.Join(" | ", lines.Skip(start));
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return "logs timed out";
+        }
+        catch (Exception logError)
+        {
+            return $"logs error ({logError.GetType().Name}: {logError.Message})";
+        }
+    }
+
     private static string FormatReadiness(
         string action,
         string resourceName,
         string? endpointName,
         string? endpointDisplay,
-        string? resourceState = null)
+        string? resourceState = null,
+        string? resourceLogs = null)
     {
         var text = new StringBuilder(action, capacity: 256);
         text.Append(" for resource '").Append(resourceName).Append('\'');
@@ -313,6 +380,11 @@ public sealed class HostedScenario : IAsyncDisposable
         if (!string.IsNullOrWhiteSpace(resourceState))
         {
             text.Append(" (").Append(resourceState).Append(')');
+        }
+
+        if (!string.IsNullOrWhiteSpace(resourceLogs))
+        {
+            text.Append(" logs: ").Append(resourceLogs);
         }
 
         text.Append('.');

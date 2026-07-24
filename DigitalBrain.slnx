@@ -15,6 +15,7 @@
   </Folder>
   <Folder Name="/hosts/">
     <Project Path="hosts/DigitalBrain.Host/DigitalBrain.Host.csproj" />
+    <Project Path="hosts/DigitalBrain.ProbeHost/DigitalBrain.ProbeHost.csproj" />
     <Project Path="hosts/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
     <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
     <Project Path="hosts/DigitalBrain.TestingAppHost/DigitalBrain.TestingAppHost.csproj" />

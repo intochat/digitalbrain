@@ -50,8 +50,10 @@ public static class HostedApplication
 
         try
         {
-            var builder = await DistributedApplicationTestingBuilder
-                .CreateAsync<TEntryPoint>(cancellationToken);
+            var builder = await DistributedApplicationTestingBuilder.CreateAsync<TEntryPoint>(
+                args: [],
+                configureBuilder: static (options, _) => options.EnableResourceLogging = true,
+                cancellationToken);
             var app = await builder.BuildAsync(cancellationToken).WaitAsync(timeout, cancellationToken);
             await app.StartAsync(cancellationToken).WaitAsync(timeout, cancellationToken);
 
