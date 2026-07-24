@@ -14,7 +14,7 @@ the twelve separate pages that used to describe them one at a time.
 | `DigitalBrain.Abstractions` | Leaf neuron and synapse contracts | nothing |
 | `DigitalBrain.Kernel` | Domain-neutral silo runtime | Abstractions |
 | `DigitalBrain.Client` | Typed owner-bound client | Abstractions |
-| `DigitalBrain.Testing` | Real-cluster simulations | Kernel |
+| `DigitalBrain.Testing` | Development-only L1 Scenario, thin Gherkin, exclusive L2 hosting | Kernel |
 | `DigitalBrain.Aspire` | Client Generic Host integration | Client |
 | `DigitalBrain.Aspire.Hosting` | Core AppHost brain composition | Abstractions |
 | `DigitalBrain.DevTools` | Development journals and dashboard | nothing |

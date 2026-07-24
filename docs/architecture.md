@@ -756,6 +756,28 @@ synapse, and correlation today, with owner, neuron, synapse type, and causation 
 set. Sensitive content is off by default, and turning it on is a deliberate act. Aspire receives the
 OTLP output.
 
+### Testing
+
+`DigitalBrain.Testing` is the one public packable testing product, and it is development-only. Proofs
+run at three tiers; there is no parallel fake runtime:
+
+```text
+L0  Compiler/shape     DigitalBrain.Tests (contracts, packages, generators)
+L1  Kernel simulation  assembly multi-silo + method-scoped Scenario (+ Gherkin)
+L2  Hosted OS          exclusive Aspire HostedScenario fixture
+```
+
+**L1** is the default depth for module semantic and durable behavior: an assembly-owned multi-silo
+cluster shared by tests, with a method-scoped typed `Scenario` as the isolation unit (owner namespace,
+controllable clock, closed durability faults, always-on failure artifacts). **L2** is exclusive — one
+full AppHost at a time — and is only for hosting, process restart, endpoints, and multi-resource
+composition. Gherkin is core authoring surface but stays thin over typed Scenario; generation may
+compose only existing vocabulary, never invent neuron or synapse types.
+
+Substitutes stop at the closed external edges named by `TestingEdges`: `IChatClient`, southbound MCP
+protocol transport, OAuth/params, and the shared `TimeProvider` already registered on every L1
+Scenario. Neurons, journals, filters, and module logic stay real. Behavior is not a Neuron (see §5).
+
 ## 8. Known limitations
 
 These are limits of what stands today, and each one is a boundary someone chose rather than a defect

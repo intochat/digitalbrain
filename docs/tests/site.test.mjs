@@ -106,9 +106,15 @@ test('the architecture page is module-organized and states each status once', ()
   for (const heading of [
     'The vision', 'The kernel', 'The module model', 'The modules',
     'Behaviors and scripting', 'Registry and discovery', 'Hosting and durability',
+    'Testing',
   ]) {
     assert.ok(architecture.includes(heading), `architecture must have a ${heading} section`)
   }
+
+  assert.match(architecture, /method-scoped typed `Scenario`/)
+  assert.match(architecture, /exclusive Aspire HostedScenario/)
+  assert.match(architecture, /TestingEdges/)
+  assert.match(architecture, /Behavior is not a Neuron/)
 
   for (const module of ['AI', 'Tasks', 'Google', 'Salesforce', 'Time', 'Flutter', 'Memory']) {
     assert.ok(

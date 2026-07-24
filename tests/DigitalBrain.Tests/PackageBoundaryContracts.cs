@@ -71,6 +71,28 @@ public sealed class PackageBoundaryContracts
         Assert.DoesNotContain("DigitalBrain.Testing", ProjectsReachableFrom(package), StringComparer.Ordinal);
     }
 
+    [Fact(DisplayName = "no production silo, host, module, or sample project references DigitalBrain.Testing")]
+    public void NoProductionTreeReferencesDigitalBrainTesting()
+    {
+        string[] roots = ["src", "modules", "hosts", "samples"];
+        var offenders = roots
+            .SelectMany(root => Directory.EnumerateFiles(
+                Path.Combine(RepositoryRoot, root),
+                "*.csproj",
+                SearchOption.AllDirectories))
+            .Where(project => !string.Equals(
+                Path.GetFileNameWithoutExtension(project),
+                "DigitalBrain.Testing",
+                StringComparison.Ordinal))
+            .Where(project => DirectProjectReferencesOf(Path.GetFileNameWithoutExtension(project)!)
+                .Contains("DigitalBrain.Testing", StringComparer.Ordinal))
+            .Select(Path.GetFileNameWithoutExtension)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Empty(offenders);
+    }
+
     [Theory]
     [MemberData(nameof(PackagesThatMayHostNeurons))]
     public void APackageThatHostsNeuronsStillDeclaresNoProviderSdkItself(string package)

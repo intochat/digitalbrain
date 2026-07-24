@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>The DigitalBrain simulation and hosted-test machine (L1 Scenario + exclusive L2 Aspire HostedScenario). Development-only — includes Aspire.Hosting.Testing for L2 entry points.</Description>
+    <Description>Development-only testing product: method-scoped L1 Scenario, thin Gherkin over Scenario, exclusive L2 Aspire HostedScenario. Real kernel and modules; substitutes only at closed external edges (IChatClient, southbound MCP transport, OAuth/params, TimeProvider).</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>

@@ -194,4 +194,22 @@ public sealed class TestingFrameworkContracts
         await fault.DisposeAsync();
         await scenario.DisposeAsync();
     }
+
+    [Fact(DisplayName = "TestingEdges.Closed is the locked external substitute list")]
+    public void TestingEdgesClosedListIsLocked()
+    {
+        Assert.Equal(
+            [
+                TestingEdges.ChatClient,
+                TestingEdges.SouthboundMcpTransport,
+                TestingEdges.OAuthAndParams,
+                TestingEdges.TimeProvider,
+            ],
+            TestingEdges.Closed);
+
+        Assert.Equal("IChatClient", TestingEdges.ChatClient);
+        Assert.Equal("southbound MCP transport", TestingEdges.SouthboundMcpTransport);
+        Assert.Equal("OAuth/params", TestingEdges.OAuthAndParams);
+        Assert.Equal("TimeProvider", TestingEdges.TimeProvider);
+    }
 }
