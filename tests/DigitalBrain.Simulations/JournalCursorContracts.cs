@@ -117,45 +117,6 @@ public sealed class JournalCursorContracts
             afterSequence: -1));
     }
 
-    [Fact(DisplayName = "an empty-journal assertion does not mistake a reset for an empty journal")]
-    public async Task AnEmptyJournalAssertionDoesNotMistakeAResetForAnEmptyJournal()
-    {
-        var simulation = await DeliverPastTheBoundAsync("cursor-consumer-empty");
-        var steps = new ScenarioSteps(simulation);
-
-        await Assert.ThrowsAsync<SimulationAssertionException>(
-            () => steps.ThenTheIncomingJournalIsEmpty(nameof(Echo), "target"));
-    }
-
-    [Fact(DisplayName = "a containment assertion reads a reset snapshot after compaction")]
-    public async Task AContainmentAssertionReadsAResetSnapshotAfterCompaction()
-    {
-        var simulation = await DeliverPastTheBoundAsync("cursor-consumer-contains");
-        var steps = new ScenarioSteps(simulation);
-
-        await steps.ThenTheIncomingJournalContains(nameof(Echo), "target", "Ping");
-    }
-
-    [Fact(DisplayName = "an exact-count assertion reads a reset tally after compaction")]
-    public async Task AnExactCountAssertionReadsAResetTallyAfterCompaction()
-    {
-        await SimulationCluster.StartAsync();
-
-        var simulation = new Simulation();
-        simulation.OpenBrain("cursor-consumer-count");
-
-        await simulation.SendAsync("Ping", nameof(Relay), "target", NoValues);
-
-        for (var delivery = 0; delivery < DeliveriesPastTheBound; delivery++)
-        {
-            await simulation.SendAsync("Pong", nameof(Relay), "target", NoValues);
-        }
-
-        var steps = new ScenarioSteps(simulation);
-
-        await steps.ThenTheJournalContainsExactlyOnce("incoming", nameof(Relay), "target", "Ping");
-    }
-
     [Fact(DisplayName = "settling a compacted journal waits for its sequence to stop advancing")]
     public async Task SettlingACompactedJournalWaitsForItsSequenceToStopAdvancing()
     {

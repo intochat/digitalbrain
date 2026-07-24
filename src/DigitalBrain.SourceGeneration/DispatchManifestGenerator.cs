@@ -14,7 +14,12 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
     private const string EmitInterface = "DigitalBrain.Abstractions.IEmit<TSynapse>";
     private const string NeuronInterface = "DigitalBrain.Abstractions.INeuron";
     private const string ModuleInterface = "DigitalBrain.Abstractions.IModule";
+    private const string SynapseBase = "DigitalBrain.Abstractions.Synapse";
     private const string CompiledModuleInterface = "DigitalBrain.Kernel.ICompiledModule";
+    private const string DigitalBrainClient = "DigitalBrain.Client.IDigitalBrain";
+    private const string TestJournal = "DigitalBrain.Testing.TestJournal";
+    private const string TestOwner = "DigitalBrain.Testing.TestOwner";
+    private const string ReqnrollBinding = "Reqnroll.BindingAttribute";
     private const string SiloBuilder = "Orleans.Hosting.ISiloBuilder";
     private const string DigitalBrainRuntime = "DigitalBrain.Kernel.DigitalBrainRuntime";
 
@@ -69,6 +74,14 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor AmbiguousVocabularyName = new(
+        "DBGEN007",
+        "Gherkin vocabulary short names must be unique",
+        "The short {0} name '{1}' is ambiguous; use one of: {2}",
+        "DigitalBrain.SourceGeneration",
+        DiagnosticSeverity.Info,
+        isEnabledByDefault: true);
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var wirings = context.SyntaxProvider
@@ -108,6 +121,31 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
             {
                 production.AddSource("DigitalBrainComposition.g.cs", Composition(model));
             }
+        });
+
+        var vocabulary = context.CompilationProvider
+            .Select(static (compilation, _) => VocabularyOf(compilation));
+
+        context.RegisterSourceOutput(vocabulary, static (production, model) =>
+        {
+            if (!model.Emit)
+            {
+                return;
+            }
+
+            foreach (var ambiguity in model.Ambiguities)
+            {
+                production.ReportDiagnostic(Diagnostic.Create(
+                    AmbiguousVocabularyName,
+                    Location.None,
+                    ambiguity.Kind,
+                    ambiguity.ShortName,
+                    string.Join(", ", ambiguity.Candidates)));
+            }
+
+            production.AddSource(
+                "GeneratedTestVocabulary.g.cs",
+                TestVocabulary(model));
         });
     }
 
@@ -379,6 +417,509 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         return source.ToString();
     }
 
+    private static VocabularyModel VocabularyOf(Compilation compilation)
+    {
+        var neuronContract = compilation.GetTypeByMetadataName(NeuronInterface);
+        var synapseContract = compilation.GetTypeByMetadataName(SynapseBase);
+        var testOwner = compilation.GetTypeByMetadataName(TestOwner);
+        var testJournal = compilation.GetTypeByMetadataName(TestJournal);
+        var client = compilation.GetTypeByMetadataName(DigitalBrainClient);
+        var binding = compilation.GetTypeByMetadataName(ReqnrollBinding);
+
+        if (neuronContract is null
+            || synapseContract is null
+            || testOwner is null
+            || testJournal is null
+            || client is null
+            || binding is null)
+        {
+            return new VocabularyModel([], [], [], emit: false);
+        }
+
+        var visibleTypes = compilation.SourceModule.ReferencedAssemblySymbols
+            .Append(compilation.Assembly)
+            .SelectMany(static assembly => TypesIn(assembly.GlobalNamespace))
+            .Where(static type => type.DeclaredAccessibility == Accessibility.Public)
+            .Where(static type => type.TypeParameters.Length == 0)
+            .GroupBy(
+                static type => type.ToDisplayString(FullName),
+                StringComparer.Ordinal)
+            .Select(static group => group.First())
+            .ToArray();
+
+        var neurons = visibleTypes
+            .Where(type => type.TypeKind == TypeKind.Interface)
+            .Where(type => !SymbolEqualityComparer.Default.Equals(
+                type,
+                neuronContract))
+            .Where(type => type.AllInterfaces.Any(contract =>
+                SymbolEqualityComparer.Default.Equals(
+                    contract,
+                    neuronContract)))
+            .Select(type => new VocabularyNeuron(
+                type.ToDisplayString(FullName),
+                type.Name))
+            .OrderBy(static type => type.FullName, StringComparer.Ordinal)
+            .ToImmutableArray();
+
+        var synapses = visibleTypes
+            .Where(type => type.TypeKind is TypeKind.Class
+                && !type.IsAbstract)
+            .Where(type => InheritsFrom(type, synapseContract))
+            .Select(type => new VocabularySynapse(
+                type.ToDisplayString(FullName),
+                type.Name,
+                SynapseFactory(type)))
+            .OrderBy(static type => type.FullName, StringComparer.Ordinal)
+            .ToImmutableArray();
+
+        var ambiguities = Ambiguities("neuron", neurons
+                .Select(static neuron =>
+                    (neuron.ShortName, neuron.FullName)))
+            .Concat(Ambiguities("synapse", synapses
+                .Select(static synapse =>
+                    (synapse.ShortName, synapse.FullName))))
+            .OrderBy(static ambiguity => ambiguity.Kind, StringComparer.Ordinal)
+            .ThenBy(
+                static ambiguity => ambiguity.ShortName,
+                StringComparer.Ordinal)
+            .ToImmutableArray();
+
+        return new VocabularyModel(
+            neurons,
+            synapses,
+            ambiguities,
+            emit: true);
+    }
+
+    private static ImmutableArray<VocabularyAmbiguity> Ambiguities(
+        string kind,
+        IEnumerable<(string ShortName, string FullName)> entries)
+        => entries
+            .GroupBy(
+                static entry => entry.ShortName,
+                StringComparer.Ordinal)
+            .Where(static group => group.Count() > 1)
+            .Select(group => new VocabularyAmbiguity(
+                kind,
+                group.Key,
+                group.Select(static entry => entry.FullName)
+                    .OrderBy(static name => name, StringComparer.Ordinal)
+                    .ToImmutableArray()))
+            .ToImmutableArray();
+
+    private static bool InheritsFrom(
+        INamedTypeSymbol type,
+        INamedTypeSymbol expected)
+    {
+        for (var current = type.BaseType;
+            current is not null;
+            current = current.BaseType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, expected))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string SynapseFactory(INamedTypeSymbol synapse)
+    {
+        var constructors = synapse.InstanceConstructors
+            .Where(static constructor =>
+                constructor.DeclaredAccessibility == Accessibility.Public)
+            .Select(constructor => new
+            {
+                Constructor = constructor,
+                Arguments = constructor.Parameters
+                    .Select(parameter => ArgumentExpression(
+                        parameter.Type,
+                        parameter.Name))
+                    .ToArray(),
+            })
+            .Where(static candidate =>
+                candidate.Arguments.All(static argument =>
+                    argument is not null))
+            .OrderByDescending(static candidate =>
+                candidate.Constructor.Parameters.Length)
+            .ThenBy(
+                static candidate =>
+                    candidate.Constructor.ToDisplayString(FullName),
+                StringComparer.Ordinal)
+            .FirstOrDefault();
+
+        if (constructors is null)
+        {
+            return UnsupportedFactory(synapse);
+        }
+
+        var constructorParameterNames = new HashSet<string>(
+            constructors.Constructor.Parameters
+                .Select(static parameter => parameter.Name),
+            StringComparer.OrdinalIgnoreCase);
+        var settableProperties = synapse.GetMembers()
+            .OfType<IPropertySymbol>()
+            .Where(static property => !property.IsStatic
+                && property.DeclaredAccessibility == Accessibility.Public
+                && property.SetMethod is
+                {
+                    DeclaredAccessibility: Accessibility.Public,
+                    IsInitOnly: false,
+                })
+            .Where(property =>
+                !constructorParameterNames.Contains(property.Name))
+            .Select(property => new
+            {
+                Property = property,
+                Expression = ArgumentExpression(
+                    property.Type,
+                    $"value{property.Name}"),
+            })
+            .Where(static property => property.Expression is not null)
+            .OrderBy(static property => property.Property.Name, StringComparer.Ordinal)
+            .ToArray();
+        var arguments = string.Join(
+            ", ",
+            constructors.Arguments.Select(static argument => argument!));
+        var constructed =
+            $"new global::{synapse.ToDisplayString(FullName)}({arguments})";
+
+        if (settableProperties.Length == 0)
+        {
+            return $"static arguments => {constructed}";
+        }
+
+        var source = new StringBuilder();
+        source.AppendLine("static arguments =>");
+        source.AppendLine("            {");
+        source.AppendLine($"                var synapse = {constructed};");
+
+        foreach (var property in settableProperties)
+        {
+            var propertyName = StringLiteral(property.Property.Name);
+            source.AppendLine(
+                $"                if (arguments.TryGetValue(\"{propertyName}\", out var value{property.Property.Name}))");
+            source.AppendLine("                {");
+            source.AppendLine(
+                $"                    synapse.{EscapeIdentifier(property.Property.Name)} = {property.Expression};");
+            source.AppendLine("                }");
+        }
+
+        source.AppendLine();
+        source.AppendLine("                return synapse;");
+        source.Append("            }");
+        return source.ToString();
+    }
+
+    private static string UnsupportedFactory(INamedTypeSymbol synapse)
+    {
+        var fullName = synapse.ToDisplayString(FullName);
+        return
+            $"static _ => throw new global::System.NotSupportedException(\"Cannot construct synapse '{StringLiteral(fullName)}' from Gherkin arguments because it has no supported public constructor or settable property shape.\")";
+    }
+
+    private static string? ArgumentExpression(
+        ITypeSymbol type,
+        string argumentName)
+    {
+        var argument =
+            $"Argument(arguments, \"{StringLiteral(argumentName)}\")";
+
+        return type.SpecialType switch
+        {
+            SpecialType.System_String => argument,
+            SpecialType.System_Boolean =>
+                $"global::System.Boolean.Parse({argument})",
+            SpecialType.System_Byte =>
+                $"global::System.Byte.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+            SpecialType.System_SByte =>
+                $"global::System.SByte.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+            SpecialType.System_Int16 =>
+                $"global::System.Int16.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+            SpecialType.System_UInt16 =>
+                $"global::System.UInt16.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+            SpecialType.System_Int32 =>
+                $"global::System.Int32.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+            SpecialType.System_UInt32 =>
+                $"global::System.UInt32.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+            SpecialType.System_Int64 =>
+                $"global::System.Int64.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+            SpecialType.System_UInt64 =>
+                $"global::System.UInt64.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+            SpecialType.System_Single =>
+                $"global::System.Single.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+            SpecialType.System_Double =>
+                $"global::System.Double.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+            SpecialType.System_Decimal =>
+                $"global::System.Decimal.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+            _ when type.TypeKind == TypeKind.Enum =>
+                $"global::System.Enum.Parse<global::{type.ToDisplayString(FullName)}>({argument}, ignoreCase: true)",
+            _ when type.ToDisplayString(FullName) == "System.Guid" =>
+                $"global::System.Guid.Parse({argument})",
+            _ when type.ToDisplayString(FullName) == "System.DateTime" =>
+                $"global::System.DateTime.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+            _ when type.ToDisplayString(FullName) == "System.DateTimeOffset" =>
+                $"global::System.DateTimeOffset.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+            _ when type.ToDisplayString(FullName) == "System.TimeSpan" =>
+                $"global::System.TimeSpan.Parse({argument}, global::System.Globalization.CultureInfo.InvariantCulture)",
+            _ => null,
+        };
+    }
+
+    private static string EscapeIdentifier(string value)
+        => SyntaxFacts.GetKeywordKind(value) == SyntaxKind.None
+            ? value
+            : $"@{value}";
+
+    private static string StringLiteral(string value)
+        => value
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"");
+
+    private static string TestVocabulary(VocabularyModel model)
+    {
+        var source = new StringBuilder();
+
+        source.AppendLine("#nullable enable");
+        source.AppendLine("using System.Diagnostics.CodeAnalysis;");
+        source.AppendLine();
+        source.AppendLine("namespace DigitalBrain.Generated;");
+        source.AppendLine();
+        source.AppendLine("[ExcludeFromCodeCoverage]");
+        source.AppendLine("internal sealed class TestNeuronAccess");
+        source.AppendLine("{");
+        source.AppendLine("    internal TestNeuronAccess(");
+        source.AppendLine("        global::DigitalBrain.Abstractions.NeuronId id,");
+        source.AppendLine("        global::DigitalBrain.Testing.TestJournal incoming,");
+        source.AppendLine("        global::DigitalBrain.Testing.TestJournal outgoing,");
+        source.AppendLine("        global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.Task> restart)");
+        source.AppendLine("    {");
+        source.AppendLine("        Id = id;");
+        source.AppendLine("        Incoming = incoming;");
+        source.AppendLine("        Outgoing = outgoing;");
+        source.AppendLine("        Restart = restart;");
+        source.AppendLine("    }");
+        source.AppendLine();
+        source.AppendLine("    internal global::DigitalBrain.Abstractions.NeuronId Id { get; }");
+        source.AppendLine();
+        source.AppendLine("    internal global::DigitalBrain.Testing.TestJournal Incoming { get; }");
+        source.AppendLine();
+        source.AppendLine("    internal global::DigitalBrain.Testing.TestJournal Outgoing { get; }");
+        source.AppendLine();
+        source.AppendLine("    internal global::System.Func<global::System.Threading.CancellationToken, global::System.Threading.Tasks.Task> Restart { get; }");
+        source.AppendLine("}");
+        source.AppendLine();
+        source.AppendLine("[ExcludeFromCodeCoverage]");
+        source.AppendLine("internal sealed class TestNeuronContract");
+        source.AppendLine("{");
+        source.AppendLine("    internal TestNeuronContract(");
+        source.AppendLine("        string identity,");
+        source.AppendLine("        global::System.Func<global::DigitalBrain.Testing.TestOwner, string, TestNeuronAccess> open,");
+        source.AppendLine("        global::System.Func<global::DigitalBrain.Client.IDigitalBrain, string, global::DigitalBrain.Abstractions.Synapse, global::System.Threading.Tasks.Task> send)");
+        source.AppendLine("    {");
+        source.AppendLine("        Identity = identity;");
+        source.AppendLine("        Open = open;");
+        source.AppendLine("        Send = send;");
+        source.AppendLine("    }");
+        source.AppendLine();
+        source.AppendLine("    internal string Identity { get; }");
+        source.AppendLine();
+        source.AppendLine("    internal global::System.Func<global::DigitalBrain.Testing.TestOwner, string, TestNeuronAccess> Open { get; }");
+        source.AppendLine();
+        source.AppendLine("    internal global::System.Func<global::DigitalBrain.Client.IDigitalBrain, string, global::DigitalBrain.Abstractions.Synapse, global::System.Threading.Tasks.Task> Send { get; }");
+        source.AppendLine("}");
+        source.AppendLine();
+        source.AppendLine("[ExcludeFromCodeCoverage]");
+        source.AppendLine("internal sealed class TestSynapseObservation");
+        source.AppendLine("{");
+        source.AppendLine("    internal TestSynapseObservation(");
+        source.AppendLine("        string correlationInstance,");
+        source.AppendLine("        long sequence)");
+        source.AppendLine("    {");
+        source.AppendLine("        CorrelationInstance = correlationInstance;");
+        source.AppendLine("        Sequence = sequence;");
+        source.AppendLine("    }");
+        source.AppendLine();
+        source.AppendLine("    internal string CorrelationInstance { get; }");
+        source.AppendLine();
+        source.AppendLine("    internal long Sequence { get; }");
+        source.AppendLine("}");
+        source.AppendLine();
+        source.AppendLine("[ExcludeFromCodeCoverage]");
+        source.AppendLine("internal sealed class TestSynapseContract");
+        source.AppendLine("{");
+        source.AppendLine("    internal TestSynapseContract(");
+        source.AppendLine("        string identity,");
+        source.AppendLine("        global::System.Func<global::System.Collections.Generic.IReadOnlyDictionary<string, string>, global::DigitalBrain.Abstractions.Synapse> create,");
+        source.AppendLine("        global::System.Func<global::DigitalBrain.Testing.TestJournal, global::System.Threading.CancellationToken, global::System.Threading.Tasks.Task<TestSynapseObservation>> next,");
+        source.AppendLine("        global::System.Func<global::DigitalBrain.Testing.TestJournal, long, global::System.Threading.CancellationToken, global::System.Threading.Tasks.Task<int>> count)");
+        source.AppendLine("    {");
+        source.AppendLine("        Identity = identity;");
+        source.AppendLine("        Create = create;");
+        source.AppendLine("        Next = next;");
+        source.AppendLine("        Count = count;");
+        source.AppendLine("    }");
+        source.AppendLine();
+        source.AppendLine("    internal string Identity { get; }");
+        source.AppendLine();
+        source.AppendLine("    internal global::System.Func<global::System.Collections.Generic.IReadOnlyDictionary<string, string>, global::DigitalBrain.Abstractions.Synapse> Create { get; }");
+        source.AppendLine();
+        source.AppendLine("    internal global::System.Func<global::DigitalBrain.Testing.TestJournal, global::System.Threading.CancellationToken, global::System.Threading.Tasks.Task<TestSynapseObservation>> Next { get; }");
+        source.AppendLine();
+        source.AppendLine("    internal global::System.Func<global::DigitalBrain.Testing.TestJournal, long, global::System.Threading.CancellationToken, global::System.Threading.Tasks.Task<int>> Count { get; }");
+        source.AppendLine("}");
+        source.AppendLine();
+        source.AppendLine("[ExcludeFromCodeCoverage]");
+        source.AppendLine("internal static class GeneratedTestVocabulary");
+        source.AppendLine("{");
+        EmitNeuronDictionary(source, model.Neurons);
+        source.AppendLine();
+        EmitSynapseDictionary(source, model.Synapses);
+        source.AppendLine();
+        source.AppendLine("    internal static bool TryResolveNeuron(");
+        source.AppendLine("        string name,");
+        source.AppendLine("        [NotNullWhen(true)] out TestNeuronContract? contract)");
+        source.AppendLine("        => Neurons.TryGetValue(name, out contract);");
+        source.AppendLine();
+        source.AppendLine("    internal static bool TryResolveSynapse(");
+        source.AppendLine("        string name,");
+        source.AppendLine("        [NotNullWhen(true)] out TestSynapseContract? contract)");
+        source.AppendLine("        => Synapses.TryGetValue(name, out contract);");
+        source.AppendLine();
+        source.AppendLine("    internal static bool TryCreateSynapse(");
+        source.AppendLine("        string name,");
+        source.AppendLine("        global::System.Collections.Generic.IReadOnlyDictionary<string, string> arguments,");
+        source.AppendLine("        [NotNullWhen(true)] out global::DigitalBrain.Abstractions.Synapse? synapse)");
+        source.AppendLine("    {");
+        source.AppendLine("        if (TryResolveSynapse(name, out var contract))");
+        source.AppendLine("        {");
+        source.AppendLine("            synapse = contract.Create(arguments);");
+        source.AppendLine("            return true;");
+        source.AppendLine("        }");
+        source.AppendLine();
+        source.AppendLine("        synapse = null;");
+        source.AppendLine("        return false;");
+        source.AppendLine("    }");
+        source.AppendLine();
+        source.AppendLine("    private static string Argument(");
+        source.AppendLine("        global::System.Collections.Generic.IReadOnlyDictionary<string, string> arguments,");
+        source.AppendLine("        string name)");
+        source.AppendLine("        => arguments.TryGetValue(name, out var value)");
+        source.AppendLine("            ? value");
+        source.AppendLine("            : throw new global::System.ArgumentException(");
+        source.AppendLine("                $\"Required Gherkin argument '{name}' was not supplied.\",");
+        source.AppendLine("                nameof(arguments));");
+        source.AppendLine("}");
+
+        return source.ToString();
+    }
+
+    private static void EmitNeuronDictionary(
+        StringBuilder source,
+        ImmutableArray<VocabularyNeuron> neurons)
+    {
+        var uniqueShortNames = new HashSet<string>(
+            neurons
+                .GroupBy(
+                    static neuron => neuron.ShortName,
+                    StringComparer.Ordinal)
+                .Where(static group => group.Count() == 1)
+                .Select(static group => group.Key),
+            StringComparer.Ordinal);
+
+        source.AppendLine("    private static readonly global::System.Collections.Generic.IReadOnlyDictionary<string, TestNeuronContract> Neurons =");
+        source.AppendLine("        new global::System.Collections.Generic.Dictionary<string, TestNeuronContract>(global::System.StringComparer.Ordinal)");
+        source.AppendLine("        {");
+
+        foreach (var neuron in neurons)
+        {
+            EmitNeuronEntry(source, neuron.FullName, neuron);
+
+            if (neuron.ShortName != neuron.FullName
+                && uniqueShortNames.Contains(neuron.ShortName))
+            {
+                EmitNeuronEntry(source, neuron.ShortName, neuron);
+            }
+        }
+
+        source.AppendLine("        };");
+    }
+
+    private static void EmitNeuronEntry(
+        StringBuilder source,
+        string key,
+        VocabularyNeuron neuron)
+    {
+        source.AppendLine($"            [\"{StringLiteral(key)}\"] =");
+        source.AppendLine("                new TestNeuronContract(");
+        source.AppendLine($"                    \"{StringLiteral(neuron.FullName)}\",");
+        source.AppendLine("                    static (owner, name) =>");
+        source.AppendLine("                    {");
+        source.AppendLine($"                        var neuron = owner.Neuron<global::{neuron.FullName}>(name);");
+        source.AppendLine("                        return new TestNeuronAccess(");
+        source.AppendLine("                            neuron.Id,");
+        source.AppendLine("                            neuron.Incoming,");
+        source.AppendLine("                            neuron.Outgoing,");
+        source.AppendLine("                            neuron.RestartHostAsync);");
+        source.AppendLine("                    },");
+        source.AppendLine($"                    static (client, name, synapse) => client.SendAsync<global::{neuron.FullName}>(name, synapse)),");
+    }
+
+    private static void EmitSynapseDictionary(
+        StringBuilder source,
+        ImmutableArray<VocabularySynapse> synapses)
+    {
+        var uniqueShortNames = new HashSet<string>(
+            synapses
+                .GroupBy(
+                    static synapse => synapse.ShortName,
+                    StringComparer.Ordinal)
+                .Where(static group => group.Count() == 1)
+                .Select(static group => group.Key),
+            StringComparer.Ordinal);
+
+        source.AppendLine("    private static readonly global::System.Collections.Generic.IReadOnlyDictionary<string, TestSynapseContract> Synapses =");
+        source.AppendLine("        new global::System.Collections.Generic.Dictionary<string, TestSynapseContract>(global::System.StringComparer.Ordinal)");
+        source.AppendLine("        {");
+
+        foreach (var synapse in synapses)
+        {
+            EmitSynapseEntry(source, synapse.FullName, synapse);
+
+            if (synapse.ShortName != synapse.FullName
+                && uniqueShortNames.Contains(synapse.ShortName))
+            {
+                EmitSynapseEntry(source, synapse.ShortName, synapse);
+            }
+        }
+
+        source.AppendLine("        };");
+    }
+
+    private static void EmitSynapseEntry(
+        StringBuilder source,
+        string key,
+        VocabularySynapse synapse)
+    {
+        source.AppendLine($"            [\"{StringLiteral(key)}\"] =");
+        source.AppendLine("                new TestSynapseContract(");
+        source.AppendLine($"                    \"{StringLiteral(synapse.FullName)}\",");
+        source.AppendLine($"                    {synapse.Factory},");
+        source.AppendLine("                    static async (journal, cancellationToken) =>");
+        source.AppendLine("                    {");
+        source.AppendLine($"                        var observed = await journal.NextAsync<global::{synapse.FullName}>(cancellationToken);");
+        source.AppendLine("                        return new TestSynapseObservation(");
+        source.AppendLine("                            observed.CorrelationId.Value.ToString(\"D\"),");
+        source.AppendLine("                            observed.Sequence);");
+        source.AppendLine("                    },");
+        source.AppendLine("                    static async (journal, afterSequence, cancellationToken) =>");
+        source.AppendLine($"                        (await journal.ReadAsync<global::{synapse.FullName}>(");
+        source.AppendLine("                            afterSequence,");
+        source.AppendLine("                            cancellationToken)).Count),");
+    }
+
     private static CompositionModel CompositionOf(Compilation compilation)
     {
         var moduleContract = compilation.GetTypeByMetadataName(ModuleInterface);
@@ -585,5 +1126,54 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         public bool EmitCatalog { get; } = emitCatalog;
 
         public bool EmitExtension { get; } = emitExtension;
+    }
+
+    private readonly struct VocabularyNeuron(
+        string fullName,
+        string shortName)
+    {
+        public string FullName { get; } = fullName;
+
+        public string ShortName { get; } = shortName;
+    }
+
+    private readonly struct VocabularySynapse(
+        string fullName,
+        string shortName,
+        string factory)
+    {
+        public string FullName { get; } = fullName;
+
+        public string ShortName { get; } = shortName;
+
+        public string Factory { get; } = factory;
+    }
+
+    private readonly struct VocabularyAmbiguity(
+        string kind,
+        string shortName,
+        ImmutableArray<string> candidates)
+    {
+        public string Kind { get; } = kind;
+
+        public string ShortName { get; } = shortName;
+
+        public ImmutableArray<string> Candidates { get; } = candidates;
+    }
+
+    private readonly struct VocabularyModel(
+        ImmutableArray<VocabularyNeuron> neurons,
+        ImmutableArray<VocabularySynapse> synapses,
+        ImmutableArray<VocabularyAmbiguity> ambiguities,
+        bool emit)
+    {
+        public ImmutableArray<VocabularyNeuron> Neurons { get; } = neurons;
+
+        public ImmutableArray<VocabularySynapse> Synapses { get; } = synapses;
+
+        public ImmutableArray<VocabularyAmbiguity> Ambiguities { get; } =
+            ambiguities;
+
+        public bool Emit { get; } = emit;
     }
 }
