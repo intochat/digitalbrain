@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Kernel;
 using Orleans;
 using Orleans.Runtime;
 
@@ -184,6 +185,19 @@ internal sealed class VolatileReminderTable : IReminderTable
 
     private static bool BelongsToScope(GrainId grainId, string scope)
     {
+        if (string.Equals(
+                grainId.Type.ToString(),
+                OutboxWakeup.GrainTypeName,
+                StringComparison.Ordinal))
+        {
+            return OutboxWakeup.TryParseTarget(
+                    grainId.Key.ToString(),
+                    out var target)
+                && target.Owner.Value.StartsWith(
+                    $"{scope}-",
+                    StringComparison.Ordinal);
+        }
+
         var id = NeuronId.FromGrainKey(
             grainId.Type.ToString()
                 ?? throw new InvalidOperationException(

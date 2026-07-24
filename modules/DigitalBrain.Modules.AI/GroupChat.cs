@@ -244,12 +244,16 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
                 cursor.Revision));
     }
 
+    [SuppressMessage(
+        "Design",
+        "CA1033:Interface methods should be callable by child types",
+        Justification = "Reminder delivery is private infrastructure and must remain an explicit capability.")]
     async Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
     {
         if (!string.Equals(reminderName, RecoveryReminderName, StringComparison.Ordinal))
         {
-            await base.ReceiveReminder(reminderName, status);
-            return;
+            throw new InvalidOperationException(
+                $"GroupChat '{Id}' does not own reminder '{reminderName}'.");
         }
 
         var state = LoadWorkerState();

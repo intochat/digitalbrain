@@ -649,8 +649,8 @@ internal sealed class ClockProbeNeuron :
     {
         if (!string.Equals(reminderName, ReminderName, StringComparison.Ordinal))
         {
-            await base.ReceiveReminder(reminderName, status);
-            return;
+            throw new InvalidOperationException(
+                $"{nameof(ClockProbeNeuron)} does not own reminder '{reminderName}'.");
         }
 
         Record("reminder");

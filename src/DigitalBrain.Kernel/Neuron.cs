@@ -9,7 +9,7 @@ namespace DigitalBrain.Kernel;
 public abstract class Neuron :
     DurableGrain,
     INeuron,
-    IRemindable,
+    IOutboxDrain,
     ICapabilityDelegationAuthority
 {
     private const string IncomingJournalName = "incoming";
@@ -20,8 +20,6 @@ public abstract class Neuron :
     private const string DelegationConsumedName = "delegation-consumed";
     private const string DelegationTerminalsName = "delegation-terminals";
     private const string CapturedCapabilityCausesName = "captured-capability-causes";
-    private const string OutboxReminderName = "db.outbox";
-
     private const int RememberedDeliveries = 4096;
     private const int MaximumRememberedDelegations = 32;
     private const int MaximumCapturedCapabilityCauses = 32;
@@ -29,8 +27,6 @@ public abstract class Neuron :
     private const int ProtectedTerminalDelegations = 1;
 
     private static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(50);
-    private static readonly TimeSpan ReminderInterval = TimeSpan.FromMinutes(1);
-
     private readonly NeuronFeed _incoming;
     private readonly NeuronFeed _outgoing;
     private readonly List<Watcher> _watchers = [];
@@ -83,18 +79,20 @@ public abstract class Neuron :
 
         await base.OnActivateAsync(cancellationToken);
 
-        _wakeUpRegistered = await this.GetReminder(OutboxReminderName) is not null;
-
         RecallHandledDeliveries();
 
-        ScheduleDrain();
-    }
+        if (_outbox.Count > 0)
+        {
+            await Wakeup().Arm();
+            _wakeUpRegistered = true;
+        }
+        else
+        {
+            await Wakeup().Disarm();
+            _wakeUpRegistered = false;
+        }
 
-    public async Task ReceiveReminder(string reminderName, TickStatus status)
-    {
         ScheduleDrain();
-
-        await ForgetWakeUpWhenOutboxIsEmptyAsync();
     }
 
     public async Task Deliver(SynapseDelivery delivery)
@@ -892,7 +890,7 @@ public abstract class Neuron :
     {
         if (_outbox.Count > 0 && !_wakeUpRegistered)
         {
-            await this.RegisterOrUpdateReminder(OutboxReminderName, ReminderInterval, ReminderInterval);
+            await Wakeup().Arm();
             _wakeUpRegistered = true;
         }
 
@@ -908,13 +906,15 @@ public abstract class Neuron :
             return;
         }
 
-        if (await this.GetReminder(OutboxReminderName) is { } registered)
-        {
-            await this.UnregisterReminder(registered);
-        }
-
+        await Wakeup().Disarm();
         _wakeUpRegistered = false;
     }
+
+    Task IOutboxDrain.Drain()
+        => DrainAsync(CancellationToken.None);
+
+    private IOutboxWakeup Wakeup()
+        => GrainFactory.GetGrain<IOutboxWakeup>(Id.ToString());
 
     private static void Discard<TEntry>(IDurableList<TEntry> journal, int committed)
     {

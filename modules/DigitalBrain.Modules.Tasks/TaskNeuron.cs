@@ -342,8 +342,8 @@ internal sealed class TaskNeuron :
 
         if (!string.Equals(reminderName, RetryReminderName, StringComparison.Ordinal))
         {
-            await base.ReceiveReminder(reminderName, status);
-            return;
+            throw new InvalidOperationException(
+                $"Task neuron '{Id}' does not own reminder '{reminderName}'.");
         }
 
         var data = LoadIfStarted();

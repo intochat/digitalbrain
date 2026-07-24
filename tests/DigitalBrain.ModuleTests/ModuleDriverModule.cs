@@ -37,6 +37,12 @@ public partial interface INoticeListener : INeuron;
 
 public partial interface INoticeAudit : INeuron;
 
+public partial interface IOutboxRecoverySource : INeuron;
+
+public partial interface IOutboxRecoveryListener : INeuron;
+
+public partial interface IOutboxRecoveryAudit : INeuron;
+
 public partial interface ICycleProbe : INeuron;
 
 public partial interface IAlphaProbe : INeuron;
@@ -98,6 +104,25 @@ public sealed record NoticeSeen : Synapse;
 [GenerateSerializer]
 [Alias("module-tests.notice-audited")]
 public sealed record NoticeAudited : Synapse;
+
+[GenerateSerializer]
+[Alias("module-tests.begin-outbox-recovery")]
+public sealed record BeginOutboxRecovery(
+    [property: Id(0)] NeuronId Listener,
+    [property: Id(1)] NeuronId Audit) : Synapse;
+
+[GenerateSerializer]
+[Alias("module-tests.recovery-notice")]
+public sealed record RecoveryNotice(
+    [property: Id(0)] NeuronId Audit) : Synapse;
+
+[GenerateSerializer]
+[Alias("module-tests.recovery-seen")]
+public sealed record RecoverySeen : Synapse;
+
+[GenerateSerializer]
+[Alias("module-tests.recovery-audited")]
+public sealed record RecoveryAudited : Synapse;
 
 [GenerateSerializer]
 [Alias("module-tests.loop")]
@@ -265,6 +290,48 @@ internal sealed class NoticeAudit :
         Notice synapse,
         CancellationToken cancellationToken)
         => EmitAsync(new NoticeAudited());
+}
+
+internal sealed class OutboxRecoverySource :
+    Neuron,
+    IOutboxRecoverySource,
+    IHandle<BeginOutboxRecovery>,
+    IEmit<RecoveryNotice>
+{
+    public Task HandleAsync(
+        BeginOutboxRecovery synapse,
+        CancellationToken cancellationToken)
+        => SendAsync(
+            synapse.Listener,
+            new RecoveryNotice(synapse.Audit));
+}
+
+internal sealed class OutboxRecoveryListener :
+    Neuron,
+    IOutboxRecoveryListener,
+    IHandle<RecoveryNotice>,
+    IEmit<RecoveryNotice>,
+    IEmit<RecoverySeen>
+{
+    public async Task HandleAsync(
+        RecoveryNotice synapse,
+        CancellationToken cancellationToken)
+    {
+        await EmitAsync(new RecoverySeen());
+        await SendAsync(synapse.Audit, synapse);
+    }
+}
+
+internal sealed class OutboxRecoveryAudit :
+    Neuron,
+    IOutboxRecoveryAudit,
+    IHandle<RecoveryNotice>,
+    IEmit<RecoveryAudited>
+{
+    public Task HandleAsync(
+        RecoveryNotice synapse,
+        CancellationToken cancellationToken)
+        => EmitAsync(new RecoveryAudited());
 }
 
 internal sealed class CycleProbe :
