@@ -87,7 +87,7 @@ public sealed class AssemblyBoundaryContracts
 
     [Fact]
     public void TheAspireHostingIntegrationDoesNotReachTheKernel()
-        => Assert.DoesNotContain("DigitalBrain.Kernel", ReachableFrom(typeof(BrainService).Assembly), StringComparer.Ordinal);
+        => Assert.DoesNotContain("DigitalBrain.Kernel", ReachableFrom(typeof(DigitalBrainBuilder).Assembly), StringComparer.Ordinal);
 
     private static bool IsDigitalBrain(string assemblyName)
         => assemblyName.StartsWith("DigitalBrain", StringComparison.Ordinal);

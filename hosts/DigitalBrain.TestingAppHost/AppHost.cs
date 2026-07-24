@@ -2,13 +2,8 @@ using DigitalBrain.Aspire.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var storage = builder.AddAzureStorage("storage").RunAsEmulator();
-
-var brain = builder.AddBrain("brain")
-    .WithAzureStorage(storage);
-
-var probeBrain = builder.AddBrain("probe")
-    .WithAzureStorage(storage);
+var brain = builder.AddDigitalBrain("brain");
+var probeBrain = builder.AddDigitalBrain("probe");
 
 builder.AddProject<Projects.DigitalBrain_Host>("silo")
     .WithReference(brain);

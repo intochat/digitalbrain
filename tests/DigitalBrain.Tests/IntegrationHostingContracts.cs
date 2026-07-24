@@ -1,7 +1,7 @@
+using System.Reflection;
 using System.Xml.Linq;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.Azure;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
@@ -103,113 +103,39 @@ public sealed class IntegrationHostingContracts
         Assert.DoesNotContain(".codegraph-initialized", serialized, StringComparison.Ordinal);
     }
 
-    [Fact(DisplayName = "one durable brain profile owns Orleans tables, journal readiness, and silo-only protection")]
-    public async Task DurableBrainProfileIsCompleteAndSiloOnly()
+    [Fact(DisplayName = "AppHost exposes one opaque DigitalBrain root creation surface")]
+    public void AppHostExposesOnlyTypedDigitalBrainCreation()
     {
-        var builder = DistributedApplication.CreateBuilder();
-        var storage = builder.AddAzureStorage("storage");
-        var brain = builder.AddBrain("brain").WithAzureStorage(storage);
-        BrainModuleHosting.RequireStateProtection(brain);
-        BrainModuleHosting.RequireStateProtection(brain);
+        var add = typeof(DigitalBrainHostingExtensions)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Single(method => method.Name == "AddDigitalBrain");
 
-        var tables = builder.Resources
-            .OfType<AzureTableStorageResource>()
-            .Select(resource => resource.Name)
-            .ToList();
-        var journal = Assert.IsType<AzureBlobStorageResource>(
-            Assert.Single(builder.Resources, resource => resource.Name == "brain-journal"));
-        var protectionKey = Parameter(builder, "brain-state-protection-key");
+        Assert.Equal(typeof(IDistributedApplicationBuilder), add.GetParameters()[0].ParameterType);
+        Assert.Equal(typeof(string), add.GetParameters()[1].ParameterType);
+        Assert.Equal(typeof(DigitalBrainBuilder), add.ReturnType);
+        Assert.Equal(
+            [nameof(DigitalBrainBuilder.Name)],
+            typeof(DigitalBrainBuilder)
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Select(property => property.Name));
 
-        Assert.Equal(["brain-clustering", "brain-reminders"], tables);
-        Assert.True(protectionKey.Secret);
-        Assert.Throws<InvalidOperationException>(() => brain.WithAzureStorage(storage));
-        Assert.Equal(2, builder.Resources.OfType<AzureTableStorageResource>().Count());
-        Assert.Single(builder.Resources.OfType<AzureBlobStorageResource>());
+        var exported = typeof(DigitalBrainHostingExtensions).Assembly.GetExportedTypes();
+        var publicNames = exported
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Static))
+            .Select(method => method.Name)
+            .ToHashSet(StringComparer.Ordinal);
 
-        var silo = builder.AddResource(new ProjectionProbe("silo")).WithReference(brain);
-        var client = builder.AddResource(new ProjectionProbe("client")).WithReference(brain.AsClient());
-        var siloEnvironment = await ProjectAsync(silo.Resource);
-        var clientEnvironment = await ProjectAsync(client.Resource);
-
-        Assert.Same(protectionKey, siloEnvironment["DigitalBrain__Security__StateProtectionKey"]);
-        Assert.Contains("ConnectionStrings__journal", siloEnvironment.Keys);
-        var waits = silo.Resource.Annotations.OfType<WaitAnnotation>().ToList();
-        Assert.Contains(waits, annotation => ReferenceEquals(annotation.Resource, journal));
-        Assert.Contains(
-            waits,
-            annotation => annotation.Resource is AzureTableStorageResource table
-                && table.Name == "brain-clustering"
-                && annotation.WaitType == WaitType.WaitUntilHealthy);
-        Assert.Contains(
-            waits,
-            annotation => annotation.Resource is AzureTableStorageResource table
-                && table.Name == "brain-reminders"
-                && annotation.WaitType == WaitType.WaitUntilHealthy);
-        Assert.Contains(
-            waits,
-            annotation => ReferenceEquals(annotation.Resource, storage.Resource)
-                && annotation.WaitType == WaitType.WaitUntilHealthy);
-        Assert.DoesNotContain("DigitalBrain__Security__StateProtectionKey", clientEnvironment.Keys);
-        Assert.DoesNotContain("ConnectionStrings__journal", clientEnvironment.Keys);
-    }
-
-    [Fact(DisplayName = "Azure run mode requires an explicit shared state-protection key")]
-    public async Task AzureRunModeRequiresExplicitStateProtectionKey()
-    {
-        var builder = DistributedApplication.CreateBuilder();
-        var storage = builder.AddAzureStorage("storage");
-        var brain = builder.AddBrain("brain").WithAzureStorage(storage);
-
-        BrainModuleHosting.RequireStateProtection(brain);
-
-        var protectionKey = Parameter(builder, "brain-state-protection-key");
-
-        Assert.True(builder.ExecutionContext.IsRunMode);
-        Assert.True(protectionKey.Secret);
-        Assert.Null(protectionKey.Default);
-        await Assert.ThrowsAsync<MissingParameterValueException>(
-            () => protectionKey.GetValueAsync(TestContext.Current.CancellationToken).AsTask());
-    }
-
-    [Fact(DisplayName = "each development model generates one fresh shared state-protection key")]
-    public async Task DevelopmentRunGeneratesOneFreshSharedStateProtectionKey()
-    {
-        var firstBuilder = DistributedApplication.CreateBuilder();
-        var firstBrain = firstBuilder.AddBrain("brain").WithDevelopmentStores();
-        BrainModuleHosting.RequireStateProtection(firstBrain);
-        var firstKey = Parameter(firstBuilder, "brain-state-protection-key");
-        var firstValue = await firstKey.GetValueAsync(TestContext.Current.CancellationToken);
-        var firstSilo = firstBuilder.AddResource(new ProjectionProbe("first-silo")).WithReference(firstBrain);
-        var secondSilo = firstBuilder.AddResource(new ProjectionProbe("second-silo")).WithReference(firstBrain);
-
-        var firstEnvironment = await ProjectAsync(firstSilo.Resource);
-        var secondEnvironment = await ProjectAsync(secondSilo.Resource);
-
-        Assert.Same(firstKey, firstEnvironment["DigitalBrain__Security__StateProtectionKey"]);
-        Assert.Same(firstKey, secondEnvironment["DigitalBrain__Security__StateProtectionKey"]);
-        Assert.Equal(firstValue, await firstKey.GetValueAsync(TestContext.Current.CancellationToken));
-        Assert.NotNull(firstValue);
-        var decoded = Convert.FromBase64String(firstValue);
-        Assert.Equal(32, decoded.Length);
-        Assert.False(decoded.SequenceEqual(new byte[32]));
-
-        var secondBuilder = DistributedApplication.CreateBuilder();
-        var secondBrain = secondBuilder.AddBrain("brain").WithDevelopmentStores();
-        BrainModuleHosting.RequireStateProtection(secondBrain);
-        var secondKey = Parameter(secondBuilder, "brain-state-protection-key");
-
-        Assert.True(firstBuilder.ExecutionContext.IsRunMode);
-        Assert.True(secondBuilder.ExecutionContext.IsRunMode);
-        Assert.NotEqual(
-            firstValue,
-            await secondKey.GetValueAsync(TestContext.Current.CancellationToken));
+        Assert.DoesNotContain("AddBrain", publicNames);
+        Assert.DoesNotContain("WithAzureStorage", publicNames);
+        Assert.DoesNotContain("WithDevelopmentStores", publicNames);
+        Assert.DoesNotContain("BrainModuleHosting", exported.Select(type => type.Name));
     }
 
     [Fact(DisplayName = "AppHost prompts only for provider-required OAuth parameters")]
     public void AppHostPromptsOnceForOfficialOAuthParameters()
     {
         var builder = DistributedApplication.CreateBuilder();
-        var brain = builder.AddBrain("brain");
+        var brain = builder.AddDigitalBrain("brain");
 
         brain.AddModule<GoogleModule>(google => google.WithGmail());
         brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
@@ -225,13 +151,27 @@ public sealed class IntegrationHostingContracts
         Assert.Single(builder.Resources, resource => resource.Name == "brain-state-protection-key");
     }
 
+    [Fact(DisplayName = "multiple brains share application-scoped OAuth parameters")]
+    public void MultipleBrainsShareApplicationScopedOAuthParameters()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+
+        builder.AddDigitalBrain("first")
+            .AddModule<GoogleModule>(google => google.WithGmail());
+        builder.AddDigitalBrain("second")
+            .AddModule<GoogleModule>(google => google.WithGmail());
+
+        Assert.Single(builder.Resources, resource => resource.Name == "mcp-authorization-mode");
+        Assert.Single(builder.Resources, resource => resource.Name == "google-client-id");
+        Assert.Single(builder.Resources, resource => resource.Name == "google-client-secret");
+        Assert.Single(builder.Resources, resource => resource.Name == "google-redirect-uri");
+    }
+
     [Fact(DisplayName = "integration OAuth configuration is projected only to the silo")]
     public async Task IntegrationOAuthConfigurationIsProjectedOnlyToTheSilo()
     {
         var builder = DistributedApplication.CreateBuilder();
-        var brain = builder
-            .AddBrain("brain")
-            .WithDevelopmentStores();
+        var brain = builder.AddDigitalBrain("brain");
 
         brain.AddModule<GoogleModule>(google => google.WithGmail());
         brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
@@ -264,9 +204,9 @@ public sealed class IntegrationHostingContracts
     public void AppHostRejectsDuplicateIntegrationSelections()
     {
         var googleBuilder = DistributedApplication.CreateBuilder();
-        var googleBrain = googleBuilder.AddBrain("google-brain");
+        var googleBrain = googleBuilder.AddDigitalBrain("google-brain");
         var salesforceBuilder = DistributedApplication.CreateBuilder();
-        var salesforceBrain = salesforceBuilder.AddBrain("salesforce-brain");
+        var salesforceBrain = salesforceBuilder.AddDigitalBrain("salesforce-brain");
 
         Assert.Throws<InvalidOperationException>(
             () => googleBrain.AddModule<GoogleModule>(google => google

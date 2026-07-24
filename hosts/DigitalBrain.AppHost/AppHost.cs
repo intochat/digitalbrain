@@ -9,10 +9,7 @@ using DigitalBrain.Salesforce.Aspire.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var storage = builder.AddAzureStorage("storage").RunAsEmulator();
-
-var brain = builder.AddBrain("brain")
-    .WithAzureStorage(storage);
+var brain = builder.AddDigitalBrain("brain");
 
 brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
 brain.AddModule<GoogleModule>(google => google.WithGmail());

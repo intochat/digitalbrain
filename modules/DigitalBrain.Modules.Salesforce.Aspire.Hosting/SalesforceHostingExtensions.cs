@@ -14,11 +14,12 @@ public static class SalesforceHostingExtensions
         ClientSecretDescription: null,
         "OAuth callback URI registered on the Salesforce External Client App. Use an HTTP loopback callback only with the explicit local development authorization mode.");
 
-    public static SalesforceModule WithSalesforce(this SalesforceModule module)
+    public static DigitalBrainModuleBuilder<SalesforceModule> WithSalesforce(
+        this DigitalBrainModuleBuilder<SalesforceModule> module)
     {
         ArgumentNullException.ThrowIfNull(module);
 
-        McpProviderHosting.Register(BrainModuleHosting.BrainOf(module), Salesforce);
+        McpProviderHosting.Register(module, Salesforce);
         return module;
     }
 }

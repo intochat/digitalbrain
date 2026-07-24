@@ -15,9 +15,7 @@ public sealed class AIHostingContracts
     public void AppHostSurfaceCreatesOneResourcePerProvider()
     {
         var builder = DistributedApplication.CreateBuilder();
-        var brain = builder
-            .AddBrain("brain")
-            .WithDevelopmentStores();
+        var brain = builder.AddDigitalBrain("brain");
 
         brain.AddModule<AIModule>(ai => ai
             .WithLlm<Llama32>()
@@ -33,7 +31,7 @@ public sealed class AIHostingContracts
     public void AppHostRejectsDuplicateSelections()
     {
         var moduleBuilder = DistributedApplication.CreateBuilder();
-        var moduleBrain = moduleBuilder.AddBrain("module-brain");
+        var moduleBrain = moduleBuilder.AddDigitalBrain("module-brain");
 
         moduleBrain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
 
@@ -41,7 +39,7 @@ public sealed class AIHostingContracts
             () => moduleBrain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>()));
 
         var modelBuilder = DistributedApplication.CreateBuilder();
-        var modelBrain = modelBuilder.AddBrain("model-brain");
+        var modelBrain = modelBuilder.AddDigitalBrain("model-brain");
 
         Assert.Throws<InvalidOperationException>(
             () => modelBrain.AddModule<AIModule>(ai => ai
@@ -53,9 +51,7 @@ public sealed class AIHostingContracts
     public void OpenAIUsesDocumentedSecretParameter()
     {
         var builder = DistributedApplication.CreateBuilder();
-        var brain = builder
-            .AddBrain("brain")
-            .WithDevelopmentStores();
+        var brain = builder.AddDigitalBrain("brain");
 
         brain.AddModule<AIModule>(ai => ai.WithLlm<Gpt56>());
 
@@ -74,7 +70,7 @@ public sealed class AIHostingContracts
     public void OllamaCreatesOnlySharedStateSecret()
     {
         var builder = DistributedApplication.CreateBuilder();
-        var brain = builder.AddBrain("brain");
+        var brain = builder.AddDigitalBrain("brain");
 
         brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
 
@@ -89,9 +85,7 @@ public sealed class AIHostingContracts
     public async Task AIConfigurationIsProjectedOnlyToTheSilo()
     {
         var builder = DistributedApplication.CreateBuilder();
-        var brain = builder
-            .AddBrain("brain")
-            .WithDevelopmentStores();
+        var brain = builder.AddDigitalBrain("brain");
 
         brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
 
@@ -112,9 +106,7 @@ public sealed class AIHostingContracts
     public async Task OpenAIProjectionContainsOnlyAParameterExpression()
     {
         var builder = DistributedApplication.CreateBuilder();
-        var brain = builder
-            .AddBrain("brain")
-            .WithDevelopmentStores();
+        var brain = builder.AddDigitalBrain("brain");
 
         brain.AddModule<AIModule>(ai => ai.WithLlm<Gpt56>());
 

@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.OpenAI;
@@ -10,31 +9,26 @@ namespace DigitalBrain.AI.Aspire.Hosting;
 
 public static class AIHostingExtensions
 {
-    private static readonly ConditionalWeakTable<AIModule, AIHostingState> States = new();
-
-    public static AIModule WithLlm<TModel>(this AIModule module)
+    public static DigitalBrainModuleBuilder<AIModule> WithLlm<TModel>(
+        this DigitalBrainModuleBuilder<AIModule> module)
         where TModel : LLM
     {
         ArgumentNullException.ThrowIfNull(module);
 
-        var state = States.GetValue(module, CreateState);
-        state.Add<TModel>();
+        var state = module.Brain.GetOrAddState(
+            static brain => new AIHostingState(brain),
+            out var added);
+        if (added)
+        {
+            module.RequireStateProtection();
+            module.AddProjection(state);
+        }
 
+        state.Add<TModel>();
         return module;
     }
 
-    private static AIHostingState CreateState(AIModule module)
-    {
-        var brain = BrainModuleHosting.BrainOf(module);
-        var state = new AIHostingState(brain);
-
-        BrainModuleHosting.RequireStateProtection(brain);
-        BrainModuleHosting.AddReference(brain, state);
-
-        return state;
-    }
-
-    private sealed class AIHostingState(BrainService brain) : BrainModuleReference
+    private sealed class AIHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
     {
         private readonly HashSet<Type> _models = [];
         private IResourceBuilder<OllamaResource>? _ollama;
@@ -70,7 +64,7 @@ public static class AIHostingExtensions
                 $"{model.FullName} has no Aspire integration. The AI module must own the provider resource for every concrete LLM.");
         }
 
-        public override void Apply<T>(IResourceBuilder<T> builder)
+        public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
             ArgumentNullException.ThrowIfNull(builder);
 
@@ -104,25 +98,24 @@ public static class AIHostingExtensions
 
         private void AddLlama32()
         {
-            _ollama ??= brain.Builder
+            var builder = brain.GetApplicationBuilder();
+            _ollama ??= builder
                 .AddOllama($"{brain.Name}-ai-ollama")
                 .WithDataVolume();
-
             _llama32 = _ollama.AddModel($"{brain.Name}-ai-llama32", "llama3.2");
         }
 
         private void AddGpt56()
         {
-            _openAIKey ??= brain.Builder
+            var builder = brain.GetApplicationBuilder();
+            _openAIKey ??= builder
                 .AddParameter("openai-api-key", secret: true)
                 .WithDescription(
                     "Create or manage an API key at [OpenAI Platform](https://platform.openai.com/api-keys).",
                     enableMarkdown: true);
-
-            _openAI ??= brain.Builder
+            _openAI ??= builder
                 .AddOpenAI($"{brain.Name}-ai-openai")
                 .WithApiKey(_openAIKey);
-
             _gpt56 = _openAI.AddModel($"{brain.Name}-ai-gpt56", "gpt-5.6");
         }
     }
