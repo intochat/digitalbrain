@@ -1,6 +1,8 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using Orleans.Runtime;
 using Orleans.Runtime.Services;
 using Orleans.TestingHost;
 
@@ -60,6 +62,19 @@ internal sealed class FixtureCluster : IAsyncDisposable
             ?? throw new InvalidOperationException(
                 "The DigitalBrain fixture cluster is not running.");
 
+    internal JournalFaultRegistration ArmJournalFault(
+        NeuronId target,
+        int completedWrites,
+        string message)
+        => _journalStorage.ArmFault(
+            target,
+            completedWrites,
+            message);
+
+    internal bool DisarmJournalFault(
+        JournalFaultRegistration registration)
+        => _journalStorage.DisarmFault(registration);
+
     internal async Task<TestClock> PrepareMethodAsync(string scope)
     {
         _clock.Reset();
@@ -82,6 +97,30 @@ internal sealed class FixtureCluster : IAsyncDisposable
             1 => "beta",
             _ => "gamma",
         };
+    }
+
+    internal async Task RestartHostAsync(
+        NeuronId neuron,
+        CancellationToken cancellationToken)
+    {
+        var cluster = _cluster
+            ?? throw new InvalidOperationException(
+                "The DigitalBrain fixture cluster is not running.");
+        var management = cluster.Client.GetGrain<IManagementGrain>(0);
+        var statistics = await management
+            .GetDetailedGrainStatistics()
+            .WaitAsync(cancellationToken);
+        var hosting = statistics
+            .FirstOrDefault(statistic =>
+                statistic.GrainId == neuron.ToGrainId())
+            ?.SiloAddress
+            ?? throw new InvalidOperationException(
+                $"{neuron} is not activated on any silo, so no host can be restarted.");
+        var host = cluster.Silos.Single(silo =>
+            silo.SiloAddress.Equals(hosting));
+
+        await cluster.RestartSiloAsync(host).WaitAsync(cancellationToken);
+        _ = await management.GetHosts().WaitAsync(cancellationToken);
     }
 
     public async ValueTask DisposeAsync()

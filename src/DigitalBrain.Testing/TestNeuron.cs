@@ -5,12 +5,16 @@ namespace DigitalBrain.Testing;
 public sealed class TestNeuron<TNeuron>
     where TNeuron : class, INeuron
 {
+    private readonly TestBrain _brain;
+
     internal TestNeuron(
+        TestBrain brain,
         NeuronId id,
         TNeuron reference,
         TestJournal incoming,
         TestJournal outgoing)
     {
+        _brain = brain;
         Id = id;
         Reference = reference;
         Incoming = incoming;
@@ -24,4 +28,19 @@ public sealed class TestNeuron<TNeuron>
     public TestJournal Incoming { get; }
 
     public TestJournal Outgoing { get; }
+
+    public JournalFaultHandle FailNextJournalCommit(string message)
+        => FailJournalCommitAfter(0, message);
+
+    public JournalFaultHandle FailJournalCommitAfter(
+        int completedWrites,
+        string message)
+        => _brain.ArmJournalFault(
+            Id,
+            completedWrites,
+            message);
+
+    public Task RestartHostAsync(
+        CancellationToken cancellationToken = default)
+        => _brain.RestartHostAsync(Id, cancellationToken);
 }

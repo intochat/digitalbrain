@@ -16,6 +16,8 @@ public sealed class TestBrain : IAsyncDisposable
     private readonly Lock _journalGate = new();
     private readonly Dictionary<(NeuronId Subject, JournalKind Direction), TestJournal>
         _journals = [];
+    private readonly Lock _faultGate = new();
+    private readonly HashSet<JournalFaultHandle> _faults = [];
     private readonly string _scope;
     private readonly TestOwner _defaultOwner;
     private Action? _release;
@@ -80,6 +82,10 @@ public sealed class TestBrain : IAsyncDisposable
         }
     }
 
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Method teardown must disarm every journal fault and attempt every journal cleanup before releasing the serial fixture lease; all failures are preserved.")]
     public async ValueTask DisposeAsync()
     {
         var release = Interlocked.Exchange(ref _release, null);
@@ -88,14 +94,71 @@ public sealed class TestBrain : IAsyncDisposable
             return;
         }
 
+        List<Exception> failures = [];
+
         try
         {
-            await Clock.InvalidateAsync();
-            await DisposeJournalsAsync();
+            try
+            {
+                await Clock.InvalidateAsync();
+            }
+            catch (Exception failure)
+            {
+                failures.Add(failure);
+            }
+
+            if (CleanupJournalFaults() is { } faultFailure)
+            {
+                failures.Add(faultFailure);
+            }
+
+            try
+            {
+                await DisposeJournalsAsync();
+            }
+            catch (Exception failure)
+            {
+                failures.Add(failure);
+            }
         }
         finally
         {
             release();
+        }
+
+        if (failures.Count == 1)
+        {
+            throw failures[0];
+        }
+
+        if (failures.Count > 1)
+        {
+            throw new AggregateException(
+                "One or more DigitalBrain test resources failed to clean up.",
+                failures);
+        }
+    }
+
+    internal JournalFaultHandle ArmJournalFault(
+        NeuronId target,
+        int completedWrites,
+        string message)
+    {
+        lock (_faultGate)
+        {
+            ObjectDisposedException.ThrowIf(
+                Volatile.Read(ref _release) is null,
+                this);
+
+            var registration = Cluster.ArmJournalFault(
+                target,
+                completedWrites,
+                message);
+            var handle = new JournalFaultHandle(
+                registration,
+                Cluster.DisarmJournalFault);
+            _faults.Add(handle);
+            return handle;
         }
     }
 
@@ -118,10 +181,54 @@ public sealed class TestBrain : IAsyncDisposable
         }
     }
 
+    internal Task RestartHostAsync(
+        NeuronId target,
+        CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(
+            Volatile.Read(ref _release) is null,
+            this);
+        return Cluster.RestartHostAsync(target, cancellationToken);
+    }
+
     private TestOwner CreateOwner(string label)
         => TestOwner.Create(
             this,
             new($"{_scope}-{label}"));
+
+    private InvalidOperationException? CleanupJournalFaults()
+    {
+        JournalFaultHandle[] faults;
+
+        lock (_faultGate)
+        {
+            faults = [.. _faults];
+            _faults.Clear();
+        }
+
+        List<string>? leaks = null;
+
+        foreach (var fault in faults)
+        {
+            if (fault.IsConsumed)
+            {
+                continue;
+            }
+
+            if (!fault.Disarm() || fault.IsConsumed)
+            {
+                continue;
+            }
+
+            (leaks ??= []).Add(
+                $"neuron='{fault.Target}', message='{fault.Message}'");
+        }
+
+        return leaks is null
+            ? null
+            : new InvalidOperationException(
+                $"Unconsumed journal commit faults were not explicitly disposed before method cleanup: {string.Join("; ", leaks)}.");
+    }
 
     [SuppressMessage(
         "Design",

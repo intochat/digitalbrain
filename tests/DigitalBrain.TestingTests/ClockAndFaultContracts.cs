@@ -316,6 +316,100 @@ public sealed class ClockAndFaultContracts(TestingFixture fixture)
         Assert.Contains(ReminderName, failure.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task FaultIsScopedToExactlyOneTestNeuron()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var target = test.Neuron<IEchoNeuron>("fault-target");
+        var other = test.Neuron<IEchoNeuron>("fault-other");
+        await using var fault =
+            target.FailNextJournalCommit("target commit failure");
+
+        await other.Reference.Publish("other");
+
+        var observed = Assert.Single(await other.Outgoing.ReadAsync<Echoed>(
+            cancellationToken: cancellationToken));
+        Assert.Equal("other", observed.Synapse.Value);
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => target.Reference.Publish("target"));
+        Assert.Equal("target commit failure", failure.Message);
+    }
+
+    [Fact]
+    public async Task FaultAfterCompletedWritesThrowsTheExactMessage()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var echo = test.Neuron<IEchoNeuron>("fault-after");
+        await using var fault =
+            echo.FailJournalCommitAfter(1, "expected commit failure");
+
+        await echo.Reference.Publish("committed");
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => echo.Reference.Publish("failed"));
+        Assert.Equal("expected commit failure", failure.Message);
+    }
+
+    [Fact]
+    public async Task FaultLeftUnconsumedAndUndisposedFailsMethodCleanup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var test = await fixture.CreateBrainAsync(cancellationToken);
+        var echo = test.Neuron<IEchoNeuron>("fault-leaked");
+        _ = echo.FailNextJournalCommit("unconsumed commit failure");
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await test.DisposeAsync());
+
+        Assert.Contains(echo.Id.ToString(), failure.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            "unconsumed commit failure",
+            failure.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FaultExplicitlyDisposedIsDisarmedBeforeCleanup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var echo = test.Neuron<IEchoNeuron>("fault-disarmed");
+        var fault = echo.FailNextJournalCommit("must not remain armed");
+
+        await fault.DisposeAsync();
+        await echo.Reference.Publish("committed");
+
+        var observed = Assert.Single(await echo.Outgoing.ReadAsync<Echoed>(
+            cancellationToken: cancellationToken));
+        Assert.Equal("committed", observed.Synapse.Value);
+    }
+
+    [Fact]
+    public async Task RestartPreservesEvidenceAndExistingReferenceBecomesUsable()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var echo = test.Neuron<IEchoNeuron>("restart");
+        var reference = echo.Reference;
+
+        await reference.Publish("before restart");
+        var before = Assert.Single(await echo.Outgoing.ReadAsync<Echoed>(
+            cancellationToken: cancellationToken));
+
+        await echo.RestartHostAsync(cancellationToken);
+
+        Assert.Same(reference, echo.Reference);
+        Assert.Equal("after restart", await reference.Echo("after restart"));
+
+        var preserved = Assert.Single(await echo.Outgoing.ReadAsync<Echoed>(
+            cancellationToken: cancellationToken));
+        Assert.Equal(before.Sequence, preserved.Sequence);
+        Assert.Equal("before restart", preserved.Synapse.Value);
+    }
+
     private const string ReminderName = "tests.clock";
 }
 

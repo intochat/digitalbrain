@@ -21,6 +21,8 @@ internal static class SimulationClusterHost
     private static SynapseObserver? _observer;
     private static RecordingJournalStorageProvider? _journalStorage;
     private static ScenarioClock? _clock;
+    private static readonly Dictionary<NeuronId, JournalFaultRegistration>
+        JournalFaults = [];
 
     private static bool IsDeployed => _cluster is not null;
 
@@ -41,10 +43,28 @@ internal static class SimulationClusterHost
         GrainId grain,
         int completedWritesBeforeFailure,
         string message)
-        => JournalStorage().FailWriteAfter(grain, completedWritesBeforeFailure, message);
+    {
+        var target = ToNeuronId(grain);
+
+        if (JournalFaults.Remove(target, out var existing))
+        {
+            _ = JournalStorage().DisarmFault(existing);
+        }
+
+        JournalFaults[target] = JournalStorage().ArmFault(
+            target,
+            completedWritesBeforeFailure,
+            message);
+    }
 
     public static void ClearJournalWriteFailure(GrainId grain)
-        => JournalStorage().ClearFailure(grain);
+    {
+        var target = ToNeuronId(grain);
+        if (JournalFaults.Remove(target, out var fault))
+        {
+            _ = JournalStorage().DisarmFault(fault);
+        }
+    }
 
     public static async Task EnsureStartedAsync(CancellationToken cancellationToken = default)
     {
@@ -147,6 +167,7 @@ internal static class SimulationClusterHost
             _cluster = null;
             _journalStorage = null;
             _clock = null;
+            JournalFaults.Clear();
         }
         finally
         {
@@ -184,6 +205,13 @@ internal static class SimulationClusterHost
         => _journalStorage
             ?? throw new InvalidOperationException(
                 $"The simulation cluster is not running. Call {nameof(SimulationCluster)}.{nameof(SimulationCluster.StartAsync)} before a scenario runs.");
+
+    private static NeuronId ToNeuronId(GrainId grain)
+        => NeuronId.FromGrainKey(
+            grain.Type.ToString()
+                ?? throw new InvalidOperationException(
+                    "A journal fault target has no grain type."),
+            grain.Key.ToString());
 
     private static async Task WaitForClientConnectivityAsync(IClusterClient client)
     {

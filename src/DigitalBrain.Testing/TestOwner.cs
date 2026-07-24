@@ -27,6 +27,7 @@ public sealed class TestOwner
         var id = NeuronId.For<TNeuron>(Id, name);
 
         return new(
+            _brain,
             id,
             Client.Get<TNeuron>(name),
             _brain.Journal(id, JournalKind.Incoming),

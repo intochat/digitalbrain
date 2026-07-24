@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Collections.Concurrent;
+using DigitalBrain.Abstractions;
 using Orleans.Journaling;
 using Orleans.Runtime;
 
@@ -9,7 +10,8 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     : IJournalStorageProvider
 {
     private readonly ConcurrentDictionary<JournalId, long> _completedWrites = new();
-    private readonly Dictionary<JournalId, InjectedFailure> _failures = [];
+    private readonly Dictionary<NeuronId, JournalFaultState> _failures = [];
+    private readonly Dictionary<JournalId, NeuronId> _faultTargets = [];
     private readonly object _failureLock = new();
 
     public IJournalStorage CreateStorage(JournalId journalId)
@@ -18,8 +20,8 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     internal long CompletedWrites(GrainId grain)
         => _completedWrites.GetValueOrDefault(JournalId.FromGrainId(grain));
 
-    internal void FailWriteAfter(
-        GrainId grain,
+    internal JournalFaultRegistration ArmFault(
+        NeuronId target,
         int completedWritesBeforeFailure,
         string message)
     {
@@ -28,15 +30,37 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
 
         lock (_failureLock)
         {
-            _failures[JournalId.FromGrainId(grain)] = new(completedWritesBeforeFailure, message);
+            if (_failures.ContainsKey(target))
+            {
+                throw new InvalidOperationException(
+                    $"A journal commit fault is already armed for neuron '{target}'.");
+            }
+
+            var state = new JournalFaultState(
+                completedWritesBeforeFailure,
+                message);
+            _failures.Add(target, state);
+            _faultTargets.Add(
+                JournalId.FromGrainId(target.ToGrainId()),
+                target);
+            return new(target, message, state.Consumed.Task, state);
         }
     }
 
-    internal void ClearFailure(GrainId grain)
+    internal bool DisarmFault(JournalFaultRegistration registration)
     {
+        ArgumentNullException.ThrowIfNull(registration);
+
         lock (_failureLock)
         {
-            _failures.Remove(JournalId.FromGrainId(grain));
+            if (!_failures.TryGetValue(registration.Target, out var state)
+                || !ReferenceEquals(state, registration.Token))
+            {
+                return false;
+            }
+
+            RemoveFault(registration.Target);
+            return true;
         }
     }
 
@@ -44,22 +68,20 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     {
         lock (_failureLock)
         {
-            if (!_failures.TryGetValue(journalId, out var failure))
+            if (!_faultTargets.TryGetValue(journalId, out var target)
+                || !_failures.TryGetValue(target, out var failure))
             {
                 return;
             }
 
-            if (failure.CompletedWritesBeforeFailure > 0)
+            if (failure.RemainingWrites > 0)
             {
-                _failures[journalId] = failure with
-                {
-                    CompletedWritesBeforeFailure = failure.CompletedWritesBeforeFailure - 1,
-                };
-
+                failure.RemainingWrites--;
                 return;
             }
 
-            _failures.Remove(journalId);
+            RemoveFault(target);
+            failure.Consumed.TrySetResult();
             throw new InvalidOperationException(failure.Message);
         }
     }
@@ -67,7 +89,23 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     private void AfterWrite(JournalId journalId)
         => _completedWrites.AddOrUpdate(journalId, 1, static (_, count) => count + 1);
 
-    private sealed record InjectedFailure(int CompletedWritesBeforeFailure, string Message);
+    private void RemoveFault(NeuronId target)
+    {
+        _failures.Remove(target);
+        _faultTargets.Remove(JournalId.FromGrainId(target.ToGrainId()));
+    }
+
+    private sealed class JournalFaultState(
+        int remainingWrites,
+        string message)
+    {
+        internal TaskCompletionSource Consumed { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal string Message { get; } = message;
+
+        internal int RemainingWrites { get; set; } = remainingWrites;
+    }
 
     private sealed class RecordingJournalStorage(
         RecordingJournalStorageProvider recorder,
@@ -118,3 +156,9 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
             => inner.UpdateMetadataAsync(metadata, tagsToRemove, eTag, cancellationToken);
     }
 }
+
+internal sealed record JournalFaultRegistration(
+    NeuronId Target,
+    string Message,
+    Task Consumed,
+    object Token);
