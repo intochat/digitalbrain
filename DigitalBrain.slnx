@@ -30,6 +30,7 @@
     <Project Path="modules/DigitalBrain.Modules.Tasks.Contracts/DigitalBrain.Modules.Tasks.Contracts.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Tasks/DigitalBrain.Modules.Tasks.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
+    <Project Path="modules/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Google.Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Google/DigitalBrain.Modules.Google.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Google.Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />
@@ -48,5 +49,6 @@
     <Project Path="tests/DigitalBrain.ModuleTests/DigitalBrain.ModuleTests.csproj" />
     <Project Path="tests/DigitalBrain.HostTests/DigitalBrain.HostTests.csproj" />
     <Project Path="tests/DigitalBrain.Quickstart.Tests/DigitalBrain.Quickstart.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.Time.Tests/DigitalBrain.Time.Tests.csproj" />
   </Folder>
 </Solution>

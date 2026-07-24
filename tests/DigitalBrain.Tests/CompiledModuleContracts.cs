@@ -5,6 +5,7 @@ using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Tasks;
+using DigitalBrain.Time;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -16,6 +17,7 @@ public sealed class CompiledModuleContracts
     [
         typeof(AIModule),
         typeof(TasksModule),
+        typeof(TimeModule),
         typeof(GoogleModule),
         typeof(SalesforceModule),
     ];

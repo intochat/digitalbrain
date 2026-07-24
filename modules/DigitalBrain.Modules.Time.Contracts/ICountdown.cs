@@ -2,6 +2,7 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Time;
 
+[ClientEntryPoint]
 public partial interface ICountdown : INeuron
 {
     [Alias(nameof(Start))]

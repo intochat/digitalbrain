@@ -25,5 +25,7 @@ internal static class PackableProjects
         "DigitalBrain.Modules.Salesforce.Aspire.Hosting",
         "DigitalBrain.Modules.Tasks.Contracts",
         "DigitalBrain.Modules.Tasks",
+        "DigitalBrain.Modules.Time.Contracts",
+        "DigitalBrain.Modules.Time",
     ];
 }

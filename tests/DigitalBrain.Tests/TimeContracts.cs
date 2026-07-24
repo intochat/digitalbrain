@@ -53,6 +53,9 @@ public sealed class TimeContracts
     public void CountdownMethodsKeepTheSettledUnsuffixedSignatures()
     {
         Assert.Contains(typeof(INeuron), typeof(ICountdown).GetInterfaces());
+        Assert.NotNull(
+            typeof(ICountdown).GetCustomAttribute<ClientEntryPointAttribute>(
+                inherit: false));
         Assert.Equal(
             "DigitalBrain.Time.ICountdown",
             DeclaredAlias(typeof(ICountdown)));
@@ -225,7 +228,7 @@ public sealed class TimeContracts
     }
 
     [Fact]
-    public void TimeContractsAreOnePackableLeafAndNoRuntimeExistsYet()
+    public void TimeContractsAreOnePackableLeafBesideItsRuntime()
     {
         var projectPath = Path.Combine(
             ContractsDirectory,
@@ -280,6 +283,7 @@ public sealed class TimeContracts
                 SearchOption.AllDirectories)
             .Where(path => !IsBuildOutput(path))
             .Select(path => Path.GetRelativePath(RepositoryRoot, path))
+            .Order(StringComparer.Ordinal)
             .ToArray();
         Assert.Equal(
             [
@@ -287,6 +291,14 @@ public sealed class TimeContracts
                     "modules",
                     "DigitalBrain.Modules.Time.Contracts",
                     "DigitalBrain.Modules.Time.Contracts.csproj"),
+                Path.Combine(
+                    "modules",
+                    "DigitalBrain.Modules.Time",
+                    "DigitalBrain.Modules.Time.csproj"),
+                Path.Combine(
+                    "tests",
+                    "DigitalBrain.Time.Tests",
+                    "DigitalBrain.Time.Tests.csproj"),
             ],
             timeProjects);
 
@@ -297,6 +309,16 @@ public sealed class TimeContracts
             CountOccurrences(
                 solution,
                 "modules/DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj"));
+        Assert.Equal(
+            1,
+            CountOccurrences(
+                solution,
+                "modules/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj"));
+        Assert.Equal(
+            1,
+            CountOccurrences(
+                solution,
+                "tests/DigitalBrain.Time.Tests/DigitalBrain.Time.Tests.csproj"));
     }
 
     [Fact]

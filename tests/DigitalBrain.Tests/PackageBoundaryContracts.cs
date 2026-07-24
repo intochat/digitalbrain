@@ -192,6 +192,7 @@ public sealed class PackageBoundaryContracts
             .Append("DigitalBrain.Modules.Salesforce")
             .Append("DigitalBrain.Modules.Salesforce.Aspire.Hosting")
             .Append("DigitalBrain.Modules.Tasks")
+            .Append("DigitalBrain.Modules.Time")
             .ToHashSet(StringComparer.Ordinal);
 
         var packable = ProductionRoots
