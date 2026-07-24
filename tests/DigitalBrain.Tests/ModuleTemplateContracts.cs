@@ -6,6 +6,26 @@ namespace DigitalBrain.Tests;
 public sealed class ModuleTemplateContracts
 {
     private static readonly string RepositoryRoot = LocateRepositoryRoot();
+    private static readonly string[] QuickstartTestReferences =
+    [
+        "PackageReference:Microsoft.NET.Test.Sdk",
+        "PackageReference:xunit.runner.visualstudio",
+        "PackageReference:xunit.v3",
+        "ProjectReference:DigitalBrain.Quickstart",
+        "ProjectReference:DigitalBrain.Quickstart.Contracts",
+        "ProjectReference:DigitalBrain.Testing",
+    ];
+    private static readonly string[] QuickstartTestForbiddenVocabulary =
+    [
+        "Orleans",
+        "Aspire",
+        "IGrainFactory",
+        "GrainId",
+        "NeuronId",
+        "Simulation",
+        "Scenario",
+        "ConcurrentDictionary",
+    ];
 
     [Fact(DisplayName = "module .Contracts packages are leaves with only approved public vocabulary dependencies")]
     public void ModuleContractsPackagesAreLeaves()
@@ -131,6 +151,100 @@ public sealed class ModuleTemplateContracts
         }
     }
 
+    [Fact(DisplayName = "Quickstart tests use only the public testing surface")]
+    public void QuickstartTestsUseOnlyThePublicTestingSurface()
+    {
+        var projectDirectory = Path.Combine(
+            RepositoryRoot,
+            "tests",
+            "DigitalBrain.Quickstart.Tests");
+        var project = Path.Combine(
+            projectDirectory,
+            "DigitalBrain.Quickstart.Tests.csproj");
+        var fixture = Path.Combine(
+            projectDirectory,
+            "QuickstartFixture.cs");
+        var violations = new List<string>();
+
+        if (!File.Exists(project))
+        {
+            Assert.Fail(
+                $"{Path.GetRelativePath(RepositoryRoot, project)} does not exist.");
+        }
+
+        var document = XDocument.Load(project);
+        var references = document
+            .Descendants()
+            .Where(element =>
+                element.Name.LocalName is "PackageReference" or "ProjectReference")
+            .Select(reference =>
+                $"{reference.Name.LocalName}:{ReferenceName(reference)}")
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        if (!references.SequenceEqual(
+                QuickstartTestReferences,
+                StringComparer.Ordinal))
+        {
+            violations.Add(
+                $"{Path.GetRelativePath(RepositoryRoot, project)} directly references "
+                + $"[{string.Join(", ", references)}], expected "
+                + $"[{string.Join(", ", QuickstartTestReferences)}].");
+        }
+
+        if (!string.Equals(
+                document.Descendants("OutputType").SingleOrDefault()?.Value,
+                "Exe",
+                StringComparison.Ordinal))
+        {
+            violations.Add(
+                $"{Path.GetRelativePath(RepositoryRoot, project)} must be an executable test project.");
+        }
+
+        var inspectedFiles = Directory
+            .EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !IsBuildOutput(projectDirectory, path))
+            .Append(project);
+
+        foreach (var path in inspectedFiles)
+        {
+            var source = File.ReadAllText(path);
+            foreach (var token in QuickstartTestForbiddenVocabulary)
+            {
+                if (source.Contains(token, StringComparison.OrdinalIgnoreCase))
+                {
+                    violations.Add(
+                        $"{Path.GetRelativePath(RepositoryRoot, path)} contains forbidden token '{token}'.");
+                }
+            }
+        }
+
+        if (!File.Exists(fixture))
+        {
+            violations.Add(
+                $"{Path.GetRelativePath(RepositoryRoot, fixture)} does not exist.");
+        }
+        else
+        {
+            const string moduleSelection =
+                "brain.AddModule<QuickstartModule>()";
+            var selectionCount = CountOccurrences(
+                File.ReadAllText(fixture),
+                moduleSelection);
+            if (selectionCount != 1)
+            {
+                violations.Add(
+                    $"{Path.GetRelativePath(RepositoryRoot, fixture)} must contain exactly one "
+                    + $"{moduleSelection} selection; found {selectionCount}.");
+            }
+        }
+
+        if (violations.Count != 0)
+        {
+            Assert.Fail(string.Join(Environment.NewLine, violations));
+        }
+    }
+
     private static void ValidateQuickstartProject(
         string path,
         string[] expectedConsumerDependencies,
@@ -245,6 +359,32 @@ public sealed class ModuleTemplateContracts
             violations.Add(
                 $"{relativePath} directly versions [{string.Join(", ", directlyVersioned)}].");
         }
+    }
+
+    private static bool IsBuildOutput(string root, string path)
+        => Path.GetRelativePath(root, path)
+            .Split(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar)
+            .Any(segment =>
+                segment.Equals("bin", StringComparison.OrdinalIgnoreCase)
+                || segment.Equals("obj", StringComparison.OrdinalIgnoreCase));
+
+    private static int CountOccurrences(string source, string value)
+    {
+        var count = 0;
+        var offset = 0;
+
+        while ((offset = source.IndexOf(
+                   value,
+                   offset,
+                   StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            offset += value.Length;
+        }
+
+        return count;
     }
 
     private static bool FlowsToConsumers(XElement reference) =>
