@@ -1,18 +1,19 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.Testing;
+using DigitalBrain.Testing;
 using Xunit;
 
 namespace DigitalBrain.HostTests;
 
+[Collection(HostedApplication.CollectionName)]
 public sealed class Topology
 {
     [Fact(DisplayName = "different silo applications use different Orleans brains")]
     public async Task DifferentSiloApplicationsUseDifferentBrains()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var appHost = await DistributedApplicationTestingBuilder
-            .CreateAsync<Projects.DigitalBrain_TestingAppHost>(cancellationToken);
+        await using var appHost = await HostedApplication.CreateBuilderAsync<Projects.DigitalBrain_TestingAppHost>(
+            cancellationToken);
         var silo = Assert.IsAssignableFrom<IResourceWithEnvironment>(
             Assert.Single(appHost.Resources, resource => resource.Name == "silo"));
         var probe = Assert.IsAssignableFrom<IResourceWithEnvironment>(
@@ -32,8 +33,8 @@ public sealed class Topology
     public async Task NoResourcePublishesAnExternalEndpoint()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var appHost = await DistributedApplicationTestingBuilder
-            .CreateAsync<Projects.DigitalBrain_TestingAppHost>(cancellationToken);
+        await using var appHost = await HostedApplication.CreateBuilderAsync<Projects.DigitalBrain_TestingAppHost>(
+            cancellationToken);
 
         var external = appHost.Resources
             .SelectMany(
@@ -50,8 +51,8 @@ public sealed class Topology
     public async Task TheClusteringEndpointsAreHostAllocatedAndInternal()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var appHost = await DistributedApplicationTestingBuilder
-            .CreateAsync<Projects.DigitalBrain_TestingAppHost>(cancellationToken);
+        await using var appHost = await HostedApplication.CreateBuilderAsync<Projects.DigitalBrain_TestingAppHost>(
+            cancellationToken);
 
         var silo = Assert.Single(appHost.Resources, resource => resource.Name == "silo");
         var clustering = silo.Annotations

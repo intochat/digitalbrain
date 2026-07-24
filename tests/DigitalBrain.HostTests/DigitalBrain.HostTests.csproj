@@ -12,5 +12,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\hosts\DigitalBrain.AppHost\DigitalBrain.AppHost.csproj" />
     <ProjectReference Include="..\..\hosts\DigitalBrain.TestingAppHost\DigitalBrain.TestingAppHost.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
   </ItemGroup>
 </Project>

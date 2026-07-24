@@ -1,10 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>The DigitalBrain simulation machine: fire synapses into a real in-process cluster and expect synapses on the timeline. Development-only.</Description>
+    <Description>The DigitalBrain simulation and hosted-test machine (L1 Scenario + exclusive L2 Aspire HostedScenario). Development-only — includes Aspire.Hosting.Testing for L2 entry points.</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Testing" />
     <PackageReference Include="Microsoft.Orleans.TestingHost" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
     <PackageReference Include="Reqnroll" />
