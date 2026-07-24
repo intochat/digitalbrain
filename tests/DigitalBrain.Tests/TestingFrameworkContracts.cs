@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.Testing;
 using Xunit;
 
@@ -43,5 +44,50 @@ public sealed class TestingFrameworkContracts
         Assert.NotNull(scenario.Grains);
         Assert.NotNull(scenario.Clock);
         Assert.IsType<ScenarioClock>(scenario.Clock);
+        Assert.NotSame(TimeProvider.System, scenario.Clock);
+    }
+
+    [Fact(DisplayName = "Scenario.Clock starts at a recorded instant and stays put until AdvanceClock")]
+    public async Task ClockStartsAtRecordedInstant()
+    {
+        await using var scenario = await Simulations.OpenAsync(TestContext.Current.CancellationToken);
+
+        var first = scenario.Clock.GetUtcNow();
+        var second = scenario.Clock.GetUtcNow();
+
+        Assert.Equal(first, second);
+        Assert.NotEqual(default, first);
+    }
+
+    [Fact(DisplayName = "Scenario.AdvanceClock moves GetUtcNow by the requested delta without wall-clock sleep")]
+    public async Task AdvanceClockMovesGetUtcNow()
+    {
+        await using var scenario = await Simulations.OpenAsync(TestContext.Current.CancellationToken);
+
+        var before = scenario.Clock.GetUtcNow();
+        scenario.AdvanceClock(TimeSpan.FromMinutes(5));
+
+        Assert.Equal(before + TimeSpan.FromMinutes(5), scenario.Clock.GetUtcNow());
+    }
+
+    [Fact(DisplayName = "host ScenarioClock is registered in silo DI so neuron journal stamps follow AdvanceClock")]
+    public async Task AdvanceClockStampsNeuronJournalDeliveries()
+    {
+        await using var scenario = await Simulations.OpenAsync(TestContext.Current.CancellationToken);
+
+        var before = scenario.Clock.GetUtcNow();
+        scenario.AdvanceClock(TimeSpan.FromHours(3));
+        var expected = before + TimeSpan.FromHours(3);
+
+        var sessionId = new NeuronId(ISessionNeuron.GrainTypeName, scenario.Owner, "session");
+        var peerId = new NeuronId(ISessionNeuron.GrainTypeName, scenario.Owner, "peer");
+        var session = scenario.Grains.GetGrain<ISessionNeuron>(sessionId.ToGrainId());
+
+        await session.FireAsync(peerId, new CapabilityRequested("IProbe", "Ping", peerId));
+
+        var journal = await session.ReadNeuronJournalAsync(sessionId, JournalKind.Outgoing, afterSequence: 0);
+        var stamped = Assert.Single(journal.Delta);
+
+        Assert.Equal(expected, stamped.Timestamp);
     }
 }

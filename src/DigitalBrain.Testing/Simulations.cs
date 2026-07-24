@@ -10,7 +10,7 @@ public static class Simulations
 
         return new Scenario(
             owner: new OwnerId(Guid.NewGuid().ToString("N")),
-            clock: new ScenarioClock(),
+            clock: SimulationClusterHost.Clock,
             grains: SimulationClusterHost.Grains);
     }
 }

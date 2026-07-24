@@ -20,10 +20,15 @@ internal static class SimulationClusterHost
     private static InProcessTestCluster? _cluster;
     private static SynapseObserver? _observer;
     private static RecordingJournalStorageProvider? _journalStorage;
+    private static ScenarioClock? _clock;
 
     private static bool IsDeployed => _cluster is not null;
 
     public static IGrainFactory Grains => Deployed().Client;
+
+    public static ScenarioClock Clock => _clock
+        ?? throw new InvalidOperationException(
+            $"The simulation cluster is not running. Call {nameof(SimulationCluster)}.{nameof(SimulationCluster.StartAsync)} before a scenario runs.");
 
     public static SynapseObserver Observed => _observer
         ?? throw new InvalidOperationException(
@@ -59,6 +64,7 @@ internal static class SimulationClusterHost
             var journalStorage = new RecordingJournalStorageProvider(
                 new VolatileJournalStorageProvider());
             var reminderTable = new VolatileReminderTable();
+            var clock = new ScenarioClock();
             var builder = new InProcessTestClusterBuilder(SiloCount);
             var handlerAssemblies = AppDomain.CurrentDomain.GetAssemblies()
                 .Where(assembly => SynapseWiring.TryGetManifest(assembly, out _))
@@ -85,6 +91,7 @@ internal static class SimulationClusterHost
                     reminders.RefreshReminderListPeriod = TimeSpan.FromMilliseconds(50);
                 });
                 silo.Services.AddSingleton<IJournalStorageProvider>(journalStorage);
+                silo.Services.AddSingleton<TimeProvider>(clock);
             });
             builder.ConfigureClient(client =>
             {
@@ -96,6 +103,7 @@ internal static class SimulationClusterHost
 
             _observer = new SynapseObserver();
             _journalStorage = journalStorage;
+            _clock = clock;
             _cluster = cluster;
         }
         finally
@@ -135,6 +143,7 @@ internal static class SimulationClusterHost
             await _cluster.DisposeAsync();
             _cluster = null;
             _journalStorage = null;
+            _clock = null;
         }
         finally
         {

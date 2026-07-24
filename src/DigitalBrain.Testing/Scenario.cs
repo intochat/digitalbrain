@@ -6,7 +6,7 @@ public sealed class Scenario : IAsyncDisposable
 {
     private int _disposed;
 
-    internal Scenario(OwnerId owner, TimeProvider clock, IGrainFactory grains)
+    internal Scenario(OwnerId owner, ScenarioClock clock, IGrainFactory grains)
     {
         Owner = owner;
         Clock = clock;
@@ -18,6 +18,9 @@ public sealed class Scenario : IAsyncDisposable
     public TimeProvider Clock { get; }
 
     public IGrainFactory Grains { get; }
+
+    public void AdvanceClock(TimeSpan delta)
+        => ((ScenarioClock)Clock).Advance(delta);
 
     public ValueTask DisposeAsync()
     {
