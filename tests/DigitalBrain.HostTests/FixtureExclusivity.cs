@@ -8,6 +8,34 @@ public sealed class FixtureExclusivity(
     ProductionAppHostFixture production)
 {
     [Fact]
+    public async Task ASecondGraphWaitsForTheFirstWithinTheSameFixture()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var first = await testing.StartAsync(cancellationToken);
+        Task<RunningAppHost>? waiting = null;
+        RunningAppHost? second = null;
+
+        try
+        {
+            waiting = testing.StartAsync(cancellationToken);
+            Assert.False(waiting.IsCompleted);
+            await first.DisposeAsync();
+
+            second = await waiting;
+            Assert.NotNull(second);
+        }
+        finally
+        {
+            await first.DisposeAsync();
+            if (waiting is not null)
+            {
+                second ??= await waiting;
+                await second.DisposeAsync();
+            }
+        }
+    }
+
+    [Fact]
     public async Task ASecondGraphWaitsForTheFirstAcrossFixtureTypes()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

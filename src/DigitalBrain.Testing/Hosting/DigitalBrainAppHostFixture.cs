@@ -12,7 +12,7 @@ public abstract class DigitalBrainAppHostFixture<TAppHost> : IAsyncLifetime
     private readonly object _sync = new();
     private RunningAppHost? _active;
     private bool _disposed;
-    private bool _starting;
+    private int _pendingStarts;
 
     public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
@@ -22,13 +22,7 @@ public abstract class DigitalBrainAppHostFixture<TAppHost> : IAsyncLifetime
         lock (_sync)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            if (_starting || _active is not null)
-            {
-                throw new InvalidOperationException(
-                    "This AppHost fixture already owns an active graph handle.");
-            }
-
-            _starting = true;
+            _pendingStarts = checked(_pendingStarts + 1);
         }
 
         return StartCoreAsync(cancellationToken);
@@ -39,11 +33,11 @@ public abstract class DigitalBrainAppHostFixture<TAppHost> : IAsyncLifetime
         lock (_sync)
         {
             _disposed = true;
-            if (_starting || _active is not null)
+            if (_pendingStarts != 0 || _active is not null)
             {
                 return ValueTask.FromException(
                     new InvalidOperationException(
-                        "The AppHost fixture was disposed with an active graph handle."));
+                        "The AppHost fixture was disposed with a pending start or active graph handle."));
             }
         }
 
@@ -113,7 +107,7 @@ public abstract class DigitalBrainAppHostFixture<TAppHost> : IAsyncLifetime
                 }
             }
 
-            ClearStartClaim();
+            ClearPendingStart();
             throw;
         }
     }
@@ -123,16 +117,31 @@ public abstract class DigitalBrainAppHostFixture<TAppHost> : IAsyncLifetime
         lock (_sync)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            _starting = false;
+            if (_pendingStarts <= 0)
+            {
+                throw new InvalidOperationException(
+                    "The AppHost fixture has no pending start to register.");
+            }
+
+            if (_active is not null)
+            {
+                throw new InvalidOperationException(
+                    "The AppHost fixture already owns an active graph handle.");
+            }
+
+            _pendingStarts--;
             _active = running;
         }
     }
 
-    private void ClearStartClaim()
+    private void ClearPendingStart()
     {
         lock (_sync)
         {
-            _starting = false;
+            if (_pendingStarts > 0)
+            {
+                _pendingStarts--;
+            }
         }
     }
 
