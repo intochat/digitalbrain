@@ -13,6 +13,7 @@ public sealed class BrainService
 {
     private readonly List<Type> _modules = [];
     private readonly List<BrainModuleReference> _moduleReferences = [];
+    private readonly List<IResource> _startupDependencies = [];
     private IResourceBuilder<AzureBlobStorageResource>? _journal;
     private IResourceBuilder<ParameterResource>? _stateProtectionKey;
     private string? _storageProfile;
@@ -35,6 +36,8 @@ public sealed class BrainService
     internal IReadOnlyList<BrainModuleReference> ModuleReferences => _moduleReferences;
 
     internal IResourceBuilder<AzureBlobStorageResource>? Journal => _journal;
+
+    internal IReadOnlyList<IResource> StartupDependencies => _startupDependencies;
 
     internal IResourceBuilder<ParameterResource>? StateProtectionKey => _stateProtectionKey;
 
@@ -66,6 +69,16 @@ public sealed class BrainService
     }
 
     internal void SetJournal(IResourceBuilder<AzureBlobStorageResource> journal) => _journal = journal;
+
+    internal void RequireHealthyBeforeStart(IResource dependency)
+    {
+        ArgumentNullException.ThrowIfNull(dependency);
+
+        if (!_startupDependencies.Contains(dependency))
+        {
+            _startupDependencies.Add(dependency);
+        }
+    }
 
     internal void RequireStateProtection()
     {
@@ -174,6 +187,10 @@ public static class BrainHostingExtensions
         var journal = storage.AddBlobs($"{brain.Name}-journal");
 
         brain.SetJournal(journal);
+        brain.RequireHealthyBeforeStart(storage.Resource);
+        brain.RequireHealthyBeforeStart(clustering.Resource);
+        brain.RequireHealthyBeforeStart(reminders.Resource);
+        brain.RequireHealthyBeforeStart(journal.Resource);
         brain.Orleans
             .WithClustering(clustering)
             .WithReminders(reminders);
@@ -225,12 +242,15 @@ public static class BrainHostingExtensions
 
         if (brain.Journal is not null)
         {
-            builder
-                .WithReference(brain.Journal, "journal")
-                .WithAnnotation(new WaitAnnotation(
-                    brain.Journal.Resource,
-                    WaitType.WaitUntilHealthy,
-                    exitCode: 0));
+            builder.WithReference(brain.Journal, "journal");
+        }
+
+        foreach (var dependency in brain.StartupDependencies)
+        {
+            builder.WithAnnotation(new WaitAnnotation(
+                dependency,
+                WaitType.WaitUntilHealthy,
+                exitCode: 0));
         }
 
         if (brain.StateProtectionKey is not null)

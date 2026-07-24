@@ -98,9 +98,22 @@ public sealed class IntegrationHostingContracts
 
         Assert.Same(protectionKey, siloEnvironment["DigitalBrain__Security__StateProtectionKey"]);
         Assert.Contains("ConnectionStrings__journal", siloEnvironment.Keys);
+        var waits = silo.Resource.Annotations.OfType<WaitAnnotation>().ToList();
+        Assert.Contains(waits, annotation => ReferenceEquals(annotation.Resource, journal));
         Assert.Contains(
-            silo.Resource.Annotations.OfType<WaitAnnotation>(),
-            annotation => ReferenceEquals(annotation.Resource, journal));
+            waits,
+            annotation => annotation.Resource is AzureTableStorageResource table
+                && table.Name == "brain-clustering"
+                && annotation.WaitType == WaitType.WaitUntilHealthy);
+        Assert.Contains(
+            waits,
+            annotation => annotation.Resource is AzureTableStorageResource table
+                && table.Name == "brain-reminders"
+                && annotation.WaitType == WaitType.WaitUntilHealthy);
+        Assert.Contains(
+            waits,
+            annotation => ReferenceEquals(annotation.Resource, storage.Resource)
+                && annotation.WaitType == WaitType.WaitUntilHealthy);
         Assert.DoesNotContain("DigitalBrain__Security__StateProtectionKey", clientEnvironment.Keys);
         Assert.DoesNotContain("ConnectionStrings__journal", clientEnvironment.Keys);
     }

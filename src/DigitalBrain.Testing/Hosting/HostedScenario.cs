@@ -61,7 +61,8 @@ public sealed class HostedScenario : IAsyncDisposable
                     "CreateHttpClient failed",
                     resourceName,
                     endpointName,
-                    endpointDisplay),
+                    endpointDisplay,
+                    resourceState: TryDescribeResourceState(resourceName)),
                 ex);
         }
     }
@@ -88,11 +89,16 @@ public sealed class HostedScenario : IAsyncDisposable
                     $"Resource did not become healthy within {_startupTimeout}",
                     resourceName,
                     endpointName: null,
-                    endpointDisplay: TryDescribeEndpoint(resourceName)),
+                    endpointDisplay: TryDescribeEndpoint(resourceName),
+                    resourceState: TryDescribeResourceState(resourceName)),
                 ex);
         }
     }
 
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "HTTP readiness polls until the deadline; transport and client-timeout failures are retained as lastFailure.")]
     public async Task WaitHttpReadyAsync(
         string resourceName,
         string path = "/health",
@@ -125,13 +131,12 @@ public sealed class HostedScenario : IAsyncDisposable
                 lastFailure = new InvalidOperationException(
                     $"HTTP {(int)response.StatusCode} from {resourceName}{path} at {endpoint}.");
             }
-            catch (Exception ex) when (ex is not OperationCanceledException || cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-
+                throw;
+            }
+            catch (Exception ex)
+            {
                 lastFailure = ex;
             }
 
@@ -143,7 +148,8 @@ public sealed class HostedScenario : IAsyncDisposable
                 $"HTTP path '{path}' did not become ready within {_startupTimeout}",
                 resourceName,
                 endpointName: null,
-                endpointDisplay: endpoint),
+                endpointDisplay: endpoint,
+                resourceState: TryDescribeResourceState(resourceName)),
             lastFailure);
     }
 
@@ -170,7 +176,8 @@ public sealed class HostedScenario : IAsyncDisposable
                     "resource-restart failed",
                     resourceName,
                     endpointName: null,
-                    endpointDisplay: null),
+                    endpointDisplay: null,
+                    resourceState: TryDescribeResourceState(resourceName)),
                 ex);
         }
     }
@@ -244,11 +251,52 @@ public sealed class HostedScenario : IAsyncDisposable
         }
     }
 
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Resource state is best-effort diagnostics attached to readiness failures.")]
+    private string TryDescribeResourceState(string resourceName)
+    {
+        try
+        {
+            if (!_application.ResourceNotifications.TryGetCurrentState(resourceName, out var resourceEvent)
+                || resourceEvent is null)
+            {
+                return "state unavailable";
+            }
+
+            var snapshot = resourceEvent.Snapshot;
+            var text = new StringBuilder(capacity: 128);
+            text.Append("state=").Append(snapshot.State?.Text ?? "(null)");
+            if (!string.IsNullOrWhiteSpace(snapshot.State?.Style))
+            {
+                text.Append(" style=").Append(snapshot.State.Style);
+            }
+
+            if (snapshot.ExitCode is not null)
+            {
+                text.Append(" exitCode=").Append(snapshot.ExitCode.Value.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (!string.IsNullOrWhiteSpace(snapshot.HealthStatus?.ToString()))
+            {
+                text.Append(" health=").Append(snapshot.HealthStatus);
+            }
+
+            return text.ToString();
+        }
+        catch (Exception stateError)
+        {
+            return $"state error ({stateError.GetType().Name}: {stateError.Message})";
+        }
+    }
+
     private static string FormatReadiness(
         string action,
         string resourceName,
         string? endpointName,
-        string? endpointDisplay)
+        string? endpointDisplay,
+        string? resourceState = null)
     {
         var text = new StringBuilder(action, capacity: 256);
         text.Append(" for resource '").Append(resourceName).Append('\'');
@@ -260,6 +308,11 @@ public sealed class HostedScenario : IAsyncDisposable
         if (!string.IsNullOrWhiteSpace(endpointDisplay))
         {
             text.Append(" at ").Append(endpointDisplay);
+        }
+
+        if (!string.IsNullOrWhiteSpace(resourceState))
+        {
+            text.Append(" (").Append(resourceState).Append(')');
         }
 
         text.Append('.');
