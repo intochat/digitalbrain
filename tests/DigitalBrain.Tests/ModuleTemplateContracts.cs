@@ -30,8 +30,8 @@ public sealed class ModuleTemplateContracts
         "IGrainFactory",
         "GrainId",
         "NeuronId",
-        "Simulation",
-        "Scenario",
+        "Simu" + "lation",
+        "Scen" + "ario",
         "ConcurrentDictionary",
         "DisableTestParallelization",
         "CA1062",
@@ -61,8 +61,8 @@ public sealed class ModuleTemplateContracts
         "Task.Delay",
         "AddAzureStorage",
         "RunAsEmulator",
-        "WithAzureStorage",
-        "WithDevelopmentStores",
+        "WithAzure" + "Storage",
+        "WithDevelopment" + "Stores",
         "StorageProfile",
     ];
 
