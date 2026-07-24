@@ -364,7 +364,7 @@ internal sealed class AppHostTestDiagnostics
             resource.Health = health is null ? null : Sanitize(health);
             resource.Timestamp = timestamp;
             resource.ExitCode = exitCode;
-            resource.EmittedRuntimeState |= resource.State is not null
+            var isRuntimeState = resource.State is not null
                 && !string.Equals(
                     resource.State,
                     KnownResourceStates.NotStarted,
@@ -377,6 +377,9 @@ internal sealed class AppHostTestDiagnostics
                     resource.ResourceType,
                     nameof(ParameterResource),
                     StringComparison.Ordinal);
+            var isTerminalState = resource.State is not null
+                && TerminalStates.Contains(resource.State);
+            resource.EmittedRuntimeState |= isRuntimeState;
             resource.Urls = Array.AsReadOnly(
                 urls
                     .Select(SanitizeUrl)
@@ -391,10 +394,18 @@ internal sealed class AppHostTestDiagnostics
                 resource.Health,
                 timestamp));
 
-            if (resource.State is not null
-                && TerminalStates.Contains(resource.State))
+            if (isTerminalState)
             {
+                resource.TerminalObserved = true;
                 resource.Terminal?.TrySetResult();
+            }
+            else if (isRuntimeState)
+            {
+                resource.TerminalObserved = false;
+                if (resource.Terminal?.Task.IsCompleted == true)
+                {
+                    resource.Terminal = null;
+                }
             }
         }
     }
@@ -493,8 +504,7 @@ internal sealed class AppHostTestDiagnostics
                 var resource = GetOrAddResourceLocked(
                     resourceId,
                     "unknown");
-                if (resource.State is not null
-                    && TerminalStates.Contains(resource.State))
+                if (resource.TerminalObserved)
                 {
                     return Task.CompletedTask;
                 }
@@ -717,6 +727,8 @@ internal sealed class AppHostTestDiagnostics
         internal string? State { get; set; }
 
         internal TaskCompletionSource? Terminal { get; set; }
+
+        internal bool TerminalObserved { get; set; }
 
         internal DateTimeOffset? Timestamp { get; set; }
 

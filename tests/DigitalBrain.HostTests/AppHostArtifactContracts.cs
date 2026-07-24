@@ -215,6 +215,89 @@ public sealed class AppHostArtifactContracts(TestingAppHostFixture fixture)
     }
 
     [Fact]
+    public async Task TerminalObservationRemainsTrueAfterALaterNullState()
+    {
+        var diagnostics = new AppHostTestDiagnostics(
+            [("runtime-resource", "ContainerResource")]);
+        var terminalState = KnownResourceStates.TerminalStates[0];
+
+        diagnostics.RecordNotification(
+            "runtime-resource",
+            "ContainerResource",
+            KnownResourceStates.Running,
+            health: null,
+            DateTimeOffset.UtcNow,
+            exitCode: null,
+            urls: []);
+        diagnostics.RecordNotification(
+            "runtime-resource",
+            "ContainerResource",
+            terminalState,
+            health: null,
+            DateTimeOffset.UtcNow,
+            exitCode: 0,
+            urls: []);
+        diagnostics.RecordNotification(
+            "runtime-resource",
+            "ContainerResource",
+            state: null,
+            health: null,
+            DateTimeOffset.UtcNow,
+            exitCode: null,
+            urls: []);
+
+        var terminalWait = diagnostics.WaitForTerminalAsync(
+            "runtime-resource",
+            CancellationToken.None);
+
+        Assert.True(terminalWait.IsCompletedSuccessfully);
+        await terminalWait;
+    }
+
+    [Fact]
+    public async Task LaterRunningNotificationStartsANewTerminalLifecycle()
+    {
+        var diagnostics = new AppHostTestDiagnostics(
+            [("runtime-resource", "ContainerResource")]);
+        var terminalState = KnownResourceStates.TerminalStates[0];
+
+        diagnostics.RecordNotification(
+            "runtime-resource",
+            "ContainerResource",
+            terminalState,
+            health: null,
+            DateTimeOffset.UtcNow,
+            exitCode: 0,
+            urls: []);
+        diagnostics.RecordNotification(
+            "runtime-resource",
+            "ContainerResource",
+            KnownResourceStates.Running,
+            health: null,
+            DateTimeOffset.UtcNow,
+            exitCode: null,
+            urls: []);
+
+        var terminalWait = diagnostics.WaitForTerminalAsync(
+            "runtime-resource",
+            CancellationToken.None);
+
+        Assert.False(terminalWait.IsCompleted);
+
+        diagnostics.RecordNotification(
+            "runtime-resource",
+            "ContainerResource",
+            terminalState,
+            health: null,
+            DateTimeOffset.UtcNow,
+            exitCode: 0,
+            urls: []);
+
+        await terminalWait;
+        Assert.True(terminalWait.IsCompletedSuccessfully);
+    }
+
+    [Fact]
     public void NotStartedNotificationIsRecordedButNotAwaited()
     {
         var diagnostics = new AppHostTestDiagnostics(
