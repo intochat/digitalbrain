@@ -120,9 +120,9 @@ public abstract class BrainModuleReference
 [EditorBrowsable(EditorBrowsableState.Never)]
 public static class BrainModuleHosting
 {
-    private static readonly ConditionalWeakTable<IModule, BrainService> Brains = new();
+    private static readonly ConditionalWeakTable<object, BrainService> Brains = new();
 
-    public static BrainService BrainOf(IModule module)
+    public static BrainService BrainOf(object module)
     {
         ArgumentNullException.ThrowIfNull(module);
 
@@ -146,9 +146,9 @@ public static class BrainModuleHosting
         brain.RequireStateProtection();
     }
 
-    internal static void Bind(IModule module, BrainService brain) => Brains.Add(module, brain);
+    internal static void Bind(object module, BrainService brain) => Brains.Add(module, brain);
 
-    internal static void Unbind(IModule module) => Brains.Remove(module);
+    internal static void Unbind(object module) => Brains.Remove(module);
 }
 
 public static class BrainHostingExtensions

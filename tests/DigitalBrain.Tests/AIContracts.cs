@@ -3,6 +3,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
+using DigitalBrain.Kernel;
 using DigitalBrain.Security;
 using DigitalBrain.Tasks;
 using Microsoft.Agents.AI.Workflows.Checkpointing;
@@ -211,7 +212,7 @@ public sealed class AIContracts
     public void ModuleRegistersTypedChatClients()
     {
         var builder = Host.CreateApplicationBuilder();
-        builder.UseOrleans(AIModule.Configure);
+        builder.UseOrleans(silo => ((ICompiledModule)new AIModule()).Activate(silo));
 
         using var host = builder.Build();
         var llama = host.Services.GetRequiredKeyedService<IChatClient>(typeof(Llama32));
@@ -227,7 +228,7 @@ public sealed class AIContracts
         var builder = Host.CreateApplicationBuilder();
         builder.Configuration[DurablePayloadProtector.ConfigurationKey] =
             Convert.ToBase64String(new byte[32]);
-        builder.UseOrleans(AIModule.Configure);
+        builder.UseOrleans(silo => ((ICompiledModule)new AIModule()).Activate(silo));
 
         using var host = builder.Build();
 

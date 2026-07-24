@@ -52,7 +52,7 @@ public sealed class ClientGetLlmContracts
             silo.Configuration[DurablePayloadProtector.ConfigurationKey] =
                 Convert.ToBase64String(new byte[32]);
             silo.AddDigitalBrain("client-get-llm");
-            AIModule.Configure(silo);
+            ((ICompiledModule)new AIModule()).Activate(silo);
             silo.UseInMemoryReminderService();
             silo.Services.AddSingleton<IJournalStorageProvider>(new VolatileJournalStorageProvider());
             silo.Services.AddKeyedSingleton<IChatClient>(typeof(Llama32), chatClient);

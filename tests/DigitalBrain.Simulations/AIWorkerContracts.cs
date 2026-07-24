@@ -2521,7 +2521,7 @@ public sealed class AIWorkerContracts
             silo.Configuration[DurablePayloadProtector.ConfigurationKey] =
                 Convert.ToBase64String(new byte[32]);
             silo.AddDigitalBrain("ai-worker-contracts");
-            AIModule.Configure(silo);
+            ((ICompiledModule)new AIModule()).Activate(silo);
             silo.UseInMemoryReminderService();
             silo.Services.AddSingleton(probes);
             silo.Services.AddSingleton<IJournalStorageProvider>(

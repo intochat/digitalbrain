@@ -1,6 +1,5 @@
 namespace DigitalBrain.Abstractions;
 
-[Alias("db.session")]
 [ClientEntryPoint]
 public partial interface ISessionNeuron : INeuron
 {

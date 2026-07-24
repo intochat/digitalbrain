@@ -10,7 +10,7 @@ namespace DigitalBrain.Tests;
 
 public sealed class ModuleActivationContracts
 {
-    [Fact(DisplayName = "an available module contributes wire codecs without activating runtime services")]
+    [Fact(DisplayName = "an available module contributes nothing until its capsule is selected")]
     public void AvailableModuleIsNotAutomaticallySelected()
     {
         var builder = Host.CreateApplicationBuilder();
@@ -20,17 +20,9 @@ public sealed class ModuleActivationContracts
         Assert.DoesNotContain(builder.Services, IsChatClient);
 
         using var host = builder.Build();
-        var message = new ChatMessage(ChatRole.User, "wire contract");
-        var response = new ChatResponse(new ChatMessage(ChatRole.Assistant, "wire response"));
-        var messageSerializer = host.Services.GetRequiredService<Serializer<ChatMessage>>();
-        var responseSerializer = host.Services.GetRequiredService<Serializer<ChatResponse>>();
-
-        Assert.Equal(
-            message.Text,
-            messageSerializer.Deserialize(messageSerializer.SerializeToArray(message)).Text);
-        Assert.Equal(
-            response.Text,
-            responseSerializer.Deserialize(responseSerializer.SerializeToArray(response)).Text);
+        var serializer = host.Services.GetRequiredService<Serializer<ChatMessage>>();
+        Assert.Throws<CodecNotFoundException>(
+            () => serializer.SerializeToArray(new ChatMessage(ChatRole.User, "wire contract")));
     }
 
     [Fact(DisplayName = "AppHost selection activates the generated silo module")]
@@ -42,6 +34,14 @@ public sealed class ModuleActivationContracts
         builder.UseOrleans(silo => silo.AddDigitalBrain());
 
         Assert.Contains(builder.Services, IsChatClient);
+
+        using var host = builder.Build();
+        var message = new ChatMessage(ChatRole.User, "wire contract");
+        var serializer = host.Services.GetRequiredService<Serializer<ChatMessage>>();
+
+        Assert.Equal(
+            message.Text,
+            serializer.Deserialize(serializer.SerializeToArray(message)).Text);
     }
 
     [Fact(DisplayName = "the silo rejects an AppHost module absent from its generated catalog")]

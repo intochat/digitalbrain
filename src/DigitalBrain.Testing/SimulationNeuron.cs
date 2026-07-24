@@ -3,7 +3,6 @@ using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Testing;
 
-[Alias("db.testing.simulation")]
 [ClientEntryPoint]
 public partial interface ISimulationNeuron : INeuron
 {

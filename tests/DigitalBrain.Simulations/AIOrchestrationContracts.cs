@@ -753,7 +753,7 @@ public sealed class AIOrchestrationContracts
             silo.Configuration[DurablePayloadProtector.ConfigurationKey] =
                 Convert.ToBase64String(new byte[32]);
             silo.AddDigitalBrain("ai-orchestration-contracts");
-            AIModule.Configure(silo);
+            ((ICompiledModule)new AIModule()).Activate(silo);
             silo.UseInMemoryReminderService();
             silo.Services.AddSingleton(journals ?? new VolatileJournalStorageProvider());
             silo.Services.AddKeyedSingleton<IChatClient>(typeof(Llama32), llama);

@@ -2,7 +2,6 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Salesforce;
 
-[Alias("db.salesforce")]
 public partial interface ISalesforce : INeuron
 {
     [Alias(nameof(ProposeAccountDescription))]

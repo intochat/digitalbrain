@@ -94,8 +94,9 @@ public sealed class SerializationContracts
             [nameof(JournalRead)] = "db.journal-read",
             [nameof(JournalSnapshot)] = "db.journal-snapshot",
             [nameof(JournalTally)] = "db.journal-tally",
-            [nameof(INeuron)] = "db.neuron",
-            [nameof(ISessionNeuron)] = "db.session",
+            [nameof(ModuleId)] = "db.module-id",
+            [nameof(INeuron)] = "DigitalBrain.Abstractions.INeuron",
+            [nameof(ISessionNeuron)] = "DigitalBrain.Abstractions.ISessionNeuron",
             [nameof(NeuronAuthorizationException)] = "db.authorization-error",
             [nameof(ISubscriptionRegistry)] = "db.subscription-registry",
             [nameof(IJournalObserver)] = "db.journal-observer",
@@ -174,8 +175,8 @@ public sealed class SerializationContracts
     {
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            [nameof(ITask)] = "tasks.task",
-            [nameof(IWorker)] = "tasks.worker",
+            [nameof(ITask)] = "DigitalBrain.Tasks.ITask",
+            [nameof(IWorker)] = "DigitalBrain.Tasks.IWorker",
             [nameof(TaskPolicy)] = "tasks.policy",
             [nameof(StartTask)] = "tasks.start",
             [nameof(CancelTask)] = "tasks.cancel",

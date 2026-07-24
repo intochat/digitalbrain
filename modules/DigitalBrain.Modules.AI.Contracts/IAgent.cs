@@ -3,7 +3,6 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI;
 
-[Alias("ai.agent")]
 public partial interface IAgent : INeuron
 {
     [Alias(nameof(Respond))]

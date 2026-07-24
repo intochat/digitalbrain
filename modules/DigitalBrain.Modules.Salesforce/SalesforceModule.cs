@@ -1,17 +1,14 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Integrations.Mcp;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Hosting;
 
 namespace DigitalBrain.Salesforce;
 
-public sealed class SalesforceModule : IModule
+public sealed partial class SalesforceModule : IModule
 {
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void Configure(ISiloBuilder builder)
+    static partial void ConfigureRuntime(ISiloBuilder builder)
     {
-        ArgumentNullException.ThrowIfNull(builder);
-
         McpRuntimeHosting.Configure(builder.Services, builder.Configuration);
         builder.Services.AddSingleton(SalesforceRuntimeOptions.Default);
     }

@@ -2,7 +2,6 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Tasks;
 
-[Alias("tasks.task")]
 public partial interface ITask : INeuron
 {
     [Alias(nameof(Start))]

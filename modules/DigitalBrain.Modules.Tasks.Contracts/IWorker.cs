@@ -2,7 +2,6 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Tasks;
 
-[Alias("tasks.worker")]
 public partial interface IWorker : INeuron
 {
     [Alias(nameof(Accept))]

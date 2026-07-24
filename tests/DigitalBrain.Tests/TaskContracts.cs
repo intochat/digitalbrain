@@ -39,7 +39,9 @@ public sealed class TaskContracts
             .SelectMany(type => type.GetMembers().Select(member => $"{type.FullName} {member}"))
             .ToArray();
 
-        Assert.Equal(["DigitalBrain.Abstractions"], projectReferences);
+        Assert.Equal(
+            ["DigitalBrain.Abstractions", "DigitalBrain.SourceGeneration"],
+            projectReferences);
         Assert.Empty(project.Descendants("PackageReference"));
         Assert.DoesNotContain(
             Contracts.GetReferencedAssemblies(),

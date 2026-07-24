@@ -1179,8 +1179,8 @@ public sealed class AccountEnrichmentCompositionContracts
             silo.Configuration[DurablePayloadProtector.ConfigurationKey] =
                 Convert.ToBase64String(Enumerable.Range(0, 32).Select(value => (byte)value).ToArray());
             silo.AddDigitalBrain("account-enrichment");
-            GoogleModule.Configure(silo);
-            SalesforceModule.Configure(silo);
+            ((ICompiledModule)new GoogleModule()).Activate(silo);
+            ((ICompiledModule)new SalesforceModule()).Activate(silo);
             if (reconciliationTimeout is { } timeout)
             {
                 silo.Services.AddSingleton(new SalesforceRuntimeOptions(timeout));

@@ -1,6 +1,5 @@
 namespace DigitalBrain.Abstractions;
 
-[Alias("db.neuron")]
 public partial interface INeuron : IGrainWithStringKey
 {
     [Alias(nameof(Deliver))]
