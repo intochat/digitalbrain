@@ -66,6 +66,21 @@ test('navigation and sidebar reach every page', () => {
   }
 })
 
+test('the site is configured for the digitalbrain.tech GitHub Pages apex', () => {
+  const config = read('docs', '.vitepress', 'config.mts')
+  const cname = read('docs', 'public', 'CNAME').trim()
+  const pagesWorkflow = read('.github', 'workflows', 'docs-pages.yml')
+
+  assert.match(config, /base:\s*['"]\/['"]/)
+  assert.match(config, /hostname:\s*['"]https:\/\/digitalbrain\.tech['"]/)
+  assert.equal(cname, 'digitalbrain.tech')
+  assert.match(pagesWorkflow, /npm test/)
+  assert.match(pagesWorkflow, /npm run build/)
+  assert.match(pagesWorkflow, /actions\/upload-pages-artifact@v5/)
+  assert.match(pagesWorkflow, /actions\/deploy-pages@v5/)
+  assert.match(pagesWorkflow, /path:\s*docs\/\.vitepress\/dist/)
+})
+
 test('the homepage tells the neurons, synapses, and simulations story', () => {
   const homepage = read('docs', 'index.md')
 
@@ -194,6 +209,9 @@ test('the contributing guide states the gate and the non-negotiable rules', () =
   assert.match(contributing, /Tier 0/)
   assert.match(contributing, /Tier 1/)
   assert.match(contributing, /Tier 2/)
+  assert.match(contributing, /digitalbrain\.tech/)
+  assert.match(contributing, /docs-pages\.yml/)
+  assert.match(contributing, /GitHub Actions/)
 })
 
 test('the open debts are disclosed rather than buried', () => {
