@@ -257,8 +257,6 @@ internal sealed class McpEdgeScript : HttpMessageHandler
 
     internal bool FailUpdate { get; set; }
 
-    internal string? ReconciliationDescription { get; set; }
-
     internal IReadOnlyList<McpToolCall> Calls
     {
         get
@@ -276,7 +274,6 @@ internal sealed class McpEdgeScript : HttpMessageHandler
         {
             _calls.Clear();
             FailUpdate = false;
-            ReconciliationDescription = null;
         }
     }
 
@@ -357,18 +354,6 @@ internal sealed class McpEdgeScript : HttpMessageHandler
             }),
             "updateSobjectRecord" => JsonSerializer.SerializeToElement(
                 new { success = true }),
-            "soqlQuery" when ReconciliationDescription is { } description =>
-                JsonSerializer.SerializeToElement(new
-                {
-                    records = new[]
-                    {
-                        new
-                        {
-                            Id = "001000000000042AAA",
-                            Description = description,
-                        },
-                    },
-                }),
             "soqlQuery" => JsonSerializer.SerializeToElement(
                 new { records = Array.Empty<object>() }),
             _ => throw new InvalidOperationException(

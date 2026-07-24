@@ -76,10 +76,6 @@ public sealed record Increment : Synapse;
 public sealed record Counted([property: Id(0)] int Count) : Synapse;
 
 [GenerateSerializer]
-[Alias("module-tests.read-count")]
-public sealed record ReadCount : Synapse;
-
-[GenerateSerializer]
 [Alias("module-tests.count-observed")]
 public sealed record CountObserved([property: Id(0)] int Count) : Synapse;
 
@@ -212,9 +208,7 @@ internal sealed class RollbackProbe :
     Neuron,
     IRollbackProbe,
     IHandle<Increment>,
-    IHandle<ReadCount>,
-    IEmit<Counted>,
-    IEmit<CountObserved>
+    IEmit<Counted>
 {
     private int _count;
 
@@ -235,10 +229,6 @@ internal sealed class RollbackProbe :
         return _count;
     }
 
-    public Task HandleAsync(
-        ReadCount synapse,
-        CancellationToken cancellationToken)
-        => EmitAsync(new CountObserved(_count));
 }
 
 internal sealed class Announcer :

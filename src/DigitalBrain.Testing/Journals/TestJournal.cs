@@ -16,6 +16,8 @@ public sealed class TestJournal
     private readonly BrainTestDiagnostics _diagnostics;
     private readonly JournalKind _direction;
     private readonly SemaphoreSlim _nextGate = new(1, 1);
+    private readonly Lock _nextTasksGate = new();
+    private readonly HashSet<Task> _outstandingNextTasks = [];
     private readonly List<SynapseDelivery> _pending = [];
     private readonly ISessionNeuron _session;
     private readonly SemaphoreSlim _setupGate = new(1, 1);
@@ -43,8 +45,35 @@ public sealed class TestJournal
                 "session").ToGrainId());
     }
 
-    public async Task<ObservedSynapse<TSynapse>> NextAsync<TSynapse>(
+    public Task<ObservedSynapse<TSynapse>> NextAsync<TSynapse>(
         CancellationToken cancellationToken = default)
+        where TSynapse : Synapse
+    {
+        lock (_nextTasksGate)
+        {
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                return Task.FromException<ObservedSynapse<TSynapse>>(
+                    _diagnostics.CaptureFailure(
+                        "journal.next",
+                        new ObjectDisposedException(nameof(TestJournal))));
+            }
+
+            var task = NextTrackedAsync<TSynapse>(cancellationToken);
+            _outstandingNextTasks.Add(task);
+            _ = task.ContinueWith(
+                static (completed, state) =>
+                    ((TestJournal)state!).RetireNextTask(completed),
+                this,
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            return task;
+        }
+    }
+
+    private async Task<ObservedSynapse<TSynapse>> NextTrackedAsync<TSynapse>(
+        CancellationToken cancellationToken)
         where TSynapse : Synapse
     {
         try
@@ -177,9 +206,14 @@ public sealed class TestJournal
         Justification = "Journal teardown must attempt unwatch, object-reference deletion, and observer disposal; all failures are retained in an aggregate.")]
     internal async ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        lock (_nextTasksGate)
         {
-            return;
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                return;
+            }
+
+            Volatile.Write(ref _disposed, 1);
         }
 
         TestJournalObserver? observer;
@@ -238,14 +272,46 @@ public sealed class TestJournal
             }
         }
 
-        await _nextGate.WaitAsync();
-        _nextGate.Release();
+        await AwaitOutstandingNextTasksAsync();
 
         if (failures.Count > 0)
         {
             throw new AggregateException(
                 $"Cleanup failed for the {_direction} journal of '{_subject}'.",
                 failures);
+        }
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Each caller-owned NextAsync task retains its terminal exception; journal teardown waits only for completion and must not duplicate expected disposal failures as cleanup failures.")]
+    private async Task AwaitOutstandingNextTasksAsync()
+    {
+        Task[] tasks;
+
+        lock (_nextTasksGate)
+        {
+            tasks = [.. _outstandingNextTasks];
+        }
+
+        foreach (var task in tasks)
+        {
+            try
+            {
+                await task;
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private void RetireNextTask(Task task)
+    {
+        lock (_nextTasksGate)
+        {
+            _outstandingNextTasks.Remove(task);
         }
     }
 
