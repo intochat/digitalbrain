@@ -60,6 +60,9 @@ public sealed class CountdownRecovery(TimeFixture fixture)
         Assert.Empty(await destination.Incoming.ReadAsync<CountdownElapsed>(
             cancellationToken: cancellationToken));
 
+        Assert.Equal(
+            CountdownStatus.Scheduled,
+            (await countdown.Reference.Read()).Status);
         await countdown.RestartHostAsync(cancellationToken);
         await test.Clock.AdvanceAsync(
             TimeSpan.Zero,
@@ -73,6 +76,47 @@ public sealed class CountdownRecovery(TimeFixture fixture)
         Assert.Equal(
             CountdownStatus.Elapsed,
             (await countdown.Reference.Read()).Status);
+    }
+
+    [Fact]
+    public async Task FailedOccurrenceCommitRecoversWithoutAHostRestart()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var countdown = test.Neuron<ICountdown>("occurrence-fault-no-restart");
+        var destination = test.Neuron<ICountdown>("destination");
+        var started = await Start(
+            countdown,
+            destination,
+            TimeSpan.FromHours(1));
+        await using var fault = countdown.FailNextJournalCommit(
+            "countdown occurrence commit failure");
+
+        var failure = await Assert.ThrowsAsync<BrainTestFailureException>(
+            () => test.Clock.AdvanceAsync(
+                TimeSpan.FromHours(1),
+                cancellationToken));
+        Assert.Equal(
+            "countdown occurrence commit failure",
+            failure.InnerException?.Message);
+        Assert.Empty(await destination.Incoming.ReadAsync<CountdownElapsed>(
+            cancellationToken: cancellationToken));
+
+        await test.Clock.AdvanceAsync(
+            TimeSpan.Zero,
+            cancellationToken);
+        var elapsed = await destination.Incoming.NextAsync<CountdownElapsed>(
+            cancellationToken);
+
+        Assert.Equal(started.Generation, elapsed.Synapse.Generation);
+        Assert.Equal(started.Revision, elapsed.Synapse.Revision);
+        Assert.Equal(CountdownResolution.Recovered, elapsed.Synapse.Resolution);
+
+        await test.Clock.AdvanceAsync(
+            TimeSpan.FromMinutes(1),
+            cancellationToken);
+        Assert.Single(await destination.Incoming.ReadAsync<CountdownElapsed>(
+            cancellationToken: cancellationToken));
     }
 
     [Fact]

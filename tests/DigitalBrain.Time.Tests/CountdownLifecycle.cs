@@ -516,6 +516,25 @@ public sealed class CountdownLifecycle(TimeFixture fixture)
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void RevisionAndGenerationCountersRejectOverflow()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            LocateRepositoryRoot(),
+            "modules",
+            "DigitalBrain.Modules.Time",
+            "CountdownNeuron.cs"));
+
+        Assert.Contains(
+            "var nextRevision = checked(current.Revision + 1);",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "var generation = checked(current.Generation + 1);",
+            source,
+            StringComparison.Ordinal);
+    }
+
     private static Task<CountdownSnapshot> Start(
         TestNeuron<ICountdown> countdown,
         TestNeuron<ICountdown> destination,

@@ -95,13 +95,14 @@ internal sealed class CountdownNeuron :
 
         var scheduledAt = TimeProvider.GetUtcNow();
         var dueAt = DueAt(scheduledAt, command.Duration);
+        var nextRevision = checked(current.Revision + 1);
         var reminderName = ReminderName(
             current.Generation,
-            current.Revision + 1);
+            nextRevision);
         var next = Copy(
             current,
             status: CountdownStatus.Scheduled,
-            revision: current.Revision + 1,
+            revision: nextRevision,
             scheduledAt: scheduledAt,
             dueAt: dueAt,
             duration: command.Duration,
@@ -280,6 +281,8 @@ internal sealed class CountdownNeuron :
         catch
         {
             RestoreState(rollbackState);
+            DisposeLocalTimer();
+            DeactivateOnIdle();
             throw;
         }
 
