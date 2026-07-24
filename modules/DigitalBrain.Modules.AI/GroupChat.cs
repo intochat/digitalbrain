@@ -43,8 +43,7 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
         _workerStates = ServiceProvider.GetRequiredService<Serializer<AIWorkerState>>();
         _messages = ServiceProvider.GetRequiredService<Serializer<ChatMessage>>();
         _clock = ServiceProvider.GetKeyedService<TimeProvider>(ClockName)
-            ?? ServiceProvider.GetService<TimeProvider>()
-            ?? TimeProvider.System;
+            ?? TimeProvider;
     }
 
     protected abstract IReadOnlyList<Participant> Participants { get; }
