@@ -11,19 +11,22 @@ internal sealed class TestJournalObserver :
     IJournalObserver,
     IAsyncDisposable
 {
-    private const int ChannelCapacity = 64;
+    internal const int EvidenceLimit = 64;
 
     private readonly Channel<JournalObservation> _observations =
         Channel.CreateBounded<JournalObservation>(
-            new BoundedChannelOptions(ChannelCapacity)
+            new BoundedChannelOptions(EvidenceLimit)
             {
                 AllowSynchronousContinuations = false,
                 FullMode = BoundedChannelFullMode.Wait,
                 SingleReader = true,
                 SingleWriter = true,
             });
-    private readonly SemaphoreSlim _pushGate = new(1, 1);
+    private readonly Lock _gate = new();
     private readonly JournalKind _direction;
+
+    private bool _completed;
+    private Exception? _completionFailure;
     private long _cursor;
     private int _disposed;
 
@@ -35,7 +38,7 @@ internal sealed class TestJournalObserver :
     internal ChannelReader<JournalObservation> Observations
         => _observations.Reader;
 
-    public async Task ObserveAsync(JournalKind kind, JournalRead read)
+    public Task ObserveAsync(JournalKind kind, JournalRead read)
     {
         ArgumentNullException.ThrowIfNull(read);
 
@@ -45,33 +48,58 @@ internal sealed class TestJournalObserver :
                 $"A {_direction} journal observer received a {kind} batch.");
         }
 
-        await _pushGate.WaitAsync();
-        try
+        lock (_gate)
         {
+            if (_completed)
+            {
+                return Task.FromException(
+                    _completionFailure
+                    ?? new ObjectDisposedException(nameof(TestJournalObserver)));
+            }
+
             var observation = new JournalObservation(_cursor, read);
-            _cursor = read.ResumeSequence;
-            await _observations.Writer.WriteAsync(observation);
-        }
-        finally
-        {
-            _pushGate.Release();
+            if (_observations.Writer.TryWrite(observation))
+            {
+                _cursor = read.ResumeSequence;
+                return Task.CompletedTask;
+            }
+
+            var failure = new InvalidOperationException(
+                $"Journal evidence overflow for direction '{_direction}': capacity {EvidenceLimit} was exhausted for the batch requested after cursor {_cursor}, with resume sequence {read.ResumeSequence} and {read.Delta.Count} deliveries.");
+            CompleteUnderLock(failure);
+            return Task.FromException(failure);
         }
     }
 
     internal void Complete(Exception? failure = null)
-        => _observations.Writer.TryComplete(failure);
+    {
+        lock (_gate)
+        {
+            if (_completed)
+            {
+                return;
+            }
 
-    public async ValueTask DisposeAsync()
+            CompleteUnderLock(failure);
+        }
+    }
+
+    public ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
-            return;
+            return ValueTask.CompletedTask;
         }
 
         Complete();
 
-        await _pushGate.WaitAsync();
-        _pushGate.Release();
-        _pushGate.Dispose();
+        return ValueTask.CompletedTask;
+    }
+
+    private void CompleteUnderLock(Exception? failure)
+    {
+        _completed = true;
+        _completionFailure = failure;
+        _observations.Writer.TryComplete(failure);
     }
 }

@@ -6,6 +6,9 @@ namespace DigitalBrain.TestingTests;
 
 public sealed class JournalContracts(TestingFixture fixture)
 {
+    private const int EvidenceLimit = 64;
+    private static readonly TimeSpan DeadlockGuard = TimeSpan.FromSeconds(10);
+
     [Fact]
     public async Task ATestNeuronUsesTheRealReferenceAndCommittedJournal()
     {
@@ -144,5 +147,91 @@ public sealed class JournalContracts(TestingFixture fixture)
         await using var second = await fixture.CreateBrainAsync(cancellationToken);
 
         Assert.NotNull(second.Neuron<IEchoNeuron>("after-cleanup").Reference);
+    }
+
+    [Fact]
+    public async Task EvidenceOverflowDoesNotBlockProductSendsAndFailsTheWait()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var echo = test.Neuron<IEchoNeuron>("overflow");
+        var installed = echo.Outgoing.NextAsync<Echoed>(cancellationToken);
+
+        await echo.Reference.Publish("installed");
+        await installed;
+
+        for (var index = 0; index <= EvidenceLimit; index++)
+        {
+            await echo.Reference
+                .Publish($"overflow-{index}")
+                .WaitAsync(DeadlockGuard, cancellationToken);
+        }
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => echo.Outgoing
+                .NextAsync<EchoRequested>(cancellationToken)
+                .WaitAsync(DeadlockGuard, cancellationToken));
+
+        Assert.Contains("overflow", failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(echo.Id.ToString(), failure.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(JournalKind.Outgoing), failure.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            EvidenceLimit.ToString(CultureInfo.InvariantCulture),
+            failure.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnIncompatibleHistoricalBatchCannotExceedTheEvidenceLimit()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var echo = test.Neuron<IEchoNeuron>("historical-overflow");
+
+        for (var index = 0; index <= EvidenceLimit; index++)
+        {
+            await echo.Reference.Publish($"historical-{index}");
+        }
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => echo.Outgoing
+                .NextAsync<EchoRequested>(cancellationToken)
+                .WaitAsync(DeadlockGuard, cancellationToken));
+
+        Assert.Contains("overflow", failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(echo.Id.ToString(), failure.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(JournalKind.Outgoing), failure.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            EvidenceLimit.ToString(CultureInfo.InvariantCulture),
+            failure.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DisposalTerminatesAnOutstandingWaitBeforeReleasingTheLease()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var first =
+            await fixture.CreateBrainAsync(cancellationToken);
+        var echo = first.Neuron<IEchoNeuron>("dispose-wait");
+        var waiting =
+            echo.Outgoing.NextAsync<EchoRequested>(cancellationToken);
+
+        await echo.Reference.Publish("unmatched");
+        Assert.False(waiting.IsCompleted);
+
+        await first
+            .DisposeAsync()
+            .AsTask()
+            .WaitAsync(DeadlockGuard, cancellationToken);
+
+        Assert.True(waiting.IsCompleted);
+        await Assert.ThrowsAnyAsync<Exception>(() => waiting);
+
+        await using var second = await fixture
+            .CreateBrainAsync(cancellationToken)
+            .WaitAsync(DeadlockGuard, cancellationToken);
+
+        Assert.NotNull(second.Neuron<IEchoNeuron>("after-wait").Reference);
     }
 }

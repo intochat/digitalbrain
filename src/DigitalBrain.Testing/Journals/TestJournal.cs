@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Runtime.ExceptionServices;
+using System.Threading.Channels;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Testing;
@@ -56,9 +57,29 @@ public sealed class TestJournal
                     return Observe((TSynapse)pending.Synapse, pending);
                 }
 
-                var observation =
-                    await observer.Observations.ReadAsync(cancellationToken);
-                Accept(observation);
+                JournalObservation observation;
+
+                try
+                {
+                    observation =
+                        await observer.Observations.ReadAsync(cancellationToken);
+                }
+                catch (ChannelClosedException closed)
+                    when (closed.InnerException is InvalidOperationException failure)
+                {
+                    throw ObservationFailure(failure);
+                }
+                catch (ChannelClosedException closed)
+                    when (closed.InnerException is not null)
+                {
+                    ExceptionDispatchInfo.Capture(closed.InnerException).Throw();
+                    throw;
+                }
+
+                if (Accept<TSynapse>(observer, observation) is { } accepted)
+                {
+                    return Observe((TSynapse)accepted.Synapse, accepted);
+                }
             }
         }
         finally
@@ -161,6 +182,9 @@ public sealed class TestJournal
             }
         }
 
+        await _nextGate.WaitAsync();
+        _nextGate.Release();
+
         if (failures.Count > 0)
         {
             throw new AggregateException(
@@ -169,7 +193,10 @@ public sealed class TestJournal
         }
     }
 
-    private void Accept(JournalObservation observation)
+    private SynapseDelivery? Accept<TSynapse>(
+        TestJournalObserver observer,
+        JournalObservation observation)
+        where TSynapse : Synapse
     {
         if (observation.Read.ResetSnapshot is not null)
         {
@@ -178,7 +205,27 @@ public sealed class TestJournal
                 observation.Read);
         }
 
-        _pending.AddRange(observation.Read.Delta);
+        SynapseDelivery? matching = null;
+
+        foreach (var delivery in observation.Read.Delta)
+        {
+            if (matching is null && delivery.Synapse is TSynapse)
+            {
+                matching = delivery;
+                continue;
+            }
+
+            if (_pending.Count >= TestJournalObserver.EvidenceLimit)
+            {
+                var failure = PendingOverflowFailure(observation);
+                observer.Complete(failure);
+                throw failure;
+            }
+
+            _pending.Add(delivery);
+        }
+
+        return matching;
     }
 
     private InvalidOperationException CompactionFailure(
@@ -203,6 +250,17 @@ public sealed class TestJournal
             CultureInfo.InvariantCulture,
             $"Journal compaction for subject '{_subject}', direction '{_direction}', requested cursor {requestedCursor}, reset resume sequence {read.ResumeSequence}: retained={snapshot.RetainedCount}, dropped={dropped}, tallies=[{tallies}]."));
     }
+
+    private InvalidOperationException ObservationFailure(
+        InvalidOperationException failure)
+        => new(
+            $"Journal evidence failed for subject '{_subject}', direction '{_direction}': {failure.Message}",
+            failure);
+
+    private InvalidOperationException PendingOverflowFailure(
+        JournalObservation observation)
+        => new(
+            $"Journal evidence overflow for subject '{_subject}', direction '{_direction}': unmatched evidence exceeded limit {TestJournalObserver.EvidenceLimit} while processing the batch requested after cursor {observation.RequestedCursor}, with resume sequence {observation.Read.ResumeSequence}.");
 
     [SuppressMessage(
         "Design",

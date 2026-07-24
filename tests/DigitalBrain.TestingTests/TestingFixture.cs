@@ -12,6 +12,9 @@ public partial interface IEchoNeuron : INeuron
 {
     [Alias(nameof(Echo))]
     Task<string> Echo(string value);
+
+    [Alias(nameof(Publish))]
+    Task Publish(string value);
 }
 
 [GenerateSerializer]
@@ -29,6 +32,8 @@ internal sealed class EchoNeuron :
     IEmit<Echoed>
 {
     public Task<string> Echo(string value) => Task.FromResult(value);
+
+    public Task Publish(string value) => EmitAsync(new Echoed(value));
 
     public Task HandleAsync(
         EchoRequested request,
