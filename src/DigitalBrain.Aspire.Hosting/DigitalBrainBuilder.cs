@@ -1,9 +1,11 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Cryptography;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
+using Aspire.Hosting.Publishing;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Aspire.Hosting;
@@ -99,8 +101,14 @@ public sealed class DigitalBrainBuilder
             return;
         }
 
-        _stateProtectionKey = _builder
-            .AddParameter($"{Name}-state-protection-key", secret: true)
+        var name = $"{Name}-state-protection-key";
+        _stateProtectionKey = (_builder.ExecutionContext.IsRunMode
+                ? _builder.AddParameter(
+                    name,
+                    new StateProtectionKeyParameterDefault(),
+                    secret: true,
+                    persist: true)
+                : _builder.AddParameter(name, secret: true))
             .WithDescription(
                 "Base64-encoded 256-bit key shared by every silo that recovers encrypted durable module state.");
     }
@@ -123,6 +131,18 @@ public sealed class DigitalBrainBuilder
     }
 
     public ClientDigitalBrainReference AsClient() => new(this);
+
+    private sealed class StateProtectionKeyParameterDefault : ParameterDefault
+    {
+        public override string GetDefaultValue()
+            => Convert.ToBase64String(
+                RandomNumberGenerator.GetBytes(32));
+
+        public override void WriteToManifest(
+            ManifestPublishingContext context)
+            => throw new InvalidOperationException(
+                "Local state-protection defaults cannot be published.");
+    }
 }
 
 public sealed class ClientDigitalBrainReference

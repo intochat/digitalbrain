@@ -198,6 +198,54 @@ public sealed class IntegrationHostingContracts
         Assert.DoesNotContain("WithMemoryReminders", hostingSource, StringComparison.Ordinal);
     }
 
+    [Fact(DisplayName = "run mode persists one valid local state-protection key only for the silo")]
+    public async Task RunModePersistsOneValidLocalStateProtectionKeyOnlyForTheSilo()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddDigitalBrain("brain");
+
+        brain.AddModule<GoogleModule>(google => google.WithGmail());
+
+        var silo = builder.AddResource(new ProjectionProbe("silo")).WithReference(brain);
+        var client = builder.AddResource(new ProjectionProbe("client")).WithReference(brain.AsClient());
+        var protectionKey = Parameter(builder, "brain-state-protection-key");
+        var localDefault = Assert.IsAssignableFrom<ParameterDefault>(
+            protectionKey.Default);
+        var encodedKey = localDefault.GetDefaultValue();
+        var siloEnvironment = await ProjectAsync(silo.Resource);
+        var clientEnvironment = await ProjectAsync(client.Resource);
+
+        Assert.True(protectionKey.Secret);
+        Assert.Equal("UserSecretsParameterDefault", localDefault.GetType().Name);
+        Assert.Equal(32, Convert.FromBase64String(encodedKey).Length);
+        Assert.Same(
+            protectionKey,
+            siloEnvironment["DigitalBrain__Security__StateProtectionKey"]);
+        Assert.DoesNotContain(
+            "DigitalBrain__Security__StateProtectionKey",
+            clientEnvironment.Keys);
+    }
+
+    [Fact(DisplayName = "publish mode keeps the state-protection key required and unresolved")]
+    public async Task PublishModeKeepsTheStateProtectionKeyRequiredAndUnresolved()
+    {
+        var builder = DistributedApplication.CreateBuilder(
+            ["--operation", "publish"]);
+        var brain = builder.AddDigitalBrain("brain");
+
+        brain.AddModule<GoogleModule>(google => google.WithGmail());
+
+        var protectionKey = Parameter(builder, "brain-state-protection-key");
+
+        Assert.True(builder.ExecutionContext.IsPublishMode);
+        Assert.True(protectionKey.Secret);
+        Assert.Null(protectionKey.Default);
+        await Assert.ThrowsAsync<MissingParameterValueException>(
+            () => protectionKey
+                .GetValueAsync(TestContext.Current.CancellationToken)
+                .AsTask());
+    }
+
     [Fact(DisplayName = "AppHost prompts only for provider-required OAuth parameters")]
     public void AppHostPromptsOnceForOfficialOAuthParameters()
     {
