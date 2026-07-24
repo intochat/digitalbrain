@@ -1,9 +1,9 @@
+using System.Collections.Concurrent;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using System.Collections.Concurrent;
 using Xunit;
 
 namespace DigitalBrain.Simulations;
@@ -311,7 +311,8 @@ public sealed class TaskLifecycleContracts
         var expected = script == "recover-cancel" ? TaskState.Cancelled : TaskState.Succeeded;
         var terminal = await ReadUntilAsync(task, snapshot => snapshot.State == expected);
 
-        Assert.True(ScriptedWorker.DispatchCount(taskId) >= 2);
+        var worker = SimulationCluster.Grains.GetGrain<IScriptedWorkerControl>(workerId.ToGrainId());
+        Assert.True(await worker.DispatchCountAsync(taskId) >= 2);
         Assert.Equal(expected, terminal.State);
     }
 
@@ -341,7 +342,8 @@ public sealed class TaskLifecycleContracts
 
         Assert.Equal(expected, acknowledged.State);
         Assert.False(await reminder.ExistsAsync(taskId, "tasks.dispatch"));
-        Assert.Equal(1, ScriptedWorker.OperationCount(taskId, nameof(ScriptedWorker.AcceptAsync)));
+        var worker = SimulationCluster.Grains.GetGrain<IScriptedWorkerControl>(workerId.ToGrainId());
+        Assert.Equal(1, await worker.OperationCountAsync(taskId, nameof(IWorker.AcceptAsync)));
     }
 
     [Fact(DisplayName = "a Waiting fact acknowledges a Continue call whose reply was ambiguous")]
@@ -372,7 +374,8 @@ public sealed class TaskLifecycleContracts
         Assert.IsType<InputRequired>(waiting.Blocker);
         Assert.Equal(TaskState.Waiting, current.State);
         Assert.False(await reminder.ExistsAsync(taskId, "tasks.dispatch"));
-        Assert.Equal(1, ScriptedWorker.OperationCount(taskId, nameof(ScriptedWorker.ContinueAsync)));
+        var worker = SimulationCluster.Grains.GetGrain<IScriptedWorkerControl>(workerId.ToGrainId());
+        Assert.Equal(1, await worker.OperationCountAsync(taskId, nameof(IWorker.ContinueAsync)));
     }
 
     [Fact(DisplayName = "a forwarded Kernel db.outbox reminder drains delivery after sender restart")]
@@ -399,7 +402,9 @@ public sealed class TaskLifecycleContracts
         await SimulationCluster.RestartHostOfAsync(relayId);
         await reminder.ExpediteAsync(relayId, "db.outbox");
 
-        OutboxRecoveryReceiver.Allow(receiverId);
+        var receiver = SimulationCluster.Grains.GetGrain<IOutboxRecoveryReceiverControl>(
+            receiverId.ToGrainId());
+        await receiver.AllowAsync();
         await AwaitIncomingAsync(receiverId, new OutboxRecoveryDelivered());
         await WaitForReminderRemovalAsync(reminder, relayId, "db.outbox");
     }
@@ -737,9 +742,11 @@ public sealed class TaskLifecycleContracts
 
     private static async Task WaitForOutboxAttemptAsync(NeuronId receiver)
     {
+        var control = SimulationCluster.Grains.GetGrain<IOutboxRecoveryReceiverControl>(
+            receiver.ToGrainId());
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-        while (!OutboxRecoveryReceiver.WasAttempted(receiver))
+        while (!await control.WasAttemptedAsync())
         {
             await Task.Delay(TimeSpan.FromMilliseconds(10), timeout.Token);
         }
@@ -866,18 +873,19 @@ internal sealed class ScriptedWorker :
     IEmit<AttemptCancelled>,
     IEmit<AttemptOutcomeUncertain>
 {
+    // Process maps keyed by owner-unique NeuronId so recover scripts survive the worker's host restart.
     private static readonly ConcurrentDictionary<NeuronId, string> Scripts = new();
     private static readonly ConcurrentDictionary<NeuronId, int> Acceptances = new();
     private static readonly ConcurrentDictionary<(NeuronId Task, string Operation), int> Dispatches = new();
     private IGrainTimer? _delayedFact;
 
-    internal static int DispatchCount(NeuronId task)
-        => Dispatches.Where(entry => entry.Key.Task == task).Sum(entry => entry.Value);
-
-    internal static int OperationCount(NeuronId task, string operation)
-        => Dispatches.TryGetValue((task, operation), out var count) ? count : 0;
-
     public Task SendFactAsync(AttemptFact fact) => SendAsync(fact.Task, fact);
+
+    public Task<int> DispatchCountAsync(NeuronId task)
+        => Task.FromResult(Dispatches.Where(entry => entry.Key.Task == task).Sum(entry => entry.Value));
+
+    public Task<int> OperationCountAsync(NeuronId task, string operation)
+        => Task.FromResult(Dispatches.TryGetValue((task, operation), out var count) ? count : 0);
 
     public async Task AcceptAsync(AttemptRequest request)
     {
@@ -1247,6 +1255,12 @@ internal interface IScriptedWorkerControl : INeuron
 {
     [Alias("SendFact")]
     Task SendFactAsync(AttemptFact fact);
+
+    [Alias("DispatchCount")]
+    Task<int> DispatchCountAsync(NeuronId task);
+
+    [Alias("OperationCount")]
+    Task<int> OperationCountAsync(NeuronId task, string operation);
 }
 
 [Alias("db.test.fact-injector")]
@@ -1315,28 +1329,42 @@ internal sealed class OutboxForwardingRelay :
         => await base.ReceiveReminder(reminderName, status);
 }
 
-internal sealed class OutboxRecoveryReceiver : Neuron, IHandle<OutboxRecoveryDelivered>
+[Alias("db.test.outbox-recovery-receiver-control")]
+[ClientEntryPoint]
+internal interface IOutboxRecoveryReceiverControl : INeuron
 {
-    private static readonly ConcurrentDictionary<NeuronId, bool> Allowed = new();
+    [Alias("Allow")]
+    Task AllowAsync();
 
-    internal static void Allow(NeuronId receiver) => Allowed[receiver] = true;
+    [Alias("WasAttempted")]
+    Task<bool> WasAttemptedAsync();
+}
 
-    internal static bool WasAttempted(NeuronId receiver) => Allowed.ContainsKey(receiver);
+internal sealed class OutboxRecoveryReceiver
+    : Neuron,
+      IHandle<OutboxRecoveryDelivered>,
+      IOutboxRecoveryReceiverControl
+{
+    private bool _attempted;
+    private bool _allowed;
+
+    public Task AllowAsync()
+    {
+        _allowed = true;
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> WasAttemptedAsync() => Task.FromResult(_attempted);
 
     public Task HandleAsync(OutboxRecoveryDelivered synapse, CancellationToken cancellationToken)
     {
-        if (!Allowed.TryGetValue(Id, out var allowed))
-        {
-            Allowed[Id] = false;
-            throw new InvalidOperationException("The receiver is unavailable until the outbox sender restarts.");
-        }
+        _attempted = true;
 
-        if (!allowed)
+        if (!_allowed)
         {
             throw new InvalidOperationException("The receiver is unavailable until the outbox sender restarts.");
         }
 
-        Allowed.TryRemove(Id, out _);
         return Task.CompletedTask;
     }
 }
