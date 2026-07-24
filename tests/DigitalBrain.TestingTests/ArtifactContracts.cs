@@ -75,6 +75,78 @@ public sealed class ArtifactContracts(TestingFixture fixture)
     }
 
     [Fact]
+    public async Task SensitiveOwnerIdentifiersAreRedactedBeforeRingEviction()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test =
+            await fixture.CreateBrainAsync(cancellationToken);
+        const string label = "client-token";
+        var sensitive = test.Owner(label);
+        var echo = sensitive.Neuron<IEchoNeuron>("sensitive-target");
+        _ = echo.FailNextJournalCommit("provider payload");
+
+        var failure = await Assert.ThrowsAsync<BrainTestFailureException>(
+            async () => await test.DisposeAsync());
+        var artifact = failure.Artifact;
+        var ownerId = sensitive.Id.Value;
+        var target = echo.Id.ToString();
+        string[] forbidden = [label, ownerId, target];
+
+        Assert.All(
+            artifact.Events,
+            item =>
+            {
+                Assert.All(
+                    forbidden,
+                    raw =>
+                    {
+                        Assert.DoesNotContain(
+                            raw,
+                            item.Operation,
+                            StringComparison.Ordinal);
+                        Assert.DoesNotContain(
+                            raw,
+                            item.State,
+                            StringComparison.Ordinal);
+                        Assert.All(
+                            item.Metadata,
+                            field =>
+                            {
+                                Assert.DoesNotContain(
+                                    raw,
+                                    field.Key,
+                                    StringComparison.Ordinal);
+                                Assert.DoesNotContain(
+                                    raw,
+                                    field.Value,
+                                    StringComparison.Ordinal);
+                            });
+                    });
+            });
+        Assert.All(
+            artifact.Faults,
+            fault =>
+            {
+                Assert.All(
+                    forbidden,
+                    raw => Assert.DoesNotContain(
+                        raw,
+                        fault.Target,
+                        StringComparison.Ordinal));
+            });
+        Assert.All(
+            forbidden,
+            raw => Assert.DoesNotContain(
+                raw,
+                artifact.ToJson(),
+                StringComparison.Ordinal));
+        Assert.Contains(
+            "[REDACTED]",
+            artifact.ToJson(),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ArtifactIsRedactedAndBounded()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

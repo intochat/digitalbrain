@@ -176,8 +176,13 @@ internal sealed class BrainTestDiagnostics
     private readonly List<string> _owners = [];
     private readonly HashSet<string> _ownerSet =
         new(StringComparer.Ordinal);
+    private readonly HashSet<string> _sensitiveOwnerIds =
+        new(StringComparer.Ordinal);
+    private readonly HashSet<string> _sensitiveOwnerLabels =
+        new(StringComparer.Ordinal);
     private readonly string _scopeId;
     private DateTimeOffset _clockUtc;
+    private bool _redactAllDerivedIdentifiers;
     private long _sequence;
 
     internal BrainTestDiagnostics(
@@ -203,10 +208,15 @@ internal sealed class BrainTestDiagnostics
         string label,
         string ownerId)
     {
-        var bounded = Sanitize($"owner.{label}", ownerId);
-
         lock (_gate)
         {
+            var ownerKey = $"owner.{label}";
+            if (IsSensitiveKey(ownerKey))
+            {
+                TrackSensitiveOwnerLocked(label, ownerId);
+            }
+
+            var bounded = Sanitize(ownerKey, ownerId);
             if (_owners.Count >= BrainTestArtifact.MaximumOwners
                 || !_ownerSet.Add(bounded))
             {
@@ -244,7 +254,9 @@ internal sealed class BrainTestDiagnostics
         {
             if (_faults.Count < BrainTestArtifact.MaximumFaults)
             {
-                _faults[handle] = new(Bound(target), "armed");
+                _faults[handle] = new(
+                    Sanitize("target", target),
+                    "armed");
             }
 
             RecordEventLocked(
@@ -276,7 +288,9 @@ internal sealed class BrainTestDiagnostics
             if (_faults.Count < BrainTestArtifact.MaximumFaults)
             {
                 _faults[handle] = new(
-                    Bound(handle.Target.ToString()),
+                    Sanitize(
+                        "target",
+                        handle.Target.ToString()),
                     "cleanup-leak");
             }
         }
@@ -368,7 +382,7 @@ internal sealed class BrainTestDiagnostics
         foreach (var (key, value) in metadata)
         {
             var boundedKey = Bound(key);
-            fields[boundedKey] = Sanitize(boundedKey, value);
+            fields[boundedKey] = Sanitize(key, value);
         }
 
         _events.Add(new BrainTestEvent(
@@ -378,13 +392,54 @@ internal sealed class BrainTestDiagnostics
             new ReadOnlyDictionary<string, string>(fields)));
     }
 
-    private static string Sanitize(
+    private string Sanitize(
         string key,
         string value)
-        => SensitiveKeys.Any(fragment =>
-            key.Contains(fragment, StringComparison.OrdinalIgnoreCase))
+        => IsSensitiveKey(key)
+            || IsDerivedFromSensitiveOwner(value)
                 ? Redacted
                 : Bound(value);
+
+    private bool IsDerivedFromSensitiveOwner(string value)
+    {
+        if (_redactAllDerivedIdentifiers)
+        {
+            return true;
+        }
+
+        var bounded = Bound(value);
+        if (_sensitiveOwnerLabels.Contains(bounded))
+        {
+            return true;
+        }
+
+        return _sensitiveOwnerIds.Any(ownerId =>
+            value.Contains(ownerId, StringComparison.Ordinal));
+    }
+
+    private static bool IsSensitiveKey(string key)
+        => SensitiveKeys.Any(fragment =>
+            key.Contains(fragment, StringComparison.OrdinalIgnoreCase));
+
+    private void TrackSensitiveOwnerLocked(
+        string label,
+        string ownerId)
+    {
+        var boundedOwnerId = Bound(ownerId);
+        if (_sensitiveOwnerIds.Contains(boundedOwnerId))
+        {
+            return;
+        }
+
+        if (_sensitiveOwnerIds.Count >= BrainTestArtifact.MaximumOwners)
+        {
+            _redactAllDerivedIdentifiers = true;
+            return;
+        }
+
+        _sensitiveOwnerIds.Add(boundedOwnerId);
+        _sensitiveOwnerLabels.Add(Bound(label));
+    }
 
     private static string Bound(string value)
     {
