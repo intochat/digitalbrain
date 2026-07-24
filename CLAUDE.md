@@ -200,11 +200,10 @@ and the public surface should stop changing without review.
 ## 7. Where things stand
 
 The durable neuron and synapse foundation, generated module activation, typed AI neurons, and
-AI-owned Aspire integration are proven. The Foundation PoC architecture is frozen through the
-ratified rules in `docs/architecture.md` (§9). Its proposed public CLR seams, red-green order, and stop conditions are in
-`docs/superpowers/plans/2026-07-20-foundation-poc.md`. That plan is approved and its Tasks 1 through 8
-are complete, as it records at its own line 11; the work remaining in it proceeds one green slice at a
-time.
+AI-owned Aspire integration are proven. The next approved architecture is frozen in
+`docs/superpowers/specs/2026-07-24-digitalbrain-hosting-and-testing-design.md`. Its executable
+four-stage order, linked red-green plans, and completion gates are in
+`docs/superpowers/plans/2026-07-24-digitalbrain-hosting-testing-program.md`.
 
 One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
 That benchmark and the behavior proposal/install rail remain deliberately outside the Foundation
