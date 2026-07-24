@@ -1,20 +1,35 @@
 {
   "mcpServers": {
-    "codegraph": {
-      "command": "gcf-proxy",
-      "args": ["npx", "-y", "@colbymchenry/codegraph", "serve", "--mcp"]
-    },
     "aspire": {
-      "command": "gcf-proxy",
-      "args": ["aspire", "agent", "mcp"]
+      "command": "aspire",
+      "args": ["agent", "mcp"]
     },
-    "context7": {
-      "command": "gcf-proxy",
-      "args": ["npx", "-y", "@upstash/context7-mcp@latest"]
+    "dart": {
+      "command": "dart",
+      "args": ["mcp-server"]
     },
     "microsoft-learn": {
       "type": "http",
       "url": "https://learn.microsoft.com/api/mcp"
+    },
+    "context7": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@upstash/context7-mcp@latest"]
+    },
+    "codegraph": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@colbymchenry/codegraph@latest",
+        "serve",
+        "--mcp"
+      ]
+    },
+    "digitalbrain-mcp": {
+      "type": "http",
+      "url": "http://localhost:5000/mcp"
     }
   }
 }

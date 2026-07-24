@@ -121,7 +121,7 @@ public sealed class JournalCursorContracts
     public async Task AnEmptyJournalAssertionDoesNotMistakeAResetForAnEmptyJournal()
     {
         var simulation = await DeliverPastTheBoundAsync("cursor-consumer-empty");
-        var steps = new NeuronSteps(simulation);
+        var steps = new ScenarioSteps(simulation);
 
         await Assert.ThrowsAsync<SimulationAssertionException>(
             () => steps.ThenTheIncomingJournalIsEmpty(nameof(Echo), "target"));
@@ -131,7 +131,7 @@ public sealed class JournalCursorContracts
     public async Task AContainmentAssertionReadsAResetSnapshotAfterCompaction()
     {
         var simulation = await DeliverPastTheBoundAsync("cursor-consumer-contains");
-        var steps = new NeuronSteps(simulation);
+        var steps = new ScenarioSteps(simulation);
 
         await steps.ThenTheIncomingJournalContains(nameof(Echo), "target", "Ping");
     }
@@ -151,7 +151,7 @@ public sealed class JournalCursorContracts
             await simulation.SendAsync("Pong", nameof(Relay), "target", NoValues);
         }
 
-        var steps = new NeuronSteps(simulation);
+        var steps = new ScenarioSteps(simulation);
 
         await steps.ThenTheJournalContainsExactlyOnce("incoming", nameof(Relay), "target", "Ping");
     }

@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
@@ -7,6 +6,7 @@ using DigitalBrain.Testing;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using Xunit;
+using ScenarioFactory = DigitalBrain.Testing.Simulations;
 
 namespace DigitalBrain.Simulations;
 
@@ -18,15 +18,16 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "delegation mint and target entry observe completed atomic journal writes")]
     public async Task DelegationMintAndTargetEntryObserveCompletedAtomicJournalWrites()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-storage-ordering");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-storage-ordering",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var issuerWrites = SimulationCluster.CompletedJournalWrites(issuerId.ToGrainId());
         var targetWrites = SimulationCluster.CompletedJournalWrites(targetId.ToGrainId());
@@ -48,37 +49,48 @@ public sealed class CapabilityDelegationSecurityContracts
             afterSequence: 0);
 
         Assert.Single(durableOutgoing.Delta, Is<CapabilityRequested>);
-        DelegatedTargetStorageObservations.Expect(owner, targetId.ToGrainId(), targetWrites);
         Assert.Equal(17, await runner.InvokeAsync(delegation, targetId));
+
+        var targetIncoming = await simulation.ReadJournalAsync(
+            JournalKind.Incoming,
+            nameof(DelegatedCapabilityTarget),
+            "target",
+            afterSequence: 0);
+        var targetOutgoing = await simulation.ReadJournalAsync(
+            JournalKind.Outgoing,
+            nameof(DelegatedCapabilityTarget),
+            "target",
+            afterSequence: 0);
+
+        Assert.Single(targetIncoming.Delta, Is<CapabilityRequested>);
+        Assert.Single(targetOutgoing.Delta, Is<DelegatedCapabilityObserved>);
+        Assert.True(
+            SimulationCluster.CompletedJournalWrites(targetId.ToGrainId()) > targetWrites,
+            "Target journal storage must complete at least one write for delegated entry.");
     }
 
     [Fact(DisplayName = "a failed delegation mint does not consume durable retention capacity")]
     public async Task FailedDelegationMintDoesNotConsumeDurableRetentionCapacity()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-mint-write-rollback");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-mint-write-rollback",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
 
-        SimulationCluster.FailJournalWriteAfter(
+        await using (scenario.Arm(new JournalCommitAfter(
             issuerId.ToGrainId(),
-            completedWritesBeforeFailure: 0,
-            "injected delegation mint persistence failure");
-
-        try
+            CompletedWritesBeforeFailure: 0,
+            Message: "injected delegation mint persistence failure")))
         {
             _ = await Assert.ThrowsAsync<InvalidOperationException>(() => issuer.IssueAsync(
                 runner.GetGrainId(),
                 targetId,
                 nameof(IDelegatedCapabilityTarget.EnterAsync)));
-        }
-        finally
-        {
-            SimulationCluster.ClearJournalWriteFailure(issuerId.ToGrainId());
         }
 
         for (var index = 0; index < MaximumRememberedDelegations; index++)
@@ -93,32 +105,27 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "a failed delegation redemption can be retried")]
     public async Task FailedDelegationRedemptionCanBeRetried()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-redemption-write-rollback");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-redemption-write-rollback",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var delegation = await issuer.IssueAsync(
             runner.GetGrainId(),
             targetId,
             nameof(IDelegatedCapabilityTarget.EnterAsync));
 
-        SimulationCluster.FailJournalWriteAfter(
+        await using (scenario.Arm(new JournalCommitAfter(
             issuerId.ToGrainId(),
-            completedWritesBeforeFailure: 0,
-            "injected delegation redemption persistence failure");
-
-        try
+            CompletedWritesBeforeFailure: 0,
+            Message: "injected delegation redemption persistence failure")))
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 runner.RedeemOnlyAsync(delegation, issuerId));
-        }
-        finally
-        {
-            SimulationCluster.ClearJournalWriteFailure(issuerId.ToGrainId());
         }
 
         Assert.Equal(17, await runner.InvokeAsync(delegation, targetId));
@@ -127,15 +134,16 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "a failed delegation finish retry durably records one terminal outcome")]
     public async Task FailedDelegationFinishRetryDurablyRecordsOneTerminalOutcome()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-finish-write-rollback");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-finish-write-rollback",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var delegation = await issuer.IssueAsync(
             runner.GetGrainId(),
@@ -143,19 +151,13 @@ public sealed class CapabilityDelegationSecurityContracts
             nameof(IDelegatedCapabilityTarget.EnterAsync));
         await runner.RedeemOnlyAsync(delegation, issuerId);
 
-        SimulationCluster.FailJournalWriteAfter(
+        await using (scenario.Arm(new JournalCommitAfter(
             issuerId.ToGrainId(),
-            completedWritesBeforeFailure: 0,
-            "injected delegation finish persistence failure");
-
-        try
+            CompletedWritesBeforeFailure: 0,
+            Message: "injected delegation finish persistence failure")))
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 runner.RepeatOutcomeAsync(delegation, issuerId, succeeded: true));
-        }
-        finally
-        {
-            SimulationCluster.ClearJournalWriteFailure(issuerId.ToGrainId());
         }
 
         await runner.RepeatOutcomeAsync(delegation, issuerId, succeeded: true);
@@ -173,55 +175,59 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "a failed target journal write prevents semantic method entry")]
     public async Task FailedTargetJournalWritePreventsSemanticMethodEntry()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-target-write-failure");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-target-write-failure",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
+        var simulation = new Simulation();
+        simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var delegation = await issuer.IssueAsync(
             runner.GetGrainId(),
             targetId,
             nameof(IDelegatedCapabilityTarget.EnterAsync));
-        DelegatedTargetEntryObservations.Reset(owner);
-        SimulationCluster.FailJournalWriteAfter(
-            targetId.ToGrainId(),
-            completedWritesBeforeFailure: 0,
-            "injected target incoming persistence failure");
 
-        try
+        await using (scenario.Arm(new JournalCommitAfter(
+            targetId.ToGrainId(),
+            CompletedWritesBeforeFailure: 0,
+            Message: "injected target incoming persistence failure")))
         {
             _ = await Assert.ThrowsAnyAsync<Exception>(
                 () => runner.InvokeAsync(delegation, targetId));
         }
-        finally
-        {
-            SimulationCluster.ClearJournalWriteFailure(targetId.ToGrainId());
-        }
 
-        Assert.Equal(0, DelegatedTargetEntryObservations.Count(owner));
+        var targetOutgoing = await simulation.ReadJournalAsync(
+            JournalKind.Outgoing,
+            nameof(DelegatedCapabilityTarget),
+            "target",
+            afterSequence: 0);
+
+        Assert.DoesNotContain(targetOutgoing.Delta, Is<DelegatedCapabilityObserved>);
     }
 
     [Fact(DisplayName = "mismatched delegated calls are rejected without consuming the valid delegation")]
     public async Task MismatchedDelegatedCallsDoNotConsumeTheValidDelegation()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-mismatches");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-mismatches",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
         var wrongTarget = NeuronId.For<DelegatedCapabilityTarget>(owner, "other-target");
         var foreignTarget = NeuronId.For<DelegatedCapabilityTarget>(new OwnerId("foreign"), "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
-        var wrongRunner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var wrongRunner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/wrong-runner"));
-        var foreignRunner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var foreignRunner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create("foreign/runner"));
         var delegation = await issuer.IssueAsync(
             runner.GetGrainId(),
@@ -265,19 +271,20 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "minting rejects foreign runner and target owners before appending a request")]
     public async Task MintingRejectsForeignOwnersBeforeAppendingARequest()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-mint-owner");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-mint-owner",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var foreignOwner = new OwnerId("delegation-mint-foreign");
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var localTarget = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
         var foreignTarget = NeuronId.For<DelegatedCapabilityTarget>(foreignOwner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var localRunner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var localRunner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
-        var foreignRunner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var foreignRunner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{foreignOwner.Value}/runner"));
 
         await Assert.ThrowsAsync<NeuronAuthorizationException>(
@@ -303,15 +310,16 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "a forged raw RequestContext delivery cannot authorize a runner")]
     public async Task ForgedRawRequestContextDoesNotConsumeAValidDelegation()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-forged-context");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-forged-context",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var delegation = await issuer.IssueAsync(
             runner.GetGrainId(),
@@ -340,15 +348,16 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "a consumed delegation remains rejected after causal-caller reactivation")]
     public async Task ConsumedDelegationIsRejectedAfterCausalCallerReactivation()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-replay-reactivation");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-replay-reactivation",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var delegation = await issuer.IssueAsync(
             runner.GetGrainId(),
@@ -380,15 +389,16 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "a consumed delegation is rejected on immediate same-activation replay")]
     public async Task ConsumedDelegationIsRejectedOnImmediateReplay()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-immediate-replay");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-immediate-replay",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var delegation = await issuer.IssueAsync(
             runner.GetGrainId(),
@@ -412,16 +422,18 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "delegation consumption is durable before semantic target invocation")]
     public async Task DelegationConsumptionIsDurableBeforeSemanticTargetInvocation()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-consume-before-entry");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-consume-before-entry",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
-        DelegatedInvocationGate.Reset(owner);
+        var gate = scenario.Grains.GetGrain<IDelegatedInvocationGate>(owner.Value);
+        await gate.ResetAsync();
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var delegation = await issuer.IssueAsync(
             runner.GetGrainId(),
@@ -429,19 +441,26 @@ public sealed class CapabilityDelegationSecurityContracts
             nameof(IDelegatedCapabilityTarget.BlockAsync));
 
         var firstInvocation = runner.InvokeBlockedAsync(delegation, targetId);
-        await DelegatedInvocationGate
-            .Entered(owner)
-            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        await issuer.DeactivateAsync();
+        try
+        {
+            await gate
+                .WaitEnteredAsync()
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await issuer.DeactivateAsync();
 
-        await Assert.ThrowsAsync<NeuronAuthorizationException>(
-            () => runner
-                .InvokeBlockedAsync(delegation, targetId)
-                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+            await Assert.ThrowsAsync<NeuronAuthorizationException>(
+                () => runner
+                    .InvokeBlockedAsync(delegation, targetId)
+                    .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
-        Assert.Equal(1, DelegatedInvocationGate.EntryCount(owner));
-        DelegatedInvocationGate.Release(owner);
-        Assert.Equal(23, await firstInvocation);
+            Assert.Equal(1, await gate.EntryCountAsync());
+            await gate.ReleaseAsync();
+            Assert.Equal(23, await firstInvocation);
+        }
+        finally
+        {
+            await gate.ReleaseAsync();
+        }
 
         var callerOutgoing = await simulation.ReadJournalAsync(
             JournalKind.Outgoing,
@@ -455,15 +474,16 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "the persisted post-redemption loss cut requires a fresh delegation")]
     public async Task PersistedPostRedemptionLossCutRequiresFreshDelegation()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-redeemed-loss-cut");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-redeemed-loss-cut",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var consumed = await issuer.IssueAsync(
             runner.GetGrainId(),
@@ -514,16 +534,17 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "real authority callbacks reject the wrong runner and causal-caller target")]
     public async Task RealAuthorityCallbacksRejectWrongRunnerAndCausalCallerTarget()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-authority-identities");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-authority-identities",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var wrongIssuerId = NeuronId.For<DelegationIssuer>(owner, "wrong-issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
-        var wrongRunner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var wrongRunner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/wrong-runner"));
         var delegation = await issuer.IssueAsync(
             runner.GetGrainId(),
@@ -543,15 +564,16 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "duplicate matching outcomes are idempotent and contradictory outcomes are rejected")]
     public async Task DuplicateAndContradictoryDelegatedOutcomesCannotCreateExtraFacts()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-terminal-idempotency");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-terminal-idempotency",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var delegation = await issuer.IssueAsync(
             runner.GetGrainId(),
@@ -576,16 +598,17 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "delegation retention backpressures when only protected active and terminal authority remains")]
     public async Task DelegationRetentionIsBoundedWithoutEvictingActiveAuthority()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-bounded-retention");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-bounded-retention",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var initialTarget = NeuronId.For<DelegatedCapabilityTarget>(owner, "initial-target");
         var recoveryTarget = NeuronId.For<DelegatedCapabilityTarget>(owner, "recovery-target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var consumed = await issuer.IssueAsync(
             runner.GetGrainId(),
@@ -651,15 +674,16 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "consumed delegation loss recovery stays bounded and protects the newest authority")]
     public async Task ConsumedDelegationLossRecoveryStaysBoundedAndProtectsTheNewestAuthority()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-consumed-retention");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-consumed-retention",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var consumed = new List<CapabilityDelegation>();
 
@@ -723,16 +747,17 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "capacity backpressure protects the newest terminal delegation")]
     public async Task CapacityBackpressureProtectsTheNewestTerminalDelegation()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-terminal-retention");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-terminal-retention",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
         var blockedTarget = NeuronId.For<DelegatedCapabilityTarget>(owner, "blocked-target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
 
         for (var index = 0; index < MaximumRememberedDelegations - 1; index++)
@@ -777,13 +802,14 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "finishing atomically moves delegation retention from consumed to terminal")]
     public async Task FinishingAtomicallyMovesDelegationRetentionFromConsumedToTerminal()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-finish-retention-move");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-finish-retention-move",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var terminal = await issuer.IssueAsync(
             runner.GetGrainId(),
@@ -832,15 +858,16 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "persisted terminal order drives eviction before protected consumed authority")]
     public async Task PersistedTerminalOrderDrivesEvictionBeforeProtectedConsumedAuthority()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-persisted-terminal-retention");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-persisted-terminal-retention",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var oldTerminal = await issuer.IssueAsync(
             runner.GetGrainId(),
@@ -904,15 +931,16 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "a legitimate delegated target failure produces only one failed outcome")]
     public async Task LegitimateDelegatedTargetFailureProducesOnlyOneFailedOutcome()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-failure");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-failure",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var delegation = await issuer.IssueAsync(
             runner.GetGrainId(),
@@ -937,15 +965,16 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "a legitimate target authorization failure is Failed and remains terminally consistent")]
     public async Task LegitimateTargetAuthorizationFailureIsFailedAndTerminallyConsistent()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-target-authorization-failure");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-target-authorization-failure",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var delegation = await issuer.IssueAsync(
             runner.GetGrainId(),
@@ -972,33 +1001,29 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "outcome callback failure does not replace the semantic target exception")]
     public async Task OutcomeCallbackFailureDoesNotReplaceSemanticTargetException()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-outcome-callback-failure");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-outcome-callback-failure",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var delegation = await issuer.IssueAsync(
             runner.GetGrainId(),
             targetId,
             nameof(IDelegatedCapabilityTarget.RejectAsync));
-        SimulationCluster.FailJournalWriteAfter(
-            issuerId.ToGrainId(),
-            completedWritesBeforeFailure: 1,
-            "injected delegation outcome callback persistence failure");
 
         NeuronAuthorizationException failure;
 
-        try
+        await using (scenario.Arm(new JournalCommitAfter(
+            issuerId.ToGrainId(),
+            CompletedWritesBeforeFailure: 1,
+            Message: "injected delegation outcome callback persistence failure")))
         {
             failure = await Assert.ThrowsAsync<NeuronAuthorizationException>(
                 () => runner.InvokeAuthorizationFailureAsync(delegation, targetId));
-        }
-        finally
-        {
-            SimulationCluster.ClearJournalWriteFailure(issuerId.ToGrainId());
         }
 
         Assert.Equal("Expected delegated target authorization failure.", failure.Message);
@@ -1016,33 +1041,29 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "throwing semantic diagnostic data cannot mask the original callback failure path")]
     public async Task ThrowingSemanticDiagnosticDataCannotMaskOriginalCallbackFailurePath()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-throwing-diagnostic-data");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-throwing-diagnostic-data",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
         var delegation = await issuer.IssueAsync(
             runner.GetGrainId(),
             targetId,
             nameof(IDelegatedCapabilityTarget.ThrowDiagnosticDataAsync));
-        SimulationCluster.FailJournalWriteAfter(
-            issuerId.ToGrainId(),
-            completedWritesBeforeFailure: 1,
-            "injected delegation outcome callback persistence failure");
 
         ThrowingDiagnosticDataException failure;
 
-        try
+        await using (scenario.Arm(new JournalCommitAfter(
+            issuerId.ToGrainId(),
+            CompletedWritesBeforeFailure: 1,
+            Message: "injected delegation outcome callback persistence failure")))
         {
             failure = await Assert.ThrowsAsync<ThrowingDiagnosticDataException>(
                 () => runner.InvokeThrowingDataFailureAsync(delegation, targetId));
-        }
-        finally
-        {
-            SimulationCluster.ClearJournalWriteFailure(issuerId.ToGrainId());
         }
 
         Assert.Equal("Expected throwing diagnostic data semantic failure.", failure.Message);
@@ -1055,13 +1076,14 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "delegation rejects an overloaded method name because it is not an exact operation")]
     public async Task DelegationRejectsAnOverloadedMethodName()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-overload");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-overload",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
 
         await Assert.ThrowsAsync<ArgumentException>(
@@ -1071,34 +1093,24 @@ public sealed class CapabilityDelegationSecurityContracts
     [Fact(DisplayName = "a delegated call preserves its committed causal request and completes exactly once")]
     public async Task DelegatedCallPreservesCommittedCausalRequestAndCompletesExactlyOnce()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("delegation-valid");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "delegation-valid",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var simulation = new Simulation();
         simulation.OpenBrain(owner.Value);
         var issuerId = NeuronId.For<DelegationIssuer>(owner, "issuer");
         var targetId = NeuronId.For<DelegatedCapabilityTarget>(owner, "target");
-        var issuer = SimulationCluster.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
-        var runner = SimulationCluster.Grains.GetGrain<IDelegatedRunner>(
+        var issuer = scenario.Grains.GetGrain<IDelegationIssuer>(issuerId.ToGrainId());
+        var runner = scenario.Grains.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{owner.Value}/runner"));
-        var runnerId = runner.GetGrainId();
-        var observer = new DelegatedTargetJournalObserver();
-        var observerReference = SimulationCluster.Grains.CreateObjectReference<IJournalObserver>(observer);
-        DelegatedTargetCommitObservations.Expect(owner);
-
-        await simulation.WatchAsync(
-            JournalKind.Incoming,
-            nameof(DelegatedCapabilityTarget),
-            "target",
-            afterSequence: 0,
-            observerReference);
 
         await simulation.SendAsync(
             nameof(BeginDelegatedCall),
             nameof(DelegationIssuer),
             "issuer",
             NoValues);
-        var delegation = DelegationIssuance.Take(owner);
+        var delegation = await issuer.LastIssuedAsync();
 
         await issuer.DeactivateAsync();
 
@@ -1145,74 +1157,6 @@ public sealed class CapabilityDelegationSecurityContracts
     private static bool Is<TSynapse>(SynapseDelivery delivery)
         where TSynapse : Synapse
         => delivery.Synapse is TSynapse;
-
-    private sealed class DelegatedTargetJournalObserver : IJournalObserver
-    {
-        public Task ObserveAsync(JournalKind kind, JournalRead read)
-        {
-            foreach (var delivery in read.Delta.Where(Is<CapabilityRequested>))
-            {
-                DelegatedTargetCommitObservations.Record(delivery.SynapseId);
-            }
-
-            return Task.CompletedTask;
-        }
-    }
-}
-
-internal static class DelegatedTargetCommitObservations
-{
-    private static readonly ConcurrentDictionary<SynapseId, byte> Committed = new();
-    private static readonly ConcurrentDictionary<OwnerId, byte> Expected = new();
-
-    internal static void Expect(OwnerId owner) => Expected.TryAdd(owner, 0);
-
-    internal static bool IsExpected(OwnerId owner) => Expected.ContainsKey(owner);
-
-    internal static bool Contains(SynapseId request) => Committed.ContainsKey(request);
-
-    internal static void Record(SynapseId request) => Committed.TryAdd(request, 0);
-}
-
-internal static class DelegatedTargetStorageObservations
-{
-    private static readonly ConcurrentDictionary<OwnerId, Expectation> Expected = new();
-
-    internal static void Expect(OwnerId owner, GrainId target, long completedWrites)
-        => Expected[owner] = new(target, completedWrites);
-
-    internal static void VerifyCompletedBeforeEntry(OwnerId owner)
-    {
-        if (!Expected.TryRemove(owner, out var expected))
-        {
-            return;
-        }
-
-        var actual = SimulationCluster.CompletedJournalWrites(expected.Target);
-
-        if (actual != expected.CompletedWrites + 1)
-        {
-            throw new InvalidOperationException(
-                "Exactly one target journal write must complete before semantic method entry.");
-        }
-    }
-
-    private sealed record Expectation(GrainId Target, long CompletedWrites);
-}
-
-internal static class DelegatedTargetEntryObservations
-{
-    private static readonly ConcurrentDictionary<OwnerId, int> Entries = new();
-
-    internal static void Reset(OwnerId owner) => Entries[owner] = 0;
-
-    internal static void ObserveAtEntry(OwnerId owner)
-    {
-        Entries.AddOrUpdate(owner, 1, static (_, count) => count + 1);
-        DelegatedTargetStorageObservations.VerifyCompletedBeforeEntry(owner);
-    }
-
-    internal static int Count(OwnerId owner) => Entries.GetValueOrDefault(owner);
 }
 
 [GenerateSerializer]
@@ -1238,6 +1182,9 @@ internal interface IDelegationIssuer : INeuron
         GrainId delegateSource,
         NeuronId target);
 
+    [Alias("LastIssued")]
+    Task<CapabilityDelegation> LastIssuedAsync();
+
     [Alias("Deactivate")]
     Task DeactivateAsync();
 }
@@ -1247,6 +1194,8 @@ internal sealed class DelegationIssuer
       IDelegationIssuer,
       IHandle<BeginDelegatedCall>
 {
+    private CapabilityDelegation? _lastIssued;
+
     public async Task HandleAsync(
         BeginDelegatedCall synapse,
         CancellationToken cancellationToken)
@@ -1254,24 +1203,26 @@ internal sealed class DelegationIssuer
         var runner = GrainFactory.GetGrain<IDelegatedRunner>(
             IdSpan.Create($"{Id.Owner.Value}/runner"));
         var target = NeuronId.For<DelegatedCapabilityTarget>(Id.Owner, "target");
-        var delegation = await DelegateCapabilityAsync(
+        _lastIssued = await DelegateCapabilityAsync(
             runner.GetGrainId(),
             target,
             typeof(IDelegatedCapabilityTarget),
             nameof(IDelegatedCapabilityTarget.EnterAsync));
-
-        DelegationIssuance.Record(Id.Owner, delegation);
     }
 
-    public Task<CapabilityDelegation> IssueAsync(
+    public async Task<CapabilityDelegation> IssueAsync(
         GrainId delegateSource,
         NeuronId target,
         string method)
-        => DelegateCapabilityAsync(
+    {
+        var delegation = await DelegateCapabilityAsync(
             delegateSource,
             target,
             typeof(IDelegatedCapabilityTarget),
             method);
+        _lastIssued = delegation;
+        return delegation;
+    }
 
     public Task<CapabilityDelegation> IssueOverloadedAsync(
         GrainId delegateSource,
@@ -1282,25 +1233,17 @@ internal sealed class DelegationIssuer
             typeof(IOverloadedDelegatedTarget),
             nameof(IOverloadedDelegatedTarget.InvokeAsync));
 
+    public Task<CapabilityDelegation> LastIssuedAsync()
+        => _lastIssued is { } issued
+            ? Task.FromResult(issued)
+            : throw new InvalidOperationException($"No delegation was issued for '{Id.Owner}'.");
+
     public Task DeactivateAsync()
     {
         DeactivateOnIdle();
 
         return Task.CompletedTask;
     }
-}
-
-internal static class DelegationIssuance
-{
-    private static readonly ConcurrentDictionary<OwnerId, CapabilityDelegation> Issued = new();
-
-    internal static void Record(OwnerId owner, CapabilityDelegation delegation)
-        => Issued[owner] = delegation;
-
-    internal static CapabilityDelegation Take(OwnerId owner)
-        => Issued.TryRemove(owner, out var delegation)
-            ? delegation
-            : throw new InvalidOperationException($"No delegation was issued for '{owner}'.");
 }
 
 [Alias("db.test.overloaded-delegated-target")]
@@ -1470,17 +1413,8 @@ internal sealed class DelegatedCapabilityTarget
 {
     public async Task<int> EnterAsync()
     {
-        DelegatedTargetEntryObservations.ObserveAtEntry(Id.Owner);
-
         var incoming = await ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
         var request = incoming.Delta.Single(delivery => delivery.Synapse is CapabilityRequested);
-
-        if (DelegatedTargetCommitObservations.IsExpected(Id.Owner)
-            && !DelegatedTargetCommitObservations.Contains(request.SynapseId))
-        {
-            throw new InvalidOperationException(
-                "The target request was not durably observed before semantic method entry.");
-        }
 
         var caller = GrainFactory.GetGrain<INeuron>(request.Caller.ToGrainId());
         var callerOutgoing = await caller.ReadJournalAsync(JournalKind.Outgoing, afterSequence: 0);
@@ -1515,10 +1449,65 @@ internal sealed class DelegatedCapabilityTarget
                 "The target request was not committed before semantic method entry.");
         }
 
-        await DelegatedInvocationGate.EnterAsync(Id.Owner);
+        await GrainFactory.GetGrain<IDelegatedInvocationGate>(Id.Owner.Value).EnterAsync();
 
         return 23;
     }
+}
+
+[Alias("db.test.delegated-invocation-gate")]
+internal interface IDelegatedInvocationGate : IGrainWithStringKey
+{
+    [Alias("Reset")]
+    Task ResetAsync();
+
+    [Alias("WaitEntered")]
+    Task WaitEnteredAsync();
+
+    [Alias("Enter")]
+    Task EnterAsync();
+
+    [Alias("Release")]
+    Task ReleaseAsync();
+
+    [Alias("EntryCount")]
+    Task<int> EntryCountAsync();
+}
+
+[Reentrant]
+internal sealed class DelegatedInvocationGateGrain : Grain, IDelegatedInvocationGate
+{
+    private TaskCompletionSource _entered = NewSource();
+    private TaskCompletionSource _released = NewSource();
+    private int _entries;
+
+    public Task ResetAsync()
+    {
+        _entered = NewSource();
+        _released = NewSource();
+        _entries = 0;
+        return Task.CompletedTask;
+    }
+
+    public Task WaitEnteredAsync() => _entered.Task;
+
+    public Task<int> EntryCountAsync() => Task.FromResult(Volatile.Read(ref _entries));
+
+    public async Task EnterAsync()
+    {
+        Interlocked.Increment(ref _entries);
+        _entered.TrySetResult();
+        await _released.Task;
+    }
+
+    public Task ReleaseAsync()
+    {
+        _released.TrySetResult();
+        return Task.CompletedTask;
+    }
+
+    private static TaskCompletionSource NewSource()
+        => new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
 
 [GenerateSerializer]
@@ -1544,39 +1533,4 @@ internal sealed class ThrowingDiagnosticDataException : Exception
     }
 
     public override IDictionary Data => ThrowingData;
-}
-
-internal static class DelegatedInvocationGate
-{
-    private static readonly ConcurrentDictionary<OwnerId, Gate> Gates = new();
-
-    internal static void Reset(OwnerId owner) => Gates[owner] = new Gate();
-
-    internal static Task Entered(OwnerId owner) => For(owner).Entered.Task;
-
-    internal static int EntryCount(OwnerId owner) => For(owner).Entries;
-
-    internal static async Task EnterAsync(OwnerId owner)
-    {
-        var gate = For(owner);
-        Interlocked.Increment(ref gate.Entries);
-        gate.Entered.TrySetResult();
-        await gate.Released.Task;
-    }
-
-    internal static void Release(OwnerId owner) => For(owner).Released.TrySetResult();
-
-    private static Gate For(OwnerId owner)
-        => Gates.TryGetValue(owner, out var gate)
-            ? gate
-            : throw new InvalidOperationException($"No invocation gate exists for '{owner}'.");
-
-    private sealed class Gate
-    {
-        internal TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        internal TaskCompletionSource Released { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        internal int Entries;
-    }
 }

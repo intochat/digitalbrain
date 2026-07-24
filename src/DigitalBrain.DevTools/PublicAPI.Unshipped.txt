@@ -1,7 +1,0 @@
-#nullable enable
-DigitalBrain.DevTools.DevToolsHosting
-DigitalBrain.DevTools.DevelopmentJournalStorage
-const DigitalBrain.DevTools.DevToolsHosting.DashboardPath = "/dashboard" -> string!
-static DigitalBrain.DevTools.DevToolsHosting.AddDigitalBrainDevTools(this Orleans.Hosting.ISiloBuilder! builder, Microsoft.Extensions.Hosting.IHostEnvironment! environment) -> Orleans.Hosting.ISiloBuilder!
-static DigitalBrain.DevTools.DevToolsHosting.MapDigitalBrainDevTools(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, Microsoft.Extensions.Hosting.IHostEnvironment! environment) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
-static DigitalBrain.DevTools.DevelopmentJournalStorage.AddDevelopmentJournalStorage(this Orleans.Hosting.ISiloBuilder! builder) -> Orleans.Hosting.ISiloBuilder!

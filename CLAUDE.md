@@ -23,9 +23,9 @@ The architecture in six lines:
   installs inside it as a behavior.
 - **Every install is a human-approved proposal**, journaled and reversible.
 
-`REFINED-ARCHITECTURE-AND-NEXT-STEPS.md` is the plan of record. Read its ratified architecture,
-hard deletion manifest, and ordered implementation plan before changing framework code. Do not
-silently reverse its decisions. If evidence invalidates one, record the reversal in that file.
+`docs/architecture.md` is the plan of record. Read its ratified architecture before changing
+framework code. Do not silently reverse its decisions. If evidence invalidates one, record the
+reversal in that file.
 
 ---
 
@@ -98,14 +98,37 @@ like any other. Check its method, not only its conclusions.
 | Does the system behave this way? | **The test suite.** Not the docs — several docs have been wrong |
 | What was here before? Is this recoverable? | **git.** Retired trees live at `git show <sha>^:<path>` |
 
-Optional accelerators, in `.mcp.json`: `codegraph` for architecture, `context7` for package docs,
-`aspire` for resource control, `microsoft-learn` for .NET docs.
+Optional accelerators ship as **project MCP** in root `.mcp.json` only:
 
-**If an accelerator is unavailable, say so and fall back to the oracles. Do not skip silently.** Both
-`context7` and `codegraph` have been unavailable in this repository — quota exhausted and `npx`
-exiting 9009 — and a ritual that mandates an unavailable tool gets worked around instead of followed.
-Note: Microsoft Learn returns the older `Orleans.EventSourcing.JournaledGrain` for journaling queries.
-That is a different API from `Microsoft.Orleans.Journaling`. Do not conflate them.
+| Server | Role |
+|---|---|
+| `aspire` | AppHost resource control |
+| `codegraph` | repo architecture index |
+| `context7` | package/docs lookup (`CONTEXT7_API_KEY`) |
+| `microsoft-learn` | official Microsoft docs (HTTP) |
+| `dart` | Dart/Flutter analysis MCP |
+| `digitalbrain-mcp` | product MCP HTTP at `http://localhost:5000/mcp` — Aspire client over `IDigitalBrain.Get<ILlama32>`; tool `ask_llama32` returns `ChatResponse` (requires silo + MCP host) |
+
+That file is the sole catalog. Shape matches sibling DigitalBrain projects: direct `aspire` / `dart`,
+Windows `cmd /c npx -y …` for Node MCPs, native `"type":"http"` for remote HTTP. No `gcf-proxy`, no
+user-profile paths, no global npm MCP installs as a requirement.
+
+Claude project trust is in `.claude/settings.json`: `enableAllProjectMcpServers`,
+`enabledMcpjsonServers` (same names as `.mcp.json`), and `permissions.allow` for `mcp__*` tools.
+Open agents at the repository root with a **plain** start (`claude` / `grok` / `codex`) — do not use
+`--strict-mcp-config` or isolated homes as proof of health. Codex cannot read `.mcp.json`; its only
+adapter is `.codex/config.toml` with the same servers. Project `.grok/config.toml` holds matching
+`[mcp_servers.*]` so name collisions with `~/.claude.json` still resolve to the project lines. Keep
+`.mcp.json`, `.claude/settings.json` allow-lists, `.codex/config.toml`, and `.grok` MCP blocks in
+lockstep. Do not enable plugins that inject MCP.
+
+**If an accelerator is unavailable, say so and fall back to the oracles. Do not skip silently.**
+`codegraph` maintains its index during `dotnet build` — which `aspire run` triggers — and is served
+from `.mcp.json` when the session root is this repository. A session rooted above the repo cannot
+reach that index; that absence is the environment, not a broken tool. `context7` needs
+`CONTEXT7_API_KEY` in the process environment — fall back to Microsoft Learn when it is unset.
+Note: Microsoft Learn returns the older `Orleans.EventSourcing.JournaledGrain` for journaling
+queries. That is a different API from `Microsoft.Orleans.Journaling`. Do not conflate them.
 
 **Check whether the ground moved.** Record `git rev-parse HEAD` and `git status --porcelain` at the
 start of a session, and check both again before staging. This repository has been modified mid-session
@@ -116,12 +139,11 @@ it and do not sweep it into your commit.
 finding counts — for example "changes a decision that is currently open", not "find valuable
 content". Without a rule they return summaries; with one they return findings.
 
-**Agent harness (Claude / Grok / Codex).** Capability inventory is `tools/harness/inventory.json`
-(IAW-aligned plugins + mattpocock). Portable skills live in `.agents/skills/`. Per-harness adapters:
-`.claude/settings.json`, `.grok/config.toml`, `.codex/config.toml`. Install/sync with
-`pwsh tools/harness/setup.ps1`; check declared capability presence with
-`pwsh tools/harness/verify.ps1`. This is an installation check, not a behavioural conformance
-suite. Codex will never get Claude LSP/hooks; those rows are explicit `unsupported`.
+**Agent harness (Claude / Grok / Codex).** MCP lives in `.mcp.json`. Harness adapters
+(`.claude/settings.json`, `.grok/config.toml`, `.codex/config.toml`) hold only harness-native
+non-MCP settings, except Codex’s required MCP TOML mirror. Do not fork the server list in three
+places. If a tool only appears from user-level config or a marketplace plugin, treat it as outside
+this repository’s harness and do not depend on it.
 
 ---
 
@@ -144,10 +166,13 @@ node tools/render-specification.mjs
 node --test tests/*.test.mjs
 ```
 
-Two guards fail the build by design, and that is correct:
+One guard fails the build by design, and that is correct:
 
-- Adding a public type means updating `PublicAPI.Unshipped.txt`.
 - Adding an `[Alias]` means updating the pinned-alias contract.
+
+Public API is not baseline-locked while the framework is a pre-release alpha in flux; the
+`PublicApiAnalyzers` baseline files were removed. Re-introduce them when a real release approaches
+and the public surface should stop changing without review.
 
 ---
 
@@ -176,9 +201,10 @@ Two guards fail the build by design, and that is correct:
 
 The durable neuron and synapse foundation, generated module activation, typed AI neurons, and
 AI-owned Aspire integration are proven. The Foundation PoC architecture is frozen through the
-ratified decision record. Its proposed public CLR seams, red-green order, and stop conditions are in
-`docs/superpowers/plans/2026-07-20-foundation-poc.md`; implementation begins only after that plan is
-approved and then proceeds one green slice at a time.
+ratified rules in `docs/architecture.md` (§9). Its proposed public CLR seams, red-green order, and stop conditions are in
+`docs/superpowers/plans/2026-07-20-foundation-poc.md`. That plan is approved and its Tasks 1 through 8
+are complete, as it records at its own line 11; the work remaining in it proceeds one green slice at a
+time.
 
 One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
 That benchmark and the behavior proposal/install rail remain deliberately outside the Foundation

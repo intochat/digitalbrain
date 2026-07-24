@@ -1,9 +1,9 @@
-using System.Collections.Concurrent;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
 using Xunit;
+using ScenarioFactory = DigitalBrain.Testing.Simulations;
 
 namespace DigitalBrain.Simulations;
 
@@ -74,24 +74,29 @@ public sealed class CapabilityCausalContinuationContracts
     [Fact(DisplayName = "capability causation rejects an uncommitted delivered request fact")]
     public async Task CaptureRejectsAnUncommittedDeliveredCapabilityRequest()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("causal-capture-uncommitted");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "causal-capture-uncommitted",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var driverId = NeuronId.For<CausalContinuationDriver>(owner, "driver");
         var continuationId = NeuronId.For<CausalContinuationTarget>(owner, "continuation");
-        var driver = SimulationCluster.Grains.GetGrain<ICausalContinuationDriver>(driverId.ToGrainId());
-        CausalContinuationCaptureObservations.Reset(continuationId);
+        var driver = scenario.Grains.GetGrain<ICausalContinuationDriver>(driverId.ToGrainId());
+        var target = scenario.Grains.GetGrain<ICausalContinuationTarget>(continuationId.ToGrainId());
 
         await driver.SendUncommittedCaptureAsync(continuationId);
 
-        for (var attempt = 0; attempt < 100 && !CausalContinuationCaptureObservations.TryRead(
-                 continuationId,
-                 out _); attempt++)
+        bool? rejected = null;
+        for (var attempt = 0; attempt < 100; attempt++)
         {
+            rejected = await target.ReadUncommittedCaptureRejectedAsync();
+            if (rejected is not null)
+            {
+                break;
+            }
+
             await Task.Delay(TimeSpan.FromMilliseconds(10), TestContext.Current.CancellationToken);
         }
 
-        Assert.True(CausalContinuationCaptureObservations.TryRead(continuationId, out var rejected));
         Assert.True(rejected);
     }
 
@@ -254,28 +259,24 @@ public sealed class CapabilityCausalContinuationContracts
     [Fact(DisplayName = "a failed deferred reply commit cannot leak its outgoing fact into a later commit")]
     public async Task FailedDeferredReplyCommitRollsBackOutgoingJournal()
     {
-        await SimulationCluster.StartAsync();
-
-        var owner = new OwnerId("causal-continuation-reply-write-rollback");
+        await using var scenario = await ScenarioFactory.OpenAsync(
+            "causal-continuation-reply-write-rollback",
+            TestContext.Current.CancellationToken);
+        var owner = scenario.Owner;
         var driverId = NeuronId.For<CausalContinuationDriver>(owner, "driver");
         var continuationId = NeuronId.For<CausalContinuationTarget>(owner, "continuation");
-        var driver = SimulationCluster.Grains.GetGrain<ICausalContinuationDriver>(driverId.ToGrainId());
+        var driver = scenario.Grains.GetGrain<ICausalContinuationDriver>(driverId.ToGrainId());
         var causation = await driver.CaptureAsync(continuationId);
-        var targetGrain = continuationId.ToGrainId();
+        var infrastructure = scenario.Grains.GetGrain<ICausalContinuationInfrastructureRunner>(
+            IdSpan.Create($"{owner.Value}/causal-continuation-infrastructure-runner"));
 
-        SimulationCluster.FailJournalWriteAfter(
-            targetGrain,
-            completedWritesBeforeFailure: 0,
-            "Expected deferred-reply commit failure.");
-
-        try
+        await using (scenario.Arm(new JournalCommitAfter(
+            continuationId.ToGrainId(),
+            CompletedWritesBeforeFailure: 0,
+            Message: "Expected deferred-reply commit failure.")))
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                InfrastructureRunner(owner).CompleteAsync(continuationId, causation));
-        }
-        finally
-        {
-            SimulationCluster.ClearJournalWriteFailure(targetGrain);
+                infrastructure.CompleteAsync(continuationId, causation));
         }
 
         await driver.TouchAsync(continuationId);
@@ -285,7 +286,7 @@ public sealed class CapabilityCausalContinuationContracts
             afterUnrelatedCommit.Delta,
             delivery => delivery.Synapse is DeferredCausalReply);
 
-        await InfrastructureRunner(owner).CompleteAsync(continuationId, causation);
+        await infrastructure.CompleteAsync(continuationId, causation);
 
         var received = await ReadUntilAsync(
             driver,
@@ -445,6 +446,9 @@ internal interface ICausalContinuationTarget : INeuron
 
     [Alias("ReplyThenThrow")]
     Task ReplyThenThrowAsync(SynapseId causation);
+
+    [Alias("ReadUncommittedCaptureRejected")]
+    Task<bool?> ReadUncommittedCaptureRejectedAsync();
 }
 
 internal sealed class CausalContinuationTarget
@@ -453,6 +457,8 @@ internal sealed class CausalContinuationTarget
       ICausalContinuationOwnerCallback,
       IHandle<CapabilityRequested>
 {
+    private bool? _uncommittedCaptureRejected;
+
     public Task<SynapseId> CaptureAsync(NeuronId expectedCaller)
         => Task.FromResult(CaptureCapabilityCausation(expectedCaller));
 
@@ -497,17 +503,20 @@ internal sealed class CausalContinuationTarget
         throw new InvalidOperationException("Expected failure after deferred reply staging.");
     }
 
+    public Task<bool?> ReadUncommittedCaptureRejectedAsync()
+        => Task.FromResult(_uncommittedCaptureRejected);
+
     public Task HandleAsync(CapabilityRequested synapse, CancellationToken cancellationToken)
     {
         try
         {
             _ = CaptureCapabilityCausation(
                 NeuronId.For<CausalContinuationDriver>(Id.Owner, "driver"));
-            CausalContinuationCaptureObservations.Record(Id, rejected: false);
+            _uncommittedCaptureRejected = false;
         }
         catch (InvalidOperationException)
         {
-            CausalContinuationCaptureObservations.Record(Id, rejected: true);
+            _uncommittedCaptureRejected = true;
         }
 
         return Task.CompletedTask;
@@ -528,16 +537,4 @@ internal sealed class CausalContinuationInfrastructureRunner(IGrainFactory grain
     public Task CompleteAsync(NeuronId target, SynapseId causation)
         => grains.GetGrain<ICausalContinuationOwnerCallback>(target.ToGrainId())
             .CompleteDeferredAsync(causation);
-}
-
-internal static class CausalContinuationCaptureObservations
-{
-    private static readonly ConcurrentDictionary<NeuronId, bool> Observed = new();
-
-    internal static void Reset(NeuronId target) => Observed.TryRemove(target, out _);
-
-    internal static void Record(NeuronId target, bool rejected) => Observed[target] = rejected;
-
-    internal static bool TryRead(NeuronId target, out bool rejected)
-        => Observed.TryGetValue(target, out rejected);
 }

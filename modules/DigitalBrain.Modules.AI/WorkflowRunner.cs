@@ -1,8 +1,8 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
+using DigitalBrain.Security;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Agents.AI.Workflows.Checkpointing;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
@@ -16,6 +16,10 @@ internal interface IWorkflowRunner : IGrainWithStringKey
     [OneWay]
     [Alias("Execute")]
     Task ExecuteAsync(WorkflowRunCommand command);
+
+    [AlwaysInterleave]
+    [Alias("Cancel")]
+    Task CancelAsync(Guid runId);
 }
 
 [Alias("ai.workflow-run-owner")]
@@ -40,16 +44,16 @@ internal interface IWorkflowRunCompletion : INeuron
 [GrainType("ai-workflow-runner")]
 internal sealed class WorkflowRunner(
     IGrainFactory grains,
-    IDataProtectionProvider dataProtection,
+    IDurablePayloadProtector payloadProtector,
     ILogger<WorkflowRunner> logger,
     Serializer<ChatMessage> messages) : Grain, IWorkflowRunner
 {
-    private const string CheckpointProtectionPurpose = "DigitalBrain.AI.WorkflowCheckpoint.v1";
     private static readonly Action<ILogger, Guid, Exception?> LogRunFailure = LoggerMessage.Define<Guid>(
         LogLevel.Error,
         new EventId(1, "WorkflowRunFailed"),
         "Workflow run {RunId} failed before adoption.");
     private Guid? _executing;
+    private CancellationTokenSource? _executionCancellation;
 
     public async Task ExecuteAsync(WorkflowRunCommand command)
     {
@@ -66,11 +70,13 @@ internal sealed class WorkflowRunner(
                 $"Workflow runner '{this.GetGrainId()}' is already executing another run.");
         }
 
+        var cancellation = new CancellationTokenSource();
         _executing = command.Run.RunId;
+        _executionCancellation = cancellation;
 
         try
         {
-            await ExecuteCoreAsync(command);
+            await ExecuteCoreAsync(command, cancellation.Token);
         }
         catch (Exception failure)
         {
@@ -80,13 +86,33 @@ internal sealed class WorkflowRunner(
         }
         finally
         {
-            _executing = null;
+            if (_executing == command.Run.RunId
+                && ReferenceEquals(_executionCancellation, cancellation))
+            {
+                _executing = null;
+                _executionCancellation = null;
+            }
+
+            cancellation.Dispose();
         }
     }
 
-    private async Task ExecuteCoreAsync(WorkflowRunCommand command)
+    public Task CancelAsync(Guid runId)
+    {
+        if (_executing == runId)
+        {
+            _executionCancellation?.Cancel();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task ExecuteCoreAsync(
+        WorkflowRunCommand command,
+        CancellationToken cancellationToken)
     {
         RequireCommandMatchesRunner(command);
+        cancellationToken.ThrowIfCancellationRequested();
         var turnScheduler = TaskScheduler.Current;
         var owner = grains.GetGrain<IWorkflowRunOwner>(command.Run.Cursor.Worker.ToGrainId());
         var participants = MafParticipantAdapter.CreateDelegated(
@@ -95,19 +121,26 @@ internal sealed class WorkflowRunner(
             turnScheduler,
             participant => OnTurn(
                 () => owner.AuthorizeParticipantAsync(command.Run, participant),
-                turnScheduler));
+                turnScheduler,
+                cancellationToken));
         var workflow = GroupChatWorkflow.Create(participants);
         var identity = WorkflowCheckpointIdentity.For(command.Run.Cursor);
         var checkpointGrain = grains.GetGrain<IWorkflowCheckpointGrain>(
             IdSpan.Create(identity.GrainKey));
-        var protector = dataProtection.CreateProtector(
-            CheckpointProtectionPurpose,
-            identity.SessionId);
-        var store = new OrleansCheckpointStore(checkpointGrain, identity.SessionId, protector);
+        var protectionPurpose = WorkflowCheckpointProtection.Purpose(
+            identity.SessionId,
+            command.Run.DefinitionFingerprint);
+        var store = new OrleansCheckpointStore(
+            checkpointGrain,
+            identity.SessionId,
+            payloadProtector,
+            protectionPurpose);
         var checkpoints = CheckpointManager.CreateJson(store);
         StreamingRun execution;
+        var inputCheckpoint = command.Run.InputCheckpoint;
+        var sendInitialTurn = inputCheckpoint is null;
 
-        if (command.Run.InputCheckpoint is null)
+        if (inputCheckpoint is null)
         {
             execution = await InProcessExecution.Lockstep
                 .WithCheckpointing(checkpoints)
@@ -115,24 +148,19 @@ internal sealed class WorkflowRunner(
                     workflow,
                     ChatMessageCopies.Clone(command.ReplayInput, messages),
                     identity.SessionId,
-                    CancellationToken.None);
-
-            if (!await execution.TrySendMessageAsync(new TurnToken(emitEvents: true)))
-            {
-                throw new InvalidOperationException("The fresh workflow run rejected its initial turn token.");
-            }
+                    cancellationToken);
         }
         else
         {
-            RequireCheckpointIdentity(command.Run.InputCheckpoint, identity);
+            RequireCheckpointIdentity(inputCheckpoint, identity);
             execution = await InProcessExecution.Lockstep
                 .WithCheckpointing(checkpoints)
                 .ResumeStreamingAsync(
                     workflow,
                     new CheckpointInfo(
-                        command.Run.InputCheckpoint.SessionId,
-                        command.Run.InputCheckpoint.CheckpointId),
-                    CancellationToken.None);
+                        inputCheckpoint.SessionId,
+                        inputCheckpoint.CheckpointId),
+                    cancellationToken);
         }
 
         List<ChatMessage>? terminal = null;
@@ -140,7 +168,21 @@ internal sealed class WorkflowRunner(
 
         try
         {
-            await foreach (var workflowEvent in execution.WatchStreamAsync(CancellationToken.None))
+            if (sendInitialTurn)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var accepted = await AwaitSendAsync(
+                    execution.TrySendMessageAsync(new TurnToken(emitEvents: true)),
+                    cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (!accepted)
+                {
+                    throw new InvalidOperationException("The fresh workflow run rejected its initial turn token.");
+                }
+            }
+
+            await foreach (var workflowEvent in execution.WatchStreamAsync(cancellationToken))
             {
                 if (workflowEvent is WorkflowOutputEvent output
                     && !output.IsIntermediate()
@@ -158,15 +200,10 @@ internal sealed class WorkflowRunner(
         }
         finally
         {
-            try
-            {
-                await execution.CancelRunAsync();
-            }
-            finally
-            {
-                await execution.DisposeAsync();
-            }
+            await AwaitCleanupAsync(execution, cancellationToken);
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (outputCheckpoint is null)
         {
@@ -181,7 +218,8 @@ internal sealed class WorkflowRunner(
             terminal is null ? null : ChatMessageCopies.Clone(terminal, messages));
         var completionDelegation = await OnTurn(
             () => owner.AuthorizeCompletionAsync(command.Run),
-            turnScheduler);
+            turnScheduler,
+            cancellationToken);
         var completion = grains.GetGrain<IWorkflowRunCompletion>(
             command.Run.Cursor.Worker.ToGrainId());
 
@@ -189,7 +227,8 @@ internal sealed class WorkflowRunner(
             () => DigitalBrainRuntime.InvokeAsync(
                 completionDelegation,
                 () => completion.CompleteAsync(result)),
-            turnScheduler);
+            turnScheduler,
+            cancellationToken);
     }
 
     private void RequireCommandMatchesRunner(WorkflowRunCommand command)
@@ -222,12 +261,71 @@ internal sealed class WorkflowRunner(
         }
     }
 
-    private static Task<T> OnTurn<T>(Func<Task<T>> invoke, TaskScheduler turnScheduler)
-        => Task.Factory.StartNew(
+    private static Task<T> OnTurn<T>(
+        Func<Task<T>> invoke,
+        TaskScheduler turnScheduler,
+        CancellationToken cancellationToken)
+    {
+        var pending = Task.Factory.StartNew(
             invoke,
-            CancellationToken.None,
+            cancellationToken,
             TaskCreationOptions.DenyChildAttach,
             turnScheduler).Unwrap();
+
+        return AwaitOperationAsync(pending, cancellationToken);
+    }
+
+    private static Task<bool> AwaitSendAsync(
+        ValueTask<bool> pending,
+        CancellationToken cancellationToken)
+        => AwaitOperationAsync(pending.AsTask(), cancellationToken);
+
+    private static Task AwaitCleanupAsync(
+        StreamingRun execution,
+        CancellationToken cancellationToken)
+        => AwaitOperationAsync(CleanupExecutionAsync(execution), cancellationToken);
+
+    private static async Task CleanupExecutionAsync(StreamingRun execution)
+    {
+        try
+        {
+            await execution.CancelRunAsync();
+        }
+        finally
+        {
+            await execution.DisposeAsync();
+        }
+    }
+
+    private static async Task AwaitOperationAsync(
+        Task pending,
+        CancellationToken cancellationToken)
+    {
+        ObserveLateFault(pending);
+
+        await pending.WaitAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    private static async Task<T> AwaitOperationAsync<T>(
+        Task<T> pending,
+        CancellationToken cancellationToken)
+    {
+        ObserveLateFault(pending);
+
+        var result = await pending.WaitAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return result;
+    }
+
+    private static void ObserveLateFault(Task pending)
+    {
+        _ = pending.ContinueWith(
+            static completed => _ = completed.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default);
+    }
 }
 
 internal static class WorkflowRunnerIdentity

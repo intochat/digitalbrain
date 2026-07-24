@@ -32,6 +32,24 @@ public sealed class AssemblyBoundaryContracts
         Assert.Contains(reachable, reference => reference.StartsWith("OpenAI", StringComparison.Ordinal));
     }
 
+    [Fact(DisplayName = "public production package types expose MEAI but no MAF implementation types")]
+    public void PublicProductionPackageSurfacesDoNotExposeMafTypes()
+    {
+        var exportedSurface = PackableProjects.Names
+            .Select(Assembly.Load)
+            .SelectMany(assembly => assembly.GetExportedTypes())
+            .SelectMany(PublicSurfaceTypes)
+            .SelectMany(TypeClosure)
+            .Distinct()
+            .ToArray();
+
+        Assert.Contains(exportedSurface, type => type == typeof(Microsoft.Extensions.AI.ChatMessage));
+        Assert.Contains(exportedSurface, type => type == typeof(Microsoft.Extensions.AI.ChatResponse));
+        Assert.DoesNotContain(
+            exportedSurface,
+            type => type.Namespace?.StartsWith("Microsoft.Agents.AI", StringComparison.Ordinal) is true);
+    }
+
     [Fact]
     public void TheAbstractionsPackageIsALeaf()
         => Assert.DoesNotContain(ReachableFrom(typeof(NeuronId).Assembly), IsDigitalBrain);
@@ -73,6 +91,133 @@ public sealed class AssemblyBoundaryContracts
 
     private static bool IsDigitalBrain(string assemblyName)
         => assemblyName.StartsWith("DigitalBrain", StringComparison.Ordinal);
+
+    private static IEnumerable<Type> PublicSurfaceTypes(Type type)
+    {
+        const BindingFlags Members =
+            BindingFlags.Public
+            | BindingFlags.NonPublic
+            | BindingFlags.Instance
+            | BindingFlags.Static
+            | BindingFlags.FlattenHierarchy;
+
+        yield return type;
+
+        if (type.BaseType is not null)
+        {
+            yield return type.BaseType;
+        }
+
+        foreach (var contract in type.GetInterfaces())
+        {
+            yield return contract;
+        }
+
+        foreach (var constructor in type.GetConstructors(Members).Where(IsVisible))
+        {
+            foreach (var parameter in constructor.GetParameters())
+            {
+                yield return parameter.ParameterType;
+            }
+        }
+
+        foreach (var method in type.GetMethods(Members).Where(IsVisible))
+        {
+            yield return method.ReturnType;
+
+            foreach (var parameter in method.GetParameters())
+            {
+                yield return parameter.ParameterType;
+            }
+
+            foreach (var argument in method.GetGenericArguments())
+            {
+                yield return argument;
+            }
+        }
+
+        foreach (var property in type.GetProperties(Members).Where(IsVisible))
+        {
+            yield return property.PropertyType;
+
+            foreach (var parameter in property.GetIndexParameters())
+            {
+                yield return parameter.ParameterType;
+            }
+        }
+
+        foreach (var field in type.GetFields(Members).Where(IsVisible))
+        {
+            yield return field.FieldType;
+        }
+
+        foreach (var eventInfo in type.GetEvents(Members).Where(IsVisible))
+        {
+            if (eventInfo.EventHandlerType is not null)
+            {
+                yield return eventInfo.EventHandlerType;
+            }
+        }
+    }
+
+    private static bool IsVisible(MethodBase method)
+        => method.IsPublic
+            || method.IsFamily
+            || method.IsFamilyOrAssembly
+            || method.IsFamilyAndAssembly;
+
+    private static bool IsVisible(FieldInfo field)
+        => field.IsPublic
+            || field.IsFamily
+            || field.IsFamilyOrAssembly
+            || field.IsFamilyAndAssembly;
+
+    private static bool IsVisible(PropertyInfo property)
+        => property.GetAccessors(nonPublic: true).Any(IsVisible);
+
+    private static bool IsVisible(EventInfo eventInfo)
+        => new[]
+        {
+            eventInfo.AddMethod,
+            eventInfo.RemoveMethod,
+            eventInfo.RaiseMethod,
+        }
+        .OfType<MethodInfo>()
+        .Any(IsVisible);
+
+    private static IEnumerable<Type> TypeClosure(Type type)
+    {
+        var pending = new Stack<Type>([type]);
+        var reached = new HashSet<Type>();
+
+        while (pending.TryPop(out var current))
+        {
+            if (!reached.Add(current))
+            {
+                continue;
+            }
+
+            yield return current;
+
+            if (current.HasElementType && current.GetElementType() is { } element)
+            {
+                pending.Push(element);
+            }
+
+            foreach (var argument in current.GetGenericArguments())
+            {
+                pending.Push(argument);
+            }
+
+            if (current.IsGenericParameter)
+            {
+                foreach (var constraint in current.GetGenericParameterConstraints())
+                {
+                    pending.Push(constraint);
+                }
+            }
+        }
+    }
 
     private static HashSet<string> ReachableFrom(Assembly root)
     {

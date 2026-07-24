@@ -4,7 +4,10 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" />
+    <PackageVersion Include="ModelContextProtocol" Version="1.4.1" />
+    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="1.4.1" />
+    <PackageVersion Include="ModelContextProtocol.Core" Version="1.4.1" />
+
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageVersion Include="Reqnroll" Version="3.3.4" />
     <PackageVersion Include="Reqnroll.xunit.v3" Version="3.3.4" />
@@ -14,12 +17,16 @@
   <ItemGroup>
     <PackageVersion Include="Aspire.Hosting" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting.JavaScript" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.OpenAI" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.4.6" />
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.8.0" />
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.4.0" />
     <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.8.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.8.0" />
     <PackageVersion Include="Microsoft.Agents.AI" Version="1.13.0" />
@@ -27,11 +34,13 @@
     <PackageVersion Include="Microsoft.AspNetCore.DataProtection" Version="10.0.10" />
     <PackageVersion Include="OllamaSharp" Version="5.4.27" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Dashboard" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Journaling" Version="10.2.2-rc.2.alpha.1" />
     <PackageVersion Include="Microsoft.Orleans.Journaling.AzureStorage" Version="10.2.2-rc.2.alpha.1" />
     <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.2.2-rc.2" />
+    <PackageVersion Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.2-rc.2" />
     <PackageVersion Include="Microsoft.Orleans.Serialization.SystemTextJson" Version="10.2.2-rc.2" />

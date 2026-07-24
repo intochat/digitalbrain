@@ -1,10 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain.Security;
 using DigitalBrain.Tasks;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Agents.AI.Workflows.Checkpointing;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
@@ -65,10 +65,31 @@ internal sealed class WorkflowCheckpointGrain : DurableGrain, IWorkflowCheckpoin
         }
 
         var checkpointId = Guid.NewGuid().ToString("N");
-        _payloads.Add(checkpointId, command.ProtectedPayload.ToArray());
-        _parents.Add(checkpointId, command.Parent?.CheckpointId ?? string.Empty);
-        _order.Add(checkpointId);
-        await WriteStateAsync();
+        var payloads = _payloads.ToDictionary(
+            static entry => entry.Key,
+            static entry => entry.Value.ToArray(),
+            StringComparer.Ordinal);
+        var parents = _parents.ToDictionary(
+            static entry => entry.Key,
+            static entry => entry.Value,
+            StringComparer.Ordinal);
+        var order = _order.ToArray();
+
+        try
+        {
+            _payloads.Add(checkpointId, command.ProtectedPayload.ToArray());
+            _parents.Add(checkpointId, command.Parent?.CheckpointId ?? string.Empty);
+            _order.Add(checkpointId);
+            await WriteStateAsync();
+        }
+        catch
+        {
+            Restore(_payloads, payloads);
+            Restore(_parents, parents);
+            Restore(_order, order);
+
+            throw;
+        }
 
         return new WorkflowCheckpointReference(command.SessionId, checkpointId);
     }
@@ -119,16 +140,41 @@ internal sealed class WorkflowCheckpointGrain : DurableGrain, IWorkflowCheckpoin
 
         return $"dbw_{hash}";
     }
+
+    private static void Restore<T>(
+        IDurableDictionary<string, T> target,
+        IReadOnlyDictionary<string, T> snapshot)
+    {
+        target.Clear();
+
+        foreach (var entry in snapshot)
+        {
+            target.Add(entry.Key, entry.Value);
+        }
+    }
+
+    private static void Restore<T>(
+        IDurableList<T> target,
+        IReadOnlyList<T> snapshot)
+    {
+        target.Clear();
+
+        foreach (var value in snapshot)
+        {
+            target.Add(value);
+        }
+    }
 }
 
 internal sealed class OrleansCheckpointStore(
     IWorkflowCheckpointGrain grain,
     string sessionId,
-    IDataProtector protector) : ICheckpointStore<JsonElement>
+    IDurablePayloadProtector protector,
+    string protectionPurpose) : JsonCheckpointStore
 {
     internal string SessionId { get; } = sessionId;
 
-    public async ValueTask<CheckpointInfo> CreateCheckpointAsync(
+    public override async ValueTask<CheckpointInfo> CreateCheckpointAsync(
         string sessionId,
         JsonElement checkpoint,
         CheckpointInfo? parent)
@@ -136,7 +182,9 @@ internal sealed class OrleansCheckpointStore(
         RequireSession(sessionId);
         var created = await grain.CreateAsync(new CheckpointWrite(
             sessionId,
-            protector.Protect(Encoding.UTF8.GetBytes(checkpoint.GetRawText())),
+            protector.Protect(
+                protectionPurpose,
+                Encoding.UTF8.GetBytes(checkpoint.GetRawText())),
             parent is null
                 ? null
                 : new WorkflowCheckpointReference(parent.SessionId, parent.CheckpointId)));
@@ -144,20 +192,20 @@ internal sealed class OrleansCheckpointStore(
         return new CheckpointInfo(created.SessionId, created.CheckpointId);
     }
 
-    public async ValueTask<JsonElement> RetrieveCheckpointAsync(
+    public override async ValueTask<JsonElement> RetrieveCheckpointAsync(
         string sessionId,
         CheckpointInfo checkpoint)
     {
         RequireSession(sessionId);
         var protectedPayload = await grain.ReadAsync(
             new WorkflowCheckpointReference(checkpoint.SessionId, checkpoint.CheckpointId));
-        var payload = protector.Unprotect(protectedPayload);
+        var payload = protector.Unprotect(protectionPurpose, protectedPayload);
         using var document = JsonDocument.Parse(payload);
 
         return document.RootElement.Clone();
     }
 
-    public async ValueTask<IEnumerable<CheckpointInfo>> RetrieveIndexAsync(
+    public override async ValueTask<IEnumerable<CheckpointInfo>> RetrieveIndexAsync(
         string sessionId,
         CheckpointInfo? parent)
     {
@@ -195,5 +243,18 @@ internal sealed record WorkflowCheckpointIdentity(
         return new(
             $"{cursor.Worker.GrainKey}/workflow-checkpoint/{hash}",
             $"dbw_{hash}");
+    }
+}
+
+internal static class WorkflowCheckpointProtection
+{
+    private const string RootPurpose = "DigitalBrain.AI.WorkflowCheckpoint.v1";
+
+    internal static string Purpose(string sessionId, string definitionFingerprint)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(definitionFingerprint);
+
+        return $"{RootPurpose}\n{sessionId}\n{definitionFingerprint}";
     }
 }

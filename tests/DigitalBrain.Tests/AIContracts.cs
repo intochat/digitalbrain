@@ -3,12 +3,12 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
+using DigitalBrain.Security;
 using DigitalBrain.Tasks;
-using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Agents.AI.Workflows.Checkpointing;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Xunit;
 
@@ -94,13 +94,13 @@ public sealed class AIContracts
     {
         var expected = new Dictionary<string, (string Alias, (string Name, uint Id)[] Members)>(StringComparer.Ordinal)
         {
-            ["DigitalBrain.AI.AIWorkerState"] = ("ai.worker-state", [("Cursor", 0u), ("ReplayInput", 1u), ("Definition", 2u), ("Checkpoint", 3u), ("Causation", 4u), ("ActiveRun", 5u)]),
+            ["DigitalBrain.AI.AIWorkerState"] = ("ai.worker-state", [("Cursor", 0u), ("ReplayInput", 1u), ("Definition", 2u), ("Checkpoint", 3u), ("Causation", 4u), ("ActiveRun", 5u), ("Lifecycle", 6u)]),
             ["DigitalBrain.AI.WorkflowCheckpointReference"] = ("ai.workflow-checkpoint-reference", [("SessionId", 0u), ("CheckpointId", 1u)]),
             ["DigitalBrain.AI.WorkflowRun"] = ("ai.workflow-run", [("RunId", 0u), ("Cursor", 1u), ("DefinitionFingerprint", 2u), ("InputCheckpoint", 3u), ("RecoverAfterUtc", 4u)]),
             ["DigitalBrain.AI.WorkflowRunCommand"] = ("ai.workflow-run-command", [("Run", 0u), ("Definition", 1u), ("ReplayInput", 2u)]),
             ["DigitalBrain.AI.WorkflowRunResult"] = ("ai.workflow-run-result", [("Run", 0u), ("OutputCheckpoint", 1u), ("TerminalMessages", 2u)]),
             ["DigitalBrain.AI.OrchestrationParticipant"] = ("ai.orchestration-participant", [("Contract", 0u), ("NeuronId", 1u), ("AgentId", 2u), ("AgentName", 3u)]),
-            ["DigitalBrain.AI.OrchestrationDefinition"] = ("ai.orchestration-definition", [("FormatVersion", 0u), ("MafVersion", 1u), ("Fingerprint", 2u), ("Participants", 3u), ("HostId", 4u), ("HostName", 5u)]),
+            ["DigitalBrain.AI.OrchestrationDefinition"] = ("ai.orchestration-definition", [("FormatVersion", 0u), ("MafVersion", 1u), ("Fingerprint", 2u), ("Participants", 3u), ("HostId", 4u), ("HostName", 5u), ("Kind", 6u), ("OrchestrationType", 7u), ("ExecutionEnvironment", 8u), ("Manager", 9u), ("Aggregator", 10u), ("ApplicationVersion", 11u)]),
             ["DigitalBrain.AI.CheckpointWrite"] = ("ai.checkpoint-write", [("SessionId", 0u), ("ProtectedPayload", 1u), ("Parent", 2u)]),
         };
         var aliases = new List<string>();
@@ -117,7 +117,7 @@ public sealed class AIContracts
 
         var interfaces = new Dictionary<string, (string Alias, string[] Methods)>(StringComparer.Ordinal)
         {
-            ["DigitalBrain.AI.IWorkflowRunner"] = ("ai.workflow-runner", ["Execute"]),
+            ["DigitalBrain.AI.IWorkflowRunner"] = ("ai.workflow-runner", ["Execute", "Cancel"]),
             ["DigitalBrain.AI.IWorkflowRunOwner"] = ("ai.workflow-run-owner", ["AuthorizeParticipant", "AuthorizeCompletion"]),
             ["DigitalBrain.AI.IWorkflowRunCompletion"] = ("ai.workflow-run-completion", ["Complete"]),
             ["DigitalBrain.AI.IWorkflowCheckpointGrain"] = ("ai.workflow-checkpoint-grain", ["Create", "Read", "Index"]),
@@ -221,17 +221,48 @@ public sealed class AIContracts
             () => host.Services.GetRequiredKeyedService<IChatClient>(typeof(Gpt56)));
     }
 
-    [Fact(DisplayName = "AIModule preserves the host Data Protection application discriminator")]
-    public void ModulePreservesHostDataProtectionIsolation()
+    [Fact(DisplayName = "AIModule uses shared durable protection without process-local Data Protection")]
+    public void ModuleUsesSharedDurableProtection()
     {
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.AddDataProtection().SetApplicationName("brain-deployment");
+        builder.Configuration[DurablePayloadProtector.ConfigurationKey] =
+            Convert.ToBase64String(new byte[32]);
         builder.UseOrleans(AIModule.Configure);
 
         using var host = builder.Build();
-        var options = host.Services.GetRequiredService<IOptions<DataProtectionOptions>>().Value;
 
-        Assert.Equal("brain-deployment", options.ApplicationDiscriminator);
+        Assert.NotNull(host.Services.GetRequiredService<IDurablePayloadProtector>());
+        Assert.DoesNotContain(
+            Runtime.GetReferencedAssemblies(),
+            reference => reference.Name == "Microsoft.AspNetCore.DataProtection");
+    }
+
+    [Fact(DisplayName = "the AI runtime has one MEAI adapter for every MAF participant path")]
+    public void RuntimeUsesOneMafChatClientAdapter()
+    {
+        var adapters = Runtime.GetTypes()
+            .Where(type => type is { IsAbstract: false, IsInterface: false }
+                && typeof(IChatClient).IsAssignableFrom(type))
+            .ToArray();
+
+        Assert.Equal(["DigitalBrain.AI.NeuronChatClient"], adapters.Select(type => type.FullName));
+    }
+
+    [Fact(DisplayName = "MAF execution has no unused pseudo-agent layer")]
+    public void MafExecutionHasNoPseudoAgentLayer()
+    {
+        Assert.Null(Runtime.GetType("DigitalBrain.AI.Agent", throwOnError: false));
+        Assert.Null(Runtime.GetType("DigitalBrain.AI.MafAgentFactory", throwOnError: false));
+    }
+
+    [Fact(DisplayName = "Orleans checkpoints extend the MAF JSON checkpoint-store abstraction")]
+    public void OrleansCheckpointStoreUsesMafJsonBase()
+    {
+        var store = Assert.IsType<Type>(
+            Runtime.GetType("DigitalBrain.AI.OrleansCheckpointStore", throwOnError: false),
+            exactMatch: false);
+
+        Assert.Equal(typeof(JsonCheckpointStore), store.BaseType);
     }
 
     [Fact(DisplayName = "IChatClient injection is confined to concrete LLM neurons")]
@@ -286,5 +317,83 @@ public sealed class AIContracts
         Assert.DoesNotContain(references, reference => reference.Name == "Microsoft.Extensions.AI.OpenAI");
         Assert.DoesNotContain(references, reference => reference.Name == "OllamaSharp");
         Assert.DoesNotContain(surface, member => member.ToString()?.Contains("Microsoft.Agents", StringComparison.Ordinal) is true);
+    }
+
+    [Fact(DisplayName = "direct MAF session mechanics are one internal deep module")]
+    public void DirectSessionMechanicsAreInternalAndReplacedShallowTypesAreGone()
+    {
+        var directSession = Runtime.GetType("DigitalBrain.AI.DirectAgentSession", throwOnError: false);
+
+        Assert.NotNull(directSession);
+        Assert.False(directSession.IsPublic);
+        Assert.Null(Runtime.GetType("DigitalBrain.AI.SessionCompatibility", throwOnError: false));
+        Assert.Null(Runtime.GetType("DigitalBrain.AI.OrchestrationState", throwOnError: false));
+    }
+
+    [Fact(DisplayName = "one typed direct orchestration shape owns definition and agent construction")]
+    public void DirectOrchestrationShapeOwnsDefinitionAndAgentConstruction()
+    {
+        var shape = Runtime.GetType("DigitalBrain.AI.DirectOrchestrationShape", throwOnError: false);
+
+        Assert.NotNull(shape);
+        Assert.False(shape.IsPublic);
+        foreach (var factoryName in new[] { "CreateConcurrent", "CreateGroupChat" })
+        {
+            var factory = Assert.Single(
+                shape.GetMethods(BindingFlags.Static | BindingFlags.NonPublic),
+                method => method.Name == factoryName);
+            Assert.Equal(shape, factory.ReturnType);
+            Assert.Equal(
+                [typeof(Type), typeof(IReadOnlyList<Participant>)],
+                factory.GetParameters().Select(parameter => parameter.ParameterType));
+        }
+
+        var definition = Assert.Single(
+            shape.GetProperties(BindingFlags.Instance | BindingFlags.NonPublic),
+            property => property.Name == "Definition");
+        Assert.Equal(
+            "DigitalBrain.AI.OrchestrationDefinition",
+            definition.PropertyType.FullName);
+        var agent = Assert.Single(
+            shape.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic),
+            method => method.Name == "CreateAgent");
+        Assert.Equal("Microsoft.Agents.AI.AIAgent", agent.ReturnType.FullName);
+    }
+
+    [Fact(DisplayName = "missing supervised lifecycle state fails closed and terminal states cannot continue")]
+    public void SupervisedAttemptLifecycleFailsClosed()
+    {
+        var lifecycle = Runtime.GetType(
+            "DigitalBrain.AI.SupervisedAttemptLifecycle",
+            throwOnError: false);
+        var rules = Runtime.GetType(
+            "DigitalBrain.AI.SupervisedAttemptLifecycleRules",
+            throwOnError: false);
+
+        Assert.NotNull(lifecycle);
+        Assert.NotNull(rules);
+        Assert.Equal(
+            ["Unknown", "Running", "AwaitingContinuation", "Succeeded", "Cancelled", "Cancelling"],
+            Enum.GetNames(lifecycle));
+        var defaultValue = Activator.CreateInstance(lifecycle);
+        Assert.Equal("Unknown", Enum.GetName(lifecycle, defaultValue!));
+        var canContinue = Assert.Single(
+            rules.GetMethods(BindingFlags.Static | BindingFlags.NonPublic),
+            method => method.Name == "CanContinue");
+        var allowsDirect = Assert.Single(
+            rules.GetMethods(BindingFlags.Static | BindingFlags.NonPublic),
+            method => method.Name == "AllowsDirect");
+
+        Assert.False((bool)canContinue.Invoke(null, [defaultValue])!);
+        Assert.False((bool)allowsDirect.Invoke(null, [defaultValue])!);
+        Assert.True((bool)canContinue.Invoke(
+            null,
+            [Enum.Parse(lifecycle, "AwaitingContinuation")])!);
+        foreach (var terminal in new[] { "Succeeded", "Cancelled" })
+        {
+            var value = Enum.Parse(lifecycle, terminal);
+            Assert.False((bool)canContinue.Invoke(null, [value])!);
+            Assert.True((bool)allowsDirect.Invoke(null, [value])!);
+        }
     }
 }

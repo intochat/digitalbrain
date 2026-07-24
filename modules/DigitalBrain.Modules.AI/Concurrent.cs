@@ -1,9 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
-using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.Workflows;
+using DigitalBrain.Security;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Journaling;
 
 namespace DigitalBrain.AI;
 
@@ -13,6 +14,18 @@ namespace DigitalBrain.AI;
     Justification = "Concurrent is the ratified public orchestration vocabulary.")]
 public abstract class Concurrent : Neuron, IAgent
 {
+    private const string StateName = "ai.concurrent.session";
+    private readonly DirectAgentSession _directSession;
+
+    protected Concurrent()
+    {
+        _directSession = new DirectAgentSession(
+            ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName),
+            ServiceProvider.GetRequiredService<IDurablePayloadProtector>(),
+            () => WriteStateAsync(),
+            Id);
+    }
+
     protected abstract IReadOnlyList<Participant> Participants { get; }
 
     protected Participant<TNeuron> Participant<TNeuron>(string? name = null)
@@ -23,13 +36,14 @@ public abstract class Concurrent : Neuron, IAgent
     {
         ArgumentNullException.ThrowIfNull(messages);
 
-        var turnScheduler = TaskScheduler.Current;
-        var participants = MafParticipantAdapter.CreateAll(GrainFactory, Participants, turnScheduler);
-        var workflow = AgentWorkflowBuilder.BuildConcurrent(participants);
-        var agent = workflow.AsAIAgent();
-        var session = await agent.CreateSessionAsync();
-        var response = await agent.RunAsync(messages, session);
+        var snapshot = OrchestrationParticipants.Snapshot(Id, Participants);
+        var shape = DirectOrchestrationShape.CreateConcurrent(GetType(), snapshot);
+        var agent = shape.CreateAgent(GrainFactory, TaskScheduler.Current);
 
-        return response.AsChatResponse();
+        return await _directSession.RunAsync(
+            agent,
+            shape.Definition,
+            messages,
+            CancellationToken.None);
     }
 }

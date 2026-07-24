@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Client;
 
-public sealed class DigitalBrainClient
+public sealed class DigitalBrainClient : IDigitalBrain
 {
     private const string SessionName = "session";
     private const string DefaultInstance = "default";
@@ -23,6 +23,18 @@ public sealed class DigitalBrainClient
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
 
         return new DigitalBrainClient(grains, new OwnerId(owner));
+    }
+
+    public T Get<T>()
+        where T : class, INeuron
+        => Get<T>(DefaultInstance);
+
+    public T Get<T>(string name)
+        where T : class, INeuron
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        return _grains.GetGrain<T>(NeuronId.For<T>(Owner, name).ToGrainId());
     }
 
     public Task SendAsync<TNeuron>(Synapse synapse)

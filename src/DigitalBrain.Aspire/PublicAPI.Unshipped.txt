@@ -1,3 +1,0 @@
-#nullable enable
-DigitalBrain.Aspire.DigitalBrainClientHostingExtensions
-static DigitalBrain.Aspire.DigitalBrainClientHostingExtensions.AddDigitalBrainClient(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder, string! owner) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!

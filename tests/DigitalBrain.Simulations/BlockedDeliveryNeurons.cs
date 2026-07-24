@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 
@@ -31,18 +30,15 @@ internal sealed class OutageRelay : Neuron, IHandle<Ping>
 
 internal sealed class RecoveringReceiver : Neuron, IHandle<Ping>
 {
-    private static readonly ConcurrentDictionary<string, int> RemainingOutages = new(StringComparer.Ordinal);
+    private int _failuresLeft = 2;
 
     public Task HandleAsync(Ping synapse, CancellationToken cancellationToken)
     {
-        var remaining = RemainingOutages.AddOrUpdate(Id.GrainKey, 2, static (_, left) => left - 1);
-
-        if (remaining > 0)
+        if (_failuresLeft > 0)
         {
+            var remaining = _failuresLeft--;
             throw new InvalidOperationException($"Receiver is still out; {remaining} failure(s) remain before it accepts.");
         }
-
-        RemainingOutages.TryRemove(Id.GrainKey, out _);
 
         return Task.CompletedTask;
     }

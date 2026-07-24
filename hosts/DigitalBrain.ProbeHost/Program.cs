@@ -6,6 +6,8 @@ using Orleans;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.AddKeyedAzureTableServiceClient("probe-clustering");
+builder.AddKeyedAzureTableServiceClient("probe-reminders");
 builder.UseOrleans(silo => silo
     .AddDigitalBrain()
     .AddBroadcastHandlers(typeof(Recorder).Assembly)

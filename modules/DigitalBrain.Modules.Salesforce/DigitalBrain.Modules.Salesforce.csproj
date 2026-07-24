@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Salesforce module: Account mutation neuron backed by the official hosted MCP boundary.</Description>
+    <RootNamespace>DigitalBrain.Salesforce</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812;CA2007</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Modules.Salesforce.Contracts\DigitalBrain.Modules.Salesforce.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Integrations.Mcp\DigitalBrain.Integrations.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
+  </ItemGroup>
+</Project>

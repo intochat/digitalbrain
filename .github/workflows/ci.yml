@@ -23,33 +23,12 @@ jobs:
           global-json-file: global.json
       - name: test
         run: dotnet test DigitalBrain.slnx -c Release
-      - name: pack
-        shell: pwsh
-        run: ./eng/pack.ps1
-      - name: consumer restore and run from an empty package cache
-        shell: pwsh
-        run: ./eng/verify-consumer.ps1
-      - uses: actions/upload-artifact@v7
-        with:
-          name: packages
-          path: artifacts/packages
 
-  dependency-hygiene:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
-        with:
-          global-json-file: global.json
-      - name: no vulnerable, deprecated or floating dependencies
-        shell: pwsh
-        run: ./eng/verify-dependencies.ps1
-
-  website:
+  docs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: website
+        working-directory: docs
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

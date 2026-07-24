@@ -32,4 +32,10 @@ public sealed class ClientEntryPointContracts
 
         Assert.Equal([nameof(ISessionNeuron)], shipped);
     }
+
+    [Fact(DisplayName = "ILLM is a module client entry point so IDigitalBrain.Get can call RespondAsync")]
+    public void LlmContractIsAModuleClientEntryPoint()
+    {
+        Assert.NotNull(typeof(DigitalBrain.AI.ILLM).GetCustomAttribute<ClientEntryPointAttribute>());
+    }
 }

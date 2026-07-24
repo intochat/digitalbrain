@@ -1,6 +1,6 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
-using Microsoft.AspNetCore.DataProtection;
+using DigitalBrain.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Serialization;
@@ -14,7 +14,7 @@ public sealed class AIModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        builder.Services.AddDataProtection();
+        DurablePayloadProtectionHosting.Configure(builder.Services, builder.Configuration);
         AIClients.Add(builder.Services);
     }
 

@@ -1,3 +1,0 @@
-#nullable enable
-DigitalBrain.AI.Aspire.Hosting.AIHostingExtensions
-static DigitalBrain.AI.Aspire.Hosting.AIHostingExtensions.WithLlm<TModel>(this DigitalBrain.AI.AIModule! module) -> DigitalBrain.AI.AIModule!

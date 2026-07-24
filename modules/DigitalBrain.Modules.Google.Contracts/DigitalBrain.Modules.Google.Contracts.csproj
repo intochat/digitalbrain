@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Google module contracts: typed Gmail neuron vocabulary.</Description>
+    <RootNamespace>DigitalBrain.Google</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

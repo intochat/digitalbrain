@@ -1,18 +1,20 @@
 <Project>
   <PropertyGroup>
-    <_CodeGraphSentinel>$(MSBuildThisFileDirectory).config\.codegraph-initialized</_CodeGraphSentinel>
+    <_CodeGraphRepositoryRoot>$([System.IO.Path]::TrimEndingDirectorySeparator($([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)'))))</_CodeGraphRepositoryRoot>
+    <_CodeGraphAppHostProject>$([System.IO.Path]::Combine('$(_CodeGraphRepositoryRoot)', 'hosts', 'DigitalBrain.AppHost', 'DigitalBrain.AppHost.csproj'))</_CodeGraphAppHostProject>
+    <_CodeGraphDatabase>$([System.IO.Path]::Combine('$(_CodeGraphRepositoryRoot)', '.codegraph', 'codegraph.db'))</_CodeGraphDatabase>
   </PropertyGroup>
 
-  <Target Name="InitCodeGraph" BeforeTargets="Build"
-          Condition=" ! $([System.String]::new('$(MSBuildProjectName)').Contains('AppHost')) And !Exists('$(_CodeGraphSentinel)') ">
-    <MakeDir Directories="$(MSBuildThisFileDirectory).config" />
-    <Exec Command="npx --yes @colbymchenry/codegraph init"
-          WorkingDirectory="$(MSBuildThisFileDirectory)"
-          ContinueOnError="true">
-      <Output TaskParameter="ExitCode" PropertyName="_CodeGraphExitCode" />
-    </Exec>
-    <Touch Files="$(_CodeGraphSentinel)" AlwaysCreate="true" />
-    <Warning Condition="'$(_CodeGraphExitCode)' != '0'"
-             Text="CodeGraph init failed with exit code $(_CodeGraphExitCode). The codegraph MCP server has no index, so the Pre-Change Ritual's step 2 cannot be followed. Run 'npx @colbymchenry/codegraph init' manually, read the output, then delete .config/.codegraph-initialized to re-arm this check." />
+  <Target Name="RefreshCodeGraph" BeforeTargets="Build"
+          Condition="'$(IsAspireHost)' == 'true' And '$(MSBuildProjectFullPath)' == '$(_CodeGraphAppHostProject)'">
+    <PropertyGroup>
+      <_CodeGraphDatabaseExists>$([System.IO.File]::Exists('$(_CodeGraphDatabase)'))</_CodeGraphDatabaseExists>
+    </PropertyGroup>
+    <Exec Command="npx -y @colbymchenry/codegraph@latest init &quot;$(_CodeGraphRepositoryRoot)&quot;"
+          WorkingDirectory="$(_CodeGraphRepositoryRoot)"
+          Condition="'$(_CodeGraphDatabaseExists)' != 'True'" />
+    <Exec Command="npx -y @colbymchenry/codegraph@latest sync &quot;$(_CodeGraphRepositoryRoot)&quot;"
+          WorkingDirectory="$(_CodeGraphRepositoryRoot)"
+          Condition="'$(_CodeGraphDatabaseExists)' == 'True'" />
   </Target>
 </Project>

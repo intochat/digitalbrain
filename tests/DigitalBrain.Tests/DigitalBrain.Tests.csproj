@@ -20,8 +20,13 @@
     <ProjectReference Include="..\..\src\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.DevTools\DigitalBrain.DevTools.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Security\DigitalBrain.Security.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.AI\DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.AI.Aspire.Hosting\DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Tasks\DigitalBrain.Modules.Tasks.csproj" />
+    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Google\DigitalBrain.Modules.Google.csproj" />
+    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Google.Aspire.Hosting\DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />
+    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Salesforce\DigitalBrain.Modules.Salesforce.csproj" />
+    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Salesforce.Aspire.Hosting\DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

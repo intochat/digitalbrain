@@ -472,6 +472,7 @@ internal sealed class TaskNeuron :
         }
         catch (Exception)
         {
+            await RegisterDispatchReminderAsync();
             return;
         }
 

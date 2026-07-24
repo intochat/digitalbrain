@@ -63,6 +63,28 @@ public sealed class ArchitectureCutContracts
         Assert.Empty(violations);
     }
 
+    [Fact(DisplayName = "production projects contain no source-like scratch artifacts")]
+    public void ProductionProjectsContainNoSourceLikeScratchArtifacts()
+    {
+        string[] roots = ["src", "modules", "hosts", "samples"];
+
+        var artifacts = roots
+            .SelectMany(root => Directory.EnumerateFiles(
+                Path.Combine(RepositoryRoot, root),
+                "*.cs.txt",
+                SearchOption.AllDirectories))
+            .Where(file => !file.Contains(
+                $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal))
+            .Where(file => !file.Contains(
+                $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal))
+            .Select(file => Path.GetRelativePath(RepositoryRoot, file))
+            .ToArray();
+
+        Assert.Empty(artifacts);
+    }
+
     private static string LocateRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
