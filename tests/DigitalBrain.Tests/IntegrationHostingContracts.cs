@@ -21,30 +21,33 @@ public sealed class IntegrationHostingContracts
         var testingAppHost = XDocument.Load(
             Path.Combine(RepositoryRoot, "hosts", "DigitalBrain.TestingAppHost", "DigitalBrain.TestingAppHost.csproj"));
         var solution = File.ReadAllText(Path.Combine(RepositoryRoot, "DigitalBrain.slnx"));
+        var testingAppHostDirectory = Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.TestingAppHost");
         var projectRefs = testingAppHost
             .Descendants("ProjectReference")
             .Where(reference =>
             {
                 var aspireResource = reference.Attribute("IsAspireProjectResource");
-                return aspireResource is null || !string.Equals(aspireResource.Value, "false", StringComparison.OrdinalIgnoreCase);
+                return aspireResource is null
+                    || !string.Equals(aspireResource.Value, "false", StringComparison.OrdinalIgnoreCase);
             })
             .Select(reference => reference.Attribute("Include")?.Value)
             .Where(include => !string.IsNullOrWhiteSpace(include))
-            .Select(include => Path.GetFullPath(Path.Combine(
-                RepositoryRoot,
-                "hosts",
-                "DigitalBrain.TestingAppHost",
-                include!)))
-            .Select(fullPath => Path.GetRelativePath(RepositoryRoot, fullPath).Replace('\\', '/'))
+            .Select(include =>
+            {
+                var normalized = include!.Replace('\\', Path.DirectorySeparatorChar);
+                var fullPath = Path.GetFullPath(Path.Combine(testingAppHostDirectory, normalized));
+                return Path.GetRelativePath(RepositoryRoot, fullPath).Replace('\\', '/');
+            })
             .ToList();
 
         Assert.Contains(projectRefs, path => path.EndsWith("DigitalBrain.Host.csproj", StringComparison.Ordinal));
         Assert.Contains(projectRefs, path => path.EndsWith("DigitalBrain.ProbeHost.csproj", StringComparison.Ordinal));
-        Assert.All(projectRefs, path =>
-            Assert.Contains(
-                path,
-                solution,
-                StringComparison.Ordinal));
+        Assert.All(
+            projectRefs,
+            path => Assert.Contains(path, solution, StringComparison.Ordinal));
     }
 
     [Fact(DisplayName = "the AppHost build exclusively initializes or synchronizes CodeGraph")]
