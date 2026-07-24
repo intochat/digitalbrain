@@ -5,8 +5,7 @@ using Xunit;
 
 namespace DigitalBrain.HostTests;
 
-[Collection(HostedApplication.CollectionName)]
-public sealed class HostedRestart
+public sealed class HostedRestart(TestingAppHostFixture fixture)
 {
     private static readonly TimeSpan DeliveryLimit = TimeSpan.FromSeconds(30);
 
@@ -14,13 +13,14 @@ public sealed class HostedRestart
     public async Task ADurableTurnAndDeliverySurviveAKernelRestart()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var hosted = await HostedApplication.OpenAsync<Projects.DigitalBrain_TestingAppHost>(
-            cancellationToken: cancellationToken);
+        await using var host = await fixture.StartAsync(cancellationToken);
+        var silo = host.Resource("silo");
+        var probe = host.Resource("probe");
 
-        await hosted.WaitHttpReadyAsync("silo", cancellationToken: cancellationToken);
-        await hosted.WaitHttpReadyAsync("probe", cancellationToken: cancellationToken);
+        await silo.WaitUntilHealthyAsync(cancellationToken);
+        await probe.WaitUntilHealthyAsync(cancellationToken);
 
-        using (var kernel = hosted.CreateHttpClient("probe"))
+        using (var kernel = probe.CreateHttpClient())
         {
             kernel.Timeout = TimeSpan.FromSeconds(30);
             using var turn = await kernel.PostAsync(
@@ -33,10 +33,10 @@ public sealed class HostedRestart
             Assert.Equal(1, await SettledAsync(kernel, "/probe/delivered/Recorder", 1, cancellationToken));
         }
 
-        await hosted.RestartResourceAsync("probe", cancellationToken);
-        await hosted.WaitHttpReadyAsync("probe", cancellationToken: cancellationToken);
+        await probe.RestartAsync(cancellationToken);
+        await probe.WaitUntilHealthyAsync(cancellationToken);
 
-        using var recovered = hosted.CreateHttpClient("probe");
+        using var recovered = probe.CreateHttpClient();
         recovered.Timeout = TimeSpan.FromSeconds(30);
 
         Assert.Equal(1, await CountAsync(recovered, "/probe/fired", cancellationToken));
@@ -55,13 +55,14 @@ public sealed class HostedRestart
     public async Task TheOrleansDashboardIsServedInDevelopment()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var hosted = await HostedApplication.OpenAsync<Projects.DigitalBrain_TestingAppHost>(
-            cancellationToken: cancellationToken);
+        await using var host = await fixture.StartAsync(cancellationToken);
+        var silo = host.Resource("silo");
+        var probe = host.Resource("probe");
 
-        await hosted.WaitHttpReadyAsync("silo", cancellationToken: cancellationToken);
-        await hosted.WaitHttpReadyAsync("probe", cancellationToken: cancellationToken);
+        await silo.WaitUntilHealthyAsync(cancellationToken);
+        await probe.WaitUntilHealthyAsync(cancellationToken);
 
-        using var kernel = hosted.CreateHttpClient("probe");
+        using var kernel = probe.CreateHttpClient();
         kernel.Timeout = TimeSpan.FromSeconds(30);
         using var dashboard = await kernel.GetAsync(new Uri("/dashboard", UriKind.Relative), cancellationToken);
 
