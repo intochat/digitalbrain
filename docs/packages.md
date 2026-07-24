@@ -56,9 +56,10 @@ package remain model-provider-free. Each chat client is keyed by its concrete mo
 
 The namespace and type name are the model identity.
 
-Ollama models share one Ollama resource. OpenAI models share one OpenAI resource and one secret
-`openai-api-key` parameter. Only silo references receive provider endpoints, model names, and that
-secret parameter; client references receive none of them.
+Within one brain, Ollama models share one Ollama resource and OpenAI models share one OpenAI
+resource. Each brain owns a secret `<brain-name>-ai-openai-api-key` parameter. Only silo references
+receive provider endpoints, model names, and that secret parameter; client references receive none
+of them.
 
 `DigitalBrain.Security` is the shared purpose-bound durable encryption package. AI uses it for direct
 MAF sessions and supervised workflow checkpoints; `DigitalBrain.Integrations.Mcp` uses it for OAuth

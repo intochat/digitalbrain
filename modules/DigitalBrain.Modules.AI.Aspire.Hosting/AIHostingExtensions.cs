@@ -109,7 +109,7 @@ public static class AIHostingExtensions
         {
             var builder = brain.GetApplicationBuilder();
             _openAIKey ??= builder
-                .AddParameter("openai-api-key", secret: true)
+                .AddParameter($"{brain.Name}-ai-openai-api-key", secret: true)
                 .WithDescription(
                     "Create or manage an API key at [OpenAI Platform](https://platform.openai.com/api-keys).",
                     enableMarkdown: true);

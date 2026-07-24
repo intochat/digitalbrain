@@ -23,7 +23,7 @@ public sealed class AIHostingContracts
 
         Assert.Single(builder.Resources, resource => resource.Name == "brain-ai-ollama");
         Assert.Single(builder.Resources, resource => resource.Name == "brain-ai-openai");
-        Assert.Single(builder.Resources, resource => resource.Name == "openai-api-key");
+        Assert.Single(builder.Resources, resource => resource.Name == "brain-ai-openai-api-key");
         Assert.Single(builder.Resources, resource => resource.Name == "brain-state-protection-key");
     }
 
@@ -56,7 +56,7 @@ public sealed class AIHostingContracts
         brain.AddModule<AIModule>(ai => ai.WithLlm<Gpt56>());
 
         var apiKey = Assert.IsType<ParameterResource>(
-            Assert.Single(builder.Resources, resource => resource.Name == "openai-api-key"));
+            Assert.Single(builder.Resources, resource => resource.Name == "brain-ai-openai-api-key"));
 
         Assert.True(apiKey.Secret);
         Assert.True(apiKey.EnableDescriptionMarkdown);
@@ -64,6 +64,22 @@ public sealed class AIHostingContracts
             "[OpenAI Platform](https://platform.openai.com/api-keys)",
             apiKey.Description,
             StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "multiple brains own distinct OpenAI resources and secrets")]
+    public void MultipleBrainsOwnDistinctOpenAIResourcesAndSecrets()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+
+        builder.AddDigitalBrain("first")
+            .AddModule<AIModule>(ai => ai.WithLlm<Gpt56>());
+        builder.AddDigitalBrain("second")
+            .AddModule<AIModule>(ai => ai.WithLlm<Gpt56>());
+
+        Assert.Single(builder.Resources, resource => resource.Name == "first-ai-openai");
+        Assert.Single(builder.Resources, resource => resource.Name == "second-ai-openai");
+        Assert.Single(builder.Resources, resource => resource.Name == "first-ai-openai-api-key");
+        Assert.Single(builder.Resources, resource => resource.Name == "second-ai-openai-api-key");
     }
 
     [Fact(DisplayName = "Ollama configuration creates only the shared durable-state secret")]
@@ -113,7 +129,7 @@ public sealed class AIHostingContracts
         var silo = builder.AddResource(new ProjectionProbe("silo")).WithReference(brain);
         var environment = await ProjectAsync(silo.Resource);
         var apiKey = Assert.IsType<ParameterResource>(
-            Assert.Single(builder.Resources, resource => resource.Name == "openai-api-key"));
+            Assert.Single(builder.Resources, resource => resource.Name == "brain-ai-openai-api-key"));
 
         Assert.Same(apiKey, environment["DigitalBrain__AI__OpenAI__ApiKey"]);
     }

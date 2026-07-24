@@ -86,6 +86,6 @@ to OpenAI is a typed AppHost choice:
 brain.AddModule<AIModule>(ai => ai.WithLlm<Gpt56>());
 ```
 
-That selection creates a secret `openai-api-key` Aspire parameter with a direct link to the OpenAI
-Platform. Do not add both `AddModule<AIModule>` calls; configure a module exactly once and chain its
-models in one callback.
+That selection creates a secret `<brain-name>-ai-openai-api-key` Aspire parameter with a direct link
+to the OpenAI Platform. Do not add both `AddModule<AIModule>` calls; configure a module exactly once
+and chain its models in one callback.
