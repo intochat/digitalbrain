@@ -22,7 +22,11 @@ public abstract class DigitalBrainFixture : IAsyncLifetime
         await _methodLease.WaitAsync(cancellationToken);
         try
         {
-            return TestBrain.Create(Cluster(), () => _methodLease.Release());
+            var scope = $"test-{Guid.NewGuid():N}";
+            return TestBrain.Create(
+                Cluster(),
+                scope,
+                () => _methodLease.Release());
         }
         catch
         {

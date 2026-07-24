@@ -7,6 +7,7 @@ namespace DigitalBrain.TestingTests;
 #pragma warning disable CA1515 // Public probe types model an external consumer assembly.
 public sealed partial class TestingProbeModule : IModule;
 
+[ClientEntryPoint]
 public partial interface IEchoNeuron : INeuron
 {
     [Alias(nameof(Echo))]

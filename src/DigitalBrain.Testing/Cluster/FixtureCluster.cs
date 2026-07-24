@@ -54,6 +54,11 @@ internal sealed class FixtureCluster : IAsyncDisposable
         }
     }
 
+    internal IGrainFactory Client
+        => _cluster?.Client
+            ?? throw new InvalidOperationException(
+                "The DigitalBrain fixture cluster is not running.");
+
     internal static string LabelOf(string siloName)
     {
         var separator = siloName.LastIndexOf('_');
