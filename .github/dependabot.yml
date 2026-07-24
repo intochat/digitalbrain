@@ -1,0 +1,49 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      github-actions:
+        patterns:
+          - '*'
+
+  - package-ecosystem: npm
+    directory: /docs
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      docs-npm:
+        patterns:
+          - '*'
+
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 15
+    groups:
+      aspire:
+        patterns:
+          - 'Aspire.*'
+          - 'CommunityToolkit.Aspire.*'
+      microsoft-extensions:
+        patterns:
+          - 'Microsoft.Extensions.*'
+      microsoft-orleans:
+        patterns:
+          - 'Microsoft.Orleans.*'
+          - 'Orleans.*'
+      test-stack:
+        patterns:
+          - 'xunit*'
+          - 'Reqnroll*'
+          - 'Microsoft.NET.Test.Sdk'
+          - 'coverlet*'
+      azure-sdk:
+        patterns:
+          - 'Azure.*'
+          - 'Microsoft.Azure.*'

@@ -112,13 +112,26 @@ implemented. Where a guarantee is incomplete, say so plainly — the [Architectu
 page's "Known limitations" section (§8) tracks the open debts, and a limitation a user discovers
 themselves costs far more than one you wrote down.
 
+## CI and CD
+
+Two workflows, no NuGet publish until there is a real consumer and a versioning design.
+
+| Workflow | When | What |
+| --- | --- | --- |
+| [`.github/workflows/ci.yml`](https://github.com/intochat/digitalbrain/blob/master/.github/workflows/ci.yml) | PR and push to `master` | **`framework`**: `dotnet test DigitalBrain.slnx -c Release` on every event. **`docs`**: `npm ci` / `npm test` / `npm run build` in `docs/` **on pull requests only**. |
+| [`.github/workflows/docs-pages.yml`](https://github.com/intochat/digitalbrain/blob/master/.github/workflows/docs-pages.yml) | Every push to `master`, plus `workflow_dispatch` | Same docs gate, then upload `docs/.vitepress/dist` and deploy with `actions/deploy-pages`. |
+
+Rules that matter:
+
+- Website deploy does **not** wait on the framework job. A red framework check must not block Pages; it must still block merge when required checks are configured.
+- Master runs the docs gate **once**, inside `docs-pages` (not again in `ci`), so the site is not double-built on every land.
+- There is no framework CD workflow: nothing packs or pushes to NuGet.org.
+- Action pins use major tags (`@v7`, …). [`.github/dependabot.yml`](https://github.com/intochat/digitalbrain/blob/master/.github/dependabot.yml) updates GitHub Actions, npm under `docs/`, and NuGet (grouped).
+- Pull requests into `master` should require the **`framework`** and **`docs`** check names from `ci`.
+
 ## Documentation site on GitHub Pages
 
-The VitePress site under `docs/` is published to **https://digitalbrain.tech** by
-[`.github/workflows/docs-pages.yml`](https://github.com/intochat/digitalbrain/blob/master/.github/workflows/docs-pages.yml).
-On every push to `master` (and on manual `workflow_dispatch`), that workflow runs the same docs gate
-as CI (`npm ci`, `npm test`, `npm run build` in `docs/`), uploads `docs/.vitepress/dist`, and deploys
-with `actions/deploy-pages`.
+The VitePress site under `docs/` is published to **https://digitalbrain.tech** by `docs-pages.yml` as above.
 
 Publishing source must be **GitHub Actions** (not a branch/`gh-pages` folder). Set that under
 **Settings → Pages → Build and deployment → Source**.
