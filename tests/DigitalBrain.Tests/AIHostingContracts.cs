@@ -11,6 +11,17 @@ namespace DigitalBrain.Tests;
 
 public sealed class AIHostingContracts
 {
+    [Fact(DisplayName = "AI hosting extensions receive the exact typed module builder")]
+    public void AIHostingExtensionsUseTypedModuleReceiver()
+    {
+        var receiver = Assert.Single(
+            typeof(AIHostingExtensions)
+                .GetMethod(nameof(AIHostingExtensions.WithLlm))!
+                .GetParameters());
+
+        Assert.Equal(typeof(DigitalBrainModuleBuilder<AIModule>), receiver.ParameterType);
+    }
+
     [Fact(DisplayName = "AppHost configures typed LLMs through its AI module")]
     public void AppHostSurfaceCreatesOneResourcePerProvider()
     {
