@@ -90,4 +90,56 @@ public sealed class TestingFrameworkContracts
 
         Assert.Equal(expected, stamped.Timestamp);
     }
+
+    [Fact(DisplayName = "Scenario.Arm journal commit fault fails the next write without FailJournalWriteAfter")]
+    public async Task ArmJournalCommitAfterFailsNextWriteWithoutStaticFailApi()
+    {
+        await using var scenario = await Simulations.OpenAsync(TestContext.Current.CancellationToken);
+
+        var sessionId = new NeuronId(ISessionNeuron.GrainTypeName, scenario.Owner, "session");
+        var peerId = new NeuronId(ISessionNeuron.GrainTypeName, scenario.Owner, "peer");
+        var session = scenario.Grains.GetGrain<ISessionNeuron>(sessionId.ToGrainId());
+
+        await using var fault = scenario.Arm(new JournalCommitAfter(
+            sessionId.ToGrainId(),
+            CompletedWritesBeforeFailure: 0,
+            Message: "injected scenario journal commit failure"));
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            session.FireAsync(peerId, new CapabilityRequested("IProbe", "Ping", peerId)));
+
+        Assert.Equal("injected scenario journal commit failure", error.Message);
+    }
+
+    [Fact(DisplayName = "disposing Scenario while a fault is still armed fails the test")]
+    public async Task DisposeWithArmedFaultFails()
+    {
+        var scenario = await Simulations.OpenAsync(TestContext.Current.CancellationToken);
+        var grain = new NeuronId(ISessionNeuron.GrainTypeName, scenario.Owner, "armed").ToGrainId();
+
+        _ = scenario.Arm(new JournalCommitAfter(
+            grain,
+            CompletedWritesBeforeFailure: 0,
+            Message: "left armed on purpose"));
+
+        var error = await Assert.ThrowsAsync<SimulationAssertionException>(async () =>
+            await scenario.DisposeAsync());
+
+        Assert.Contains("still armed", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact(DisplayName = "disposing FaultHandle then Scenario succeeds")]
+    public async Task DisposeAfterDisarmSucceeds()
+    {
+        var scenario = await Simulations.OpenAsync(TestContext.Current.CancellationToken);
+        var grain = new NeuronId(ISessionNeuron.GrainTypeName, scenario.Owner, "disarmed").ToGrainId();
+
+        var fault = scenario.Arm(new JournalCommitAfter(
+            grain,
+            CompletedWritesBeforeFailure: 0,
+            Message: "disarmed before scenario dispose"));
+
+        await fault.DisposeAsync();
+        await scenario.DisposeAsync();
+    }
 }

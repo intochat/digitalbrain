@@ -4,6 +4,7 @@ namespace DigitalBrain.Testing;
 
 public sealed class Scenario : IAsyncDisposable
 {
+    private readonly ScenarioFaults _faults = new();
     private int _disposed;
 
     internal Scenario(OwnerId owner, ScenarioClock clock, IGrainFactory grains)
@@ -22,9 +23,19 @@ public sealed class Scenario : IAsyncDisposable
     public void AdvanceClock(TimeSpan delta)
         => ((ScenarioClock)Clock).Advance(delta);
 
-    public ValueTask DisposeAsync()
+    public FaultHandle Arm(FaultPoint point)
     {
-        Interlocked.Exchange(ref _disposed, 1);
-        return ValueTask.CompletedTask;
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        return _faults.Arm(point);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        await _faults.DisarmLeftoversAndThrowIfAnyAsync();
     }
 }
