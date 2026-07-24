@@ -190,20 +190,27 @@ test('the architecture page is module-organized and states each status once', ()
 
 test('the quickstart matches the sample that CI actually runs', () => {
   const quickstart = read('docs', 'quickstart.md')
-  const program = read('samples', 'DigitalBrain.Quickstart', 'Program.cs')
-  const neurons = read('samples', 'DigitalBrain.Quickstart', 'Neurons.cs')
+  const contract = read('samples', 'DigitalBrain.Quickstart.Contracts', 'IGreeter.cs')
+  const synapses = read('samples', 'DigitalBrain.Quickstart.Contracts', 'GreetingSynapses.cs')
+  const module = read('samples', 'DigitalBrain.Quickstart', 'QuickstartModule.cs')
+  const host = read('hosts', 'DigitalBrain.Quickstart.Host', 'Program.cs')
+  const appHost = read('hosts', 'DigitalBrain.Quickstart.AppHost', 'AppHost.cs')
+  const fixture = read('tests', 'DigitalBrain.Quickstart.Tests', 'QuickstartFixture.cs')
 
-  for (const call of ['UseLocalhostClustering()', 'AddDigitalBrain()', 'AddDevelopmentJournalStorage()']) {
-    assert.ok(program.includes(call), `the sample must still call ${call}`)
-    assert.ok(quickstart.includes(call), `the quickstart must document ${call}`)
-  }
-
-  assert.ok(neurons.includes('interface IGreeter'), 'the sample must expose a typed neuron contract')
-  assert.ok(neurons.includes('record SayHello'), 'the sample must declare its incoming synapse')
-  assert.ok(program.includes('SendAsync<IGreeter>'), 'the sample must use the owner-bound client entry point')
+  assert.match(quickstart, /^---\r?\ntitle: Quickstart\r?\n---/)
+  assert.ok(contract.includes('interface IGreeter'), 'the contracts package must expose IGreeter')
+  assert.ok(synapses.includes('record SayHello'), 'the contracts package must expose SayHello')
+  assert.ok(synapses.includes('record Greeted'), 'the contracts package must expose Greeted')
+  assert.ok(module.includes('partial class QuickstartModule'), 'the runtime must expose its compiled module')
+  assert.ok(host.includes('AddDigitalBrain()'), 'the compiled host must install the kernel')
+  assert.ok(appHost.includes('AddDigitalBrain("quickstart")'), 'AppHost must own infrastructure')
+  assert.ok(appHost.includes('AddModule<QuickstartModule>()'), 'AppHost must select the compiled module')
+  assert.ok(fixture.includes('AddModule<QuickstartModule>()'), 'tests must select the same compiled module')
   assert.ok(quickstart.includes('interface IGreeter'), 'the quickstart must show the real contract')
   assert.ok(quickstart.includes('SendAsync<IGreeter>'), 'the quickstart must show the real client call')
-  assert.match(quickstart, /samples\/DigitalBrain\.Quickstart/)
+  assert.ok(quickstart.includes('IDigitalBrain brain'), 'the endpoint must receive the client through DI')
+  assert.ok(quickstart.includes('.WithReference(brain.AsClient())'), 'AppHost must project a client reference')
+  assert.doesNotMatch(quickstart, /Host\.CreateApplicationBuilder|GetRequiredService|host\.StartAsync/)
 })
 
 test('the specification publishes every Tier-1 feature file verbatim', () => {

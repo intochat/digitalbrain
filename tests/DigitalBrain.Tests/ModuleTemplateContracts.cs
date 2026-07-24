@@ -661,6 +661,9 @@ public sealed class ModuleTemplateContracts
             "UseInMemoryReminderService",
             "IGrainFactory",
             "DigitalBrainClient.Connect",
+            "Host.CreateApplicationBuilder",
+            "GetRequiredService",
+            "host.StartAsync",
             "FirstMatchWatch",
             "AwaitMatchAsync",
             "Task.Delay",
@@ -679,9 +682,18 @@ public sealed class ModuleTemplateContracts
             "`ReadAsync<Greeted>`",
             "`AddDigitalBrainClient(owner)`",
             "`IDigitalBrain`",
+            "WebApplication.CreateBuilder(args)",
+            "builder.AddDigitalBrainClient(owner)",
+            "app.MapPost(",
+            "IDigitalBrain brain",
+            ".WithReference(brain.AsClient())",
         };
-        var stale = obsoleteVocabulary.Any(token =>
-            source.Contains(token, StringComparison.Ordinal));
+        var normalized = NormalizeSource(source);
+        var stale = !normalized.StartsWith(
+                "---\ntitle: Quickstart\n---\n\n# Quickstart",
+                StringComparison.Ordinal)
+            || obsoleteVocabulary.Any(token =>
+                source.Contains(token, StringComparison.Ordinal));
         var offset = 0;
         foreach (var token in orderedVocabulary)
         {

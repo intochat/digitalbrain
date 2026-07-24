@@ -1,3 +1,7 @@
+---
+title: Quickstart
+---
+
 # Quickstart
 
 The quickstart keeps public vocabulary, compiled behavior, hosting, and testing in separate projects. Consumers reference the contracts package; hosts compile the runtime module; Aspire owns the infrastructure topology.
@@ -83,7 +87,7 @@ builder.Build().Run();
 Run the complete topology from the repository root:
 
 ```powershell
-dotnet run --project hosts/DigitalBrain.Quickstart.AppHost
+aspire start --apphost hosts/DigitalBrain.Quickstart.AppHost
 ```
 
 The compiled host exposes `/health`.
@@ -134,16 +138,33 @@ using DigitalBrain.Aspire;
 using DigitalBrain.Client;
 using DigitalBrain.Quickstart;
 
-var builder = Host.CreateApplicationBuilder(args);
-var owner = "contoso";
+var builder = WebApplication.CreateBuilder(args);
+const string owner = "contoso";
 
 builder.AddDigitalBrainClient(owner);
 
-using var host = builder.Build();
-await host.StartAsync();
+var app = builder.Build();
 
-var brain = host.Services.GetRequiredService<IDigitalBrain>();
-await brain.SendAsync<IGreeter>("welcome", new SayHello("Ada"));
+app.MapPost("/greetings/{name}", async (
+    string name,
+    IDigitalBrain brain) =>
+{
+    await brain.SendAsync<IGreeter>(
+        "welcome",
+        new SayHello(name));
+    return Results.Accepted();
+});
+
+app.Run();
+```
+
+In AppHost, give the production client project only the client projection:
+
+```csharp
+builder.AddProject<Projects.Contoso_Api>("api")
+    .WithReference(brain.AsClient());
 ```
 
 `IDigitalBrain` is an owner-scoped local facade over the connected client. It is neither a root neuron nor a status object. Consumers address typed neuron contracts by name and exchange typed synapses; hosting and transport details stay behind the facade.
+
+`AsClient()` supplies Orleans client discovery. The production client project never receives silo storage, journal access, module secrets, or the state-protection secret.
