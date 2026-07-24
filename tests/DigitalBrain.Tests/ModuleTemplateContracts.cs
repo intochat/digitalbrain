@@ -6,6 +6,14 @@ namespace DigitalBrain.Tests;
 public sealed class ModuleTemplateContracts
 {
     private static readonly string RepositoryRoot = LocateRepositoryRoot();
+    private static readonly string[] ExpectedModuleContractProjects =
+    [
+        "DigitalBrain.Modules.AI.Contracts",
+        "DigitalBrain.Modules.Google.Contracts",
+        "DigitalBrain.Modules.Salesforce.Contracts",
+        "DigitalBrain.Modules.Tasks.Contracts",
+        "DigitalBrain.Modules.Time.Contracts",
+    ];
     private static readonly string[] QuickstartTestReferences =
     [
         "PackageReference:Microsoft.NET.Test.Sdk",
@@ -66,6 +74,11 @@ public sealed class ModuleTemplateContracts
             .ToList();
 
         Assert.NotEmpty(contractsProjects);
+        Assert.Equal(
+            ExpectedModuleContractProjects,
+            contractsProjects
+                .Select(Path.GetFileNameWithoutExtension)
+                .Order(StringComparer.Ordinal));
 
         foreach (var project in contractsProjects)
         {

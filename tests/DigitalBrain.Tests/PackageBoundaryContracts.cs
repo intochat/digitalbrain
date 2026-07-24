@@ -23,6 +23,7 @@ public sealed class PackageBoundaryContracts
         "DigitalBrain.Modules.Google.Contracts",
         "DigitalBrain.Modules.Salesforce.Contracts",
         "DigitalBrain.Modules.Tasks.Contracts",
+        "DigitalBrain.Modules.Time.Contracts",
     ];
 
     private static readonly string[] NeuronHosting = ["DigitalBrain.Testing", "DigitalBrain.DevTools"];

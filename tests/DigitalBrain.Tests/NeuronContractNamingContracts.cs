@@ -4,6 +4,7 @@ using DigitalBrain.AI;
 using DigitalBrain.Google;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Tasks;
+using DigitalBrain.Time;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans;
@@ -20,6 +21,7 @@ public sealed class NeuronContractNamingContracts
         typeof(IGmail).Assembly,
         typeof(ISalesforce).Assembly,
         typeof(ITask).Assembly,
+        typeof(ICountdown).Assembly,
     ];
 
     [Fact]
