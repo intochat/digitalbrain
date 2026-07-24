@@ -5,7 +5,7 @@ namespace DigitalBrain.Testing;
 
 [Alias("db.testing.simulation")]
 [ClientEntryPoint]
-public interface ISimulationNeuron : INeuron
+public partial interface ISimulationNeuron : INeuron
 {
     [Alias("Stimulate")]
     Task StimulateAsync(NeuronId receiver, Synapse synapse);
@@ -28,7 +28,7 @@ internal sealed class SimulationNeuron : Neuron, ISimulationNeuron
 
         var delivery = await FireAsync(synapse, []);
 
-        await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).DeliverAsync(delivery);
+        await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).Deliver(delivery);
     }
 
     public async Task StimulateTwiceAsync(NeuronId receiver, Synapse synapse)
@@ -38,13 +38,13 @@ internal sealed class SimulationNeuron : Neuron, ISimulationNeuron
         var delivery = await FireAsync(synapse, []);
         var target = GrainFactory.GetGrain<INeuron>(receiver.ToGrainId());
 
-        await target.DeliverAsync(delivery);
-        await target.DeliverAsync(delivery);
+        await target.Deliver(delivery);
+        await target.Deliver(delivery);
     }
 
     public Task SubscribeAsync(string synapseType, NeuronId subscriber, OwnerId registryOwner)
-        => GrainFactory.GetGrain<ISubscriptionRegistry>(registryOwner.Value).RegisterAsync(synapseType, subscriber);
+        => GrainFactory.GetGrain<ISubscriptionRegistry>(registryOwner.Value).Register(synapseType, subscriber);
 
     public Task<int> SubscriberCountAsync(string synapseType)
-        => GrainFactory.GetGrain<ISubscriptionRegistry>(Id.Owner.Value).SubscriberCountAsync(synapseType);
+        => GrainFactory.GetGrain<ISubscriptionRegistry>(Id.Owner.Value).SubscriberCount(synapseType);
 }

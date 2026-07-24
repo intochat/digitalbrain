@@ -57,7 +57,7 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
         where TNeuron : INeuron
         => new(NeuronId.For<TNeuron>(Id.Owner, name ?? Id.Name));
 
-    public async Task AcceptAsync(AttemptRequest request)
+    public async Task Accept(AttemptRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         ValidateRequest(request);
@@ -122,7 +122,7 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
         Schedule(state);
     }
 
-    public async Task ContinueAsync(AttemptCursor cursor)
+    public async Task Continue(AttemptCursor cursor)
     {
         ArgumentNullException.ThrowIfNull(cursor);
         ValidateCursor(cursor);
@@ -188,7 +188,7 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
         Schedule(resumed);
     }
 
-    public async Task CancelAsync(AttemptCursor cursor)
+    public async Task Cancel(AttemptCursor cursor)
     {
         ArgumentNullException.ThrowIfNull(cursor);
         ValidateCursor(cursor);
@@ -286,7 +286,7 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
         await DispatchAsync(replacementState);
     }
 
-    public async Task<ChatResponse> RespondAsync(IReadOnlyList<ChatMessage> messages)
+    public async Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages)
     {
         ArgumentNullException.ThrowIfNull(messages);
 
@@ -333,7 +333,7 @@ public abstract class GroupChat : Neuron, IGroupChat, IWorkflowRunOwner, IWorkfl
             Runner(run).GetGrainId(),
             storedParticipant.NeuronId,
             invocationContract,
-            nameof(IAgent.RespondAsync));
+            nameof(IAgent.Respond));
     }
 
     async Task<CapabilityDelegation> IWorkflowRunOwner.AuthorizeCompletionAsync(WorkflowRun run)

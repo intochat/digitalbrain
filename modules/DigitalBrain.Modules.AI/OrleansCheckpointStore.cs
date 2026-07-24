@@ -20,13 +20,13 @@ internal sealed record CheckpointWrite(
 [Alias("ai.workflow-checkpoint-grain")]
 internal interface IWorkflowCheckpointGrain : IGrainWithStringKey
 {
-    [Alias("Create")]
+    [Alias(nameof(CreateAsync))]
     Task<WorkflowCheckpointReference> CreateAsync(CheckpointWrite command);
 
-    [Alias("Read")]
+    [Alias(nameof(ReadAsync))]
     Task<byte[]> ReadAsync(WorkflowCheckpointReference checkpoint);
 
-    [Alias("Index")]
+    [Alias(nameof(IndexAsync))]
     Task<WorkflowCheckpointReference[]> IndexAsync(WorkflowCheckpointReference? parent);
 }
 

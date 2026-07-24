@@ -104,9 +104,9 @@ public sealed class TestingFrameworkContracts
         var peerId = new NeuronId(ISessionNeuron.GrainTypeName, scenario.Owner, "peer");
         var session = scenario.Grains.GetGrain<ISessionNeuron>(sessionId.ToGrainId());
 
-        await session.FireAsync(peerId, new CapabilityRequested("IProbe", "Ping", peerId));
+        await session.Fire(peerId, new CapabilityRequested("IProbe", "Ping", peerId));
 
-        var journal = await session.ReadNeuronJournalAsync(sessionId, JournalKind.Outgoing, afterSequence: 0);
+        var journal = await session.ReadNeuronJournal(sessionId, JournalKind.Outgoing, afterSequence: 0);
         var stamped = Assert.Single(journal.Delta);
 
         Assert.True(stamped.Timestamp >= expected - TimeSpan.FromSeconds(2));
@@ -129,7 +129,7 @@ public sealed class TestingFrameworkContracts
             Message: "injected scenario journal commit failure"));
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            session.FireAsync(peerId, new CapabilityRequested("IProbe", "Ping", peerId)));
+            session.Fire(peerId, new CapabilityRequested("IProbe", "Ping", peerId)));
 
         Assert.Equal("injected scenario journal commit failure", error.Message);
     }

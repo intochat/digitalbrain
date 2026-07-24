@@ -142,8 +142,8 @@ internal static class MafParticipantAdapter
 
         Func<IReadOnlyList<ChatMessage>, Task<ChatResponse>> invoke =
             typeof(ILLM).IsAssignableFrom(contract)
-                ? grains.GetGrain<ILLM>(participant.NeuronId.ToGrainId()).RespondAsync
-                : grains.GetGrain<IAgent>(participant.NeuronId.ToGrainId()).RespondAsync;
+                ? grains.GetGrain<ILLM>(participant.NeuronId.ToGrainId()).Respond
+                : grains.GetGrain<IAgent>(participant.NeuronId.ToGrainId()).Respond;
         var client = new NeuronChatClient(
             async request =>
             {

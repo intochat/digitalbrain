@@ -3,18 +3,18 @@ using DigitalBrain.Abstractions;
 namespace DigitalBrain.Salesforce;
 
 [Alias("db.salesforce")]
-public interface ISalesforce : INeuron
+public partial interface ISalesforce : INeuron
 {
-    [Alias("ProposeAccountDescription")]
-    Task<SalesforceAccountDescriptionMutation> ProposeAccountDescriptionAsync(
+    [Alias(nameof(ProposeAccountDescription))]
+    Task<SalesforceAccountDescriptionMutation> ProposeAccountDescription(
         CommandId commandId,
         NeuronId requester,
         string accountId,
         string description,
         CancellationToken cancellationToken);
 
-    [Alias("ApproveAccountDescription")]
-    Task<SalesforceAccountDescriptionMutation> ApproveAccountDescriptionAsync(
+    [Alias(nameof(ApproveAccountDescription))]
+    Task<SalesforceAccountDescriptionMutation> ApproveAccountDescription(
         SalesforceMutationApproval approval,
         SynapseDelivery approvalEvidence,
         CancellationToken cancellationToken);

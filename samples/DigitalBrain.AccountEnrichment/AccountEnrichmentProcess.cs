@@ -86,9 +86,9 @@ public sealed class AccountEnrichmentProcess : Neuron,
             GmailId(request.GmailAccount).ToGrainId());
         var salesforce = GrainFactory.GetGrain<ISalesforce>(
             NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
-        var message = await gmail.ReadMessageAsync(request.MessageId, cancellationToken);
+        var message = await gmail.ReadMessage(request.MessageId, cancellationToken);
         var description = $"Email from {message.Sender}: {message.Subject}\n{message.PlaintextBody}";
-        var mutation = await salesforce.ProposeAccountDescriptionAsync(
+        var mutation = await salesforce.ProposeAccountDescription(
             synapse.CommandId,
             Id,
             request.AccountId,
@@ -163,7 +163,7 @@ public sealed class AccountEnrichmentProcess : Neuron,
         var salesforce = GrainFactory.GetGrain<ISalesforce>(
             NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
         var evidence = await FindApprovalEvidenceAsync(synapse.Approval);
-        var mutation = await salesforce.ApproveAccountDescriptionAsync(
+        var mutation = await salesforce.ApproveAccountDescription(
             synapse.Approval,
             evidence,
             cancellationToken);
@@ -192,7 +192,7 @@ public sealed class AccountEnrichmentProcess : Neuron,
             mutation.Description));
     }
 
-    Task INeuron.DeliverAsync(SynapseDelivery delivery)
+    Task INeuron.Deliver(SynapseDelivery delivery)
     {
         ArgumentNullException.ThrowIfNull(delivery);
 
@@ -201,13 +201,13 @@ public sealed class AccountEnrichmentProcess : Neuron,
                 || approval.Approver.Type != ISessionNeuron.GrainTypeName
                 || approval.Approver.Owner != Id.Owner)
             ? Task.CompletedTask
-            : base.DeliverAsync(delivery);
+            : base.Deliver(delivery);
     }
 
     private async Task<SynapseDelivery> FindApprovalEvidenceAsync(
         SalesforceMutationApproval approval)
     {
-        var incoming = await ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
+        var incoming = await ReadJournal(JournalKind.Incoming, afterSequence: 0);
         var evidence = incoming.Delta.FirstOrDefault(delivery =>
             delivery.Caller == approval.Approver
             && delivery.Synapse is SalesforceMutationApproval recorded

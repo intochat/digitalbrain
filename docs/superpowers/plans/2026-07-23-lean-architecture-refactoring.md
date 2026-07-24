@@ -265,9 +265,9 @@ These are shape constraints, not copy-paste implementations. Verify exact access
 Public callers continue to use the existing `IAgent` contract and Microsoft.Extensions.AI messages:
 
 ```csharp
-public interface IAgent : INeuron
+public partial interface IAgent : INeuron
 {
-    Task<ChatResponse> RespondAsync(
+    Task<ChatResponse> Respond(
         IReadOnlyList<ChatMessage> messages);
 }
 ```
@@ -348,7 +348,7 @@ Public shape stays semantic:
 IGmail gmail = GrainFactory.GetGrain<IGmail>(
     NeuronId.For<IGmail>(owner, "myemail@gmail.com").ToGrainId());
 GmailMessage message =
-    await gmail.ReadMessageAsync(messageId, cancellationToken);
+    await gmail.ReadMessage(messageId, cancellationToken);
 ```
 
 The Gmail implementation:
@@ -368,7 +368,7 @@ Public proposal and approval remain semantic and separate:
 
 ```csharp
 SalesforceAccountDescriptionMutation proposal =
-    await salesforce.ProposeAccountDescriptionAsync(
+    await salesforce.ProposeAccountDescription(
         commandId,
         requester,
         accountId,
@@ -376,7 +376,7 @@ SalesforceAccountDescriptionMutation proposal =
         cancellationToken);
 
 SalesforceAccountDescriptionMutation receipt =
-    await salesforce.ApproveAccountDescriptionAsync(
+    await salesforce.ApproveAccountDescription(
         approval,
         approvalEvidence,
         cancellationToken);

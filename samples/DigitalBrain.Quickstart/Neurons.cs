@@ -5,7 +5,7 @@ using Orleans;
 namespace DigitalBrain.Quickstart;
 
 [Alias("quickstart.greeter")]
-internal interface IGreeter : INeuron
+internal partial interface IGreeter : INeuron
 ;
 
 [GenerateSerializer]

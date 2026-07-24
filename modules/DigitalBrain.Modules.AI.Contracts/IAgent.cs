@@ -4,8 +4,8 @@ using Microsoft.Extensions.AI;
 namespace DigitalBrain.AI;
 
 [Alias("ai.agent")]
-public interface IAgent : INeuron
+public partial interface IAgent : INeuron
 {
-    [Alias("Ask")]
-    Task<ChatResponse> RespondAsync(IReadOnlyList<ChatMessage> messages);
+    [Alias(nameof(Respond))]
+    Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages);
 }

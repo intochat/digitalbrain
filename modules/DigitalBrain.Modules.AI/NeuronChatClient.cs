@@ -69,8 +69,8 @@ internal sealed class NeuronChatClient(
 
         return participant switch
         {
-            ILLM model => model.RespondAsync,
-            IAgent agent => agent.RespondAsync,
+            ILLM model => model.Respond,
+            IAgent agent => agent.Respond,
             _ => throw new ArgumentException(
                 $"AI participant '{participant.GetType().FullName}' must implement {nameof(ILLM)} or {nameof(IAgent)}.",
                 nameof(participant)),

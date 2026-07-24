@@ -19,7 +19,7 @@ public sealed class TaskLifecycleContracts
         var taskId = NeuronId.For<ITask>(owner, "task");
         var task = SimulationCluster.Grains.GetGrain<ITask>(taskId.ToGrainId());
 
-        var refusal = await Assert.ThrowsAsync<NeuronAuthorizationException>(task.ReadAsync);
+        var refusal = await Assert.ThrowsAsync<NeuronAuthorizationException>(task.Read);
         var remindable = SimulationCluster.Grains.GetGrain<IRemindable>(taskId.ToGrainId());
         _ = await Assert.ThrowsAsync<NeuronAuthorizationException>(
             () => remindable.ReceiveReminder("tasks.dispatch", default));
@@ -86,7 +86,7 @@ public sealed class TaskLifecycleContracts
         var request = Assert.IsType<CapabilityRequested>(requested.Synapse);
 
         Assert.Equal(typeof(ITask).FullName, request.Contract);
-        Assert.Equal(nameof(ITask.StartAsync), request.Method);
+        Assert.Equal(nameof(ITask.Start), request.Method);
         Assert.Equal(taskId, request.Target);
         Assert.Contains(taskIncoming.Delta, delivery => delivery.SynapseId == requested.SynapseId);
 
@@ -343,7 +343,7 @@ public sealed class TaskLifecycleContracts
         Assert.Equal(expected, acknowledged.State);
         Assert.False(await reminder.ExistsAsync(taskId, "tasks.dispatch"));
         var worker = SimulationCluster.Grains.GetGrain<IScriptedWorkerControl>(workerId.ToGrainId());
-        Assert.Equal(1, await worker.OperationCountAsync(taskId, nameof(IWorker.AcceptAsync)));
+        Assert.Equal(1, await worker.OperationCountAsync(taskId, nameof(IWorker.Accept)));
     }
 
     [Fact(DisplayName = "a Waiting fact acknowledges a Continue call whose reply was ambiguous")]
@@ -375,7 +375,7 @@ public sealed class TaskLifecycleContracts
         Assert.Equal(TaskState.Waiting, current.State);
         Assert.False(await reminder.ExistsAsync(taskId, "tasks.dispatch"));
         var worker = SimulationCluster.Grains.GetGrain<IScriptedWorkerControl>(workerId.ToGrainId());
-        Assert.Equal(1, await worker.OperationCountAsync(taskId, nameof(IWorker.ContinueAsync)));
+        Assert.Equal(1, await worker.OperationCountAsync(taskId, nameof(IWorker.Continue)));
     }
 
     [Fact(DisplayName = "a forwarded Kernel db.outbox reminder drains delivery after sender restart")]
@@ -805,7 +805,7 @@ internal sealed class TaskTestClient(NeuronId task, ITaskDriver driver)
 
 [Alias("db.test.task-driver")]
 [ClientEntryPoint]
-internal interface ITaskDriver : INeuron
+internal partial interface ITaskDriver : INeuron
 {
     [Alias("StartTask")]
     Task<TaskSnapshot> StartAsync(NeuronId task, StartTask command);
@@ -821,13 +821,13 @@ internal interface ITaskDriver : INeuron
 internal sealed class TaskDriver : Neuron, ITaskDriver
 {
     public Task<TaskSnapshot> StartAsync(NeuronId task, StartTask command)
-        => Task(task).StartAsync(command);
+        => Task(task).Start(command);
 
     public Task<TaskSnapshot> CancelAsync(NeuronId task, CancelTask command)
-        => Task(task).CancelAsync(command);
+        => Task(task).Cancel(command);
 
     public Task<TaskSnapshot> ReadAsync(NeuronId task)
-        => Task(task).ReadAsync();
+        => Task(task).Read();
 
     private ITask Task(NeuronId task)
         => GrainFactory.GetGrain<ITask>(task.ToGrainId());
@@ -835,7 +835,7 @@ internal sealed class TaskDriver : Neuron, ITaskDriver
 
 [Alias("db.test.reminder-caller")]
 [ClientEntryPoint]
-internal interface IReminderCaller : INeuron
+internal partial interface IReminderCaller : INeuron
 {
     [Alias("DeliverReminder")]
     Task DeliverAsync(NeuronId target, string reminderName);
@@ -887,12 +887,12 @@ internal sealed class ScriptedWorker :
     public Task<int> OperationCountAsync(NeuronId task, string operation)
         => Task.FromResult(Dispatches.TryGetValue((task, operation), out var count) ? count : 0);
 
-    public async Task AcceptAsync(AttemptRequest request)
+    public async Task Accept(AttemptRequest request)
     {
         var description = ((TracerGoal)request.Goal).Description;
         Scripts[request.Task] = description;
         var dispatch = Dispatches.AddOrUpdate(
-            (request.Task, nameof(AcceptAsync)),
+            (request.Task, nameof(Accept)),
             1,
             static (_, count) => count + 1);
 
@@ -1127,13 +1127,13 @@ internal sealed class ScriptedWorker :
                 []));
     }
 
-    public Task ContinueAsync(AttemptCursor cursor)
+    public Task Continue(AttemptCursor cursor)
         => ContinueCoreAsync(cursor);
 
     private async Task ContinueCoreAsync(AttemptCursor cursor)
     {
         var dispatch = Dispatches.AddOrUpdate(
-            (cursor.Task, nameof(ContinueAsync)),
+            (cursor.Task, nameof(Continue)),
             1,
             static (_, count) => count + 1);
         var script = Scripts[cursor.Task];
@@ -1181,11 +1181,11 @@ internal sealed class ScriptedWorker :
                 []));
     }
 
-    public async Task CancelAsync(AttemptCursor cursor)
+    public async Task Cancel(AttemptCursor cursor)
     {
         var script = Scripts[cursor.Task];
         var dispatch = Dispatches.AddOrUpdate(
-            (cursor.Task, nameof(CancelAsync)),
+            (cursor.Task, nameof(Cancel)),
             1,
             static (_, count) => count + 1);
 
@@ -1251,7 +1251,7 @@ internal sealed class ScriptedWorker :
 
 [Alias("db.test.scripted-worker-control")]
 [ClientEntryPoint]
-internal interface IScriptedWorkerControl : INeuron
+internal partial interface IScriptedWorkerControl : INeuron
 {
     [Alias("SendFact")]
     Task SendFactAsync(AttemptFact fact);
@@ -1265,7 +1265,7 @@ internal interface IScriptedWorkerControl : INeuron
 
 [Alias("db.test.fact-injector")]
 [ClientEntryPoint]
-internal interface IFactInjector : INeuron
+internal partial interface IFactInjector : INeuron
 {
     [Alias("Send")]
     Task SendAsync(AttemptFact fact);
@@ -1278,7 +1278,7 @@ internal sealed class FactInjector : Neuron, IFactInjector
 
 [Alias("db.test.reminder-probe")]
 [ClientEntryPoint]
-internal interface IReminderProbe : INeuron
+internal partial interface IReminderProbe : INeuron
 {
     [Alias("Exists")]
     Task<bool> ExistsAsync(NeuronId task, string reminderName);
@@ -1331,7 +1331,7 @@ internal sealed class OutboxForwardingRelay :
 
 [Alias("db.test.outbox-recovery-receiver-control")]
 [ClientEntryPoint]
-internal interface IOutboxRecoveryReceiverControl : INeuron
+internal partial interface IOutboxRecoveryReceiverControl : INeuron
 {
     [Alias("Allow")]
     Task AllowAsync();

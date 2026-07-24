@@ -21,7 +21,7 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
 
-        return brain.Get<ILlama32>("default").RespondAsync(
+        return brain.Get<ILlama32>("default").Respond(
             [new ChatMessage(ChatRole.User, prompt)]);
     }
 }

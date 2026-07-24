@@ -792,7 +792,7 @@ public sealed class AIOrchestrationContracts
         Assert.Equal(caller, request.Caller);
         Assert.Equal(target, capability.Target);
         Assert.Equal(typeof(ILLM).FullName, capability.Contract);
-        Assert.Equal(nameof(ILLM.RespondAsync), capability.Method);
+        Assert.Equal(nameof(ILLM.Respond), capability.Method);
         Assert.Equal(cause.SynapseId, request.CausationId);
         Assert.Equal(cause.CorrelationId, request.CorrelationId);
         Assert.Equal(request.SynapseId, received.SynapseId);
@@ -811,7 +811,7 @@ public sealed class AIOrchestrationContracts
 
 [Alias("db.test.ai-orchestration-probe")]
 [ClientEntryPoint]
-internal interface IAIOrchestrationProbe : INeuron
+internal partial interface IAIOrchestrationProbe : INeuron
 {
     [Alias("Call")]
     Task<ChatResponse> CallAsync(NeuronId target, IReadOnlyList<ChatMessage> messages);
@@ -841,7 +841,7 @@ internal interface IAIOrchestrationProbe : INeuron
 internal sealed class AIOrchestrationProbe : Neuron, IAIOrchestrationProbe
 {
     public Task<ChatResponse> CallAsync(NeuronId target, IReadOnlyList<ChatMessage> messages)
-        => GrainFactory.GetGrain<IAgent>(target.ToGrainId()).RespondAsync(messages);
+        => GrainFactory.GetGrain<IAgent>(target.ToGrainId()).Respond(messages);
 
     public Task<byte[]> ReadGroupStateAsync(NeuronId target)
         => GrainFactory.GetGrain<ITestGroupChat>(target.ToGrainId()).ReadSessionStateAsync();
@@ -862,11 +862,11 @@ internal sealed class AIOrchestrationProbe : Neuron, IAIOrchestrationProbe
         => GrainFactory.GetGrain<ITestGroupChat>(target.ToGrainId()).ActivationAsync();
 
     public Task<JournalRead> ReadJournalAsync(NeuronId target, JournalKind kind)
-        => GrainFactory.GetGrain<INeuron>(target.ToGrainId()).ReadJournalAsync(kind, afterSequence: 0);
+        => GrainFactory.GetGrain<INeuron>(target.ToGrainId()).ReadJournal(kind, afterSequence: 0);
 }
 
 [Alias("db.test.concurrent")]
-internal interface ITestConcurrent : IAgent
+internal partial interface ITestConcurrent : IAgent
 {
     [Alias("ReadSessionState")]
     Task<byte[]> ReadSessionStateAsync();
@@ -901,7 +901,7 @@ internal sealed class TestConcurrent : Concurrent, ITestConcurrent
 }
 
 [Alias("db.test.foreign-owner-concurrent")]
-internal interface IForeignOwnerConcurrent : ITestConcurrent;
+internal partial interface IForeignOwnerConcurrent : ITestConcurrent;
 
 internal sealed class ForeignOwnerConcurrent : Concurrent, IForeignOwnerConcurrent
 {
@@ -929,7 +929,7 @@ internal sealed class ForeignOwnerConcurrent : Concurrent, IForeignOwnerConcurre
 }
 
 [Alias("db.test.invalid-concurrent")]
-internal interface IInvalidConcurrent : IAgent;
+internal partial interface IInvalidConcurrent : IAgent;
 
 internal sealed class InvalidConcurrent : Concurrent, IInvalidConcurrent
 {
@@ -937,7 +937,7 @@ internal sealed class InvalidConcurrent : Concurrent, IInvalidConcurrent
 }
 
 [Alias("db.test.group-chat")]
-internal interface ITestGroupChat : IGroupChat
+internal partial interface ITestGroupChat : IGroupChat
 {
     [Alias("ReadSessionState")]
     Task<byte[]> ReadSessionStateAsync();
@@ -994,7 +994,7 @@ internal sealed class TestGroupChat : GroupChat, ITestGroupChat
 }
 
 [Alias("db.test.foreign-owner-group-chat")]
-internal interface IForeignOwnerGroupChat : ITestGroupChat;
+internal partial interface IForeignOwnerGroupChat : ITestGroupChat;
 
 internal sealed class ForeignOwnerGroupChat : GroupChat, IForeignOwnerGroupChat
 {

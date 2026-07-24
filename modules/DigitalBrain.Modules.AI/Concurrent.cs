@@ -32,7 +32,7 @@ public abstract class Concurrent : Neuron, IAgent
         where TNeuron : INeuron
         => new(NeuronId.For<TNeuron>(Id.Owner, name ?? Id.Name));
 
-    public async Task<ChatResponse> RespondAsync(IReadOnlyList<ChatMessage> messages)
+    public async Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages)
     {
         ArgumentNullException.ThrowIfNull(messages);
 

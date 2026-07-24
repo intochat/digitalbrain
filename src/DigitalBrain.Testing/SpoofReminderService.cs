@@ -49,7 +49,7 @@ internal sealed class SpoofReminderServiceClient(IServiceProvider services) :
 
 [Alias("db.test.spoof-reminder-service-caller")]
 [ClientEntryPoint]
-internal interface ISpoofReminderServiceCaller : INeuron
+internal partial interface ISpoofReminderServiceCaller : INeuron
 {
     [Alias("Deliver")]
     Task DeliverAsync(NeuronId target, string reminderName);

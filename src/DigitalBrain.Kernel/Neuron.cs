@@ -91,7 +91,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDe
         await ForgetWakeUpWhenOutboxIsEmptyAsync();
     }
 
-    public async Task DeliverAsync(SynapseDelivery delivery)
+    public async Task Deliver(SynapseDelivery delivery)
     {
         ArgumentNullException.ThrowIfNull(delivery);
 
@@ -162,10 +162,10 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDe
         ScheduleDrain();
     }
 
-    public Task<JournalRead> ReadJournalAsync(JournalKind kind, long afterSequence)
+    public Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence)
         => Task.FromResult(FeedFor(kind).Read(afterSequence));
 
-    public async Task WatchAsync(JournalKind kind, long afterSequence, IJournalObserver observer)
+    public async Task Watch(JournalKind kind, long afterSequence, IJournalObserver observer)
     {
         ArgumentNullException.ThrowIfNull(observer);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
@@ -179,7 +179,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDe
         await PushAsync(watcher);
     }
 
-    public Task UnwatchAsync(IJournalObserver observer)
+    public Task Unwatch(IJournalObserver observer)
     {
         ArgumentNullException.ThrowIfNull(observer);
 
@@ -763,7 +763,7 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDe
             .Select(grainType => NeuronId.BroadcastReceiver(grainType, Id.Owner, correlation))
             .ToList();
 
-        foreach (var subscriber in await SubscriptionRegistry.For(GrainFactory, Id.Owner).SubscribersAsync(synapseType))
+        foreach (var subscriber in await SubscriptionRegistry.For(GrainFactory, Id.Owner).Subscribers(synapseType))
         {
             if (!receivers.Contains(subscriber))
             {
@@ -1015,11 +1015,11 @@ public abstract class Neuron : DurableGrain, INeuron, IRemindable, ICapabilityDe
         {
             if (receiver == Id)
             {
-                await DeliverAsync(entry.Delivery);
+                await Deliver(entry.Delivery);
             }
             else
             {
-                await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).DeliverAsync(entry.Delivery);
+                await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).Deliver(entry.Delivery);
             }
 
             return true;

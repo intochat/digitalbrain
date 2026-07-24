@@ -60,7 +60,7 @@ own browser is a hosted authorization flow.
 
 ## Provider behavior
 
-Gmail keeps `IGmail.ReadMessageAsync` and maps the official Developer Preview `get_message` result
+Gmail keeps `IGmail.ReadMessage` and maps the official Developer Preview `get_message` result
 into `GmailMessage`. Its policy admits only the read-only, non-destructive tool with required
 `messageId` input and requests only the Gmail read-only scope.
 

@@ -239,7 +239,7 @@ public sealed class CapabilityDelegationContracts
 
 }
 
-internal interface IOwnerBoundCapability : INeuron
+internal partial interface IOwnerBoundCapability : INeuron
 {
     Task InvokeAsync();
 }

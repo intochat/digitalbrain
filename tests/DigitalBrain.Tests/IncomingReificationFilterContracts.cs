@@ -20,7 +20,7 @@ public sealed class IncomingReificationFilterContracts
         var context = new IncomingContext(
             target,
             GrainId.Create("raw-runner", "incoming-default-deny/runner"),
-            typeof(ITask).GetMethod(nameof(ITask.ReadAsync))!);
+            typeof(ITask).GetMethod(nameof(ITask.Read))!);
 
         var failure = await Record.ExceptionAsync(
             () => new IncomingReificationFilter().Invoke(context));
@@ -37,7 +37,7 @@ public sealed class IncomingReificationFilterContracts
         var requestedTarget = new NeuronId("task", owner, "semantic-target");
         var authorizedRunner = GrainId.Create("runner", $"{owner.Value}/authorized");
         var request = SynapseDelivery.Create(
-            new CapabilityRequested("DigitalBrain.Tasks.ITask", "ReadAsync", requestedTarget),
+            new CapabilityRequested("DigitalBrain.Tasks.ITask", "Read", requestedTarget),
             causalCaller,
             sequence: 1);
         var delegation = new CapabilityDelegation(
@@ -70,7 +70,7 @@ public sealed class IncomingReificationFilterContracts
         var requestedTarget = new NeuronId("task", owner, "semantic-target");
         var authorizedRunner = GrainId.Create("runner", $"{owner.Value}/authorized");
         var request = SynapseDelivery.Create(
-            new CapabilityRequested("DigitalBrain.Tasks.ITask", "ReadAsync", requestedTarget),
+            new CapabilityRequested("DigitalBrain.Tasks.ITask", "Read", requestedTarget),
             causalCaller,
             sequence: 1);
         var delegation = new CapabilityDelegation(
@@ -111,7 +111,7 @@ public sealed class IncomingReificationFilterContracts
         var request = SynapseDelivery.Create(
             new CapabilityRequested(
                 typeof(ITask).FullName!,
-                nameof(ITask.ReadAsync),
+                nameof(ITask.Read),
                 requestedTarget),
             causalCaller,
             sequence: 1);
@@ -132,8 +132,8 @@ public sealed class IncomingReificationFilterContracts
         {
             "contract" => typeof(IAlternateTaskCapability).GetMethod(
                 nameof(IAlternateTaskCapability.ReadAsync))!,
-            "method" => typeof(ITask).GetMethod(nameof(ITask.CancelAsync))!,
-            _ => typeof(ITask).GetMethod(nameof(ITask.ReadAsync))!,
+            "method" => typeof(ITask).GetMethod(nameof(ITask.Cancel))!,
+            _ => typeof(ITask).GetMethod(nameof(ITask.Read))!,
         };
         var context = new IncomingContext(
             target,
@@ -235,7 +235,7 @@ public sealed class IncomingReificationFilterContracts
     }
 }
 
-internal interface IAlternateTaskCapability : INeuron
+internal partial interface IAlternateTaskCapability : INeuron
 {
     Task<TaskSnapshot> ReadAsync();
 }

@@ -32,14 +32,14 @@ internal sealed record BeforeCapabilityRequest : Synapse;
 internal sealed record AuthorizationShapedFailure : Synapse;
 
 [Alias("db.test.echo-probe")]
-internal interface IEchoProbe : INeuron
+internal partial interface IEchoProbe : INeuron
 {
     [Alias("Poke")]
     Task PokeAsync();
 }
 
 [Alias("db.test.timing-probe")]
-internal interface ITimingProbe : INeuron
+internal partial interface ITimingProbe : INeuron
 {
     [Alias("Poke")]
     Task PokeAsync();
@@ -51,7 +51,7 @@ internal sealed class Echo : Neuron, IHandle<Ping>, IEmit<CapabilityObserved>, I
 
     public async Task PokeAsync()
     {
-        var targetJournal = await ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
+        var targetJournal = await ReadJournal(JournalKind.Incoming, afterSequence: 0);
 
         if (!ContainsRequest(targetJournal))
         {
@@ -84,7 +84,7 @@ internal sealed class TimingProbe : Neuron, ITimingProbe
 {
     public async Task PokeAsync()
     {
-        var targetJournal = await ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
+        var targetJournal = await ReadJournal(JournalKind.Incoming, afterSequence: 0);
         var requested = AssertSingleRequest(targetJournal);
 
         if (!CapabilityRequestObservations.Contains(requested.SynapseId))
@@ -99,7 +99,7 @@ internal sealed class TimingProbe : Neuron, ITimingProbe
 }
 
 [Alias("db.test.failing-probe")]
-internal interface IFailingProbe : INeuron
+internal partial interface IFailingProbe : INeuron
 {
     [Alias("Fail")]
     Task FailAsync();

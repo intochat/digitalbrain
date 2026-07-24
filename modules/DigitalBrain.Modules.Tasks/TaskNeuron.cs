@@ -35,7 +35,7 @@ internal sealed class TaskNeuron :
         _states = ServiceProvider.GetRequiredService<Serializer<TaskData>>();
     }
 
-    public async Task<TaskSnapshot> StartAsync(StartTask command)
+    public async Task<TaskSnapshot> Start(StartTask command)
     {
         ArgumentNullException.ThrowIfNull(command);
         Validate(command.CommandId);
@@ -89,7 +89,7 @@ internal sealed class TaskNeuron :
         return snapshot;
     }
 
-    public async Task<TaskSnapshot> CancelAsync(CancelTask command)
+    public async Task<TaskSnapshot> Cancel(CancelTask command)
     {
         ArgumentNullException.ThrowIfNull(command);
         Validate(command.CommandId);
@@ -143,7 +143,7 @@ internal sealed class TaskNeuron :
         return snapshot;
     }
 
-    public Task<TaskSnapshot> ReadAsync() => Task.FromResult(Snapshot(Load()));
+    public Task<TaskSnapshot> Read() => Task.FromResult(Snapshot(Load()));
 
     public Task HandleAsync(AttemptAccepted fact, CancellationToken cancellationToken)
     {
@@ -376,13 +376,13 @@ internal sealed class TaskNeuron :
         await TryDispatchPendingAsync();
     }
 
-    Task INeuron.DeliverAsync(SynapseDelivery delivery)
+    Task INeuron.Deliver(SynapseDelivery delivery)
     {
         ArgumentNullException.ThrowIfNull(delivery);
 
         return delivery.Synapse is AttemptFact fact && delivery.Caller != fact.Worker
             ? Task.CompletedTask
-            : base.DeliverAsync(delivery);
+            : base.Deliver(delivery);
     }
 
     private TaskData Load()
@@ -458,15 +458,15 @@ internal sealed class TaskNeuron :
             switch (pending)
             {
                 case AcceptWorkerDispatch accept:
-                    await worker.AcceptAsync(accept.Request);
+                    await worker.Accept(accept.Request);
                     break;
 
                 case ContinueWorkerDispatch continuation:
-                    await worker.ContinueAsync(continuation.Cursor);
+                    await worker.Continue(continuation.Cursor);
                     break;
 
                 case CancelWorkerDispatch cancellation:
-                    await worker.CancelAsync(cancellation.Cursor);
+                    await worker.Cancel(cancellation.Cursor);
                     break;
             }
         }
@@ -617,7 +617,7 @@ internal sealed class TaskNeuron :
 
         var snapshot = await GrainFactory
             .GetGrain<ITask>(predecessor.Value.ToGrainId())
-            .ReadAsync();
+            .Read();
 
         if (!IsTerminal(snapshot.State))
         {

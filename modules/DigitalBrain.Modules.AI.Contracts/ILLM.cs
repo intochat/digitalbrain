@@ -5,8 +5,8 @@ namespace DigitalBrain.AI;
 
 [Alias("ai.llm")]
 [ClientEntryPoint]
-public interface ILLM : INeuron
+public partial interface ILLM : INeuron
 {
-    [Alias("Ask")]
-    Task<ChatResponse> RespondAsync(IReadOnlyList<ChatMessage> messages);
+    [Alias(nameof(Respond))]
+    Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages);
 }

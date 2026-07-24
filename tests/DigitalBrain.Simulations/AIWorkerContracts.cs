@@ -466,7 +466,7 @@ public sealed class AIWorkerContracts
                     && request.Target == workerId
                     && string.Equals(
                         request.Method,
-                        nameof(IWorker.ContinueAsync),
+                        nameof(IWorker.Continue),
                         StringComparison.Ordinal));
             Assert.Equal(continuationRequest.SynapseId, cancelledDelivery.CausationId);
             Assert.Equal(
@@ -1424,7 +1424,7 @@ public sealed class AIWorkerContracts
             owner,
             "fence identical acceptance replay",
             "must remain blocked");
-        var replay = probes.ReplayRpc(workerId, "AcceptAsync");
+        var replay = probes.ReplayRpc(workerId, "Accept");
         probes.ResetDefinitionName(owner);
 
         try
@@ -1457,7 +1457,7 @@ public sealed class AIWorkerContracts
         finally
         {
             replay.ReleaseReplay();
-            probes.ResetRpc(workerId, "AcceptAsync");
+            probes.ResetRpc(workerId, "Accept");
             probes.ResetDefinitionName(owner);
             model.Release();
             await cluster.StopAllSilosAsync();
@@ -2131,7 +2131,7 @@ public sealed class AIWorkerContracts
         var cancellation = probes.BlockRunnerCancellation(workerId);
         var workerCancellation = probes.BlockRpc(
             workerId,
-            nameof(IWorker.CancelAsync));
+            nameof(IWorker.Cancel));
         var workerGrain = workerId.ToGrainId();
 
         try
@@ -2206,7 +2206,7 @@ public sealed class AIWorkerContracts
             _ = await cancelling.WaitAsync(
                 TimeSpan.FromSeconds(5),
                 TestContext.Current.CancellationToken);
-            probes.ResetRpc(workerId, nameof(IWorker.CancelAsync));
+            probes.ResetRpc(workerId, nameof(IWorker.Cancel));
             Assert.Equal(TaskState.Cancelling, (await task.ReadAsync()).State);
 
             journals.ClearFailure(workerGrain);
@@ -2245,7 +2245,7 @@ public sealed class AIWorkerContracts
         {
             journals.ClearFailure(workerGrain);
             workerCancellation.Release();
-            probes.ResetRpc(workerId, nameof(IWorker.CancelAsync));
+            probes.ResetRpc(workerId, nameof(IWorker.Cancel));
             cancellation.Release();
             probes.ResetRunnerCancellation(workerId);
             model.Release();
@@ -2271,7 +2271,7 @@ public sealed class AIWorkerContracts
             "repeat committed cancellation",
             "must remain blocked");
         var cancellation = probes.BlockRunnerCancellation(workerId);
-        var workerCalls = probes.ReplayRpc(workerId, "CancelAsync");
+        var workerCalls = probes.ReplayRpc(workerId, "Cancel");
 
         try
         {
@@ -2327,7 +2327,7 @@ public sealed class AIWorkerContracts
         {
             cancellation.Release();
             workerCalls.ReleaseReplay();
-            probes.ResetRpc(workerId, "CancelAsync");
+            probes.ResetRpc(workerId, "Cancel");
             probes.ResetRunnerCancellation(workerId);
             model.Release();
             await cluster.StopAllSilosAsync();
@@ -2718,10 +2718,10 @@ internal sealed class AIWorkerRunnerOutgoingFilter(AIWorkerTestProbes probes) : 
 
         return (context.InterfaceMethod.Name, argument) switch
         {
-            (nameof(IWorker.AcceptAsync), AttemptRequest request) =>
-                grain => ((IWorker)grain).AcceptAsync(request),
-            (nameof(IWorker.CancelAsync), AttemptCursor cursor) =>
-                grain => ((IWorker)grain).CancelAsync(cursor),
+            (nameof(IWorker.Accept), AttemptRequest request) =>
+                grain => ((IWorker)grain).Accept(request),
+            (nameof(IWorker.Cancel), AttemptCursor cursor) =>
+                grain => ((IWorker)grain).Cancel(cursor),
             _ => throw new InvalidOperationException(
                 $"RPC replay does not support '{context.InterfaceMethod.Name}' "
                 + $"with argument '{argument?.GetType().FullName ?? "<null>"}'."),
@@ -2827,7 +2827,7 @@ internal sealed class AIWorkerTestProbes
         object? argument,
         out AttemptCursor mutated)
     {
-        if (string.Equals(method, nameof(IWorker.ContinueAsync), StringComparison.Ordinal)
+        if (string.Equals(method, nameof(IWorker.Continue), StringComparison.Ordinal)
             && argument is AttemptCursor cursor
             && _mutations.TryGetValue(target, out var mutation))
         {
@@ -2859,7 +2859,7 @@ internal sealed class AIWorkerTestProbes
         string? method,
         out AIWorkerContinuationGate gate)
     {
-        if (string.Equals(method, nameof(IWorker.ContinueAsync), StringComparison.Ordinal)
+        if (string.Equals(method, nameof(IWorker.Continue), StringComparison.Ordinal)
             && _continuations.TryGetValue(target, out var found))
         {
             gate = found;
@@ -3539,16 +3539,16 @@ internal sealed record AIWorkerResult(
     [property: Id(1)] bool OutputWasReadOnly) : Result;
 
 [Alias("db.test.ai-worker-model")]
-internal interface IAIWorkerModel : ILLM;
+internal partial interface IAIWorkerModel : ILLM;
 
 internal sealed class AIWorkerModel : Neuron, IAIWorkerModel
 {
-    public Task<ChatResponse> RespondAsync(IReadOnlyList<ChatMessage> messages)
+    public Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages)
         => ServiceProvider.GetRequiredService<AIWorkerTestProbes>().GateFor(Id.Owner).RespondAsync(messages);
 }
 
 [Alias("db.test.task-group-chat")]
-internal interface ITaskGroupChat : IGroupChat
+internal partial interface ITaskGroupChat : IGroupChat
 {
     [Alias("ReadDirectState")]
     Task<byte[]> ReadDirectStateAsync();
@@ -3631,7 +3631,7 @@ internal sealed class TaskGroupChat : GroupChat, ITaskGroupChat
 }
 
 [Alias("db.test.empty-task-group-chat")]
-internal interface IEmptyTaskGroupChat : IGroupChat;
+internal partial interface IEmptyTaskGroupChat : IGroupChat;
 
 internal sealed class EmptyTaskGroupChat : GroupChat, IEmptyTaskGroupChat
 {
@@ -3645,7 +3645,7 @@ internal sealed class EmptyTaskGroupChat : GroupChat, IEmptyTaskGroupChat
 }
 
 [Alias("db.test.foreign-participant-task-group-chat")]
-internal interface IForeignParticipantTaskGroupChat : IGroupChat;
+internal partial interface IForeignParticipantTaskGroupChat : IGroupChat;
 
 internal sealed class ForeignParticipantTaskGroupChat : GroupChat, IForeignParticipantTaskGroupChat
 {
@@ -3665,7 +3665,7 @@ internal sealed class ForeignParticipantTaskGroupChat : GroupChat, IForeignParti
 
 [Alias("db.test.ai-worker-probe")]
 [ClientEntryPoint]
-internal interface IAIWorkerProbe : INeuron
+internal partial interface IAIWorkerProbe : INeuron
 {
     [Alias("Accept")]
     Task AcceptAsync(NeuronId worker, AttemptRequest request);
@@ -3698,16 +3698,16 @@ internal interface IAIWorkerProbe : INeuron
 internal sealed class AIWorkerProbe : Neuron, IAIWorkerProbe
 {
     public Task AcceptAsync(NeuronId worker, AttemptRequest request)
-        => GrainFactory.GetGrain<IWorker>(worker.ToGrainId()).AcceptAsync(request);
+        => GrainFactory.GetGrain<IWorker>(worker.ToGrainId()).Accept(request);
 
     public Task<ChatResponse> RespondAsync(NeuronId worker, IReadOnlyList<ChatMessage> messages)
-        => GrainFactory.GetGrain<IAgent>(worker.ToGrainId()).RespondAsync(messages);
+        => GrainFactory.GetGrain<IAgent>(worker.ToGrainId()).Respond(messages);
 
     public Task CancelAsync(NeuronId worker, AttemptCursor cursor)
-        => GrainFactory.GetGrain<IWorker>(worker.ToGrainId()).CancelAsync(cursor);
+        => GrainFactory.GetGrain<IWorker>(worker.ToGrainId()).Cancel(cursor);
 
     public Task ContinueAsync(NeuronId worker, AttemptCursor cursor)
-        => GrainFactory.GetGrain<IWorker>(worker.ToGrainId()).ContinueAsync(cursor);
+        => GrainFactory.GetGrain<IWorker>(worker.ToGrainId()).Continue(cursor);
 
     public Task<byte[]> ReadDirectStateAsync(NeuronId worker)
         => GrainFactory.GetGrain<ITaskGroupChat>(worker.ToGrainId()).ReadDirectStateAsync();
@@ -3722,7 +3722,7 @@ internal sealed class AIWorkerProbe : Neuron, IAIWorkerProbe
         => GrainFactory.GetGrain<ITaskGroupChat>(worker.ToGrainId()).DeactivateWorkerAsync();
 
     public Task<JournalRead> ReadJournalAsync(NeuronId worker, JournalKind kind)
-        => GrainFactory.GetGrain<INeuron>(worker.ToGrainId()).ReadJournalAsync(kind, afterSequence: 0);
+        => GrainFactory.GetGrain<INeuron>(worker.ToGrainId()).ReadJournal(kind, afterSequence: 0);
 }
 
 [GenerateSerializer]
@@ -3735,7 +3735,7 @@ internal sealed record AIWorkerCheckpointRollbackObservation(
 
 [Alias("db.test.ai-worker-checkpoint-harness")]
 [ClientEntryPoint]
-internal interface IAIWorkerCheckpointHarness : INeuron
+internal partial interface IAIWorkerCheckpointHarness : INeuron
 {
     [Alias("FailThenRetry")]
     Task<AIWorkerCheckpointRollbackObservation> FailThenRetryAsync(
@@ -4109,7 +4109,7 @@ internal sealed class RawWorkflowRunner(IGrainFactory grains) : Grain, IRawWorkf
 }
 
 [Alias("db.test.raw-capability-target")]
-internal interface IRawCapabilityTarget : INeuron
+internal partial interface IRawCapabilityTarget : INeuron
 {
     [Alias("Enter")]
     Task EnterAsync();
@@ -4117,7 +4117,7 @@ internal interface IRawCapabilityTarget : INeuron
 
 [Alias("db.test.raw-capability-target-control")]
 [ClientEntryPoint]
-internal interface IRawCapabilityTargetControl : INeuron
+internal partial interface IRawCapabilityTargetControl : INeuron
 {
     [Alias("EntryCount")]
     Task<int> EntryCountAsync();
@@ -4138,7 +4138,7 @@ internal sealed class RawCapabilityTarget : Neuron, IRawCapabilityTarget, IRawCa
 
 [Alias("db.test.kernel-client-entry-probe")]
 [ClientEntryPoint]
-internal interface IKernelClientEntryProbe : INeuron
+internal partial interface IKernelClientEntryProbe : INeuron
 {
     [Alias("Enter")]
     Task<int> EnterAsync();

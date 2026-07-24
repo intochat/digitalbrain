@@ -5,7 +5,7 @@ namespace DigitalBrain.AI;
 
 public abstract class LLM(IChatClient chatClient) : Neuron, ILLM
 {
-    public Task<ChatResponse> RespondAsync(IReadOnlyList<ChatMessage> messages)
+    public Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages)
     {
         ArgumentNullException.ThrowIfNull(messages);
 

@@ -23,7 +23,7 @@ app.MapPost("/probe/turn", async (IGrainFactory grains) =>
 {
     var owner = Owner();
 
-    await Session(grains, owner).FireAsync(
+    await Session(grains, owner).Fire(
         NeuronId.For<Recorder>(owner, "one"),
         new Remembered("a durable turn"));
 
@@ -33,7 +33,7 @@ app.MapPost("/probe/turn", async (IGrainFactory grains) =>
 app.MapGet("/probe/fired", async (IGrainFactory grains) =>
 {
     var owner = Owner();
-    var fired = await Session(grains, owner).ReadNeuronJournalAsync(
+    var fired = await Session(grains, owner).ReadNeuronJournal(
         SessionId(owner),
         JournalKind.Outgoing,
         afterSequence: 0);
@@ -45,7 +45,7 @@ app.MapGet("/probe/fired", async (IGrainFactory grains) =>
 app.MapGet("/probe/delivered/{neuron}", async (string neuron, IGrainFactory grains) =>
 {
     var owner = Owner();
-    var delivered = await Session(grains, owner).ReadNeuronJournalAsync(
+    var delivered = await Session(grains, owner).ReadNeuronJournal(
         new NeuronId(neuron, owner, "one"),
         JournalKind.Incoming,
         afterSequence: 0);

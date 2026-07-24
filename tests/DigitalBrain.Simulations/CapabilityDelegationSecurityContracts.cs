@@ -1169,7 +1169,7 @@ internal sealed record BeginDelegatedCall : Synapse;
 
 [Alias("db.test.delegation-issuer")]
 [ClientEntryPoint]
-internal interface IDelegationIssuer : INeuron
+internal partial interface IDelegationIssuer : INeuron
 {
     [Alias("Issue")]
     Task<CapabilityDelegation> IssueAsync(
@@ -1247,7 +1247,7 @@ internal sealed class DelegationIssuer
 }
 
 [Alias("db.test.overloaded-delegated-target")]
-internal interface IOverloadedDelegatedTarget : INeuron
+internal partial interface IOverloadedDelegatedTarget : INeuron
 {
     [Alias("InvokeWithoutArgument")]
     Task<int> InvokeAsync();
@@ -1380,7 +1380,7 @@ internal sealed class DelegatedRunner(IGrainFactory grains) : Grain, IDelegatedR
 }
 
 [Alias("db.test.delegated-capability-target")]
-internal interface IDelegatedCapabilityTarget : INeuron
+internal partial interface IDelegatedCapabilityTarget : INeuron
 {
     [Alias("Enter")]
     Task<int> EnterAsync();
@@ -1399,7 +1399,7 @@ internal interface IDelegatedCapabilityTarget : INeuron
 }
 
 [Alias("db.test.alternate-delegated-target")]
-internal interface IAlternateDelegatedTarget : INeuron
+internal partial interface IAlternateDelegatedTarget : INeuron
 {
     [Alias("Enter")]
     Task<int> EnterAsync();
@@ -1413,11 +1413,11 @@ internal sealed class DelegatedCapabilityTarget
 {
     public async Task<int> EnterAsync()
     {
-        var incoming = await ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
+        var incoming = await ReadJournal(JournalKind.Incoming, afterSequence: 0);
         var request = incoming.Delta.Single(delivery => delivery.Synapse is CapabilityRequested);
 
         var caller = GrainFactory.GetGrain<INeuron>(request.Caller.ToGrainId());
-        var callerOutgoing = await caller.ReadJournalAsync(JournalKind.Outgoing, afterSequence: 0);
+        var callerOutgoing = await caller.ReadJournal(JournalKind.Outgoing, afterSequence: 0);
 
         if (!callerOutgoing.Delta.Any(delivery => delivery.SynapseId == request.SynapseId))
         {
@@ -1441,7 +1441,7 @@ internal sealed class DelegatedCapabilityTarget
 
     public async Task<int> BlockAsync()
     {
-        var incoming = await ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
+        var incoming = await ReadJournal(JournalKind.Incoming, afterSequence: 0);
 
         if (!incoming.Delta.Any(delivery => delivery.Synapse is CapabilityRequested))
         {

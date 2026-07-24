@@ -3,10 +3,10 @@ using DigitalBrain.Abstractions;
 namespace DigitalBrain.Google;
 
 [Alias("db.google.gmail")]
-public interface IGmail : INeuron
+public partial interface IGmail : INeuron
 {
-    [Alias("ReadMessage")]
-    Task<GmailMessage> ReadMessageAsync(
+    [Alias(nameof(ReadMessage))]
+    Task<GmailMessage> ReadMessage(
         string messageId,
         CancellationToken cancellationToken);
 }

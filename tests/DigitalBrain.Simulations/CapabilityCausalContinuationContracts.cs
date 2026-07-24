@@ -329,7 +329,7 @@ internal sealed record DeferredCausalReply : Synapse;
 
 [Alias("db.test.causal-continuation-driver")]
 [ClientEntryPoint]
-internal interface ICausalContinuationDriver : INeuron
+internal partial interface ICausalContinuationDriver : INeuron
 {
     [Alias("Capture")]
     Task<SynapseId> CaptureAsync(NeuronId target);
@@ -409,8 +409,8 @@ internal sealed class CausalContinuationDriver
 
     public Task<JournalRead> ReadAsync(NeuronId target, JournalKind kind)
         => target == Id
-            ? ReadJournalAsync(kind, afterSequence: 0)
-            : GrainFactory.GetGrain<INeuron>(target.ToGrainId()).ReadJournalAsync(kind, afterSequence: 0);
+            ? ReadJournal(kind, afterSequence: 0)
+            : GrainFactory.GetGrain<INeuron>(target.ToGrainId()).ReadJournal(kind, afterSequence: 0);
 
     public Task HandleAsync(DeferredCausalReply synapse, CancellationToken cancellationToken)
         => Task.CompletedTask;
@@ -421,7 +421,7 @@ internal sealed class CausalContinuationDriver
 
 [Alias("db.test.causal-continuation-target")]
 [ClientEntryPoint]
-internal interface ICausalContinuationTarget : INeuron
+internal partial interface ICausalContinuationTarget : INeuron
 {
     [Alias("Capture")]
     Task<SynapseId> CaptureAsync(NeuronId expectedCaller);

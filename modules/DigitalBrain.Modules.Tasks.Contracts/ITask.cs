@@ -3,14 +3,14 @@ using DigitalBrain.Abstractions;
 namespace DigitalBrain.Tasks;
 
 [Alias("tasks.task")]
-public interface ITask : INeuron
+public partial interface ITask : INeuron
 {
-    [Alias("Start")]
-    Task<TaskSnapshot> StartAsync(StartTask command);
+    [Alias(nameof(Start))]
+    Task<TaskSnapshot> Start(StartTask command);
 
-    [Alias("Cancel")]
-    Task<TaskSnapshot> CancelAsync(CancelTask command);
+    [Alias(nameof(Cancel))]
+    Task<TaskSnapshot> Cancel(CancelTask command);
 
-    [Alias("Read")]
-    Task<TaskSnapshot> ReadAsync();
+    [Alias(nameof(Read))]
+    Task<TaskSnapshot> Read();
 }

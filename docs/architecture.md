@@ -199,10 +199,10 @@ them MAF semantics; an agent is a concrete typed neuron contract, and MAF owns i
 namespace DigitalBrain.AI;
 
 [Alias("ai.llm")]
-public interface ILLM : INeuron
+public partial interface ILLM : INeuron
 {
-    [Alias("Ask")]
-    Task<ChatResponse> RespondAsync(IReadOnlyList<ChatMessage> messages);
+    [Alias(nameof(Respond))]
+    Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages);
 }
 ```
 
@@ -242,7 +242,7 @@ the base class says *how* it operates. Orchestrations accept both raw `ILLM` neu
 by typed neuron identity, never by injecting fake constructor dependencies.
 
 **Orleans is the durability authority.** There is exactly one outer MAF artifact per entry path: a
-direct `RespondAsync` turn owns a protected serialized `AgentSession`; a supervised Attempt owns a raw
+direct `Respond` turn owns a protected serialized `AgentSession`; a supervised Attempt owns a raw
 MAF workflow checkpoint lineage through an Orleans-backed MAF `JsonCheckpointStore`. Both payloads
 are encrypted by `DigitalBrain.Security` with one brain-scoped 256-bit key and purposes derived from
 the neuron/definition or checkpoint lineage, so a restart or another silo can recover them without
@@ -460,7 +460,7 @@ approved payload cannot be swapped between the moment a person read it and the m
 
 The pause between proposal and approval is not machinery. Proposing a description performs zero MCP
 or provider operations, records the mutation once as `AwaitingApproval`, and returns a receipt.
-Resuming it is a second ordinary interface call, `ISalesforce.ApproveAccountDescriptionAsync`,
+Resuming it is a second ordinary interface call, `ISalesforce.ApproveAccountDescription`,
 carrying the approval record together with the durable delivery that proves a human produced it.
 Nothing intercepts, wraps, or watches the neuron — which is precisely why the neuron has to do the
 checking itself, and does. It requires that the delivery's caller is the approver the approval names,
@@ -665,7 +665,7 @@ Inside the brain, one neuron calls another typed capability directly:
 public sealed class Analyst(ILlama32 llama) : Neuron, IAnalyst, IHandle<SummaryRequested>
 {
     public Task HandleAsync(SummaryRequested request, CancellationToken cancellationToken)
-        => llama.RespondAsync([new ChatMessage(ChatRole.User, request.Prompt)]);
+        => llama.Respond([new ChatMessage(ChatRole.User, request.Prompt)]);
 }
 ```
 

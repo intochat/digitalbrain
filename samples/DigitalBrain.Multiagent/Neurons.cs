@@ -5,7 +5,7 @@ using Orleans;
 namespace DigitalBrain.Multiagent;
 
 [Alias("multiagent.moderator")]
-internal interface IModerator : INeuron
+internal partial interface IModerator : INeuron
 ;
 
 [GenerateSerializer]

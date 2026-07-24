@@ -17,7 +17,7 @@ namespace DigitalBrain.Simulations;
 
 public sealed class ClientGetLlmContracts
 {
-    [Fact(DisplayName = "IDigitalBrain.Get<ILlama32> returns the real neuron and RespondAsync yields ChatResponse")]
+    [Fact(DisplayName = "IDigitalBrain.Get<ILlama32> returns the real neuron and Respond yields ChatResponse")]
     public async Task GetLlama32Responds()
     {
         using var chatClient = new ClientGetTracingChatClient();
@@ -30,7 +30,7 @@ public sealed class ClientGetLlmContracts
 
             Assert.IsAssignableFrom<ILlama32>(llama);
 
-            var response = await llama.RespondAsync(
+            var response = await llama.Respond(
                 [new ChatMessage(ChatRole.User, "hello from client")]);
 
             Assert.Equal("response:hello from client", response.Text);

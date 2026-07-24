@@ -26,7 +26,7 @@ public sealed class AIContracts
             var method = Assert.Single(contract.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
             var parameter = Assert.Single(method.GetParameters());
 
-            Assert.Equal("RespondAsync", method.Name);
+            Assert.Equal("Respond", method.Name);
             Assert.Equal(typeof(Task<ChatResponse>), method.ReturnType);
             Assert.Equal(typeof(IReadOnlyList<ChatMessage>), parameter.ParameterType);
             Assert.DoesNotContain(method.GetParameters(), candidate => candidate.ParameterType == typeof(ChatOptions));
@@ -63,17 +63,17 @@ public sealed class AIContracts
 
         var accept = Assert.Single(
             typeof(GroupChat).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            candidate => candidate.Name == "AcceptAsync");
+            candidate => candidate.Name == "Accept");
         Assert.False(accept.IsAbstract);
 
         var cancel = Assert.Single(
             typeof(GroupChat).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            candidate => candidate.Name == "CancelAsync");
+            candidate => candidate.Name == "Cancel");
         Assert.False(cancel.IsAbstract);
 
         var continuation = Assert.Single(
             typeof(GroupChat).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            candidate => candidate.Name == "ContinueAsync");
+            candidate => candidate.Name == "Continue");
         Assert.False(continuation.IsAbstract);
     }
 
@@ -117,10 +117,10 @@ public sealed class AIContracts
 
         var interfaces = new Dictionary<string, (string Alias, string[] Methods)>(StringComparer.Ordinal)
         {
-            ["DigitalBrain.AI.IWorkflowRunner"] = ("ai.workflow-runner", ["Execute", "Cancel"]),
-            ["DigitalBrain.AI.IWorkflowRunOwner"] = ("ai.workflow-run-owner", ["AuthorizeParticipant", "AuthorizeCompletion"]),
-            ["DigitalBrain.AI.IWorkflowRunCompletion"] = ("ai.workflow-run-completion", ["Complete"]),
-            ["DigitalBrain.AI.IWorkflowCheckpointGrain"] = ("ai.workflow-checkpoint-grain", ["Create", "Read", "Index"]),
+            ["DigitalBrain.AI.IWorkflowRunner"] = ("ai.workflow-runner", ["ExecuteAsync", "CancelAsync"]),
+            ["DigitalBrain.AI.IWorkflowRunOwner"] = ("ai.workflow-run-owner", ["AuthorizeParticipantAsync", "AuthorizeCompletionAsync"]),
+            ["DigitalBrain.AI.IWorkflowRunCompletion"] = ("ai.workflow-run-completion", ["CompleteAsync"]),
+            ["DigitalBrain.AI.IWorkflowCheckpointGrain"] = ("ai.workflow-checkpoint-grain", ["CreateAsync", "ReadAsync", "IndexAsync"]),
         };
 
         foreach (var (name, contract) in interfaces)

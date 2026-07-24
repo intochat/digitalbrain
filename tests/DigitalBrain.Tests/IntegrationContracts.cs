@@ -43,7 +43,7 @@ public sealed class IntegrationContracts
         Assert.Contains(typeof(INeuron), typeof(IGmail).GetInterfaces());
 
         var read = Assert.Single(typeof(IGmail).GetMethods());
-        Assert.Equal(nameof(IGmail.ReadMessageAsync), read.Name);
+        Assert.Equal(nameof(IGmail.ReadMessage), read.Name);
         Assert.Equal(typeof(Task<GmailMessage>), read.ReturnType);
         Assert.Equal(
             [typeof(string), typeof(CancellationToken)],
@@ -62,7 +62,7 @@ public sealed class IntegrationContracts
             .OrderBy(method => method.Name, StringComparer.Ordinal)
             .ToArray();
         Assert.Equal(
-            [nameof(ISalesforce.ApproveAccountDescriptionAsync), nameof(ISalesforce.ProposeAccountDescriptionAsync)],
+            [nameof(ISalesforce.ApproveAccountDescription), nameof(ISalesforce.ProposeAccountDescription)],
             methods.Select(method => method.Name));
         Assert.All(methods, method =>
             Assert.Equal(typeof(Task<SalesforceAccountDescriptionMutation>), method.ReturnType));

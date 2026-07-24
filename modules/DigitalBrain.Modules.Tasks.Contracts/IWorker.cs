@@ -3,14 +3,18 @@ using DigitalBrain.Abstractions;
 namespace DigitalBrain.Tasks;
 
 [Alias("tasks.worker")]
-public interface IWorker : INeuron
+public partial interface IWorker : INeuron
 {
-    [Alias("Accept")]
-    Task AcceptAsync(AttemptRequest request);
+    [Alias(nameof(Accept))]
+    Task Accept(AttemptRequest request);
 
-    [Alias("Continue")]
-    Task ContinueAsync(AttemptCursor cursor);
+    [Alias(nameof(Continue))]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Naming",
+        "CA1716:Identifiers should not match keywords",
+        Justification = "Continue is the ratified domain verb for advancing an accepted task attempt.")]
+    Task Continue(AttemptCursor cursor);
 
-    [Alias("Cancel")]
-    Task CancelAsync(AttemptCursor cursor);
+    [Alias(nameof(Cancel))]
+    Task Cancel(AttemptCursor cursor);
 }

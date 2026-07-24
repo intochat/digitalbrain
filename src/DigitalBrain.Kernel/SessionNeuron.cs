@@ -4,7 +4,7 @@ namespace DigitalBrain.Kernel;
 
 internal sealed class SessionNeuron : Neuron, ISessionNeuron
 {
-    public Task FireAsync(NeuronId receiver, Synapse synapse)
+    public Task Fire(NeuronId receiver, Synapse synapse)
     {
         if (receiver.Owner != Id.Owner)
         {
@@ -15,25 +15,25 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
         return SendAsync(receiver, synapse);
     }
 
-    public new Task EmitAsync(Synapse synapse)
+    public Task Emit(Synapse synapse)
     {
         ArgumentNullException.ThrowIfNull(synapse);
 
         return base.EmitAsync(synapse);
     }
 
-    public Task<JournalRead> ReadNeuronJournalAsync(NeuronId subject, JournalKind kind, long afterSequence)
+    public Task<JournalRead> ReadNeuronJournal(NeuronId subject, JournalKind kind, long afterSequence)
         => subject == Id
-            ? ReadJournalAsync(kind, afterSequence)
-            : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).ReadJournalAsync(kind, afterSequence);
+            ? ReadJournal(kind, afterSequence)
+            : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).ReadJournal(kind, afterSequence);
 
-    public Task WatchNeuronAsync(NeuronId subject, JournalKind kind, long afterSequence, IJournalObserver observer)
+    public Task WatchNeuron(NeuronId subject, JournalKind kind, long afterSequence, IJournalObserver observer)
         => subject == Id
-            ? WatchAsync(kind, afterSequence, observer)
-            : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).WatchAsync(kind, afterSequence, observer);
+            ? Watch(kind, afterSequence, observer)
+            : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).Watch(kind, afterSequence, observer);
 
-    public Task UnwatchNeuronAsync(NeuronId subject, IJournalObserver observer)
+    public Task UnwatchNeuron(NeuronId subject, IJournalObserver observer)
         => subject == Id
-            ? UnwatchAsync(observer)
-            : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).UnwatchAsync(observer);
+            ? Unwatch(observer)
+            : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).Unwatch(observer);
 }

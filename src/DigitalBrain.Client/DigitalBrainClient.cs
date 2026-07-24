@@ -61,14 +61,14 @@ public sealed class DigitalBrainClient : IDigitalBrain
                 $"Client owner '{Owner}' cannot send to neuron '{receiver}' owned by '{receiver.Owner}'.");
         }
 
-        return Session().FireAsync(receiver, synapse);
+        return Session().Fire(receiver, synapse);
     }
 
     public Task EmitAsync(Synapse synapse)
     {
         ArgumentNullException.ThrowIfNull(synapse);
 
-        return Session().EmitAsync(synapse);
+        return Session().Emit(synapse);
     }
 
     private ISessionNeuron Session()

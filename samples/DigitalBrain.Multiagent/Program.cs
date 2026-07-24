@@ -29,7 +29,7 @@ var session = grains.GetGrain<ISessionNeuron>(sessionId.ToGrainId());
 var verdicts = new FirstMatchWatch(delivery => delivery.Synapse is VerdictReached);
 var verdictReference = grains.CreateObjectReference<IJournalObserver>(verdicts);
 
-await session.WatchNeuronAsync(
+await session.WatchNeuron(
     moderatorId,
     JournalKind.Outgoing,
     afterSequence: 0,
@@ -45,7 +45,7 @@ try
     var recorded = new FirstMatchWatch(delivery => delivery.Synapse is VerdictReached);
     var scribeReference = grains.CreateObjectReference<IJournalObserver>(recorded);
 
-    await session.WatchNeuronAsync(
+    await session.WatchNeuron(
         scribeId,
         JournalKind.Incoming,
         afterSequence: 0,
@@ -60,12 +60,12 @@ try
     }
     finally
     {
-        await session.UnwatchNeuronAsync(scribeId, scribeReference);
+        await session.UnwatchNeuron(scribeId, scribeReference);
     }
 }
 finally
 {
-    await session.UnwatchNeuronAsync(moderatorId, verdictReference);
+    await session.UnwatchNeuron(moderatorId, verdictReference);
 }
 
 await host.StopAsync();

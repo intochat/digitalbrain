@@ -14,30 +14,30 @@ namespace DigitalBrain.AI;
 internal interface IWorkflowRunner : IGrainWithStringKey
 {
     [OneWay]
-    [Alias("Execute")]
+    [Alias(nameof(ExecuteAsync))]
     Task ExecuteAsync(WorkflowRunCommand command);
 
     [AlwaysInterleave]
-    [Alias("Cancel")]
+    [Alias(nameof(CancelAsync))]
     Task CancelAsync(Guid runId);
 }
 
 [Alias("ai.workflow-run-owner")]
 internal interface IWorkflowRunOwner : IGrainWithStringKey
 {
-    [Alias("AuthorizeParticipant")]
+    [Alias(nameof(AuthorizeParticipantAsync))]
     Task<CapabilityDelegation> AuthorizeParticipantAsync(
         WorkflowRun run,
         OrchestrationParticipant participant);
 
-    [Alias("AuthorizeCompletion")]
+    [Alias(nameof(AuthorizeCompletionAsync))]
     Task<CapabilityDelegation> AuthorizeCompletionAsync(WorkflowRun run);
 }
 
 [Alias("ai.workflow-run-completion")]
-internal interface IWorkflowRunCompletion : INeuron
+internal partial interface IWorkflowRunCompletion : INeuron
 {
-    [Alias("Complete")]
+    [Alias(nameof(CompleteAsync))]
     Task<bool> CompleteAsync(WorkflowRunResult result);
 }
 

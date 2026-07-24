@@ -28,7 +28,7 @@ var greeterId = new NeuronId(nameof(Greeter), brain.Owner, "first");
 var greeted = new FirstMatchWatch(delivery => delivery.Synapse is Greeted);
 var greetedReference = grains.CreateObjectReference<IJournalObserver>(greeted);
 
-await session.WatchNeuronAsync(
+await session.WatchNeuron(
     greeterId,
     JournalKind.Outgoing,
     afterSequence: 0,
@@ -39,7 +39,7 @@ try
     await brain.SendAsync<IGreeter>("first", new SayHello());
     await greeted.AwaitMatchAsync(TimeSpan.FromSeconds(30));
 
-    var fired = await session.ReadNeuronJournalAsync(greeterId, JournalKind.Outgoing, afterSequence: 0);
+    var fired = await session.ReadNeuronJournal(greeterId, JournalKind.Outgoing, afterSequence: 0);
     var firedCount = fired.ResetSnapshot?.TotalRecorded ?? fired.Delta.Count;
     var firedTypes = fired.ResetSnapshot is { } reset
         ? reset.Tallies.Select(tally => tally.SynapseType)
@@ -49,7 +49,7 @@ try
 }
 finally
 {
-    await session.UnwatchNeuronAsync(greeterId, greetedReference);
+    await session.UnwatchNeuron(greeterId, greetedReference);
 }
 
 await host.StopAsync();

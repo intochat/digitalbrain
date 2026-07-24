@@ -54,7 +54,7 @@ internal sealed class Salesforce : Neuron, ISalesforce
         _durableIdentity = Id.ToString();
     }
 
-    public async Task<SalesforceAccountDescriptionMutation> ProposeAccountDescriptionAsync(
+    public async Task<SalesforceAccountDescriptionMutation> ProposeAccountDescription(
         CommandId commandId,
         NeuronId requester,
         string accountId,
@@ -93,7 +93,7 @@ internal sealed class Salesforce : Neuron, ISalesforce
         "Design",
         "CA1031:Do not catch general exception types",
         Justification = "Any failure after durable Invoking makes the external mutation outcome uncertain and must not escape into an automatic retry path.")]
-    public async Task<SalesforceAccountDescriptionMutation> ApproveAccountDescriptionAsync(
+    public async Task<SalesforceAccountDescriptionMutation> ApproveAccountDescription(
         SalesforceMutationApproval approval,
         SynapseDelivery approvalEvidence,
         CancellationToken cancellationToken)

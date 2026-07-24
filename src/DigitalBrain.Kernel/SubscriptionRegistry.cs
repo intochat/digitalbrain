@@ -22,7 +22,7 @@ internal sealed class SubscriptionRegistry : DurableGrain, ISubscriptionRegistry
 
     internal OwnerId Owner => new(this.GetPrimaryKeyString());
 
-    public async Task RegisterAsync(string synapseType, NeuronId subscriber)
+    public async Task Register(string synapseType, NeuronId subscriber)
     {
         if (subscriber.Owner != Owner)
         {
@@ -41,10 +41,10 @@ internal sealed class SubscriptionRegistry : DurableGrain, ISubscriptionRegistry
         await WriteStateAsync();
     }
 
-    public Task<IReadOnlyList<NeuronId>> SubscribersAsync(string synapseType)
+    public Task<IReadOnlyList<NeuronId>> Subscribers(string synapseType)
         => Task.FromResult<IReadOnlyList<NeuronId>>(Read(synapseType));
 
-    public Task<int> SubscriberCountAsync(string synapseType)
+    public Task<int> SubscriberCount(string synapseType)
         => Task.FromResult(_catalog.HandlerCount(synapseType) + Read(synapseType).Length);
 
     private NeuronId[] Read(string synapseType)

@@ -33,7 +33,7 @@ internal sealed class Gmail : Neuron, IGmail
         _durableIdentity = Id.ToString();
     }
 
-    public async Task<GmailMessage> ReadMessageAsync(
+    public async Task<GmailMessage> ReadMessage(
         string messageId,
         CancellationToken cancellationToken)
     {

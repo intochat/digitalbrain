@@ -143,7 +143,7 @@ public sealed class AccountEnrichmentCompositionContracts
                 composition,
                 command,
                 caller);
-            var outgoingAfterRejection = await session.ReadNeuronJournalAsync(
+            var outgoingAfterRejection = await session.ReadNeuronJournal(
                 composition,
                 JournalKind.Outgoing,
                 afterSequence: 0);
@@ -158,11 +158,11 @@ public sealed class AccountEnrichmentCompositionContracts
             Assert.Empty(server.ToolCalls);
 
             const string validGmailAccount = "account-enrichment@example.com";
-            await session.FireAsync(
+            await session.Fire(
                 composition,
                 command with { GmailAccount = validGmailAccount });
             await ReadUntilAsync<AccountEnrichmentProposed>(session, composition);
-            var namedGmailIncoming = await session.ReadNeuronJournalAsync(
+            var namedGmailIncoming = await session.ReadNeuronJournal(
                 NeuronId.For<IGmail>(owner, validGmailAccount),
                 JournalKind.Incoming,
                 afterSequence: 0);
@@ -170,7 +170,7 @@ public sealed class AccountEnrichmentCompositionContracts
             Assert.Single(
                 namedGmailIncoming.Delta,
                 delivery => delivery.Synapse is CapabilityRequested request
-                    && request.Method == nameof(IGmail.ReadMessageAsync));
+                    && request.Method == nameof(IGmail.ReadMessage));
             Assert.Equal(
                 1,
                 await CountOutgoingAsync<AccountEnrichmentProposed>(
@@ -213,7 +213,7 @@ public sealed class AccountEnrichmentCompositionContracts
 
             foreach (var account in accounts)
             {
-                await session.FireAsync(
+                await session.Fire(
                     composition,
                     EnrichmentRequest(CommandId.New(), account));
             }
@@ -222,7 +222,7 @@ public sealed class AccountEnrichmentCompositionContracts
                 session,
                 composition,
                 expectedCount: accounts.Length);
-            var outgoing = await session.ReadNeuronJournalAsync(
+            var outgoing = await session.ReadNeuronJournal(
                 composition,
                 JournalKind.Outgoing,
                 afterSequence: 0);
@@ -241,14 +241,14 @@ public sealed class AccountEnrichmentCompositionContracts
 
             foreach (var account in accounts)
             {
-                var incoming = await session.ReadNeuronJournalAsync(
+                var incoming = await session.ReadNeuronJournal(
                     NeuronId.For<IGmail>(owner, account),
                     JournalKind.Incoming,
                     afterSequence: 0);
                 Assert.Single(
                     incoming.Delta,
                     delivery => delivery.Synapse is CapabilityRequested request
-                        && request.Method == nameof(IGmail.ReadMessageAsync));
+                        && request.Method == nameof(IGmail.ReadMessage));
             }
         }
         finally
@@ -284,7 +284,7 @@ public sealed class AccountEnrichmentCompositionContracts
                 completedWritesBeforeFailure,
                 "Expected account-enrichment write failure.");
 
-            await session.FireAsync(composition, command);
+            await session.Fire(composition, command);
 
             if (completedWritesBeforeFailure == 5)
             {
@@ -294,7 +294,7 @@ public sealed class AccountEnrichmentCompositionContracts
                 await WaitUntilAsync(
                     () => journals.CompletedWrites(process) == 6,
                     "The failed proposal turn did not durably preserve its pending self-delivery.");
-                var outgoing = await session.ReadNeuronJournalAsync(
+                var outgoing = await session.ReadNeuronJournal(
                     composition,
                     JournalKind.Outgoing,
                     afterSequence: 0);
@@ -310,7 +310,7 @@ public sealed class AccountEnrichmentCompositionContracts
                     1,
                     server.ToolCalls.Count(call => call.Tool == "get_message"));
 
-                await session.FireAsync(composition, continuation.Synapse);
+                await session.Fire(composition, continuation.Synapse);
             }
 
             await ReadUntilAsync<AccountEnrichmentProposed>(session, composition);
@@ -346,7 +346,7 @@ public sealed class AccountEnrichmentCompositionContracts
             var session = cluster.Client.GetGrain<ISessionNeuron>(
                 new NeuronId(ISessionNeuron.GrainTypeName, owner, "session").ToGrainId());
 
-            await session.FireAsync(
+            await session.Fire(
                 composition,
                 EnrichmentRequest(CommandId.New(), "account-enrichment@example.com"));
             await gate.Entered.WaitAsync(
@@ -358,7 +358,7 @@ public sealed class AccountEnrichmentCompositionContracts
 
             gate.Release();
             await ReadUntilAsync<AccountEnrichmentProposed>(session, composition);
-            var outgoing = await session.ReadNeuronJournalAsync(
+            var outgoing = await session.ReadNeuronJournal(
                 composition,
                 JournalKind.Outgoing,
                 afterSequence: 0);
@@ -396,7 +396,7 @@ public sealed class AccountEnrichmentCompositionContracts
                 CommandId.New(),
                 "account-enrichment@example.com");
 
-            await session.FireAsync(composition, command);
+            await session.Fire(composition, command);
             await ReadUntilAsync<AccountEnrichmentProposed>(session, composition);
             var requestsBeforeReplay = server.Requests.Count;
             var callsBeforeReplay = server.ToolCalls.Count;
@@ -726,7 +726,7 @@ public sealed class AccountEnrichmentCompositionContracts
                 new NeuronId(ISessionNeuron.GrainTypeName, owner, "session").ToGrainId());
             var verifier = NeuronId.For<SalesforceMutationVerifier>(owner, "verifier");
             var command = CommandId.New();
-            await session.FireAsync(verifier, new VerifySalesforceMutation(
+            await session.Fire(verifier, new VerifySalesforceMutation(
                 command,
                 "001000000000042AAA",
                 "Approved description",
@@ -743,7 +743,7 @@ public sealed class AccountEnrichmentCompositionContracts
                 "Expected Salesforce invoking-fence write failure.");
             var approval = Approval(owner, command, prepared.Fingerprint);
 
-            await session.FireAsync(verifier, approval);
+            await session.Fire(verifier, approval);
             var verifiedDelivery = await ReadUntilAsync<SalesforceMutationVerified>(session, verifier);
             var verified = Assert.IsType<SalesforceMutationVerified>(verifiedDelivery.Synapse);
 
@@ -773,7 +773,7 @@ public sealed class AccountEnrichmentCompositionContracts
             var verifier = NeuronId.For<SalesforceMutationVerifier>(owner, "verifier");
             var session = cluster.Client.GetGrain<ISessionNeuron>(
                 new NeuronId(ISessionNeuron.GrainTypeName, owner, "session").ToGrainId());
-            await session.FireAsync(verifier, new VerifySalesforceMutation(
+            await session.Fire(verifier, new VerifySalesforceMutation(
                 CommandId.New(),
                 "001' OR Name != '",
                 "Approved description"));
@@ -810,7 +810,7 @@ public sealed class AccountEnrichmentCompositionContracts
             var session = cluster.Client.GetGrain<ISessionNeuron>(
                 new NeuronId(ISessionNeuron.GrainTypeName, owner, "session").ToGrainId());
             var command = new CommandId(Guid.Parse("e412132c-7273-42d0-90df-a28a3fb00f69"));
-            await session.FireAsync(verifier, new VerifySalesforceMutation(
+            await session.Fire(verifier, new VerifySalesforceMutation(
                 command,
                 "001000000000042AAA",
                 "Approved description"));
@@ -823,7 +823,7 @@ public sealed class AccountEnrichmentCompositionContracts
                 prepared.Fingerprint,
                 new NeuronId(ISessionNeuron.GrainTypeName, owner, "session"),
                 new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero));
-            await session.FireAsync(verifier, approval);
+            await session.Fire(verifier, approval);
 
             var delivery = await ReadUntilAsync<SalesforceMutationVerified>(session, verifier);
             var verified = Assert.IsType<SalesforceMutationVerified>(delivery.Synapse);
@@ -871,7 +871,7 @@ public sealed class AccountEnrichmentCompositionContracts
             var command = EnrichmentRequest(
                 CommandId.New(),
                 "account-enrichment@example.com");
-            await session.FireAsync(composition, command);
+            await session.Fire(composition, command);
             var proposedDelivery = await ReadUntilAsync<AccountEnrichmentProposed>(
                 session,
                 composition);
@@ -925,7 +925,7 @@ public sealed class AccountEnrichmentCompositionContracts
                 "001000000000042AAA",
                 "account-enrichment@example.com");
 
-            await session.FireAsync(composition, command);
+            await session.Fire(composition, command);
 
             var proposedDelivery = await ReadUntilAsync<AccountEnrichmentProposed>(session, composition);
             var proposed = Assert.IsType<AccountEnrichmentProposed>(proposedDelivery.Synapse);
@@ -949,9 +949,9 @@ public sealed class AccountEnrichmentCompositionContracts
                 new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero));
 
             var forger = NeuronId.For<ApprovalForger>(owner, "forger");
-            await session.FireAsync(forger, new ForgeSalesforceApproval(composition, approval));
+            await session.Fire(forger, new ForgeSalesforceApproval(composition, approval));
             await ReadUntilAsync<ApprovalForgeryAttempted>(session, forger);
-            var afterForgery = await session.ReadNeuronJournalAsync(
+            var afterForgery = await session.ReadNeuronJournal(
                 composition,
                 JournalKind.Incoming,
                 afterSequence: 0);
@@ -963,7 +963,7 @@ public sealed class AccountEnrichmentCompositionContracts
                 server.ToolCalls,
                 call => call.Tool == "updateSobjectRecord");
 
-            await session.FireAsync(composition, approval);
+            await session.Fire(composition, approval);
 
             var completed = await ReadUntilAsync<AccountEnriched>(session, composition);
             var outcome = Assert.IsType<AccountEnriched>(completed.Synapse);
@@ -999,7 +999,7 @@ public sealed class AccountEnrichmentCompositionContracts
                 composition,
                 owner,
                 command.GmailAccount);
-            var incoming = await session.ReadNeuronJournalAsync(
+            var incoming = await session.ReadNeuronJournal(
                 composition,
                 JournalKind.Incoming,
                 afterSequence: 0);
@@ -1065,7 +1065,7 @@ public sealed class AccountEnrichmentCompositionContracts
         var session = cluster.Client.GetGrain<ISessionNeuron>(
             new NeuronId(ISessionNeuron.GrainTypeName, owner, "session").ToGrainId());
         var command = CommandId.New();
-        await session.FireAsync(verifier, new VerifySalesforceMutation(
+        await session.Fire(verifier, new VerifySalesforceMutation(
             command,
             "001000000000042AAA",
             "Approved description",
@@ -1074,7 +1074,7 @@ public sealed class AccountEnrichmentCompositionContracts
         var prepared = Assert.IsType<SalesforceMutationPrepared>(preparedDelivery.Synapse);
         Assert.Null(prepared.Failure);
 
-        await session.FireAsync(
+        await session.Fire(
             verifier,
             Approval(owner, command, prepared.Fingerprint));
         var verifiedDelivery = await ReadUntilAsync<SalesforceMutationVerified>(session, verifier);
@@ -1090,7 +1090,7 @@ public sealed class AccountEnrichmentCompositionContracts
         NeuronId caller)
     {
         var probeId = Guid.NewGuid();
-        await session.FireAsync(
+        await session.Fire(
             probe,
             new ProbeAccountEnrichmentDelivery(
                 probeId,
@@ -1100,7 +1100,7 @@ public sealed class AccountEnrichmentCompositionContracts
 
         for (var attempt = 0; attempt < 100; attempt++)
         {
-            var outgoing = await session.ReadNeuronJournalAsync(
+            var outgoing = await session.ReadNeuronJournal(
                 probe,
                 JournalKind.Outgoing,
                 afterSequence: 0);
@@ -1220,7 +1220,7 @@ public sealed class AccountEnrichmentCompositionContracts
         OwnerId owner,
         string gmailAccount)
     {
-        var outgoing = await session.ReadNeuronJournalAsync(
+        var outgoing = await session.ReadNeuronJournal(
             composition,
             JournalKind.Outgoing,
             afterSequence: 0);
@@ -1230,20 +1230,20 @@ public sealed class AccountEnrichmentCompositionContracts
         var gmail = Assert.Single(requests, delivery =>
             delivery.Synapse is CapabilityRequested request
             && request.Contract == typeof(IGmail).FullName
-            && request.Method == nameof(IGmail.ReadMessageAsync));
+            && request.Method == nameof(IGmail.ReadMessage));
         var proposed = Assert.Single(requests, delivery =>
             delivery.Synapse is CapabilityRequested request
             && request.Contract == typeof(ISalesforce).FullName
-            && request.Method == nameof(ISalesforce.ProposeAccountDescriptionAsync));
+            && request.Method == nameof(ISalesforce.ProposeAccountDescription));
         var approved = Assert.Single(requests, delivery =>
             delivery.Synapse is CapabilityRequested request
             && request.Contract == typeof(ISalesforce).FullName
-            && request.Method == nameof(ISalesforce.ApproveAccountDescriptionAsync));
-        var gmailIncoming = await session.ReadNeuronJournalAsync(
+            && request.Method == nameof(ISalesforce.ApproveAccountDescription));
+        var gmailIncoming = await session.ReadNeuronJournal(
             NeuronId.For<IGmail>(owner, gmailAccount),
             JournalKind.Incoming,
             afterSequence: 0);
-        var salesforceIncoming = await session.ReadNeuronJournalAsync(
+        var salesforceIncoming = await session.ReadNeuronJournal(
             NeuronId.For<ISalesforce>(owner, "salesforce"),
             JournalKind.Incoming,
             afterSequence: 0);
@@ -1262,7 +1262,7 @@ public sealed class AccountEnrichmentCompositionContracts
 
         for (var attempt = 0; attempt < 100; attempt++)
         {
-            outgoing = await session.ReadNeuronJournalAsync(
+            outgoing = await session.ReadNeuronJournal(
                 neuron,
                 JournalKind.Outgoing,
                 afterSequence: 0);
@@ -1276,7 +1276,7 @@ public sealed class AccountEnrichmentCompositionContracts
             await Task.Delay(TimeSpan.FromMilliseconds(10), TestContext.Current.CancellationToken);
         }
 
-        var incoming = await session.ReadNeuronJournalAsync(
+        var incoming = await session.ReadNeuronJournal(
             neuron,
             JournalKind.Incoming,
             afterSequence: 0);
@@ -1301,7 +1301,7 @@ public sealed class AccountEnrichmentCompositionContracts
     {
         for (var attempt = 0; attempt < 100; attempt++)
         {
-            var journal = await session.ReadNeuronJournalAsync(
+            var journal = await session.ReadNeuronJournal(
                 neuron,
                 JournalKind.Outgoing,
                 afterSequence: 0);
@@ -1323,7 +1323,7 @@ public sealed class AccountEnrichmentCompositionContracts
         NeuronId neuron)
         where TSynapse : Synapse
     {
-        var outgoing = await session.ReadNeuronJournalAsync(
+        var outgoing = await session.ReadNeuronJournal(
             neuron,
             JournalKind.Outgoing,
             afterSequence: 0);
@@ -1335,7 +1335,7 @@ public sealed class AccountEnrichmentCompositionContracts
         NeuronId neuron,
         string synapseType)
     {
-        var outgoing = await session.ReadNeuronJournalAsync(
+        var outgoing = await session.ReadNeuronJournal(
             neuron,
             JournalKind.Outgoing,
             afterSequence: 0);
@@ -1420,7 +1420,7 @@ internal sealed class AccountEnrichmentDeliveryProbe : Neuron,
         try
         {
             var target = GrainFactory.GetGrain<INeuron>(synapse.Target.ToGrainId());
-            await target.DeliverAsync(ForgedDelivery.Create(synapse.Synapse, synapse.Caller));
+            await target.Deliver(ForgedDelivery.Create(synapse.Synapse, synapse.Caller));
         }
         catch (Exception exception)
         {
@@ -1440,7 +1440,7 @@ internal sealed class ApprovalForger : Neuron,
         CancellationToken cancellationToken)
     {
         var target = GrainFactory.GetGrain<INeuron>(synapse.Target.ToGrainId());
-        await target.DeliverAsync(ForgedDelivery.Create(synapse.Approval, Id));
+        await target.Deliver(ForgedDelivery.Create(synapse.Approval, Id));
         await EmitAsync(new ApprovalForgeryAttempted());
     }
 }
@@ -1515,7 +1515,7 @@ internal sealed class SalesforceMutationVerifier(
 
         try
         {
-            proposal = await salesforce.ProposeAccountDescriptionAsync(
+            proposal = await salesforce.ProposeAccountDescription(
                 synapse.CommandId,
                 Id,
                 synapse.AccountId,
@@ -1533,7 +1533,7 @@ internal sealed class SalesforceMutationVerifier(
         }
 
         var differentArgumentsRejected = await RejectsAsync(
-            () => salesforce.ProposeAccountDescriptionAsync(
+            () => salesforce.ProposeAccountDescription(
                 synapse.CommandId,
                 Id,
                 synapse.AccountId,
@@ -1572,13 +1572,13 @@ internal sealed class SalesforceMutationVerifier(
         var approval = synapse.Approval;
         var salesforce = GrainFactory.GetGrain<ISalesforce>(
             NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
-        var incoming = await ReadJournalAsync(JournalKind.Incoming, afterSequence: 0);
+        var incoming = await ReadJournal(JournalKind.Incoming, afterSequence: 0);
         var evidence = incoming.Delta.Single(delivery =>
             delivery.Caller == approval.Approver
             && delivery.Synapse is SalesforceMutationApproval recorded
             && recorded == approval);
         var wrongFingerprintRejected = await RejectsAsync(
-            () => salesforce.ApproveAccountDescriptionAsync(
+            () => salesforce.ApproveAccountDescription(
                 approval with { Fingerprint = "WRONG-FINGERPRINT" },
                 evidence,
                 cancellationToken));
@@ -1597,7 +1597,7 @@ internal sealed class SalesforceMutationVerifier(
 
         try
         {
-            outcome = await salesforce.ApproveAccountDescriptionAsync(
+            outcome = await salesforce.ApproveAccountDescription(
                 approval,
                 evidence,
                 callerCancellation.Token);
@@ -1614,7 +1614,7 @@ internal sealed class SalesforceMutationVerifier(
         if (_request.Mode is SalesforceProbeMode.RetryAfterFailure or SalesforceProbeMode.CancelAfterFence
             && failure is not null)
         {
-            outcome = await salesforce.ApproveAccountDescriptionAsync(
+            outcome = await salesforce.ApproveAccountDescription(
                 approval,
                 evidence,
                 cancellationToken);
@@ -1622,13 +1622,13 @@ internal sealed class SalesforceMutationVerifier(
 
         var differentEvidenceRejected = outcome is not null
             && await RejectsAuthorizationAsync(
-                () => salesforce.ApproveAccountDescriptionAsync(
+                () => salesforce.ApproveAccountDescription(
                     approval,
                     ForgedDelivery.Create(approval, approval.Approver),
                     cancellationToken));
         var replay = outcome is null
             ? null
-            : await salesforce.ApproveAccountDescriptionAsync(
+            : await salesforce.ApproveAccountDescription(
                 approval,
                 evidence,
                 cancellationToken);

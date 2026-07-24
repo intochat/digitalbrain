@@ -210,7 +210,7 @@ export const BEHAVIORS = [
     public async Task HandleAsync(ReminderElapsed e, ...)
     {
         var mail = await gmail.SearchAsync("is:unread");
-        await llama.RespondAsync(Digest(mail));
+        await llama.Respond(Digest(mail));
     }
 }`,
   },

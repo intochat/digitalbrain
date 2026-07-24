@@ -74,7 +74,7 @@ public sealed class AIAgentContracts
 
 [Alias("db.test.ai-agent-probe")]
 [ClientEntryPoint]
-internal interface IAIAgentProbe : INeuron
+internal partial interface IAIAgentProbe : INeuron
 {
     [Alias("CallLlm")]
     Task<string> CallLlmAsync(NeuronId target, string message);
@@ -86,7 +86,7 @@ internal sealed class AIAgentProbe : Neuron, IAIAgentProbe
     {
         var response = await GrainFactory
             .GetGrain<ILLM>(target.ToGrainId())
-            .RespondAsync([new ChatMessage(ChatRole.User, message)]);
+            .Respond([new ChatMessage(ChatRole.User, message)]);
 
         return response.Text;
     }
