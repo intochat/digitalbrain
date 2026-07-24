@@ -9,4 +9,4 @@ namespace DigitalBrain.HostTests;
     "Design",
     "CA1515:Consider making public types internal",
     Justification = "xUnit requires collection definition types to be public.")]
-public sealed class HostedCollectionDefinition : ICollectionFixture<TestingAppHostFixture>;
+public sealed class HostedCollectionDefinition;

@@ -6,7 +6,7 @@ using Xunit;
 namespace DigitalBrain.HostTests;
 
 [Collection(HostedApplication.CollectionName)]
-public sealed class HostedRestart(TestingAppHostFixture fixture)
+public sealed class HostedRestart
 {
     private static readonly TimeSpan DeliveryLimit = TimeSpan.FromSeconds(30);
 
@@ -14,8 +14,10 @@ public sealed class HostedRestart(TestingAppHostFixture fixture)
     public async Task ADurableTurnAndDeliverySurviveAKernelRestart()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var hosted = fixture.App;
+        await using var hosted = await HostedApplication.OpenAsync<Projects.DigitalBrain_TestingAppHost>(
+            cancellationToken: cancellationToken);
 
+        await hosted.WaitHttpReadyAsync("silo", cancellationToken: cancellationToken);
         await hosted.WaitHttpReadyAsync("probe", cancellationToken: cancellationToken);
 
         using (var kernel = hosted.CreateHttpClient("probe"))
@@ -53,8 +55,10 @@ public sealed class HostedRestart(TestingAppHostFixture fixture)
     public async Task TheOrleansDashboardIsServedInDevelopment()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var hosted = fixture.App;
+        await using var hosted = await HostedApplication.OpenAsync<Projects.DigitalBrain_TestingAppHost>(
+            cancellationToken: cancellationToken);
 
+        await hosted.WaitHttpReadyAsync("silo", cancellationToken: cancellationToken);
         await hosted.WaitHttpReadyAsync("probe", cancellationToken: cancellationToken);
 
         using var kernel = hosted.CreateHttpClient("probe");
