@@ -17,6 +17,13 @@ public partial interface IEchoNeuron : INeuron
     Task Publish(string value);
 }
 
+[ClientEntryPoint]
+public partial interface ICapabilityRetryDriver : INeuron
+{
+    [Alias(nameof(PublishWithRetry))]
+    Task PublishWithRetry(NeuronId target, string value);
+}
+
 [GenerateSerializer]
 [Alias("tests.echo-requested")]
 internal sealed record EchoRequested([property: Id(0)] string Value) : Synapse;
@@ -39,6 +46,27 @@ internal sealed class EchoNeuron :
         EchoRequested request,
         CancellationToken cancellationToken)
         => EmitAsync(new Echoed(request.Value));
+}
+
+internal sealed class CapabilityRetryDriver :
+    Neuron,
+    ICapabilityRetryDriver
+{
+    public async Task PublishWithRetry(NeuronId target, string value)
+    {
+        var echo = GrainFactory.GetGrain<IEchoNeuron>(
+            $"{target.Owner.Value}/{target.Name}");
+
+        try
+        {
+            await echo.Publish(value);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        await echo.Publish(value);
+    }
 }
 
 public sealed class TestingFixture : DigitalBrainFixture

@@ -357,6 +357,27 @@ public sealed class ClockAndFaultContracts(TestingFixture fixture)
     }
 
     [Fact]
+    public async Task FailedCapabilityEntryCommitDoesNotRemainInTheIncomingJournal()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var target = test.Neuron<IEchoNeuron>("capability-entry-fault");
+        var driver = test.Neuron<ICapabilityRetryDriver>("capability-entry-driver");
+        await using var fault =
+            target.FailNextJournalCommit("capability entry commit failure");
+
+        await driver.Reference.PublishWithRetry(target.Id, "committed once");
+
+        var request = Assert.Single(await target.Incoming.ReadAsync<CapabilityRequested>(
+            cancellationToken: cancellationToken));
+        Assert.Equal(nameof(IEchoNeuron.Publish), request.Synapse.Method);
+        Assert.Equal(
+            "committed once",
+            Assert.Single(await target.Outgoing.ReadAsync<Echoed>(
+                cancellationToken: cancellationToken)).Synapse.Value);
+    }
+
+    [Fact]
     public async Task FaultLeftUnconsumedAndUndisposedFailsMethodCleanup()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

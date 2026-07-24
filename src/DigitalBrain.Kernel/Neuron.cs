@@ -121,6 +121,7 @@ public abstract class Neuron :
             _handled.Count,
             InboundCommitted: false,
             SnapshotCapturedCapabilityCauses(),
+            _incoming.Checkpoint(),
             _outgoing.Checkpoint());
 
         _firedWhileHandling.Clear();
@@ -148,6 +149,7 @@ public abstract class Neuron :
             Discard(_outbox, checkpoint.CommittedOutbox);
             Discard(_handled, checkpoint.CommittedHandled);
             RestoreCapturedCapabilityCauses(checkpoint.CapturedCapabilityCauses);
+            _incoming.Restore(checkpoint.Incoming);
             _outgoing.Restore(checkpoint.Outgoing);
             RollbackTurnState();
 
@@ -666,6 +668,7 @@ public abstract class Neuron :
             _handled.Count,
             InboundCommitted: true,
             SnapshotCapturedCapabilityCauses(),
+            _incoming.Checkpoint(),
             _outgoing.Checkpoint());
         _firedWhileHandling.Clear();
         _turnRollbacks.Clear();
@@ -715,8 +718,19 @@ public abstract class Neuron :
             _handlingDepth,
             _turnCheckpoint);
 
-        _incoming.Append(delivery);
-        await CommitAsync(CancellationToken.None);
+        var incomingCheckpoint = _incoming.Checkpoint();
+
+        try
+        {
+            _incoming.Append(delivery);
+            await CommitAsync(CancellationToken.None);
+        }
+        catch
+        {
+            _incoming.Restore(incomingCheckpoint);
+            throw;
+        }
+
         await NotifyWatchersAsync();
 
         _handling = delivery;
@@ -726,6 +740,7 @@ public abstract class Neuron :
             _handled.Count,
             InboundCommitted: true,
             SnapshotCapturedCapabilityCauses(),
+            _incoming.Checkpoint(),
             _outgoing.Checkpoint());
         _turnRollbacks.Clear();
 
@@ -1125,6 +1140,7 @@ public abstract class Neuron :
                 CommittedOutbox = _outbox.Count,
                 CommittedHandled = _handled.Count,
                 CapturedCapabilityCauses = SnapshotCapturedCapabilityCauses(),
+                Incoming = _incoming.Checkpoint(),
                 Outgoing = _outgoing.Checkpoint(),
             };
             _turnRollbacks.Clear();
@@ -1293,5 +1309,6 @@ public abstract class Neuron :
         int CommittedHandled,
         bool InboundCommitted,
         IReadOnlyDictionary<Guid, byte[]> CapturedCapabilityCauses,
+        NeuronFeedCheckpoint Incoming,
         NeuronFeedCheckpoint Outgoing);
 }
