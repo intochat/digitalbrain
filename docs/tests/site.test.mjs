@@ -153,10 +153,24 @@ test('the architecture page is module-organized and states each status once', ()
     assert.ok(architecture.includes(heading), `architecture must have a ${heading} section`)
   }
 
-  assert.match(architecture, /one active method-scoped `TestBrain`/)
-  assert.match(architecture, /exclusive Aspire HostedScenario/)
+  assert.match(architecture, /real three-silo DigitalBrainFixture/)
+  assert.match(architecture, /assembly-owned DigitalBrainAppHostFixture<TAppHost>/)
+  assert.match(architecture, /method-scoped RunningAppHost/)
+  assert.match(architecture, /host\.Resource\("silo"\)/)
+  assert.match(architecture, /never enumerates or kills processes by name/)
   assert.match(architecture, /TestingEdges/)
   assert.match(architecture, /Runtime behavior is not a Neuron/)
+
+  const retiredHostedTesting = new RegExp([
+    'Hosted' + 'Application',
+    'Hosted' + 'Scen' + 'ario',
+    'DefaultTracked' + 'ProcessNames',
+    'GetProcesses' + 'ByName',
+    'IsExclusive' + 'Held',
+    'Exclusive' + 'Owner',
+  ].join('|'))
+  assert.doesNotMatch(architecture, retiredHostedTesting)
+  assert.doesNotMatch(read('docs', 'packages.md'), retiredHostedTesting)
 
   for (const module of ['AI', 'Tasks', 'Google', 'Salesforce', 'Time', 'Flutter', 'Memory']) {
     assert.ok(

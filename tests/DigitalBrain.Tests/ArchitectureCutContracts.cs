@@ -67,6 +67,19 @@ public sealed class ArchitectureCutContracts
         "Fault" + "Point",
         "Fault" + "Handle",
         "Scen" + "arioFailureArtifact",
+        "Hosted" + "Application",
+        "Hosted" + "Scenario",
+    ];
+
+    private static readonly string[] RejectedHostedTestingSourcePatterns =
+    [
+        @"\bHosted" + @"Application\b",
+        @"\bHosted" + @"Scenario\b",
+        @"\bDefaultTracked" + @"ProcessNames\b",
+        @"\bGetProcesses" + @"ByName\b",
+        @"\bIsExclusive" + @"Held\b",
+        @"\bExclusive" + @"Owner\b",
+        @"\bpublic\s+Distributed" + @"Application\b",
     ];
 
     private static readonly string[] RejectedTestingSourcePatterns =
@@ -221,9 +234,53 @@ public sealed class ArchitectureCutContracts
 
         Assert.Empty(typeOffenders);
         Assert.Empty(memberOffenders);
-        Assert.Contains(
-            exported,
-            type => type.Name == "Hosted" + "Scenario");
+    }
+
+    [Fact(DisplayName = "repository source and durable docs contain no retired hosted-testing surface")]
+    public void RepositoryContainsNoRetiredHostedTestingSurface()
+    {
+        string[] roots = ["src", "tests", "hosts", "docs"];
+        var guardFile = Path.GetFullPath(Path.Combine(
+            RepositoryRoot,
+            "tests",
+            "DigitalBrain.Tests",
+            nameof(ArchitectureCutContracts) + ".cs"));
+        var excludedDocs = Path.GetFullPath(Path.Combine(
+            RepositoryRoot,
+            "docs",
+            "superpowers")) + Path.DirectorySeparatorChar;
+
+        var violations = roots
+            .SelectMany(root => Directory.EnumerateFiles(
+                Path.Combine(RepositoryRoot, root),
+                "*",
+                SearchOption.AllDirectories))
+            .Where(file => Path.GetExtension(file)
+                is ".cs" or ".csproj" or ".md" or ".mjs")
+            .Where(file => !file.Contains(
+                $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal))
+            .Where(file => !file.Contains(
+                $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal))
+            .Where(file => !string.Equals(
+                Path.GetFullPath(file),
+                guardFile,
+                StringComparison.OrdinalIgnoreCase))
+            .Where(file => !Path.GetFullPath(file).StartsWith(
+                excludedDocs,
+                StringComparison.OrdinalIgnoreCase))
+            .SelectMany(file => RejectedHostedTestingSourcePatterns
+                .Where(pattern => Regex.IsMatch(
+                    File.ReadAllText(file),
+                    pattern,
+                    RegexOptions.CultureInvariant))
+                .Select(pattern =>
+                    $"{Path.GetRelativePath(RepositoryRoot, file)}: {pattern}"))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(violations);
     }
 
     [Fact(DisplayName = "repository source and durable docs contain no obsolete L1 testing vocabulary")]

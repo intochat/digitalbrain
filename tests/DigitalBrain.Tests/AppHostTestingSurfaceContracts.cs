@@ -18,8 +18,8 @@ public sealed class AppHostTestingSurfaceContracts
         Assert.Contains("DigitalBrainAppHostFixture`1", exported);
         Assert.Contains(nameof(RunningAppHost), exported);
         Assert.Contains(nameof(HostedResource), exported);
-        Assert.DoesNotContain("HostedApplication", exported);
-        Assert.DoesNotContain("HostedScenario", exported);
+        Assert.DoesNotContain("Hosted" + "Application", exported);
+        Assert.DoesNotContain("Hosted" + "Scen" + "ario", exported);
     }
 
     [Fact]

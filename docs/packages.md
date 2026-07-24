@@ -14,7 +14,7 @@ the twelve separate pages that used to describe them one at a time.
 | `DigitalBrain.Abstractions` | Leaf neuron and synapse contracts | nothing |
 | `DigitalBrain.Kernel` | Domain-neutral silo runtime | Abstractions |
 | `DigitalBrain.Client` | Typed owner-bound client | Abstractions |
-| `DigitalBrain.Testing` | Development-only real multi-silo fixtures, method-scoped `TestBrain`, deterministic time, typed journal evidence, closed durability faults, and exclusive Aspire hosting | Kernel |
+| `DigitalBrain.Testing` | Development-only real three-silo `DigitalBrainFixture`, method-scoped `TestBrain`, and assembly-owned `DigitalBrainAppHostFixture<TAppHost>` with method-scoped `RunningAppHost` | Kernel |
 | `DigitalBrain.Aspire` | Client Generic Host integration | Client |
 | `DigitalBrain.Aspire.Hosting` | One-call durable AppHost brain composition | Abstractions |
 | `DigitalBrain.DevTools` | Development journals and dashboard | nothing |
@@ -46,6 +46,15 @@ without the durable `journal` connection used by production hosts. `DigitalBrain
 the in-memory escape hatch for local development instead of weakening that rule inside the kernel
 itself.
 
+`DigitalBrain.Testing` separates its proof depths. L0 checks compiler and public shape. L1 uses the
+real three-silo `DigitalBrainFixture` and method-scoped `TestBrain` for neuron and module semantics.
+L2 uses the exclusive assembly-owned `DigitalBrainAppHostFixture<TAppHost>` and method-scoped
+`RunningAppHost` only for AppHost composition, real resource health, HTTP endpoints, graph/process
+restart, and bounded cleanup or failure evidence. Tests bind each resource name once through
+`host.Resource(name)`. The package-internal lease is the only serialization owner; test projects use
+no collection or global parallelization switch. Cleanup follows Aspire resource commands and terminal
+observations and never enumerates or kills processes by name.
+
 `IDigitalBrain` is the owner-scoped client contract and `DigitalBrainClient` is its implementation.
 There is no concrete brain neuron or root-neuron interface: `DigitalBrainBuilder` owns AppHost state,
 while the client addresses typed neurons within one owner.
@@ -58,8 +67,10 @@ supplied to `Connect`.
 Blob-backed journals. Aspire run mode uses Azurite for that resource, while publish mode provisions
 Azure Storage. The silo executable remains an explicit project reference because its compilation
 generates the typed module catalog. Silo references receive clustering, reminders, journals,
-protection material when required, and durable-resource waits. Client references receive only the
-clustering connection Orleans needs for gateway discovery.
+protection material when required, and durable-resource waits. Run mode generates and persists a
+secret Base64 256-bit state-protection key for local durability; Publish mode requires that secret
+from the deployment environment. The key is projected only to silos, never clients. Client
+references receive only the clustering connection Orleans needs for gateway discovery.
 
 Each runtime module compiles to a typed capsule. Startup asks every available capsule to prepare
 serializers for its public wire contracts, then activates runtime services and broadcast handlers

@@ -724,7 +724,9 @@ introduced until a second *complete* journaling, clustering, and reminder profil
 one profile does not justify an abstraction over profiles.
 
 Any selected AI or MCP-backed module also causes AppHost to declare one brain-scoped secret containing
-a base64-encoded 256-bit durable-state key. It is projected only to the silo and is shared by every
+a Base64-encoded 256-bit durable-state key. Run mode generates a cryptographically random key and
+persists it for local durability; Publish mode has no default and requires the secret from the
+deployment environment. The key is projected only to silos, never clients, and is shared by every
 silo in that brain. It encrypts MAF sessions, workflow checkpoints, and MCP OAuth tokens with distinct
 purposes; provider modules do not create their own keys or process-local key rings.
 
@@ -771,9 +773,9 @@ OTLP output.
 run at three tiers; there is no parallel fake runtime:
 
 ```text
-L0  Compiler/shape     DigitalBrain.Tests (contracts, packages, generators)
-L1  Kernel test        assembly-owned multi-silo fixture + method-scoped TestBrain
-L2  Hosted OS          exclusive Aspire HostedScenario fixture
+L0  Compiler/shape     DigitalBrain.Tests contracts, packages, and generators
+L1  Kernel semantics   real three-silo DigitalBrainFixture + method-scoped TestBrain
+L2  AppHost system     assembly-owned DigitalBrainAppHostFixture<TAppHost> + method-scoped RunningAppHost
 ```
 
 **L1** is the default depth for module semantics and durability. One `DigitalBrainFixture` owns one
@@ -781,10 +783,26 @@ real three-silo cluster and permits one active method-scoped `TestBrain` at a ti
 serialize within a fixture, while separate test assemblies may run in parallel. Each `TestBrain`
 receives an isolated owner namespace, deterministic clock, closed durability faults, typed
 committed-journal evidence, and always-on failure artifacts. `TestOwner` is the isolated owner
-identity, and `TestNeuron<T>` is its typed neuron handle. **L2** is exclusive — one full AppHost at a
-time — and is only for hosting, process restart, endpoints, and multi-resource composition. Gherkin
-remains a thin generated vocabulary over the same `TestBrain`; generation may compose only existing
-vocabulary, never invent neuron or synapse types.
+identity, and `TestNeuron<T>` is its typed neuron handle.
+
+**L2** is reserved for AppHost composition, real resource `Healthy` state, HTTP endpoints,
+graph/process restart, and bounded cleanup and failure evidence. An assembly-owned
+`DigitalBrainAppHostFixture<TAppHost>` creates one method-scoped `RunningAppHost`. The package-internal
+lease is the only AppHost serialization owner; test projects do not add xUnit collections or global
+parallelization switches. Each test binds each runtime resource name once and keeps that handle:
+
+```csharp
+await using var host = await fixture.StartAsync(cancellationToken);
+var silo = host.Resource("silo");
+await silo.WaitUntilHealthyAsync(cancellationToken);
+using var client = silo.CreateHttpClient();
+await silo.RestartAsync(cancellationToken);
+```
+
+Cleanup remains graph-owned: it uses Aspire resource commands and terminal observations, records
+bounded evidence, and never enumerates or kills processes by name. L1 remains the default for neuron
+and module semantics. Gherkin remains a thin generated vocabulary over the same `TestBrain`;
+generation may compose only existing vocabulary, never invent neuron or synapse types.
 
 Substitutes stop at the closed external edges named by `TestingEdges`: `IChatClient`, southbound MCP
 protocol transport, OAuth/params, and the shared `TimeProvider` already registered on every L1
