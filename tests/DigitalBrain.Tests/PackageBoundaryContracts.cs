@@ -1,4 +1,6 @@
 using System.Xml.Linq;
+using DigitalBrain.Abstractions;
+using DigitalBrain.Client;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -36,6 +38,18 @@ public sealed class PackageBoundaryContracts
         "DigitalBrain.Modules.Google",
         "DigitalBrain.Modules.Salesforce",
     ];
+
+    [Fact(DisplayName = "DigitalBrainClient is the owner-scoped IDigitalBrain contract implementation")]
+    public void DigitalBrainClientImplementsTheOwnerScopedContract()
+    {
+        Assert.True(typeof(IDigitalBrain).IsInterface);
+        Assert.Contains(typeof(IDigitalBrain), typeof(DigitalBrainClient).GetInterfaces());
+        Assert.Equal(
+            typeof(OwnerId),
+            typeof(IDigitalBrain).GetProperty(nameof(IDigitalBrain.Owner))?.PropertyType);
+        Assert.False(typeof(INeuron).IsAssignableFrom(typeof(IDigitalBrain)));
+        Assert.False(typeof(INeuron).IsAssignableFrom(typeof(DigitalBrainClient)));
+    }
 
     [Theory]
     [MemberData(nameof(ConsumerPathPackages))]

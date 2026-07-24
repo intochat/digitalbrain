@@ -137,8 +137,7 @@ which is why it is treated as architecture rather than as naming taste.
 Infrastructure is declared in AppHost:
 
 ```csharp
-var storage = builder.AddAzureStorage("storage").RunAsEmulator();
-var brain = builder.AddBrain("brain").WithAzureStorage(storage);
+var brain = builder.AddDigitalBrain("brain");
 
 brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
 brain.AddModule<GoogleModule>(google => google.WithGmail());
@@ -147,6 +146,15 @@ brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 builder.AddProject<Projects.DigitalBrain_Host>("silo")
     .WithReference(brain);
 ```
+
+`AddDigitalBrain(name)` is the one durable hosting call. It owns a brain-scoped Azure Storage
+resource and derives clustering and reminder tables plus Blob-backed journals from it. In Aspire run
+mode that same resource runs as Azurite; publishing points the unchanged durable profile at Azure
+Storage. There is no separate in-memory hosting profile hidden behind local execution.
+
+The executable remains explicit in `AddProject<Projects.DigitalBrain_Host>` because that compiled
+project contains the generated module catalog. The brain resource describes infrastructure and
+selected modules; it cannot manufacture an executable or a grain catalog.
 
 The silo stays boring:
 
@@ -158,12 +166,13 @@ builder.UseOrleans(silo => silo
     .AddDigitalBrainJournalStorage(builder.Configuration));
 ```
 
-`WithAzureStorage` is one complete profile: it derives the clustering table, reminder table, and
-`journal` blob resources from the same Azure Storage account, projects them only to the silo, and
-adds journal readiness to the silo reference. The service project loads the Orleans Azure clustering
-and reminder providers and registers Aspire's keyed `TableServiceClient`s under the exact projected
-resource names. `AddDigitalBrainJournalStorage` still throws when no `journal` connection string is
-configured, so an incomplete hand-wired silo does not start.
+The complete silo reference receives clustering, reminders, the `journal` blob, protection material
+when a selected module needs it, and the durable-resource health waits. A client reference receives
+the clustering connection required for Orleans gateway discovery and nothing else: never reminders,
+journals, protection material, or durable-resource waits. The service project loads the Orleans Azure
+clustering and reminder providers and registers Aspire's keyed `TableServiceClient`s under the exact
+projected resource names. `AddDigitalBrainJournalStorage` still throws when no `journal` connection
+string is configured, so an incomplete hand-wired silo does not start.
 
 One brain is one homogeneous Orleans cluster. Executables with different grain/application catalogs
 must not reference the same brain and rely on placement luck; each gets its own brain identity and
@@ -172,11 +181,14 @@ complete storage profile, even when those profiles share the same underlying Azu
 Package reference means *available*. `AddModule<T>()` means *selected and configured*. Each module is
 added exactly once; a repeat call is a composition error, not a merge.
 
-Compilation generates the module catalog and the runtime composition from the referenced module
-types. AppHost projects the selected module manifest and its resource configuration; startup fails
-when AppHost selects a module the silo's compiled catalog does not contain. Runtime assembly scanning
-is not a mechanism this framework has — a catalog that can be discovered at runtime is a catalog that
-can drift from the code that was compiled.
+Compilation turns every referenced module into a typed executable capsule and generates the
+executable's catalog from those capsules. AppHost projects the selected module manifest and its
+resource configuration; startup fails when AppHost selects a module the silo's compiled catalog does
+not contain. Every available capsule prepares serializers needed by its public contracts, while only
+selected capsules activate runtime services and broadcast handlers. That split keeps wire types
+decodable without silently running an unselected module. Runtime assembly scanning is not a mechanism
+this framework has — a catalog that can be discovered at runtime is a catalog that can drift from the
+code that was compiled.
 
 ## 4. The modules
 
@@ -198,7 +210,6 @@ them MAF semantics; an agent is a concrete typed neuron contract, and MAF owns i
 ```csharp
 namespace DigitalBrain.AI;
 
-[Alias("ai.llm")]
 public partial interface ILLM : INeuron
 {
     [Alias(nameof(Respond))]
@@ -653,11 +664,14 @@ await brain.SendAsync<IAnalyst>(
     new SummaryRequested("Summarize the incident."));
 ```
 
-`DigitalBrainClient` is the only public client facade. Owner identity is ambient to it.
+`IDigitalBrain` is the owner-scoped client contract, and `DigitalBrainClient` is its implementation
+and the only public client facade. A brain is hosting state held by `DigitalBrainBuilder`, not a
+concrete `DigitalBrain` neuron or an addressable root-neuron interface. Owner identity is ambient to
+the client.
 `SendAsync<TNeuron>()` enters through the owner-bound session and derives the target neuron type from
 the interface; `EmitAsync()` broadcasts a fact through the same deliberate entry point. The client
-never returns raw neuron proxies. Authentication remains an edge responsibility — an Orleans client is
-a trusted cluster peer.
+returns only owner-bound typed capability proxies, never an untyped root. Authentication remains an
+edge responsibility — an Orleans client is a trusted cluster peer.
 
 Inside the brain, one neuron calls another typed capability directly:
 
@@ -699,20 +713,15 @@ writable later without another redesign.
 
 ## 7. Hosting and durability
 
-AppHost declares infrastructure explicitly and the silo composes it (see §3). A brain selects exactly
-one complete storage profile; attempting to combine or repeat profiles is a composition error.
-
-`WithDevelopmentStores()` is explicitly non-durable — development clustering, memory grain storage,
-and memory reminders. It is honest about being a development convenience rather than pretending to be
-a lightweight production mode.
-
-The durable profile is one Azure Storage resource supplying Blob-backed neuron journals and
-Table-backed Orleans clustering and reminders. Local development may run that resource against
-Azurite; deployment points it at real Azure Storage. The three derived resources have brain-scoped
-names, journal readiness is attached to the silo, and none of them or their connection material is
-projected through `AsClient()`. No generic durability-provider abstraction is introduced until a
-second *complete* journaling, clustering, and reminder profile actually exists — one profile does not
-justify an abstraction over profiles.
+AppHost declares infrastructure explicitly and the silo composes it (see §3).
+`AddDigitalBrain(name)` creates one complete durable profile: a brain-scoped Azure Storage resource
+supplying Blob-backed neuron journals and Table-backed Orleans clustering and reminders. Aspire run
+mode uses Azurite for that resource; deployment points the same profile at real Azure Storage. The
+three derived resources have brain-scoped names and journal readiness is attached to the silo. An
+`AsClient()` reference necessarily receives clustering discovery, but never reminders, journals,
+protection material, or durable-resource waits. No generic durability-provider abstraction is
+introduced until a second *complete* journaling, clustering, and reminder profile actually exists —
+one profile does not justify an abstraction over profiles.
 
 Any selected AI or MCP-backed module also causes AppHost to declare one brain-scoped secret containing
 a base64-encoded 256-bit durable-state key. It is projected only to the silo and is shared by every
@@ -836,9 +845,9 @@ letting the rule quietly soften.
 1. Kernel = neuron mechanics only; no AI/provider/memory/UI domain knowledge. Its one opaque
    `CapabilityDelegation` transport seam is infrastructure, never semantic vocabulary.
 2. Modules own vocabulary; behaviors own logic over existing vocabulary.
-3. AppHost selects modules once; silo is `AddDigitalBrain()` only.
+3. AppHost creates the durable brain and selects modules once; silo is `AddDigitalBrain()` only.
 4. Namespaces and type names are the programming vocabulary.
-5. Generated catalogs; no runtime assembly scanning as truth.
+5. Generated typed module capsules and executable catalogs; no runtime assembly scanning as truth.
 
 ### AI and MAF
 
@@ -894,7 +903,7 @@ letting the rule quietly soften.
 43. One schedule per neuron; explicit destination; revision + CommandId.
 44. Interval vs Calendar schedules; deterministic DST; coalesce overdue recurrence.
 45. Persisted Time state authoritative; shared Kernel reminder store.
-46. One complete storage profile per brain; first durable profile is single Azure Storage (`WithAzureStorage`).
+46. `AddDigitalBrain(name)` owns one complete durable Azure Storage profile per brain; run mode uses Azurite.
 47. One silo-only brain key protects durable AI and MCP payloads with distinct purposes.
 48. Deterministic test time via `TimeProvider` + simulation driver.
 

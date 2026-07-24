@@ -23,7 +23,7 @@ var grains = host.Services.GetRequiredService<IGrainFactory>();
 var brain = DigitalBrainClient.Connect(grains, "quickstart");
 var sessionId = new NeuronId(ISessionNeuron.GrainTypeName, brain.Owner, "session");
 var session = grains.GetGrain<ISessionNeuron>(sessionId.ToGrainId());
-var greeterId = new NeuronId(nameof(Greeter), brain.Owner, "first");
+var greeterId = NeuronId.For<IGreeter>(brain.Owner, "first");
 
 var greeted = new FirstMatchWatch(delivery => delivery.Synapse is Greeted);
 var greetedReference = grains.CreateObjectReference<IJournalObserver>(greeted);
@@ -37,6 +37,7 @@ await session.WatchNeuron(
 try
 {
     await brain.SendAsync<IGreeter>("first", new SayHello());
+    Console.WriteLine(await brain.Get<IGreeter>("first").Greet("Ada"));
     await greeted.AwaitMatchAsync(TimeSpan.FromSeconds(30));
 
     var fired = await session.ReadNeuronJournal(greeterId, JournalKind.Outgoing, afterSequence: 0);

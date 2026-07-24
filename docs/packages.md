@@ -16,7 +16,7 @@ the twelve separate pages that used to describe them one at a time.
 | `DigitalBrain.Client` | Typed owner-bound client | Abstractions |
 | `DigitalBrain.Testing` | Development-only L1 Scenario, thin Gherkin, exclusive L2 hosting | Kernel |
 | `DigitalBrain.Aspire` | Client Generic Host integration | Client |
-| `DigitalBrain.Aspire.Hosting` | Core AppHost brain composition | Abstractions |
+| `DigitalBrain.Aspire.Hosting` | One-call durable AppHost brain composition | Abstractions |
 | `DigitalBrain.DevTools` | Development journals and dashboard | nothing |
 | `DigitalBrain.Security` | Purpose-bound durable encryption | configuration and dependency-injection abstractions |
 | `DigitalBrain.Integrations.Mcp` | Southbound official MCP transport, OAuth, token cache, and session mechanics | Security |
@@ -46,9 +46,25 @@ without the durable `journal` connection used by production hosts. `DigitalBrain
 the in-memory escape hatch for local development instead of weakening that rule inside the kernel
 itself.
 
+`IDigitalBrain` is the owner-scoped client contract and `DigitalBrainClient` is its implementation.
+There is no concrete brain neuron or root-neuron interface: `DigitalBrainBuilder` owns AppHost state,
+while the client addresses typed neurons within one owner.
 `DigitalBrain.Client` is **not** an authentication boundary. An Orleans client is a trusted cluster
 peer — authenticate the user at the application edge and bind the resulting principal to the owner
 supplied to `Connect`.
+
+`DigitalBrain.Aspire.Hosting` creates the complete durable profile with one
+`AddDigitalBrain(name)` call: brain-scoped Azure Storage provides clustering, reminders, and
+Blob-backed journals. Aspire run mode uses Azurite for that resource, while publish mode provisions
+Azure Storage. The silo executable remains an explicit project reference because its compilation
+generates the typed module catalog. Silo references receive clustering, reminders, journals,
+protection material when required, and durable-resource waits. Client references receive only the
+clustering connection Orleans needs for gateway discovery.
+
+Each runtime module compiles to a typed capsule. Startup asks every available capsule to prepare
+serializers for its public wire contracts, then activates runtime services and broadcast handlers
+only for modules selected by AppHost. There is no string catalog, reflective configuration-method
+lookup, or runtime assembly scan.
 
 Model-provider SDKs live only in `DigitalBrain.Modules.AI`. Model-provider Aspire integrations live
 only in `DigitalBrain.Modules.AI.Aspire.Hosting`. Kernel, AI Contracts, and every consumer-path

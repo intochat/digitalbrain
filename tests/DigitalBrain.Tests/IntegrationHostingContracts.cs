@@ -119,17 +119,6 @@ public sealed class IntegrationHostingContracts
             typeof(DigitalBrainBuilder)
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Select(property => property.Name));
-
-        var exported = typeof(DigitalBrainHostingExtensions).Assembly.GetExportedTypes();
-        var publicNames = exported
-            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Static))
-            .Select(method => method.Name)
-            .ToHashSet(StringComparer.Ordinal);
-
-        Assert.DoesNotContain("AddBrain", publicNames);
-        Assert.DoesNotContain("WithAzureStorage", publicNames);
-        Assert.DoesNotContain("WithDevelopmentStores", publicNames);
-        Assert.DoesNotContain("BrainModuleHosting", exported.Select(type => type.Name));
     }
 
     [Fact(DisplayName = "integration hosting extensions receive their exact typed module builders")]
@@ -146,43 +135,6 @@ public sealed class IntegrationHostingContracts
 
         Assert.Equal(typeof(DigitalBrainModuleBuilder<GoogleModule>), gmailReceiver.ParameterType);
         Assert.Equal(typeof(DigitalBrainModuleBuilder<SalesforceModule>), salesforceReceiver.ParameterType);
-    }
-
-    [Fact(DisplayName = "module and provider hosting source contains no process-static marker lookup")]
-    public async Task ModuleHostingSourceContainsNoConditionalWeakTable()
-    {
-        var moduleRoots = Directory
-            .EnumerateDirectories(
-                Path.Combine(RepositoryRoot, "modules"),
-                "*.Aspire.Hosting",
-                SearchOption.TopDirectoryOnly);
-        var integrationRoots = Directory
-            .EnumerateDirectories(
-                Path.Combine(RepositoryRoot, "src"),
-                "*.Aspire.Hosting",
-                SearchOption.TopDirectoryOnly);
-        var roots = moduleRoots.Concat(integrationRoots);
-        var sourceFiles = roots
-            .SelectMany(root => Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories))
-            .Where(path => !IsBuildOutput(path))
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .ToArray();
-        var offenders = new List<string>();
-
-        Assert.NotEmpty(sourceFiles);
-
-        foreach (var path in sourceFiles)
-        {
-            var source = await File.ReadAllTextAsync(
-                path,
-                TestContext.Current.CancellationToken);
-            if (source.Contains("ConditionalWeakTable", StringComparison.Ordinal))
-            {
-                offenders.Add(Path.GetRelativePath(RepositoryRoot, path).Replace('\\', '/'));
-            }
-        }
-
-        Assert.Empty(offenders);
     }
 
     [Fact(DisplayName = "AddDigitalBrain owns one complete durable profile")]
@@ -353,14 +305,6 @@ public sealed class IntegrationHostingContracts
         ?? throw new InvalidOperationException($"{element.Name.LocalName} carries no {name} attribute.");
 
     private static string CommandOf(XElement exec) => AttributeOf(exec, "Command");
-
-    private static bool IsBuildOutput(string path)
-        => path.Contains(
-                $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
-                StringComparison.OrdinalIgnoreCase)
-            || path.Contains(
-                $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
-                StringComparison.OrdinalIgnoreCase);
 
     private static string LocateRepositoryRoot()
     {

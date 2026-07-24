@@ -14,8 +14,11 @@ under `samples/DigitalBrain.Quickstart` restores only from `artifacts/packages` 
 ## Declare a typed neuron
 
 ```csharp
-[Alias("quickstart.greeter")]
-internal interface IGreeter : INeuron;
+public partial interface IGreeter : INeuron
+{
+    [Alias(nameof(Greet))]
+    Task<string> Greet(string name);
+}
 
 [GenerateSerializer]
 [Alias("quickstart.say-hello")]
@@ -27,13 +30,18 @@ internal sealed record Greeted : Synapse;
 
 internal sealed class Greeter : Neuron, IGreeter, IHandle<SayHello>, IEmit<Greeted>
 {
+    public Task<string> Greet(string name)
+        => Task.FromResult($"Hello, {name}!");
+
     public Task HandleAsync(SayHello synapse, CancellationToken cancellationToken)
         => EmitAsync(new Greeted());
 }
 ```
 
-The interface names the neuron capability. `SayHello` is its incoming fact and `Greeted` is its
-emitted fact.
+The partial interface names the neuron capability; its generated identity is the fully qualified
+interface name. Capability methods use ordinary non-`Async` domain verbs and
+`[Alias(nameof(Method))]`. Explicit string aliases remain on durable synapse and state records:
+`SayHello` is an incoming fact and `Greeted` is an emitted fact.
 
 ## Start the silo
 
@@ -60,18 +68,20 @@ var grains = host.Services.GetRequiredService<IGrainFactory>();
 var brain = DigitalBrainClient.Connect(grains, "quickstart");
 
 await brain.SendAsync<IGreeter>("first", new SayHello());
+var greeting = await brain.Get<IGreeter>("first").Greet("Ada");
 ```
 
-`DigitalBrainClient` is owner-bound. `SendAsync<TNeuron>()` derives neuron identity from the
-interface type and routes through the session neuron, the kernel's deliberate external entry point.
+`IDigitalBrain` is the owner-scoped client contract and `DigitalBrainClient` is its implementation.
+`SendAsync<TNeuron>()` derives neuron identity from the interface type and routes through the session
+neuron, the kernel's deliberate external entry point. There is no concrete brain neuron or
+addressable root neuron; the hosting brain and the owner-bound client are separate concepts.
 
 ## Add AI through AppHost
 
 The production distributed AppHost configures local Ollama without changing the silo code:
 
 ```csharp
-var brain = builder.AddBrain("brain")
-    .WithDevelopmentStores();
+var brain = builder.AddDigitalBrain("brain");
 
 brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
 
@@ -79,8 +89,12 @@ builder.AddProject<Projects.DigitalBrain_Host>("silo")
     .WithReference(brain);
 ```
 
-The AI module owns the Ollama resource and projects its endpoint and model into the silo. Switching
-to OpenAI is a typed AppHost choice:
+`AddDigitalBrain("brain")` is one-call durable hosting: it owns the Azure Storage resource used for
+Orleans clustering and reminders and for Blob-backed journals. Aspire run mode starts Azurite for
+that same durable profile; a publish uses Azure Storage. The silo project remains explicit because
+its compiled executable contains the generated typed module catalog. The AI module owns the Ollama
+resource and projects its endpoint and model into that silo. Switching to OpenAI is a typed AppHost
+choice:
 
 ```csharp
 brain.AddModule<AIModule>(ai => ai.WithLlm<Gpt56>());
