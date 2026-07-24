@@ -18,7 +18,7 @@ public sealed class PublicSurfaceContracts
         Assert.Contains(nameof(DigitalBrainFixture), exported);
         Assert.Contains(nameof(DigitalBrainTestBuilder), exported);
         Assert.Contains(nameof(TestBrain), exported);
-        Assert.Contains(nameof(TestOwner), exported);
+        Assert.Contains("TestOwner", exported);
         Assert.Contains("TestNeuron`1", exported);
         Assert.Contains("ObservedSynapse`1", exported);
         Assert.DoesNotContain("Simulation", exported);
