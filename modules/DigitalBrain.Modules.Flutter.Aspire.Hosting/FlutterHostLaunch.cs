@@ -9,9 +9,10 @@ internal enum FlutterHostKind
 internal static class FlutterHostLaunch
 {
     private const string ShellPackageDirectoryName = "shell";
-    private const string FlutterRootEnvironmentVariable = "FLUTTER_ROOT";
     private const string ConfigurationFlutterCommandKey = "DigitalBrain:FlutterCommand";
     private const string ConfigurationDartCommandKey = "DigitalBrain:DartCommand";
+    private const string DefaultFlutterCommand = "flutter";
+    private const string DefaultDartCommand = "dart";
 
     internal sealed record Result(string Command, string WorkingDirectory, string[] Args);
 
@@ -100,43 +101,41 @@ internal static class FlutterHostLaunch
         return Directory.Exists(Path.Combine(workingDirectory, deviceTarget));
     }
 
+    /// <summary>
+    /// v0.1.18 shape: options → DigitalBrain:FlutterCommand → FLUTTER_COMMAND → "flutter".
+    /// When the default name is used, prefer an absolute path resolved from PATH so Aspire DCP
+    /// does not depend on inheriting an interactive shell PATH (still the flutter CLI, not a .bat brand).
+    /// </summary>
     internal static string ResolveFlutterCommand(
         FlutterHostOptions options,
         Microsoft.Extensions.Configuration.IConfiguration? configuration = null)
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        if (TryExplicitCommand(options.FlutterCommand, out var fromOptions))
+        if (TryConfiguredCommand(options.FlutterCommand, out var fromOptions))
         {
             return fromOptions;
         }
 
-        var fromConfiguration = configuration?[ConfigurationFlutterCommandKey];
-        if (TryExplicitCommand(fromConfiguration, out var configured))
+        if (TryConfiguredCommand(configuration?[ConfigurationFlutterCommandKey], out var fromConfig))
         {
-            return configured;
+            return fromConfig;
         }
 
-        var fromEnv = Environment.GetEnvironmentVariable(
-            FlutterHostingExtensions.FlutterCommandEnvironmentVariable);
-        if (TryExplicitCommand(fromEnv, out var envCommand))
+        if (TryConfiguredCommand(
+                Environment.GetEnvironmentVariable(
+                    FlutterHostingExtensions.FlutterCommandEnvironmentVariable),
+                out var fromEnv))
         {
-            return envCommand;
+            return fromEnv;
         }
 
-        if (TryFindFlutterCli(out var discovered))
+        if (TryResolveCommandOnPath(DefaultFlutterCommand, out var fromPath))
         {
-            return discovered;
+            return fromPath;
         }
 
-        throw new InvalidOperationException(
-            "Flutter CLI was not found for WithFlutterHost(). " +
-            "Set DigitalBrain:FlutterCommand in AppHost configuration, " +
-            $"{FlutterHostingExtensions.FlutterCommandEnvironmentVariable}, " +
-            $"{FlutterRootEnvironmentVariable}, or install Flutter on PATH. " +
-            "DCP does not inherit an interactive shell PATH; prefer an absolute path " +
-            $"(e.g. E:\\tools\\flutter\\bin\\flutter.bat). Tried PATH entries and " +
-            $"{FlutterRootEnvironmentVariable}/bin.");
+        return DefaultFlutterCommand;
     }
 
     internal static string ResolveDartCommand(
@@ -145,33 +144,33 @@ internal static class FlutterHostLaunch
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        if (TryExplicitCommand(options.DartCommand, out var fromOptions))
+        if (TryConfiguredCommand(options.DartCommand, out var fromOptions))
         {
             return fromOptions;
         }
 
-        var fromConfiguration = configuration?[ConfigurationDartCommandKey];
-        if (TryExplicitCommand(fromConfiguration, out var configured))
+        if (TryConfiguredCommand(configuration?[ConfigurationDartCommandKey], out var fromConfig))
         {
-            return configured;
+            return fromConfig;
         }
 
-        var fromEnv = Environment.GetEnvironmentVariable(
-            FlutterHostingExtensions.DartCommandEnvironmentVariable);
-        if (TryExplicitCommand(fromEnv, out var envCommand))
+        if (TryConfiguredCommand(
+                Environment.GetEnvironmentVariable(
+                    FlutterHostingExtensions.DartCommandEnvironmentVariable),
+                out var fromEnv))
         {
-            return envCommand;
+            return fromEnv;
         }
 
-        if (TryFindDartCli(out var discovered))
+        if (TryResolveCommandOnPath(DefaultDartCommand, out var fromPath))
         {
-            return discovered;
+            return fromPath;
         }
 
-        return OperatingSystem.IsWindows() ? "dart.bat" : "dart";
+        return DefaultDartCommand;
     }
 
-    private static bool TryExplicitCommand(string? value, out string command)
+    private static bool TryConfiguredCommand(string? value, out string command)
     {
         command = string.Empty;
         if (string.IsNullOrWhiteSpace(value))
@@ -179,120 +178,103 @@ internal static class FlutterHostLaunch
             return false;
         }
 
-        var trimmed = value.Trim().Trim('"');
-        if (Path.IsPathRooted(trimmed))
-        {
-            if (!File.Exists(trimmed))
-            {
-                throw new InvalidOperationException(
-                    $"Configured Flutter/Dart command '{trimmed}' does not exist.");
-            }
-
-            command = Path.GetFullPath(trimmed);
-            return true;
-        }
-
-        command = trimmed;
+        command = value.Trim().Trim('"');
         return true;
     }
 
-    private static bool TryFindFlutterCli(out string path)
+    /// <summary>
+    /// Resolve a command the way a shell would: search process PATH, then User+Machine PATH,
+    /// applying PATHEXT on Windows. Returns an absolute path when found.
+    /// </summary>
+    internal static bool TryResolveCommandOnPath(string commandName, out string absolutePath)
     {
-        foreach (var candidate in FlutterExecutableCandidates())
+        absolutePath = string.Empty;
+        if (string.IsNullOrWhiteSpace(commandName) || Path.IsPathRooted(commandName))
         {
-            if (File.Exists(candidate))
+            if (!string.IsNullOrWhiteSpace(commandName)
+                && Path.IsPathRooted(commandName)
+                && File.Exists(commandName))
             {
-                path = Path.GetFullPath(candidate);
+                absolutePath = Path.GetFullPath(commandName);
                 return true;
+            }
+
+            return false;
+        }
+
+        var names = CommandFileNames(commandName);
+        foreach (var directory in PathSearchDirectories())
+        {
+            if (!Directory.Exists(directory))
+            {
+                continue;
+            }
+
+            foreach (var name in names)
+            {
+                var candidate = Path.Combine(directory, name);
+                if (File.Exists(candidate))
+                {
+                    absolutePath = Path.GetFullPath(candidate);
+                    return true;
+                }
             }
         }
 
-        path = string.Empty;
         return false;
     }
 
-    private static bool TryFindDartCli(out string path)
+    private static string[] CommandFileNames(string commandName)
     {
-        foreach (var candidate in DartExecutableCandidates())
+        if (!OperatingSystem.IsWindows()
+            || commandName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+            || commandName.EndsWith(".bat", StringComparison.OrdinalIgnoreCase)
+            || commandName.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
+            || commandName.EndsWith(".com", StringComparison.OrdinalIgnoreCase))
         {
-            if (File.Exists(candidate))
-            {
-                path = Path.GetFullPath(candidate);
-                return true;
-            }
+            return [commandName];
         }
 
-        path = string.Empty;
-        return false;
+        // PATHEXT order (common default). Prefer extensionless only if present (Unix-style shim).
+        return
+        [
+            commandName,
+            commandName + ".exe",
+            commandName + ".cmd",
+            commandName + ".bat",
+            commandName + ".com",
+        ];
     }
 
-    private static IEnumerable<string> FlutterExecutableCandidates()
+    private static IEnumerable<string> PathSearchDirectories()
     {
-        var fileNames = OperatingSystem.IsWindows()
-            ? new[] { "flutter.bat", "flutter.cmd", "flutter" }
-            : new[] { "flutter" };
-
-        foreach (var root in SdkRoots())
+        foreach (var directory in SplitPath(Environment.GetEnvironmentVariable("PATH")))
         {
-            foreach (var fileName in fileNames)
-            {
-                yield return Path.Combine(root, "bin", fileName);
-            }
+            yield return directory;
         }
 
-        foreach (var directory in PathDirectories())
+        // DCP / non-interactive hosts often lack a full interactive User PATH. Merge User+Machine.
+        foreach (var directory in SplitPath(
+                     Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User)))
         {
-            foreach (var fileName in fileNames)
-            {
-                yield return Path.Combine(directory, fileName);
-            }
-        }
-    }
-
-    private static IEnumerable<string> DartExecutableCandidates()
-    {
-        var fileNames = OperatingSystem.IsWindows()
-            ? new[] { "dart.bat", "dart.cmd", "dart" }
-            : new[] { "dart" };
-
-        foreach (var root in SdkRoots())
-        {
-            foreach (var fileName in fileNames)
-            {
-                yield return Path.Combine(root, "bin", fileName);
-            }
+            yield return directory;
         }
 
-        foreach (var directory in PathDirectories())
+        foreach (var directory in SplitPath(
+                     Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine)))
         {
-            foreach (var fileName in fileNames)
-            {
-                yield return Path.Combine(directory, fileName);
-            }
+            yield return directory;
         }
-    }
 
-    private static IEnumerable<string> SdkRoots()
-    {
-        var flutterRoot = Environment.GetEnvironmentVariable(FlutterRootEnvironmentVariable);
+        var flutterRoot = Environment.GetEnvironmentVariable("FLUTTER_ROOT");
         if (!string.IsNullOrWhiteSpace(flutterRoot))
         {
-            yield return flutterRoot.Trim().Trim('"');
-        }
-
-        // Well-known Windows dev layouts used by this monorepo (not user-profile paths).
-        if (OperatingSystem.IsWindows())
-        {
-            yield return @"E:\tools\flutter";
-            yield return @"E:\flutter";
-            yield return @"C:\src\flutter";
-            yield return @"C:\flutter";
+            yield return Path.Combine(flutterRoot.Trim().Trim('"'), "bin");
         }
     }
 
-    private static IEnumerable<string> PathDirectories()
+    private static IEnumerable<string> SplitPath(string? path)
     {
-        var path = Environment.GetEnvironmentVariable("PATH");
         if (string.IsNullOrWhiteSpace(path))
         {
             yield break;
