@@ -149,7 +149,7 @@ internal static class LocalLoopbackMcpAuthorizationRedirect
         }
     }
 
-    internal static string ValidateCallback(
+    private static string ValidateCallback(
         Uri authorizationUri,
         Uri redirectUri,
         Uri callbackUri)

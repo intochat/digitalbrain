@@ -84,7 +84,7 @@ internal sealed class McpRuntime(
             tokenState,
             commit,
             protector,
-            TokenPurpose(server, durableIdentity));
+            $"mcp/oauth/{server.Key}/{durableIdentity}");
         var authorization = McpOAuthOptions.Create(server, configuration, tokens);
         using var httpClient = httpClients.CreateClient(HttpClientName);
         var transport = new HttpClientTransport(
@@ -122,14 +122,5 @@ internal sealed class McpRuntime(
         return result.StructuredContent?.Clone()
             ?? throw new InvalidOperationException(
                 $"{server.DisplayName} MCP tool '{toolName}' returned no structured content.");
-    }
-
-    internal static string TokenPurpose(
-        McpServerDefinition server,
-        string durableIdentity)
-    {
-        ArgumentNullException.ThrowIfNull(server);
-        ArgumentException.ThrowIfNullOrWhiteSpace(durableIdentity);
-        return $"mcp/oauth/{server.Key}/{durableIdentity}";
     }
 }

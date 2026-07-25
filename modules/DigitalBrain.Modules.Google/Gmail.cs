@@ -66,7 +66,7 @@ internal sealed class Gmail : Neuron, IGmail
             cancellationToken);
     }
 
-    internal static McpClientTool AdmitGetMessage(IList<McpClientTool> tools)
+    private static McpClientTool AdmitGetMessage(IList<McpClientTool> tools)
     {
         ArgumentNullException.ThrowIfNull(tools);
         var matches = tools

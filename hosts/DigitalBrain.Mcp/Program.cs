@@ -1,5 +1,3 @@
-using DigitalBrain.AI.Ollama;
-using DigitalBrain.Aspire;
 using DigitalBrain.Client;
 using DigitalBrain.Mcp;
 using Microsoft.Extensions.AI;

@@ -25,28 +25,16 @@ internal sealed class Salesforce : Neuron, ISalesforce
         "DigitalBrain:Salesforce",
         ["mcp_api", "refresh_token"],
         requiresClientSecret: false);
+    private static readonly TimeSpan ReconciliationTimeout = TimeSpan.FromSeconds(30);
     private readonly string _durableIdentity;
     private readonly IDurableDictionary<Guid, byte[]> _mutations;
     private readonly McpRuntime _runtime;
-    private readonly TimeSpan _reconciliationTimeout;
     private readonly Serializer<MutationData> _states;
     private readonly IDurableValue<byte[]> _tokenState;
 
-    public Salesforce(
-        McpRuntime runtime,
-        SalesforceRuntimeOptions options)
+    public Salesforce(McpRuntime runtime)
     {
-        ArgumentNullException.ThrowIfNull(options);
-        if (options.ReconciliationTimeout <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                options.ReconciliationTimeout,
-                "Salesforce reconciliation timeout must be positive.");
-        }
-
         _runtime = runtime;
-        _reconciliationTimeout = options.ReconciliationTimeout;
         _mutations = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(
             MutationsName);
         _states = ServiceProvider.GetRequiredService<Serializer<MutationData>>();
@@ -227,7 +215,7 @@ internal sealed class Salesforce : Neuron, ISalesforce
 
     private async Task<MutationData> ReconcileBoundedAsync(MutationData mutation)
     {
-        using var reconciliation = new CancellationTokenSource(_reconciliationTimeout);
+        using var reconciliation = new CancellationTokenSource(ReconciliationTimeout);
         return await ReconcileAsync(mutation, reconciliation.Token);
     }
 
@@ -639,10 +627,4 @@ internal sealed class Salesforce : Neuron, ISalesforce
         Completed,
         OutcomeUncertain,
     }
-}
-
-internal sealed record SalesforceRuntimeOptions(TimeSpan ReconciliationTimeout)
-{
-    internal static SalesforceRuntimeOptions Default { get; } =
-        new(TimeSpan.FromSeconds(30));
 }
