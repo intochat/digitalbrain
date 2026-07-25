@@ -6,7 +6,7 @@ namespace DigitalBrain.HostTests;
 public sealed class ProductionHostedBrain(ProductionAppHostFixture fixture)
 {
     [Fact(DisplayName =
-        "production AppHost silo reaches Healthy with selected modules and /health OK")]
+        "production AppHost silo reaches Healthy and /health OK")]
     public async Task TheSiloReachesHealthyOnTheProductionHost()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

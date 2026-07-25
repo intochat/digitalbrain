@@ -11,10 +11,7 @@ public sealed class AiContractBoundaries
 {
     [Fact(DisplayName = "ILLM does not inherit IAgent")]
     public void IllmDoesNotInheritIAgent()
-    {
-        Assert.False(typeof(IAgent).IsAssignableFrom(typeof(ILLM)));
-        Assert.DoesNotContain(typeof(IAgent), typeof(ILLM).GetInterfaces());
-    }
+        => Assert.False(typeof(IAgent).IsAssignableFrom(typeof(ILLM)));
 
     [Fact(DisplayName = "every concrete LLM follows namespace, contract, and typed-key grammar")]
     public void EveryConcreteLlmFollowsNamespaceContractAndTypedKeyGrammar()

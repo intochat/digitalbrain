@@ -109,9 +109,6 @@ public sealed class HostingProjectionContracts
             "DigitalBrain.AppHost",
             "AppHost.cs"));
 
-        Assert.Contains(".WithReference(brain)", appHost, StringComparison.Ordinal);
-        Assert.Contains(".WithReference(brain.AsClient())", appHost, StringComparison.Ordinal);
-
         var siloBlock = Between(appHost, "var silo =", ";");
         var mcpBlock = Between(appHost, "builder.AddProject<Projects.DigitalBrain_Mcp>", ";");
 

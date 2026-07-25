@@ -42,10 +42,6 @@ public sealed class CompositionBoundaryContracts
             .ToArray();
 
         Assert.Equal(AllowedProjectReferences, projectReferences);
-        Assert.DoesNotContain(projectReferences, name => name == "DigitalBrain.Kernel");
-        Assert.DoesNotContain(
-            projectReferences,
-            name => name.Contains("Integrations", StringComparison.Ordinal));
         Assert.DoesNotContain(
             packageReferences,
             name => name.Contains("Orleans", StringComparison.OrdinalIgnoreCase)

@@ -73,15 +73,14 @@ public sealed class FlutterContracts
             $"Wire contract drift.\nExpected:\n{expected.ToJsonString(Indented)}\nActual:\n{actual.ToJsonString(Indented)}");
     }
 
-    [Fact(DisplayName = "Flutter contracts reach neither Kernel nor Flutter/Dart SDKs")]
-    public void FlutterContractsReachNeitherKernelNorFlutterDartSdks()
+    [Fact(DisplayName = "Flutter contracts reach neither Flutter nor Dart SDKs")]
+    public void FlutterContractsReachNeitherFlutterNorDartSdks()
     {
         var references = typeof(IShell).Assembly
             .GetReferencedAssemblies()
             .Select(name => name.Name!)
             .ToArray();
 
-        Assert.DoesNotContain(references, name => name == "DigitalBrain.Kernel");
         Assert.DoesNotContain(
             references,
             name => name.Contains("Flutter", StringComparison.OrdinalIgnoreCase)

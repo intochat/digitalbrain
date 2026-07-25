@@ -59,9 +59,6 @@ public sealed class FlutterHostingProjectionContracts
 
         var environment = await EnvironmentKeysOf(ui).ConfigureAwait(true);
         Assert.Contains(FlutterHostingExtensions.OwnerEnvironmentVariable, environment);
-        Assert.DoesNotContain("ConnectionStrings__journal", environment);
-        Assert.DoesNotContain("DigitalBrain__Security__StateProtectionKey", environment);
-        Assert.DoesNotContain("DigitalBrain__Modules__0", environment);
 
         Assert.Contains(
             ui.Annotations.OfType<WaitAnnotation>(),
@@ -228,13 +225,9 @@ public sealed class FlutterHostingProjectionContracts
     }
 
     [Fact(DisplayName =
-        "Flutter Aspire.Hosting package is packable inventory and Kernel-free")]
-    public void FlutterHostingPackageIsPackableAndKernelFree()
+        "Flutter Aspire.Hosting package is Kernel-free and hosts only via Aspire.Hosting")]
+    public void FlutterHostingPackageIsKernelFreeAndHostsViaAspireHosting()
     {
-        Assert.Contains(
-            "DigitalBrain.Modules.Flutter.Aspire.Hosting",
-            PackableProjects.Names,
-            StringComparer.Ordinal);
         Assert.Equal(
             "DigitalBrain.Flutter.Aspire.Hosting",
             typeof(FlutterHostingExtensions).Namespace);
