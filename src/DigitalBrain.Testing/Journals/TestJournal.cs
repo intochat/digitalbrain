@@ -372,11 +372,19 @@ public sealed class TestJournal
         }
     }
 
-    private static ObservedSynapse<TSynapse> Observe<TSynapse>(
+    private ObservedSynapse<TSynapse> Observe<TSynapse>(
         TSynapse synapse,
         SynapseDelivery delivery)
         where TSynapse : Synapse
-        => new(synapse, delivery.SynapseId);
+        => new(
+            synapse,
+            delivery.SynapseId,
+            delivery.Sequence,
+            delivery.Timestamp,
+            delivery.CorrelationId,
+            delivery.CausationId,
+            delivery.Caller,
+            _direction);
 
     private SynapseDelivery? TakePending<TSynapse>()
         where TSynapse : Synapse

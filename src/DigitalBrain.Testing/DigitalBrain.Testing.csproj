@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
+    <DevelopmentDependency>true</DevelopmentDependency>
     <Description>Development-only DigitalBrain testing: assembly-owned real multi-silo fixtures, method-scoped TestBrain, deterministic time, typed journal evidence, closed durability faults, and exclusive Aspire AppHost testing.</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007</NoWarn>
   </PropertyGroup>

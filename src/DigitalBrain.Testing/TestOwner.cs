@@ -6,23 +6,24 @@ namespace DigitalBrain.Testing;
 public sealed class TestOwner
 {
     private readonly TestBrain _brain;
-    private readonly OwnerId _id;
 
     internal TestOwner(TestBrain brain, OwnerId id)
     {
         _brain = brain;
-        _id = id;
+        Id = id;
         Client = DigitalBrainClient.Connect(brain.Cluster.Client, id.Value);
     }
 
-    internal IDigitalBrain Client { get; }
+    public OwnerId Id { get; }
+
+    public IDigitalBrain Client { get; }
 
     public TestNeuron<TNeuron> Neuron<TNeuron>(string name = "default")
         where TNeuron : class, INeuron
     {
         try
         {
-            var id = NeuronId.For<TNeuron>(_id, name);
+            var id = NeuronId.For<TNeuron>(Id, name);
             return new TestNeuron<TNeuron>(
                 _brain,
                 id,
