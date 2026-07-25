@@ -8,6 +8,14 @@ namespace DigitalBrain.ModuleTests;
 [Alias("DigitalBrain.ModuleTests.IConcurrentProbe")]
 public interface IConcurrentProbe : IAgent;
 
+[Alias("DigitalBrain.ModuleTests.IParticipantSwapConcurrentProbe")]
+[ClientEntryPoint]
+public interface IParticipantSwapConcurrentProbe : IAgent
+{
+    [Alias(nameof(UseParticipants))]
+    Task UseParticipants(string left, string right);
+}
+
 [Alias("DigitalBrain.ModuleTests.IGroupChatProbe")]
 [ClientEntryPoint]
 public interface IGroupChatProbe : IGroupChat
@@ -29,6 +37,27 @@ public sealed class ConcurrentProbe : Concurrent, IConcurrentProbe
         Participant<ILlama32>("left"),
         Participant<ILlama32>("right"),
     ];
+}
+
+public sealed class ParticipantSwapConcurrentProbe : Concurrent, IParticipantSwapConcurrentProbe
+{
+    private string _left = "left";
+    private string _right = "right";
+
+    protected override IReadOnlyList<Participant> Participants =>
+    [
+        Participant<ILlama32>(_left),
+        Participant<ILlama32>(_right),
+    ];
+
+    public Task UseParticipants(string left, string right)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(left);
+        ArgumentException.ThrowIfNullOrWhiteSpace(right);
+        _left = left;
+        _right = right;
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class GroupChatProbe : GroupChat, IGroupChatProbe

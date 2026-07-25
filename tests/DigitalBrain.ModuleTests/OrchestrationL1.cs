@@ -96,4 +96,36 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
         Assert.False(string.IsNullOrWhiteSpace(second.Text));
         Assert.Equal(4, test.Chat().CallCount);
     }
+
+    [Fact(DisplayName =
+        "Concurrent.Respond after participant change on the same id demands migration or reset")]
+    public async Task ParticipantChangeOnSameIdDemandsMigrationOrReset()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        test.Chat().Reply("fingerprint-left");
+        test.Chat().Reply("fingerprint-right");
+
+        var orchestration = test.Client.Get<IParticipantSwapConcurrentProbe>("fingerprint-team");
+        var first = await orchestration.Respond(
+            [new ChatMessage(ChatRole.User, "turn one")]);
+        Assert.False(string.IsNullOrWhiteSpace(first.Text));
+        Assert.Equal(2, test.Chat().CallCount);
+
+        await orchestration.UseParticipants("left-alt", "right-alt");
+
+        var mismatch = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => orchestration.Respond(
+                [new ChatMessage(ChatRole.User, "turn two")]));
+
+        Assert.Contains(
+            "incompatible with the current orchestration definition",
+            mismatch.Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "migration or reset",
+            mismatch.Message,
+            StringComparison.Ordinal);
+        Assert.Equal(2, test.Chat().CallCount);
+    }
 }
