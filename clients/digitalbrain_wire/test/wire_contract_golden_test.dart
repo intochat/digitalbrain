@@ -1,8 +1,29 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:digitalbrain_wire/digitalbrain_wire.dart';
 import 'package:test/test.dart';
+
+// Dart pin of modules/.../flutter-wire-contracts.golden.json (single oracle file; no forked copy).
+const _namespace = 'DigitalBrain.Flutter';
+const _recordNames = <String>{
+  'ControlActivated',
+  'OpenScene',
+  'SceneOpened',
+};
+const _interfaceNames = <String>{
+  'IScene',
+  'IShell',
+};
+const _aliases = <String, String>{
+  'ControlActivated': 'flutter.control-activated',
+  'IScene': 'DigitalBrain.Flutter.IScene',
+  'IShell': 'DigitalBrain.Flutter.IShell',
+  'OpenScene': 'flutter.open-scene',
+  'SceneOpened': 'flutter.scene-opened',
+};
+const _controlActivatedFields = <String>['ControlId', 'Intent', 'SceneKey'];
+const _openSceneFields = <String>['CommandId', 'SceneKey', 'Title'];
+const _sceneOpenedFields = <String>['CommandId', 'SceneKey', 'Shell', 'Title'];
 
 void main() {
   test('Dart wire pins match Flutter.Contracts golden manifest', () {
@@ -10,7 +31,7 @@ void main() {
     final root = jsonDecode(goldenFile.readAsStringSync()) as Map<String, dynamic>;
 
     expect(root['version'], 1);
-    expect(root['namespace'], flutterWireNamespace);
+    expect(root['namespace'], _namespace);
 
     final types = (root['types'] as List<dynamic>).cast<Map<String, dynamic>>();
     final byName = {
@@ -18,17 +39,17 @@ void main() {
     };
 
     expect(byName.keys.toSet(), {
-      ...flutterWireRecordNames,
-      ...flutterWireInterfaceNames,
+      ..._recordNames,
+      ..._interfaceNames,
     });
 
-    for (final entry in flutterWireAliases.entries) {
+    for (final entry in _aliases.entries) {
       expect(byName[entry.key]?['alias'], entry.value);
     }
 
-    expect(_propertyNames(byName['ControlActivated']!), controlActivatedFields);
-    expect(_propertyNames(byName['OpenScene']!), openSceneFields);
-    expect(_propertyNames(byName['SceneOpened']!), sceneOpenedFields);
+    expect(_propertyNames(byName['ControlActivated']!), _controlActivatedFields);
+    expect(_propertyNames(byName['OpenScene']!), _openSceneFields);
+    expect(_propertyNames(byName['SceneOpened']!), _sceneOpenedFields);
 
     final shell = byName['IShell']!;
     final methods = (shell['methods'] as List<dynamic>).cast<Map<String, dynamic>>();

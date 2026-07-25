@@ -46,12 +46,4 @@ final class SceneOpenedEvent {
       shell: json['shell'] as String,
     );
   }
-
-  Map<String, Object?> toJson() => {
-        'sequence': sequence,
-        'sceneKey': sceneKey,
-        'title': title,
-        'commandId': commandId,
-        'shell': shell,
-      };
 }

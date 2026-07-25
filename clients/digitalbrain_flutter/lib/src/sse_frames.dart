@@ -40,12 +40,3 @@ final class SseSceneOpenedParser {
     return SceneOpenedEvent.fromJson(decoded.cast<String, Object?>());
   }
 }
-
-Iterable<SceneOpenedEvent> parseSseSceneOpenedEvents(String text) {
-  final parser = SseSceneOpenedParser();
-  return [
-    for (final line in const LineSplitter().convert(text))
-      ...parser.addLine(line),
-    ...parser.flush(),
-  ];
-}

@@ -56,7 +56,7 @@ void main() {
     expect(surface.latest?.sequence, 4);
   });
 
-  test('parseSseSceneOpenedEvents reads scene-opened frames without restart', () {
+  test('SseSceneOpenedParser reads scene-opened frames without restart', () {
     const frames = '''
 : connected
 
@@ -70,7 +70,11 @@ data: {"sequence":5,"sceneKey":"countdown","title":"Countdown","commandId":"d","
 
 ''';
 
-    final events = parseSseSceneOpenedEvents(frames).toList();
+    final parser = SseSceneOpenedParser();
+    final events = <SceneOpenedEvent>[
+      for (final line in frames.split('\n')) ...parser.addLine(line),
+      ...parser.flush(),
+    ];
     expect(events, hasLength(2));
     expect(events[0].sceneKey, 'home');
     expect(events[1].title, 'Countdown');
