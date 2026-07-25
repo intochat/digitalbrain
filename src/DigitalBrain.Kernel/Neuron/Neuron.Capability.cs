@@ -342,7 +342,6 @@ public abstract partial class Neuron
 
         var turn = new CapabilityTurn(
             _outbox.Count,
-            SnapshotCapturedCapabilityCauses(),
             _outgoing.Checkpoint(),
             [.. _turnRollbacks],
             _handling,
@@ -370,7 +369,6 @@ public abstract partial class Neuron
             _outbox.Count,
             _handled.Count,
             InboundCommitted: true,
-            SnapshotCapturedCapabilityCauses(),
             _incoming.Checkpoint(),
             _outgoing.Checkpoint());
         _turnRollbacks.Clear();
@@ -394,8 +392,6 @@ public abstract partial class Neuron
         Discard(
             _outbox,
             _turnCheckpoint?.CommittedOutbox ?? turn.CommittedOutbox);
-        RestoreCapturedCapabilityCauses(
-            _turnCheckpoint?.CapturedCapabilityCauses ?? turn.CapturedCapabilityCauses);
         _outgoing.Restore(_turnCheckpoint?.Outgoing ?? turn.Outgoing);
         RollbackTurnState();
         _firedWhileHandling.Clear();

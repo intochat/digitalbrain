@@ -49,7 +49,6 @@ public abstract partial class Neuron
             _outbox.Count,
             _handled.Count,
             InboundCommitted: false,
-            SnapshotCapturedCapabilityCauses(),
             _incoming.Checkpoint(),
             _outgoing.Checkpoint());
 
@@ -77,7 +76,6 @@ public abstract partial class Neuron
 
             Discard(_outbox, checkpoint.CommittedOutbox);
             Discard(_handled, checkpoint.CommittedHandled);
-            RestoreCapturedCapabilityCauses(checkpoint.CapturedCapabilityCauses);
             _incoming.Restore(checkpoint.Incoming);
             _outgoing.Restore(checkpoint.Outgoing);
             RollbackTurnState();

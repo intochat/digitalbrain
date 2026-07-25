@@ -62,7 +62,6 @@ public abstract partial class Neuron
             {
                 CommittedOutbox = _outbox.Count,
                 CommittedHandled = _handled.Count,
-                CapturedCapabilityCauses = SnapshotCapturedCapabilityCauses(),
                 Incoming = _incoming.Checkpoint(),
                 Outgoing = _outgoing.Checkpoint(),
             };
@@ -91,27 +90,6 @@ public abstract partial class Neuron
         _incoming.Append(_handling);
         Remember(_handling.SynapseId);
         _turnCheckpoint = checkpoint with { InboundCommitted = true };
-    }
-
-    private Dictionary<Guid, byte[]> SnapshotCapturedCapabilityCauses()
-        => _capturedCapabilityCauses.ToDictionary(
-            entry => entry.Key,
-            entry => entry.Value.ToArray());
-
-    private void RestoreCapturedCapabilityCauses(IReadOnlyDictionary<Guid, byte[]> snapshot)
-    {
-        foreach (var key in _capturedCapabilityCauses.Select(entry => entry.Key).ToArray())
-        {
-            if (!snapshot.ContainsKey(key))
-            {
-                _capturedCapabilityCauses.Remove(key);
-            }
-        }
-
-        foreach (var entry in snapshot)
-        {
-            _capturedCapabilityCauses[entry.Key] = entry.Value.ToArray();
-        }
     }
 
     private DelegationCheckpoint SnapshotDelegations()
@@ -215,7 +193,6 @@ public abstract partial class Neuron
 
     internal readonly record struct CapabilityTurn(
         int CommittedOutbox,
-        IReadOnlyDictionary<Guid, byte[]> CapturedCapabilityCauses,
         NeuronFeedCheckpoint Outgoing,
         IReadOnlyList<Action> PreviousRollbacks,
         SynapseDelivery? PreviousHandling,
@@ -231,7 +208,6 @@ public abstract partial class Neuron
         int CommittedOutbox,
         int CommittedHandled,
         bool InboundCommitted,
-        IReadOnlyDictionary<Guid, byte[]> CapturedCapabilityCauses,
         NeuronFeedCheckpoint Incoming,
         NeuronFeedCheckpoint Outgoing);
 }

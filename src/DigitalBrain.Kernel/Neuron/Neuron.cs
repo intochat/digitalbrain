@@ -18,7 +18,6 @@ public abstract partial class Neuron :
     private const string DelegationsName = "delegations";
     private const string DelegationConsumedName = "delegation-consumed";
     private const string DelegationTerminalsName = "delegation-terminals";
-    private const string CapturedCapabilityCausesName = "captured-capability-causes";
     private const int RememberedDeliveries = 4096;
     private const int MaximumRememberedDelegations = 32;
     private const int ProtectedConsumedDelegations = 1;
@@ -31,7 +30,6 @@ public abstract partial class Neuron :
     private readonly IDurableList<byte[]> _outbox;
     private readonly IDurableList<Guid> _handled;
     private readonly IDurableDictionary<Guid, byte[]> _delegations;
-    private readonly IDurableDictionary<Guid, byte[]> _capturedCapabilityCauses;
     private readonly IDurableList<Guid> _delegationConsumed;
     private readonly IDurableList<Guid> _delegationTerminals;
     private readonly HashSet<SynapseId> _remembered = [];
@@ -53,8 +51,6 @@ public abstract partial class Neuron :
         _outbox = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(OutboxName);
         _handled = ServiceProvider.GetRequiredKeyedService<IDurableList<Guid>>(HandledName);
         _delegations = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(DelegationsName);
-        _capturedCapabilityCauses = ServiceProvider
-            .GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(CapturedCapabilityCausesName);
         _delegationConsumed = ServiceProvider.GetRequiredKeyedService<IDurableList<Guid>>(DelegationConsumedName);
         _delegationTerminals = ServiceProvider.GetRequiredKeyedService<IDurableList<Guid>>(DelegationTerminalsName);
         _entries = ServiceProvider.GetRequiredService<Serializer<OutboxEntry>>();
