@@ -4,11 +4,20 @@ using DigitalBrain.Aspire.Hosting;
 
 namespace DigitalBrain.Flutter.Aspire.Hosting;
 
-public enum FlutterHostMode
+// Host kinds for WithFlutterHost<T> — same selection style as AI WithLlm<TModel>.
+// No Auto: pick Desktop or Headless explicitly (default WithFlutterHost = Desktop).
+public sealed class DesktopHost
 {
-    Auto = 0,
-    FlutterDesktop = 1,
-    Headless = 2,
+    private DesktopHost()
+    {
+    }
+}
+
+public sealed class HeadlessHost
+{
+    private HeadlessHost()
+    {
+    }
 }
 
 public static class FlutterHostingExtensions
@@ -38,13 +47,37 @@ public static class FlutterHostingExtensions
     public static DigitalBrainModuleBuilder<FlutterModule> WithFlutterHost(
         this DigitalBrainModuleBuilder<FlutterModule> module,
         Action<FlutterHostOptions>? configure = null)
+        => WithFlutterHost<DesktopHost>(module, configure);
+
+    public static DigitalBrainModuleBuilder<FlutterModule> WithFlutterHost<THost>(
+        this DigitalBrainModuleBuilder<FlutterModule> module,
+        Action<FlutterHostOptions>? configure = null)
+        where THost : class
     {
         ArgumentNullException.ThrowIfNull(module);
 
         var options = new FlutterHostOptions();
         configure?.Invoke(options);
-        GetOrCreateState(module).EnsureFlutterHost(options);
+        GetOrCreateState(module).EnsureFlutterHost(HostKindOf<THost>(), options);
         return module;
+    }
+
+    private static FlutterHostKind HostKindOf<THost>()
+        where THost : class
+    {
+        if (typeof(THost) == typeof(DesktopHost))
+        {
+            return FlutterHostKind.Desktop;
+        }
+
+        if (typeof(THost) == typeof(HeadlessHost))
+        {
+            return FlutterHostKind.Headless;
+        }
+
+        throw new NotSupportedException(
+            $"{typeof(THost).FullName} is not a Flutter host kind. " +
+            $"Use {nameof(DesktopHost)} or {nameof(HeadlessHost)}.");
     }
 
     private static FlutterHostingState GetOrCreateState(
@@ -86,7 +119,6 @@ public static class FlutterHostingExtensions
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
                 ? DefaultUiResourceName
                 : options.ResourceName;
-
             var owner = string.IsNullOrWhiteSpace(options.Owner)
                 ? "dev"
                 : options.Owner;
@@ -99,7 +131,7 @@ public static class FlutterHostingExtensions
                 .WithEnvironment(OwnerEnvironmentVariable, owner);
         }
 
-        internal void EnsureFlutterHost(FlutterHostOptions options)
+        internal void EnsureFlutterHost(FlutterHostKind kind, FlutterHostOptions options)
         {
             if (_flutterHost is not null)
             {
@@ -119,16 +151,12 @@ public static class FlutterHostingExtensions
             if (!Directory.Exists(packageRoot)
                 || !File.Exists(Path.Combine(packageRoot, "pubspec.yaml")))
             {
-                if (options.RequireHost)
-                {
-                    throw new InvalidOperationException(
-                        $"Flutter host package was not found at '{packageRoot}'. " +
-                        "Pass FlutterHostOptions.WorkingDirectory or place clients/digitalbrain_flutter in the repo.");
-                }
-
-                return;
+                throw new InvalidOperationException(
+                    $"Flutter host package was not found at '{packageRoot}'. " +
+                    "Pass FlutterHostOptions.WorkingDirectory or place clients/digitalbrain_flutter in the repo.");
             }
 
+            var launch = FlutterHostLaunch.Resolve(kind, packageRoot, options);
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
                 ? DefaultFlutterResourceName
                 : options.ResourceName;
@@ -136,27 +164,10 @@ public static class FlutterHostingExtensions
                 ? DefaultShellName
                 : options.ShellName;
             var ui = _ui!;
-            var endpoint = ui.GetEndpoint(UiHttpEndpointName);
-
-            var launch = FlutterHostLaunch.Resolve(packageRoot, options);
-            if (launch is null)
-            {
-                if (options.RequireHost)
-                {
-                    throw new InvalidOperationException(
-                        "Flutter host could not be launched: no runnable Auto path. " +
-                        "Need Flutter CLI plus lib/main.dart and a platform folder (package root or shell/) " +
-                        "for FlutterDesktop, or bin/digitalbrain_host.dart for Headless " +
-                        "(Flutter SDK still required when the headless package pubspec depends on sdk: flutter). " +
-                        "Install Flutter, pass an explicit mode, or set RequireHost false.");
-                }
-
-                return;
-            }
 
             _flutterHost = appHost
                 .AddExecutable(resourceName, launch.Command, launch.WorkingDirectory, launch.Args)
-                .WithEnvironment(UiBaseEnvironmentVariable, endpoint)
+                .WithEnvironment(UiBaseEnvironmentVariable, ui.GetEndpoint(UiHttpEndpointName))
                 .WithEnvironment(ShellEnvironmentVariable, shell)
                 .WaitFor(ui);
         }
@@ -245,8 +256,6 @@ public sealed class FlutterHostOptions
 {
     public string ResourceName { get; set; } = FlutterHostingExtensions.DefaultFlutterResourceName;
 
-    public FlutterHostMode Mode { get; set; } = FlutterHostMode.Auto;
-
     public string DeviceTarget { get; set; } = "windows";
 
     public string ShellName { get; set; } = FlutterHostingExtensions.DefaultShellName;
@@ -256,6 +265,4 @@ public sealed class FlutterHostOptions
     public string? DartCommand { get; set; }
 
     public string? WorkingDirectory { get; set; }
-
-    public bool RequireHost { get; set; }
 }

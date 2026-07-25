@@ -10,9 +10,9 @@ Northbound OS surface host for DigitalBrain (architecture §4.6).
   `DIGITALBRAIN_SHELL` only (no Orleans/journal/MCP env).
 - **Built (Windows chrome):** nested `shell/` Flutter package (`lib/main.dart` + `windows/`)
   Material list of scene key/title from `ShellSurfaceController` / SSE `SceneOpened`.
-- **Headless vs desktop:** root package is **pure Dart** so `dart run bin/digitalbrain_host.dart`
-  works without the Flutter SDK (honest Aspire Auto/Headless path). Desktop chrome is
-  `cd shell && flutter run -d windows` (explicit FlutterDesktop / WorkingDirectory override).
+- **Headless vs desktop (explicit):** root is pure Dart — `WithFlutterHost<HeadlessHost>()` →
+  `dart run bin/digitalbrain_host.dart`. Default `WithFlutterHost()` / `<DesktopHost>` →
+  `flutter run -d windows` under `shell/`. No Auto fallback.
 
 Do not embed Orleans or talk MCP tools as the UI bus.
 

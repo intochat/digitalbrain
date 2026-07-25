@@ -719,11 +719,10 @@ Flutter / Dart host  ──HTTP/JSON (+ SSE watch)──►  hosts/DigitalBrain.
   Proof tier is code + local Flutter/Dart jobs — **not** product AppHost Built-live.
 - **Built (module hosting projection):** `DigitalBrain.Modules.Flutter.Aspire.Hosting` — `WithUiEdge` /
   `WithFlutterHost` project `digitalbrain-ui` (AsClient) and host executable
-  (`DIGITALBRAIN_UI_BASE` + `DIGITALBRAIN_SHELL` only). Host mode: **Auto** (Flutter desktop only when
-  CLI is available and the host package has desktop markers; otherwise headless
-  `dart run bin/digitalbrain_host.dart`); explicit `FlutterDesktop` / `Headless`. Production AppHost
-  composes the surface via module selection. Proof tier for this bullet is **L0 projection pins**, not
-  live resource Healthy.
+  (`DIGITALBRAIN_UI_BASE` + `DIGITALBRAIN_SHELL` only). Host mode is **explicit**: default
+  `WithFlutterHost()` = Desktop (`flutter run -d windows` under `shell/`); `WithFlutterHost<HeadlessHost>()`
+  = pure-Dart headless. No Auto. Production AppHost composes the surface via module selection.
+  Proof tier for this bullet is **L0 projection pins**, not live resource Healthy.
 - **Built (OS compositions, pre-Behavior rail):** `samples/DigitalBrain.Compositions` —
   shell-only `OpenHome` / `PostAuthBootstrap` / `NavigateShell`; multi-module surfaces
   `CountdownSurface` (Flutter+Time) and `AiPaneSurface` (Flutter+AI); OS-scene-only
@@ -752,8 +751,9 @@ path only (L0 pins no hand-wired `DigitalBrain_Ui` project).
 ```text
 var brain = builder.AddDigitalBrain("brain");
 brain.AddModule<FlutterModule>(flutter => flutter
-    .WithUiEdge()           // projects hosts/DigitalBrain.Ui as AsClient edge
-    .WithFlutterHost());    // projects clients/digitalbrain_flutter executable (edge URL only)
+    .WithUiEdge()                         // projects hosts/DigitalBrain.Ui as AsClient edge
+    .WithFlutterHost());                  // Desktop: flutter run -d windows under shell/
+// Headless (CI / pure Dart): .WithFlutterHost<HeadlessHost>()
 
 var silo = builder.AddProject<…>("silo").WithReference(brain);
 // Host WaitFor(Ui) when projected; Apply on silo WithReference: Ui WaitFor(silo)
@@ -763,16 +763,16 @@ var silo = builder.AddProject<…>("silo").WithReference(brain);
 | --- | --- | --- |
 | Package / namespace | `DigitalBrain.Modules.Flutter.Aspire.Hosting` / `DigitalBrain.Flutter.Aspire.Hosting` | Kernel types leak into hosting public API |
 | Vocabulary-only selection | `AddModule<FlutterModule>()` with no `With*` = silo vocabulary only; **no** Ui/Flutter resources | Selecting the module silently starts the OS surface |
-| Explicit surface | `WithUiEdge(Action<FlutterUiEdgeOptions>? = null)` and `WithFlutterHost(Action<FlutterHostOptions>? = null)` | Host options invented outside module builder |
+| Explicit surface | `WithUiEdge(...)` and `WithFlutterHost()` / `WithFlutterHost<DesktopHost\|HeadlessHost>()` (same selection style as AI `WithLlm<T>`; **no Auto**) | Host options invented outside module builder |
 | `WithFlutterHost` without edge | Implies `WithUiEdge()` (host needs an edge base URL) | Flutter WaitFor/points at kernel, MCP, or Orleans client |
 | Default Ui resource name | `digitalbrain-ui` (product northbound name, overridable) | Per-brain rename without updating edge client docs |
 | Default Flutter resource name | `digitalbrain-flutter` (overridable) | Required when SDK missing without honest skip path |
 | Ui project materialization | Path-based `AddProject(name, uiCsprojPath)` resolved from AppHost directory → `../DigitalBrain.Ui/DigitalBrain.Ui.csproj` (hosts layout); override via options | Hard dependency on Aspire `Projects.*` codegen inside the packable package |
 | Ui trust wiring | `WithReference(brain.AsClient())` + `DigitalBrain__Owner` (default `"dev"`) | Journal, state-protection, or module list projected onto Ui |
 | Flutter process | `AddExecutable` default working dir `clients/digitalbrain_flutter` (pure Dart / headless); desktop chrome requires WorkingDirectory `…/shell` (or equivalent) with `lib/main.dart` + platform folder; env **edge HTTP base + shell only** (`DIGITALBRAIN_UI_BASE`, `DIGITALBRAIN_SHELL`) | Orleans/journal/reminder env; MCP tool env as UI bus; gRPC kernel; claiming root package is a Flutter app |
-| Host modes | `Auto` → Flutter desktop only when CLI and desktop project markers exist in WorkingDirectory, else headless Dart at pure-Dart root; `FlutterDesktop` / `Headless` explicit | Fake green when neither flutter nor headless entry exists and `RequireHost`; treating root `lib/main.dart` as present when chrome is only under `shell/` |
+| Host modes | **Explicit only:** `WithFlutterHost()` / `<DesktopHost>` = Windows chrome under `shell/`; `<HeadlessHost>` = pure-Dart `dart run bin/digitalbrain_host.dart`. Missing markers/entry **throws** — no silent Auto fallback | Auto mode, silent headless when desktop intended, omit-host without error |
 | WaitFor graph | Host `WaitFor(Ui)` when host projected; Ui `WaitFor(silo)` in projection `Apply` on silo `WithReference(brain)` | Process-name kill; hand WaitFor only in every AppHost forever without module path |
-| Missing Flutter SDK | Headless `dart run bin/digitalbrain_host.dart` at pure-Dart root is the honest live path | Silent success when host cannot start and `RequireHost` |
+| Missing Flutter SDK | Choose `WithFlutterHost<HeadlessHost>()` when desktop is not wanted; Desktop still projects `flutter run` (fail loud at process start if CLI missing) | Silent success / fake Healthy headless when AppHost asked for desktop |
 | MCP host | Stays AppHost-owned peer (not Flutter module packaging) | MCP folded into Flutter hosting as product UI |
 | Historical recovery | Intent only: `AddExecutable(flutter run -d …)` + edge URL env + WaitFor edge (`v0.1.18` / later `DIGITALBRAIN_V2_UI_ENDPOINT` shape). Rebind to Ui HTTP. | Restore kernel gRPC, Orleans client on Flutter, wholesale `app/` |
 

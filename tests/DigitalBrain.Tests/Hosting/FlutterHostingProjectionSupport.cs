@@ -33,10 +33,10 @@ internal static class FlutterHostingProjectionSupport
             "clients/digitalbrain_flutter/shell must exist for desktop chrome.");
         Assert.True(
             File.Exists(Path.Combine(shellDirectory, "lib", "main.dart")),
-            "shell Windows chrome requires lib/main.dart (Auto discovers shell/ under pure-Dart root).");
+            "shell Windows chrome requires lib/main.dart (Desktop host uses shell/ under pure-Dart root).");
         Assert.True(
             Directory.Exists(Path.Combine(shellDirectory, "windows")),
-            "shell Windows chrome requires windows/ (Auto discovers shell/ under pure-Dart root).");
+            "shell Windows chrome requires windows/ (Desktop host uses shell/ under pure-Dart root).");
         Assert.False(
             File.Exists(Path.Combine(
                 shellDirectory,
