@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>false</IsPackable>
-    <Description>Pre-rail Behavior-shaped compositions over IDigitalBrain and module contracts.</Description>
+    <Description>Shell and surface compositions over IDigitalBrain and module contracts only.</Description>
     <RootNamespace>DigitalBrain</RootNamespace>
     <NoWarn>$(NoWarn);CA2007;CA1822</NoWarn>
   </PropertyGroup>
