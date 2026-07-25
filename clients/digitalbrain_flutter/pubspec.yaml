@@ -1,12 +1,16 @@
 name: digitalbrain_flutter
 description: >
-  DigitalBrain OS pixel host (Designed Windows desktop). Pure Dart projection
-  and edge client until Flutter SDK is available in the agent environment.
+  DigitalBrain OS surface host. Built: pure Dart edge client, SSE projection,
+  headless host (bin/digitalbrain_host.dart). Designed: Flutter Windows chrome
+  when Flutter SDK is on PATH. Never Orleans, never MCP-as-UI.
 publish_to: none
 version: 0.1.0
 
 environment:
   sdk: ^3.12.0
+
+executables:
+  digitalbrain_host:
 
 dependencies:
   digitalbrain_wire:

@@ -1,15 +1,26 @@
+using System.Diagnostics;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
 
 namespace DigitalBrain.Flutter.Aspire.Hosting;
 
+public enum FlutterHostMode
+{
+    Auto = 0,
+    FlutterDesktop = 1,
+    Headless = 2,
+}
+
 public static class FlutterHostingExtensions
 {
     public const string DefaultUiResourceName = "digitalbrain-ui";
     public const string DefaultFlutterResourceName = "digitalbrain-flutter";
     public const string UiBaseEnvironmentVariable = "DIGITALBRAIN_UI_BASE";
+    public const string ShellEnvironmentVariable = "DIGITALBRAIN_SHELL";
     public const string OwnerEnvironmentVariable = "DigitalBrain__Owner";
+    public const string HeadlessHostEntry = "bin/digitalbrain_host.dart";
+    public const string DefaultShellName = "desk";
 
     public static DigitalBrainModuleBuilder<FlutterModule> WithUiEdge(
         this DigitalBrainModuleBuilder<FlutterModule> module,
@@ -118,21 +129,114 @@ public static class FlutterHostingExtensions
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
                 ? DefaultFlutterResourceName
                 : options.ResourceName;
-            var command = string.IsNullOrWhiteSpace(options.FlutterCommand)
-                ? Environment.GetEnvironmentVariable("FLUTTER_COMMAND") ?? "flutter"
-                : options.FlutterCommand;
-            var target = string.IsNullOrWhiteSpace(options.DeviceTarget)
-                ? "windows"
-                : options.DeviceTarget;
-
+            var shell = string.IsNullOrWhiteSpace(options.ShellName)
+                ? DefaultShellName
+                : options.ShellName;
             var ui = _ui!;
             var endpoint = ui.GetEndpoint("http");
+
+            var launch = ResolveHostLaunch(workingDirectory, options);
+            if (launch is null)
+            {
+                if (options.RequireHost)
+                {
+                    throw new InvalidOperationException(
+                        "Flutter host could not be launched: Flutter CLI missing and headless entry not found. " +
+                        "Install Flutter, pass FlutterHostMode.Headless with bin/digitalbrain_host.dart, or set RequireHost false.");
+                }
+
+                return;
+            }
+
             _flutterHost = appHost
-                .AddExecutable(resourceName, command, workingDirectory, "run", "-d", target)
+                .AddExecutable(resourceName, launch.Command, workingDirectory, launch.Args)
                 .WithEnvironment(UiBaseEnvironmentVariable, endpoint)
+                .WithEnvironment(ShellEnvironmentVariable, shell)
                 .WithReference(endpoint)
                 .WaitFor(ui);
         }
+
+        private static HostLaunch? ResolveHostLaunch(
+            string workingDirectory,
+            FlutterHostOptions options)
+        {
+            var mode = options.Mode;
+            if (mode == FlutterHostMode.Auto)
+            {
+                mode = FlutterCliAvailable(options)
+                    ? FlutterHostMode.FlutterDesktop
+                    : FlutterHostMode.Headless;
+            }
+
+            if (mode == FlutterHostMode.FlutterDesktop)
+            {
+                var command = string.IsNullOrWhiteSpace(options.FlutterCommand)
+                    ? Environment.GetEnvironmentVariable("FLUTTER_COMMAND") ?? "flutter"
+                    : options.FlutterCommand;
+                var target = string.IsNullOrWhiteSpace(options.DeviceTarget)
+                    ? "windows"
+                    : options.DeviceTarget;
+                return new HostLaunch(command, ["run", "-d", target]);
+            }
+
+            var headlessEntry = Path.Combine(workingDirectory, HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(headlessEntry))
+            {
+                return null;
+            }
+
+            var dart = string.IsNullOrWhiteSpace(options.DartCommand)
+                ? Environment.GetEnvironmentVariable("DART_COMMAND") ?? "dart"
+                : options.DartCommand;
+            return new HostLaunch(dart, ["run", HeadlessHostEntry]);
+        }
+
+        private static bool FlutterCliAvailable(FlutterHostOptions options)
+        {
+            var command = string.IsNullOrWhiteSpace(options.FlutterCommand)
+                ? Environment.GetEnvironmentVariable("FLUTTER_COMMAND") ?? "flutter"
+                : options.FlutterCommand;
+
+            try
+            {
+                using var process = Process.Start(new ProcessStartInfo
+                {
+                    FileName = command,
+                    Arguments = "--version",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                });
+                if (process is null)
+                {
+                    return false;
+                }
+
+                if (!process.WaitForExit(5_000))
+                {
+                    try
+                    {
+                        process.Kill(entireProcessTree: true);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                    }
+
+                    return false;
+                }
+
+                return process.ExitCode == 0;
+            }
+            catch (Exception exception) when (exception is System.ComponentModel.Win32Exception
+                or FileNotFoundException
+                or InvalidOperationException)
+            {
+                return false;
+            }
+        }
+
+        private sealed record HostLaunch(string Command, string[] Args);
 
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
@@ -218,9 +322,15 @@ public sealed class FlutterHostOptions
 {
     public string ResourceName { get; set; } = FlutterHostingExtensions.DefaultFlutterResourceName;
 
+    public FlutterHostMode Mode { get; set; } = FlutterHostMode.Auto;
+
     public string DeviceTarget { get; set; } = "windows";
 
+    public string ShellName { get; set; } = FlutterHostingExtensions.DefaultShellName;
+
     public string? FlutterCommand { get; set; }
+
+    public string? DartCommand { get; set; }
 
     public string? WorkingDirectory { get; set; }
 

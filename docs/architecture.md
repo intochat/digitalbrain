@@ -601,7 +601,7 @@ calendar, and DST record shapes. Do not implement those as though they were sett
 
 ### 4.6 Flutter
 
-Status: Built (first-vertical vocabulary + L0/L1 journal proofs + C# northbound UI edge + module-owned `Flutter.Aspire.Hosting` WithUiEdge/WithFlutterHost); Designed (Flutter Windows chrome polish, full product chrome, product journal observation on IDigitalBrain, multi-principal IdP edge)
+Status: Built (first-vertical vocabulary + L0/L1 journal proofs + C# northbound UI edge + module-owned `Flutter.Aspire.Hosting` WithUiEdge/WithFlutterHost + headless Dart host projection); Designed (Flutter Windows widget chrome polish, full product chrome, product journal observation on IDigitalBrain, multi-principal IdP edge)
 
 The OS surface is not a Flutter app with agents behind it. It is a brain whose **UI vocabulary** is a
 Flutter module, and whose **logic** (shell policy, post-auth composition, multi-window orchestration,
@@ -701,16 +701,18 @@ Flutter / Dart host  ──HTTP/JSON (+ SSE watch)──►  hosts/DigitalBrain.
   or reminders; attaching `brain.AsClient()` to a non-.NET Flutter resource as if it were an Orleans
   client; gRPC UiGateway / protobuf dual vocabulary; resurrected `app/` or `workspace/` product trees;
   **Aspire-only Flutter/Ui wiring with zero `FlutterModule` selection implication**.
-- **Built (Dart skeleton):** `clients/digitalbrain_wire` (dual golden pin + edge DTOs) and
-  `clients/digitalbrain_flutter` (HTTP/SSE edge client + pure projection). `dart analyze` / `dart test`
-  are local gates; Windows Flutter chrome still Designed (Flutter SDK not required for wire proofs).
+- **Built (Dart host):** `clients/digitalbrain_wire` (dual golden pin + edge DTOs) and
+  `clients/digitalbrain_flutter` (HTTP/SSE edge client, SSE parse, `ShellSurfaceController`, headless
+  `bin/digitalbrain_host.dart`). `dart analyze` / `dart test` are local gates.
 - **Built (module hosting):** `DigitalBrain.Modules.Flutter.Aspire.Hosting` — `WithUiEdge` /
-  `WithFlutterHost` project `digitalbrain-ui` (AsClient) and optional Flutter executable
-  (`DIGITALBRAIN_UI_BASE` only); production AppHost composes the surface via module selection.
-- **Designed:** Flutter Windows desktop chrome polish on `clients/digitalbrain_flutter`; production
-  IdP principal→owner bind; product journal observation on `IDigitalBrain` when a non-UI consumer
-  needs the same cursor/watch; optional upgrade from edge journal poll to grain `WatchNeuron` push
-  without changing the HTTP event schema.
+  `WithFlutterHost` project `digitalbrain-ui` (AsClient) and host executable
+  (`DIGITALBRAIN_UI_BASE` + `DIGITALBRAIN_SHELL` only). Host mode: **Auto** (Flutter desktop if CLI
+  on PATH, else headless `dart run bin/digitalbrain_host.dart`); explicit `FlutterDesktop` /
+  `Headless`. Production AppHost composes the surface via module selection.
+- **Designed:** Flutter Windows **widget** chrome polish; production IdP principal→owner bind;
+  product journal observation on `IDigitalBrain` when a non-UI consumer needs the same cursor/watch;
+  optional upgrade from edge journal poll to grain `WatchNeuron` push without changing the HTTP event
+  schema.
 - Edge executable lives under `hosts/` (peer of MCP and the silo host). The pixel host is a
   **client** under `clients/`, not a packable module and not a second Orleans host under `hosts/`.
   Do not invent a second public client facade beside `DigitalBrainClient`.
@@ -746,9 +748,10 @@ var silo = builder.AddProject<…>("silo").WithReference(brain);
 | Default Flutter resource name | `digitalbrain-flutter` (overridable) | Required when SDK missing without honest skip path |
 | Ui project materialization | Path-based `AddProject(name, uiCsprojPath)` resolved from AppHost directory → `../DigitalBrain.Ui/DigitalBrain.Ui.csproj` (hosts layout); override via options | Hard dependency on Aspire `Projects.*` codegen inside the packable package |
 | Ui trust wiring | `WithReference(brain.AsClient())` + `DigitalBrain__Owner` (default `"dev"`) | Journal, state-protection, or module list projected onto Ui |
-| Flutter process | `AddExecutable` `flutter run -d windows` (or configured target) with working dir `clients/digitalbrain_flutter`; env **edge HTTP base only** (`DIGITALBRAIN_UI_BASE` ← Ui endpoint) | Orleans/journal/reminder env; MCP tool env as UI bus; gRPC kernel |
-| WaitFor graph | Projection `Apply` (silo `WithReference(brain)`): Ui `WaitFor(silo)`; Flutter host `WaitFor(Ui)` | Process-name kill; hand WaitFor only in every AppHost forever without module path |
-| Missing Flutter SDK / path | Honest skip or Explicit test — never fake green | Silent success when host cannot start |
+| Flutter process | `AddExecutable` under `clients/digitalbrain_flutter`; env **edge HTTP base + shell only** (`DIGITALBRAIN_UI_BASE`, `DIGITALBRAIN_SHELL`) | Orleans/journal/reminder env; MCP tool env as UI bus; gRPC kernel |
+| Host modes | `Auto` → Flutter desktop when CLI available, else headless Dart; `FlutterDesktop` / `Headless` explicit | Fake green when neither flutter nor headless entry exists and `RequireHost` |
+| WaitFor graph | Projection `Apply` (silo `WithReference(brain)`): Ui `WaitFor(silo)`; host `WaitFor(Ui)` | Process-name kill; hand WaitFor only in every AppHost forever without module path |
+| Missing Flutter SDK | Headless `dart run bin/digitalbrain_host.dart` is the honest live path | Silent success when host cannot start and `RequireHost` |
 | MCP host | Stays AppHost-owned peer (not Flutter module packaging) | MCP folded into Flutter hosting as product UI |
 | Historical recovery | Intent only: `AddExecutable(flutter run -d …)` + edge URL env + WaitFor edge (`v0.1.18` / later `DIGITALBRAIN_V2_UI_ENDPOINT` shape). Rebind to Ui HTTP. | Restore kernel gRPC, Orleans client on Flutter, wholesale `app/` |
 
@@ -862,7 +865,7 @@ Dart package exists; they do not replace L1 journal proof. Domain gate remains t
 - Dart host mapping descriptors to widgets beyond the skeleton; Windows chrome polish (path of
   record: `clients/digitalbrain_flutter` + `clients/digitalbrain_wire`).
 - Product journal observation API on `IDigitalBrain` (promote when a non-UI consumer needs it).
-- Live Windows vertical chrome (runnable Flutter desktop host against AppHost-composed edge).
+- Flutter Windows widget chrome (headless Dart host is Built; desktop embedder polish still open).
 - Multi-principal edge factory beyond singleton `AddDigitalBrainClient(owner)` / process owner config.
 - Full desktop chrome, multi-window, notifications, AI pane as product surfaces.
 - Optional `WatchNeuron` push upgrade (SSE poll is acceptable and Built on the edge).

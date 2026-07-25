@@ -70,8 +70,8 @@ public sealed class FlutterHostingProjectionContracts
     }
 
     [Fact(DisplayName =
-        "WithFlutterHost projects flutter executable with DIGITALBRAIN_UI_BASE only")]
-    public async Task WithFlutterHostProjectsEdgeUrlOnly()
+        "WithFlutterHost headless projects dart host with DIGITALBRAIN_UI_BASE only")]
+    public async Task WithFlutterHostHeadlessProjectsEdgeUrlOnly()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
@@ -90,6 +90,69 @@ public sealed class FlutterHostingProjectionContracts
             .WithFlutterHost(options =>
             {
                 options.WorkingDirectory = flutterDir;
+                options.Mode = FlutterHostMode.Headless;
+                options.RequireHost = true;
+                options.ShellName = "desk";
+            }));
+
+        _ = builder
+            .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
+            .WithHttpEndpoint(name: "http")
+            .WithReference(brain);
+
+        var host = Assert.Single(
+            builder.Resources.OfType<ExecutableResource>(),
+            resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
+
+        Assert.Equal("dart", host.Command, StringComparer.OrdinalIgnoreCase);
+        var args = await ResolvedArgsOf(host).ConfigureAwait(true);
+        Assert.Contains(
+            args,
+            arg => string.Equals(
+                arg,
+                FlutterHostingExtensions.HeadlessHostEntry,
+                StringComparison.Ordinal));
+
+        var environment = await EnvironmentKeysOf(host).ConfigureAwait(true);
+        Assert.Contains(FlutterHostingExtensions.UiBaseEnvironmentVariable, environment);
+        Assert.Contains(FlutterHostingExtensions.ShellEnvironmentVariable, environment);
+        Assert.DoesNotContain("ConnectionStrings__journal", environment);
+        Assert.DoesNotContain("DigitalBrain__Security__StateProtectionKey", environment);
+        Assert.DoesNotContain("DigitalBrain__Modules__0", environment);
+
+        var ui = Assert.Single(
+            builder.Resources,
+            resource => resource.Name == FlutterHostingExtensions.DefaultUiResourceName);
+        Assert.Contains(
+            host.Annotations.OfType<WaitAnnotation>(),
+            wait => wait.WaitType == WaitType.WaitUntilHealthy
+                && ReferenceEquals(wait.Resource, ui));
+    }
+
+    [Fact(DisplayName =
+        "WithFlutterHost FlutterDesktop projects flutter run without journal secrets")]
+    public async Task WithFlutterHostDesktopProjectsFlutterRun()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddDigitalBrain("brain");
+        var uiProject = Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.Ui",
+            "DigitalBrain.Ui.csproj");
+        var flutterDir = Path.Combine(
+            RepositoryRoot,
+            "clients",
+            "digitalbrain_flutter");
+
+        brain.AddModule<FlutterModule>(flutter => flutter
+            .WithUiEdge(options => options.ProjectPath = uiProject)
+            .WithFlutterHost(options =>
+            {
+                options.WorkingDirectory = flutterDir;
+                options.Mode = FlutterHostMode.FlutterDesktop;
+                options.FlutterCommand = "flutter";
+                options.DeviceTarget = "windows";
                 options.RequireHost = true;
             }));
 
@@ -102,19 +165,14 @@ public sealed class FlutterHostingProjectionContracts
             builder.Resources.OfType<ExecutableResource>(),
             resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
 
+        Assert.Equal("flutter", host.Command, StringComparer.OrdinalIgnoreCase);
+        var args = await ResolvedArgsOf(host).ConfigureAwait(true);
+        Assert.Contains(args, arg => arg == "run");
+        Assert.Contains(args, arg => arg == "windows");
+
         var environment = await EnvironmentKeysOf(host).ConfigureAwait(true);
         Assert.Contains(FlutterHostingExtensions.UiBaseEnvironmentVariable, environment);
         Assert.DoesNotContain("ConnectionStrings__journal", environment);
-        Assert.DoesNotContain("DigitalBrain__Security__StateProtectionKey", environment);
-        Assert.DoesNotContain("DigitalBrain__Modules__0", environment);
-
-        var ui = Assert.Single(
-            builder.Resources,
-            resource => resource.Name == FlutterHostingExtensions.DefaultUiResourceName);
-        Assert.Contains(
-            host.Annotations.OfType<WaitAnnotation>(),
-            wait => wait.WaitType == WaitType.WaitUntilHealthy
-                && ReferenceEquals(wait.Resource, ui));
     }
 
     [Fact(DisplayName =
@@ -169,6 +227,18 @@ public sealed class FlutterHostingProjectionContracts
 
         keys.UnionWith(context.EnvironmentVariables.Keys);
         return keys;
+    }
+
+    private static async Task<List<string>> ResolvedArgsOf(ExecutableResource resource)
+    {
+        var args = new List<object>();
+        var context = new CommandLineArgsCallbackContext(args, resource, CancellationToken.None);
+        foreach (var annotation in resource.Annotations.OfType<CommandLineArgsCallbackAnnotation>())
+        {
+            await annotation.Callback(context).ConfigureAwait(true);
+        }
+
+        return args.Select(static arg => arg?.ToString() ?? string.Empty).ToList();
     }
 
     private static string LocateRepositoryRoot()
