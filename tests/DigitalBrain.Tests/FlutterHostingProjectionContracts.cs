@@ -197,7 +197,7 @@ public sealed class FlutterHostingProjectionContracts
     }
 
     [Fact(DisplayName =
-        "production AppHost composes Ui via FlutterModule host options, not hand-wire")]
+        "production AppHost composes OS surface via FlutterModule host options, not hand-wire")]
     public void ProductionAppHostComposesUiThroughModuleHosting()
     {
         var appHost = File.ReadAllText(Path.Combine(
@@ -206,12 +206,47 @@ public sealed class FlutterHostingProjectionContracts
             "DigitalBrain.AppHost",
             "AppHost.cs"));
 
-        Assert.Contains("WithUiEdge", appHost, StringComparison.Ordinal);
         Assert.Contains("AddModule<FlutterModule>", appHost, StringComparison.Ordinal);
+        Assert.Contains("WithUiEdge", appHost, StringComparison.Ordinal);
+        Assert.Contains("WithFlutterHost", appHost, StringComparison.Ordinal);
+        AssertNoOsSurfaceHandWire(appHost);
+    }
+
+    [Fact(DisplayName =
+        "Quickstart and Testing AppHosts omit OS surface selection and never hand-wire Ui/Flutter")]
+    public void CompanionAppHostsOmitOsSurfaceAndHandWire()
+    {
+        var quickstart = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.Quickstart.AppHost",
+            "AppHost.cs"));
+        var testing = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.TestingAppHost",
+            "AppHost.cs"));
+
+        foreach (var appHost in new[] { quickstart, testing })
+        {
+            Assert.DoesNotContain("FlutterModule", appHost, StringComparison.Ordinal);
+            Assert.DoesNotContain("WithUiEdge", appHost, StringComparison.Ordinal);
+            Assert.DoesNotContain("WithFlutterHost", appHost, StringComparison.Ordinal);
+            AssertNoOsSurfaceHandWire(appHost);
+        }
+    }
+
+    private static void AssertNoOsSurfaceHandWire(string appHost)
+    {
         Assert.DoesNotContain(
             "builder.AddProject<Projects.DigitalBrain_Ui>",
             appHost,
             StringComparison.Ordinal);
+        Assert.DoesNotContain("digitalbrain-ui", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("digitalbrain-flutter", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("DIGITALBRAIN_UI_BASE", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("DIGITALBRAIN_SHELL", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddExecutable", appHost, StringComparison.Ordinal);
     }
 
     private static async Task<HashSet<string>> EnvironmentKeysOf(IResource resource)

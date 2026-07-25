@@ -111,8 +111,6 @@ public sealed class HostingProjectionContracts
 
         Assert.Contains(".WithReference(brain)", appHost, StringComparison.Ordinal);
         Assert.Contains(".WithReference(brain.AsClient())", appHost, StringComparison.Ordinal);
-        Assert.Contains("AddModule<FlutterModule>", appHost, StringComparison.Ordinal);
-        Assert.Contains("WithUiEdge", appHost, StringComparison.Ordinal);
 
         var siloBlock = Between(appHost, "var silo =", ";");
         var mcpBlock = Between(appHost, "builder.AddProject<Projects.DigitalBrain_Mcp>", ";");
@@ -124,10 +122,6 @@ public sealed class HostingProjectionContracts
             ".WithReference(brain.AsClient())",
             string.Empty,
             StringComparison.Ordinal), StringComparison.Ordinal);
-        Assert.DoesNotContain(
-            "builder.AddProject<Projects.DigitalBrain_Ui>",
-            appHost,
-            StringComparison.Ordinal);
     }
 
     private static async Task<HashSet<string>> EnvironmentKeysOf(ContainerResource resource)
