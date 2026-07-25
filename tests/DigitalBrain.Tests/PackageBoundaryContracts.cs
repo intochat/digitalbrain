@@ -25,13 +25,9 @@ public sealed class PackageBoundaryContracts
         "DigitalBrain.Quickstart.Contracts",
     ];
 
-    private static readonly string[] NeuronHosting = ["DigitalBrain.Testing"];
-
     private static readonly string[] ProductionRoots = ["src", "modules", "samples"];
 
     public static TheoryData<string> ConsumerPathPackages { get; } = [.. ConsumerPath];
-
-    public static TheoryData<string> PackagesThatMayHostNeurons { get; } = [.. NeuronHosting];
 
     public static TheoryData<string> McpProviderRuntimePackages { get; } =
     [
@@ -96,17 +92,6 @@ public sealed class PackageBoundaryContracts
     }
 
     [Theory]
-    [MemberData(nameof(PackagesThatMayHostNeurons))]
-    public void APackageThatHostsNeuronsStillDeclaresNoProviderSdkItself(string package)
-    {
-        var declared = DirectPackageReferencesOf(package)
-            .Where(dependency => ProviderSdkPrefixes.Any(sdk => dependency.StartsWith(sdk, StringComparison.Ordinal)))
-            .ToList();
-
-        Assert.Empty(declared);
-    }
-
-    [Theory]
     [MemberData(nameof(McpProviderRuntimePackages))]
     public void McpProvidersDependOnSharedMechanicsInsteadOfDeclaringCopies(string package)
     {
@@ -167,7 +152,7 @@ public sealed class PackageBoundaryContracts
     public void TheGuardsCoverEveryPackableProject()
     {
         var guarded = ConsumerPath
-            .Concat(NeuronHosting)
+            .Append("DigitalBrain.Testing")
             .Append("DigitalBrain.Kernel")
             .Append("DigitalBrain.Security")
             .Append("DigitalBrain.Integrations.Mcp")

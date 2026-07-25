@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 using DigitalBrain.Abstractions;
@@ -9,7 +8,7 @@ namespace DigitalBrain.Testing;
 [SuppressMessage(
     "Design",
     "CA1001:Types that own disposable fields should be disposable",
-    Justification = "TestBrain exclusively owns journal lifetime and invokes the internal asynchronous cleanup before releasing the fixture lease.")]
+    Justification = "TestBrain owns journal lifetime and disposes asynchronously.")]
 public sealed class TestJournal
 {
     private readonly FixtureCluster _cluster;
@@ -59,7 +58,7 @@ public sealed class TestJournal
                         new ObjectDisposedException(nameof(TestJournal))));
             }
 
-            var task = NextTrackedAsync<TSynapse>(cancellationToken);
+            var task = NextWrappedAsync<TSynapse>(cancellationToken);
             _outstandingNextTasks.Add(task);
             _ = task.ContinueWith(
                 static (completed, state) =>
@@ -72,80 +71,6 @@ public sealed class TestJournal
         }
     }
 
-    private async Task<ObservedSynapse<TSynapse>> NextTrackedAsync<TSynapse>(
-        CancellationToken cancellationToken)
-        where TSynapse : Synapse
-    {
-        try
-        {
-            var observed =
-                await NextCoreAsync<TSynapse>(cancellationToken);
-            _diagnostics.RecordEvent(
-                "journal.next",
-                "succeeded",
-                ("subject", _subject.ToString()),
-                ("direction", _direction.ToString()),
-                ("synapse.type", typeof(TSynapse).FullName ?? typeof(TSynapse).Name),
-                ("sequence", observed.Sequence.ToString(CultureInfo.InvariantCulture)));
-            return observed;
-        }
-        catch (Exception failure)
-            when (failure is not BrainTestFailureException)
-        {
-            throw _diagnostics.CaptureFailure(
-                "journal.next",
-                failure);
-        }
-    }
-
-    private async Task<ObservedSynapse<TSynapse>> NextCoreAsync<TSynapse>(
-        CancellationToken cancellationToken)
-        where TSynapse : Synapse
-    {
-        await _nextGate.WaitAsync(cancellationToken);
-        try
-        {
-            ThrowIfDisposed();
-            var observer = await EnsureWatchingAsync(cancellationToken);
-
-            while (true)
-            {
-                if (TakePending<TSynapse>() is { } pending)
-                {
-                    return Observe((TSynapse)pending.Synapse, pending);
-                }
-
-                JournalObservation observation;
-
-                try
-                {
-                    observation =
-                        await observer.Observations.ReadAsync(cancellationToken);
-                }
-                catch (ChannelClosedException closed)
-                    when (closed.InnerException is InvalidOperationException failure)
-                {
-                    throw ObservationFailure(failure);
-                }
-                catch (ChannelClosedException closed)
-                    when (closed.InnerException is not null)
-                {
-                    ExceptionDispatchInfo.Capture(closed.InnerException).Throw();
-                    throw;
-                }
-
-                if (Accept<TSynapse>(observer, observation) is { } accepted)
-                {
-                    return Observe((TSynapse)accepted.Synapse, accepted);
-                }
-            }
-        }
-        finally
-        {
-            _nextGate.Release();
-        }
-    }
-
     public async Task<IReadOnlyList<ObservedSynapse<TSynapse>>> ReadAsync<TSynapse>(
         long afterSequence = 0,
         CancellationToken cancellationToken = default)
@@ -154,56 +79,36 @@ public sealed class TestJournal
         try
         {
             ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
-            var observed = await ReadCoreAsync<TSynapse>(
-                afterSequence,
-                cancellationToken);
-            _diagnostics.RecordEvent(
-                "journal.read",
-                "succeeded",
-                ("subject", _subject.ToString()),
-                ("direction", _direction.ToString()),
-                ("synapse.type", typeof(TSynapse).FullName ?? typeof(TSynapse).Name),
-                ("count", observed.Count.ToString(CultureInfo.InvariantCulture)));
-            return observed;
+            ThrowIfDisposed();
+            var read = await _session
+                .ReadNeuronJournal(_subject, _direction, afterSequence)
+                .WaitAsync(cancellationToken);
+
+            if (read.ResetSnapshot is not null)
+            {
+                throw new InvalidOperationException(
+                    $"Journal compaction for '{_subject}' {_direction} after {afterSequence}.");
+            }
+
+            return
+            [
+                .. read.Delta
+                    .Where(delivery => delivery.Synapse is TSynapse)
+                    .Select(delivery => Observe(
+                        (TSynapse)delivery.Synapse,
+                        delivery)),
+            ];
         }
-        catch (Exception failure)
-            when (failure is not BrainTestFailureException)
+        catch (Exception failure) when (failure is not BrainTestFailureException)
         {
-            throw _diagnostics.CaptureFailure(
-                "journal.read",
-                failure);
+            throw _diagnostics.CaptureFailure("journal.read", failure);
         }
-    }
-
-    private async Task<IReadOnlyList<ObservedSynapse<TSynapse>>> ReadCoreAsync<TSynapse>(
-        long afterSequence,
-        CancellationToken cancellationToken)
-        where TSynapse : Synapse
-    {
-        ThrowIfDisposed();
-        var read = await _session
-            .ReadNeuronJournal(_subject, _direction, afterSequence)
-            .WaitAsync(cancellationToken);
-
-        if (read.ResetSnapshot is not null)
-        {
-            throw CompactionFailure(afterSequence, read);
-        }
-
-        return
-        [
-            .. read.Delta
-                .Where(delivery => delivery.Synapse is TSynapse)
-                .Select(delivery => Observe(
-                    (TSynapse)delivery.Synapse,
-                    delivery)),
-        ];
     }
 
     [SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
-        Justification = "Journal teardown must attempt unwatch, object-reference deletion, and observer disposal; all failures are retained in an aggregate.")]
+        Justification = "Teardown attempts every cleanup step and aggregates failures.")]
     internal async ValueTask DisposeAsync()
     {
         lock (_nextTasksGate)
@@ -218,7 +123,7 @@ public sealed class TestJournal
 
         TestJournalObserver? observer;
         IJournalObserver? reference;
-        bool watching;
+        var watching = false;
 
         await _setupGate.WaitAsync();
         try
@@ -254,8 +159,7 @@ public sealed class TestJournal
 
             try
             {
-                _cluster.Client.DeleteObjectReference<IJournalObserver>(
-                    reference);
+                _cluster.Client.DeleteObjectReference<IJournalObserver>(reference);
             }
             catch (Exception failure)
             {
@@ -272,30 +176,13 @@ public sealed class TestJournal
             }
         }
 
-        await AwaitOutstandingNextTasksAsync();
-
-        if (failures.Count > 0)
-        {
-            throw new AggregateException(
-                $"Cleanup failed for the {_direction} journal of '{_subject}'.",
-                failures);
-        }
-    }
-
-    [SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "Each caller-owned NextAsync task retains its terminal exception; journal teardown waits only for completion and must not duplicate expected disposal failures as cleanup failures.")]
-    private async Task AwaitOutstandingNextTasksAsync()
-    {
-        Task[] tasks;
-
+        Task[] outstanding;
         lock (_nextTasksGate)
         {
-            tasks = [.. _outstandingNextTasks];
+            outstanding = [.. _outstandingNextTasks];
         }
 
-        foreach (var task in tasks)
+        foreach (var task in outstanding)
         {
             try
             {
@@ -305,13 +192,67 @@ public sealed class TestJournal
             {
             }
         }
+
+        if (failures.Count > 0)
+        {
+            throw new AggregateException(
+                $"Cleanup failed for the {_direction} journal of '{_subject}'.",
+                failures);
+        }
     }
 
-    private void RetireNextTask(Task task)
+    private async Task<ObservedSynapse<TSynapse>> NextWrappedAsync<TSynapse>(
+        CancellationToken cancellationToken)
+        where TSynapse : Synapse
     {
-        lock (_nextTasksGate)
+        try
         {
-            _outstandingNextTasks.Remove(task);
+            return await NextCoreAsync<TSynapse>(cancellationToken);
+        }
+        catch (Exception failure) when (failure is not BrainTestFailureException)
+        {
+            throw _diagnostics.CaptureFailure("journal.next", failure);
+        }
+    }
+
+    private async Task<ObservedSynapse<TSynapse>> NextCoreAsync<TSynapse>(
+        CancellationToken cancellationToken)
+        where TSynapse : Synapse
+    {
+        await _nextGate.WaitAsync(cancellationToken);
+        try
+        {
+            ThrowIfDisposed();
+            var observer = await EnsureWatchingAsync(cancellationToken);
+
+            while (true)
+            {
+                if (TakePending<TSynapse>() is { } pending)
+                {
+                    return Observe((TSynapse)pending.Synapse, pending);
+                }
+
+                JournalObservation observation;
+                try
+                {
+                    observation = await observer.Observations.ReadAsync(cancellationToken);
+                }
+                catch (ChannelClosedException closed)
+                    when (closed.InnerException is not null)
+                {
+                    ExceptionDispatchInfo.Capture(closed.InnerException).Throw();
+                    throw;
+                }
+
+                if (Accept<TSynapse>(observer, observation) is { } accepted)
+                {
+                    return Observe((TSynapse)accepted.Synapse, accepted);
+                }
+            }
+        }
+        finally
+        {
+            _nextGate.Release();
         }
     }
 
@@ -322,13 +263,11 @@ public sealed class TestJournal
     {
         if (observation.Read.ResetSnapshot is not null)
         {
-            throw CompactionFailure(
-                observation.RequestedCursor,
-                observation.Read);
+            throw new InvalidOperationException(
+                $"Journal compaction for '{_subject}' {_direction}.");
         }
 
         SynapseDelivery? matching = null;
-
         foreach (var delivery in observation.Read.Delta)
         {
             if (matching is null && delivery.Synapse is TSynapse)
@@ -339,7 +278,8 @@ public sealed class TestJournal
 
             if (_pending.Count >= TestJournalObserver.EvidenceLimit)
             {
-                var failure = PendingOverflowFailure(observation);
+                var failure = new InvalidOperationException(
+                    $"Journal evidence overflow for '{_subject}' {_direction}.");
                 observer.Complete(failure);
                 throw failure;
             }
@@ -350,48 +290,14 @@ public sealed class TestJournal
         return matching;
     }
 
-    private InvalidOperationException CompactionFailure(
-        long requestedCursor,
-        JournalRead read)
-    {
-        var snapshot = read.ResetSnapshot
-            ?? throw new InvalidOperationException(
-                "A journal compaction failure requires a reset snapshot.");
-        var dropped = Math.Max(
-            0,
-            snapshot.TotalRecorded - snapshot.RetainedCount);
-        var tallies = string.Join(
-            ", ",
-            snapshot.Tallies
-                .OrderBy(tally => tally.SynapseType, StringComparer.Ordinal)
-                .Select(tally => string.Create(
-                    CultureInfo.InvariantCulture,
-                    $"{tally.SynapseType}={tally.Recorded}")));
-
-        return new InvalidOperationException(string.Create(
-            CultureInfo.InvariantCulture,
-            $"Journal compaction for subject '{_subject}', direction '{_direction}', requested cursor {requestedCursor}, reset resume sequence {read.ResumeSequence}: retained={snapshot.RetainedCount}, dropped={dropped}, tallies=[{tallies}]."));
-    }
-
-    private InvalidOperationException ObservationFailure(
-        InvalidOperationException failure)
-        => new(
-            $"Journal evidence failed for subject '{_subject}', direction '{_direction}': {failure.Message}",
-            failure);
-
-    private InvalidOperationException PendingOverflowFailure(
-        JournalObservation observation)
-        => new(
-            $"Journal evidence overflow for subject '{_subject}', direction '{_direction}': unmatched evidence exceeded limit {TestJournalObserver.EvidenceLimit} while processing the batch requested after cursor {observation.RequestedCursor}, with resume sequence {observation.Read.ResumeSequence}.");
-
     [SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
-        Justification = "A failed watch can leave a server registration and local object reference; both cleanup steps are attempted and preserved with the setup failure.")]
+        Justification = "Failed watch setup cleans up registration and reference best-effort.")]
     [SuppressMessage(
         "Reliability",
         "CA2000:Dispose objects before losing scope",
-        Justification = "Observer ownership transfers to TestJournal after a successful watch; every failed setup path disposes it in CleanupFailedSetupAsync.")]
+        Justification = "Observer ownership transfers on success.")]
     private async Task<TestJournalObserver> EnsureWatchingAsync(
         CancellationToken cancellationToken)
     {
@@ -399,7 +305,6 @@ public sealed class TestJournal
         try
         {
             ThrowIfDisposed();
-
             if (_observer is not null)
             {
                 return _observer;
@@ -407,36 +312,49 @@ public sealed class TestJournal
 
             var observer = new TestJournalObserver(_direction);
             IJournalObserver? reference = null;
-
             try
             {
-                reference =
-                    _cluster.Client.CreateObjectReference<IJournalObserver>(
-                        observer);
+                reference = _cluster.Client.CreateObjectReference<IJournalObserver>(observer);
                 await _session.WatchNeuron(
                     _subject,
                     _direction,
                     afterSequence: 0,
                     reference);
-
                 _observer = observer;
                 _reference = reference;
                 _watching = true;
                 return observer;
             }
-            catch (Exception setupFailure)
+            catch
             {
-                var cleanupFailures =
-                    await CleanupFailedSetupAsync(observer, reference);
-
-                if (cleanupFailures.Count > 0)
+                observer.Complete();
+                if (reference is not null)
                 {
-                    throw new AggregateException(
-                        $"Setup and cleanup failed for the {_direction} journal of '{_subject}'.",
-                        [setupFailure, .. cleanupFailures]);
+                    try
+                    {
+                        await _session.UnwatchNeuron(_subject, reference);
+                    }
+                    catch
+                    {
+                    }
+
+                    try
+                    {
+                        _cluster.Client.DeleteObjectReference<IJournalObserver>(reference);
+                    }
+                    catch
+                    {
+                    }
                 }
 
-                ExceptionDispatchInfo.Capture(setupFailure).Throw();
+                try
+                {
+                    await observer.DisposeAsync();
+                }
+                catch
+                {
+                }
+
                 throw;
             }
         }
@@ -446,49 +364,12 @@ public sealed class TestJournal
         }
     }
 
-    [SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "Partial journal setup must attempt every applicable cleanup step and report all failures.")]
-    private async Task<IReadOnlyList<Exception>> CleanupFailedSetupAsync(
-        TestJournalObserver observer,
-        IJournalObserver? reference)
+    private void RetireNextTask(Task task)
     {
-        List<Exception> failures = [];
-        observer.Complete();
-
-        if (reference is not null)
+        lock (_nextTasksGate)
         {
-            try
-            {
-                await _session.UnwatchNeuron(_subject, reference);
-            }
-            catch (Exception failure)
-            {
-                failures.Add(failure);
-            }
-
-            try
-            {
-                _cluster.Client.DeleteObjectReference<IJournalObserver>(
-                    reference);
-            }
-            catch (Exception failure)
-            {
-                failures.Add(failure);
-            }
+            _outstandingNextTasks.Remove(task);
         }
-
-        try
-        {
-            await observer.DisposeAsync();
-        }
-        catch (Exception failure)
-        {
-            failures.Add(failure);
-        }
-
-        return failures;
     }
 
     private ObservedSynapse<TSynapse> Observe<TSynapse>(
@@ -508,8 +389,7 @@ public sealed class TestJournal
     private SynapseDelivery? TakePending<TSynapse>()
         where TSynapse : Synapse
     {
-        var index =
-            _pending.FindIndex(delivery => delivery.Synapse is TSynapse);
+        var index = _pending.FindIndex(delivery => delivery.Synapse is TSynapse);
         if (index < 0)
         {
             return null;
@@ -521,9 +401,7 @@ public sealed class TestJournal
     }
 
     private void ThrowIfDisposed()
-    {
-        ObjectDisposedException.ThrowIf(
+        => ObjectDisposedException.ThrowIf(
             Volatile.Read(ref _disposed) != 0,
             this);
-    }
 }
