@@ -2,7 +2,7 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>The DigitalBrain neuron runtime: journaled neurons, the durable synapse fabric, on Orleans.</Description>
-    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1812</NoWarn>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Journaling" />
