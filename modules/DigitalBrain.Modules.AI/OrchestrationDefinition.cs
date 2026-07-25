@@ -69,19 +69,14 @@ internal sealed record OrchestrationDefinition(string Fingerprint)
         Type orchestrationType,
         IReadOnlyList<Participant> participants,
         DirectOrchestrationIdentity identity)
-    {
-        ArgumentNullException.ThrowIfNull(orchestrationType);
-        ArgumentNullException.ThrowIfNull(participants);
-        ArgumentNullException.ThrowIfNull(identity);
-
-        return Create(
+        => Create(
             orchestrationType.AssemblyQualifiedName
                 ?? throw new InvalidOperationException("The orchestration type has no assembly-qualified identity."),
             MafAssemblyIdentity(),
             identity,
             [.. participants.Select(MafParticipantAdapter.Describe)],
             AssemblyIdentity(orchestrationType.Assembly, requireVersion: true));
-    }
+
 
     private static string MafAssemblyIdentity()
         => $"{AssemblyIdentity(typeof(AIAgent).Assembly, requireVersion: false)};{AssemblyIdentity(typeof(AgentWorkflowBuilder).Assembly, requireVersion: false)}";
