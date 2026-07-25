@@ -601,13 +601,150 @@ calendar, and DST record shapes. Do not implement those as though they were sett
 
 ### 4.6 Flutter
 
-Status: Designed
+Status: Designed (vocabulary and host model ratified; first vertical unbuilt)
 
-`DigitalBrain.Flutter` will contain only Flutter neurons and its contract drift guard, following the
-same package triple and hosting pattern as every other module. It is deliberately outside the first
-executable proof, and nothing about it is settled beyond that boundary — no contract shapes, no
-transport, no hosting resources. It appears here so that "we will bolt a UI onto the kernel later" is
-never mistaken for a design.
+The OS surface is not a Flutter app with agents behind it. It is a brain whose **UI vocabulary** is a
+Flutter module, and whose **logic** (shell policy, post-auth composition, multi-window orchestration,
+settings flows) is behaviors — or, until the Behavior rail exists, ordinary C# compositions with the
+same allowlist — composing that vocabulary the way AccountEnrichment composes Gmail and Salesforce.
+
+#### Package family and public identity
+
+Physical packages follow the same triple as every other module:
+
+```text
+DigitalBrain.Modules.Flutter.Contracts
+DigitalBrain.Modules.Flutter
+DigitalBrain.Modules.Flutter.Aspire.Hosting   optional; omit until module-specific AppHost resources exist
+```
+
+Public namespaces carry meaning and never say `Modules` or `Contracts`. The domain identity is
+**`DigitalBrain.Flutter`**, matching Time (`DigitalBrain.Time`) and Google (`DigitalBrain.Google`). A
+host-neutral `DigitalBrain.UI` rename is rejected until a second non-Flutter host is a real consumer
+and this section is reversed in writing.
+
+Flutter is the **host runtime family** (pixels, widgets, platform channels) — the same class of
+concern as MCP behind Google or MAF behind AI — not a license for a public god type.
+
+#### Semantic neurons — not `IFlutter`
+
+Public vocabulary is small semantic capabilities. Namespace plus type name are the identity. There is
+no `IFlutter` mega-neuron, no central UI root, and no second “DigitalBrain desktop” grain.
+
+First vertical public surface (≤5 types; freeze signatures only with red→green proofs):
+
+| Type | Kind | Role |
+| --- | --- | --- |
+| `DigitalBrain.Flutter.IShell` | Neuron | Addressable blank chrome / host surface for one owner-bound shell |
+| `DigitalBrain.Flutter.IScene` | Neuron | Addressable content surface (scene key = neuron key) |
+| `DigitalBrain.Flutter.OpenScene` | Request command | Typed method payload to open/present a scene (not a free-form route bag) |
+| `DigitalBrain.Flutter.SceneOpened` | Synapse (fact) | Broadcast when a scene is open for projection |
+| `DigitalBrain.Flutter.ControlActivated` | Synapse (fact) | Domain user action (control id + intent) — never Flutter widget types |
+
+Out of the first vertical: `IWindow`, login/session policy neurons, navigation stacks, theming,
+multi-window layout. Those are later vocabulary or composition over `IShell` / `IScene`.
+
+#### Projection model
+
+The same two primitives as the rest of the brain:
+
+- **Synapse** = fact (broadcast or directed, no reply). Surface lifecycle and domain-relevant user
+  intent use synapses (`EmitAsync` / `SendAsync`).
+- **Interface method** = request (directed, replies), reified as `CapabilityRequested` → outcome.
+  Snapshot/query paths (`Current` / present) use methods when the host needs a typed reply.
+
+Flutter rebuild is a **projection of committed journals and serializable scene descriptors**, never
+the ledger. Widget trees, scroll offsets, hover, and frame timing stay host-local. Only
+domain-relevant intent and scene lifecycle that other neurons may consume cross the boundary.
+
+C# contracts carry **serializable descriptors only** — primitives, stable ids, closed node kinds,
+action identities, revision/causation fencing. No `Widget`, `BuildContext`, Dart types, callbacks, or
+Flutter SDK types in any C# assembly. Dart materializes widgets from descriptors.
+
+Reject driving product UI from OTel or traces (journals are durable truth; OTel is diagnostic).
+Reject a god widget tree with side-channel HTTP that bypasses `IDigitalBrain` typed contracts
+(ProbeHost-class surface).
+
+#### Northbound path
+
+The Flutter/Dart host is a **client of the brain**, not a second kernel and not a silo.
+
+```text
+Flutter / Dart host  ──deliberate UI protocol──►  C# edge (hosts/*)
+  no Orleans, no MCP tool dictionaries              auth → OwnerId
+                                                    IDigitalBrain only
+                                                    AsClient() clustering discovery
+                                                              │
+                                                              ▼
+                                                    DigitalBrain silo
+                                                    (one homogeneous catalog)
+```
+
+- **Recommend:** pure Orleans / `IDigitalBrain` C# edge process; Dart talks only to that edge.
+- **Keep** `hosts/DigitalBrain.Mcp` as agent/IDE northbound — not the product UI path (no tool
+  dictionaries on UI contracts; MCP owner binding today is process config, not human IdP).
+- **Reject:** Dart embeds Orleans client or silo; Flutter process receives journals, protection keys,
+  or reminders; attaching `brain.AsClient()` to a non-.NET Flutter resource as if it were an Orleans
+  client.
+- **Transport** (HTTP, gRPC, WebSocket) under the C# edge is open until a real Flutter consumer
+  exists; the load-bearing decision is where `IDigitalBrain` lives.
+- Edge executable lives under `hosts/` (peer of MCP and the silo host). Do not invent a second public
+  client facade beside `DigitalBrainClient`.
+
+Product journal **observation** on `IDigitalBrain` remains unbuilt (§8). First vertical proves
+journaled facts at L1 in-cluster; host watch is a named gap, not permission to invent a second
+semantic protocol.
+
+#### Auth edge
+
+Authentication is an **application-edge** responsibility. The client is not an auth boundary; an
+Orleans client is a trusted cluster peer. Bind the principal to the owner supplied to
+`AddDigitalBrainClient` / `Connect`.
+
+| Concern | Edge | Composition (post-auth / future Behavior) |
+| --- | --- | --- |
+| Credentials, IdP, cookies, token mint/validate | Owns | Forbidden |
+| Principal → `OwnerId` mapping | Owns | Receives ambient owner only |
+| Shell/scene UX after bind | May host pixels | Orchestrates via Flutter vocabulary + other modules |
+| Passwords / tokens in journals | Never | Never |
+
+Login is **not** a grain auth authority and **not** “a Behavior that authenticates.” Prefer the phrase
+**post-auth composition**: edge authenticates and binds owner; composition orchestrates sign-in UX and
+downstream wiring. Durable southbound tokens (if any) use `DigitalBrain.Security` purpose-bound
+envelopes (MCP pattern), never journal payloads.
+
+Dev: fixed test/config owner (MCP’s `"dev"` pattern only on non-public edges). Production: real IdP at
+the edge, then the same `IDigitalBrain` programming model.
+
+#### Contract drift guard
+
+Source of truth: public types in `DigitalBrain.Modules.Flutter.Contracts` (aliases, methods,
+properties). Guard: checked-in normalized **golden wire-contract manifest** extracted by reflection
+over that assembly; L0 asserts equality. When a Dart wire package exists, the same golden is the
+Dart-side oracle. Codegen Dart from Contracts may later accelerate maintenance; the gate remains
+golden equality, not “generator exit 0.” No protobuf dual vocabulary; no FFI .NET-in-Dart as the pin.
+
+#### Testing
+
+| Tier | First vertical |
+| --- | --- |
+| L0 | Package graph: Kernel free of Flutter; Contracts free of Dart/Flutter SDK; capsule + alias + golden pins |
+| L1 | Real multi-silo `TestBrain`; real Flutter-module neurons; **scene projected = committed journal fact**; no phone |
+| L2 | Only when Flutter or the C# UI edge is a real AppHost resource with readiness |
+| L3 | Device/widget/golden — never owner of domain truth; never sole gate |
+
+Headless Dart unit tests may prove pure descriptor→view-model mapping when a Dart package exists;
+they do not replace L1 journal proof.
+
+#### Still open (do not implement as settled)
+
+- Exact method signatures and `[Alias]` pins for `IShell` / `IScene` (freeze only with proofs).
+- Scene descriptor node algebra and revision fields.
+- UI protocol transport under the C# edge.
+- Product journal observation API on `IDigitalBrain` for host reconnect.
+- Whether / when `DigitalBrain.Modules.Flutter.Aspire.Hosting` is needed.
+- Multi-principal edge factory beyond singleton `AddDigitalBrainClient(owner)`.
+- Full desktop chrome, multi-window, notifications, AI pane as product surfaces.
 
 ### 4.7 Memory
 
@@ -649,6 +786,20 @@ Runtime behavior installation is designed and not yet built. The only path to a 
 human-approved proposal with a journaled, reversible decision, and generated code does not receive a
 path around that rail. Until the rail exists, changes arrive the ordinary way — through source
 control, review, and a rebuild.
+
+### OS composition before the rail
+
+Shell policy, post-auth UX orchestration, and multi-module “OS apps” (countdown scene, enrichment
+approval surface, AI pane) are **logic over vocabulary**. Until the rail ships they live as ordinary
+C# under `samples/` (recommended: `samples/DigitalBrain.Compositions`), one public sealed class per
+file, identity = namespace + class name (the future Behavior identity). Bodies use only
+`IDigitalBrain` + selected `*.Contracts` + approved BCL — the same denylist as the future compiler.
+They are pull-invoked by hosts and tests; they are not installed Behaviors and must not introduce
+`IBehavior` product APIs.
+
+Do not confuse this with `samples/DigitalBrain.AccountEnrichment`: that sample is a **compiled
+process neuron** (durable multi-module vocabulary). Flows that need new durable process state stay
+modules; flows that only compose existing vocabulary stay compositions.
 
 The client API is what makes this coherent rather than a second language: the same file runs outside
 the cluster as a script and installs inside it as a behavior. Production apps take `IDigitalBrain`
@@ -954,6 +1105,18 @@ letting the rule quietly soften.
 47. One silo-only brain key protects durable AI and MCP payloads with distinct purposes.
 48. Deterministic test time via `TimeProvider` + the `TestBrain` driver.
 
+### Flutter and OS surface
+
+49. Modules own UI vocabulary; behaviors (or pre-rail compositions) own shell/login/window *logic*.
+50. Semantic neurons (`IShell`, `IScene`, …); never a public `IFlutter` god type or central UI root.
+51. Package family `DigitalBrain.Modules.Flutter*`; public namespace `DigitalBrain.Flutter`.
+52. Flutter rebuild projects journals + serializable descriptors; journals remain durable truth.
+53. C# contracts carry no Dart/Flutter SDK types; Kernel carries no UI vocabulary.
+54. Dart host is a northbound client of a C# `IDigitalBrain` edge — never an embedded silo.
+55. Auth at the edge; post-auth composition only; never tokens/passwords in journals.
+56. Drift guard: golden wire manifest from Contracts; dual-sided when Dart models exist.
+57. L1 proves UI facts on journals without a device; L2 only for real AppHost host resources.
+
 ## 10. Still open, known deviations, and rejected
 
 ### Still open
@@ -971,6 +1134,11 @@ taken, and do not infer a shape for it from a neighbouring module.
 - **Memory architecture.** Out of scope entirely, for the reasons in §4.7.
 - **The exact CLR records for the capability-tool seam.** §4.3 ratifies that seam's architecture and
   its exclusions; the records and interfaces that would express it are unwritten.
+- **Flutter method signatures, descriptor algebra, and UI transport under the C# edge.** §4.6 ratifies
+  vocabulary shape, projection, northbound split, auth, drift guard, and testing tiers; exact
+  `[Alias]` pins and wire transport remain open until first-vertical proofs freeze them.
+- **Product journal observation on `IDigitalBrain`.** Required for a live Flutter host reconnect story;
+  not required for C#-only L1 journal proofs of the first vertical.
 
 ### Known deviations
 
@@ -1002,19 +1170,34 @@ not a configuration choice.
   never a string-addressed call beside them.
 - **A recurrence library adopted because it is the obvious one.** Ical.Net with Noda Time sits on the
   open list above; treating it as decided, rather than arguing it, is what is rejected here.
+- **A public `IFlutter` god neuron, `DigitalBrain.UI` namespace without reversal, Flutter-embedded
+  silo, OTel-driven product UI, login grain as IdP, or Behavior product APIs before the install rail.**
+  See §4.6 and §5.
 
 ## 11. Build order
 
-The remaining designed work has a dependency order:
+The remaining designed work has a dependency order. Two tracks are explicit so module vocabulary is
+not silently blocked on the self-programming rail, and so the OS product is not claimed before either
+track has proofs.
+
+**Self-programming track (product priority for installable logic):**
 
 1. Complete owner-safe client scripting and the proposal, approval, install, and rollback rail.
 2. Generate the canonical neuron catalog from public contracts and method and synapse vocabulary.
 3. Add semantic and vector discovery as a disposable index over that catalog.
+
+**Module vocabulary track (may interleave whenever a consumer and contracts are settled):**
+
 4. Extend `DigitalBrain.Google` from the `IGmail` root to `ICalendar` once a concrete calendar story
    exists.
 5. Add recurring and calendar Time vocabulary once its library and public record shapes are approved.
-6. Add `DigitalBrain.Flutter` containing only Flutter neurons and its contract drift guard.
+6. Add the Flutter module family (`DigitalBrain.Modules.Flutter*`, namespace `DigitalBrain.Flutter`)
+   with semantic UI neurons, contract drift guard, and L0/L1 proofs per §4.6. C#-only first vertical
+   before a Dart host. Ordinary compositions under `samples/` may use that vocabulary; claiming
+   installed Behaviors still requires the self-programming track.
 7. Design `DigitalBrain.Memory` independently around its own vocabulary, never inferred from AI,
    Tasks, or Time.
 
-No deferred item justifies retaining a rejected abstraction today.
+No deferred item justifies retaining a rejected abstraction today. Do not invent Behavior execution
+APIs to fake the self-programming track. Do not ship a Flutter shell app that bypasses typed
+vocabulary and journals.
