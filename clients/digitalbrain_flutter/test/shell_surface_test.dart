@@ -172,4 +172,57 @@ data: {"sequence":2,"sceneKey":"home","title":"Home","commandId":"y","shell":"sh
     expect(events.single.sceneKey, 'home');
     expect(events.single.sequence, 2);
   });
+
+  test(
+    'SSE multi-event feed projects live into one ShellSurfaceController without restart',
+    () {
+      const frames = '''
+: connected
+
+id: 3
+event: scene-opened
+data: {"sequence":3,"sceneKey":"home","title":"Home","commandId":"c","shell":"shell:dev/desk"}
+
+id: 5
+event: scene-opened
+data: {"sequence":5,"sceneKey":"countdown","title":"Countdown","commandId":"d","shell":"shell:dev/desk"}
+
+id: 7
+event: scene-opened
+data: {"sequence":7,"sceneKey":"home","title":"Home refreshed","commandId":"e","shell":"shell:dev/desk"}
+
+''';
+
+      final parser = SseSceneOpenedParser();
+      final surface = ShellSurfaceController();
+      final parserIdentity = identityHashCode(parser);
+      final surfaceIdentity = identityHashCode(surface);
+      final liveSnapshots = <List<String>>[];
+
+      for (final line in frames.split('\n')) {
+        for (final event in parser.addLine(line)) {
+          surface.apply(event);
+          liveSnapshots.add(
+            surface.scenes.map((s) => '${s.sceneKey}:${s.title}').toList(),
+          );
+        }
+      }
+      for (final event in parser.flush()) {
+        surface.apply(event);
+        liveSnapshots.add(
+          surface.scenes.map((s) => '${s.sceneKey}:${s.title}').toList(),
+        );
+      }
+
+      expect(identityHashCode(parser), parserIdentity);
+      expect(identityHashCode(surface), surfaceIdentity);
+      expect(liveSnapshots, [
+        ['home:Home'],
+        ['home:Home', 'countdown:Countdown'],
+        ['home:Home refreshed', 'countdown:Countdown'],
+      ]);
+      expect(surface.latest?.sequence, 7);
+      expect(surface.latest?.sceneKey, 'home');
+    },
+  );
 }

@@ -76,6 +76,64 @@ data: {"sequence":5,"sceneKey":"countdown","title":"Countdown","commandId":"d","
     },
   );
 
+  test(
+    'watchShellEvents multi-event SSE projects into one ShellSurfaceController without restart',
+    () async {
+      const body = '''
+: connected
+
+id: 1
+event: scene-opened
+data: {"sequence":1,"sceneKey":"home","title":"Home","commandId":"a","shell":"shell:dev/desk"}
+
+id: 2
+event: scene-opened
+data: {"sequence":2,"sceneKey":"countdown","title":"Countdown","commandId":"b","shell":"shell:dev/desk"}
+
+id: 3
+event: scene-opened
+data: {"sequence":3,"sceneKey":"home","title":"Home refreshed","commandId":"c","shell":"shell:dev/desk"}
+
+''';
+
+      final client = DigitalBrainUiEdgeClient(
+        baseUri: Uri.parse('http://ui.example:5080'),
+        httpClient: MockClient((request) async {
+          expect(
+            request.url.toString(),
+            'http://ui.example:5080/shells/desk/events?afterSequence=0',
+          );
+          return http.Response(
+            body,
+            200,
+            headers: {'content-type': 'text/event-stream'},
+          );
+        }),
+      );
+
+      final surface = ShellSurfaceController();
+      final surfaceIdentity = identityHashCode(surface);
+      final intermediate = <List<String>>[];
+
+      await for (final event in client.watchShellEvents(shellName: 'desk')) {
+        surface.apply(event);
+        intermediate.add(
+          surface.scenes.map((s) => '${s.sceneKey}:${s.title}').toList(),
+        );
+      }
+
+      expect(identityHashCode(surface), surfaceIdentity);
+      expect(intermediate, [
+        ['home:Home'],
+        ['home:Home', 'countdown:Countdown'],
+        ['home:Home refreshed', 'countdown:Countdown'],
+      ]);
+      expect(surface.scenes, hasLength(2));
+      expect(surface.latest?.title, 'Home refreshed');
+      expect(surface.latest?.sequence, 3);
+    },
+  );
+
   test('openScene and activateControl reject non-202', () async {
     final client = DigitalBrainUiEdgeClient(
       baseUri: Uri.parse('http://ui.example:5080'),
