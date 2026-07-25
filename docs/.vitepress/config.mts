@@ -2,7 +2,7 @@ import { defineConfig } from 'vitepress'
 
 export default defineConfig({
   title: 'DigitalBrain',
-  description: 'Neurons, synapses, and simulations — durable agents for .NET on Orleans and Aspire',
+  description: 'Neurons, synapses, and TestBrain — durable agents for .NET on Orleans and Aspire',
   base: '/',
   cleanUrls: true,
   srcExclude: ['superpowers/**'],
