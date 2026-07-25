@@ -10,6 +10,7 @@ namespace DigitalBrain.Ui;
 internal static class ShellEventFeed
 {
     private const string SessionName = "session";
+    private const string SseConnectedComment = ": connected\n\n";
     private static readonly JsonSerializerOptions EventJson = new(JsonSerializerDefaults.Web);
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
     private static readonly Encoding Utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
@@ -32,8 +33,7 @@ internal static class ShellEventFeed
         var session = grains.GetGrain<ISessionNeuron>(
             new NeuronId(ISessionNeuron.GrainTypeName, brain.Owner, SessionName).ToGrainId());
 
-        // Flush an SSE comment so clients see headers before the first fact.
-        await WriteAsync(responseBody, ": connected\n\n", cancellationToken);
+        await WriteAsync(responseBody, SseConnectedComment, cancellationToken);
 
         var cursor = afterSequence;
         while (!cancellationToken.IsCancellationRequested)

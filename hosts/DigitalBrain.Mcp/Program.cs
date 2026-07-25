@@ -12,11 +12,9 @@ if (string.IsNullOrWhiteSpace(owner))
 }
 
 builder.AddKeyedAzureTableServiceClient("brain-clustering");
-builder.AddDigitalBrainClient(owner, client =>
-{
-    client.Services.AddSerializer(serializer => serializer.AddJsonSerializer(
-        static type => type == typeof(ChatMessage) || type == typeof(ChatResponse)));
-});
+builder.Services.AddSerializer(serializer => serializer.AddJsonSerializer(
+    static type => type == typeof(ChatMessage) || type == typeof(ChatResponse)));
+builder.AddDigitalBrainClient(owner);
 
 builder.Services
     .AddMcpServer()

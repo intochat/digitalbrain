@@ -9,7 +9,5 @@ builder.UseOrleans(silo => silo
     .AddDigitalBrainJournalStorage(builder.Configuration));
 
 var app = builder.Build();
-
 app.MapGet("/health", () => Results.Ok("healthy"));
-
 app.Run();
