@@ -19,14 +19,6 @@ public sealed record AttemptAccepted(
     long Revision) : AttemptFact(Task, Worker, Attempt, Revision);
 
 [GenerateSerializer]
-[Alias("tasks.attempt-advanced")]
-public sealed record AttemptAdvanced(
-    NeuronId Task,
-    NeuronId Worker,
-    AttemptId Attempt,
-    long Revision) : AttemptFact(Task, Worker, Attempt, Revision);
-
-[GenerateSerializer]
 [Alias("tasks.attempt-progressed")]
 public sealed record AttemptProgressed(
     NeuronId Task,

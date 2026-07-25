@@ -38,10 +38,6 @@ public readonly record struct NeuronId
     public static NeuronId BroadcastReceiver(string type, OwnerId owner, CorrelationId correlation)
         => new(type, owner, correlation.Value.ToString("D"));
 
-    public static NeuronId BroadcastReceiver<TNeuron>(OwnerId owner, CorrelationId correlation)
-        where TNeuron : INeuron
-        => BroadcastReceiver(GrainTypeNameOf(typeof(TNeuron)), owner, correlation);
-
     public static string GrainTypeNameOf(Type neuronType)
     {
         ArgumentNullException.ThrowIfNull(neuronType);

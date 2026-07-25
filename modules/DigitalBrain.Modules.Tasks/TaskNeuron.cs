@@ -11,7 +11,6 @@ internal sealed class TaskNeuron :
     Neuron,
     ITask,
     IHandle<AttemptAccepted>,
-    IHandle<AttemptAdvanced>,
     IHandle<AttemptProgressed>,
     IHandle<AttemptWaiting>,
     IHandle<AttemptSucceeded>,
@@ -186,9 +185,6 @@ internal sealed class TaskNeuron :
         Stage(data);
         return Task.CompletedTask;
     }
-
-    public async Task HandleAsync(AttemptAdvanced fact, CancellationToken cancellationToken)
-        => await AdvanceAsync(fact);
 
     public async Task HandleAsync(AttemptProgressed fact, CancellationToken cancellationToken)
         => await AdvanceAsync(fact);

@@ -13,8 +13,4 @@ public sealed record JournalSnapshot(
     [property: Id(1)] long LastSequence,
     [property: Id(2)] long EarliestRetainedSequence,
     [property: Id(3)] int RetainedCount,
-    [property: Id(4)] IReadOnlyList<JournalTally> Tallies)
-{
-    public long RecordedOf(string synapseType)
-        => Tallies.FirstOrDefault(tally => string.Equals(tally.SynapseType, synapseType, StringComparison.Ordinal))?.Recorded ?? 0;
-}
+    [property: Id(4)] IReadOnlyList<JournalTally> Tallies);
