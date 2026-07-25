@@ -7,29 +7,25 @@ using Microsoft.Agents.AI.Workflows;
 
 namespace DigitalBrain.AI;
 
-[GenerateSerializer]
-[Alias("ai.orchestration-participant")]
 internal sealed record OrchestrationParticipant(
-    [property: Id(0)] string Contract,
-    [property: Id(1)] NeuronId NeuronId,
-    [property: Id(2)] string AgentId,
-    [property: Id(3)] string AgentName);
+    string Contract,
+    NeuronId NeuronId,
+    string AgentId,
+    string AgentName);
 
-[GenerateSerializer]
-[Alias("ai.orchestration-definition")]
 internal sealed record OrchestrationDefinition(
-    [property: Id(0)] int FormatVersion,
-    [property: Id(1)] string MafVersion,
-    [property: Id(2)] string Fingerprint,
-    [property: Id(3)] OrchestrationParticipant[] Participants,
-    [property: Id(4)] string HostId,
-    [property: Id(5)] string HostName,
-    [property: Id(6)] string Kind,
-    [property: Id(7)] string OrchestrationType,
-    [property: Id(8)] string ExecutionEnvironment,
-    [property: Id(9)] string Manager,
-    [property: Id(10)] string Aggregator,
-    [property: Id(11)] string ApplicationVersion)
+    int FormatVersion,
+    string MafVersion,
+    string Fingerprint,
+    OrchestrationParticipant[] Participants,
+    string HostId,
+    string HostName,
+    string Kind,
+    string OrchestrationType,
+    string ExecutionEnvironment,
+    string Manager,
+    string Aggregator,
+    string ApplicationVersion)
 {
     internal const int CurrentFormatVersion = 2;
 
