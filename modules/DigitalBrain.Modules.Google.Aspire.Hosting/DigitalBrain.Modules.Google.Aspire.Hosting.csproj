@@ -3,7 +3,6 @@
     <IsPackable>true</IsPackable>
     <Description>Aspire AppHost integration for the DigitalBrain Google module.</Description>
     <RootNamespace>DigitalBrain.Google.Aspire.Hosting</RootNamespace>
-    <NoWarn>$(NoWarn);CA2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.Google\DigitalBrain.Modules.Google.csproj" />

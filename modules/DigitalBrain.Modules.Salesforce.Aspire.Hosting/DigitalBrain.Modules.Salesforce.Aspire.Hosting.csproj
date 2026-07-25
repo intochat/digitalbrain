@@ -3,7 +3,6 @@
     <IsPackable>true</IsPackable>
     <Description>Aspire AppHost integration for the DigitalBrain Salesforce module.</Description>
     <RootNamespace>DigitalBrain.Salesforce.Aspire.Hosting</RootNamespace>
-    <NoWarn>$(NoWarn);CA2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.Salesforce\DigitalBrain.Modules.Salesforce.csproj" />
