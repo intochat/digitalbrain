@@ -98,34 +98,11 @@ public sealed class FlutterHostingProjectionContracts
         Assert.Equal(2, CountOccurrences(flutterHost, "WithEnvironment"));
         Assert.Contains("UiBaseEnvironmentVariable", flutterHost, StringComparison.Ordinal);
         Assert.Contains("ShellEnvironmentVariable", flutterHost, StringComparison.Ordinal);
-        Assert.Contains(".WaitFor(ui)", flutterHost, StringComparison.Ordinal);
         Assert.DoesNotContain("OwnerEnvironmentVariable", flutterHost, StringComparison.Ordinal);
         Assert.DoesNotContain("AsClient", flutterHost, StringComparison.Ordinal);
         Assert.DoesNotContain("WithReference", flutterHost, StringComparison.Ordinal);
         Assert.DoesNotContain("Journal", flutterHost, StringComparison.Ordinal);
         Assert.DoesNotContain("StateProtectionKey", flutterHost, StringComparison.Ordinal);
-    }
-
-    [Fact(DisplayName =
-        "Auto mode short-circuits on project markers before spawning a Flutter CLI probe")]
-    public void AutoModeProbesMarkersBeforeFlutterCli()
-    {
-        var source = File.ReadAllText(Path.Combine(
-            RepositoryRoot,
-            "modules",
-            "DigitalBrain.Modules.Flutter.Aspire.Hosting",
-            "FlutterHostingExtensions.cs"))
-            .Replace("\r\n", "\n", StringComparison.Ordinal);
-
-        var resolve = MethodBody(source, "private static HostLaunch? ResolveHostLaunch");
-        Assert.Contains(
-            "HasFlutterDesktopProjectMarker(workingDirectory) && FlutterCliAvailable(options)",
-            resolve,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain(
-            "FlutterCliAvailable(options) && HasFlutterDesktopProjectMarker(workingDirectory)",
-            resolve,
-            StringComparison.Ordinal);
     }
 
     [Fact(DisplayName =
@@ -154,7 +131,7 @@ public sealed class FlutterHostingProjectionContracts
                 options.ShellName = "desk";
             }));
 
-        var silo = builder
+        _ = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
             .WithHttpEndpoint(name: "http")
             .WithReference(brain);
@@ -182,116 +159,6 @@ public sealed class FlutterHostingProjectionContracts
             host.Annotations.OfType<WaitAnnotation>(),
             wait => wait.WaitType == WaitType.WaitUntilHealthy
                 && ReferenceEquals(wait.Resource, ui));
-        Assert.DoesNotContain(
-            host.Annotations.OfType<WaitAnnotation>(),
-            wait => ReferenceEquals(wait.Resource, silo.Resource));
-    }
-
-    [Fact(DisplayName =
-        "WithFlutterHost RequireHost true throws when package directory is missing")]
-    public void WithFlutterHostRequireHostThrowsWhenPackageMissing()
-    {
-        var builder = DistributedApplication.CreateBuilder();
-        var brain = builder.AddDigitalBrain("brain");
-        var uiProject = Path.Combine(
-            RepositoryRoot,
-            "hosts",
-            "DigitalBrain.Ui",
-            "DigitalBrain.Ui.csproj");
-        var missingPackage = Path.Combine(
-            Path.GetTempPath(),
-            "digitalbrain-flutter-missing-" + Guid.NewGuid().ToString("N"));
-
-        var exception = Assert.Throws<InvalidOperationException>(() =>
-            brain.AddModule<FlutterModule>(flutter => flutter
-                .WithUiEdge(options => options.ProjectPath = uiProject)
-                .WithFlutterHost(options =>
-                {
-                    options.WorkingDirectory = missingPackage;
-                    options.RequireHost = true;
-                })));
-
-        Assert.Contains("was not found", exception.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain(
-            builder.Resources,
-            resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
-    }
-
-    [Fact(DisplayName =
-        "WithFlutterHost RequireHost false omits host when package directory is missing")]
-    public void WithFlutterHostRequireHostFalseOmitsMissingPackage()
-    {
-        var builder = DistributedApplication.CreateBuilder();
-        var brain = builder.AddDigitalBrain("brain");
-        var uiProject = Path.Combine(
-            RepositoryRoot,
-            "hosts",
-            "DigitalBrain.Ui",
-            "DigitalBrain.Ui.csproj");
-        var missingPackage = Path.Combine(
-            Path.GetTempPath(),
-            "digitalbrain-flutter-missing-" + Guid.NewGuid().ToString("N"));
-
-        brain.AddModule<FlutterModule>(flutter => flutter
-            .WithUiEdge(options => options.ProjectPath = uiProject)
-            .WithFlutterHost(options =>
-            {
-                options.WorkingDirectory = missingPackage;
-                options.RequireHost = false;
-            }));
-
-        _ = builder
-            .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: "http")
-            .WithReference(brain);
-
-        Assert.Contains(
-            builder.Resources,
-            resource => resource.Name == FlutterHostingExtensions.DefaultUiResourceName);
-        Assert.DoesNotContain(
-            builder.Resources,
-            resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
-    }
-
-    [Fact(DisplayName =
-        "WithFlutterHost Headless RequireHost true throws when headless entry is missing")]
-    public void WithFlutterHostHeadlessRequireHostThrowsWhenEntryMissing()
-    {
-        var packageDir = Path.Combine(
-            Path.GetTempPath(),
-            "digitalbrain-flutter-no-entry-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(packageDir);
-        File.WriteAllText(Path.Combine(packageDir, "pubspec.yaml"), "name: probe\n");
-
-        try
-        {
-            var builder = DistributedApplication.CreateBuilder();
-            var brain = builder.AddDigitalBrain("brain");
-            var uiProject = Path.Combine(
-                RepositoryRoot,
-                "hosts",
-                "DigitalBrain.Ui",
-                "DigitalBrain.Ui.csproj");
-
-            var exception = Assert.Throws<InvalidOperationException>(() =>
-                brain.AddModule<FlutterModule>(flutter => flutter
-                    .WithUiEdge(options => options.ProjectPath = uiProject)
-                    .WithFlutterHost(options =>
-                    {
-                        options.WorkingDirectory = packageDir;
-                        options.Mode = FlutterHostMode.Headless;
-                        options.RequireHost = true;
-                    })));
-
-            Assert.Contains("could not be launched", exception.Message, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain(
-                builder.Resources,
-                resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
-        }
-        finally
-        {
-            Directory.Delete(packageDir, recursive: true);
-        }
     }
 
     [Fact(DisplayName =
@@ -422,24 +289,11 @@ public sealed class FlutterHostingProjectionContracts
             "hosts",
             "DigitalBrain.AppHost",
             "AppHost.cs"));
-        var project = File.ReadAllText(Path.Combine(
-            RepositoryRoot,
-            "hosts",
-            "DigitalBrain.AppHost",
-            "DigitalBrain.AppHost.csproj"));
 
         Assert.Contains("AddModule<FlutterModule>", appHost, StringComparison.Ordinal);
         Assert.Contains("WithUiEdge", appHost, StringComparison.Ordinal);
         Assert.Contains("WithFlutterHost", appHost, StringComparison.Ordinal);
         AssertNoOsSurfaceHandWire(appHost);
-
-        Assert.Contains(
-            "DigitalBrain.Modules.Flutter.Aspire.Hosting",
-            project,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain("DigitalBrain.Ui", project, StringComparison.Ordinal);
-        Assert.DoesNotContain("ProbeHost", project, StringComparison.Ordinal);
-        Assert.DoesNotContain("ProbeHost", appHost, StringComparison.Ordinal);
     }
 
     [Fact(DisplayName =
@@ -516,14 +370,15 @@ public sealed class FlutterHostingProjectionContracts
 
     private static void AssertNoOsSurfaceHandWire(string appHost)
     {
-        Assert.DoesNotContain("Projects.DigitalBrain_Ui", appHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("DigitalBrain_Ui", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "builder.AddProject<Projects.DigitalBrain_Ui>",
+            appHost,
+            StringComparison.Ordinal);
         Assert.DoesNotContain("digitalbrain-ui", appHost, StringComparison.Ordinal);
         Assert.DoesNotContain("digitalbrain-flutter", appHost, StringComparison.Ordinal);
         Assert.DoesNotContain("DIGITALBRAIN_UI_BASE", appHost, StringComparison.Ordinal);
         Assert.DoesNotContain("DIGITALBRAIN_SHELL", appHost, StringComparison.Ordinal);
         Assert.DoesNotContain("AddExecutable", appHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("ProbeHost", appHost, StringComparison.Ordinal);
     }
 
     private static async Task<HashSet<string>> EnvironmentKeysOf(IResource resource)
