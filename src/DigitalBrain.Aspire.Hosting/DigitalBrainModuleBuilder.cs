@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Aspire.Hosting;
@@ -8,14 +7,11 @@ public sealed class DigitalBrainModuleBuilder<TModule>
 {
     internal DigitalBrainModuleBuilder(DigitalBrainBuilder brain) => Brain = brain;
 
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public DigitalBrainBuilder Brain { get; }
+    internal DigitalBrainBuilder Brain { get; }
 
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public void AddProjection(DigitalBrainModuleProjection projection)
+    internal void AddProjection(DigitalBrainModuleProjection projection)
         => Brain.AddProjection(projection);
 
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public void RequireStateProtection()
+    internal void RequireStateProtection()
         => Brain.RequireStateProtection();
 }
