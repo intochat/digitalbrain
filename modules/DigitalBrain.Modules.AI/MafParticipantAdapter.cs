@@ -24,18 +24,6 @@ internal static class MafParticipantAdapter
             agentName);
     }
 
-    internal static AIAgent[] CreateAll(
-        IGrainFactory grains,
-        IReadOnlyList<Participant> participants,
-        TaskScheduler turnScheduler)
-    {
-        ArgumentNullException.ThrowIfNull(grains);
-        ArgumentNullException.ThrowIfNull(participants);
-        ArgumentNullException.ThrowIfNull(turnScheduler);
-
-        return [.. participants.Select(participant => participant.CreateAgent(grains, turnScheduler))];
-    }
-
     [SuppressMessage(
         "Reliability",
         "CA2000:Dispose objects before losing scope",

@@ -47,15 +47,9 @@ internal sealed record OrchestrationDefinition(
             throw new InvalidOperationException("An orchestration requires at least one participant.");
         }
 
-        if (participants.Any(participant => participant is null))
-        {
-            throw new InvalidOperationException("An orchestration participant cannot be null.");
-        }
-
-        var snapshot = participants.ToArray();
         var kind = identity.KindName;
         var executionEnvironment = identity.ExecutionEnvironmentName;
-        var manager = identity.ManagerName(snapshot.Length);
+        var manager = identity.ManagerName(participants.Length);
         var aggregator = identity.AggregatorName;
         var source = new FingerprintSource(
             CurrentFormatVersion,
@@ -67,7 +61,7 @@ internal sealed record OrchestrationDefinition(
             manager,
             aggregator,
             "fingerprint-v2",
-            snapshot);
+            participants);
         var fingerprint = Convert.ToHexStringLower(
             SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(source)));
 
@@ -75,7 +69,7 @@ internal sealed record OrchestrationDefinition(
             CurrentFormatVersion,
             mafVersion,
             fingerprint,
-            snapshot,
+            participants,
             $"dba_{fingerprint}",
             $"orchestration_{fingerprint}",
             kind,

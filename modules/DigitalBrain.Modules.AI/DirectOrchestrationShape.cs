@@ -153,19 +153,19 @@ internal sealed class DirectOrchestrationShape
         ArgumentNullException.ThrowIfNull(grains);
         ArgumentNullException.ThrowIfNull(turnScheduler);
 
-        var participants = MafParticipantAdapter.CreateAll(
-            grains,
-            _participants,
-            turnScheduler);
+        AIAgent[] agents =
+        [
+            .. _participants.Select(participant => participant.CreateAgent(grains, turnScheduler)),
+        ];
         var workflow = _identity.Kind switch
         {
-            DirectOrchestrationKind.Concurrent => AgentWorkflowBuilder.BuildConcurrent(participants),
+            DirectOrchestrationKind.Concurrent => AgentWorkflowBuilder.BuildConcurrent(agents),
             DirectOrchestrationKind.GroupChat => AgentWorkflowBuilder
                 .CreateGroupChatBuilderWith(team => new RoundRobinGroupChatManager(team)
                 {
-                    MaximumIterationCount = participants.Length,
+                    MaximumIterationCount = agents.Length,
                 })
-                .AddParticipants([.. participants])
+                .AddParticipants(agents)
                 .Build(),
             _ => throw new InvalidOperationException(
                 $"Unknown direct orchestration kind '{_identity.Kind}'."),
