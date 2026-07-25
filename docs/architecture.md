@@ -601,7 +601,7 @@ calendar, and DST record shapes. Do not implement those as though they were sett
 
 ### 4.6 Flutter
 
-Status: Built (first-vertical vocabulary + L0/L1 journal proofs + C# northbound UI edge); Designed (Dart host, full chrome, product journal observation on IDigitalBrain, multi-principal IdP edge)
+Status: Built (first-vertical vocabulary + L0/L1 journal proofs + C# northbound UI edge); Designed (Flutter Windows chrome, full product chrome, product journal observation on IDigitalBrain, multi-principal IdP edge)
 
 The OS surface is not a Flutter app with agents behind it. It is a brain whose **UI vocabulary** is a
 Flutter module, and whose **logic** (shell policy, post-auth composition, multi-window orchestration,
@@ -694,11 +694,13 @@ Flutter / Dart host  ──HTTP/JSON (+ SSE watch)──►  hosts/DigitalBrain.
 - **Reject:** Dart embeds Orleans client or silo; Flutter process receives journals, protection keys,
   or reminders; attaching `brain.AsClient()` to a non-.NET Flutter resource as if it were an Orleans
   client; gRPC UiGateway / protobuf dual vocabulary; resurrected `app/` or `workspace/` product trees.
-- **Designed:** Dart host at `clients/digitalbrain_flutter` (optional pure-Dart wire package
-  `clients/digitalbrain_wire`); production IdP principal→owner bind; product journal observation on
-  `IDigitalBrain` when a non-UI consumer needs the same cursor/watch (not required for the first live
-  host feed); optional upgrade from edge journal poll to grain `WatchNeuron` push without changing the
-  HTTP event schema.
+- **Built (Dart skeleton):** `clients/digitalbrain_wire` (dual golden pin + edge DTOs) and
+  `clients/digitalbrain_flutter` (HTTP/SSE edge client + pure projection). `dart analyze` / `dart test`
+  are local gates; Windows Flutter chrome still Designed (Flutter SDK not required for wire proofs).
+- **Designed:** Flutter Windows desktop chrome on that client; production IdP principal→owner bind;
+  product journal observation on `IDigitalBrain` when a non-UI consumer needs the same cursor/watch;
+  optional upgrade from edge journal poll to grain `WatchNeuron` push without changing the HTTP event
+  schema.
 - Edge executable lives under `hosts/` (peer of MCP and the silo host). The pixel host is a
   **client** under `clients/`, not a packable module and not a second Orleans host under `hosts/`.
   Do not invent a second public client facade beside `DigitalBrainClient`.

@@ -21,3 +21,8 @@ docs/.vitepress/dist/
 # Local MCP tool installs (Codex absolute launch)
 .config/codegraph-tool/
 .config/context7-tool/
+
+# Dart / Flutter clients
+**/.dart_tool/
+**/packages/pubspec_overrides.yaml
+

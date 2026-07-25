@@ -53,9 +53,9 @@ Quickstart, Tasks, Time, and Flutter have no module `Aspire.Hosting` package bec
 module-specific AppHost resources. AI, Google, and Salesforce do. Flutter packages are
 `DigitalBrain.Modules.Flutter.Contracts` and `DigitalBrain.Modules.Flutter` with public namespace
 `DigitalBrain.Flutter` (semantic neurons `IShell` / `IScene` — not an `IFlutter` god type). The
-Flutter/Dart pixel host remains a Designed northbound HTTP client of `hosts/DigitalBrain.Ui` (path of
-record: `clients/digitalbrain_flutter`), not a packable module, not under `modules/`, and not an
-Orleans silo.
+Flutter/Dart pixel host is a northbound HTTP client of `hosts/DigitalBrain.Ui` under `clients/`
+(`digitalbrain_wire` + `digitalbrain_flutter` skeletons Built; Windows Flutter chrome Designed) — not a
+packable module, not under `modules/`, and not an Orleans silo.
 
 ## Boundary rules
 
