@@ -2,9 +2,9 @@ using System.Diagnostics;
 
 namespace DigitalBrain.Kernel;
 
-public static class SynapseTelemetry
+internal static class SynapseTelemetry
 {
-    public const string ActivitySourceName = "DigitalBrain";
+    private const string ActivitySourceName = "DigitalBrain";
 
     internal const string ReceiverTag = "db.receiver";
 

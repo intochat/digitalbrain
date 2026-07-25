@@ -47,9 +47,9 @@ internal sealed class PinToSiloDirector(ISiloMetadataCache metadata) : IPlacemen
     }
 }
 
-public static class PinToSiloExtensions
+internal static class PinToSiloExtensions
 {
-    public static IServiceCollection AddPinToSiloPlacement(this IServiceCollection services)
+    internal static IServiceCollection AddPinToSiloPlacement(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 

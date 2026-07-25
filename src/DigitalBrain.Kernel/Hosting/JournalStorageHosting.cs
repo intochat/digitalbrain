@@ -5,7 +5,7 @@ namespace DigitalBrain.Kernel;
 
 public static class JournalStorageHosting
 {
-    public const string ConnectionStringName = "journal";
+    private const string ConnectionStringName = "journal";
 
     public static ISiloBuilder AddDigitalBrainJournalStorage(this ISiloBuilder builder, IConfiguration configuration)
     {

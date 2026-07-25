@@ -3,21 +3,21 @@ using System.Reflection;
 
 namespace DigitalBrain.Kernel;
 
-public sealed record SynapseWiringEntry(string Neuron, string Synapse);
+internal sealed record SynapseWiringEntry(string Neuron, string Synapse);
 
-public sealed class DispatchManifest(IReadOnlyList<SynapseWiringEntry> handlers)
+internal sealed class DispatchManifest(IReadOnlyList<SynapseWiringEntry> handlers)
 {
-    public IReadOnlyList<SynapseWiringEntry> Handlers { get; } = handlers;
+    internal IReadOnlyList<SynapseWiringEntry> Handlers { get; } = handlers;
 }
 
-public static class SynapseWiring
+internal static class SynapseWiring
 {
     private const string GeneratedManifestType = "DigitalBrain.Generated.DispatchManifest";
     private const string GeneratedWiringsField = "Wirings";
 
     private static readonly ConcurrentDictionary<Assembly, DispatchManifest?> Manifests = new();
 
-    public static bool TryGetManifest(Assembly assembly, out DispatchManifest manifest)
+    internal static bool TryGetManifest(Assembly assembly, out DispatchManifest manifest)
     {
         var found = Manifests.GetOrAdd(assembly, static probed => Load(probed));
         manifest = found ?? new DispatchManifest([]);
