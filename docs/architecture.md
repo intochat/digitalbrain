@@ -855,9 +855,10 @@ remain designed; no product `IWorker` under `modules/` emits attempt facts yet.
 selection ship. There is no cluster-level proof of Gmail reads, Salesforce mutations, approval fencing,
 or reconciliation against a real or scripted provider edge.
 
-**AI has no Concurrent/GroupChat L1 proof.** Typed LLM smoke (`ILlama32`) exercises a direct model
-turn. Direct Concurrent/GroupChat `Respond` surfaces exist in code; no L1 test asserts multi-participant
-orchestration. Supervised `IWorker` Accept/Continue/Cancel paths throw until rewritten.
+**AI direct Concurrent/GroupChat L1 is closed; supervised remains Designed.** Typed LLM smoke
+(`ILlama32`) plus ModuleTests multi-participant Concurrent/GroupChat `Respond` and durable second-turn
+session reuse exercise the direct surface. Supervised `IWorker` Accept/Continue/Cancel paths still
+throw until a thin Orleans-primary path is rewritten.
 
 **Supervised workflow checkpoints are not built.** `DigitalBrain.Security` is purpose-ready for them;
 the supervised Orleans-primary runner and checkpoint adoption path do not ship. Present-tense claims
