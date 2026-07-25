@@ -45,21 +45,22 @@ public abstract class GroupChat : Neuron, IGroupChat
     public Task Accept(AttemptRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        throw new InvalidOperationException(
-            $"GroupChat '{Id}' supervised Attempts are not implemented. Use direct {nameof(Respond)}.");
+        return SupervisedNotImplemented();
     }
 
     public Task Continue(AttemptCursor cursor)
     {
         ArgumentNullException.ThrowIfNull(cursor);
-        throw new InvalidOperationException(
-            $"GroupChat '{Id}' supervised Attempts are not implemented. Use direct {nameof(Respond)}.");
+        return SupervisedNotImplemented();
     }
 
     public Task Cancel(AttemptCursor cursor)
     {
         ArgumentNullException.ThrowIfNull(cursor);
-        throw new InvalidOperationException(
-            $"GroupChat '{Id}' supervised Attempts are not implemented. Use direct {nameof(Respond)}.");
+        return SupervisedNotImplemented();
     }
+
+    private Task SupervisedNotImplemented()
+        => throw new InvalidOperationException(
+            $"GroupChat '{Id}' supervised Attempts are not implemented. Use direct {nameof(Respond)}.");
 }
