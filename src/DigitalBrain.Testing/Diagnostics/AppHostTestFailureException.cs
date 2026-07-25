@@ -6,7 +6,7 @@ namespace DigitalBrain.Testing;
     "Design",
     "CA1032:Implement standard exception constructors",
     Justification = "AppHost test failures always wrap an operation description.")]
-public sealed class AppHostTestFailureException : InvalidOperationException
+internal sealed class AppHostTestFailureException : InvalidOperationException
 {
     public AppHostTestFailureException(string message)
         : base(message)
