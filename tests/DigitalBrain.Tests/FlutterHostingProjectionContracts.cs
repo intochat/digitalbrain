@@ -1,0 +1,186 @@
+using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
+using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Flutter;
+using DigitalBrain.Flutter.Aspire.Hosting;
+using Xunit;
+
+namespace DigitalBrain.Tests;
+
+public sealed class FlutterHostingProjectionContracts
+{
+    private static readonly string RepositoryRoot = LocateRepositoryRoot();
+
+    [Fact(DisplayName =
+        "FlutterModule without host options projects no OS surface resources")]
+    public void VocabularyOnlySelectionDoesNotStartOsSurface()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddDigitalBrain("brain");
+        brain.AddModule<FlutterModule>();
+
+        _ = builder
+            .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
+            .WithHttpEndpoint(name: "http")
+            .WithReference(brain);
+
+        Assert.DoesNotContain(
+            builder.Resources,
+            resource => resource.Name is FlutterHostingExtensions.DefaultUiResourceName
+                or FlutterHostingExtensions.DefaultFlutterResourceName);
+    }
+
+    [Fact(DisplayName =
+        "WithUiEdge projects digitalbrain-ui as AsClient with owner env")]
+    public async Task WithUiEdgeProjectsUiEdgeAsClientOnly()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddDigitalBrain("brain");
+        var uiProject = Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.Ui",
+            "DigitalBrain.Ui.csproj");
+
+        brain.AddModule<FlutterModule>(flutter => flutter.WithUiEdge(options =>
+        {
+            options.ProjectPath = uiProject;
+            options.Owner = "edge-owner";
+        }));
+
+        var silo = builder
+            .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
+            .WithHttpEndpoint(name: "http")
+            .WithReference(brain);
+
+        var ui = Assert.Single(
+            builder.Resources.OfType<ProjectResource>(),
+            resource => resource.Name == FlutterHostingExtensions.DefaultUiResourceName);
+
+        var environment = await EnvironmentKeysOf(ui).ConfigureAwait(true);
+        Assert.Contains(FlutterHostingExtensions.OwnerEnvironmentVariable, environment);
+        Assert.DoesNotContain("ConnectionStrings__journal", environment);
+        Assert.DoesNotContain("DigitalBrain__Security__StateProtectionKey", environment);
+        Assert.DoesNotContain("DigitalBrain__Modules__0", environment);
+
+        Assert.Contains(
+            ui.Annotations.OfType<WaitAnnotation>(),
+            wait => wait.WaitType == WaitType.WaitUntilHealthy
+                && ReferenceEquals(wait.Resource, silo.Resource));
+    }
+
+    [Fact(DisplayName =
+        "WithFlutterHost projects flutter executable with DIGITALBRAIN_UI_BASE only")]
+    public async Task WithFlutterHostProjectsEdgeUrlOnly()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddDigitalBrain("brain");
+        var uiProject = Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.Ui",
+            "DigitalBrain.Ui.csproj");
+        var flutterDir = Path.Combine(
+            RepositoryRoot,
+            "clients",
+            "digitalbrain_flutter");
+
+        brain.AddModule<FlutterModule>(flutter => flutter
+            .WithUiEdge(options => options.ProjectPath = uiProject)
+            .WithFlutterHost(options =>
+            {
+                options.WorkingDirectory = flutterDir;
+                options.RequireHost = true;
+            }));
+
+        _ = builder
+            .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
+            .WithHttpEndpoint(name: "http")
+            .WithReference(brain);
+
+        var host = Assert.Single(
+            builder.Resources.OfType<ExecutableResource>(),
+            resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
+
+        var environment = await EnvironmentKeysOf(host).ConfigureAwait(true);
+        Assert.Contains(FlutterHostingExtensions.UiBaseEnvironmentVariable, environment);
+        Assert.DoesNotContain("ConnectionStrings__journal", environment);
+        Assert.DoesNotContain("DigitalBrain__Security__StateProtectionKey", environment);
+        Assert.DoesNotContain("DigitalBrain__Modules__0", environment);
+
+        var ui = Assert.Single(
+            builder.Resources,
+            resource => resource.Name == FlutterHostingExtensions.DefaultUiResourceName);
+        Assert.Contains(
+            host.Annotations.OfType<WaitAnnotation>(),
+            wait => wait.WaitType == WaitType.WaitUntilHealthy
+                && ReferenceEquals(wait.Resource, ui));
+    }
+
+    [Fact(DisplayName =
+        "Flutter Aspire.Hosting package is packable inventory and Kernel-free")]
+    public void FlutterHostingPackageIsPackableAndKernelFree()
+    {
+        Assert.Contains(
+            "DigitalBrain.Modules.Flutter.Aspire.Hosting",
+            PackableProjects.Names,
+            StringComparer.Ordinal);
+        Assert.Equal(
+            "DigitalBrain.Flutter.Aspire.Hosting",
+            typeof(FlutterHostingExtensions).Namespace);
+
+        var references = typeof(FlutterHostingExtensions).Assembly
+            .GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.DoesNotContain("DigitalBrain.Kernel", references);
+        Assert.Contains("DigitalBrain.Aspire.Hosting", references);
+        Assert.Contains("DigitalBrain.Modules.Flutter", references);
+    }
+
+    [Fact(DisplayName =
+        "production AppHost composes Ui via FlutterModule host options, not hand-wire")]
+    public void ProductionAppHostComposesUiThroughModuleHosting()
+    {
+        var appHost = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.AppHost",
+            "AppHost.cs"));
+
+        Assert.Contains("WithUiEdge", appHost, StringComparison.Ordinal);
+        Assert.Contains("AddModule<FlutterModule>", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "builder.AddProject<Projects.DigitalBrain_Ui>",
+            appHost,
+            StringComparison.Ordinal);
+    }
+
+    private static async Task<HashSet<string>> EnvironmentKeysOf(IResource resource)
+    {
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        var execution = new DistributedApplicationExecutionContext(DistributedApplicationOperation.Run);
+        var context = new EnvironmentCallbackContext(execution, resource);
+
+        foreach (var annotation in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
+        {
+            await annotation.Callback(context).ConfigureAwait(true);
+        }
+
+        keys.UnionWith(context.EnvironmentVariables.Keys);
+        return keys;
+    }
+
+    private static string LocateRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null
+               && !File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName
+            ?? throw new InvalidOperationException("DigitalBrain.slnx was not found above the test assembly.");
+    }
+}

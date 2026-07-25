@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:digitalbrain_wire/digitalbrain_wire.dart';
 import 'package:http/http.dart' as http;
@@ -11,6 +12,24 @@ final class DigitalBrainUiEdgeClient {
     http.Client? httpClient,
   })  : _http = httpClient ?? http.Client(),
         _ownsClient = httpClient == null;
+
+  /// Base URL from `--dart-define=DIGITALBRAIN_UI_BASE=` or process env (AppHost injects).
+  factory DigitalBrainUiEdgeClient.fromEnvironment({http.Client? httpClient}) {
+    const key = 'DIGITALBRAIN_UI_BASE';
+    var raw = const String.fromEnvironment(key);
+    if (raw.isEmpty) {
+      raw = Platform.environment[key] ?? '';
+    }
+    if (raw.isEmpty) {
+      throw StateError(
+        'DIGITALBRAIN_UI_BASE is required (AppHost WithFlutterHost injects it).',
+      );
+    }
+    return DigitalBrainUiEdgeClient(
+      baseUri: Uri.parse(raw),
+      httpClient: httpClient,
+    );
+  }
 
   final Uri baseUri;
   final http.Client _http;

@@ -31,6 +31,7 @@
     <Project Path="modules/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
+    <Project Path="modules/DigitalBrain.Modules.Flutter.Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Google.Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Google/DigitalBrain.Modules.Google.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Google.Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />

@@ -100,7 +100,7 @@ public sealed class HostingProjectionContracts
         Assert.Contains("WaitAnnotation", siloBody, StringComparison.Ordinal);
     }
 
-    [Fact(DisplayName = "production AppHost silo takes the complete brain; MCP and UI take AsClient only")]
+    [Fact(DisplayName = "production AppHost silo takes the complete brain; MCP takes AsClient only")]
     public void ProductionAppHostKeepsSiloCompleteAndNorthboundClientsAsClientOnly()
     {
         var appHost = File.ReadAllText(Path.Combine(
@@ -112,10 +112,10 @@ public sealed class HostingProjectionContracts
         Assert.Contains(".WithReference(brain)", appHost, StringComparison.Ordinal);
         Assert.Contains(".WithReference(brain.AsClient())", appHost, StringComparison.Ordinal);
         Assert.Contains("AddModule<FlutterModule>", appHost, StringComparison.Ordinal);
+        Assert.Contains("WithUiEdge", appHost, StringComparison.Ordinal);
 
         var siloBlock = Between(appHost, "var silo =", ";");
         var mcpBlock = Between(appHost, "builder.AddProject<Projects.DigitalBrain_Mcp>", ";");
-        var uiBlock = Between(appHost, "builder.AddProject<Projects.DigitalBrain_Ui>", ";");
 
         Assert.Contains(".WithReference(brain)", siloBlock, StringComparison.Ordinal);
         Assert.DoesNotContain("AsClient", siloBlock, StringComparison.Ordinal);
@@ -124,11 +124,10 @@ public sealed class HostingProjectionContracts
             ".WithReference(brain.AsClient())",
             string.Empty,
             StringComparison.Ordinal), StringComparison.Ordinal);
-        Assert.Contains(".WithReference(brain.AsClient())", uiBlock, StringComparison.Ordinal);
-        Assert.DoesNotContain(".WithReference(brain)", uiBlock.Replace(
-            ".WithReference(brain.AsClient())",
-            string.Empty,
-            StringComparison.Ordinal), StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "builder.AddProject<Projects.DigitalBrain_Ui>",
+            appHost,
+            StringComparison.Ordinal);
     }
 
     private static async Task<HashSet<string>> EnvironmentKeysOf(ContainerResource resource)

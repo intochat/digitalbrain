@@ -46,10 +46,14 @@ export const MODULES = [
   },
   {
     id: 'flutter', label: 'Flutter', status: 'built', section: '#_4-6-flutter',
-    role: 'Semantic UI vocabulary (IShell, IScene) with journaled scene/control facts. Flutter/Dart host is a northbound client edge, not an embedded silo. Drift guard is a golden wire manifest over Contracts.',
+    role: 'Semantic UI vocabulary (IShell, IScene) with journaled scene/control facts. Flutter/Dart host is a northbound client edge, not an embedded silo. Module Aspire.Hosting composes the OS surface when host options are selected. Drift guard is a golden wire manifest over Contracts.',
     neurons: ['IShell', 'IScene'],
     synapses: ['SceneOpened', 'ControlActivated'],
-    mcp: false, ui: true, aspire: [],
+    mcp: false, ui: true,
+    aspire: [
+      { res: 'digitalbrain-ui', sub: 'AsClient edge', model: '', params: ['DigitalBrain__Owner'] },
+      { res: 'digitalbrain-flutter', sub: 'edge URL only', model: '', params: ['DIGITALBRAIN_UI_BASE'] },
+    ],
   },
   {
     id: 'memory', label: 'Memory', status: 'scope', section: '#_4-7-memory',

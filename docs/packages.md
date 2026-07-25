@@ -35,6 +35,7 @@ for what ships and what each package may depend on.
 | `DigitalBrain.Modules.Time` | Built durable Countdown runtime; no Reminder or recurrence implementation | Time.Contracts, Kernel |
 | `DigitalBrain.Modules.Flutter.Contracts` | Shell/scene UI vocabulary and wire aliases | Abstractions |
 | `DigitalBrain.Modules.Flutter` | Shell and scene neurons; golden-backed contract drift pin | Flutter.Contracts, Kernel |
+| `DigitalBrain.Modules.Flutter.Aspire.Hosting` | Module-selected OS surface: Ui edge + Flutter host projection | Flutter, Aspire.Hosting |
 | `DigitalBrain.Quickstart.Contracts` | Built Greeter neuron and greeting facts for external authors | Abstractions |
 | `DigitalBrain.Quickstart` | Built compiled Quickstart module | Quickstart.Contracts, Kernel |
 
@@ -47,15 +48,17 @@ for what ships and what each package may depend on.
 | Time | yes | yes | no | `DigitalBrain.Time.Tests` (Countdown lifecycle and recovery) | Built: Countdown only |
 | Google | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` Gmail ReadMessage admit + annotation refusal on scripted MCP edge | Built |
 | Salesforce | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` propose / reject / approve→Completed on scripted MCP edge | Built |
-| Flutter | yes | yes | no | L0 golden + namespace/boundary pins; L1 journals in `DigitalBrain.Flutter.Tests`; L1 HTTP edge + SSE shell events in `DigitalBrain.Ui.Tests`; AppHost selects `FlutterModule` + `digitalbrain-ui` AsClient | Built (vocabulary + C# UI edge + host-facing SSE); Designed (Dart host at `clients/digitalbrain_flutter`, Aspire.Hosting, full chrome) |
+| Flutter | yes | yes | yes (OS surface) | L0 golden + namespace/boundary pins + hosting projection contracts; L1 journals in `DigitalBrain.Flutter.Tests`; L1 HTTP edge + SSE shell events in `DigitalBrain.Ui.Tests`; module hosting projects Ui/Flutter when `WithUiEdge` / `WithFlutterHost` selected | Built (vocabulary + C# UI edge + host-facing SSE + `Flutter.Aspire.Hosting`); Designed (Windows chrome polish, full desktop OS) |
 
-Quickstart, Tasks, Time, and Flutter have no module `Aspire.Hosting` package because they need no
-module-specific AppHost resources. AI, Google, and Salesforce do. Flutter packages are
-`DigitalBrain.Modules.Flutter.Contracts` and `DigitalBrain.Modules.Flutter` with public namespace
-`DigitalBrain.Flutter` (semantic neurons `IShell` / `IScene` — not an `IFlutter` god type). The
-Flutter/Dart pixel host is a northbound HTTP client of `hosts/DigitalBrain.Ui` under `clients/`
-(`digitalbrain_wire` + `digitalbrain_flutter` skeletons Built; Windows Flutter chrome Designed) — not a
-packable module, not under `modules/`, and not an Orleans silo.
+Quickstart, Tasks, and Time have no module `Aspire.Hosting` package because they need no
+module-specific AppHost resources. AI, Google, Salesforce, and **Flutter (OS surface)** do.
+Flutter packages are `DigitalBrain.Modules.Flutter.Contracts`, `DigitalBrain.Modules.Flutter`, and
+`DigitalBrain.Modules.Flutter.Aspire.Hosting` with public namespaces `DigitalBrain.Flutter` and
+`DigitalBrain.Flutter.Aspire.Hosting` (semantic neurons `IShell` / `IScene` — not an `IFlutter` god
+type). Selecting `FlutterModule` without host options is vocabulary-only; `WithUiEdge` /
+`WithFlutterHost` project the OS surface. The Flutter/Dart pixel host is a northbound HTTP client of
+`hosts/DigitalBrain.Ui` under `clients/` (`digitalbrain_wire` + `digitalbrain_flutter` skeletons Built;
+Windows Flutter chrome Designed) — not a packable module, not under `modules/`, and not an Orleans silo.
 
 ## Boundary rules
 
