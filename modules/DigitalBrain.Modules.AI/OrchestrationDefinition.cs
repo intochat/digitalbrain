@@ -87,9 +87,7 @@ internal sealed record OrchestrationDefinition(
         ArgumentNullException.ThrowIfNull(stored);
         ArgumentNullException.ThrowIfNull(current);
 
-        if (!string.Equals(stored.Fingerprint, current.Fingerprint, StringComparison.Ordinal)
-            || !string.Equals(stored.HostId, current.HostId, StringComparison.Ordinal)
-            || !string.Equals(stored.HostName, current.HostName, StringComparison.Ordinal))
+        if (!string.Equals(stored.Fingerprint, current.Fingerprint, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 "The durable direct-agent session is incompatible with the current orchestration definition; an explicit migration or reset is required.");
