@@ -5,7 +5,6 @@ namespace DigitalBrain.Client;
 public sealed class DigitalBrainClient : IDigitalBrain
 {
     private const string SessionName = "session";
-    private const string DefaultInstance = "default";
 
     private readonly IGrainFactory _grains;
 
@@ -25,10 +24,6 @@ public sealed class DigitalBrainClient : IDigitalBrain
         return new DigitalBrainClient(grains, new OwnerId(owner));
     }
 
-    public T Get<T>()
-        where T : class, INeuron
-        => Get<T>(DefaultInstance);
-
     public T Get<T>(string name)
         where T : class, INeuron
     {
@@ -36,10 +31,6 @@ public sealed class DigitalBrainClient : IDigitalBrain
 
         return _grains.GetGrain<T>(NeuronId.For<T>(Owner, name).ToGrainId());
     }
-
-    public Task SendAsync<TNeuron>(Synapse synapse)
-        where TNeuron : INeuron
-        => SendAsync<TNeuron>(DefaultInstance, synapse);
 
     public Task SendAsync<TNeuron>(string name, Synapse synapse)
         where TNeuron : INeuron
