@@ -18,6 +18,6 @@ public sealed class AISmoke(ModuleFixture fixture)
             [new ChatMessage(ChatRole.User, "hello")]);
 
         Assert.Equal("typed response", response.Text);
-        Assert.Single(test.Chat().Calls);
+        Assert.Equal(1, test.Chat().CallCount);
     }
 }

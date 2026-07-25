@@ -25,23 +25,19 @@ internal static class ChatEdgeExtensions
         => brain.ChatClientScript<ChatEdgeScript>();
 }
 
-internal sealed record ChatCall(
-    IReadOnlyList<ChatMessage> Messages,
-    ChatOptions? Options);
-
 internal sealed class ChatEdgeScript
 {
     private readonly Lock _gate = new();
-    private readonly List<ChatCall> _calls = [];
     private readonly Queue<string> _replies = [];
+    private int _callCount;
 
-    internal IReadOnlyList<ChatCall> Calls
+    internal int CallCount
     {
         get
         {
             lock (_gate)
             {
-                return [.. _calls];
+                return _callCount;
             }
         }
     }
@@ -59,22 +55,17 @@ internal sealed class ChatEdgeScript
         ChatOptions? options,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(messages);
+        _ = options;
         cancellationToken.ThrowIfCancellationRequested();
 
         string text;
         lock (_gate)
         {
-            var snapshot = messages
-                .Select(message => new ChatMessage(
-                    message.Role,
-                    message.Contents
-                        .Select(content => content)
-                        .ToArray()))
-                .ToArray();
-            _calls.Add(new(snapshot, options));
+            _callCount++;
             text = _replies.Count > 0
                 ? _replies.Dequeue()
-                : $"reply-{_calls.Count}";
+                : $"reply-{_callCount}";
         }
 
         return Task.FromResult(new ChatResponse(
@@ -85,7 +76,7 @@ internal sealed class ChatEdgeScript
     {
         lock (_gate)
         {
-            _calls.Clear();
+            _callCount = 0;
             _replies.Clear();
         }
     }
