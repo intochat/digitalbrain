@@ -716,9 +716,11 @@ Flutter / Dart host  ──HTTP/JSON (+ SSE watch)──►  hosts/DigitalBrain.
   `dart run bin/digitalbrain_host.dart`); explicit `FlutterDesktop` / `Headless`. Production AppHost
   composes the surface via module selection.
 - **Built (OS compositions, pre-Behavior rail):** `samples/DigitalBrain.Compositions` —
-  `OpenHome`, `PostAuthBootstrap`, `NavigateShell`, `CountdownSurface`, `AccountEnrichmentSurface`,
-  `AiPaneSurface` (contracts-only; L1 journal proofs). Multi-module enrichment Gmail→Salesforce
-  remains Integrations L1; OS surface opens the enrichment scene without secrets in journals.
+  shell-only `OpenHome` / `PostAuthBootstrap` / `NavigateShell`; multi-module surfaces
+  `CountdownSurface` (Flutter+Time) and `AiPaneSurface` (Flutter+AI); OS-scene-only
+  `AccountEnrichmentSurface` (opens enrichment scene — does not run Gmail→Salesforce). Contracts
+  only; L1 journal proofs. Multi-module enrichment process remains Integrations L1
+  (`IAccountEnrichment`); OS scene journals carry no secrets.
 - **Designed:** Flutter Windows **widget** chrome polish; production IdP principal→owner bind;
   product journal observation on `IDigitalBrain` when a non-UI consumer needs the same cursor/watch;
   optional upgrade from edge journal poll to grain `WatchNeuron` push without changing the HTTP event
@@ -914,17 +916,25 @@ control, review, and a rebuild.
 
 ### OS composition before the rail
 
-Shell policy, post-auth UX orchestration, and multi-module “OS apps” (countdown scene, enrichment
-approval surface, AI pane) are **logic over vocabulary**. Until the rail ships they live as ordinary
-C# under `samples/DigitalBrain.Compositions`, one public sealed class per file, identity = namespace +
-class name (the future Behavior identity). Bodies use only `IDigitalBrain` + selected `*.Contracts` +
-approved BCL + Microsoft.Extensions.AI message types where AI compositions need them — the future
-compiler allowlist. They are pull-invoked by tests today (not installed into the production silo and
-not wired as host startup); they are not Behaviors and must not introduce `IBehavior` product APIs.
+Shell policy, post-auth UX orchestration, and OS surface “apps” are **logic over vocabulary**. Until
+the rail ships they live as ordinary C# under `samples/DigitalBrain.Compositions`, one public sealed
+class per file, identity = namespace + class name (the future Behavior identity). Bodies use only
+`IDigitalBrain` + selected `*.Contracts` + approved BCL + Microsoft.Extensions.AI message types where
+AI compositions need them — the future compiler allowlist. They are pull-invoked by tests today (not
+installed into the production silo and not wired as host startup); they are not Behaviors and must
+not introduce `IBehavior` product APIs.
+
+Honesty split (do not blur):
+
+- **Shell-only:** `OpenHome`, `PostAuthBootstrap`, `NavigateShell` — Flutter `IShell` scenes only.
+- **Multi-module surfaces:** `CountdownSurface` (Flutter + `ICountdown`), `AiPaneSurface` (Flutter +
+  `ILlama32`). Compose existing vocabulary; no new durable process type.
+- **OS-scene-only surface:** `AccountEnrichmentSurface` opens the enrichment scene. It is **not** the
+  Gmail→Salesforce enrichment process and not an approval rail.
 
 Do not confuse this with `samples/DigitalBrain.AccountEnrichment`: that sample is a **compiled
-process neuron** (durable multi-module vocabulary). Flows that need new durable process state stay
-modules; flows that only compose existing vocabulary stay compositions.
+process neuron** (durable multi-module vocabulary, Integrations L1). Flows that need new durable
+process state stay modules; flows that only compose existing vocabulary stay compositions.
 
 The client API is what makes this coherent rather than a second language: the same file runs outside
 the cluster as a script and installs inside it as a behavior. Production apps take `IDigitalBrain`
