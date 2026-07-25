@@ -27,14 +27,12 @@ public sealed class TestOwner
         try
         {
             var id = NeuronId.For<TNeuron>(Id, name);
-            var neuron = new TestNeuron<TNeuron>(
+            return new TestNeuron<TNeuron>(
                 _brain,
                 id,
                 Client.Get<TNeuron>(name),
                 _brain.Journal(id, JournalKind.Incoming),
                 _brain.Journal(id, JournalKind.Outgoing));
-            _brain.RecordNeuron(id);
-            return neuron;
         }
         catch (Exception failure)
             when (failure is not BrainTestFailureException)

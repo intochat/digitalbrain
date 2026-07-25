@@ -10,10 +10,10 @@ public sealed class TestBrain : IAsyncDisposable
     private const string DefaultOwnerLabel = "default";
 
     private readonly Lock _ownerGate = new();
-    private readonly Dictionary<string, string> _labelSpellings =
-        new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, TestOwner> _owners =
         new(StringComparer.Ordinal);
+    private readonly HashSet<string> _ownerLabels =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly Lock _journalGate = new();
     private readonly Dictionary<(NeuronId Subject, JournalKind Direction), TestJournal>
         _journals = [];
@@ -43,11 +43,10 @@ public sealed class TestBrain : IAsyncDisposable
         _edges = edges;
         _edgeGeneration = edgeGeneration;
 
-        var owner = CreateOwner(DefaultOwnerLabel);
-        _labelSpellings.Add(DefaultOwnerLabel, DefaultOwnerLabel);
-        _owners.Add(DefaultOwnerLabel, owner);
-        _defaultOwner = owner;
-        Client = owner.Client;
+        _defaultOwner = CreateOwner(DefaultOwnerLabel);
+        _owners.Add(DefaultOwnerLabel, _defaultOwner);
+        _ownerLabels.Add(DefaultOwnerLabel);
+        Client = _defaultOwner.Client;
     }
 
     public IDigitalBrain Client { get; }
@@ -94,24 +93,17 @@ public sealed class TestBrain : IAsyncDisposable
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public void SetOAuthParameter(
-        string name,
-        string? value)
+    public void SetOAuthParameter(string name, string? value)
     {
         ThrowIfDisposed();
-        _edges.SetOAuthParameter(
-            name,
-            value,
-            _edgeGeneration);
+        _edges.SetOAuthParameter(name, value, _edgeGeneration);
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     public string? OAuthParameter(string name)
     {
         ThrowIfDisposed();
-        return _edges.OAuthParameter(
-            name,
-            _edgeGeneration);
+        return _edges.OAuthParameter(name, _edgeGeneration);
     }
 
     public TestNeuron<TNeuron> Neuron<TNeuron>(string name = "default")
@@ -131,37 +123,28 @@ public sealed class TestBrain : IAsyncDisposable
                     return owner;
                 }
 
-                if (_labelSpellings.TryGetValue(validated, out var existing))
+                if (!_ownerLabels.Add(validated))
                 {
                     throw new ArgumentException(
-                        $"Owner label '{validated}' differs only by casing from already used label '{existing}'.",
+                        $"Owner label '{validated}' differs only by casing from an existing label.",
                         nameof(label));
                 }
 
                 owner = CreateOwner(validated);
-                _labelSpellings.Add(validated, validated);
                 _owners.Add(validated, owner);
-                _diagnostics.RecordEvent(
-                    "owner.open",
-                    "succeeded",
-                    ("label", validated),
-                    ("owner", owner.Id.Value));
                 return owner;
             }
         }
-        catch (Exception failure)
-            when (failure is not BrainTestFailureException)
+        catch (Exception failure) when (failure is not BrainTestFailureException)
         {
-            throw _diagnostics.CaptureFailure(
-                "owner.open",
-                failure);
+            throw _diagnostics.CaptureFailure("owner.open", failure);
         }
     }
 
     [SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
-        Justification = "Method teardown must disarm every journal fault and attempt every journal cleanup before releasing the serial fixture lease; all failures are preserved.")]
+        Justification = "Teardown attempts every cleanup step before releasing the fixture lease.")]
     public async ValueTask DisposeAsync()
     {
         var release = Interlocked.Exchange(ref _release, null);
@@ -171,7 +154,6 @@ public sealed class TestBrain : IAsyncDisposable
         }
 
         List<Exception> failures = [];
-        InvalidOperationException? faultCleanupFailure = null;
 
         try
         {
@@ -186,7 +168,6 @@ public sealed class TestBrain : IAsyncDisposable
 
             if (CleanupJournalFaults() is { } faultFailure)
             {
-                faultCleanupFailure = faultFailure;
                 failures.Add(faultFailure);
             }
 
@@ -211,17 +192,7 @@ public sealed class TestBrain : IAsyncDisposable
                 : new AggregateException(
                     "One or more DigitalBrain test resources failed to clean up.",
                     failures);
-            var cleanupStage = failures.Count == 1
-                && ReferenceEquals(
-                    failure,
-                    faultCleanupFailure)
-                    ? "fault-cleanup"
-                    : "method-cleanup";
-
-            throw _diagnostics.CaptureFailure(
-                "brain.cleanup",
-                failure,
-                cleanupStage);
+            throw _diagnostics.CaptureFailure("brain.cleanup", failure);
         }
     }
 
@@ -246,15 +217,11 @@ public sealed class TestBrain : IAsyncDisposable
                     RetireJournalFault,
                     _diagnostics);
                 _faults.Add(handle);
-                _diagnostics.TrackFault(handle, target.ToString());
                 return handle;
             }
-            catch (Exception failure)
-                when (failure is not BrainTestFailureException)
+            catch (Exception failure) when (failure is not BrainTestFailureException)
             {
-                throw _diagnostics.CaptureFailure(
-                    "fault.arm",
-                    failure);
+                throw _diagnostics.CaptureFailure("fault.arm", failure);
             }
         }
     }
@@ -291,33 +258,16 @@ public sealed class TestBrain : IAsyncDisposable
             ObjectDisposedException.ThrowIf(
                 Volatile.Read(ref _release) is null,
                 this);
-            _diagnostics.RecordEvent(
-                "neuron.restart",
-                "started",
-                ("target", target.ToString()));
             await Cluster.RestartHostAsync(target, cancellationToken);
-            _diagnostics.RecordEvent(
-                "neuron.restart",
-                "succeeded",
-                ("target", target.ToString()));
         }
-        catch (Exception failure)
-            when (failure is not BrainTestFailureException)
+        catch (Exception failure) when (failure is not BrainTestFailureException)
         {
-            throw _diagnostics.CaptureFailure(
-                "neuron.restart",
-                failure);
+            throw _diagnostics.CaptureFailure("neuron.restart", failure);
         }
     }
 
     private TestOwner CreateOwner(string label)
-    {
-        var owner = TestOwner.Create(
-            this,
-            new($"{_scope}-{label}"));
-        _diagnostics.RecordOwner(label, owner.Id.Value);
-        return owner;
-    }
+        => TestOwner.Create(this, new($"{_scope}-{label}"));
 
     private void ThrowIfDisposed()
         => ObjectDisposedException.ThrowIf(
@@ -329,30 +279,18 @@ public sealed class TestBrain : IAsyncDisposable
         Exception failure)
         => _diagnostics.CaptureFailure(operation, failure);
 
-    internal void RecordNeuron(NeuronId target)
-        => _diagnostics.RecordEvent(
-            "neuron.open",
-            "succeeded",
-            ("target", target.ToString()));
-
     private bool RetireJournalFault(JournalFaultHandle fault)
     {
         lock (_faultGate)
         {
             _faults.Remove(fault);
-            var disarmed =
-                Cluster.DisarmJournalFault(fault.Registration);
-            _diagnostics.RetireFault(
-                fault,
-                disarmed ? "succeeded" : "inactive");
-            return disarmed;
+            return Cluster.DisarmJournalFault(fault.Registration);
         }
     }
 
     private InvalidOperationException? CleanupJournalFaults()
     {
         JournalFaultHandle[] faults;
-
         lock (_faultGate)
         {
             faults = [.. _faults];
@@ -360,7 +298,6 @@ public sealed class TestBrain : IAsyncDisposable
         }
 
         List<string>? leaks = null;
-
         foreach (var fault in faults)
         {
             if (fault.IsConsumed)
@@ -373,7 +310,6 @@ public sealed class TestBrain : IAsyncDisposable
                 continue;
             }
 
-            _diagnostics.RecordCleanupLeak(fault);
             (leaks ??= []).Add(
                 $"neuron='{fault.Target}', message='{fault.Message}'");
         }
@@ -381,17 +317,16 @@ public sealed class TestBrain : IAsyncDisposable
         return leaks is null
             ? null
             : new InvalidOperationException(
-                $"Unconsumed journal commit faults were not explicitly disposed before method cleanup: {string.Join("; ", leaks)}.");
+                $"Unconsumed journal commit faults remain: {string.Join("; ", leaks)}.");
     }
 
     [SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
-        Justification = "Method teardown must attempt every journal cleanup before releasing the serial fixture lease; all failures are preserved in an aggregate.")]
+        Justification = "Every journal cleanup is attempted before releasing the fixture lease.")]
     private async Task DisposeJournalsAsync()
     {
         TestJournal[] journals;
-
         lock (_journalGate)
         {
             journals = [.. _journals.Values];
@@ -399,7 +334,6 @@ public sealed class TestBrain : IAsyncDisposable
         }
 
         List<Exception>? failures = null;
-
         foreach (var journal in journals)
         {
             try
