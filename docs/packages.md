@@ -14,7 +14,7 @@ for what ships and what each package may depend on.
 | `DigitalBrain.Abstractions` | Leaf neuron and synapse contracts | nothing |
 | `DigitalBrain.Kernel` | Domain-neutral silo runtime | Abstractions |
 | `DigitalBrain.Client` | Typed owner-bound client | Abstractions |
-| `DigitalBrain.Testing` | Development-only real three-silo `DigitalBrainFixture`, method-scoped `TestBrain`, and assembly-owned `DigitalBrainAppHostFixture<TAppHost>` with method-scoped `RunningAppHost` | Kernel |
+| `DigitalBrain.Testing` | Development-only real three-silo `DigitalBrainFixture`, method-scoped `TestBrain`, and assembly-owned `DigitalBrainAppHostFixture<TAppHost>` with method-scoped `RunningAppHost` | Kernel, Client |
 | `DigitalBrain.Aspire` | Client Generic Host integration | Client |
 | `DigitalBrain.Aspire.Hosting` | One-call durable AppHost brain composition | Abstractions |
 | `DigitalBrain.Security` | Purpose-bound durable encryption | configuration and dependency-injection abstractions |
@@ -39,7 +39,7 @@ for what ships and what each package may depend on.
 | Family | Contracts | Runtime | Module hosting package | Semantic proof | Status |
 | --- | --- | --- | --- | --- | --- |
 | Quickstart | yes | yes | no | `DigitalBrain.Quickstart.Tests` + Quickstart AppHost | Built |
-| AI | yes | yes | yes | typed LLM smoke + direct Concurrent/GroupChat Respond; supervised IWorker unbuilt | Built (direct); Designed (supervised) |
+| AI | yes | yes | yes | typed LLM smoke (`ILlama32`); direct Concurrent/GroupChat exist, no L1 orchestration proof yet; supervised IWorker unbuilt | Built (direct surface); Designed (supervised) |
 | Tasks | yes | yes | no | contracts + runtime package | Built |
 | Time | yes | yes | no | `DigitalBrain.Time.Tests` | Built: Countdown only |
 | Google | yes | yes | yes | AppHost selection | Built |
@@ -58,18 +58,19 @@ without the durable `journal` connection used by production hosts. There is no s
 storage package: test hosts use `DigitalBrain.Testing`; production hosts use the durable journal
 connection projected by `AddDigitalBrain`.
 
-`DigitalBrain.Testing` separates its proof depths. L0 checks package graph and assembly boundaries.
-L1 uses the real multi-silo `DigitalBrainFixture` and method-scoped `TestBrain` for neuron and module
-semantics with journal observation and controllable clock. L2 uses exclusive
-`DigitalBrainAppHostFixture<TAppHost>` and method-scoped `RunningAppHost` for composition, health,
-and restart via Aspire APIs. Failures are ordinary exceptions; there is no public diagnostic DTO zoo.
+`DigitalBrain.Testing` owns the L1 and L2 proof surfaces. L0 package-graph and assembly-boundary
+checks live in `DigitalBrain.Tests` and do not need a cluster. L1 uses the real multi-silo
+`DigitalBrainFixture` and method-scoped `TestBrain` for neuron and module semantics with journal
+observation and controllable clock. L2 uses exclusive `DigitalBrainAppHostFixture<TAppHost>` and
+method-scoped `RunningAppHost` for composition, health, and graph cleanup via Aspire APIs. Failures
+are ordinary exceptions; there is no public diagnostic DTO zoo.
 
 `IDigitalBrain` is the owner-scoped client contract and `DigitalBrainClient` is its implementation.
 There is no concrete brain neuron or root-neuron interface: `DigitalBrainBuilder` owns AppHost state,
 while the client addresses typed neurons within one owner.
 `DigitalBrain.Client` is **not** an authentication boundary. An Orleans client is a trusted cluster
 peer — authenticate the user at the application edge and bind the resulting principal to the owner
-supplied to `Connect`.
+supplied to `AddDigitalBrainClient` (or `Connect` for Testing/host wiring).
 
 `DigitalBrain.Aspire.Hosting` creates the complete durable profile with one
 `AddDigitalBrain(name)` call: brain-scoped Azure Storage provides clustering, reminders, and

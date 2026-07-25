@@ -291,13 +291,15 @@ deadline. Applications and modules define the concrete types. There is no `objec
 JSON, no metadata dictionary, no generic event string, and no prompt anywhere in this module.
 
 That leaves an obvious question: if Tasks may not know what a prompt is, how does a `Goal` ever reach
-a model? Through two protected abstract methods on the AI `GroupChat` base class. One turns the
-immutable `Goal` into the chat messages a workflow starts from; the other turns the workflow's
-terminal messages back into a typed `Result`. Both are deterministic and synchronous, and the base
-class copies messages in each direction so that neither MAF nor the application ends up holding a
-reference into the other's state. That is the entire bridge. Tasks never learns what a `ChatMessage`
-is, AI never learns what any particular `Goal` means, and the application class that already defines
-both vocabularies is the one place the translation lives.
+a model? Through the ratified supervised bridge on AI orchestration — **designed, not standing today**.
+When supervised `GroupChat` returns, two protected abstract methods on that base class own the seam:
+one turns the immutable `Goal` into the chat messages a workflow starts from; the other turns the
+workflow's terminal messages back into a typed `Result`. Both are deterministic and synchronous, and
+the base class copies messages in each direction so that neither MAF nor the application ends up
+holding a reference into the other's state. That is the entire bridge. Tasks never learns what a
+`ChatMessage` is, AI never learns what any particular `Goal` means, and the application class that
+already defines both vocabularies is the one place the translation lives. Today's `GroupChat` is
+direct `Respond` only; those mapping methods and the supervised worker path are not in the repository.
 
 Four other shapes for that seam were considered and rejected: a generic `GroupChat<TGoal, TResult>`,
 a public mapper interface, a reflection convention over method names, and a service-locator lookup.
@@ -326,9 +328,9 @@ Four rules make concurrency tractable:
   every other fact — older or newer — is durably ignored: `Matches` compares
   `fact.Revision == data.Revision`, and a caller that gets `false` returns without touching state, so
   a future-revision fact produces neither a retry storm nor a corruption signal. The worker's own
-  cursor path does reject: `GroupChat` requires an incoming cursor to be exactly its next revision
-  and throws on anything else. Either way a terminal Attempt refuses continuation and a retry always
-  gets a new attempt identity.
+  cursor path (designed for supervised orchestrations) rejects: an incoming cursor must be exactly
+  the next revision and throws on anything else. Either way a terminal Attempt refuses continuation
+  and a retry always gets a new attempt identity.
 - **An Attempt failure is not a Task failure.** Policy may start another sequential Attempt, enter
   `Waiting`, or declare terminal failure. A later retry is a successor Task linked by `RetryOf`.
 - **Cancellation is truthful.** It is best-effort intent, never pretend rollback. A cancelling worker
@@ -348,13 +350,12 @@ would declare success for work that has not happened. Workflow output may comple
 
 Settled but not yet standing up: a pending MAF request mapping to Task `Waiting` with a typed blocker,
 and a workflow error feeding Task retry policy rather than terminating the Task on its own. Neither
-exists in the repository — `WorkflowRunner` watches only `WorkflowOutputEvent` and
-`SuperStepCompletedEvent`, and `AttemptWaiting`/`AttemptFailed` are constructed nowhere under
-`modules/` or `src/`, only inside a hand-rolled fake worker that exercises `TaskNeuron`'s state machine
-in isolation. What happens today when a run fails is infrastructure recovering itself rather than Task
-policy hearing about it: `GroupChat`'s own `db.ai.workflow-run` reminder notices the active run past
-its recovery deadline, mints a fresh `RunId` on the same cursor, and retries the superstep — the Task
-is never consulted.
+exists in the repository. The retired private `WorkflowRunner` / checkpoint stack that once watched
+MAF workflow events was deleted with overbuilt supervised reinvention (§4.1). `TaskNeuron` still
+handles attempt facts, but nothing under `modules/`, `src/`, `samples/`, or `tests/` constructs
+`AttemptWaiting` / `AttemptFailed` (or the other attempt facts) today — there is no live worker
+producer until the supervised path returns. `GroupChat.Accept` / `Continue` / `Cancel` throw until
+that thin Orleans-primary path is rewritten; direct `Respond` does not consult Task policy.
 
 ### 4.3 Google
 
@@ -510,14 +511,13 @@ Read-only operations stay retryable and do not touch it.
 Status: Built — Countdown only
 
 Time separates *public scheduled behavior* from *private kernel scheduling*, and that separation is
-the entire point of the module. Kernel timers and reminders maintain outbox delivery, run recovery,
-and retry pumps. Those are infrastructure, and by convention their reminder names begin `db.` — the
-kernel outbox registers `db.outbox` and the AI worker's recovery reminder registers
-`db.ai.workflow-run`. The prefix is a reading aid for whoever inspects a reminder table, not an
-enforced reservation: no code validates it, and durable state keys deliberately do not follow it at
-all, which is why the AI orchestration keys are `ai.*`. Time neurons, by contrast, are addressable
-schedules that behaviors, Tasks, and modules may talk to. A behavior must never see `IGrainTimer`,
-`IGrainReminder`, `TickStatus`, or a raw reminder name.
+the entire point of the module. Kernel timers and reminders maintain outbox delivery and other private recovery pumps. Those are
+infrastructure, and by convention their reminder names begin `db.` — the kernel outbox registers
+`db.outbox`. The prefix is a reading aid for whoever inspects a reminder table, not an enforced
+reservation: no code validates it, and durable state keys deliberately do not follow it at all, which
+is why AI direct-session keys are `ai.*`. Time neurons, by contrast, are addressable schedules that
+behaviors, Tasks, and modules may talk to. A behavior must never see `IGrainTimer`, `IGrainReminder`,
+`TickStatus`, or a raw reminder name.
 
 The implemented public vocabulary is `DigitalBrain.Time.ICountdown`, a durable one-shot duration.
 Its Contracts and runtime packages, deterministic `TimeProvider` test edge, durable Orleans-reminder
@@ -648,10 +648,12 @@ path around that rail. Until the rail exists, changes arrive the ordinary way �
 control, review, and a rebuild.
 
 The client API is what makes this coherent rather than a second language: the same file runs outside
-the cluster as a script and installs inside it as a behavior.
+the cluster as a script and installs inside it as a behavior. Production apps take `IDigitalBrain`
+from DI (`AddDigitalBrainClient(owner)`). `DigitalBrainClient.Connect` remains only for Testing and
+host wiring that already hold an `IGrainFactory` — it is not the author story.
 
 ```csharp
-var brain = DigitalBrainClient.Connect(grains, "acme");
+// IDigitalBrain brain from DI, TestBrain.Client, or Connect wiring
 await brain.SendAsync<IAnalyst>(
     "incident-42",
     new SummaryRequested("Summarize the incident."));
@@ -794,7 +796,11 @@ using var client = silo.CreateHttpClient();
 
 Cleanup remains graph-owned: it uses Aspire resource commands and terminal observations, and never enumerates or kills processes by name. L1 remains the default for neuron and module semantics. Product silo restart is proven through L1 `TestNeuron.RestartHostAsync` (in-process cluster), not through AppHost resource-restart commands.
 
-Substitutes stop at the closed external edges named by `TestingEdges`: `IChatClient` (module smoke) and the shared `TimeProvider` already registered on every L1 test. Neurons, journals, filters, and module logic stay real. `Behavior` remains the name of a user-authored ordinary-test concept; the testing framework adds no behavior interfaces or behavior fixture hierarchy. Runtime behavior is not a Neuron (see §5).
+Substitutes stop at the closed external edges: scripted `IChatClient` via
+`DigitalBrainTestBuilder.ConfigureChatClient` (module smoke) and the framework-owned `TimeProvider`
+already registered on every L1 test. Neurons, journals, filters, and module logic stay real.
+`Behavior` remains the name of a user-authored ordinary-test concept; the testing framework adds no
+behavior interfaces or behavior fixture hierarchy. Runtime behavior is not a Neuron (see §5).
 
 ## 8. Known limitations
 

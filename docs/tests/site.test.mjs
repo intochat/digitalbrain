@@ -158,7 +158,7 @@ test('the architecture page is module-organized and states each status once', ()
   assert.match(architecture, /method-scoped RunningAppHost/)
   assert.match(architecture, /host\.Resource\("silo"\)/)
   assert.match(architecture, /never enumerates or kills processes by name/)
-  assert.match(architecture, /TestingEdges/)
+  assert.match(architecture, /ConfigureChatClient/)
   assert.match(architecture, /Runtime behavior is not a Neuron/)
 
   const retiredHostedTesting = new RegExp([
@@ -179,9 +179,11 @@ test('the architecture page is module-organized and states each status once', ()
   }
 
   const built = architecture.match(/^Status: Built$/gm) ?? []
+  const builtCountdown = architecture.match(/^Status: Built — Countdown only$/gm) ?? []
   const designed = architecture.match(/^Status: Designed$/gm) ?? []
   assert.equal(built.length, 4, 'AI, Tasks, Google, and Salesforce are built')
-  assert.equal(designed.length, 2, 'Time and Flutter are designed')
+  assert.equal(builtCountdown.length, 1, 'Time is built — Countdown only')
+  assert.equal(designed.length, 2, 'Flutter module and Behaviors section are designed')
 
   assert.match(architecture, /human-approved proposal/)
   assert.match(architecture, /Runtime behavior installation is designed and not yet built/)

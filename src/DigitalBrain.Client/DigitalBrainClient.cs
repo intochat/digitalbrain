@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Client;
@@ -16,6 +17,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
 
     public OwnerId Owner { get; }
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public static DigitalBrainClient Connect(IGrainFactory grains, string owner)
     {
         ArgumentNullException.ThrowIfNull(grains);

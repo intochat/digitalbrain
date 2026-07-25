@@ -10,15 +10,15 @@ What it is being built toward:
 > **A brain you program by writing ordinary C#, and that can program itself.**
 
 ```csharp
-var brain = DigitalBrainClient.Connect(grains, "acme");
+// production: builder.AddDigitalBrainClient(owner); inject IDigitalBrain
 await brain.SendAsync<IAnalyst>(
     "incident-42",
     new SummaryRequested("Summarize the incident."));
 ```
 
-The owner-bound client enters through a session; neurons call typed capabilities such as `ILlama32`
-inside the brain. The same vocabulary will later support approved C# behaviors generated from
-natural language. See [docs/architecture.md](docs/architecture.md) for what is built versus
+The owner-bound `IDigitalBrain` facade enters through a session; neurons call typed capabilities such
+as `ILlama32` inside the brain. The same vocabulary will later support approved C# behaviors generated
+from natural language. See [docs/architecture.md](docs/architecture.md) for what is built versus
 designed.
 
 ## The shape of it

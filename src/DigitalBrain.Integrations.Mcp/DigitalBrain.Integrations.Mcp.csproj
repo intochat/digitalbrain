@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Official MCP SDK, OAuth, tool admission, and durable token infrastructure for DigitalBrain modules.</Description>
+    <Description>Southbound official MCP SDK transport, OAuth, token cache, session, and fingerprint mechanics for DigitalBrain modules.</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>

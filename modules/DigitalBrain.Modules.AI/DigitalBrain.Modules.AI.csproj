@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>AI module: provider adapters and model completion outside the kernel.</Description>
+    <Description>AI module: typed LLM neurons and direct Concurrent/GroupChat MAF orchestration outside the kernel.</Description>
     <RootNamespace>DigitalBrain.AI</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007</NoWarn>
   </PropertyGroup>

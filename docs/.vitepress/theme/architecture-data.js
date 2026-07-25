@@ -14,7 +14,7 @@ export const MODULES = [
     mcp: false, ui: false,
     aspire: [
       { res: 'Ollama', sub: 'data volume', model: 'llama3.2', params: [] },
-      { res: 'OpenAI', sub: '', model: 'gpt-5.6', params: ['openai-api-key'] },
+      { res: 'OpenAI', sub: '', model: 'gpt-5.6', params: ['<brain>-ai-openai-api-key'] },
     ],
     example: true,
   },
@@ -38,7 +38,7 @@ export const MODULES = [
     aspire: [{ res: 'Salesforce OAuth', sub: 'external client app', model: '', params: ['salesforce-client-id', 'salesforce-redirect-uri'] }],
   },
   {
-    id: 'time', label: 'Time', status: 'designed', section: '#_4-5-time',
+    id: 'time', label: 'Time', status: 'built', section: '#_4-5-time',
     role: 'Built: durable one-shot ICountdown. Designed/unbuilt: IReminder and recurring calendar schedules. Separate from kernel-private outbox timers; reuses the shared kernel reminder provider.',
     neurons: ['ICountdown', 'IReminder'],
     synapses: ['CountdownElapsed', 'ReminderElapsed', 'ReminderOverdue'],
@@ -59,7 +59,7 @@ export const MODULES = [
 export const ACTORS = [
   {
     id: 'people', label: 'People', status: 'built',
-    role: 'Operate the brain through the owner-bound client — DigitalBrainClient.Connect(grains, "acme"). They send to and observe neurons, and they are the approval authority for every behaviour install.',
+    role: 'Operate the brain through the owner-bound IDigitalBrain facade (AddDigitalBrainClient in production DI; Connect only for Testing/host wiring). They send and emit typed facts, and they are the approval authority for every behaviour install.',
   },
   {
     id: 'agents', label: 'Agents', status: 'designed',
@@ -78,8 +78,8 @@ export const BEHAVIORS = [
 {
     public async Task HandleAsync(ReminderElapsed e, ...)
     {
-        var message = await gmail.ReadMessageAsync(...);
-        await llama.RespondAsync(Summarise(message));
+        var message = await gmail.ReadMessage(...);
+        await llama.Respond([new ChatMessage(ChatRole.User, Summarise(message))]);
     }
 }`,
   },
@@ -94,8 +94,8 @@ export const BEHAVIORS = [
     public async Task HandleAsync(AttemptWaiting a, ...)
     {
         if (a.Blocker is not ApprovalRequired) return;
-        await crm.ProposeAccountDescriptionAsync(...);
-        await followUp.StartAsync(TimeSpan.FromDays(2));
+        await crm.ProposeAccountDescription(...);
+        await followUp.Start(new StartCountdown(CommandId.New(), TimeSpan.FromDays(2), dest));
     }
 }`,
   },
