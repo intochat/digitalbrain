@@ -52,11 +52,10 @@ internal sealed class ChatEdgeScript
 
     internal Task<ChatResponse> Respond(
         IEnumerable<ChatMessage> messages,
-        ChatOptions? options,
+        ChatOptions? _,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(messages);
-        _ = options;
         cancellationToken.ThrowIfCancellationRequested();
 
         string text;
