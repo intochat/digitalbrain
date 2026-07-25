@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +20,10 @@ internal interface ITestReminderDeliveryService : IGrainService
 
 }
 
+[SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain service activated by the runtime.")]
 internal sealed class TestReminderDeliveryService :
     GrainService,
     ITestReminderDeliveryService
@@ -64,6 +69,10 @@ internal interface ITestReminderDeliveryServiceClient :
     IGrainServiceClient<ITestReminderDeliveryService>,
     ITestReminderDeliveryService;
 
+[SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Registered as a singleton grain-service client in the fixture silo.")]
 internal sealed class TestReminderDeliveryServiceClient(
     IServiceProvider services) :
     GrainServiceClient<ITestReminderDeliveryService>(services),
@@ -99,6 +108,10 @@ internal partial interface ITestReminderDeliveryCaller : INeuron
 
 }
 
+[SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans neuron activated by grain identity, not by the fixture.")]
 internal sealed class TestReminderDeliveryCaller :
     Neuron,
     ITestReminderDeliveryCaller
