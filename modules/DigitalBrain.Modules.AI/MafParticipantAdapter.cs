@@ -49,22 +49,18 @@ internal static class MafParticipantAdapter
         ArgumentNullException.ThrowIfNull(turnScheduler);
         Validate(typeof(TNeuron));
 
-        var (agentId, agentName) = AgentIdentity(typeof(TNeuron), id);
         return new ChatClientAgent(
             new NeuronChatClient(grains.GetGrain<TNeuron>(id.ToGrainId()), turnScheduler),
             new ChatClientAgentOptions
             {
-                Id = agentId,
-                Name = agentName,
+                Id = AgentId(typeof(TNeuron), id),
             });
     }
 
-    private static (string Id, string Name) AgentIdentity(Type contract, NeuronId id)
+    private static string AgentId(Type contract, NeuronId id)
     {
         var source = Encoding.UTF8.GetBytes($"{contract.AssemblyQualifiedName}\n{id}");
-        var identity = Convert.ToHexStringLower(SHA256.HashData(source));
-
-        return ($"dbp_{identity}", $"participant_{identity}");
+        return $"dbp_{Convert.ToHexStringLower(SHA256.HashData(source))}";
     }
 
     private static void Validate(Type contract)
