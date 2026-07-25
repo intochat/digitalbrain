@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Integrations.Mcp;
 using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Testing;
@@ -38,6 +39,16 @@ public sealed class DigitalBrainTestBuilder
             adapter,
             script,
             reset);
+    }
+
+    internal void ConfigureMcpSessionFactory<TScript>(
+        IMcpClientSessionFactory factory,
+        TScript script,
+        Action<TScript> reset)
+        where TScript : class
+    {
+        ThrowIfSealed();
+        _edges.ConfigureMcpSessionFactory(factory, script, reset);
     }
 
     internal TestFixtureComposition Seal()

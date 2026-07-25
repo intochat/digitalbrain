@@ -63,6 +63,14 @@ public sealed class TestBrain : IAsyncDisposable
         return _edges.ChatClientScript<TScript>(_edgeGeneration);
     }
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public TScript McpSessionScript<TScript>()
+        where TScript : class
+    {
+        ThrowIfDisposed();
+        return _edges.McpSessionScript<TScript>(_edgeGeneration);
+    }
+
     public TestNeuron<TNeuron> Neuron<TNeuron>(string name = "default")
         where TNeuron : class, INeuron
         => _defaultOwner.Neuron<TNeuron>(name);

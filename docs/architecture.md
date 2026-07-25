@@ -801,10 +801,12 @@ using var client = silo.CreateHttpClient();
 Cleanup remains graph-owned: it uses Aspire resource commands and terminal observations, and never enumerates or kills processes by name. L1 remains the default for neuron and module semantics. Product silo restart is proven through L1 `TestNeuron.RestartHostAsync` (in-process cluster), not through AppHost resource-restart commands.
 
 Substitutes stop at the closed external edges: scripted `IChatClient` via
-`DigitalBrainTestBuilder.ConfigureChatClient` (module smoke) and the framework-owned `TimeProvider`
-already registered on every L1 test. Neurons, journals, filters, and module logic stay real.
-`Behavior` remains the name of a user-authored ordinary-test concept; the testing framework adds no
-behavior interfaces or behavior fixture hierarchy. Runtime behavior is not a Neuron (see §5).
+`DigitalBrainTestBuilder.ConfigureChatClient` (module smoke), scripted southbound MCP sessions via
+internal `ConfigureMcpSessionFactory` / `IMcpClientSessionFactory` (Integrations L1), and the
+framework-owned `TimeProvider` already registered on every L1 test. Neurons, journals, filters, and
+module logic stay real. `Behavior` remains the name of a user-authored ordinary-test concept; the
+testing framework adds no behavior interfaces or behavior fixture hierarchy.
+Runtime behavior is not a Neuron (see §5).
 
 ## 8. Known limitations
 
@@ -853,9 +855,11 @@ receipts, Cancel → Cancelling → `AttemptCancelled` → Cancelled, and stale-
 Assembly-boundary tests still keep Tasks free of AI/MAF/Time. Supervised MAF-per-attempt workers
 remain designed; no product `IWorker` under `modules/` emits attempt facts yet.
 
-**Google and Salesforce have no L1 semantic proof.** Contracts, runtime, MCP hosting, and AppHost
-selection ship. There is no cluster-level proof of Gmail reads, Salesforce mutations, approval fencing,
-or reconciliation against a real or scripted provider edge.
+**Google and Salesforce L1 proofs use a scripted southbound MCP edge, not live cloud.**
+`DigitalBrain.Integrations.Tests` proves Gmail `ReadMessage` against an admitted `get_message` tool,
+Salesforce propose without MCP, approval rejection before MCP when human evidence mismatches, and
+approve → `Completed` through admitted update/query tools on the same in-process edge. Live OAuth and
+hosted MCP endpoints remain out of the default L1 path.
 
 **AI direct Concurrent/GroupChat L1 is closed; supervised remains Designed.** Typed LLM smoke
 (`ILlama32`) plus ModuleTests multi-participant Concurrent/GroupChat `Respond` and durable second-turn

@@ -1,7 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
-using DigitalBrain.Security;
-using Microsoft.Extensions.Configuration;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using Orleans.Journaling;
@@ -55,23 +52,16 @@ internal sealed class McpServerDefinition
     internal bool RequiresClientSecret { get; }
 }
 
-internal sealed class McpRuntime(
-    IConfiguration configuration,
-    IHttpClientFactory httpClients,
-    IDurablePayloadProtector protector)
+internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
 {
     internal const string HttpClientName = "DigitalBrain.Integrations.Mcp";
 
-    [SuppressMessage(
-        "Reliability",
-        "CA2000:Dispose objects before losing scope",
-        Justification = "The official MCP client takes ownership of its transport and disposes it with the session.")]
     internal async ValueTask<T> RunAsync<T>(
         McpServerDefinition server,
         IDurableValue<byte[]> tokenState,
         Func<ValueTask> commit,
         string durableIdentity,
-        Func<ModelContextProtocol.Client.McpClient, CancellationToken, ValueTask<T>> callback,
+        Func<McpClient, CancellationToken, ValueTask<T>> callback,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(server);
@@ -80,28 +70,13 @@ internal sealed class McpRuntime(
         ArgumentException.ThrowIfNullOrWhiteSpace(durableIdentity);
         ArgumentNullException.ThrowIfNull(callback);
 
-        var tokens = new DurableMcpTokenCache(
+        await using var session = await sessions.OpenAsync(
+            server,
             tokenState,
             commit,
-            protector,
-            $"mcp/oauth/{server.Key}/{durableIdentity}");
-        var authorization = McpOAuthOptions.Create(server, configuration, tokens);
-        using var httpClient = httpClients.CreateClient(HttpClientName);
-        var transport = new HttpClientTransport(
-            new HttpClientTransportOptions
-            {
-                Endpoint = server.Endpoint,
-                Name = server.DisplayName,
-                OAuth = authorization,
-            },
-            httpClient,
-            loggerFactory: null,
-            ownsHttpClient: false);
-        await using var client = await ModelContextProtocol.Client.McpClient.CreateAsync(
-            transport,
-            cancellationToken: cancellationToken);
-
-        return await callback(client, cancellationToken);
+            durableIdentity,
+            cancellationToken);
+        return await callback(session.Client, cancellationToken);
     }
 
     internal static JsonElement RequireStructuredContent(

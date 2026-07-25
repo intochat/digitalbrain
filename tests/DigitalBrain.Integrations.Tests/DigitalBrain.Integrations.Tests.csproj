@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);CA2007;CA1515;CA1812;ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Google.Contracts\DigitalBrain.Modules.Google.Contracts.csproj" />
+    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Google\DigitalBrain.Modules.Google.csproj" />
+    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Salesforce.Contracts\DigitalBrain.Modules.Salesforce.Contracts.csproj" />
+    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Salesforce\DigitalBrain.Modules.Salesforce.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Integrations.Mcp\DigitalBrain.Integrations.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+  </ItemGroup>
+</Project>

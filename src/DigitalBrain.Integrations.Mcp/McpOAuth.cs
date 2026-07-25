@@ -221,6 +221,7 @@ internal static class McpRuntimeHosting
 
         services.AddHttpClient(McpRuntime.HttpClientName);
         DurablePayloadProtectionHosting.Configure(services, configuration);
+        services.TryAddSingleton<IMcpClientSessionFactory, HttpMcpClientSessionFactory>();
         services.TryAddSingleton<McpRuntime>();
     }
 }
