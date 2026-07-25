@@ -3,7 +3,7 @@
     <IsPackable>true</IsPackable>
     <Description>Quickstart module: the minimal greeter neuron implementation.</Description>
     <RootNamespace>DigitalBrain.Quickstart</RootNamespace>
-    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1812</NoWarn>
+    <NoWarn>$(NoWarn);CA2007;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Quickstart.Contracts\DigitalBrain.Quickstart.Contracts.csproj" />
