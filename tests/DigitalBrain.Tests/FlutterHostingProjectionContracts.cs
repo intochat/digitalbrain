@@ -271,6 +271,19 @@ public sealed class FlutterHostingProjectionContracts
             "hosts",
             "DigitalBrain.TestingAppHost",
             "AppHost.cs"));
+        var quickstartProject = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.Quickstart.AppHost",
+            "DigitalBrain.Quickstart.AppHost.csproj"));
+        var testingProject = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.TestingAppHost",
+            "DigitalBrain.TestingAppHost.csproj"));
+
+        Assert.Contains("AddModule<QuickstartModule>", quickstart, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddModule", testing, StringComparison.Ordinal);
 
         foreach (var appHost in new[] { quickstart, testing })
         {
@@ -278,6 +291,13 @@ public sealed class FlutterHostingProjectionContracts
             Assert.DoesNotContain("WithUiEdge", appHost, StringComparison.Ordinal);
             Assert.DoesNotContain("WithFlutterHost", appHost, StringComparison.Ordinal);
             AssertNoOsSurfaceHandWire(appHost);
+        }
+
+        foreach (var project in new[] { quickstartProject, testingProject })
+        {
+            Assert.DoesNotContain("DigitalBrain.Modules.Flutter", project, StringComparison.Ordinal);
+            Assert.DoesNotContain("DigitalBrain.Ui", project, StringComparison.Ordinal);
+            Assert.DoesNotContain("Flutter.Aspire.Hosting", project, StringComparison.Ordinal);
         }
     }
 
