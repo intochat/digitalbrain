@@ -11,9 +11,9 @@ for what ships and what each package may depend on.
 | Package | Contains | Depends on |
 | --- | --- | --- |
 | `DigitalBrain` | Consumer metapackage (no assembly; never Kernel or modules) | Abstractions, Client, Aspire |
-| `DigitalBrain.Abstractions` | Leaf neuron and synapse contracts (incl. substrate `DigitalBrainActivated` / `db.digitalbrain-activated`); Orleans grain bases deliberate (`INeuron`/`IJournalObserver`) | Microsoft.Orleans.Sdk |
-| `DigitalBrain.Kernel` | Domain-neutral silo runtime | Abstractions |
-| `DigitalBrain.Client` | Owner-bound `IDigitalBrain` facade (`Get`/`Send`/`Emit` only; no product journal watch) | Abstractions, Microsoft.Orleans.Client |
+| `DigitalBrain.Abstractions` | Leaf neuron and synapse contracts (incl. substrate `DigitalBrainActivated`, `IDigitalBrainNeuron`, marker `IBehavior`); Orleans grain bases deliberate (`INeuron`/`IJournalObserver`) | Microsoft.Orleans.Sdk |
+| `DigitalBrain.Kernel` | Domain-neutral silo runtime (incl. `DigitalBrainNeuron` activation emitter) | Abstractions |
+| `DigitalBrain.Client` | Owner-bound `IDigitalBrain` facade (`ActivateAsync`/`Get`/`Send`/`Emit`; no product journal watch) | Abstractions, Microsoft.Orleans.Client |
 | `DigitalBrain.Testing` | Development-only real multi-silo `DigitalBrainFixture`, method-scoped `TestBrain`, scripted MCP test edges, and assembly-owned `DigitalBrainAppHostFixture<TAppHost>` with method-scoped `RunningAppHost` | Kernel, Client, Integrations.Mcp |
 | `DigitalBrain.Aspire` | Client Generic Host DI (`AddDigitalBrainClient`; owner config only; never Aspire.Hosting) | Client, Microsoft.Orleans.Client |
 | `DigitalBrain.Aspire.Hosting` | One-call durable AppHost brain (`AddDigitalBrain`; silo vs `AsClient` projection; never Client/Kernel/modules) | Abstractions, Aspire.Hosting, Aspire.Hosting.Azure.Storage, Aspire.Hosting.Orleans |
@@ -101,7 +101,8 @@ observation and controllable clock. L2 uses exclusive `DigitalBrainAppHostFixtur
 method-scoped `RunningAppHost` for composition, health, and graph cleanup via Aspire APIs. Failures
 are ordinary exceptions; there is no public diagnostic DTO zoo.
 
-`IDigitalBrain` is the owner-scoped client contract and `DigitalBrainClient` is its implementation —
+`IDigitalBrain` is the owner-scoped client contract (`ActivateAsync` + `Get`/`Send`/`Emit`) and
+`DigitalBrainClient` is its implementation talking to owner-scoped `IDigitalBrainNeuron` —
 the only public client facade. Surface is ambient-owner `Get`/`SendAsync`/`EmitAsync` only.
 Product journal observation on `IDigitalBrain` is **Designed, not Built**; northbound edges that need
 cursors use host-private `ISessionNeuron.ReadNeuronJournal` (or Testing journals), not a second

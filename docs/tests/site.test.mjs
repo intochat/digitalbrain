@@ -160,6 +160,8 @@ test('the architecture page is module-organized and states each status once', ()
   assert.match(architecture, /never enumerates or kills processes by name/)
   assert.match(architecture, /ConfigureChatClient/)
   assert.match(architecture, /Runtime behavior is not a Neuron/)
+  assert.match(architecture, /IDigitalBrainNeuron|DigitalBrainNeuron/)
+  assert.match(architecture, /IBehavior/)
 
   const retiredHostedTesting = new RegExp([
     'Hosted' + 'Application',
@@ -387,9 +389,9 @@ test('samples and compositions honesty — pre-rail logic, no Behavior install l
   assert.match(packages, /not a composition/)
 
   assert.match(architecture, /Built \(OS compositions, pre-Behavior rail\)/)
-  assert.match(architecture, /they are not Behaviors/)
-  assert.match(architecture, /No `IBehavior`/)
-  assert.match(architecture, /Runtime behavior installation is designed and not yet built/)
+  assert.match(architecture, /not the install rail|not installed Behaviors|pre-rail helpers/)
+  assert.match(architecture, /IBehavior/)
+  assert.match(architecture, /Runtime behavior \*\*install\*\* is designed and not yet built|Runtime behavior installation is designed and not yet built/)
   assert.match(architecture, /AccountEnrichmentSurface.*not.*Gmail/)
 
   assert.match(specification, /DigitalBrain\.Compositions\.Tests/)

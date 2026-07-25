@@ -32,6 +32,9 @@ public sealed class AccountEnrichmentComposition(IntegrationsFixture fixture)
         var completed = await RunEnrichmentToCompletionAsync(test, cancellationToken);
         Assert.Equal(expectedDescription, completed.Description);
 
+        var homeOpened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
+        Assert.Equal("home", homeOpened.Synapse.SceneKey);
+
         await shell.Reference.Open(new OpenScene(
             CommandId.New(),
             IntegrationsFixture.EnrichmentSceneKey,

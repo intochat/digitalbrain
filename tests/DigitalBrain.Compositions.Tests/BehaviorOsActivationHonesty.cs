@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using DigitalBrain.Flutter;
 using DigitalBrain.Shell;
@@ -19,7 +20,7 @@ public sealed class BehaviorOsActivationHonesty(CompositionsFixture fixture)
         }
         .SelectMany(static assembly => assembly.GetExportedTypes())
         .Where(static type =>
-            type.Name is "IBehavior" or "IBehaviorTest" or "BehaviorRunner"
+            type.Name is "IBehaviorTest" or "BehaviorRunner"
             || type.Name.Contains("BehaviorDispatch", StringComparison.Ordinal))
         .ToArray();
 
@@ -48,18 +49,23 @@ public sealed class BehaviorOsActivationHonesty(CompositionsFixture fixture)
     }
 
     [Fact(DisplayName =
-        "activation boot is owned by ActivateDigitalBrain + BootOnActivation compositions — not host Program")]
+        "activation product verb is IDigitalBrain.ActivateAsync — compositions remain pre-rail helpers, not host Program")]
     public void ActivationSynapseDrivesBootNotHostProgram()
     {
+        Assert.Contains(
+            typeof(IDigitalBrain).GetMethods(),
+            method => method.Name == nameof(IDigitalBrain.ActivateAsync));
         AssertPublicSealedComposition(typeof(ActivateDigitalBrain));
         AssertPublicSealedComposition(typeof(BootOnActivation));
     }
 
     [Fact(DisplayName =
-        "no Behavior-by-name dispatch API — IBehavior absent is success")]
+        "no Behavior-by-name dispatch API — IBehavior marker is synapse-activated, not Run(name)")]
     public void NoBehaviorByNameDispatchApi()
     {
         Assert.Empty(ForbiddenBehaviorDispatchNames);
+        Assert.True(typeof(IBehavior).IsInterface);
+        Assert.True(typeof(INeuron).IsAssignableFrom(typeof(IBehavior)));
     }
 
     private static void AssertPublicSealedComposition(Type composition)

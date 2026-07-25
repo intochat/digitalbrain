@@ -909,74 +909,75 @@ project synapse journals, but it may never reconstruct truth by scraping traces.
 
 Status: Designed
 
-Behavior proposal, approval, installation, execution, and rollback remain **Designed, unbuilt**.
-No `IBehavior`, `IBehaviorTest`, behavior runner, or behavior execution framework exists. Those
-names are not ratified implementation contracts. The intended rail composes existing typed
-vocabulary without inventing public neuron contracts or Orleans grain types at runtime.
+Behavior **proposal, approval, installation, execution, and rollback** remain **Designed,
+unbuilt**. There is no name-dispatch `Run("behavior")` API, no `IBehaviorTest`, and no
+BehaviorRunner. The intended human-approved install rail still composes typed vocabulary without
+bypassing journals. **Runtime behavior is not a Neuron** as a user-installed product type until
+that rail exists — first-vertical **compiled** OS Behavior hosts (`IBehavior` + `IHandle`) ship as
+module grains through rebuild, which is honest substrate, not the install rail.
 
-What *is* Built today is the pre-rail activation → shell-home product chain under ordinary C#
-compositions and one Abstractions fact — **not** the install rail (see OS composition below).
+What *is* Built today for OS boot (does not flip §5 Status to Built):
 
-The design calls for one public `Behavior` class per proposed file; namespace plus class name is its
-identity, and a replacement is the same identity at a new approved revision. That keeps a single
-proposal from smuggling several behaviors past one approval.
+- Owner-scoped **`IDigitalBrainNeuron`** (Kernel `DigitalBrainNeuron`) — product “brain is up”
+  grain; idempotent `Activate()` emits **`DigitalBrainActivated`** once per owner (durable flag).
+- Client facade **`IDigitalBrain.ActivateAsync()`** talks to that neuron; `SendAsync` / `EmitAsync`
+  ensure activation first. Hosted clients also run a start-time activation hosted service.
+- Marker **`IBehavior : INeuron`** — synapse-activated OS behaviors (not `Get` targets).
+- First compiled OS Behavior: Flutter module `OpenHomeOnActivationBehavior` implements
+  `IHandle<DigitalBrainActivated>` and opens shell home (`desk` / `home` / `Home`) via `IShell`.
+- Pre-rail compositions under `samples/DigitalBrain.Compositions` remain helpers
+  (`ActivateDigitalBrain` → `ActivateAsync`; `BootOnActivation` pull path still valid).
+
+The design still calls for one public Behavior identity per file (namespace + class / grain type);
+replacement is the same identity at a new approved revision. Behaviors are activated externally by
+**existing typed synapses** — never dispatched by name.
 
 When the behavior compiler exists it will be contract-only:
 
 - **Allowed:** the Behavior API, `DigitalBrain.Abstractions`, selected module contracts, approved BCL
   types, and Microsoft.Extensions.AI message types.
 - **Forbidden:** `IGrainFactory`, `IChatClient`, provider SDKs, MCP protocol types, `HttpClient`,
-  `IServiceProvider`, filesystem and process APIs, and reflection.
+  `IServiceProvider`, filesystem and process APIs, and reflection (author scripts; Kernel host may
+  hold implementation details until then).
 
-Behaviors are activated externally by existing typed synapses — never dispatched by name — may make
-existing typed method requests internally, and emit existing typed synapses. A behavior may supply a
-dynamic prompt or persona and may compose a behavior-scoped agent from existing contracts, but it may
-not introduce dynamic capabilities, bypass the typed registry, or register that temporary agent as a
-public neuron. Dynamic prompts are allowed; dynamic capabilities are not.
-
-Runtime behavior installation is designed and not yet built. The only path to a live behavior is a
-human-approved proposal with a journaled, reversible decision, and generated code does not receive a
-path around that rail. Until the rail exists, changes arrive the ordinary way — through source
-control, review, and a rebuild.
+Runtime behavior installation is designed and not yet built. The only path to a *user-authored*
+live behavior remains a human-approved proposal with a journaled, reversible decision. Compiled
+first-vertical OS Behaviors ship through source control and a rebuild — honest, not the full rail.
 
 ### OS composition before the rail
 
-Shell policy, post-auth UX orchestration, activation boot, and OS surface “apps” are **logic over
-vocabulary**. Until the rail ships they live as ordinary C# under `samples/DigitalBrain.Compositions`,
-one public sealed class per file, identity = namespace + class name (the future Behavior identity).
+Shell policy, post-auth UX orchestration, and OS surface “apps” that only compose vocabulary still
+live as ordinary C# under `samples/DigitalBrain.Compositions`, one public sealed class per file.
 Bodies use only `IDigitalBrain` + selected `*.Contracts` + approved BCL + Microsoft.Extensions.AI
-message types where AI compositions need them — the future compiler allowlist. They are pull-invoked
-by tests today (not installed into the production silo and not wired as host startup); they are not Behaviors
-and must not introduce `IBehavior` product APIs.
+message types where AI compositions need them. They are pull-invoked by tests (or thin wrappers
+over `ActivateAsync`) and are not the install rail.
 
-**Activation → first screen (Built pre-rail L1; install rail still Designed):**
+**Activation → first screen (Built L1; install rail still Designed):**
 
 ```text
-ActivateDigitalBrain.RunAsync(brain)
-  → EmitAsync(DigitalBrainActivated(Owner))     // Abstractions synapse, db.digitalbrain-activated
-  → BootOnActivation.RunAsync(brain, shell, …)  // pre-rail pull-invoke (not IHandle rail)
-    → OpenHome → IShell.Open(OpenScene home/Home)
+IDigitalBrain.ActivateAsync()
+  → IDigitalBrainNeuron.Activate()              // owner-scoped brain grain, once (durable)
+  → EmitAsync(DigitalBrainActivated(Owner))     // brain outgoing journal
+  → OpenHomeOnActivationBehavior.HandleAsync    // IBehavior + IHandle (Flutter module)
+    → IShell.Open(OpenScene home/Home) on desk
       → SceneOpened                             // Flutter vocabulary; Ui SSE projects this only
 ```
 
-- **`DigitalBrainActivated`** — Built substrate synapse in `DigitalBrain.Abstractions`
-  (`[Alias("db.digitalbrain-activated")]`, `OwnerId Owner` only). Not Flutter vocabulary; not a
-  compositions-local type; not Kernel domain knowledge.
-- **`ActivateDigitalBrain`** — pre-rail emitter composition (`brain.EmitAsync(new
-  DigitalBrainActivated(brain.Owner))`). Not `Connect`, not session first-touch auto-emit, not Ui
-  HTTP bind, not AppHost/`Program.cs`, not module capsule `ICompiledModule.Activate`.
-- **`BootOnActivation`** — pre-rail reactor composition; composes `OpenHome` (first screen
-  `SceneKey` `"home"` / `Title` `"Home"`). Separate product sentence from the emitter.
-- **Flutter** still consumes **`SceneOpened` only** (SSE `scene-opened`). It does not know or
-  subscribe to `DigitalBrainActivated`.
-- **L1 proof:** `DigitalBrain.Compositions.Tests` journals `DigitalBrainActivated` then home
-  `SceneOpened` via the pull-invoked chain above. That is **not** product AppHost OS Healthy, not
-  installed Behaviors, and not live `aspire start` topology.
+- **`DigitalBrainActivated`** — Built substrate synapse (`db.digitalbrain-activated`, `OwnerId` only).
+- **`IDigitalBrainNeuron` / `DigitalBrainNeuron`** — Built emitter; not session; not AppHost
+  `Program` chrome; not module capsule `ICompiledModule.Activate`.
+- **First Behavior** — Built compiled `IHandle<DigitalBrainActivated>` in Flutter module (opens
+  home). Synapse-activated, not name-dispatched.
+- **Flutter UI** still consumes **`SceneOpened` only** (SSE). It does not subscribe to activation.
+- **L1 proof:** `DigitalBrain.Compositions.Tests` — activate only → activation journal + home
+  `SceneOpened` without pull `BootOnActivation`. Not Built-live AppHost OS Healthy as a separate
+  claim.
 
 Honesty split (do not blur):
 
-- **Shell / OS boot:** `ActivateDigitalBrain`, `BootOnActivation`, `OpenHome`, `PostAuthBootstrap`,
-  `NavigateShell` — activation uses Abstractions + `EmitAsync`; open/nav use Flutter `IShell` scenes.
+- **Shell / OS boot:** brain neuron activation + first Behavior; compositions
+  `ActivateDigitalBrain` / `BootOnActivation` / `OpenHome` / `PostAuthBootstrap` / `NavigateShell`
+  remain pre-rail helpers.
 - **Multi-module surfaces:** `CountdownSurface` (Flutter + `ICountdown`), `AiPaneSurface` (Flutter +
   `ILlama32`). Compose existing vocabulary; no new durable process type.
 - **OS-scene-only surface:** `AccountEnrichmentSurface` opens the enrichment scene. It is **not** the Gmail→Salesforce

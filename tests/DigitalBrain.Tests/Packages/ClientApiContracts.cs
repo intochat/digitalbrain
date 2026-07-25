@@ -26,7 +26,7 @@ public sealed class ClientApiContracts
     }
 
     [Fact(DisplayName =
-        "IDigitalBrain surface is ambient Owner + Get/Send/Emit only — no journal observation")]
+        "IDigitalBrain surface is ambient Owner + Activate/Get/Send/Emit only — no journal observation")]
     public void ProgrammingModelIsOwnerGetSendAndEmitOnly()
     {
         Assert.Contains(typeof(IDigitalBrain), typeof(DigitalBrainClient).GetInterfaces());
@@ -41,6 +41,7 @@ public sealed class ClientApiContracts
 
         Assert.Equal(
             [
+                nameof(IDigitalBrain.ActivateAsync),
                 nameof(IDigitalBrain.EmitAsync),
                 nameof(IDigitalBrain.Get),
                 nameof(IDigitalBrain.SendAsync),
@@ -78,7 +79,7 @@ public sealed class ClientApiContracts
         });
     }
 
-    [Fact(DisplayName = "DigitalBrainClient author surface is Get/Send/Emit; Connect is wiring only")]
+    [Fact(DisplayName = "DigitalBrainClient author surface is Activate/Get/Send/Emit; Connect is wiring only")]
     public void ClientSurfaceIsGetSendEmitWithWiringConnect()
     {
         var methods = typeof(DigitalBrainClient)
@@ -91,6 +92,7 @@ public sealed class ClientApiContracts
 
         Assert.Equal(
             [
+                nameof(DigitalBrainClient.ActivateAsync),
                 nameof(DigitalBrainClient.Connect),
                 nameof(DigitalBrainClient.EmitAsync),
                 nameof(DigitalBrainClient.Get),

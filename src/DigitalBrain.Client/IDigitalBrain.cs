@@ -7,6 +7,8 @@ public interface IDigitalBrain
 {
     OwnerId Owner { get; }
 
+    Task ActivateAsync();
+
     [SuppressMessage(
         "Naming",
         "CA1716:Identifiers should not match keywords",

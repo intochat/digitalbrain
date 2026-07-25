@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Owner-bound access to a DigitalBrain cluster from outside: typed neuron Get, SendAsync, and EmitAsync.</Description>
+    <Description>Owner-bound access to a DigitalBrain cluster from outside: ActivateAsync, typed neuron Get, SendAsync, and EmitAsync.</Description>
+    <NoWarn>$(NoWarn);CA2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Client" />

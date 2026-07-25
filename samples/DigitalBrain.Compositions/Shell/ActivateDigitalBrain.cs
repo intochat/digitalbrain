@@ -1,4 +1,3 @@
-using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 
 namespace DigitalBrain.Shell;
@@ -12,6 +11,6 @@ public sealed class ActivateDigitalBrain
         ArgumentNullException.ThrowIfNull(brain);
         cancellationToken.ThrowIfCancellationRequested();
 
-        return brain.EmitAsync(new DigitalBrainActivated(brain.Owner));
+        return brain.ActivateAsync();
     }
 }

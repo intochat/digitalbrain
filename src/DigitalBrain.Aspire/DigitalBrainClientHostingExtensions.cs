@@ -48,7 +48,9 @@ public static class DigitalBrainClientHostingExtensions
             services => DigitalBrainClient.Connect(
                 services.GetRequiredService<IGrainFactory>(),
                 owner));
+        builder.Services.AddHostedService<DigitalBrainActivationHostedService>();
 
         return builder;
     }
 }
+

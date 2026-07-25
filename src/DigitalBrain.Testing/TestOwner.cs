@@ -23,8 +23,11 @@ public sealed class TestOwner
     {
         try
         {
-            var id = NeuronId.For<TNeuron>(Id, name);
+            var id = typeof(IDigitalBrainNeuron).IsAssignableFrom(typeof(TNeuron))
+                ? IDigitalBrainNeuron.ForOwner(Id)
+                : NeuronId.For<TNeuron>(Id, name);
             var reference = typeof(ISessionNeuron).IsAssignableFrom(typeof(TNeuron))
+                || typeof(IDigitalBrainNeuron).IsAssignableFrom(typeof(TNeuron))
                 ? _brain.Cluster.Client.GetGrain<TNeuron>(id.ToGrainId())
                 : Client.Get<TNeuron>(name);
             return new TestNeuron<TNeuron>(

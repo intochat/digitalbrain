@@ -24,6 +24,9 @@ public sealed class DigitalBrainClient : IDigitalBrain
         return new DigitalBrainClient(grains, new OwnerId(owner));
     }
 
+    public Task ActivateAsync()
+        => Brain().Activate();
+
     public T Get<T>(string name)
         where T : class, INeuron
     {
@@ -33,18 +36,19 @@ public sealed class DigitalBrainClient : IDigitalBrain
         return _grains.GetGrain<T>(NeuronId.For<T>(Owner, name).ToGrainId());
     }
 
-    public Task SendAsync<TNeuron>(string name, Synapse synapse)
+    public async Task SendAsync<TNeuron>(string name, Synapse synapse)
         where TNeuron : INeuron
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         RequireDomainNeuronContract(typeof(TNeuron));
 
-        return SendAsync(
+        await ActivateAsync();
+        await SendAsync(
             new NeuronId(NeuronId.GrainTypeNameOf(typeof(TNeuron)), Owner, name),
             synapse);
     }
 
-    public Task SendAsync(NeuronId receiver, Synapse synapse)
+    public async Task SendAsync(NeuronId receiver, Synapse synapse)
     {
         ArgumentNullException.ThrowIfNull(synapse);
 
@@ -54,21 +58,27 @@ public sealed class DigitalBrainClient : IDigitalBrain
                 $"Client owner '{Owner}' cannot send to neuron '{receiver}' owned by '{receiver.Owner}'.");
         }
 
-        if (string.Equals(receiver.Type, ISessionNeuron.GrainTypeName, StringComparison.Ordinal))
+        if (string.Equals(receiver.Type, ISessionNeuron.GrainTypeName, StringComparison.Ordinal)
+            || string.Equals(receiver.Type, IDigitalBrainNeuron.GrainTypeName, StringComparison.Ordinal))
         {
             throw new NeuronAuthorizationException(
-                "The owner session is the client entry gateway, not a Send target. Use SendAsync to domain neurons and EmitAsync to broadcast.");
+                "The owner DigitalBrain and session are not Send targets. Use ActivateAsync, domain Get, SendAsync to domain neurons, and EmitAsync to broadcast.");
         }
 
-        return Session().Fire(receiver, synapse);
+        await ActivateAsync();
+        await Session().Fire(receiver, synapse);
     }
 
-    public Task EmitAsync(Synapse synapse)
+    public async Task EmitAsync(Synapse synapse)
     {
         ArgumentNullException.ThrowIfNull(synapse);
 
-        return Session().Emit(synapse);
+        await ActivateAsync();
+        await Session().Emit(synapse);
     }
+
+    private IDigitalBrainNeuron Brain()
+        => _grains.GetGrain<IDigitalBrainNeuron>(IDigitalBrainNeuron.ForOwner(Owner).ToGrainId());
 
     private ISessionNeuron Session()
         => _grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(Owner).ToGrainId());
@@ -76,10 +86,12 @@ public sealed class DigitalBrainClient : IDigitalBrain
     private static void RequireDomainNeuronContract(Type neuronType)
     {
         if (neuronType == typeof(INeuron)
-            || typeof(ISessionNeuron).IsAssignableFrom(neuronType))
+            || typeof(ISessionNeuron).IsAssignableFrom(neuronType)
+            || typeof(IDigitalBrainNeuron).IsAssignableFrom(neuronType)
+            || typeof(IBehavior).IsAssignableFrom(neuronType))
         {
             throw new NeuronAuthorizationException(
-                $"'{neuronType.Name}' is not addressable through IDigitalBrain. Address domain neuron contracts with Get; fire and emit through SendAsync and EmitAsync. Journal observation is not an IDigitalBrain API.");
+                $"'{neuronType.Name}' is not addressable through IDigitalBrain.Get. Activate the brain with ActivateAsync; address domain neuron contracts with Get; fire and emit through SendAsync and EmitAsync. Journal observation is not an IDigitalBrain API.");
         }
     }
 }

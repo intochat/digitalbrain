@@ -78,6 +78,7 @@ public sealed class UiEdgeVocabulary(UiFixture fixture)
 
         Assert.Equal(
             [
+                nameof(IDigitalBrain.ActivateAsync),
                 nameof(IDigitalBrain.EmitAsync),
                 nameof(IDigitalBrain.Get),
                 nameof(IDigitalBrain.SendAsync),
