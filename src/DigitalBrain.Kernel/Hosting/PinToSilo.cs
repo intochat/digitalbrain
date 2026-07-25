@@ -6,7 +6,7 @@ using Orleans.Runtime.Placement;
 
 namespace DigitalBrain.Kernel;
 
-public sealed class PinToSiloStrategy : PlacementFilterStrategy
+internal sealed class PinToSiloStrategy : PlacementFilterStrategy
 {
     private const string LabelProperty = "label";
 
