@@ -44,6 +44,30 @@ public sealed class ShellAndCountdownCompositions(CompositionsFixture fixture)
         Assert.Equal("home", opened.Synapse.SceneKey);
     }
 
+    [Fact(DisplayName = "NavigateShell journals multiple SceneOpened facts in order")]
+    public async Task NavigateShellJournalsMultipleScenes()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var shell = test.Neuron<IShell>("desk");
+
+        await new NavigateShell().RunAsync(
+            test.Client,
+            shellName: "desk",
+            scenes:
+            [
+                ("home", "Home"),
+                ("settings", "Settings"),
+            ],
+            cancellationToken);
+
+        var first = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
+        var second = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
+        Assert.Equal("home", first.Synapse.SceneKey);
+        Assert.Equal("settings", second.Synapse.SceneKey);
+        Assert.True(second.Sequence > first.Sequence);
+    }
+
     [Fact(DisplayName = "CountdownSurface composes Flutter shell with ICountdown")]
     public async Task CountdownSurfaceComposesFlutterShellWithCountdown()
     {
@@ -67,5 +91,42 @@ public sealed class ShellAndCountdownCompositions(CompositionsFixture fixture)
         var reloaded = await countdown.Reference.Read();
         Assert.Equal(started.Generation, reloaded.Generation);
         Assert.Equal(started.Revision, reloaded.Revision);
+    }
+
+    [Fact(DisplayName = "AccountEnrichmentSurface opens enrichment scene without secrets")]
+    public async Task AccountEnrichmentSurfaceOpensEnrichmentScene()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var shell = test.Neuron<IShell>("desk");
+
+        await new AccountEnrichmentSurface().RunAsync(
+            test.Client,
+            shellName: "desk",
+            cancellationToken);
+
+        var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
+        Assert.Equal(AccountEnrichmentSurface.SceneKey, opened.Synapse.SceneKey);
+        Assert.Equal(AccountEnrichmentSurface.SceneTitle, opened.Synapse.Title);
+    }
+
+    [Fact(DisplayName = "AiPaneSurface opens AI scene and responds via typed ILlama32 only")]
+    public async Task AiPaneSurfaceOpensSceneAndResponds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var shell = test.Neuron<IShell>("desk");
+        test.Chat().Reply("hello from pane");
+
+        var response = await new AiPaneSurface().RunAsync(
+            test.Client,
+            shellName: "desk",
+            modelName: "assistant",
+            prompt: "ping",
+            cancellationToken);
+
+        var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
+        Assert.Equal(AiPaneSurface.SceneKey, opened.Synapse.SceneKey);
+        Assert.Equal("hello from pane", response.Text);
     }
 }

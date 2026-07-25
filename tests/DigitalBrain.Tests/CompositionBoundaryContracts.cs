@@ -28,10 +28,13 @@ public sealed class CompositionBoundaryContracts
         Assert.Contains("DigitalBrain.Abstractions", references);
         Assert.Contains("DigitalBrain.Modules.Flutter.Contracts", references);
         Assert.Contains("DigitalBrain.Modules.Time.Contracts", references);
+        Assert.Contains("DigitalBrain.Modules.AI.Contracts", references);
         Assert.DoesNotContain(references, name => name == "DigitalBrain.Kernel");
         Assert.DoesNotContain(references, name => name == "DigitalBrain.Modules.Flutter");
         Assert.DoesNotContain(references, name => name == "DigitalBrain.Modules.Time");
+        Assert.DoesNotContain(references, name => name == "DigitalBrain.Modules.AI");
         Assert.DoesNotContain(references, name => name.Contains("Integrations", StringComparison.Ordinal));
+        Assert.DoesNotContain(references, name => name == "DigitalBrain.AccountEnrichment");
     }
 
     private static string LocateRepositoryRoot()

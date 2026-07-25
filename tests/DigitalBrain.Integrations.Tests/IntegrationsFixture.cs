@@ -1,4 +1,5 @@
 using DigitalBrain.AccountEnrichment;
+using DigitalBrain.Flutter;
 using DigitalBrain.Google;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Testing;
@@ -13,6 +14,7 @@ public sealed class IntegrationsFixture : DigitalBrainFixture
         brain.AddModule<GoogleModule>();
         brain.AddModule<SalesforceModule>();
         brain.AddModule<EnrichmentModule>();
+        brain.AddModule<FlutterModule>();
         brain.AddModule<IntegrationsHarnessModule>();
         brain.ConfigureMcpEdge();
     }

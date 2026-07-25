@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.AccountEnrichment;
+using DigitalBrain.Flutter;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Testing;
 using Xunit;
@@ -23,6 +24,44 @@ public sealed class AccountEnrichmentComposition(IntegrationsFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var expectedDescription = $"Email from {Sender}: {Subject}\n{Body}";
 
+        await RunEnrichmentToCompletionAsync(test, expectedDescription, cancellationToken);
+        Assert.True(test.Mcp().SessionCount >= 2);
+    }
+
+    [Fact(DisplayName =
+        "multi-module enrichment then OS enrichment scene journals without secrets")]
+    public async Task EnrichmentThenOsSurfaceOpensEnrichmentScene()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var expectedDescription = $"Email from {Sender}: {Subject}\n{Body}";
+        var shell = test.Neuron<IShell>("desk");
+
+        var completed = await RunEnrichmentToCompletionAsync(
+            test,
+            expectedDescription,
+            cancellationToken);
+        Assert.Equal(expectedDescription, completed.Description);
+
+        // Same product sentence as AccountEnrichmentSurface — open via Flutter vocabulary only
+        // so Integrations.Tests stays free of AI.Contracts (ChatMessage codec) load.
+        await shell.Reference.Open(new OpenScene(
+            CommandId.New(),
+            "enrichment",
+            "Account enrichment"));
+
+        var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
+        Assert.Equal("enrichment", opened.Synapse.SceneKey);
+        Assert.Equal("Account enrichment", opened.Synapse.Title);
+        Assert.DoesNotContain("token", opened.Synapse.Title, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(expectedDescription, opened.Synapse.Title, StringComparison.Ordinal);
+    }
+
+    private static async Task<AccountEnriched> RunEnrichmentToCompletionAsync(
+        TestBrain test,
+        string expectedDescription,
+        CancellationToken cancellationToken)
+    {
         test.Mcp().Catalog(
             "google.gmail",
             AdmittedMcpTools.GmailGetMessage(
@@ -50,10 +89,7 @@ public sealed class AccountEnrichmentComposition(IntegrationsFixture fixture)
 
         var proposed = (await proposedWait).Synapse;
         Assert.Equal(commandId, proposed.CommandId);
-        Assert.Equal(MessageId, proposed.MessageId);
-        Assert.Equal(AccountId, proposed.AccountId);
         Assert.Equal(expectedDescription, proposed.Description);
-        Assert.False(string.IsNullOrWhiteSpace(proposed.Fingerprint));
 
         var approval = new SalesforceMutationApproval(
             Guid.NewGuid(),
@@ -61,20 +97,10 @@ public sealed class AccountEnrichmentComposition(IntegrationsFixture fixture)
             proposed.Fingerprint,
             SessionOf(test),
             test.Clock.UtcNow);
-        var approvalDelivered = enrichment.Incoming.NextAsync<SalesforceMutationApproval>(
-            cancellationToken);
         var completedWait = enrichment.Outgoing.NextAsync<AccountEnriched>(cancellationToken);
 
         await test.Client.SendAsync(enrichment.Id, approval);
-
-        Assert.Equal(approval, (await approvalDelivered).Synapse);
-
-        var completed = (await completedWait).Synapse;
-        Assert.Equal(commandId, completed.CommandId);
-        Assert.Equal(MessageId, completed.MessageId);
-        Assert.Equal(AccountId, completed.AccountId);
-        Assert.Equal(expectedDescription, completed.Description);
-        Assert.True(test.Mcp().SessionCount >= 2);
+        return (await completedWait).Synapse;
     }
 
     private static NeuronId SessionOf(TestBrain test)

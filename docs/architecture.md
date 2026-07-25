@@ -709,6 +709,10 @@ Flutter / Dart host  ──HTTP/JSON (+ SSE watch)──►  hosts/DigitalBrain.
   (`DIGITALBRAIN_UI_BASE` + `DIGITALBRAIN_SHELL` only). Host mode: **Auto** (Flutter desktop if CLI
   on PATH, else headless `dart run bin/digitalbrain_host.dart`); explicit `FlutterDesktop` /
   `Headless`. Production AppHost composes the surface via module selection.
+- **Built (OS compositions, pre-Behavior rail):** `samples/DigitalBrain.Compositions` —
+  `OpenHome`, `PostAuthBootstrap`, `NavigateShell`, `CountdownSurface`, `AccountEnrichmentSurface`,
+  `AiPaneSurface` (contracts-only; L1 journal proofs). Multi-module enrichment Gmail→Salesforce
+  remains Integrations L1; OS surface opens the enrichment scene without secrets in journals.
 - **Designed:** Flutter Windows **widget** chrome polish; production IdP principal→owner bind;
   product journal observation on `IDigitalBrain` when a non-UI consumer needs the same cursor/watch;
   optional upgrade from edge journal poll to grain `WatchNeuron` push without changing the HTTP event
@@ -1320,9 +1324,10 @@ track has proofs.
    commands + SSE shell events, thin compositions); (b) **module-owned hosting**
    (`Flutter.Aspire.Hosting` — `WithUiEdge` / `WithFlutterHost`) so selecting the module composes the
    OS surface; (c) Dart host under `clients/digitalbrain_flutter` over that HTTP surface + dual golden;
-   (d) deeper compositions (shell, post-auth, countdown, enrichment surface) still as samples —
-   claiming installed Behaviors still requires the self-programming track. Do not wholesale restore
-   historical `app/` or `workspace/`. Do not ship Aspire-only Flutter with no module selection.
+   (d) deeper compositions (shell navigation, post-auth, countdown, enrichment surface, AI pane)
+   as samples under `DigitalBrain.Compositions` — claiming installed Behaviors still requires the
+   self-programming track. Do not wholesale restore historical `app/` or `workspace/`. Do not ship
+   Aspire-only Flutter with no module selection.
 7. Design `DigitalBrain.Memory` independently around its own vocabulary, never inferred from AI,
    Tasks, or Time.
 

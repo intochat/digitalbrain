@@ -1,3 +1,4 @@
+using DigitalBrain.AI;
 using DigitalBrain.Flutter;
 using DigitalBrain.Testing;
 using DigitalBrain.Time;
@@ -11,5 +12,7 @@ public sealed class CompositionsFixture : DigitalBrainFixture
         ArgumentNullException.ThrowIfNull(brain);
         brain.AddModule<FlutterModule>();
         brain.AddModule<TimeModule>();
+        brain.AddModule<AIModule>();
+        CompositionChatEdge.Configure(brain);
     }
 }
