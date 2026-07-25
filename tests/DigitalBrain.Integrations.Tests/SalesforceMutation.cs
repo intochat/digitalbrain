@@ -130,6 +130,54 @@ public sealed class SalesforceMutation(IntegrationsFixture fixture)
         Assert.Equal(SalesforceMutationState.Completed, again.State);
     }
 
+    [Fact(DisplayName =
+        "ISalesforce.ApproveAccountDescription returns OutcomeUncertain when SOQL cannot prove the write")]
+    public async Task ApproveReturnsOutcomeUncertainWhenSoqlCannotProveWrite()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        const string description = "Approved description under uncertainty";
+        var driver = test.Neuron<IIntegrationDriver>("sf-uncertain");
+        var commandId = CommandId.New();
+        var proposed = await driver.Reference.ProposeSalesforceAccountDescription(
+            commandId,
+            AccountId,
+            description,
+            cancellationToken);
+
+        test.Mcp().Catalog(
+            "salesforce",
+            AdmittedMcpTools.SalesforceUpdateAccount(success: false),
+            AdmittedMcpTools.SalesforceSoqlQuery(AccountId, "provider description does not match"));
+
+        var approval = new SalesforceMutationApproval(
+            Guid.NewGuid(),
+            commandId,
+            proposed.Fingerprint,
+            SessionOf(test),
+            test.Clock.UtcNow);
+        var delivered = driver.Incoming.NextAsync<SalesforceMutationApproval>(cancellationToken);
+        await test.Client.SendAsync(driver.Id, approval);
+        Assert.Equal(approval, (await delivered).Synapse);
+
+        var uncertain = await driver.Reference.ApproveSalesforceWithStoredEvidence(
+            approval,
+            cancellationToken);
+
+        Assert.Equal(SalesforceMutationState.OutcomeUncertain, uncertain.State);
+        Assert.Equal(commandId, uncertain.CommandId);
+        Assert.Equal(AccountId, uncertain.AccountId);
+        Assert.Equal(description, uncertain.Description);
+        Assert.Equal(proposed.Fingerprint, uncertain.Fingerprint);
+        Assert.True(test.Mcp().SessionCount >= 1);
+
+        var again = await driver.Reference.ApproveSalesforceWithStoredEvidence(
+            approval,
+            cancellationToken);
+        Assert.Equal(SalesforceMutationState.OutcomeUncertain, again.State);
+        Assert.Equal(uncertain, again);
+    }
+
     private static NeuronId SessionOf(TestBrain test)
         => new(ISessionNeuron.GrainTypeName, test.Client.Owner, "session");
 }
