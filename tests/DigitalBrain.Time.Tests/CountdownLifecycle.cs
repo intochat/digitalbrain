@@ -462,62 +462,44 @@ public sealed class CountdownLifecycle(TimeFixture fixture)
     }
 
     [Fact]
-    public void WakeupEntryPointsPreserveSerializedTurns()
+    public void CountdownIsReminderPrimaryWithoutLocalTimers()
     {
-        var source = File.ReadAllText(Path.Combine(
+        var root = Path.Combine(
             LocateRepositoryRoot(),
             "modules",
-            "DigitalBrain.Modules.Time",
-            "CountdownNeuron.cs"));
-        var reminderStart = source.IndexOf(
-            "async Task IRemindable.ReceiveReminder",
-            StringComparison.Ordinal);
-        var deactivationStart = source.IndexOf(
-            "public override Task OnDeactivateAsync",
-            reminderStart,
-            StringComparison.Ordinal);
-        var reminder = source[reminderStart..deactivationStart];
-        var localTimerStart = source.IndexOf(
-            "private void ArmLocalTimer",
-            StringComparison.Ordinal);
-        var disposeStart = source.IndexOf(
-            "private void DisposeLocalTimer",
-            localTimerStart,
-            StringComparison.Ordinal);
-        var localTimer = source[localTimerStart..disposeStart];
+            "DigitalBrain.Modules.Time");
+        var joined = File.ReadAllText(Path.Combine(root, "CountdownNeuron.cs"));
 
         Assert.Contains(
-            "async Task ICountdownWakeup.Wake",
-            source,
+            "async Task IRemindable.ReceiveReminder",
+            joined,
             StringComparison.Ordinal);
         Assert.Contains(
-            "=> await WakeCore(generation, revision);",
-            source,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "await WakeCore(generation, revision);",
-            reminder,
+            "RegisterOrUpdateReminder",
+            joined,
             StringComparison.Ordinal);
         Assert.DoesNotContain(
-            "Get" + "Grain<ICountdownWakeup>",
-            reminder,
+            "CreateTimer",
+            joined,
             StringComparison.Ordinal);
-        Assert.Contains(
-            "Get" + "Grain<ICountdownWakeup>",
-            localTimer,
+        Assert.DoesNotContain(
+            "ArmLocalTimer",
+            joined,
             StringComparison.Ordinal);
-        Assert.Contains(
+        Assert.DoesNotContain(
+            "ICountdownWakeup",
+            joined,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
             "ObserveTimerWork",
-            localTimer,
+            joined,
             StringComparison.Ordinal);
         Assert.DoesNotContain(
             ".GetAwaiter()",
-            localTimer,
+            joined,
             StringComparison.Ordinal);
-        Assert.DoesNotContain(
-            ".GetResult()",
-            localTimer,
-            StringComparison.Ordinal);
+        Assert.False(
+            File.Exists(Path.Combine(root, "ICountdownWakeup.cs")));
     }
 
     [Fact]

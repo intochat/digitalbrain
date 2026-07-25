@@ -27,7 +27,7 @@ public sealed class CountdownRecovery(TimeFixture fixture)
 
         Assert.Equal(started.Generation, elapsed.Synapse.Generation);
         Assert.Equal(started.Revision, elapsed.Synapse.Revision);
-        Assert.Equal(CountdownResolution.Recovered, elapsed.Synapse.Resolution);
+        Assert.Equal(CountdownResolution.OnTime, elapsed.Synapse.Resolution);
 
         await test.Clock.AdvanceAsync(
             TimeSpan.FromMinutes(1),
@@ -72,7 +72,7 @@ public sealed class CountdownRecovery(TimeFixture fixture)
 
         Assert.Equal(started.Generation, elapsed.Synapse.Generation);
         Assert.Equal(started.Revision, elapsed.Synapse.Revision);
-        Assert.Equal(CountdownResolution.Recovered, elapsed.Synapse.Resolution);
+        Assert.Equal(CountdownResolution.OnTime, elapsed.Synapse.Resolution);
         Assert.Equal(
             CountdownStatus.Elapsed,
             (await countdown.Reference.Read()).Status);
@@ -110,7 +110,7 @@ public sealed class CountdownRecovery(TimeFixture fixture)
 
         Assert.Equal(started.Generation, elapsed.Synapse.Generation);
         Assert.Equal(started.Revision, elapsed.Synapse.Revision);
-        Assert.Equal(CountdownResolution.Recovered, elapsed.Synapse.Resolution);
+        Assert.Equal(CountdownResolution.OnTime, elapsed.Synapse.Resolution);
 
         await test.Clock.AdvanceAsync(
             TimeSpan.FromMinutes(1),

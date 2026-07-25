@@ -537,8 +537,8 @@ schedules that behaviors, Tasks, and modules may talk to. A behavior must never 
 `IGrainReminder`, `TickStatus`, or a raw reminder name.
 
 The implemented public vocabulary is `DigitalBrain.Time.ICountdown`, a durable one-shot duration.
-Its Contracts and runtime packages, deterministic `TimeProvider` test edge, local-timer plus durable
-reminder recovery, revision fencing, idempotent commands, cancellation, restart, and committed
+Its Contracts and runtime packages, deterministic `TimeProvider` test edge, durable Orleans-reminder
+wake authority, revision fencing, idempotent commands, cancellation, restart, and committed
 `CountdownElapsed` delivery are exercised in `DigitalBrain.Time.Tests`. It is `ICountdown` and not
 `ITimer` because .NET 10 already defines `System.Threading.ITimer`.
 
@@ -584,11 +584,11 @@ What is settled, and why each rule is there:
   registration at all. A wake-up whose schedule was never committed finds no matching revision, a
   wake-up from a registration already superseded finds a newer one, and a wake-up for a cancelled
   schedule finds a terminal state — all three are dropped rather than acted on.
-- **Low latency and durable delivery are bought separately, so they race on purpose.** Production
-  registers an activation-local Orleans timer for a prompt wake-up *and* a durable Orleans reminder as
-  the backstop that outlives the silo. Both may fire for the same occurrence. The Time neuron
-  deduplicates by revision and occurrence, and that deduplication is what makes running two mechanisms
-  a safety measure rather than a source of doubled work.
+- **Durable delivery is one mechanism: the Orleans reminder.** Countdown does not arm activation-local
+  `TimeProvider` timers or grain-to-self wake interfaces. The reminder is the sole wake authority;
+  early ticks re-arm the remaining due, and late ticks beyond one reminder period mark
+  `CountdownResolution.Recovered` while on-time ticks mark `OnTime`. Deduplication is by generation,
+  revision, and committed occurrence — not by racing two schedulers.
 - **Elapsed duration and wall-clock recurrence are different problems and get different types.**
   `IntervalSchedule` is a duration anchored to an instant; `CalendarSchedule` is a wall-clock rule in
   an IANA zone. DST is resolved deterministically instead of inherited from a library default: an

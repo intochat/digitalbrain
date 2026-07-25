@@ -89,7 +89,7 @@ public sealed class TestClock
 
                 if (_provider.NextDueAtOrBefore(due) is not null)
                 {
-                    if (!await _provider.TryFireNextDueAsync(due))
+                    if (!_provider.TryFireNextDue(due))
                     {
                         throw new InvalidOperationException(
                             "A deterministic timer disappeared before it could be fired.");

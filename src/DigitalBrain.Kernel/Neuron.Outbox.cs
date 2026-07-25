@@ -1,0 +1,210 @@
+using System.Diagnostics;
+using DigitalBrain.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Journaling;
+using Orleans.Serialization;
+
+namespace DigitalBrain.Kernel;
+
+public abstract partial class Neuron
+{
+    private async Task CommitAsync(CancellationToken cancellationToken)
+    {
+        if (_outbox.Count > 0 && !_wakeUpRegistered)
+        {
+            await Wakeup().Arm();
+            _wakeUpRegistered = true;
+        }
+
+        await WriteStateAsync(cancellationToken);
+
+        await ForgetWakeUpWhenOutboxIsEmptyAsync();
+    }
+
+    private async Task ForgetWakeUpWhenOutboxIsEmptyAsync()
+    {
+        if (_outbox.Count > 0 || !_wakeUpRegistered)
+        {
+            return;
+        }
+
+        await Wakeup().Disarm();
+        _wakeUpRegistered = false;
+    }
+
+    async Task IOutboxDrain.Drain()
+    {
+        _wakeUpRegistered = true;
+        await DrainAsync(CancellationToken.None);
+    }
+
+    private IOutboxWakeup Wakeup()
+        => GrainFactory.GetGrain<IOutboxWakeup>(Id.ToString());
+
+    private static void Discard<TEntry>(IDurableList<TEntry> journal, int committed)
+    {
+        while (journal.Count > committed)
+        {
+            journal.RemoveAt(journal.Count - 1);
+        }
+    }
+
+    private void ScheduleDrain()
+    {
+        if (_outbox.Count == 0 || _draining is not null)
+        {
+            return;
+        }
+
+        _draining = this.RegisterGrainTimer(DrainAsync, RetryInterval, RetryInterval);
+    }
+
+    private void StopDrainingWhenOutboxIsEmpty()
+    {
+        if (_outbox.Count > 0 || _draining is null)
+        {
+            return;
+        }
+
+        _draining.Dispose();
+        _draining = null;
+    }
+
+    private async Task DrainAsync(CancellationToken cancellationToken)
+    {
+        var blockedTargets = new HashSet<NeuronId>();
+
+        for (var index = 0; index < _outbox.Count;)
+        {
+            var committed = _entries.Deserialize(_outbox[index]);
+
+            if (committed.Depth > DeliveryPolicy.MaximumDepth)
+            {
+                Abandon(committed, $"exceeded the maximum synapse depth of {DeliveryPolicy.MaximumDepth}");
+                _outbox.RemoveAt(index);
+
+                continue;
+            }
+
+            var attemptable = committed.Pending.Where(receiver => !blockedTargets.Contains(receiver)).ToArray();
+
+            if (attemptable.Length == 0)
+            {
+                foreach (var receiver in committed.Pending)
+                {
+                    blockedTargets.Add(receiver);
+                }
+
+                index++;
+
+                continue;
+            }
+
+            var entry = committed with { Attempts = committed.Attempts + 1 };
+            var stillPending = new List<NeuronId>();
+
+            foreach (var receiver in committed.Pending)
+            {
+                if (blockedTargets.Contains(receiver))
+                {
+                    stillPending.Add(receiver);
+
+                    continue;
+                }
+
+                if (await TryDeliverAsync(entry, receiver))
+                {
+                    continue;
+                }
+
+                stillPending.Add(receiver);
+                blockedTargets.Add(receiver);
+            }
+
+            if (stillPending.Count == 0)
+            {
+                _outbox.RemoveAt(index);
+
+                continue;
+            }
+
+            if (Exhausted(entry))
+            {
+                Abandon(entry with { Pending = [.. stillPending] },
+                    $"undeliverable to {string.Join(", ", stillPending)} after {entry.Attempts} attempts");
+                _outbox.RemoveAt(index);
+
+                foreach (var receiver in stillPending)
+                {
+                    blockedTargets.Remove(receiver);
+                }
+
+                continue;
+            }
+
+            _outbox[index] = _entries.SerializeToArray(entry with { Pending = [.. stillPending] });
+            index++;
+        }
+
+        await CommitAsync(cancellationToken);
+
+        StopDrainingWhenOutboxIsEmpty();
+    }
+
+    private bool Exhausted(OutboxEntry entry)
+        => entry.Attempts >= DeliveryPolicy.MaximumAttempts
+        || TimeProvider.GetUtcNow() - entry.Delivery.Timestamp
+            > DeliveryPolicy.RetryHorizon;
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Any failure other than a permanent refusal keeps the receiver pending so the outbox redelivers it; letting it escape would abandon the delivery guarantee.")]
+    private async Task<bool> TryDeliverAsync(OutboxEntry entry, NeuronId receiver)
+    {
+        DeliveryPolicy.CarryDepth(entry.Depth);
+
+        try
+        {
+            if (receiver == Id)
+            {
+                await Deliver(entry.Delivery);
+            }
+            else
+            {
+                await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).Deliver(entry.Delivery);
+            }
+
+            return true;
+        }
+        catch (NeuronAuthorizationException refusal)
+        {
+            Record("refused", entry.Delivery, receiver, refusal.Message);
+
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static void Abandon(OutboxEntry entry, string reason)
+    {
+        foreach (var receiver in entry.Pending)
+        {
+            Record("abandoned", entry.Delivery, receiver, reason);
+        }
+    }
+
+    private static void Record(string outcome, SynapseDelivery delivery, NeuronId receiver, string reason)
+    {
+        using var recorded = SynapseTelemetry.Source.StartActivity(outcome);
+
+        recorded?.SetTag(SynapseTelemetry.ReceiverTag, receiver.ToString());
+        recorded?.SetTag(SynapseTelemetry.SynapseTag, delivery.Synapse.GetType().Name);
+        recorded?.SetTag(SynapseTelemetry.CorrelationTag, delivery.CorrelationId.ToString());
+        recorded?.SetStatus(ActivityStatusCode.Error, reason);
+    }
+
+}

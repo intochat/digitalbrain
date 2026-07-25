@@ -108,8 +108,7 @@ public sealed class KernelOutboxWakeupContracts(ModuleFixture fixture)
             Path.Combine(
                 RepositoryRoot,
                 "src",
-                "DigitalBrain.Kernel",
-                "Neuron.cs"),
+                "DigitalBrain.Kernel"),
             violations);
 
         if (violations.Count != 0)
@@ -283,10 +282,21 @@ public sealed class KernelOutboxWakeupContracts(ModuleFixture fixture)
     }
 
     private static void ValidateNeuronWakeupComposition(
-        string path,
+        string kernelDirectory,
         List<string> violations)
     {
-        var source = File.ReadAllText(path);
+        var source = string.Join(
+            Environment.NewLine,
+            Directory
+                .EnumerateFiles(kernelDirectory, "Neuron*.cs")
+                .Where(path =>
+                {
+                    var name = Path.GetFileName(path);
+                    return string.Equals(name, "Neuron.cs", StringComparison.Ordinal)
+                        || name.StartsWith("Neuron.", StringComparison.Ordinal);
+                })
+                .Order(StringComparer.Ordinal)
+                .Select(File.ReadAllText));
         var activation = Region(
             source,
             "public sealed override async Task OnActivateAsync",
@@ -326,10 +336,21 @@ public sealed class KernelOutboxWakeupContracts(ModuleFixture fixture)
         var start = source.IndexOf(
             startMarker,
             StringComparison.Ordinal);
+        if (start < 0)
+        {
+            throw new InvalidOperationException(
+                $"Source region start marker was not found: {startMarker}");
+        }
+
         var end = source.IndexOf(
             endMarker,
             start,
             StringComparison.Ordinal);
+        if (end < 0)
+        {
+            throw new InvalidOperationException(
+                $"Source region end marker was not found after start: {endMarker}");
+        }
 
         return source[start..end];
     }

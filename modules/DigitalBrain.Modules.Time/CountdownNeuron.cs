@@ -11,7 +11,6 @@ namespace DigitalBrain.Time;
 internal sealed class CountdownNeuron :
     Neuron,
     ICountdown,
-    ICountdownWakeup,
     IRemindable
 {
     private const string StateName = "time.countdown";
@@ -21,14 +20,27 @@ internal sealed class CountdownNeuron :
 
     private readonly IDurableValue<byte[]> _state;
     private readonly Serializer<CountdownState> _states;
-    private ITimer? _localTimer;
-    private long _localGeneration;
-    private long _localRevision;
 
     public CountdownNeuron()
     {
         _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
         _states = ServiceProvider.GetRequiredService<Serializer<CountdownState>>();
+    }
+
+    public Task<CountdownSnapshot> Read()
+    {
+        var data = LoadIfScheduledBefore();
+        return Task.FromResult(
+            data is null
+                ? new CountdownSnapshot(
+                    CountdownStatus.Unscheduled,
+                    Generation: 0,
+                    Revision: 0,
+                    Destination: null,
+                    ScheduledAt: null,
+                    DueAt: null,
+                    Duration: null)
+                : Snapshot(data));
     }
 
     public async Task<CountdownSnapshot> Start(StartCountdown command)
@@ -37,7 +49,6 @@ internal sealed class CountdownNeuron :
         Validate(command.CommandId);
 
         var existing = LoadIfScheduledBefore();
-
         if (TryReceipt(existing, command.CommandId, out var received))
         {
             return received;
@@ -72,19 +83,15 @@ internal sealed class CountdownNeuron :
 
         await RegisterReminderAsync(reminderName, command.Duration);
         await SaveAsync(data, rollbackState);
-        ArmLocalTimer(data);
-
         return snapshot;
     }
 
-    public async Task<CountdownSnapshot> Reschedule(
-        RescheduleCountdown command)
+    public async Task<CountdownSnapshot> Reschedule(RescheduleCountdown command)
     {
         ArgumentNullException.ThrowIfNull(command);
         Validate(command.CommandId);
 
         var current = Load();
-
         if (TryReceipt(current, command.CommandId, out var received))
         {
             return received;
@@ -96,9 +103,7 @@ internal sealed class CountdownNeuron :
         var scheduledAt = TimeProvider.GetUtcNow();
         var dueAt = DueAt(scheduledAt, command.Duration);
         var nextRevision = checked(current.Revision + 1);
-        var reminderName = ReminderName(
-            current.Generation,
-            nextRevision);
+        var reminderName = ReminderName(current.Generation, nextRevision);
         var next = Copy(
             current,
             status: CountdownStatus.Scheduled,
@@ -115,8 +120,6 @@ internal sealed class CountdownNeuron :
         await RegisterReminderAsync(reminderName, command.Duration);
         await SaveAsync(next, rollbackState);
         await RetireReminderAsync(current.ActiveReminderName);
-        ArmLocalTimer(next);
-
         return snapshot;
     }
 
@@ -126,7 +129,6 @@ internal sealed class CountdownNeuron :
         Validate(command.CommandId);
 
         var current = Load();
-
         if (TryReceipt(current, command.CommandId, out var received))
         {
             return received;
@@ -149,8 +151,6 @@ internal sealed class CountdownNeuron :
 
         await SaveAsync(next, SerializedState());
         await RetireReminderAsync(current.ActiveReminderName);
-        DisposeLocalTimer();
-
         return snapshot;
     }
 
@@ -160,7 +160,6 @@ internal sealed class CountdownNeuron :
         Validate(command.CommandId);
 
         var current = Load();
-
         if (TryReceipt(current, command.CommandId, out var received))
         {
             return received;
@@ -196,32 +195,26 @@ internal sealed class CountdownNeuron :
         await RegisterReminderAsync(reminderName, command.Duration);
         await SaveAsync(next, rollbackState);
         await RetireReminderAsync(current.ActiveReminderName);
-        ArmLocalTimer(next);
-
         return snapshot;
     }
 
-    public Task<CountdownSnapshot> Read()
+    async Task IRemindable.ReceiveReminder(
+        string reminderName,
+        TickStatus status)
     {
-        var data = LoadIfScheduledBefore();
+        if (!TryParseReminderName(
+            reminderName,
+            out var generation,
+            out var revision))
+        {
+            throw new InvalidOperationException(
+                $"Countdown neuron '{Id}' does not own reminder '{reminderName}'.");
+        }
 
-        return Task.FromResult(
-            data is null
-                ? new CountdownSnapshot(
-                    CountdownStatus.Unscheduled,
-                    Generation: 0,
-                    Revision: 0,
-                    Destination: null,
-                    ScheduledAt: null,
-                    DueAt: null,
-                    Duration: null)
-                : Snapshot(data));
+        await ElapseIfDue(generation, revision);
     }
 
-    async Task ICountdownWakeup.Wake(long generation, long revision)
-        => await WakeCore(generation, revision);
-
-    private async Task WakeCore(long generation, long revision)
+    private async Task ElapseIfDue(long generation, long revision)
     {
         var reminderName = ReminderName(generation, revision);
         var data = LoadIfScheduledBefore();
@@ -241,16 +234,17 @@ internal sealed class CountdownNeuron :
         }
 
         var observedAt = TimeProvider.GetUtcNow();
-
         if (observedAt < data.DueAt)
         {
-            ArmLocalTimer(data);
+            await RegisterReminderAsync(
+                reminderName,
+                data.DueAt - observedAt);
             return;
         }
 
-        var resolution = LocalTimerMatches(generation, revision)
-            ? CountdownResolution.OnTime
-            : CountdownResolution.Recovered;
+        var resolution = observedAt > data.DueAt + ReminderPeriod
+            ? CountdownResolution.Recovered
+            : CountdownResolution.OnTime;
         var elapsed = Copy(
             data,
             status: CountdownStatus.Elapsed,
@@ -281,37 +275,67 @@ internal sealed class CountdownNeuron :
         catch
         {
             RestoreState(rollbackState);
-            DisposeLocalTimer();
             DeactivateOnIdle();
             throw;
         }
 
         await RetireReminderAsync(reminderName);
-        DisposeLocalTimer();
     }
 
-    async Task IRemindable.ReceiveReminder(
+    private Task<Orleans.Runtime.IGrainReminder> RegisterReminderAsync(
         string reminderName,
-        TickStatus status)
-    {
-        if (!TryParseReminderName(
+        TimeSpan dueTime)
+        => this.RegisterOrUpdateReminder(
             reminderName,
-            out var generation,
-            out var revision))
+            dueTime,
+            ReminderPeriod);
+
+    private async Task RetireReminderAsync(string? reminderName)
+    {
+        if (reminderName is not null
+            && await this.GetReminder(reminderName) is { } reminder)
         {
-            throw new InvalidOperationException(
-                $"Countdown neuron '{Id}' does not own reminder '{reminderName}'.");
+            await this.UnregisterReminder(reminder);
+        }
+    }
+
+    private static string ReminderName(long generation, long revision)
+        => string.Create(
+            CultureInfo.InvariantCulture,
+            $"{ReminderPrefix}{generation}.{revision}");
+
+    private static bool TryParseReminderName(
+        string reminderName,
+        out long generation,
+        out long revision)
+    {
+        generation = 0;
+        revision = 0;
+
+        if (!reminderName.StartsWith(
+            ReminderPrefix,
+            StringComparison.Ordinal))
+        {
+            return false;
         }
 
-        await WakeCore(generation, revision);
-    }
+        var suffix = reminderName[ReminderPrefix.Length..];
+        var separator = suffix.IndexOf('.', StringComparison.Ordinal);
 
-    public override Task OnDeactivateAsync(
-        DeactivationReason reason,
-        CancellationToken cancellationToken)
-    {
-        DisposeLocalTimer();
-        return base.OnDeactivateAsync(reason, cancellationToken);
+        return separator > 0
+            && separator == suffix.LastIndexOf('.')
+            && long.TryParse(
+                suffix.AsSpan(0, separator),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out generation)
+            && long.TryParse(
+                suffix.AsSpan(separator + 1),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out revision)
+            && generation > 0
+            && revision > 0;
     }
 
     private CountdownState Load()
@@ -352,59 +376,66 @@ internal sealed class CountdownNeuron :
     private void RestoreState(byte[] serialized)
         => _state.Value = serialized;
 
-    private Task<Orleans.Runtime.IGrainReminder> RegisterReminderAsync(
-        string reminderName,
-        TimeSpan dueTime)
-        => this.RegisterOrUpdateReminder(
-            reminderName,
-            dueTime,
-            ReminderPeriod);
-
-    private async Task RetireReminderAsync(string? reminderName)
+    private static bool TryReceipt(
+        CountdownState? data,
+        CommandId commandId,
+        out CountdownSnapshot snapshot)
     {
-        if (reminderName is not null
-            && await this.GetReminder(reminderName) is { } reminder)
+        if (data is not null
+            && data.Receipts.TryGetValue(commandId, out var received))
         {
-            await this.UnregisterReminder(reminder);
-        }
-    }
-
-    private void ArmLocalTimer(CountdownState data)
-    {
-        DisposeLocalTimer();
-
-        _localGeneration = data.Generation;
-        _localRevision = data.Revision;
-        var self = GrainFactory.GetGrain<ICountdownWakeup>(
-            this.GetGrainId());
-        var dueTime = data.DueAt - TimeProvider.GetUtcNow();
-
-        if (dueTime < TimeSpan.Zero)
-        {
-            dueTime = TimeSpan.Zero;
+            snapshot = received;
+            return true;
         }
 
-        var generation = data.Generation;
-        var revision = data.Revision;
-        _localTimer = TimeProvider.CreateTimer(
-            _ => ObserveTimerWork(self.Wake(generation, revision)),
-            state: null,
-            dueTime,
-            Timeout.InfiniteTimeSpan);
+        snapshot = null!;
+        return false;
     }
 
-    private void DisposeLocalTimer()
+    private static void Remember(
+        CountdownState data,
+        CommandId commandId,
+        CountdownSnapshot snapshot)
     {
-        _localTimer?.Dispose();
-        _localTimer = null;
-        _localGeneration = 0;
-        _localRevision = 0;
+        while (data.Receipts.Count >= MaximumReceipts)
+        {
+            data.Receipts.Remove(data.Receipts.First().Key);
+        }
+
+        data.Receipts.Add(commandId, snapshot);
     }
 
-    private bool LocalTimerMatches(long generation, long revision)
-        => _localTimer is not null
-            && _localGeneration == generation
-            && _localRevision == revision;
+    private static CountdownSnapshot Snapshot(CountdownState data)
+        => new(
+            data.Status,
+            data.Generation,
+            data.Revision,
+            data.Destination,
+            data.ScheduledAt,
+            data.DueAt,
+            data.Duration);
+
+    private static CountdownState Copy(
+        CountdownState source,
+        CountdownStatus status,
+        long? generation = null,
+        long? revision = null,
+        DateTimeOffset? scheduledAt = null,
+        DateTimeOffset? dueAt = null,
+        TimeSpan? duration = null,
+        bool? occurrenceCommitted = null,
+        string? activeReminderName = null)
+        => new(
+            status,
+            generation ?? source.Generation,
+            revision ?? source.Revision,
+            source.Destination,
+            scheduledAt ?? source.ScheduledAt,
+            dueAt ?? source.DueAt,
+            duration ?? source.Duration,
+            new Dictionary<CommandId, CountdownSnapshot>(source.Receipts),
+            occurrenceCommitted ?? source.OccurrenceCommitted,
+            activeReminderName);
 
     private void ValidateDestination(NeuronId destination)
     {
@@ -467,109 +498,5 @@ internal sealed class CountdownNeuron :
             throw new InvalidOperationException(
                 $"Countdown '{Id}' is at revision {data.Revision}, not expected revision {expectedRevision}.");
         }
-    }
-
-    private static bool TryReceipt(
-        CountdownState? data,
-        CommandId commandId,
-        out CountdownSnapshot snapshot)
-    {
-        if (data is not null
-            && data.Receipts.TryGetValue(commandId, out var received))
-        {
-            snapshot = received;
-            return true;
-        }
-
-        snapshot = null!;
-        return false;
-    }
-
-    private static void Remember(
-        CountdownState data,
-        CommandId commandId,
-        CountdownSnapshot snapshot)
-    {
-        while (data.Receipts.Count >= MaximumReceipts)
-        {
-            data.Receipts.Remove(data.Receipts.First().Key);
-        }
-
-        data.Receipts.Add(commandId, snapshot);
-    }
-
-    private static CountdownSnapshot Snapshot(CountdownState data)
-        => new(
-            data.Status,
-            data.Generation,
-            data.Revision,
-            data.Destination,
-            data.ScheduledAt,
-            data.DueAt,
-            data.Duration);
-
-    private static CountdownState Copy(
-        CountdownState source,
-        CountdownStatus status,
-        long? generation = null,
-        long? revision = null,
-        DateTimeOffset? scheduledAt = null,
-        DateTimeOffset? dueAt = null,
-        TimeSpan? duration = null,
-        bool? occurrenceCommitted = null,
-        string? activeReminderName = null)
-        => new(
-            status,
-            generation ?? source.Generation,
-            revision ?? source.Revision,
-            source.Destination,
-            scheduledAt ?? source.ScheduledAt,
-            dueAt ?? source.DueAt,
-            duration ?? source.Duration,
-            new Dictionary<CommandId, CountdownSnapshot>(
-                source.Receipts),
-            occurrenceCommitted ?? source.OccurrenceCommitted,
-            activeReminderName);
-
-    private static string ReminderName(long generation, long revision)
-        => string.Create(
-            CultureInfo.InvariantCulture,
-            $"{ReminderPrefix}{generation}.{revision}");
-
-    private static bool TryParseReminderName(
-        string reminderName,
-        out long generation,
-        out long revision)
-    {
-        generation = 0;
-        revision = 0;
-
-        if (!reminderName.StartsWith(
-            ReminderPrefix,
-            StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var suffix = reminderName[ReminderPrefix.Length..];
-        var separator = suffix.IndexOf(
-            '.',
-            StringComparison.Ordinal);
-
-        return separator > 0
-            && separator == suffix.LastIndexOf(
-                '.')
-            && long.TryParse(
-                suffix.AsSpan(0, separator),
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out generation)
-            && long.TryParse(
-                suffix.AsSpan(separator + 1),
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out revision)
-            && generation > 0
-            && revision > 0;
     }
 }

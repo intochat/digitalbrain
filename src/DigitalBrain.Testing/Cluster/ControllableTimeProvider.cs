@@ -79,7 +79,7 @@ internal sealed class ControllableTimeProvider : TimeProvider
         }
     }
 
-    internal async Task<bool> TryFireNextDueAsync(DateTimeOffset now)
+    internal bool TryFireNextDue(DateTimeOffset now)
     {
         Registration? selected;
 
@@ -104,7 +104,7 @@ internal sealed class ControllableTimeProvider : TimeProvider
                 : null;
         }
 
-        await selected.InvokeAsync();
+        selected.Invoke();
         return true;
     }
 
@@ -255,7 +255,7 @@ internal sealed class ControllableTimeProvider : TimeProvider
             Period = null;
         }
 
-        internal async Task InvokeAsync()
+        internal void Invoke()
         {
             lock (Owner._gate)
             {
@@ -265,16 +265,7 @@ internal sealed class ControllableTimeProvider : TimeProvider
                 }
             }
 
-            List<Task> observed = [];
-            using (TimerWork.Capture(observed))
-            {
-                callback(state);
-            }
-
-            if (observed.Count > 0)
-            {
-                await Task.WhenAll(observed);
-            }
+            callback(state);
         }
     }
 }
