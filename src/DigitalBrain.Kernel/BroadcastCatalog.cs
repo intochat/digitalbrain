@@ -10,7 +10,7 @@ internal sealed class BroadcastCatalog
     private readonly ConcurrentDictionary<string, ImmutableHashSet<string>> _handlers =
         new(StringComparer.Ordinal);
 
-    public void AddAssembly(Assembly assembly)
+    internal void AddAssembly(Assembly assembly)
     {
         ArgumentNullException.ThrowIfNull(assembly);
 
@@ -34,6 +34,6 @@ internal sealed class BroadcastCatalog
         }
     }
 
-    public IReadOnlyCollection<string> HandlerGrainTypes(string synapseType)
+    internal IReadOnlyCollection<string> HandlerGrainTypes(string synapseType)
         => _handlers.TryGetValue(synapseType, out var handlers) ? handlers : [];
 }
