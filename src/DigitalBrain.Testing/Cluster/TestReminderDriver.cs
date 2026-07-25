@@ -11,10 +11,8 @@ internal sealed class TestReminderDriver
     internal TestReminderDriver(
         VolatileReminderTable table,
         IGrainFactory grains,
-        string scope,
-        BrainTestDiagnostics diagnostics)
+        string scope)
     {
-        _ = diagnostics;
         _table = table;
         _scope = scope;
 

@@ -4,6 +4,4 @@ internal enum TestEdgeKind
 {
     ChatClient,
     SouthboundMcpTransport,
-    OAuthParameters,
-    TimeProvider,
 }

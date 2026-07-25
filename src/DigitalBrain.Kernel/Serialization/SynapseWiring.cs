@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Reflection;
-using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Kernel;
 
@@ -26,16 +25,6 @@ public static class SynapseWiring
         manifest = found ?? new DispatchManifest([], []);
 
         return found is not null;
-    }
-
-    public static IReadOnlyCollection<Type> HandledSynapseTypes(Type neuronType)
-    {
-        ArgumentNullException.ThrowIfNull(neuronType);
-
-        return neuronType.GetInterfaces()
-            .Where(contract => contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IHandle<>))
-            .Select(contract => contract.GetGenericArguments()[0])
-            .ToHashSet();
     }
 
     private static DispatchManifest? Load(Assembly assembly)

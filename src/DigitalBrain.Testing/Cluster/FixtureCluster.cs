@@ -82,14 +82,8 @@ internal sealed class FixtureCluster : IAsyncDisposable
         JournalFaultRegistration registration)
         => _journalStorage.DisarmFault(registration);
 
-    internal BrainTestDiagnostics CreateDiagnostics(
-        string fixtureId,
-        string scope)
-        => new(
-            fixtureId,
-            scope,
-            _modules.Select(module => module.Id.Value),
-            FixedEpoch);
+    internal static BrainTestDiagnostics CreateDiagnostics(string scope)
+        => new(scope);
 
     internal async Task<(TestClock Clock, long EdgeGeneration)> PrepareMethodAsync(
         string scope,
@@ -103,8 +97,7 @@ internal sealed class FixtureCluster : IAsyncDisposable
                 new TestReminderDriver(
                     _reminderTable,
                     Client,
-                    scope,
-                    diagnostics),
+                    scope),
                 diagnostics),
             edgeGeneration);
     }

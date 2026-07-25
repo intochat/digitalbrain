@@ -4,25 +4,14 @@ internal sealed class BrainTestDiagnostics
 {
     private readonly string _scopeId;
 
-    internal BrainTestDiagnostics(
-        string fixtureId,
-        string scopeId,
-        IEnumerable<string> moduleIds,
-        DateTimeOffset clockOrigin)
-    {
-        _ = fixtureId;
-        _scopeId = scopeId;
-        _ = moduleIds;
-        _ = clockOrigin;
-    }
+    internal BrainTestDiagnostics(string scopeId)
+        => _scopeId = scopeId;
 
     internal BrainTestFailureException CaptureFailure(
         string operation,
-        Exception failure,
-        string? cleanupStage = null)
+        Exception failure)
     {
         ArgumentNullException.ThrowIfNull(failure);
-        _ = cleanupStage;
 
         if (failure is BrainTestFailureException diagnostic)
         {

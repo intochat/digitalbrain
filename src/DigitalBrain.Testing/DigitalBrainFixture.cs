@@ -24,9 +24,7 @@ public abstract class DigitalBrainFixture : IAsyncLifetime
         {
             var scope = $"test-{Guid.NewGuid():N}";
             var cluster = Cluster();
-            var diagnostics = cluster.CreateDiagnostics(
-                GetType().FullName ?? GetType().Name,
-                scope);
+            var diagnostics = FixtureCluster.CreateDiagnostics(scope);
             var method = await cluster.PrepareMethodAsync(
                 scope,
                 diagnostics);
