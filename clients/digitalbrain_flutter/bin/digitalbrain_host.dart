@@ -3,9 +3,7 @@ import 'dart:io';
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 
 Future<void> main(List<String> args) async {
-  final shell = _arg(args, '--shell') ??
-      Platform.environment['DIGITALBRAIN_SHELL'] ??
-      'desk';
+  final shell = _arg(args, '--shell') ?? DigitalBrainHostEnv.resolveShell();
   final open = _arg(args, '--open');
 
   final client = DigitalBrainUiEdgeClient.fromEnvironment();

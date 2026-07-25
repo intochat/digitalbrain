@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 
 import 'package:digitalbrain_wire/digitalbrain_wire.dart';
 import 'package:http/http.dart' as http;
 
+import 'host_environment.dart';
 import 'sse_frames.dart';
 
 final class DigitalBrainUiEdgeClient {
@@ -13,19 +13,14 @@ final class DigitalBrainUiEdgeClient {
   })  : _http = httpClient ?? http.Client(),
         _ownsClient = httpClient == null;
 
-  factory DigitalBrainUiEdgeClient.fromEnvironment({http.Client? httpClient}) {
-    const key = 'DIGITALBRAIN_UI_BASE';
-    var raw = const String.fromEnvironment(key);
-    if (raw.isEmpty) {
-      raw = Platform.environment[key] ?? '';
-    }
-    if (raw.isEmpty) {
-      throw StateError(
-        'DIGITALBRAIN_UI_BASE is required (AppHost WithFlutterHost injects it).',
-      );
-    }
+  factory DigitalBrainUiEdgeClient.fromEnvironment({
+    http.Client? httpClient,
+    Map<String, String>? processEnvironment,
+  }) {
     return DigitalBrainUiEdgeClient(
-      baseUri: Uri.parse(raw),
+      baseUri: DigitalBrainHostEnv.requireUiBaseUri(
+        processEnvironment: processEnvironment,
+      ),
       httpClient: httpClient,
     );
   }
