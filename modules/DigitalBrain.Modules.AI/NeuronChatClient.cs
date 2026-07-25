@@ -14,7 +14,6 @@ internal sealed class NeuronChatClient(INeuron participant, TaskScheduler turnSc
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(messages);
-        ArgumentNullException.ThrowIfNull(turnScheduler);
         cancellationToken.ThrowIfCancellationRequested();
 
         var request = Request(messages, options);
