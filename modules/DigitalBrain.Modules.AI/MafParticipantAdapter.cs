@@ -33,17 +33,6 @@ internal static class MafParticipantAdapter
         ArgumentNullException.ThrowIfNull(participants);
         ArgumentNullException.ThrowIfNull(turnScheduler);
 
-        if (participants.Count == 0)
-        {
-            throw new InvalidOperationException("An orchestration requires at least one participant.");
-        }
-
-        foreach (var participant in participants)
-        {
-            ArgumentNullException.ThrowIfNull(participant);
-            Validate(participant.Contract);
-        }
-
         return [.. participants.Select(participant => participant.CreateAgent(grains, turnScheduler))];
     }
 
