@@ -181,12 +181,16 @@ test('the architecture page is module-organized and states each status once', ()
   const built = architecture.match(/^Status: Built$/gm) ?? []
   const builtCountdown = architecture.match(/^Status: Built — Countdown only$/gm) ?? []
   const builtFlutter = architecture.match(
-    /^Status: Built \(first-vertical vocabulary \+ L0\/L1 journal proofs \+ C# northbound UI edge \+ module-owned `Flutter\.Aspire\.Hosting` WithUiEdge\/WithFlutterHost \+ headless Dart host projection\); Designed \([^)]+\)$/gm) ?? []
+    /^Status: Built \(first-vertical vocabulary \+ L0\/L1 journal proofs \+ C# northbound UI edge \+ module-owned `Flutter\.Aspire\.Hosting` WithUiEdge\/WithFlutterHost \+ headless Dart host projection \+ Windows chrome via `lib\/main\.dart`\/`windows\/`\); Designed \([^)]+\)$/gm) ?? []
   const designed = architecture.match(/^Status: Designed$/gm) ?? []
   assert.equal(built.length, 4, 'AI, Tasks, Google, and Salesforce are built')
   assert.equal(builtCountdown.length, 1, 'Time is built — Countdown only')
-  assert.equal(builtFlutter.length, 1, 'Flutter vocabulary + module hosting + headless host built; Windows widget chrome remains designed')
+  assert.equal(builtFlutter.length, 1, 'Flutter vocabulary + module hosting + headless host + Windows chrome built; IdP/observation remain designed')
   assert.equal(designed.length, 1, 'Behaviors section is designed')
+  assert.match(architecture, /Designed \(full product chrome beyond key\/title shell, product journal observation on IDigitalBrain, multi-principal IdP edge\)/)
+  assert.match(architecture, /## 5\. Behaviors and scripting\r?\n\r?\nStatus: Designed/)
+  assert.doesNotMatch(architecture, /Windows widget chrome polish/)
+  assert.doesNotMatch(read('docs', 'packages.md'), /Windows Flutter chrome Designed|Designed \(Windows widget chrome polish\)/)
 
   assert.match(architecture, /human-approved proposal/)
   assert.match(architecture, /Runtime behavior installation is designed and not yet built/)

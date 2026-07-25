@@ -601,7 +601,7 @@ calendar, and DST record shapes. Do not implement those as though they were sett
 
 ### 4.6 Flutter
 
-Status: Built (first-vertical vocabulary + L0/L1 journal proofs + C# northbound UI edge + module-owned `Flutter.Aspire.Hosting` WithUiEdge/WithFlutterHost + headless Dart host projection); Designed (Flutter Windows widget chrome polish, full product chrome, product journal observation on IDigitalBrain, multi-principal IdP edge)
+Status: Built (first-vertical vocabulary + L0/L1 journal proofs + C# northbound UI edge + module-owned `Flutter.Aspire.Hosting` WithUiEdge/WithFlutterHost + headless Dart host projection + Windows chrome via `lib/main.dart`/`windows/`); Designed (full product chrome beyond key/title shell, product journal observation on IDigitalBrain, multi-principal IdP edge)
 
 The OS surface is not a Flutter app with agents behind it. It is a brain whose **UI vocabulary** is a
 Flutter module, and whose **logic** (shell policy, post-auth composition, multi-window orchestration,
@@ -709,6 +709,9 @@ Flutter / Dart host  ──HTTP/JSON (+ SSE watch)──►  hosts/DigitalBrain.
 - **Built (Dart host):** `clients/digitalbrain_wire` (dual golden pin + edge DTOs) and
   `clients/digitalbrain_flutter` (HTTP/SSE edge client, SSE parse, `ShellSurfaceController`, headless
   `bin/digitalbrain_host.dart`). `dart analyze` / `dart test` are local gates.
+- **Built (Windows chrome):** `lib/main.dart` + `windows/` Material shell projects key/title scenes
+  from `ShellSurfaceController` / SSE `SceneOpened` only (not multi-window product chrome). L0 pins
+  desktop markers; `flutter build windows` is the local desktop gate when the Flutter CLI is present.
 - **Built (module hosting):** `DigitalBrain.Modules.Flutter.Aspire.Hosting` — `WithUiEdge` /
   `WithFlutterHost` project `digitalbrain-ui` (AsClient) and host executable
   (`DIGITALBRAIN_UI_BASE` + `DIGITALBRAIN_SHELL` only). Host mode: **Auto** (Flutter desktop only when
@@ -721,7 +724,7 @@ Flutter / Dart host  ──HTTP/JSON (+ SSE watch)──►  hosts/DigitalBrain.
   `AccountEnrichmentSurface` (opens enrichment scene — does not run Gmail→Salesforce). Contracts
   only; L1 journal proofs. Multi-module enrichment process remains Integrations L1
   (`IAccountEnrichment`); OS scene journals carry no secrets.
-- **Designed:** Flutter Windows **widget** chrome polish; production IdP principal→owner bind;
+- **Designed:** full product chrome beyond the key/title shell; production IdP principal→owner bind;
   product journal observation on `IDigitalBrain` when a non-UI consumer needs the same cursor/watch;
   optional upgrade from edge journal poll to grain `WatchNeuron` push without changing the HTTP event
   schema.
@@ -865,12 +868,13 @@ path-filtered peers of the docs job.
 #### Still open (do not implement as settled)
 
 - Scene descriptor node algebra and richer chrome vocabulary beyond the first five types.
-- Dart host mapping beyond key/title skeleton; Windows widget chrome polish
-  (`clients/digitalbrain_flutter` + `clients/digitalbrain_wire` path of record).
+- Dart host mapping beyond key/title skeleton (first-vertical Windows chrome is Built; richer
+  descriptors and product chrome remain open — `clients/digitalbrain_flutter` +
+  `clients/digitalbrain_wire` path of record).
 - Product journal observation API on `IDigitalBrain` (promote when a non-UI consumer needs it).
 - Multi-principal edge factory beyond singleton `AddDigitalBrainClient(owner)` / process owner config.
-- Full desktop chrome, multi-window, notifications, and product-installed OS apps (sample compositions
-  exist; they are not installed Behaviors).
+- Full product desktop chrome, multi-window, notifications, and product-installed OS apps (sample
+  compositions exist; they are not installed Behaviors).
 - Optional `WatchNeuron` push upgrade (SSE poll is acceptable and Built on the edge).
 
 ### 4.7 Memory
@@ -1270,8 +1274,9 @@ taken, and do not infer a shape for it from a neighbouring module.
 - **The exact CLR records for the capability-tool seam.** §4.3 ratifies that seam's architecture and
   its exclusions; the records and interfaces that would express it are unwritten.
 - **Flutter descriptor algebra and richer chrome vocabulary.** §4.6 freezes the first five semantic
-  types; host-facing SSE on `hosts/DigitalBrain.Ui` is Built for the first live feed. Scene
-  descriptor node algebra and full Windows product chrome remain open.
+  types; host-facing SSE on `hosts/DigitalBrain.Ui` and first-vertical Windows chrome
+  (`lib/main.dart` + `windows/`) are Built. Scene descriptor node algebra and full product chrome
+  remain open.
 - **Product journal observation on `IDigitalBrain`.** Still designed for scripts and multi-edge
   reconnect as a shared programming-model API; the first live host feed uses edge-only journal watch
   (§4.6). Not required for L1 command→journal proofs.
@@ -1329,11 +1334,12 @@ track has proofs.
 5. Add recurring and calendar Time vocabulary once its library and public record shapes are approved.
 6. Flutter OS surface remaining work (do not re-open Built steps): first vertical vocabulary + L0/L1
    journals, Ui HTTP/SSE edge, module-owned hosting (`WithUiEdge` / `WithFlutterHost` — not bare
-   `AddModule` alone), headless Dart host + dual golden, and sample compositions under
-   `DigitalBrain.Compositions` are **Built**. Still open: descriptor algebra, Windows chrome polish,
-   multi-principal IdP edge, product journal observation on `IDigitalBrain`, and treating compositions
-   as installed Behaviors (self-programming track). Do not wholesale restore historical `app/` or
-   `workspace/`. Do not ship Aspire-only Flutter with zero module host options.
+   `AddModule` alone), headless Dart host + dual golden, Windows chrome (`lib/main.dart` + `windows/`),
+   and sample compositions under `DigitalBrain.Compositions` are **Built**. Still open: descriptor
+   algebra, full product chrome beyond key/title shell, multi-principal IdP edge, product journal
+   observation on `IDigitalBrain`, and treating compositions as installed Behaviors (self-programming
+   track). Do not wholesale restore historical `app/` or `workspace/`. Do not ship Aspire-only Flutter
+   with zero module host options.
 7. Design `DigitalBrain.Memory` independently around its own vocabulary, never inferred from AI,
    Tasks, or Time.
 
