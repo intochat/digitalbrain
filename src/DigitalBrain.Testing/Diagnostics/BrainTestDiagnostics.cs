@@ -13,11 +13,6 @@ internal sealed class BrainTestDiagnostics
     {
         ArgumentNullException.ThrowIfNull(failure);
 
-        if (failure is BrainTestFailureException diagnostic)
-        {
-            return diagnostic;
-        }
-
         return new BrainTestFailureException(
             $"DigitalBrain test framework operation '{operation}' failed (scope '{_scopeId}').",
             failure);

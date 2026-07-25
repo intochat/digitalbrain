@@ -3,18 +3,14 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Testing;
 
-internal sealed record JournalObservation(
-    long RequestedCursor,
-    JournalRead Read);
-
 internal sealed class TestJournalObserver :
     IJournalObserver,
     IAsyncDisposable
 {
     internal const int EvidenceLimit = 64;
 
-    private readonly Channel<JournalObservation> _observations =
-        Channel.CreateBounded<JournalObservation>(
+    private readonly Channel<JournalRead> _observations =
+        Channel.CreateBounded<JournalRead>(
             new BoundedChannelOptions(EvidenceLimit)
             {
                 AllowSynchronousContinuations = false,
@@ -35,7 +31,7 @@ internal sealed class TestJournalObserver :
         _direction = direction;
     }
 
-    internal ChannelReader<JournalObservation> Observations
+    internal ChannelReader<JournalRead> Observations
         => _observations.Reader;
 
     public Task ObserveAsync(JournalKind kind, JournalRead read)
@@ -57,8 +53,7 @@ internal sealed class TestJournalObserver :
                     ?? new ObjectDisposedException(nameof(TestJournalObserver)));
             }
 
-            var observation = new JournalObservation(_cursor, read);
-            if (_observations.Writer.TryWrite(observation))
+            if (_observations.Writer.TryWrite(read))
             {
                 _cursor = read.ResumeSequence;
                 return Task.CompletedTask;

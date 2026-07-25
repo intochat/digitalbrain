@@ -26,7 +26,7 @@ public sealed class TestBrain : IAsyncDisposable
     private readonly TestOwner _defaultOwner;
     private Action? _release;
 
-    private TestBrain(
+    internal TestBrain(
         FixtureCluster cluster,
         string scope,
         TestClock clock,
@@ -55,31 +55,12 @@ public sealed class TestBrain : IAsyncDisposable
 
     internal FixtureCluster Cluster { get; }
 
-    internal static TestBrain Create(
-        FixtureCluster cluster,
-        string scope,
-        TestClock clock,
-        BrainTestDiagnostics diagnostics,
-        TestEdgeRegistry edges,
-        long edgeGeneration,
-        Action release)
-        => new(
-            cluster,
-            scope,
-            clock,
-            diagnostics,
-            edges,
-            edgeGeneration,
-            release);
-
     [EditorBrowsable(EditorBrowsableState.Never)]
     public TScript ChatClientScript<TScript>()
         where TScript : class
     {
         ThrowIfDisposed();
-        return _edges.Script<TScript>(
-            TestEdgeKind.ChatClient,
-            _edgeGeneration);
+        return _edges.ChatClientScript<TScript>(_edgeGeneration);
     }
 
     public TestNeuron<TNeuron> Neuron<TNeuron>(string name = "default")
@@ -90,24 +71,31 @@ public sealed class TestBrain : IAsyncDisposable
     {
         try
         {
-            var validated = IdentityLabel.Validate(label);
+            ArgumentException.ThrowIfNullOrWhiteSpace(label);
+            if (label.Contains('/', StringComparison.Ordinal)
+                || label.Any(char.IsWhiteSpace))
+            {
+                throw new ArgumentException(
+                    "Owner labels cannot contain '/' or whitespace.",
+                    nameof(label));
+            }
 
             lock (_ownerGate)
             {
-                if (_owners.TryGetValue(validated, out var owner))
+                if (_owners.TryGetValue(label, out var owner))
                 {
                     return owner;
                 }
 
-                if (!_ownerLabels.Add(validated))
+                if (!_ownerLabels.Add(label))
                 {
                     throw new ArgumentException(
-                        $"Owner label '{validated}' differs only by casing from an existing label.",
+                        $"Owner label '{label}' differs only by casing from an existing label.",
                         nameof(label));
                 }
 
-                owner = CreateOwner(validated);
-                _owners.Add(validated, owner);
+                owner = CreateOwner(label);
+                _owners.Add(label, owner);
                 return owner;
             }
         }
@@ -174,7 +162,6 @@ public sealed class TestBrain : IAsyncDisposable
 
     internal JournalFaultHandle ArmJournalFault(
         NeuronId target,
-        int completedWrites,
         string message)
     {
         lock (_faultGate)
@@ -184,10 +171,7 @@ public sealed class TestBrain : IAsyncDisposable
                 ObjectDisposedException.ThrowIf(
                     Volatile.Read(ref _release) is null,
                     this);
-                var registration = Cluster.ArmJournalFault(
-                    target,
-                    completedWrites,
-                    message);
+                var registration = Cluster.ArmJournalFault(target, message);
                 var handle = new JournalFaultHandle(
                     registration,
                     RetireJournalFault,
@@ -243,7 +227,7 @@ public sealed class TestBrain : IAsyncDisposable
     }
 
     private TestOwner CreateOwner(string label)
-        => TestOwner.Create(this, new($"{_scope}-{label}"));
+        => new(this, new($"{_scope}-{label}"));
 
     private void ThrowIfDisposed()
         => ObjectDisposedException.ThrowIf(

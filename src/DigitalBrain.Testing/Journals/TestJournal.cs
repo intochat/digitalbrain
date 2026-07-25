@@ -232,10 +232,10 @@ public sealed class TestJournal
                     return Observe((TSynapse)pending.Synapse, pending);
                 }
 
-                JournalObservation observation;
+                JournalRead batch;
                 try
                 {
-                    observation = await observer.Observations.ReadAsync(cancellationToken);
+                    batch = await observer.Observations.ReadAsync(cancellationToken);
                 }
                 catch (ChannelClosedException closed)
                     when (closed.InnerException is not null)
@@ -244,7 +244,7 @@ public sealed class TestJournal
                     throw;
                 }
 
-                if (Accept<TSynapse>(observer, observation) is { } accepted)
+                if (Accept<TSynapse>(observer, batch) is { } accepted)
                 {
                     return Observe((TSynapse)accepted.Synapse, accepted);
                 }
@@ -258,17 +258,17 @@ public sealed class TestJournal
 
     private SynapseDelivery? Accept<TSynapse>(
         TestJournalObserver observer,
-        JournalObservation observation)
+        JournalRead batch)
         where TSynapse : Synapse
     {
-        if (observation.Read.ResetSnapshot is not null)
+        if (batch.ResetSnapshot is not null)
         {
             throw new InvalidOperationException(
                 $"Journal compaction for '{_subject}' {_direction}.");
         }
 
         SynapseDelivery? matching = null;
-        foreach (var delivery in observation.Read.Delta)
+        foreach (var delivery in batch.Delta)
         {
             if (matching is null && delivery.Synapse is TSynapse)
             {
@@ -372,19 +372,11 @@ public sealed class TestJournal
         }
     }
 
-    private ObservedSynapse<TSynapse> Observe<TSynapse>(
+    private static ObservedSynapse<TSynapse> Observe<TSynapse>(
         TSynapse synapse,
         SynapseDelivery delivery)
         where TSynapse : Synapse
-        => new(
-            synapse,
-            _subject,
-            delivery.Caller,
-            _direction,
-            delivery.Sequence,
-            delivery.Timestamp,
-            delivery.CorrelationId,
-            delivery.SynapseId);
+        => new(synapse, delivery.SynapseId);
 
     private SynapseDelivery? TakePending<TSynapse>()
         where TSynapse : Synapse

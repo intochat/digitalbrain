@@ -3,19 +3,18 @@ namespace DigitalBrain.Testing;
 public sealed class HostedResource
 {
     private readonly RunningAppHost _host;
+    private readonly string _name;
 
     internal HostedResource(RunningAppHost host, string name)
     {
         _host = host;
-        Name = name;
+        _name = name;
     }
-
-    public string Name { get; }
 
     public Task WaitUntilHealthyAsync(
         CancellationToken cancellationToken = default)
-        => _host.WaitUntilHealthyAsync(Name, cancellationToken);
+        => _host.WaitUntilHealthyAsync(_name, cancellationToken);
 
-    public HttpClient CreateHttpClient(string? endpointName = null)
-        => _host.CreateHttpClient(Name, endpointName);
+    public HttpClient CreateHttpClient()
+        => _host.CreateHttpClient(_name);
 }

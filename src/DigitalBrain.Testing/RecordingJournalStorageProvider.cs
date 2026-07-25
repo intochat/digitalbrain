@@ -8,8 +8,7 @@ namespace DigitalBrain.Testing;
 internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider inner)
     : IJournalStorageProvider
 {
-    private readonly Dictionary<NeuronId, JournalFaultState> _failures = [];
-    private readonly Dictionary<JournalId, NeuronId> _faultTargets = [];
+    private readonly Dictionary<JournalId, JournalFaultState> _failures = [];
     private readonly object _failureLock = new();
 
     public IJournalStorage CreateStorage(JournalId journalId)
@@ -17,27 +16,21 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
 
     internal JournalFaultRegistration ArmFault(
         NeuronId target,
-        int completedWritesBeforeFailure,
         string message)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(completedWritesBeforeFailure);
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
 
         lock (_failureLock)
         {
-            if (_failures.ContainsKey(target))
+            var journalId = JournalId.FromGrainId(target.ToGrainId());
+            if (_failures.ContainsKey(journalId))
             {
                 throw new InvalidOperationException(
                     $"A journal commit fault is already armed for neuron '{target}'.");
             }
 
-            var state = new JournalFaultState(
-                completedWritesBeforeFailure,
-                message);
-            _failures.Add(target, state);
-            _faultTargets.Add(
-                JournalId.FromGrainId(target.ToGrainId()),
-                target);
+            var state = new JournalFaultState(message);
+            _failures.Add(journalId, state);
             return new(target, message, state.Consumed.Task, state);
         }
     }
@@ -48,13 +41,14 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
 
         lock (_failureLock)
         {
-            if (!_failures.TryGetValue(registration.Target, out var state)
+            var journalId = JournalId.FromGrainId(registration.Target.ToGrainId());
+            if (!_failures.TryGetValue(journalId, out var state)
                 || !ReferenceEquals(state, registration.Token))
             {
                 return false;
             }
 
-            RemoveFault(registration.Target);
+            _failures.Remove(journalId);
             return true;
         }
     }
@@ -63,40 +57,22 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     {
         lock (_failureLock)
         {
-            if (!_faultTargets.TryGetValue(journalId, out var target)
-                || !_failures.TryGetValue(target, out var failure))
+            if (!_failures.Remove(journalId, out var failure))
             {
                 return;
             }
 
-            if (failure.RemainingWrites > 0)
-            {
-                failure.RemainingWrites--;
-                return;
-            }
-
-            RemoveFault(target);
             failure.Consumed.TrySetResult();
             throw new InvalidOperationException(failure.Message);
         }
     }
 
-    private void RemoveFault(NeuronId target)
-    {
-        _failures.Remove(target);
-        _faultTargets.Remove(JournalId.FromGrainId(target.ToGrainId()));
-    }
-
-    private sealed class JournalFaultState(
-        int remainingWrites,
-        string message)
+    private sealed class JournalFaultState(string message)
     {
         internal TaskCompletionSource Consumed { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         internal string Message { get; } = message;
-
-        internal int RemainingWrites { get; set; } = remainingWrites;
     }
 
     private sealed class RecordingJournalStorage(

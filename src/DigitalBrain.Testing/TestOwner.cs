@@ -6,27 +6,23 @@ namespace DigitalBrain.Testing;
 public sealed class TestOwner
 {
     private readonly TestBrain _brain;
+    private readonly OwnerId _id;
 
-    private TestOwner(
-        TestBrain brain,
-        OwnerId id,
-        IDigitalBrain client)
+    internal TestOwner(TestBrain brain, OwnerId id)
     {
         _brain = brain;
-        Id = id;
-        Client = client;
+        _id = id;
+        Client = DigitalBrainClient.Connect(brain.Cluster.Client, id.Value);
     }
 
-    public OwnerId Id { get; }
-
-    public IDigitalBrain Client { get; }
+    internal IDigitalBrain Client { get; }
 
     public TestNeuron<TNeuron> Neuron<TNeuron>(string name = "default")
         where TNeuron : class, INeuron
     {
         try
         {
-            var id = NeuronId.For<TNeuron>(Id, name);
+            var id = NeuronId.For<TNeuron>(_id, name);
             return new TestNeuron<TNeuron>(
                 _brain,
                 id,
@@ -41,35 +37,5 @@ public sealed class TestOwner
                 "neuron.open",
                 failure);
         }
-    }
-
-    internal static TestOwner Create(TestBrain brain, OwnerId id)
-        => new(
-            brain,
-            id,
-            DigitalBrainClient.Connect(brain.Cluster.Client, id.Value));
-}
-
-internal static class IdentityLabel
-{
-    internal static string Validate(string label)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(label);
-
-        if (label.Contains('/', StringComparison.Ordinal))
-        {
-            throw new ArgumentException(
-                "Owner labels cannot contain '/'.",
-                nameof(label));
-        }
-
-        if (label.Any(char.IsWhiteSpace))
-        {
-            throw new ArgumentException(
-                "Owner labels cannot contain whitespace.",
-                nameof(label));
-        }
-
-        return label;
     }
 }

@@ -71,20 +71,12 @@ internal sealed class FixtureCluster : IAsyncDisposable
 
     internal JournalFaultRegistration ArmJournalFault(
         NeuronId target,
-        int completedWrites,
         string message)
-        => _journalStorage.ArmFault(
-            target,
-            completedWrites,
-            message);
+        => _journalStorage.ArmFault(target, message);
 
     internal bool DisarmJournalFault(
         JournalFaultRegistration registration)
         => _journalStorage.DisarmFault(registration);
-
-    internal static BrainTestDiagnostics CreateDiagnostics(string scope)
-        => new(scope);
-
     internal async Task<(TestClock Clock, long EdgeGeneration)> PrepareMethodAsync(
         string scope,
         BrainTestDiagnostics diagnostics)

@@ -5,12 +5,11 @@ namespace DigitalBrain.Testing;
 
 internal sealed class TestEdgeRegistry
 {
-    private readonly Dictionary<TestEdgeKind, EdgeRegistration> _adapters = [];
     private readonly Lock _gate = new();
+    private EdgeRegistration? _chatClient;
     private TimeProvider? _timeProvider;
     private Action? _timeReset;
     private long _methodGeneration;
-    private bool _sealed;
 
     internal void ConfigureChatClient<TService, TScript>(
         IReadOnlyCollection<Type> neuronAliases,
@@ -21,6 +20,19 @@ internal sealed class TestEdgeRegistry
         where TScript : class
     {
         ArgumentNullException.ThrowIfNull(neuronAliases);
+        ArgumentNullException.ThrowIfNull(adapter);
+        ArgumentNullException.ThrowIfNull(script);
+        ArgumentNullException.ThrowIfNull(reset);
+
+        var serviceType = typeof(TService);
+        if (!serviceType.IsInterface
+            || !serviceType.IsInstanceOfType(adapter))
+        {
+            throw new ArgumentException(
+                "The chat-client test edge service contract must be an interface.",
+                nameof(adapter));
+        }
+
         var aliases = neuronAliases
             .Where(alias => alias is { IsClass: true, IsAbstract: false })
             .Distinct()
@@ -32,14 +44,21 @@ internal sealed class TestEdgeRegistry
                 nameof(neuronAliases));
         }
 
-        Configure(
-            TestEdgeKind.ChatClient,
-            typeof(TService),
-            aliases,
-            keyed: true,
-            adapter,
-            script,
-            reset);
+        lock (_gate)
+        {
+            if (_chatClient is not null)
+            {
+                throw new InvalidOperationException(
+                    "The chat-client test edge already has an assembly-configured adapter.");
+            }
+
+            _chatClient = new(
+                serviceType,
+                aliases,
+                adapter,
+                script,
+                () => reset(script));
+        }
     }
 
     internal void AttachTimeProvider(
@@ -66,34 +85,25 @@ internal sealed class TestEdgeRegistry
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        EdgeRegistration[] adapters;
+        EdgeRegistration? chatClient;
         TimeProvider timeProvider;
 
         lock (_gate)
         {
-            adapters = _adapters.Values.ToArray();
+            chatClient = _chatClient;
             timeProvider = _timeProvider
                 ?? throw new InvalidOperationException(
                     "The framework-owned TimeProvider test edge has not been attached.");
         }
 
-        foreach (var registration in adapters)
+        if (chatClient is not null)
         {
-            if (registration.Keyed)
+            foreach (var serviceKey in chatClient.ServiceKeys)
             {
-                foreach (var serviceKey in registration.ServiceKeys)
-                {
-                    services.AddKeyedSingleton(
-                        registration.ServiceType,
-                        serviceKey,
-                        registration.Adapter);
-                }
-            }
-            else
-            {
-                services.AddSingleton(
-                    registration.ServiceType,
-                    registration.Adapter);
+                services.AddKeyedSingleton(
+                    chatClient.ServiceType,
+                    serviceKey,
+                    chatClient.Adapter);
             }
         }
 
@@ -104,103 +114,40 @@ internal sealed class TestEdgeRegistry
 
     internal long ResetMethodScope()
     {
-        Action[] resets;
+        Action? chatReset;
         Action timeReset;
         long generation;
 
         lock (_gate)
         {
             generation = checked(++_methodGeneration);
-            resets = _adapters.Values
-                .Select(registration => registration.Reset)
-                .ToArray();
+            chatReset = _chatClient?.Reset;
             timeReset = _timeReset
                 ?? throw new InvalidOperationException(
                     "The framework-owned TimeProvider test edge has not been attached.");
         }
 
-        foreach (var reset in resets)
-        {
-            reset();
-        }
-
+        chatReset?.Invoke();
         timeReset();
         return generation;
     }
 
-    internal TScript Script<TScript>(
-        TestEdgeKind kind,
-        long generation)
+    internal TScript ChatClientScript<TScript>(long generation)
         where TScript : class
     {
         lock (_gate)
         {
             EnsureCurrentGeneration(generation);
 
-            if (!_adapters.TryGetValue(kind, out var registration))
+            if (_chatClient is null)
             {
                 throw new InvalidOperationException(
-                    $"The '{kind}' test edge has no assembly-configured adapter.");
+                    "The chat-client test edge has no assembly-configured adapter.");
             }
 
-            return registration.Script as TScript
+            return _chatClient.Script as TScript
                 ?? throw new InvalidOperationException(
-                    $"The '{kind}' test edge script is '{registration.Script.GetType().FullName}', not '{typeof(TScript).FullName}'.");
-        }
-    }
-
-    internal void Seal()
-    {
-        lock (_gate)
-        {
-            _sealed = true;
-        }
-    }
-
-    private void Configure<TService, TScript>(
-        TestEdgeKind kind,
-        Type serviceType,
-        IReadOnlyList<Type> serviceKeys,
-        bool keyed,
-        TService adapter,
-        TScript script,
-        Action<TScript> reset)
-        where TService : class
-        where TScript : class
-    {
-        ArgumentNullException.ThrowIfNull(adapter);
-        ArgumentNullException.ThrowIfNull(script);
-        ArgumentNullException.ThrowIfNull(reset);
-
-        if (!serviceType.IsInterface
-            || !serviceType.IsInstanceOfType(adapter))
-        {
-            throw new ArgumentException(
-                $"The '{kind}' test edge service contract must be an interface.",
-                nameof(serviceType));
-        }
-
-        lock (_gate)
-        {
-            if (_sealed)
-            {
-                throw new InvalidOperationException(
-                    "The DigitalBrain test composition is already sealed.");
-            }
-
-            if (!_adapters.TryAdd(
-                kind,
-                new(
-                    serviceType,
-                    serviceKeys,
-                    keyed,
-                    adapter,
-                    script,
-                    () => reset(script))))
-            {
-                throw new InvalidOperationException(
-                    $"The '{kind}' test edge already has an assembly-configured adapter.");
-            }
+                    $"The chat-client test edge script is '{_chatClient.Script.GetType().FullName}', not '{typeof(TScript).FullName}'.");
         }
     }
 
@@ -216,7 +163,6 @@ internal sealed class TestEdgeRegistry
     private sealed record EdgeRegistration(
         Type ServiceType,
         IReadOnlyList<Type> ServiceKeys,
-        bool Keyed,
         object Adapter,
         object Script,
         Action Reset);

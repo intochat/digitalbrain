@@ -30,15 +30,7 @@ public sealed class TestNeuron<TNeuron>
     public TestJournal Outgoing { get; }
 
     public JournalFaultHandle FailNextJournalCommit(string message)
-        => FailJournalCommitAfter(0, message);
-
-    public JournalFaultHandle FailJournalCommitAfter(
-        int completedWrites,
-        string message)
-        => _brain.ArmJournalFault(
-            Id,
-            completedWrites,
-            message);
+        => _brain.ArmJournalFault(Id, message);
 
     public Task RestartHostAsync(
         CancellationToken cancellationToken = default)

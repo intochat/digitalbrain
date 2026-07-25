@@ -131,8 +131,7 @@ internal sealed class VolatileReminderTable : IReminderTable
                     entry.Entry.ETag,
                     Utc(entry.Entry.StartAt),
                     entry.NextDue,
-                    entry.Entry.Period,
-                    entry.Sequence))
+                    entry.Entry.Period))
                 .FirstOrDefault();
         }
     }
@@ -218,8 +217,7 @@ internal sealed record DueReminder(
     string ETag,
     DateTimeOffset FirstTickTime,
     DateTimeOffset Due,
-    TimeSpan Period,
-    long Sequence);
+    TimeSpan Period);
 
 internal enum ReminderRemovalResult
 {

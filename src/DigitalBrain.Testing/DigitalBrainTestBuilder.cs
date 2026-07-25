@@ -43,7 +43,6 @@ public sealed class DigitalBrainTestBuilder
     internal TestFixtureComposition Seal()
     {
         _sealed = true;
-        _edges.Seal();
         return new(
             _modules.Values.ToArray(),
             _edges);

@@ -15,7 +15,6 @@ public sealed class RunningAppHost : IAsyncDisposable
     private readonly AppHostExclusiveLease _lease;
     private readonly Action<RunningAppHost> _release;
     private readonly HashSet<string> _resourceNames;
-    private readonly string _resourceNamesDisplay;
     private readonly Dictionary<string, HostedResource> _resources =
         new(StringComparer.Ordinal);
     private readonly object _sync = new();
@@ -30,14 +29,11 @@ public sealed class RunningAppHost : IAsyncDisposable
         _lease = lease;
         _release = release;
 
-        var names = application.Services
+        _resourceNames = application.Services
             .GetRequiredService<DistributedApplicationModel>()
             .Resources
             .Select(resource => resource.Name)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-        _resourceNames = names.ToHashSet(StringComparer.Ordinal);
-        _resourceNamesDisplay = string.Join(", ", names);
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     public HostedResource Resource(string name)
@@ -50,8 +46,11 @@ public sealed class RunningAppHost : IAsyncDisposable
             ThrowIfDisposed();
             if (!_resourceNames.Contains(name))
             {
+                var known = string.Join(
+                    ", ",
+                    _resourceNames.Order(StringComparer.Ordinal));
                 throw new AppHostTestFailureException(
-                    $"Resource '{name}' does not exist. Known resources: {_resourceNamesDisplay}.");
+                    $"Resource '{name}' does not exist. Known resources: {known}.");
             }
 
             if (!_resources.TryGetValue(name, out var resource))
@@ -90,12 +89,10 @@ public sealed class RunningAppHost : IAsyncDisposable
         }
     }
 
-    internal HttpClient CreateHttpClient(
-        string resourceName,
-        string? endpointName)
+    internal HttpClient CreateHttpClient(string resourceName)
     {
         ThrowIfDisposed();
-        return _application.CreateHttpClient(resourceName, endpointName);
+        return _application.CreateHttpClient(resourceName);
     }
 
     internal async Task WaitUntilHealthyAsync(
