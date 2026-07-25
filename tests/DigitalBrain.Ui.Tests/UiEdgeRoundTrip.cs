@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Reflection;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using DigitalBrain.Flutter;
 using DigitalBrain.Testing;
@@ -73,28 +75,7 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         using var http = CreateClient(app);
         http.Timeout = TimeSpan.FromSeconds(30);
 
-        using var streamRequest = new HttpRequestMessage(
-            HttpMethod.Get,
-            "/shells/desk/events?afterSequence=0");
-        using var streamResponse = await http.SendAsync(
-            streamRequest,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken);
-        if (streamResponse.StatusCode != HttpStatusCode.OK)
-        {
-            var errorBody = await streamResponse.Content.ReadAsStringAsync(cancellationToken);
-            Assert.Fail(
-                $"SSE status {(int)streamResponse.StatusCode} {streamResponse.StatusCode}: {errorBody}");
-        }
-
-        Assert.Equal("text/event-stream", streamResponse.Content.Headers.ContentType?.MediaType);
-        Assert.Contains(
-            "no-cache",
-            streamResponse.Headers.CacheControl?.ToString() ?? string.Empty,
-            StringComparison.OrdinalIgnoreCase);
-
-        await using var body = await streamResponse.Content.ReadAsStreamAsync(cancellationToken);
-        using var reader = new StreamReader(body);
+        await using var events = await OpenShellEventStreamAsync(http, cancellationToken);
 
         using var openResponse = await http.PostAsJsonAsync(
             "/shells/desk/scenes",
@@ -105,11 +86,42 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         var journaled = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal("home", journaled.Synapse.SceneKey);
 
-        var projected = await ReadNextSceneOpenedEventAsync(reader, cancellationToken);
+        var projected = await ReadNextSceneOpenedEventAsync(events.Reader, cancellationToken);
 
         Assert.Equal("home", projected.SceneKey);
         Assert.Equal("Home", projected.Title);
-        Assert.True(projected.Sequence > 0);
+        Assert.Equal(journaled.Sequence, projected.Sequence);
+    }
+
+    [Fact(DisplayName = "IDigitalBrain mutator journals SceneOpened and SSE projects without restart")]
+    public async Task DigitalBrainMutatorJournalsAndSseProjectsWithoutRestart()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var shell = test.Neuron<IShell>("desk");
+        var command = new OpenScene(CommandId.New(), "settings", "Settings");
+
+        await using var app = await StartUiEdgeAsync(test, cancellationToken);
+        using var http = CreateClient(app);
+        http.Timeout = TimeSpan.FromSeconds(30);
+
+        await using var events = await OpenShellEventStreamAsync(http, cancellationToken);
+
+        await test.Client.Get<IShell>("desk").Open(command);
+
+        var journaled = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
+        Assert.Equal(command.CommandId, journaled.Synapse.CommandId);
+        Assert.Equal("settings", journaled.Synapse.SceneKey);
+        Assert.Equal("Settings", journaled.Synapse.Title);
+        Assert.Equal(shell.Id, journaled.Synapse.Shell);
+
+        var projected = await ReadNextSceneOpenedEventAsync(events.Reader, cancellationToken);
+
+        Assert.Equal(journaled.Sequence, projected.Sequence);
+        Assert.Equal("settings", projected.SceneKey);
+        Assert.Equal("Settings", projected.Title);
+        Assert.Equal(command.CommandId.ToString(), projected.CommandId);
+        Assert.Equal(shell.Id.ToString(), projected.Shell);
     }
 
     [Fact(DisplayName = "SSE shell events rejects negative afterSequence")]
@@ -128,6 +140,41 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact(DisplayName = "Ui shell SSE projection is journal-session backed not OpenTelemetry")]
+    public void ShellSseProjectionIsJournalSessionNotOpenTelemetry()
+    {
+        var write = typeof(ShellEventFeed).GetMethod(
+            nameof(ShellEventFeed.WriteSceneOpenedSseAsync),
+            BindingFlags.Public | BindingFlags.Static);
+        Assert.NotNull(write);
+
+        var parameters = write.GetParameters().Select(parameter => parameter.ParameterType).ToArray();
+        Assert.Contains(typeof(IGrainFactory), parameters);
+        Assert.Contains(typeof(IDigitalBrain), parameters);
+        Assert.Contains(typeof(long), parameters);
+        Assert.DoesNotContain(
+            parameters,
+            type => (type.FullName ?? type.Name).Contains("OpenTelemetry", StringComparison.Ordinal));
+        Assert.DoesNotContain(typeof(System.Diagnostics.Activity), parameters);
+        Assert.DoesNotContain(typeof(System.Diagnostics.ActivitySource), parameters);
+
+        foreach (var method in typeof(ShellEventFeed).GetMethods(
+                     BindingFlags.Public
+                     | BindingFlags.NonPublic
+                     | BindingFlags.Static
+                     | BindingFlags.Instance
+                     | BindingFlags.DeclaredOnly))
+        {
+            foreach (var parameter in method.GetParameters())
+            {
+                var typeName = parameter.ParameterType.FullName ?? parameter.ParameterType.Name;
+                Assert.False(
+                    typeName.Contains("OpenTelemetry", StringComparison.Ordinal),
+                    $"{method.Name} must not take OpenTelemetry product types; took {typeName}.");
+            }
+        }
+    }
+
     private static async Task<WebApplication> StartUiEdgeAsync(
         TestBrain test,
         CancellationToken cancellationToken)
@@ -143,6 +190,35 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         return app;
     }
 
+    private static async Task<ShellEventStream> OpenShellEventStreamAsync(
+        HttpClient http,
+        CancellationToken cancellationToken)
+    {
+        using var streamRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/shells/desk/events?afterSequence=0");
+        var streamResponse = await http.SendAsync(
+            streamRequest,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        if (streamResponse.StatusCode != HttpStatusCode.OK)
+        {
+            var errorBody = await streamResponse.Content.ReadAsStringAsync(cancellationToken);
+            streamResponse.Dispose();
+            Assert.Fail(
+                $"SSE status {(int)streamResponse.StatusCode} {streamResponse.StatusCode}: {errorBody}");
+        }
+
+        Assert.Equal("text/event-stream", streamResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Contains(
+            "no-cache",
+            streamResponse.Headers.CacheControl?.ToString() ?? string.Empty,
+            StringComparison.OrdinalIgnoreCase);
+
+        var body = await streamResponse.Content.ReadAsStreamAsync(cancellationToken);
+        return new ShellEventStream(streamResponse, body);
+    }
+
     private static async Task<SceneOpenedEvent> ReadNextSceneOpenedEventAsync(
         StreamReader reader,
         CancellationToken cancellationToken)
@@ -151,6 +227,7 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         timeout.CancelAfter(TimeSpan.FromSeconds(15));
 
         string? dataLine = null;
+        string? eventName = null;
         while (!timeout.IsCancellationRequested)
         {
             var line = await reader.ReadLineAsync(timeout.Token);
@@ -159,31 +236,77 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
                 break;
             }
 
+            if (line.StartsWith(':'))
+            {
+                continue;
+            }
+
+            if (line.StartsWith("event:", StringComparison.Ordinal))
+            {
+                eventName = line["event:".Length..].Trim();
+                continue;
+            }
+
             if (line.StartsWith("data:", StringComparison.Ordinal))
             {
                 dataLine = line["data:".Length..].Trim();
+                continue;
             }
-            else if (line.Length == 0 && dataLine is not null)
+
+            if (line.Length == 0 && dataLine is not null)
             {
+                var name = eventName;
+                var payload = dataLine;
+                eventName = null;
+                dataLine = null;
+
+                if (name is not null
+                    && !string.Equals(name, "scene-opened", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
                 var projected = System.Text.Json.JsonSerializer.Deserialize<SceneOpenedEvent>(
-                    dataLine,
+                    payload,
                     EventJsonOptions);
                 if (projected is not null
-                    && !string.IsNullOrWhiteSpace(projected.SceneKey))
+                    && !string.IsNullOrWhiteSpace(projected.SceneKey)
+                    && projected.Sequence > 0)
                 {
                     return projected;
                 }
-
-                dataLine = null;
             }
         }
 
-        throw new TimeoutException("SSE stream ended before a SceneOpened projection arrived.");
+        throw new TimeoutException(
+            "SSE stream ended before a SceneOpened projection arrived — brain may have moved while UI projection is dead.");
     }
 
     private static HttpClient CreateClient(WebApplication app)
     {
         var address = app.Urls.Single();
         return new HttpClient { BaseAddress = new Uri(address) };
+    }
+
+    private sealed class ShellEventStream : IAsyncDisposable
+    {
+        private readonly HttpResponseMessage _response;
+        private readonly Stream _body;
+
+        public ShellEventStream(HttpResponseMessage response, Stream body)
+        {
+            _response = response;
+            _body = body;
+            Reader = new StreamReader(body);
+        }
+
+        public StreamReader Reader { get; }
+
+        public async ValueTask DisposeAsync()
+        {
+            Reader.Dispose();
+            await _body.DisposeAsync();
+            _response.Dispose();
+        }
     }
 }
