@@ -1,6 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.OpenAI;
+using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Aspire.Hosting;
@@ -11,7 +12,7 @@ public static class AIHostingExtensions
 {
     public static DigitalBrainModuleBuilder<AIModule> WithLlm<TModel>(
         this DigitalBrainModuleBuilder<AIModule> module)
-        where TModel : LLM
+        where TModel : class, ILLM
     {
         ArgumentNullException.ThrowIfNull(module);
 
@@ -38,7 +39,7 @@ public static class AIHostingExtensions
         private IResourceBuilder<ParameterResource>? _openAIKey;
 
         internal void Add<TModel>()
-            where TModel : LLM
+            where TModel : class, ILLM
         {
             var model = typeof(TModel);
 

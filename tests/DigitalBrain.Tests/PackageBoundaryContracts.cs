@@ -77,6 +77,77 @@ public sealed class PackageBoundaryContracts
             StringComparer.Ordinal);
     }
 
+    [Theory]
+    [MemberData(nameof(ConsumerPathPackages))]
+    public void NothingOnTheConsumerPathCanReachDartOrFlutterSdkPackages(string package)
+    {
+        var offenders = PackagesReachableFrom(package)
+            .Where(IsDartOrFlutterSdkPackage)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Empty(offenders);
+    }
+
+    public static TheoryData<string> ContractsPackages { get; } =
+    [
+        "DigitalBrain.Modules.AI.Contracts",
+        "DigitalBrain.Modules.Google.Contracts",
+        "DigitalBrain.Modules.Salesforce.Contracts",
+        "DigitalBrain.Modules.Tasks.Contracts",
+        "DigitalBrain.Modules.Time.Contracts",
+        "DigitalBrain.Modules.Flutter.Contracts",
+        "DigitalBrain.Quickstart.Contracts",
+    ];
+
+    public static TheoryData<string> HostingPackages { get; } =
+    [
+        "DigitalBrain.Aspire.Hosting",
+        "DigitalBrain.Modules.AI.Aspire.Hosting",
+        "DigitalBrain.Modules.Flutter.Aspire.Hosting",
+        "DigitalBrain.Modules.Google.Aspire.Hosting",
+        "DigitalBrain.Modules.Salesforce.Aspire.Hosting",
+        "DigitalBrain.Integrations.Mcp.Aspire.Hosting",
+    ];
+
+    [Theory]
+    [MemberData(nameof(ContractsPackages))]
+    public void ContractsPackagesAreFreeOfKernelAndDartFlutterSdks(string package)
+    {
+        Assert.DoesNotContain(
+            "DigitalBrain.Kernel",
+            DirectCompileProjectReferencesOf(package),
+            StringComparer.Ordinal);
+        Assert.DoesNotContain(
+            "DigitalBrain.Kernel",
+            ProjectsReachableFrom(package),
+            StringComparer.Ordinal);
+        Assert.Empty(
+            DirectPackageReferencesOf(package)
+                .Where(IsDartOrFlutterSdkPackage)
+                .Order(StringComparer.Ordinal)
+                .ToList());
+        Assert.Empty(
+            PackagesReachableFrom(package)
+                .Where(IsDartOrFlutterSdkPackage)
+                .Order(StringComparer.Ordinal)
+                .ToList());
+    }
+
+    [Theory]
+    [MemberData(nameof(HostingPackages))]
+    public void HostingPackagesDoNotDirectlyReferenceKernel(string package)
+    {
+        Assert.DoesNotContain(
+            "DigitalBrain.Kernel",
+            DirectCompileProjectReferencesOf(package),
+            StringComparer.Ordinal);
+        Assert.DoesNotContain(
+            "DigitalBrain.Kernel",
+            DirectPackageReferencesOf(package),
+            StringComparer.Ordinal);
+    }
+
     [Fact]
     public void NoProductionTreeReferencesDigitalBrainTesting()
     {
@@ -290,6 +361,11 @@ public sealed class PackageBoundaryContracts
             PackableProjects.Names.Order(StringComparer.Ordinal),
             actual.Order(StringComparer.Ordinal));
     }
+
+    private static bool IsDartOrFlutterSdkPackage(string package) =>
+        !package.StartsWith("DigitalBrain", StringComparison.Ordinal)
+        && (package.Contains("Flutter", StringComparison.OrdinalIgnoreCase)
+            || package.StartsWith("Dart", StringComparison.OrdinalIgnoreCase));
 
     private static bool IsPackable(string projectFile) =>
         XDocument.Load(projectFile)
