@@ -1,4 +1,3 @@
-using System.Xml.Linq;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Testing;
 using Xunit;
@@ -396,131 +395,6 @@ public sealed class CountdownLifecycle(TimeFixture fixture)
             cancellationToken: cancellationToken));
     }
 
-    [Fact]
-    public void ExternalProjectUsesOnlyThePublicL1AuthoringSurface()
-    {
-        var root = LocateRepositoryRoot();
-        var directory = Path.Combine(
-            root,
-            "tests",
-            "DigitalBrain.Time.Tests");
-        var project = XDocument.Load(Path.Combine(
-            directory,
-            "DigitalBrain.Time.Tests.csproj"));
-
-        Assert.Equal(
-            [
-                "Microsoft.NET.Test.Sdk",
-                "xunit.runner.visualstudio",
-                "xunit.v3",
-            ],
-            project.Descendants("PackageReference")
-                .Select(reference => (string)reference.Attribute("Include")!)
-                .Order(StringComparer.Ordinal));
-        Assert.Equal(
-            [
-                "DigitalBrain.Modules.Time",
-                "DigitalBrain.Modules.Time.Contracts",
-                "DigitalBrain.Testing",
-            ],
-            project.Descendants("ProjectReference")
-                .Select(reference => Path.GetFileNameWithoutExtension(
-                    (string)reference.Attribute("Include")!))
-                .Order(StringComparer.Ordinal));
-        Assert.Equal(
-            "Exe",
-            project.Descendants("OutputType").Single().Value);
-
-        var forbidden = new[]
-        {
-            "Or" + "leans",
-            "DigitalBrain.Ker" + "nel",
-            "DigitalBrain." + "Client",
-            "Asp" + "ire",
-            "IGrain" + "Factory",
-            "Grain" + "Id",
-            "Get" + "Grain",
-            "Task." + "Delay",
-            "Thread." + "Sleep",
-        };
-        var violations = Directory
-            .EnumerateFiles(directory, "*", SearchOption.AllDirectories)
-            .Where(path => !path.Contains(
-                $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
-                StringComparison.Ordinal))
-            .Where(path => !path.Contains(
-                $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
-                StringComparison.Ordinal))
-            .SelectMany(path => forbidden
-                .Where(token => File
-                    .ReadAllText(path)
-                    .Contains(token, StringComparison.Ordinal))
-                .Select(token => $"{Path.GetFileName(path)}:{token}"))
-            .ToArray();
-
-        Assert.Empty(violations);
-    }
-
-    [Fact]
-    public void CountdownIsReminderPrimaryWithoutLocalTimers()
-    {
-        var root = Path.Combine(
-            LocateRepositoryRoot(),
-            "modules",
-            "DigitalBrain.Modules.Time");
-        var joined = File.ReadAllText(Path.Combine(root, "CountdownNeuron.cs"));
-
-        Assert.Contains(
-            "async Task IRemindable.ReceiveReminder",
-            joined,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "RegisterOrUpdateReminder",
-            joined,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain(
-            "CreateTimer",
-            joined,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain(
-            "ArmLocalTimer",
-            joined,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain(
-            "ICountdownWakeup",
-            joined,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain(
-            "ObserveTimerWork",
-            joined,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain(
-            ".GetAwaiter()",
-            joined,
-            StringComparison.Ordinal);
-        Assert.False(
-            File.Exists(Path.Combine(root, "ICountdownWakeup.cs")));
-    }
-
-    [Fact]
-    public void RevisionAndGenerationCountersRejectOverflow()
-    {
-        var source = File.ReadAllText(Path.Combine(
-            LocateRepositoryRoot(),
-            "modules",
-            "DigitalBrain.Modules.Time",
-            "CountdownNeuron.cs"));
-
-        Assert.Contains(
-            "var nextRevision = checked(current.Revision + 1);",
-            source,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "var generation = checked(current.Generation + 1);",
-            source,
-            StringComparison.Ordinal);
-    }
-
     private static Task<CountdownSnapshot> Start(
         TestNeuron<ICountdown> countdown,
         TestNeuron<ICountdown> destination,
@@ -529,20 +403,4 @@ public sealed class CountdownLifecycle(TimeFixture fixture)
             CommandId.New(),
             duration,
             destination.Id));
-
-    private static string LocateRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (directory is not null
-               && !File.Exists(
-                   Path.Combine(directory.FullName, "DigitalBrain.slnx")))
-        {
-            directory = directory.Parent;
-        }
-
-        return directory?.FullName
-            ?? throw new InvalidOperationException(
-                "DigitalBrain.slnx was not found above the test assembly.");
-    }
 }

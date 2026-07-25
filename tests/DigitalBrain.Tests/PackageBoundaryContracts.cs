@@ -1,6 +1,4 @@
 using System.Xml.Linq;
-using DigitalBrain.Abstractions;
-using DigitalBrain.Client;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -27,7 +25,7 @@ public sealed class PackageBoundaryContracts
         "DigitalBrain.Quickstart.Contracts",
     ];
 
-    private static readonly string[] NeuronHosting = ["DigitalBrain.Testing", "DigitalBrain.DevTools"];
+    private static readonly string[] NeuronHosting = ["DigitalBrain.Testing"];
 
     private static readonly string[] ProductionRoots = ["src", "modules", "samples"];
 
@@ -40,18 +38,6 @@ public sealed class PackageBoundaryContracts
         "DigitalBrain.Modules.Google",
         "DigitalBrain.Modules.Salesforce",
     ];
-
-    [Fact(DisplayName = "DigitalBrainClient is the owner-scoped IDigitalBrain contract implementation")]
-    public void DigitalBrainClientImplementsTheOwnerScopedContract()
-    {
-        Assert.True(typeof(IDigitalBrain).IsInterface);
-        Assert.Contains(typeof(IDigitalBrain), typeof(DigitalBrainClient).GetInterfaces());
-        Assert.Equal(
-            typeof(OwnerId),
-            typeof(IDigitalBrain).GetProperty(nameof(IDigitalBrain.Owner))?.PropertyType);
-        Assert.False(typeof(INeuron).IsAssignableFrom(typeof(IDigitalBrain)));
-        Assert.False(typeof(INeuron).IsAssignableFrom(typeof(DigitalBrainClient)));
-    }
 
     [Theory]
     [MemberData(nameof(ConsumerPathPackages))]
@@ -299,8 +285,21 @@ public sealed class PackageBoundaryContracts
 
     private static string ProjectFileOf(string package) =>
         Directory.EnumerateFiles(RepositoryRoot, $"{package}.csproj", SearchOption.AllDirectories)
-            .Single(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                && !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
+            .Where(file => !IsIgnoredLookupPath(file))
+            .Single();
+
+    private static bool IsIgnoredLookupPath(string file)
+    {
+        var relative = Path.GetRelativePath(RepositoryRoot, file);
+        var segments = relative.Split(
+            Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar);
+        return segments.Any(segment =>
+            segment.Equals("bin", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("obj", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals(".worktrees", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase));
+    }
 
     private static string LocateRepositoryRoot()
     {

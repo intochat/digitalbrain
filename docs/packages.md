@@ -17,7 +17,6 @@ for what ships and what each package may depend on.
 | `DigitalBrain.Testing` | Development-only real three-silo `DigitalBrainFixture`, method-scoped `TestBrain`, and assembly-owned `DigitalBrainAppHostFixture<TAppHost>` with method-scoped `RunningAppHost` | Kernel |
 | `DigitalBrain.Aspire` | Client Generic Host integration | Client |
 | `DigitalBrain.Aspire.Hosting` | One-call durable AppHost brain composition | Abstractions |
-| `DigitalBrain.DevTools` | Development journals and dashboard | nothing |
 | `DigitalBrain.Security` | Purpose-bound durable encryption | configuration and dependency-injection abstractions |
 | `DigitalBrain.Integrations.Mcp` | Southbound official MCP transport, OAuth, token cache, and session mechanics | Security |
 | `DigitalBrain.Integrations.Mcp.Aspire.Hosting` | Shared AppHost projection for MCP-backed providers | Aspire.Hosting |
@@ -40,11 +39,11 @@ for what ships and what each package may depend on.
 | Family | Contracts | Runtime | Module hosting package | Semantic proof | Status |
 | --- | --- | --- | --- | --- | --- |
 | Quickstart | yes | yes | no | `DigitalBrain.Quickstart.Tests` + Quickstart AppHost | Built |
-| AI | yes | yes | yes | `DigitalBrain.ModuleTests` + production AppHost | Built |
-| Tasks | yes | yes | no | `DigitalBrain.ModuleTests` | Built |
+| AI | yes | yes | yes | typed LLM smoke + direct Concurrent/GroupChat Respond; supervised IWorker unbuilt | Built (direct); Designed (supervised) |
+| Tasks | yes | yes | no | contracts + runtime only | Built (module L1 driver proofs removed) |
 | Time | yes | yes | no | `DigitalBrain.Time.Tests` | Built: Countdown only |
-| Google | yes | yes | yes | `DigitalBrain.ModuleTests` + production AppHost | Built |
-| Salesforce | yes | yes | yes | `DigitalBrain.ModuleTests` + production AppHost | Built |
+| Google | yes | yes | yes | production AppHost selection | Built (module L1 driver proofs removed) |
+| Salesforce | yes | yes | yes | production AppHost selection | Built (module L1 driver proofs removed) |
 
 Quickstart, Tasks, and Time have no module `Aspire.Hosting` package because they need no
 module-specific AppHost resources. AI, Google, and Salesforce do.
@@ -55,18 +54,15 @@ module-specific AppHost resources. AI, Google, and Salesforce do.
 silo chooses runtime modules separately.
 
 `DigitalBrain.Kernel` is the domain-neutral neuron runtime. `AddDigitalBrainJournalStorage` refuses to start
-without the durable `journal` connection used by production hosts. `DigitalBrain.DevTools` supplies
-the in-memory escape hatch for local development instead of weakening that rule inside the kernel
-itself.
+without the durable `journal` connection used by production hosts. There is no separate development
+storage package: test hosts use `DigitalBrain.Testing`; production hosts use the durable journal
+connection projected by `AddDigitalBrain`.
 
-`DigitalBrain.Testing` separates its proof depths. L0 checks compiler and public shape. L1 uses the
-real three-silo `DigitalBrainFixture` and method-scoped `TestBrain` for neuron and module semantics.
-L2 uses the exclusive assembly-owned `DigitalBrainAppHostFixture<TAppHost>` and method-scoped
-`RunningAppHost` only for AppHost composition, real resource health, HTTP endpoints, graph/process
-restart, and bounded cleanup or failure evidence. Tests bind each resource name once through
-`host.Resource(name)`. The package-internal lease is the only serialization owner; test projects use
-no collection or global parallelization switch. Cleanup follows Aspire resource commands and terminal
-observations and never enumerates or kills processes by name.
+`DigitalBrain.Testing` separates its proof depths. L0 checks package graph and assembly boundaries.
+L1 uses the real multi-silo `DigitalBrainFixture` and method-scoped `TestBrain` for neuron and module
+semantics with journal observation and controllable clock. L2 uses exclusive
+`DigitalBrainAppHostFixture<TAppHost>` and method-scoped `RunningAppHost` for composition, health,
+and restart via Aspire APIs. Failures are ordinary exceptions; there is no public diagnostic DTO zoo.
 
 `IDigitalBrain` is the owner-scoped client contract and `DigitalBrainClient` is its implementation.
 There is no concrete brain neuron or root-neuron interface: `DigitalBrainBuilder` owns AppHost state,

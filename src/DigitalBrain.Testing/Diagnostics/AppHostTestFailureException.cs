@@ -5,20 +5,17 @@ namespace DigitalBrain.Testing;
 [SuppressMessage(
     "Design",
     "CA1032:Implement standard exception constructors",
-    Justification = "Every AppHost failure must carry a finalized bounded artifact and preserve its original exception.")]
+    Justification = "AppHost test failures always wrap an operation description.")]
 public sealed class AppHostTestFailureException : InvalidOperationException
 {
-    internal const string AttachmentName = "digitalbrain-apphost.json";
-
-    internal AppHostTestFailureException(
-        string message,
-        AppHostTestArtifact artifact,
-        Exception innerException)
-        : base(message, innerException)
+    public AppHostTestFailureException(string message)
+        : base(message)
     {
-        ArgumentNullException.ThrowIfNull(artifact);
-        Artifact = artifact;
     }
 
-    public AppHostTestArtifact Artifact { get; }
+    public AppHostTestFailureException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+        ArgumentNullException.ThrowIfNull(innerException);
+    }
 }

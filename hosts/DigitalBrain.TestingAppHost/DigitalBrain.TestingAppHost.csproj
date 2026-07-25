@@ -9,6 +9,5 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\DigitalBrain.Host\DigitalBrain.Host.csproj" />
-    <ProjectReference Include="..\DigitalBrain.ProbeHost\DigitalBrain.ProbeHost.csproj" />
   </ItemGroup>
 </Project>

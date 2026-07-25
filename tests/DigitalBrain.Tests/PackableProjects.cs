@@ -10,7 +10,6 @@ internal static class PackableProjects
         "DigitalBrain.Testing",
         "DigitalBrain.Aspire",
         "DigitalBrain.Aspire.Hosting",
-        "DigitalBrain.DevTools",
         "DigitalBrain.Security",
         "DigitalBrain.Integrations.Mcp",
         "DigitalBrain.Integrations.Mcp.Aspire.Hosting",

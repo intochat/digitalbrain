@@ -1,5 +1,3 @@
-using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
@@ -44,15 +42,9 @@ public sealed class DigitalBrainBuilder
 
     internal IResourceBuilder<ParameterResource>? StateProtectionKey => _stateProtectionKey;
 
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    [SuppressMessage(
-        "Design",
-        "CA1024:Use properties where appropriate",
-        Justification = "Hosting extension packages consume this hidden compiler-facing method.")]
-    public IDistributedApplicationBuilder GetApplicationBuilder() => _builder;
+    internal IDistributedApplicationBuilder GetApplicationBuilder() => _builder;
 
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public TState GetOrAddState<TState>(
+    internal TState GetOrAddState<TState>(
         Func<DigitalBrainBuilder, TState> create,
         out bool added)
         where TState : class

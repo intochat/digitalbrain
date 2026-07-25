@@ -1,9 +1,9 @@
 # DigitalBrain
 
 DigitalBrain is an open-source .NET framework for durable agents on Orleans and Aspire. Its
-paradigm is **neurons, synapses, and simulations**: neurons are durable Orleans-journaled agents,
-synapses are typed messages with full lineage, and simulations fire synapses into a real in-process
-cluster and assert on the timeline.
+paradigm is **neurons and synapses**: neurons are durable Orleans-journaled agents, synapses are
+typed facts with full lineage, and method-scoped `TestBrain` fixtures fire real multi-silo traffic
+and assert on committed journals.
 
 What it is being built toward:
 

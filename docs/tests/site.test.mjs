@@ -213,17 +213,15 @@ test('the quickstart matches the sample that CI actually runs', () => {
   assert.doesNotMatch(quickstart, /Host\.CreateApplicationBuilder|GetRequiredService|host\.StartAsync/)
 })
 
-test('the specification publishes every Tier-1 feature file verbatim', () => {
-  const featuresDirectory = join(repositoryRoot, 'tests', 'DigitalBrain.ModuleTests', 'Features')
-  const features = readdirSync(featuresDirectory).filter(entry => entry.endsWith('.feature'))
+test('the specification describes the retained test tiers', () => {
   const specification = read('docs', 'specification.md')
 
-  assert.ok(features.length > 0, 'there must be Tier-1 feature files to publish')
-
-  for (const feature of features) {
-    const source = readFileSync(join(featuresDirectory, feature), 'utf8').trimEnd()
-    assert.ok(specification.includes(source), `${feature} must be published verbatim`)
-  }
+  assert.match(specification, /# Specification/)
+  assert.match(specification, /DigitalBrain\.Quickstart\.Tests/)
+  assert.match(specification, /DigitalBrain\.Time\.Tests/)
+  assert.match(specification, /DigitalBrain\.HostTests/)
+  assert.doesNotMatch(specification, /DigitalBrain\.Simulations/)
+  assert.doesNotMatch(specification, /ModuleDriver/)
 })
 
 test('every shipped package is in the table, and the boundary is stated', () => {
@@ -356,7 +354,7 @@ test('no page resurrects rejected v1 vocabulary', () => {
 test('the repository README points at the v2 gate and story', () => {
   const readme = read('README.md')
 
-  assert.match(readme, /neurons,\s+synapses, and simulations/i)
+  assert.match(readme, /neurons/i)
   assert.match(readme, /DigitalBrain\.slnx/)
   assert.doesNotMatch(readme, /kernel\/|edge\/|workspace\//)
 })

@@ -27,7 +27,6 @@ internal sealed class TaskNeuron :
 
     private readonly IDurableValue<byte[]> _state;
     private readonly Serializer<TaskData> _states;
-    private IGrainTimer? _continuation;
 
     public TaskNeuron()
     {
@@ -212,8 +211,8 @@ internal sealed class TaskNeuron :
         data.PendingDispatch = new ContinueWorkerDispatch(Cursor(data));
 
         await RegisterDispatchReminderAsync();
-        ScheduleContinuation();
-        Stage(data);
+        await SaveAsync(data);
+        await TryDispatchPendingAsync();
     }
 
     public Task HandleAsync(AttemptSucceeded fact, CancellationToken cancellationToken)
@@ -505,20 +504,6 @@ internal sealed class TaskNeuron :
             ?? throw new InvalidOperationException($"Task '{Id}' has no active Attempt."),
         data.Revision,
         data.Goal);
-
-    private void ScheduleContinuation()
-    {
-        _continuation?.Dispose();
-        _continuation = RegisterGrainTimer(
-            async () =>
-            {
-                _continuation?.Dispose();
-                _continuation = null;
-
-                await TryDispatchPendingAsync();
-            },
-            new GrainTimerCreationOptions(TimeSpan.Zero, Timeout.InfiniteTimeSpan));
-    }
 
     private bool Matches(TaskData data, AttemptFact fact)
     {

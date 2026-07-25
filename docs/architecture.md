@@ -254,37 +254,23 @@ the base class says *how* it operates. Orchestrations accept both raw `ILLM` neu
 `IAgent` neurons; internal adapters convert either into an MAF participant. Participants are declared
 by typed neuron identity, never by injecting fake constructor dependencies.
 
-**Orleans is the durability authority.** There is exactly one outer MAF artifact per entry path: a
-direct `Respond` turn owns a protected serialized `AgentSession`; a supervised Attempt owns a raw
-MAF workflow checkpoint lineage through an Orleans-backed MAF `JsonCheckpointStore`. Both payloads
-are encrypted by `DigitalBrain.Security` with one brain-scoped 256-bit key and purposes derived from
-the neuron/definition or checkpoint lineage, so a restart or another silo can recover them without
-process-local ASP.NET Data Protection state. The supervised checkpoint may contain MAF-owned
-participant sessions internally — DigitalBrain neither extracts them nor keeps a parallel outer
-session. There is no second transcript, and the MAF Durable Extension is rejected because it would
-duplicate Orleans.
-Each envelope binds the DigitalBrain state version, the MAF version, the definition fingerprint, and
-the typed participants. Restore reconstructs the exact composed definition first and only then
-restores state; a change to participants, prompts, providers, tools, orchestration shape, or MAF
-version preserves the old state and demands an explicit migration or reset instead of silently
-reusing it.
+**Orleans is the durability authority for direct turns.** Built today: direct `Concurrent` and
+`GroupChat` `Respond` paths own a protected serialized MAF `AgentSession` through
+`DirectAgentSession` (encrypted by `DigitalBrain.Security`). There is no second transcript, and the
+MAF Durable Extension is rejected because it would duplicate Orleans. Restore reconstructs the
+composed definition first and only then restores state; a fingerprint mismatch demands explicit
+migration or reset.
 
-For direct `Concurrent` and direct `GroupChat`, the internal `DirectAgentSession` is the only owner of
-MAF session create, restore, run, serialize, protect, commit, and failed-write rollback. Supervised
-Task/GroupChat execution does not reuse that envelope: `AIWorkerState`, the private `WorkflowRunner`,
-and `OrleansCheckpointStore` own its run identity, cancellation fence, and definition-bound checkpoint
-lineage. Direct `GroupChat` is refused while that supervised lifecycle is active.
+**Supervised Task/`IWorker` orchestration is Designed, not built.** `IGroupChat` still extends
+`IWorker`, but `Accept` / `Continue` / `Cancel` throw until a thin Orleans-primary supervised path is
+rewritten. The retired private `WorkflowRunner` / `OrleansCheckpointStore` / `AIWorkerState` stack was
+deleted as overbuilt reinvention — not as a product vocabulary change. When supervised work returns,
+it must re-enter as one Lockstep superstep per runner hop with definition-bound checkpoints, not as a
+second agent runtime.
 
-**A worker never runs a long MAF superstep on its Orleans turn.** It persists replayable input and one
-active run — a fresh run identity, the full attempt cursor, the definition fingerprint, the input
-checkpoint, and a recovery deadline — and returns. A private runner advances exactly one Lockstep
-superstep, and the worker adopts the result only when run identity, cursor, fingerprint, and input
-checkpoint all match and the checkpoint store has committed. That runner is infrastructure: no
-registry entry, no journal, no semantic interface, no scripting visibility.
-
-Settled but not yet standing up: `Sequential`, `Handoff`, and `Magentic` are ratified orchestration
-vocabulary and have no base class in the repository — `GroupChat` and `Concurrent` do. A single-agent
-hard task is expected to use a one-participant `Sequential` worker once that type exists.
+Settled but not yet standing up: `Sequential`, `Handoff`, and `Magentic` base types, plus the supervised
+worker path above. `GroupChat` and `Concurrent` exist for direct `Respond`. A single-agent hard task is
+expected to use a one-participant `Sequential` worker once that type and supervised wiring exist.
 Compaction is ratified with the shape it will have to keep — internal, token-budget driven,
 collapsing old tool results first, summarizing with the same typed model, truncating only as an
 emergency, and never leaking experimental MAF types into public contracts — and none of it is
@@ -504,8 +490,10 @@ What the module then does is record and return. `ReconcileAsync` persists the un
 hands back the receipt, and nothing in this module contacts a Task — it could not, because
 `DigitalBrain.Modules.Salesforce` has no reference to Tasks contracts or runtime, so Tasks vocabulary
 is out of reach by construction. The decision belongs to whoever read the receipt, and the
-repository's own consumer makes it bluntly: `AccountEnrichmentProcess` throws
-`InvalidOperationException` when the state it gets back is anything other than `Completed`.
+caller that cannot prove completion must refuse to invent success — treat any non-`Completed`
+receipt as failure or uncertainty, never as a silent retry of the mutation. The sample
+`AccountEnrichmentProcess` is the multi-module behavior example: Gmail read → Salesforce propose →
+human approval → completed enrichment fact; it refuses any non-`Completed` mutation receipt.
 
 Ratified but not built: parking the owning Task on an `OutcomeUncertain` blocker rather than letting
 the uncertainty surface as a caller-side exception. `AttemptOutcomeUncertain` has no producer under

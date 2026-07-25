@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
@@ -10,24 +8,23 @@ using Orleans.Serialization;
 
 namespace DigitalBrain.AccountEnrichment;
 
-public sealed class AccountEnrichmentProcess : Neuron,
+public sealed class AccountEnrichmentProcess :
+    Neuron,
     INeuron,
     IHandle<EnrichAccountFromEmail>,
-    IHandle<ContinueAccountEnrichment>,
     IHandle<SalesforceMutationApproval>,
-    IHandle<ExecuteApprovedAccountEnrichment>,
     IEmit<AccountEnrichmentProposed>,
     IEmit<AccountEnriched>
 {
     private const string RequestsName = "account-enrichment.requests";
     private readonly IDurableDictionary<Guid, byte[]> _requests;
-    private readonly Serializer<AccountEnrichmentData> _states;
+    private readonly Serializer<Request> _states;
 
     public AccountEnrichmentProcess()
     {
         _requests = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(
             RequestsName);
-        _states = ServiceProvider.GetRequiredService<Serializer<AccountEnrichmentData>>();
+        _states = ServiceProvider.GetRequiredService<Serializer<Request>>();
     }
 
     public async Task HandleAsync(
@@ -36,77 +33,42 @@ public sealed class AccountEnrichmentProcess : Neuron,
     {
         ArgumentNullException.ThrowIfNull(synapse);
         Validate(synapse);
-        _ = GmailId(synapse.GmailAccount);
 
-        var fingerprint = Fingerprint(synapse);
-        var existing = Load(synapse.CommandId);
-
-        if (existing is not null)
+        if (Load(synapse.CommandId) is { } existing)
         {
-            EnsureSame(existing, fingerprint);
+            EnsureSame(existing, synapse);
             return;
-        }
-
-        Stage(
-            synapse.CommandId,
-            new AccountEnrichmentData(
-                synapse.MessageId,
-                synapse.GmailAccount,
-                synapse.AccountId,
-                fingerprint,
-                Description: null,
-                MutationFingerprint: null,
-                AccountEnrichmentPhase.Fenced));
-        await SendAsync(Id, new ContinueAccountEnrichment(synapse.CommandId));
-    }
-
-    async Task IHandle<ContinueAccountEnrichment>.HandleAsync(
-        ContinueAccountEnrichment synapse,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(synapse);
-
-        var request = Load(synapse.CommandId)
-            ?? throw new InvalidOperationException(
-                $"Account enrichment '{synapse.CommandId}' has no durable request fence.");
-        EnsureIntact(synapse.CommandId, request);
-
-        if (request.Phase is AccountEnrichmentPhase.Proposed or AccountEnrichmentPhase.Completed)
-        {
-            return;
-        }
-
-        if (request.Phase is not AccountEnrichmentPhase.Fenced)
-        {
-            throw new InvalidOperationException(
-                $"Account enrichment '{synapse.CommandId}' cannot continue from {request.Phase}.");
         }
 
         var gmail = GrainFactory.GetGrain<IGmail>(
-            GmailId(request.GmailAccount).ToGrainId());
+            NeuronId.For<IGmail>(Id.Owner, synapse.GmailAccount).ToGrainId());
         var salesforce = GrainFactory.GetGrain<ISalesforce>(
             NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
-        var message = await gmail.ReadMessage(request.MessageId, cancellationToken);
-        var description = $"Email from {message.Sender}: {message.Subject}\n{message.PlaintextBody}";
+
+        var message = await gmail.ReadMessage(synapse.MessageId, cancellationToken);
+        var description =
+            $"Email from {message.Sender}: {message.Subject}\n{message.PlaintextBody}";
         var mutation = await salesforce.ProposeAccountDescription(
             synapse.CommandId,
             Id,
-            request.AccountId,
+            synapse.AccountId,
             description,
             cancellationToken);
 
         Stage(
             synapse.CommandId,
-            request with
-            {
-                Description = description,
-                MutationFingerprint = mutation.Fingerprint,
-                Phase = AccountEnrichmentPhase.Proposed,
-            });
+            new Request(
+                synapse.MessageId,
+                synapse.GmailAccount,
+                synapse.AccountId,
+                description,
+                mutation.Fingerprint,
+                Completed: false));
+
         await EmitAsync(new AccountEnrichmentProposed(
             synapse.CommandId,
-            request.MessageId,
-            request.AccountId,
+            synapse.MessageId,
+            synapse.AccountId,
             description,
             mutation.Fingerprint));
     }
@@ -119,52 +81,26 @@ public sealed class AccountEnrichmentProcess : Neuron,
 
         var request = Load(synapse.CommandId)
             ?? throw new InvalidOperationException(
-                $"Account enrichment '{synapse.CommandId}' has no durable request context.");
-        EnsureIntact(synapse.CommandId, request);
-        EnsureApproval(request, synapse);
-
-        if (request.Phase is AccountEnrichmentPhase.Completed)
+                $"Account enrichment '{synapse.CommandId}' has no durable request.");
+        if (request.Completed)
         {
             return;
         }
 
-        if (request.Phase is not AccountEnrichmentPhase.Proposed)
+        if (!string.Equals(
+                request.MutationFingerprint,
+                synapse.Fingerprint,
+                StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                $"Account enrichment '{synapse.CommandId}' cannot be approved from {request.Phase}.");
+                $"Salesforce approval '{synapse.ApprovalId}' does not match the enrichment proposal.");
         }
 
-        await SendAsync(Id, new ExecuteApprovedAccountEnrichment(synapse));
-    }
-
-    async Task IHandle<ExecuteApprovedAccountEnrichment>.HandleAsync(
-        ExecuteApprovedAccountEnrichment synapse,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(synapse);
-
-        var request = Load(synapse.Approval.CommandId)
-            ?? throw new InvalidOperationException(
-                $"Account enrichment '{synapse.Approval.CommandId}' has no durable request context.");
-        EnsureIntact(synapse.Approval.CommandId, request);
-        EnsureApproval(request, synapse.Approval);
-
-        if (request.Phase is AccountEnrichmentPhase.Completed)
-        {
-            return;
-        }
-
-        if (request.Phase is not AccountEnrichmentPhase.Proposed)
-        {
-            throw new InvalidOperationException(
-                $"Account enrichment '{synapse.Approval.CommandId}' cannot complete from {request.Phase}.");
-        }
-
+        var evidence = await ApprovalEvidenceAsync(synapse);
         var salesforce = GrainFactory.GetGrain<ISalesforce>(
             NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
-        var evidence = await FindApprovalEvidenceAsync(synapse.Approval);
         var mutation = await salesforce.ApproveAccountDescription(
-            synapse.Approval,
+            synapse,
             evidence,
             cancellationToken);
 
@@ -174,17 +110,9 @@ public sealed class AccountEnrichmentProcess : Neuron,
                 $"Salesforce could not prove completion of Account '{mutation.AccountId}' enrichment.");
         }
 
-        if (mutation.CommandId != synapse.Approval.CommandId
-            || !string.Equals(mutation.AccountId, request.AccountId, StringComparison.Ordinal)
-            || !string.Equals(mutation.Description, request.Description, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                $"Salesforce returned a receipt that does not match account enrichment '{synapse.Approval.CommandId}'.");
-        }
-
         Stage(
-            mutation.CommandId,
-            request with { Phase = AccountEnrichmentPhase.Completed });
+            synapse.CommandId,
+            request with { Completed = true });
         await EmitAsync(new AccountEnriched(
             mutation.CommandId,
             request.MessageId,
@@ -196,34 +124,35 @@ public sealed class AccountEnrichmentProcess : Neuron,
     {
         ArgumentNullException.ThrowIfNull(delivery);
 
-        return delivery.Synapse is SalesforceMutationApproval approval
+        if (delivery.Synapse is SalesforceMutationApproval approval
             && (delivery.Caller != approval.Approver
                 || approval.Approver.Type != ISessionNeuron.GrainTypeName
-                || approval.Approver.Owner != Id.Owner)
-            ? Task.CompletedTask
-            : base.Deliver(delivery);
+                || approval.Approver.Owner != Id.Owner))
+        {
+            return Task.CompletedTask;
+        }
+
+        return base.Deliver(delivery);
     }
 
-    private async Task<SynapseDelivery> FindApprovalEvidenceAsync(
+    private async Task<SynapseDelivery> ApprovalEvidenceAsync(
         SalesforceMutationApproval approval)
     {
         var incoming = await ReadJournal(JournalKind.Incoming, afterSequence: 0);
-        var evidence = incoming.Delta.FirstOrDefault(delivery =>
-            delivery.Caller == approval.Approver
-            && delivery.Synapse is SalesforceMutationApproval recorded
-            && recorded == approval);
-
-        return evidence
+        return incoming.Delta.FirstOrDefault(delivery =>
+                delivery.Caller == approval.Approver
+                && delivery.Synapse is SalesforceMutationApproval recorded
+                && recorded == approval)
             ?? throw new InvalidOperationException(
                 $"Salesforce approval '{approval.ApprovalId}' has no durable human delivery evidence.");
     }
 
-    private AccountEnrichmentData? Load(CommandId commandId)
+    private Request? Load(CommandId commandId)
         => _requests.TryGetValue(commandId.Value, out var serialized)
             ? _states.Deserialize(serialized)
             : null;
 
-    private void Stage(CommandId commandId, AccountEnrichmentData data)
+    private void Stage(CommandId commandId, Request data)
     {
         var key = commandId.Value;
         var existed = _requests.TryGetValue(key, out var previous);
@@ -241,70 +170,16 @@ public sealed class AccountEnrichmentProcess : Neuron,
         _requests[key] = _states.SerializeToArray(data);
     }
 
-    private static void EnsureApproval(
-        AccountEnrichmentData request,
-        SalesforceMutationApproval approval)
+    private static void EnsureSame(Request existing, EnrichAccountFromEmail synapse)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(approval.Fingerprint);
-
-        if (!string.Equals(
-            request.MutationFingerprint,
-            approval.Fingerprint,
-            StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                $"Salesforce approval '{approval.ApprovalId}' does not match its account-enrichment proposal.");
-        }
-    }
-
-    private static void EnsureIntact(
-        CommandId commandId,
-        AccountEnrichmentData request)
-        => EnsureSame(
-            request,
-            Fingerprint(
-                commandId,
-                request.GmailAccount,
-                request.MessageId,
-                request.AccountId));
-
-    private static void EnsureSame(
-        AccountEnrichmentData request,
-        string fingerprint)
-    {
-        if (!string.Equals(
-            request.RequestFingerprint,
-            fingerprint,
-            StringComparison.Ordinal))
+        if (!string.Equals(existing.MessageId, synapse.MessageId, StringComparison.Ordinal)
+            || !string.Equals(existing.GmailAccount, synapse.GmailAccount, StringComparison.Ordinal)
+            || !string.Equals(existing.AccountId, synapse.AccountId, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 "An account-enrichment command id cannot be reused with different input.");
         }
     }
-
-    private static string Fingerprint(EnrichAccountFromEmail request)
-        => Fingerprint(
-            request.CommandId,
-            request.GmailAccount,
-            request.MessageId,
-            request.AccountId);
-
-    private static string Fingerprint(
-        CommandId commandId,
-        string gmailAccount,
-        string messageId,
-        string accountId)
-        => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(
-            new[]
-            {
-                commandId.Value.ToString("N"),
-                gmailAccount,
-                messageId,
-                accountId,
-            })));
-
-    private NeuronId GmailId(string account)
-        => NeuronId.For<IGmail>(Id.Owner, account);
 
     private static void Validate(EnrichAccountFromEmail request)
     {
@@ -317,22 +192,15 @@ public sealed class AccountEnrichmentProcess : Neuron,
 
         ArgumentException.ThrowIfNullOrWhiteSpace(request.MessageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.AccountId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.GmailAccount);
     }
 
     [GenerateSerializer]
-    internal sealed record AccountEnrichmentData(
+    internal sealed record Request(
         [property: Id(0)] string MessageId,
         [property: Id(1)] string GmailAccount,
         [property: Id(2)] string AccountId,
-        [property: Id(3)] string RequestFingerprint,
-        [property: Id(4)] string? Description,
-        [property: Id(5)] string? MutationFingerprint,
-        [property: Id(6)] AccountEnrichmentPhase Phase);
-
-    internal enum AccountEnrichmentPhase
-    {
-        Fenced,
-        Proposed,
-        Completed,
-    }
+        [property: Id(3)] string Description,
+        [property: Id(4)] string MutationFingerprint,
+        [property: Id(5)] bool Completed);
 }
