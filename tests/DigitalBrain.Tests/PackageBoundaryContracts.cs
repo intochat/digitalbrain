@@ -121,6 +121,22 @@ public sealed class PackageBoundaryContracts
             DirectPackageReferencesOf("DigitalBrain.Modules.AI"));
     }
 
+    [Fact(DisplayName = "Kernel compile graph is Abstractions only — never Flutter, Ui, or modules")]
+    public void KernelCompileGraphIsAbstractionsOnly()
+    {
+        Assert.Equal(
+            ["DigitalBrain.Abstractions"],
+            DirectCompileProjectReferencesOf("DigitalBrain.Kernel").Order(StringComparer.Ordinal));
+
+        var reachable = CompileProjectsReachableFrom("DigitalBrain.Kernel");
+        Assert.DoesNotContain(
+            reachable,
+            project => project.Contains("Flutter", StringComparison.OrdinalIgnoreCase)
+                || project is "DigitalBrain.Ui"
+                || project.StartsWith("DigitalBrain.Ui.", StringComparison.Ordinal)
+                || project.StartsWith("DigitalBrain.Modules.", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void TasksRemainIndependentFromAiAndProviders()
     {

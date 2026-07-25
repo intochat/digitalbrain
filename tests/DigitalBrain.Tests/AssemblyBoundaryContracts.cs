@@ -72,16 +72,48 @@ public sealed class AssemblyBoundaryContracts
         }
     }
 
-    [Fact(DisplayName = "the kernel assembly reaches no Flutter module or Dart SDK")]
+    [Fact(DisplayName = "the kernel assembly reaches no Flutter module, Dart SDK, or UI host")]
     public void TheKernelReachesNoFlutterModuleOrDartSdk()
     {
         var reachable = ReachableFrom(typeof(Neuron).Assembly);
         Assert.DoesNotContain(
             reachable,
-            reference => reference.StartsWith("DigitalBrain.Modules.Flutter", StringComparison.Ordinal));
+            reference => reference.Contains("Flutter", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(
             reachable,
             reference => reference.StartsWith("Dart", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(
+            reachable,
+            reference => reference is "DigitalBrain.Ui"
+                || reference.StartsWith("DigitalBrain.Ui.", StringComparison.Ordinal));
+    }
+
+    [Fact(DisplayName = "the kernel assembly carries no Flutter or UI surface vocabulary")]
+    public void TheKernelCarriesNoFlutterOrUiVocabulary()
+    {
+        string[] forbiddenNameFragments =
+        [
+            "Flutter",
+            "IShell",
+            "IScene",
+            "OpenScene",
+            "SceneOpened",
+            "ControlActivated",
+            "UiGateway",
+            "UiSurface",
+            "BuildContext",
+            "Widget",
+        ];
+
+        var offenders = typeof(Neuron).Assembly
+            .GetTypes()
+            .Select(type => type.FullName!)
+            .Where(fullName => forbiddenNameFragments.Any(fragment =>
+                fullName.Contains(fragment, StringComparison.Ordinal)))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(offenders);
     }
 
     [Fact]
