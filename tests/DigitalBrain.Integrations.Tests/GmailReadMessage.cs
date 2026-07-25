@@ -32,4 +32,27 @@ public sealed class GmailReadMessage(IntegrationsFixture fixture)
         Assert.Equal("All green.", message.PlaintextBody);
         Assert.True(test.Mcp().SessionCount >= 1);
     }
+
+    [Fact(DisplayName =
+        "IGmail.ReadMessage refuses get_message when admitted annotations fail on the scripted MCP edge")]
+    public async Task ReadMessageRefusesIncompatibleToolAnnotations()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        test.Mcp().Catalog(
+            "google.gmail",
+            AdmittedMcpTools.GmailGetMessageWithIncompatibleAnnotations());
+
+        var driver = test.Neuron<IIntegrationDriver>("gmail-refuse");
+        var failure = await Assert.ThrowsAnyAsync<Exception>(() =>
+            driver.Reference.ReadGmailMessage(
+                "reader@example.com",
+                "msg-bad",
+                cancellationToken));
+
+        Assert.Contains("incompatible with the admitted", failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("get_message", failure.Message, StringComparison.Ordinal);
+        Assert.True(test.Mcp().SessionCount >= 1);
+    }
 }
+

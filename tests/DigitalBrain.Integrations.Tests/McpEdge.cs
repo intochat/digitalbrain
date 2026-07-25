@@ -149,48 +149,11 @@ internal static class AdmittedMcpTools
         string sender,
         string plaintextBody)
         => new FixedSchemaTool(
-            new Tool
-            {
-                Name = "get_message",
-                InputSchema = Parse(
-                    """
-                    {
-                      "type": "object",
-                      "properties": {
-                        "messageId": { "type": "string" },
-                        "messageFormat": {
-                          "type": "string",
-                          "enum": [
-                            "MESSAGE_FORMAT_UNSPECIFIED",
-                            "MINIMAL",
-                            "FULL_CONTENT",
-                            "METADATA_ONLY"
-                          ]
-                        }
-                      },
-                      "required": [ "messageId" ]
-                    }
-                    """),
-                OutputSchema = Parse(
-                    """
-                    {
-                      "type": "object",
-                      "properties": {
-                        "id": { "type": "string" },
-                        "subject": { "type": "string" },
-                        "sender": { "type": "string" },
-                        "plaintextBody": { "type": "string" }
-                      }
-                    }
-                    """),
-                Annotations = new ToolAnnotations
-                {
-                    ReadOnlyHint = true,
-                    DestructiveHint = false,
-                    IdempotentHint = true,
-                    OpenWorldHint = false,
-                },
-            },
+            GmailGetMessageProtocolTool(
+                readOnlyHint: true,
+                destructiveHint: false,
+                idempotentHint: true,
+                openWorldHint: false),
             _ => new CallToolResult
             {
                 StructuredContent = JsonSerializer.SerializeToElement(new
@@ -201,6 +164,64 @@ internal static class AdmittedMcpTools
                     plaintextBody,
                 }),
             });
+
+    internal static McpServerTool GmailGetMessageWithIncompatibleAnnotations()
+        => new FixedSchemaTool(
+            GmailGetMessageProtocolTool(
+                readOnlyHint: true,
+                destructiveHint: true,
+                idempotentHint: true,
+                openWorldHint: false),
+            _ => throw new InvalidOperationException(
+                "Incompatible Gmail get_message must not be invoked."));
+
+    private static Tool GmailGetMessageProtocolTool(
+        bool? readOnlyHint,
+        bool? destructiveHint,
+        bool? idempotentHint,
+        bool? openWorldHint)
+        => new()
+        {
+            Name = "get_message",
+            InputSchema = Parse(
+                """
+                {
+                  "type": "object",
+                  "properties": {
+                    "messageId": { "type": "string" },
+                    "messageFormat": {
+                      "type": "string",
+                      "enum": [
+                        "MESSAGE_FORMAT_UNSPECIFIED",
+                        "MINIMAL",
+                        "FULL_CONTENT",
+                        "METADATA_ONLY"
+                      ]
+                    }
+                  },
+                  "required": [ "messageId" ]
+                }
+                """),
+            OutputSchema = Parse(
+                """
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "subject": { "type": "string" },
+                    "sender": { "type": "string" },
+                    "plaintextBody": { "type": "string" }
+                  }
+                }
+                """),
+            Annotations = new ToolAnnotations
+            {
+                ReadOnlyHint = readOnlyHint,
+                DestructiveHint = destructiveHint,
+                IdempotentHint = idempotentHint,
+                OpenWorldHint = openWorldHint,
+            },
+        };
 
     internal static McpServerTool SalesforceUpdateAccount(bool success = true)
         => new FixedSchemaTool(
