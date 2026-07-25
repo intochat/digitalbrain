@@ -172,6 +172,9 @@ internal sealed class FixtureCluster : IAsyncDisposable
                 moduleIndex++;
             }
 
+            silo.Configuration["DigitalBrain:Security:StateProtectionKey"] =
+                Convert.ToBase64String(new byte[32]);
+
             DigitalBrainRuntime.Add(silo, FixtureCluster.LabelOf(options.SiloName), _modules);
             silo.Services.AddSingleton(new ReminderSourceAllowlist(
                 [TestReminderDeliveryService.SourceType]));
