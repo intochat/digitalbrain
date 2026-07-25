@@ -3,7 +3,6 @@
     <IsPackable>true</IsPackable>
     <Description>Aspire AppHost integration for typed DigitalBrain AI model neurons.</Description>
     <RootNamespace>DigitalBrain.AI.Aspire.Hosting</RootNamespace>
-    <NoWarn>$(NoWarn)</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.OpenAI" />
