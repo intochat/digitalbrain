@@ -43,7 +43,7 @@ for what ships and what each package may depend on.
 | AI | yes | yes | yes | typed LLM smoke (`ILlama32`); L1 Concurrent/GroupChat Respond multi-participant + session reuse; supervised IWorker unbuilt | Built (direct surface); Designed (supervised) |
 | Tasks | yes | yes | no | contracts + runtime package + assembly-boundary pins; `DigitalBrain.Tasks.Tests` L1 closed loop via test-only `IWorker` | Built |
 | Time | yes | yes | no | `DigitalBrain.Time.Tests` (Countdown lifecycle and recovery) | Built: Countdown only |
-| Google | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` Gmail ReadMessage on scripted MCP edge | Built |
+| Google | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` Gmail ReadMessage admit + annotation refusal on scripted MCP edge | Built |
 | Salesforce | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` propose / reject / approve→Completed on scripted MCP edge | Built |
 
 Quickstart, Tasks, and Time have no module `Aspire.Hosting` package because they need no

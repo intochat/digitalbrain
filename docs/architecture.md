@@ -857,9 +857,10 @@ remain designed; no product `IWorker` under `modules/` emits attempt facts yet.
 
 **Google and Salesforce L1 proofs use a scripted southbound MCP edge, not live cloud.**
 `DigitalBrain.Integrations.Tests` proves Gmail `ReadMessage` against an admitted `get_message` tool,
-Salesforce propose without MCP, approval rejection before MCP when human evidence mismatches, and
-approve → `Completed` through admitted update/query tools on the same in-process edge. Live OAuth and
-hosted MCP endpoints remain out of the default L1 path.
+refusal when that tool's safety annotations fail the positive admission check, Salesforce propose
+without MCP, approval rejection before MCP when human evidence mismatches, and approve → `Completed`
+through admitted update/query tools on the same in-process edge. Live OAuth and hosted MCP endpoints
+remain out of the default L1 path.
 
 **AI direct Concurrent/GroupChat L1 is closed; supervised remains Designed.** Typed LLM smoke
 (`ILlama32`) plus ModuleTests multi-participant Concurrent/GroupChat `Respond` and durable second-turn

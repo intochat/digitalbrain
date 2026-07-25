@@ -8,13 +8,13 @@ Executable product proofs live in the test tiers:
 
 | Tier | Project | What it proves |
 | --- | --- | --- |
-| L0 | `tests/DigitalBrain.Tests` | Package graph boundaries and reflection on public shapes |
+| L0 | `tests/DigitalBrain.Tests` | Package graph, assembly boundaries, public shapes, capability reification, AI surface pins |
 | L1 | `tests/DigitalBrain.TestingTests` | Testing product lifecycle (fixture, journals, clock, faults) |
 | L1 | `tests/DigitalBrain.Quickstart.Tests` | External author greeter durability |
 | L1 | `tests/DigitalBrain.Time.Tests` | Durable `ICountdown` lifecycle and recovery (Orleans reminder as wake authority) |
 | L1 | `tests/DigitalBrain.Tasks.Tests` | Task Start/Cancel lifecycle via test-only `IWorker` |
-| L1 | `tests/DigitalBrain.ModuleTests` | Optional typed LLM smoke; Concurrent/GroupChat Respond |
-| L1 | `tests/DigitalBrain.Integrations.Tests` | Gmail ReadMessage + Salesforce propose/reject/approve on scripted MCP edge |
+| L1 | `tests/DigitalBrain.ModuleTests` | Typed LLM smoke; Concurrent/GroupChat Respond multi-participant + session reuse |
+| L1 | `tests/DigitalBrain.Integrations.Tests` | Gmail ReadMessage admit + annotation refusal; Salesforce propose/reject/approve on scripted MCP edge |
 | L2 | `tests/DigitalBrain.HostTests` | Exclusive AppHost graph health |
 
 This page is authored markdown, not generated from feature files. Restore a generated specification
