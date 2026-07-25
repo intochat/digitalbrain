@@ -39,6 +39,7 @@
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/DigitalBrain.AccountEnrichment/DigitalBrain.AccountEnrichment.csproj" />
+    <Project Path="samples/DigitalBrain.Compositions/DigitalBrain.Compositions.csproj" />
     <Project Path="samples/DigitalBrain.Quickstart.Contracts/DigitalBrain.Quickstart.Contracts.csproj" />
     <Project Path="samples/DigitalBrain.Quickstart/DigitalBrain.Quickstart.csproj" />
   </Folder>
@@ -50,6 +51,7 @@
     <Project Path="tests/DigitalBrain.Quickstart.Tests/DigitalBrain.Quickstart.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Time.Tests/DigitalBrain.Time.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Flutter.Tests/DigitalBrain.Flutter.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.Compositions.Tests/DigitalBrain.Compositions.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Tasks.Tests/DigitalBrain.Tasks.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Integrations.Tests/DigitalBrain.Integrations.Tests.csproj" />
 
