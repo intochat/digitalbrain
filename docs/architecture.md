@@ -601,7 +601,7 @@ calendar, and DST record shapes. Do not implement those as though they were sett
 
 ### 4.6 Flutter
 
-Status: Built (first-vertical vocabulary + L0/L1 journal proofs + C# northbound UI edge); Designed (Dart host, host-facing edge watch, full chrome, product journal observation on IDigitalBrain, multi-principal IdP edge)
+Status: Built (first-vertical vocabulary + L0/L1 journal proofs + C# northbound UI edge); Designed (Dart host, full chrome, product journal observation on IDigitalBrain, multi-principal IdP edge)
 
 The OS surface is not a Flutter app with agents behind it. It is a brain whose **UI vocabulary** is a
 Flutter module, and whose **logic** (shell policy, post-auth composition, multi-window orchestration,
@@ -681,10 +681,12 @@ Flutter / Dart host  ──HTTP/JSON (+ SSE watch)──►  hosts/DigitalBrain.
 ```
 
 - **Built:** `hosts/DigitalBrain.Ui` — owner-bound `IDigitalBrain` edge with HTTP
-  `POST /shells/{shell}/scenes` and `POST /scenes/{scene}/controls/{id}/activate`. L1 proves those
-  map to journaled `SceneOpened` / `ControlActivated` without a Dart process. Production AppHost
-  selects `FlutterModule` on the silo and wires the UI host with `AsClient()` only (same trust split
-  as MCP).
+  `POST /shells/{shell}/scenes`, `POST /scenes/{scene}/controls/{id}/activate`, and
+  `GET /shells/{shell}/events` (SSE `scene-opened` projection from the shell **outgoing** journal via
+  host-private `ISessionNeuron.ReadNeuronJournal` poll — not `IDigitalBrain` observation, not OTel).
+  L1 proves command→journal and SSE→`SceneOpened` without a Dart process or host restart. Production
+  AppHost selects `FlutterModule` on the silo and wires the UI host with `AsClient()` only (same trust
+  split as MCP).
 - **Keep** `hosts/DigitalBrain.Mcp` as agent/IDE northbound — not the product UI path (no tool
   dictionaries on UI contracts; MCP owner binding today is process config, not human IdP). Shared
   brain state means MCP (or any trusted client) may mutate owner-scoped facts that the UI edge later
@@ -695,7 +697,8 @@ Flutter / Dart host  ──HTTP/JSON (+ SSE watch)──►  hosts/DigitalBrain.
 - **Designed:** Dart host at `clients/digitalbrain_flutter` (optional pure-Dart wire package
   `clients/digitalbrain_wire`); production IdP principal→owner bind; product journal observation on
   `IDigitalBrain` when a non-UI consumer needs the same cursor/watch (not required for the first live
-  host feed).
+  host feed); optional upgrade from edge journal poll to grain `WatchNeuron` push without changing the
+  HTTP event schema.
 - Edge executable lives under `hosts/` (peer of MCP and the silo host). The pixel host is a
   **client** under `clients/`, not a packable module and not a second Orleans host under `hosts/`.
   Do not invent a second public client facade beside `DigitalBrainClient`.
@@ -706,14 +709,14 @@ Product journal **observation** on `IDigitalBrain` remains unbuilt (§8): the pu
 sends and emits only. That gap must not invent a second semantic protocol or a ProbeHost-shaped
 “watch any grain” surface.
 
-**H1 (ratified for the first live feed):** host-facing watch on `hosts/DigitalBrain.Ui` only.
+**First live feed (built on the edge):** host-facing SSE on `hosts/DigitalBrain.Ui` only.
 
 | Decision | Choice | Fold if |
 | --- | --- | --- |
 | Where | Edge projects one owner-bound shell’s **outgoing** journal | Endpoints become generic “watch any neuron journal” (ProbeHost smell) |
-| How | Reuse existing `ISessionNeuron.ReadNeuronJournal` / `WatchNeuron` inside the UI process | Kernel gains UI types |
+| How | Host-private `ISessionNeuron.ReadNeuronJournal` poll under SSE (push/`WatchNeuron` optional later) | Kernel gains UI types |
 | Transport | HTTP **SSE** JSON under the same edge (commands stay POST); cursor = journal sequence / `afterSequence` | gRPC/proto dual vocabulary returns; or WebSocket is justified by a bidirectional need |
-| Public client | **No** `IDigitalBrain` watch in H1 | A second non-UI consumer needs the same API — then promote deliberate client observation |
+| Public client | **No** `IDigitalBrain` watch yet | A second non-UI consumer needs the same API — then promote deliberate client observation |
 | Polling `Current()` | **Not** the primary live path | Only after a real descriptor method exists with journal-backed recovery proofs |
 
 Lessons recovered from historical `workspace/` UiSurface (design only — not a code transplant): durable
@@ -1244,9 +1247,8 @@ track has proofs.
    exists.
 5. Add recurring and calendar Time vocabulary once its library and public record shapes are approved.
 6. Flutter OS surface (in order): (a) C#-only first vertical — **built** (vocabulary, L0/L1, Ui edge
-   commands, thin compositions); (b) host-facing SSE journal watch on `DigitalBrain.Ui` so a client
-   sees `SceneOpened` without process restart; (c) Dart host under `clients/digitalbrain_flutter`
-   over that HTTP surface + dual golden; (d) deeper compositions (shell, post-auth, countdown,
+   commands + SSE shell events, thin compositions); (b) Dart host under `clients/digitalbrain_flutter`
+   over that HTTP surface + dual golden; (c) deeper compositions (shell, post-auth, countdown,
    enrichment surface) still as samples — claiming installed Behaviors still requires the
    self-programming track. Do not wholesale restore historical `app/` or `workspace/`.
 7. Design `DigitalBrain.Memory` independently around its own vocabulary, never inferred from AI,

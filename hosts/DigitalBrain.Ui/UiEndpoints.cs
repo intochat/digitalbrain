@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using DigitalBrain.Flutter;
+using Orleans;
 
 namespace DigitalBrain.Ui;
 
@@ -32,6 +33,37 @@ internal static class UiEndpoints
                     request.Title));
 
                 return Results.Accepted();
+            });
+
+        endpoints.MapGet(
+            "/shells/{shellName}/events",
+            static (
+                string shellName,
+                long? afterSequence,
+                IDigitalBrain brain,
+                IGrainFactory grains,
+                CancellationToken cancellationToken) =>
+            {
+                ArgumentException.ThrowIfNullOrWhiteSpace(shellName);
+                ArgumentNullException.ThrowIfNull(brain);
+                ArgumentNullException.ThrowIfNull(grains);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var cursor = afterSequence.GetValueOrDefault();
+                if (cursor < 0)
+                {
+                    return Results.BadRequest();
+                }
+
+                return Results.Stream(
+                    async stream => await ShellEventFeed.WriteSceneOpenedSseAsync(
+                        stream,
+                        grains,
+                        brain,
+                        shellName,
+                        cursor,
+                        cancellationToken),
+                    contentType: "text/event-stream");
             });
 
         endpoints.MapPost(
