@@ -100,7 +100,8 @@ public sealed class HostingProjectionContracts
         Assert.Contains("WaitAnnotation", siloBody, StringComparison.Ordinal);
     }
 
-    [Fact(DisplayName = "production AppHost silo takes the complete brain; MCP takes AsClient only")]
+    [Fact(DisplayName =
+        "production AppHost silo takes complete brain; MCP is AsClient peer with WaitFor(silo) and owner only")]
     public void ProductionAppHostKeepsSiloCompleteAndNorthboundClientsAsClientOnly()
     {
         var appHost = File.ReadAllText(Path.Combine(
@@ -114,11 +115,48 @@ public sealed class HostingProjectionContracts
 
         Assert.Contains(".WithReference(brain)", siloBlock, StringComparison.Ordinal);
         Assert.DoesNotContain("AsClient", siloBlock, StringComparison.Ordinal);
+
         Assert.Contains(".WithReference(brain.AsClient())", mcpBlock, StringComparison.Ordinal);
+        Assert.Contains(".WaitFor(silo)", mcpBlock, StringComparison.Ordinal);
+        Assert.Contains(""".WithEnvironment("DigitalBrain__Owner", "dev")""", mcpBlock, StringComparison.Ordinal);
         Assert.DoesNotContain(".WithReference(brain)", mcpBlock.Replace(
             ".WithReference(brain.AsClient())",
             string.Empty,
             StringComparison.Ordinal), StringComparison.Ordinal);
+
+        foreach (var siloOnly in SiloOnlyEnvironmentKeys)
+        {
+            Assert.DoesNotContain(siloOnly, mcpBlock, StringComparison.Ordinal);
+        }
+
+        Assert.DoesNotContain("ConnectionStrings__journal", mcpBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("StateProtectionKey", mcpBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("WithUiEdge", mcpBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("digitalbrain-ui", mcpBlock, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName =
+        "northbound MCP host uses product AddDigitalBrainClient; Chat codecs on Orleans client, not dual hand-wire")]
+    public void NorthboundMcpHostUsesProductClientPathWithClientCodecs()
+    {
+        var program = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.Mcp",
+            "Program.cs"))
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        Assert.Contains("AddDigitalBrainClient(owner", program, StringComparison.Ordinal);
+        Assert.Contains("client.Services.AddSerializer", program, StringComparison.Ordinal);
+        Assert.Contains("ChatMessage", program, StringComparison.Ordinal);
+        Assert.Contains("ChatResponse", program, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("UseOrleansClient", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("DigitalBrainClient.Connect", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("builder.Services.AddSerializer", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("ConnectionStrings__journal", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("StateProtectionKey", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("Integrations.Mcp", program, StringComparison.Ordinal);
     }
 
     private static async Task<HashSet<string>> EnvironmentKeysOf(ContainerResource resource)
