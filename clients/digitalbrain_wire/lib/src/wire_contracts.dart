@@ -1,6 +1,3 @@
-// Contract names and aliases from the C# golden manifest.
-// Field maps for record types are asserted against the golden in tests.
-
 const flutterWireNamespace = 'DigitalBrain.Flutter';
 
 const flutterWireRecordNames = <String>{

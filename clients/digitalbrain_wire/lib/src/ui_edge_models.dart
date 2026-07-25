@@ -1,5 +1,3 @@
-// HTTP/SSE DTOs for hosts/DigitalBrain.Ui — host protocol, not module vocabulary.
-
 final class OpenSceneRequest {
   const OpenSceneRequest({required this.sceneKey, required this.title});
 
@@ -24,7 +22,6 @@ final class ActivateControlRequest {
       };
 }
 
-/// Projection of a journaled [SceneOpened] fact over SSE.
 final class SceneOpenedEvent {
   const SceneOpenedEvent({
     required this.sequence,

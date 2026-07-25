@@ -2,8 +2,6 @@ import 'package:digitalbrain_wire/digitalbrain_wire.dart';
 
 import 'scene_projection.dart';
 
-/// Host-local shell projection: accumulates scene view models from edge SSE facts.
-/// Domain truth remains journals on the brain; this is pixels/state only.
 final class ShellSurfaceController {
   final List<SceneViewModel> _scenes = [];
 

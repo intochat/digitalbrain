@@ -2,8 +2,6 @@ import 'dart:io';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 
-/// Headless OS surface host: projects edge SSE SceneOpened facts to stdout.
-/// No Orleans. No MCP tools. Requires DIGITALBRAIN_UI_BASE (AppHost injects).
 Future<void> main(List<String> args) async {
   final shell = _arg(args, '--shell') ??
       Platform.environment['DIGITALBRAIN_SHELL'] ??

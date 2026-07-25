@@ -1,11 +1,11 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:digitalbrain_wire/digitalbrain_wire.dart';
 import 'package:http/http.dart' as http;
 
-/// Northbound HTTP client for hosts/DigitalBrain.Ui. No Orleans. No MCP tools.
+import 'sse_frames.dart';
+
 final class DigitalBrainUiEdgeClient {
   DigitalBrainUiEdgeClient({
     required this.baseUri,
@@ -13,7 +13,6 @@ final class DigitalBrainUiEdgeClient {
   })  : _http = httpClient ?? http.Client(),
         _ownsClient = httpClient == null;
 
-  /// Base URL from `--dart-define=DIGITALBRAIN_UI_BASE=` or process env (AppHost injects).
   factory DigitalBrainUiEdgeClient.fromEnvironment({http.Client? httpClient}) {
     const key = 'DIGITALBRAIN_UI_BASE';
     var raw = const String.fromEnvironment(key);
@@ -78,7 +77,6 @@ final class DigitalBrainUiEdgeClient {
     }
   }
 
-  /// Parses SSE `data:` lines of event type scene-opened (or untyped JSON).
   Stream<SceneOpenedEvent> watchShellEvents({
     required String shellName,
     int afterSequence = 0,
@@ -97,17 +95,14 @@ final class DigitalBrainUiEdgeClient {
         .transform(utf8.decoder)
         .transform(const LineSplitter());
 
-    String? dataLine;
+    final parser = SseSceneOpenedParser();
     await for (final line in lines) {
-      if (line.startsWith('data:')) {
-        dataLine = line.substring('data:'.length).trim();
-      } else if (line.isEmpty && dataLine != null) {
-        final decoded = jsonDecode(dataLine);
-        dataLine = null;
-        if (decoded is Map<String, dynamic>) {
-          yield SceneOpenedEvent.fromJson(decoded.cast<String, Object?>());
-        }
+      for (final event in parser.addLine(line)) {
+        yield event;
       }
+    }
+    for (final event in parser.flush()) {
+      yield event;
     }
   }
 

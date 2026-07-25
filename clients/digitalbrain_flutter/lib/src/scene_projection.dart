@@ -1,6 +1,5 @@
 import 'package:digitalbrain_wire/digitalbrain_wire.dart';
 
-/// Host-local view model — pixels derive from this, not from journals directly.
 final class SceneViewModel {
   const SceneViewModel({
     required this.sceneKey,
