@@ -57,21 +57,30 @@ public sealed class AiContractBoundaries
             Assert.NotEmpty(chatClientParameters);
             Assert.All(chatClientParameters, parameter =>
             {
-                var llmKey = parameter
+                var keyed = parameter
                     .GetCustomAttributes(inherit: false)
-                    .SingleOrDefault(attribute =>
-                        attribute.GetType() is { IsGenericType: true } attributeType
-                        && attributeType.GetGenericTypeDefinition() == typeof(LlmAttribute<>));
+                    .OfType<FromKeyedServicesAttribute>()
+                    .SingleOrDefault();
 
                 Assert.True(
-                    llmKey is not null,
-                    $"{model.FullName} must key IChatClient with [Llm<{model.Name}>].");
-                Assert.Equal(model, llmKey!.GetType().GetGenericArguments()[0]);
-
-                var keyed = Assert.IsAssignableFrom<FromKeyedServicesAttribute>(llmKey);
-                Assert.Equal(model, keyed.Key);
+                    keyed is not null,
+                    $"{model.FullName} must key IChatClient by the concrete model type.");
+                Assert.Equal(model, keyed!.Key);
             });
         });
+    }
+
+    [Fact(DisplayName = "LLM DI key attribute is not public product surface")]
+    public void LlmDiKeyAttributeIsNotPublicProductSurface()
+    {
+        var exportedKeys = typeof(LLM).Assembly
+            .GetExportedTypes()
+            .Where(type => typeof(FromKeyedServicesAttribute).IsAssignableFrom(type))
+            .Select(type => type.FullName)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(exportedKeys);
     }
 
     [Fact(DisplayName = "IChatClient injection stays confined to concrete LLM neurons")]

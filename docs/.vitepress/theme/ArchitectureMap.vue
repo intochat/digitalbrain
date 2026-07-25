@@ -105,9 +105,9 @@ const toggle = key => { pinned.value = pinned.value === key ? null : key; hovere
 
         <!-- TIER 3 -->
         <section class="tier">
-          <div class="tier-label"><span class="tier-num">03</span><h3>Behaviors — scripting</h3><span class="tl-sub">runtime · one C# file · human-approved install</span></div>
+          <div class="tier-label"><span class="tier-num">03</span><h3>Behaviors — scripting</h3><span class="tl-sub">designed · unbuilt · one C# file · human-approved install</span></div>
           <div class="behaviors-tier">
-            <p class="beh-hint">A behaviour is one public <b>Behavior</b> class composing existing typed vocabulary. <b>Select one to see what it composes.</b></p>
+            <p class="beh-hint">Designed, not built. A behaviour will be one public <b>Behavior</b> class composing existing typed vocabulary. Until the rail ships, shell/OS logic lives as ordinary C# under <b>samples/DigitalBrain.Compositions</b> (pre-rail, not installed Behaviors). <b>Select one designed example.</b></p>
             <div class="behgrid">
               <button v-for="b in BEHAVIORS" :key="b.id" class="beh" :class="{ sel: activeKey === 'beh:' + b.id }"
                 @mouseenter="enter('beh:' + b.id)" @mouseleave="leave" @focus="enter('beh:' + b.id)" @click="toggle('beh:' + b.id)">
@@ -150,7 +150,7 @@ const toggle = key => { pinned.value = pinned.value === key ? null : key; hovere
           </div>
 
           <p class="p-sec" :class="{ off: !activeModule.ui }">UI{{ activeModule.ui ? '' : ' — none' }}</p>
-          <p v-if="activeModule.ui" class="p-note">A Flutter surface — designed, not built.</p>
+          <p v-if="activeModule.ui" class="p-note">UI vocabulary + C# northbound edge Built (L0/L1). Host mode is explicit Desktop or Headless — no Auto. Product AppHost OS Healthy is residual; full chrome Designed. Pre-rail OS compositions under samples/DigitalBrain.Compositions are logic samples, not installed Behaviors.</p>
 
           <template v-if="activeModule.example">
             <p class="p-sec">Model configuration</p>

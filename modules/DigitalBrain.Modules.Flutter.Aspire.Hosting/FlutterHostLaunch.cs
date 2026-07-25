@@ -8,11 +8,11 @@ internal enum FlutterHostKind
 
 internal static class FlutterHostLaunch
 {
-    public const string ShellPackageDirectoryName = "shell";
+    private const string ShellPackageDirectoryName = "shell";
 
-    public sealed record Result(string Command, string WorkingDirectory, string[] Args);
+    internal sealed record Result(string Command, string WorkingDirectory, string[] Args);
 
-    public static Result Resolve(
+    internal static Result Resolve(
         FlutterHostKind kind,
         string packageRoot,
         FlutterHostOptions options)
@@ -28,7 +28,7 @@ internal static class FlutterHostLaunch
         };
     }
 
-    public static string? ResolveDesktopPackageDirectory(string packageRoot, string deviceTarget)
+    private static string? ResolveDesktopPackageDirectory(string packageRoot, string deviceTarget)
     {
         if (HasDesktopMarkers(packageRoot, deviceTarget))
         {

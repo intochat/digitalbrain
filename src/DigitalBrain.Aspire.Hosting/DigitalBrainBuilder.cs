@@ -15,22 +15,25 @@ public sealed class DigitalBrainBuilder
     private readonly List<DigitalBrainModuleProjection> _projections = [];
     private readonly List<IResource> _startupDependencies = [];
     private readonly Dictionary<Type, object> _states = [];
-    private IResourceBuilder<AzureBlobStorageResource>? _journal;
     private IResourceBuilder<ParameterResource>? _stateProtectionKey;
 
     internal DigitalBrainBuilder(
         IDistributedApplicationBuilder builder,
         string name,
-        OrleansService orleans)
+        OrleansService orleans,
+        IResourceBuilder<AzureBlobStorageResource> journal)
     {
+        ArgumentNullException.ThrowIfNull(journal);
+
         _builder = builder;
         Name = name;
         Orleans = orleans;
+        Journal = journal;
     }
 
-    public string Name { get; }
+    internal string Name { get; }
 
-    internal IResourceBuilder<AzureBlobStorageResource>? Journal => _journal;
+    internal IResourceBuilder<AzureBlobStorageResource> Journal { get; }
 
     internal IReadOnlyList<ModuleId> Modules => _modules;
 
@@ -114,12 +117,6 @@ public sealed class DigitalBrainBuilder
         }
 
         _modules.Add(module);
-    }
-
-    internal void SetJournal(IResourceBuilder<AzureBlobStorageResource> journal)
-    {
-        ArgumentNullException.ThrowIfNull(journal);
-        _journal = journal;
     }
 
     public ClientDigitalBrainReference AsClient() => new(this);

@@ -4,8 +4,6 @@ using DigitalBrain.Aspire.Hosting;
 
 namespace DigitalBrain.Flutter.Aspire.Hosting;
 
-// Host kinds for WithFlutterHost<T> — same selection style as AI WithLlm<TModel>.
-// No Auto: pick Desktop or Headless explicitly (default WithFlutterHost = Desktop).
 public sealed class DesktopHost
 {
     private DesktopHost()

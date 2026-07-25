@@ -12,7 +12,7 @@ public sealed class IntegrationsFixture : DigitalBrainFixture
     public const string GmailServerKey = "google.gmail";
     public const string SalesforceServerKey = "salesforce";
     public const string GmailGetMessageTool = "get_message";
-    public const string SessionName = "session";
+    public const string SessionName = ISessionNeuron.InstanceName;
     public const string ShellName = "desk";
     public const string EnrichmentSceneKey = "enrichment";
     public const string EnrichmentSceneTitle = "Account enrichment";
@@ -29,7 +29,7 @@ public sealed class IntegrationsFixture : DigitalBrainFixture
     public static NeuronId SessionOf(TestBrain test)
     {
         ArgumentNullException.ThrowIfNull(test);
-        return new(ISessionNeuron.GrainTypeName, test.Client.Owner, SessionName);
+        return ISessionNeuron.ForOwner(test.Client.Owner);
     }
 
     public static SalesforceMutationApproval Approval(

@@ -1,5 +1,8 @@
 using DigitalBrain.Kernel;
 
+const string HealthPath = "/health";
+const string HealthResponse = "healthy";
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddKeyedAzureTableServiceClient("quickstart-clustering");
@@ -9,5 +12,5 @@ builder.UseOrleans(silo => silo
     .AddDigitalBrainJournalStorage(builder.Configuration));
 
 var app = builder.Build();
-app.MapGet("/health", () => Results.Ok("healthy"));
+app.MapGet(HealthPath, static () => Results.Ok(HealthResponse));
 app.Run();

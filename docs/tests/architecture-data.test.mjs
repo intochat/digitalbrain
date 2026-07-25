@@ -25,12 +25,27 @@ test('every behaviour composes only vocabulary that a module or the kernel actua
   }
   assert.ok(BEHAVIORS.length > 0)
   for (const b of BEHAVIORS) {
+    assert.equal(b.status, 'designed', `behaviour ${b.id} must stay Designed/unbuilt`)
     assert.ok(b.uses.length > 0, `behaviour ${b.id} composes nothing`)
     assert.ok(b.script.includes('Behavior'), `behaviour ${b.id} script must show the Behavior base`)
     for (const token of b.uses) {
       assert.ok(vocab.has(token), `behaviour ${b.id} composes ${token}, which nothing ships`)
     }
   }
+})
+
+test('flutter host modes never advertise Auto; Desktop or Headless only', () => {
+  const flutter = MODULES.find(module => module.id === 'flutter')
+  assert.ok(flutter, 'flutter module must exist')
+  for (const entry of flutter.aspire) {
+    const withoutNoAuto = (entry.sub ?? '').replaceAll('no Auto', '')
+    assert.doesNotMatch(withoutNoAuto, /\bAuto\b/, `${entry.res} must not advertise Auto host mode`)
+  }
+  const host = flutter.aspire.find(entry => entry.res === 'digitalbrain-flutter')
+  assert.ok(host, 'digitalbrain-flutter aspire entry must exist')
+  assert.match(host.sub, /Desktop/)
+  assert.match(host.sub, /Headless/)
+  assert.match(host.sub, /no Auto/)
 })
 
 test('the actors and the kernel are present and typed', () => {

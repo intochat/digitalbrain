@@ -1,21 +1,26 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Tasks;
 using DigitalBrain.Tests.Packages;
+using DigitalBrain.Time;
 using Xunit;
 
 namespace DigitalBrain.Tests.Boundary;
 
 public sealed class ContractsPackageBoundaryContracts
 {
+    private static readonly string Abstractions = PackageOf(typeof(NeuronId));
     private static readonly string Kernel = PackageOf(typeof(Neuron));
     private static readonly string AiRuntime = PackageOf(typeof(AIModule));
     private static readonly string TasksRuntime = PackageOf(typeof(TasksModule));
     private static readonly string TasksContracts = PackageOf(typeof(ITask));
     private static readonly string GoogleRuntime = PackageOf(typeof(GoogleModule));
     private static readonly string SalesforceRuntime = PackageOf(typeof(SalesforceModule));
+    private static readonly string TimeRuntime = PackageOf(typeof(TimeModule));
+    private static readonly string TimeContracts = PackageOf(typeof(ICountdown));
 
     public static TheoryData<string> ConsumerPathPackages { get; } =
         [.. PackageBoundarySupport.ConsumerPath];
@@ -124,22 +129,51 @@ public sealed class ContractsPackageBoundaryContracts
             PackageBoundarySupport.DirectPackageReferencesOf(AiRuntime));
     }
 
-    [Fact]
-    public void TasksRemainIndependentFromAiAndProviders()
+    [Fact(DisplayName =
+        "Tasks.Contracts is Abstractions-only; Tasks runtime is Kernel+Contracts — never AI, MAF, Time, or providers")]
+    public void TasksRemainIndependentFromAiMafTimeAndProviders()
     {
+        Assert.Equal(
+            [Abstractions],
+            PackageBoundarySupport.DirectCompileProjectReferencesOf(TasksContracts)
+                .Order(StringComparer.Ordinal));
+        Assert.Equal(
+            [Abstractions],
+            PackageBoundarySupport.CompileProjectsReachableFrom(TasksContracts)
+                .Order(StringComparer.Ordinal));
+
         Assert.Equal(
             new[] { Kernel, TasksContracts }.Order(StringComparer.Ordinal),
             PackageBoundarySupport.DirectCompileProjectReferencesOf(TasksRuntime)
                 .Order(StringComparer.Ordinal));
+        Assert.Equal(
+            new[] { Abstractions, Kernel, TasksContracts }.Order(StringComparer.Ordinal),
+            PackageBoundarySupport.CompileProjectsReachableFrom(TasksRuntime)
+                .Order(StringComparer.Ordinal));
 
-        var projects = PackageBoundarySupport.CompileProjectsReachableFrom(TasksRuntime);
-        Assert.DoesNotContain(
-            projects,
-            project => project.StartsWith(AiRuntime, StringComparison.Ordinal)
-                || project.StartsWith(GoogleRuntime, StringComparison.Ordinal)
-                || project.StartsWith(SalesforceRuntime, StringComparison.Ordinal)
-                || project.StartsWith(PackageInventory.IntegrationsMcp, StringComparison.Ordinal));
+        foreach (var package in new[] { TasksContracts, TasksRuntime })
+        {
+            var projects = PackageBoundarySupport.CompileProjectsReachableFrom(package);
+            Assert.DoesNotContain(projects, IsForbiddenTasksProject);
+            Assert.DoesNotContain(
+                PackageBoundarySupport.PackagesReachableFrom(package),
+                IsForbiddenTasksPackage);
+        }
     }
+
+    private static bool IsForbiddenTasksProject(string project) =>
+        project.StartsWith(AiRuntime, StringComparison.Ordinal)
+        || project.StartsWith(GoogleRuntime, StringComparison.Ordinal)
+        || project.StartsWith(SalesforceRuntime, StringComparison.Ordinal)
+        || project.StartsWith(TimeRuntime, StringComparison.Ordinal)
+        || project.StartsWith(TimeContracts, StringComparison.Ordinal)
+        || project.StartsWith(PackageInventory.IntegrationsMcp, StringComparison.Ordinal)
+        || project.StartsWith(PackageInventory.IntegrationsPrefix, StringComparison.Ordinal);
+
+    private static bool IsForbiddenTasksPackage(string package) =>
+        package.StartsWith("Microsoft.Agents.AI", StringComparison.Ordinal)
+        || PackageBoundarySupport.ProviderSdkPrefixes.Any(sdk =>
+            package.StartsWith(sdk, StringComparison.Ordinal));
 
     private static string PackageOf(Type type)
         => type.Assembly.GetName().Name

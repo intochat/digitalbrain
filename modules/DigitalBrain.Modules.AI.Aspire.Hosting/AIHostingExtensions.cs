@@ -72,7 +72,10 @@ public static class AIHostingExtensions
             if (_llama32 is not null)
             {
                 builder
-                    .WithReference(_llama32)
+                    .WithAnnotation(new WaitAnnotation(
+                        _llama32.Resource,
+                        WaitType.WaitUntilHealthy,
+                        exitCode: 0))
                     .WithEnvironment(
                         "DigitalBrain__AI__Ollama__Endpoint",
                         _llama32.Resource.Parent.UriExpression)
@@ -84,7 +87,6 @@ public static class AIHostingExtensions
             if (_gpt56 is not null)
             {
                 builder
-                    .WithReference(_gpt56)
                     .WithEnvironment(
                         "DigitalBrain__AI__OpenAI__ApiKey",
                         _openAIKey!)

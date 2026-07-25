@@ -15,7 +15,7 @@ public abstract class LLM(IChatClient chatClient) : Neuron, ILLM
 }
 
 [AttributeUsage(AttributeTargets.Parameter)]
-public sealed class LlmAttribute<TModel> : FromKeyedServicesAttribute
+internal sealed class LlmAttribute<TModel> : FromKeyedServicesAttribute
     where TModel : LLM
 {
     public LlmAttribute() : base(typeof(TModel))

@@ -36,10 +36,7 @@ public sealed partial class TestJournal
         _direction = direction;
         _diagnostics = diagnostics;
         _session = cluster.Client.GetGrain<ISessionNeuron>(
-            new NeuronId(
-                ISessionNeuron.GrainTypeName,
-                subject.Owner,
-                "session").ToGrainId());
+            ISessionNeuron.ForOwner(subject.Owner).ToGrainId());
     }
 
     public Task<ObservedSynapse<TSynapse>> NextAsync<TSynapse>(

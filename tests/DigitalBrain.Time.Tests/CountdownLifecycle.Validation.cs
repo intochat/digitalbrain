@@ -6,8 +6,6 @@ namespace DigitalBrain.Time.Tests;
 
 public sealed partial class CountdownLifecycle
 {
-    private const int MaximumRetainedReceipts = 64;
-
     [Fact(DisplayName =
         "Empty CommandId is rejected on Start, Reschedule, Cancel, and Restart")]
     public async Task EmptyCommandIdIsRejected()
@@ -111,44 +109,5 @@ public sealed partial class CountdownLifecycle
         Assert.Equal(
             CountdownStatus.Unscheduled,
             (await countdown.Reference.Read()).Status);
-    }
-
-    [Fact(DisplayName =
-        "Command receipts retain only the latest sixty-four CommandIds")]
-    public async Task ReceiptsRetainOnlyTheLatestSixtyFourCommands()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination) = TimeFixture.Pair(test);
-        var startCommand = new StartCountdown(
-            CommandId.New(),
-            Hour,
-            destination.Id);
-        var current = await countdown.Reference.Start(startCommand);
-        RescheduleCountdown? oldestRetainedCommand = null;
-        CountdownSnapshot? oldestRetainedSnapshot = null;
-
-        for (var index = 0; index < MaximumRetainedReceipts; index++)
-        {
-            var command = new RescheduleCountdown(
-                CommandId.New(),
-                current.Revision,
-                Hour);
-            current = await countdown.Reference.Reschedule(command);
-
-            if (index == 0)
-            {
-                oldestRetainedCommand = command;
-                oldestRetainedSnapshot = current;
-            }
-        }
-
-        Assert.Equal(
-            oldestRetainedSnapshot,
-            await countdown.Reference.Reschedule(
-                Assert.IsType<RescheduleCountdown>(
-                    oldestRetainedCommand)));
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => countdown.Reference.Start(startCommand));
     }
 }

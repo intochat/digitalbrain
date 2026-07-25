@@ -47,9 +47,9 @@ limitations, and remaining build order.
 ```text
 src/       domain-neutral framework packages
 modules/   independently shipped domains (AI, Tasks, Time, Google, Salesforce, …)
-hosts/     AppHost, silo, MCP, TestingAppHost, Quickstart hosts
-samples/   Quickstart and AccountEnrichment package consumers
-tests/     L0 contracts, L1 Testing/Quickstart/Time/Module, L2 HostTests
+hosts/     AppHost, silo, MCP, Ui, TestingAppHost, Quickstart hosts
+samples/   Quickstart greeter module; AccountEnrichment process sample; Compositions (pre-Behavior-rail logic, not NuGet, not installed Behaviors)
+tests/     L0 contracts; L1 suites (incl. Quickstart/Compositions); L2 HostTests
 docs/      VitePress documentation and the published specification
 ```
 

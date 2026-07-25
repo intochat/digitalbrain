@@ -3,63 +3,79 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-const _namespace = 'DigitalBrain.Flutter';
-const _recordNames = <String>{
-  'ControlActivated',
-  'OpenScene',
-  'SceneOpened',
+const _expectedWireManifest = <String, Object?>{
+  'version': 1,
+  'namespace': 'DigitalBrain.Flutter',
+  'types': [
+    {
+      'name': 'ControlActivated',
+      'kind': 'record',
+      'alias': 'flutter.control-activated',
+      'properties': [
+        {'name': 'ControlId', 'type': 'String'},
+        {'name': 'Intent', 'type': 'String'},
+        {'name': 'SceneKey', 'type': 'String'},
+      ],
+      'methods': <Object?>[],
+    },
+    {
+      'name': 'IScene',
+      'kind': 'interface',
+      'alias': 'DigitalBrain.Flutter.IScene',
+      'properties': <Object?>[],
+      'methods': <Object?>[],
+    },
+    {
+      'name': 'IShell',
+      'kind': 'interface',
+      'alias': 'DigitalBrain.Flutter.IShell',
+      'properties': <Object?>[],
+      'methods': [
+        {
+          'name': 'Open',
+          'alias': 'Open',
+          'parameters': [
+            {'name': 'command', 'type': 'OpenScene'},
+          ],
+          'returnType': 'Task',
+        },
+      ],
+    },
+    {
+      'name': 'OpenScene',
+      'kind': 'record',
+      'alias': 'flutter.open-scene',
+      'properties': [
+        {'name': 'CommandId', 'type': 'CommandId'},
+        {'name': 'SceneKey', 'type': 'String'},
+        {'name': 'Title', 'type': 'String'},
+      ],
+      'methods': <Object?>[],
+    },
+    {
+      'name': 'SceneOpened',
+      'kind': 'record',
+      'alias': 'flutter.scene-opened',
+      'properties': [
+        {'name': 'CommandId', 'type': 'CommandId'},
+        {'name': 'SceneKey', 'type': 'String'},
+        {'name': 'Shell', 'type': 'NeuronId'},
+        {'name': 'Title', 'type': 'String'},
+      ],
+      'methods': <Object?>[],
+    },
+  ],
 };
-const _interfaceNames = <String>{
-  'IScene',
-  'IShell',
-};
-const _aliases = <String, String>{
-  'ControlActivated': 'flutter.control-activated',
-  'IScene': 'DigitalBrain.Flutter.IScene',
-  'IShell': 'DigitalBrain.Flutter.IShell',
-  'OpenScene': 'flutter.open-scene',
-  'SceneOpened': 'flutter.scene-opened',
-};
-const _controlActivatedFields = <String>['ControlId', 'Intent', 'SceneKey'];
-const _openSceneFields = <String>['CommandId', 'SceneKey', 'Title'];
-const _sceneOpenedFields = <String>['CommandId', 'SceneKey', 'Shell', 'Title'];
 
 void main() {
-  test('Dart wire pins match Flutter.Contracts golden manifest', () {
-    final goldenFile = _locateGolden();
-    final root = jsonDecode(goldenFile.readAsStringSync()) as Map<String, dynamic>;
-
-    expect(root['version'], 1);
-    expect(root['namespace'], _namespace);
-
-    final types = (root['types'] as List<dynamic>).cast<Map<String, dynamic>>();
-    final byName = {
-      for (final type in types) type['name'] as String: type,
-    };
-
-    expect(byName.keys.toSet(), {
-      ..._recordNames,
-      ..._interfaceNames,
-    });
-
-    for (final entry in _aliases.entries) {
-      expect(byName[entry.key]?['alias'], entry.value);
-    }
-
-    expect(_propertyNames(byName['ControlActivated']!), _controlActivatedFields);
-    expect(_propertyNames(byName['OpenScene']!), _openSceneFields);
-    expect(_propertyNames(byName['SceneOpened']!), _sceneOpenedFields);
-
-    final shell = byName['IShell']!;
-    final methods = (shell['methods'] as List<dynamic>).cast<Map<String, dynamic>>();
-    expect(methods.single['name'], 'Open');
-    expect(methods.single['alias'], 'Open');
-  });
-}
-
-List<String> _propertyNames(Map<String, dynamic> type) {
-  final properties = (type['properties'] as List<dynamic>).cast<Map<String, dynamic>>();
-  return [for (final property in properties) property['name'] as String];
+  test(
+    'Dart wire pin deep-equals Flutter.Contracts golden (dual golden equality)',
+    () {
+      final goldenFile = _locateGolden();
+      final actual = jsonDecode(goldenFile.readAsStringSync());
+      expect(actual, _expectedWireManifest);
+    },
+  );
 }
 
 File _locateGolden() {

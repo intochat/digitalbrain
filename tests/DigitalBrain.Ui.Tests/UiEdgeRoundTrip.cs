@@ -1,12 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Reflection;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Client;
 using DigitalBrain.Flutter;
 using DigitalBrain.Testing;
 using DigitalBrain.Ui;
-using Orleans;
 using Xunit;
 
 namespace DigitalBrain.Ui.Tests;
@@ -19,9 +16,6 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
     private const string SettingsTitle = "Settings";
     private const string PrimaryControlId = "primary";
     private const string SubmitIntent = "submit";
-    private const string EventStreamMediaType = "text/event-stream";
-    private const string CacheControlNoCache = "no-cache";
-    private const string OpenTelemetryMarker = "OpenTelemetry";
 
     [Fact(DisplayName = "HTTP open-scene reaches IDigitalBrain and journals SceneOpened")]
     public async Task HttpOpenSceneJournalsSceneOpened()
@@ -30,7 +24,7 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(UiFixture.DefaultShellName);
 
-        await using var app = await StartUiEdgeAsync(test, cancellationToken);
+        await using var app = await UiFixture.StartUiEdgeAsync(test, cancellationToken);
         using var http = CreateClient(app);
 
         using var response = await http.PostAsJsonAsync(
@@ -53,7 +47,7 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var scene = test.Neuron<IScene>(HomeSceneKey);
 
-        await using var app = await StartUiEdgeAsync(test, cancellationToken);
+        await using var app = await UiFixture.StartUiEdgeAsync(test, cancellationToken);
         using var http = CreateClient(app);
 
         using var response = await http.PostAsJsonAsync(
@@ -76,7 +70,7 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(UiFixture.DefaultShellName);
 
-        await using var app = await StartUiEdgeAsync(test, cancellationToken);
+        await using var app = await UiFixture.StartUiEdgeAsync(test, cancellationToken);
         using var http = CreateClient(app, streaming: true);
         await using var events = await OpenShellEventStreamAsync(http, cancellationToken);
 
@@ -104,7 +98,7 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         var shell = test.Neuron<IShell>(UiFixture.DefaultShellName);
         var command = new OpenScene(CommandId.New(), SettingsSceneKey, SettingsTitle);
 
-        await using var app = await StartUiEdgeAsync(test, cancellationToken);
+        await using var app = await UiFixture.StartUiEdgeAsync(test, cancellationToken);
         using var http = CreateClient(app, streaming: true);
         await using var events = await OpenShellEventStreamAsync(http, cancellationToken);
 
@@ -131,7 +125,7 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
 
-        await using var app = await StartUiEdgeAsync(test, cancellationToken);
+        await using var app = await UiFixture.StartUiEdgeAsync(test, cancellationToken);
         using var http = CreateClient(app);
 
         using var response = await http.GetAsync(
@@ -139,40 +133,6 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact(DisplayName = "Ui shell SSE projection is journal-session backed not OpenTelemetry")]
-    public void ShellSseProjectionIsJournalSessionNotOpenTelemetry()
-    {
-        var write = typeof(ShellEventFeed).GetMethod(
-            nameof(ShellEventFeed.WriteSceneOpenedSseAsync),
-            BindingFlags.Public | BindingFlags.Static);
-        Assert.NotNull(write);
-
-        var parameters = write.GetParameters().Select(parameter => parameter.ParameterType).ToArray();
-        Assert.Contains(typeof(IGrainFactory), parameters);
-        Assert.Contains(typeof(IDigitalBrain), parameters);
-        Assert.Contains(typeof(long), parameters);
-        Assert.DoesNotContain(
-            parameters,
-            type => (type.FullName ?? type.Name).Contains(OpenTelemetryMarker, StringComparison.Ordinal));
-        Assert.DoesNotContain(typeof(System.Diagnostics.Activity), parameters);
-        Assert.DoesNotContain(typeof(System.Diagnostics.ActivitySource), parameters);
-    }
-
-    private static async Task<WebApplication> StartUiEdgeAsync(
-        TestBrain test,
-        CancellationToken cancellationToken)
-    {
-        var builder = WebApplication.CreateBuilder();
-        builder.WebHost.UseUrls("http://127.0.0.1:0");
-        builder.Services.AddSingleton(test.Client);
-        builder.Services.AddSingleton<IGrainFactory>(test.Cluster.Client);
-
-        var app = builder.Build();
-        app.MapUiHost();
-        await app.StartAsync(cancellationToken);
-        return app;
     }
 
     private static async Task<ShellEventStream> OpenShellEventStreamAsync(
@@ -194,9 +154,11 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
                 $"SSE status {(int)streamResponse.StatusCode} {streamResponse.StatusCode}: {errorBody}");
         }
 
-        Assert.Equal(EventStreamMediaType, streamResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(
+            UiEdgeContract.EventStreamContentType,
+            streamResponse.Content.Headers.ContentType?.MediaType);
         Assert.Contains(
-            CacheControlNoCache,
+            UiEdgeContract.CacheControlNoCache,
             streamResponse.Headers.CacheControl?.ToString() ?? string.Empty,
             StringComparison.OrdinalIgnoreCase);
 

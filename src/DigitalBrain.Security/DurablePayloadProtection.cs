@@ -13,10 +13,24 @@ internal interface IDurablePayloadProtector
     byte[] Unprotect(string purpose, ReadOnlySpan<byte> protectedPayload);
 }
 
-internal sealed class DurablePayloadProtector : IDurablePayloadProtector
+internal static class DurablePayloadProtectionHosting
 {
-    internal const string ConfigurationKey = "DigitalBrain:Security:StateProtectionKey";
+    private const string ConfigurationKey = "DigitalBrain:Security:StateProtectionKey";
 
+    internal static void Configure(IServiceCollection services, IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services.TryAddSingleton<IDurablePayloadProtector>(_ => new DurablePayloadProtector(
+            configuration[ConfigurationKey]
+            ?? throw new InvalidOperationException(
+                $"Missing shared durable state-protection key '{ConfigurationKey}'.")));
+    }
+}
+
+file sealed class DurablePayloadProtector : IDurablePayloadProtector
+{
     private const byte EnvelopeVersion = 1;
     private const int MasterKeyLength = 32;
     private const int NonceLength = 12;
@@ -107,19 +121,5 @@ internal sealed class DurablePayloadProtector : IDurablePayloadProtector
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(purpose);
         return [.. AssociatedDataPrefix, .. Encoding.UTF8.GetBytes(purpose)];
-    }
-}
-
-internal static class DurablePayloadProtectionHosting
-{
-    internal static void Configure(IServiceCollection services, IConfiguration configuration)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(configuration);
-
-        services.TryAddSingleton<IDurablePayloadProtector>(_ => new DurablePayloadProtector(
-            configuration[DurablePayloadProtector.ConfigurationKey]
-            ?? throw new InvalidOperationException(
-                $"Missing shared durable state-protection key '{DurablePayloadProtector.ConfigurationKey}'.")));
     }
 }

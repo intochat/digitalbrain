@@ -4,6 +4,10 @@ namespace DigitalBrain.Abstractions;
 public partial interface ISessionNeuron : INeuron
 {
     const string GrainTypeName = "sessionneuron";
+    const string InstanceName = "session";
+
+    static NeuronId ForOwner(OwnerId owner)
+        => new(GrainTypeName, owner, InstanceName);
 
     [Alias(nameof(Fire))]
     [System.Diagnostics.CodeAnalysis.SuppressMessage(

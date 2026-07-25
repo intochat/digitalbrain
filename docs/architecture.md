@@ -277,9 +277,10 @@ different mechanism answering a different question and must not be read as this 
 
 Status: Built
 
-A Task is durable domain identity for a desired outcome. An MAF Workflow is how one Attempt at that
-outcome executes. The Task survives worker, model, orchestration, and deployment changes; the Attempt
-does not.
+A Task is durable domain identity for a desired outcome. The Built surface today is the Task lifecycle
+plus attempt facts over any `IWorker` grain id — L1 closes with a test-only worker, not a product MAF
+orchestration. Under supervised AI (Designed, unbuilt), an MAF Workflow is how one Attempt is meant to
+execute. The Task survives worker, model, orchestration, and deployment changes; the Attempt does not.
 
 The dependency direction is one-way and load-bearing: `DigitalBrain.Modules.AI.Contracts` references
 `Tasks.Contracts`, never the reverse. Tasks knows nothing about AI, MAF, models, prompts, executors,
@@ -441,14 +442,18 @@ AI dependency. What it adds is the mutation story, because Salesforce is where D
 a system it does not control.
 
 External mutations use a durable command protocol owned by the integration neuron. Every mutation
-carries a `CommandId` and a canonical payload fingerprint and moves through:
+carries a `CommandId` and a canonical payload fingerprint. **Public** receipt state
+(`SalesforceMutationState`) is only:
 
 ```text
 AwaitingApproval
-  -> Invoking
   -> Completed
              \-> OutcomeUncertain
 ```
+
+**Internal** durable status also has an `Invoking` fence (committed before the provider is contacted).
+That fence is not a public enum member — non-terminal internal status maps to `AwaitingApproval` on
+the receipt. Callers never observe `Invoking` as product vocabulary.
 
 The same command identity and fingerprint resume the work or return the recorded result. Reusing an
 identity with different content is rejected. Human approval binds to the exact fingerprint, so an

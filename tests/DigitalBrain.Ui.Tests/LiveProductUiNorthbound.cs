@@ -26,12 +26,12 @@ public sealed class LiveProductUiNorthbound
         };
 
         using (var health = await http.GetAsync(
-                   new Uri(UiFixture.HealthPath, UriKind.Relative),
+                   new Uri(UiEdgeContract.HealthPath, UriKind.Relative),
                    cancellationToken))
         {
             Assert.True(
                 health.IsSuccessStatusCode,
-                $"Product {UiFixture.DefaultUiResourceName} {UiFixture.HealthPath} not OK at {baseAddress}. Start: aspire start --project hosts/DigitalBrain.AppHost. Status={(int)health.StatusCode}. Override with {UiFixture.UiBaseEnvironmentVariable}.");
+                $"Product {UiFixture.DefaultUiResourceName} {UiEdgeContract.HealthPath} not OK at {baseAddress}. Start: aspire start --project hosts/DigitalBrain.AppHost. Status={(int)health.StatusCode}. Override with {UiFixture.UiBaseEnvironmentVariable}.");
         }
 
         using var streamRequest = new HttpRequestMessage(
@@ -42,7 +42,9 @@ public sealed class LiveProductUiNorthbound
             HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
         Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
-        Assert.Equal("text/event-stream", streamResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(
+            UiEdgeContract.EventStreamContentType,
+            streamResponse.Content.Headers.ContentType?.MediaType);
 
         await using var body = await streamResponse.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(body);

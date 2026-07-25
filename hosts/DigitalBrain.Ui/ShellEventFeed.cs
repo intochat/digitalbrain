@@ -1,15 +1,12 @@
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Client;
 using DigitalBrain.Flutter;
-using Orleans;
 
 namespace DigitalBrain.Ui;
 
 internal static class ShellEventFeed
 {
-    private const string SessionName = "session";
     private const string SseConnectedComment = ": connected\n\n";
     private static readonly JsonSerializerOptions EventJson = new(JsonSerializerDefaults.Web);
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
@@ -17,31 +14,22 @@ internal static class ShellEventFeed
 
     public static async Task WriteSceneOpenedSseAsync(
         Stream responseBody,
-        IGrainFactory grains,
-        IDigitalBrain brain,
+        OwnerSessionJournal sessionJournal,
         string shellName,
         long afterSequence,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(responseBody);
-        ArgumentNullException.ThrowIfNull(grains);
-        ArgumentNullException.ThrowIfNull(brain);
+        ArgumentNullException.ThrowIfNull(sessionJournal);
         ArgumentException.ThrowIfNullOrWhiteSpace(shellName);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
-
-        var shellId = NeuronId.For<IShell>(brain.Owner, shellName);
-        var session = grains.GetGrain<ISessionNeuron>(
-            new NeuronId(ISessionNeuron.GrainTypeName, brain.Owner, SessionName).ToGrainId());
 
         await WriteAsync(responseBody, SseConnectedComment, cancellationToken);
 
         var cursor = afterSequence;
         while (!cancellationToken.IsCancellationRequested)
         {
-            var batch = await session.ReadNeuronJournal(
-                shellId,
-                JournalKind.Outgoing,
-                cursor);
+            var batch = await sessionJournal.ReadShellOutgoingAsync(shellName, cursor);
             foreach (var projected in ProjectSceneOpened(batch))
             {
                 cancellationToken.ThrowIfCancellationRequested();

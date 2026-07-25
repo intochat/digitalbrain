@@ -29,9 +29,8 @@ public static class DigitalBrainHostingExtensions
             .AddOrleans(name)
             .WithClustering(clustering)
             .WithReminders(reminders);
-        var brain = new DigitalBrainBuilder(builder, name, orleans);
+        var brain = new DigitalBrainBuilder(builder, name, orleans, journal);
 
-        brain.SetJournal(journal);
         brain.RequireHealthyBeforeStart(storage.Resource);
         brain.RequireHealthyBeforeStart(clustering.Resource);
         brain.RequireHealthyBeforeStart(reminders.Resource);
@@ -64,11 +63,7 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(brain);
 
         builder.WithReference(brain.Orleans);
-
-        if (brain.Journal is not null)
-        {
-            builder.WithReference(brain.Journal, JournalConnectionName);
-        }
+        builder.WithReference(brain.Journal, JournalConnectionName);
 
         foreach (var dependency in brain.StartupDependencies)
         {

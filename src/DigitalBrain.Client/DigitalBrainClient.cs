@@ -5,8 +5,6 @@ namespace DigitalBrain.Client;
 
 public sealed class DigitalBrainClient : IDigitalBrain
 {
-    private const string SessionName = "session";
-
     private readonly IGrainFactory _grains;
 
     private DigitalBrainClient(IGrainFactory grains, OwnerId owner)
@@ -30,6 +28,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
         where T : class, INeuron
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        RequireDomainNeuronContract(typeof(T));
 
         return _grains.GetGrain<T>(NeuronId.For<T>(Owner, name).ToGrainId());
     }
@@ -38,6 +37,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
         where TNeuron : INeuron
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        RequireDomainNeuronContract(typeof(TNeuron));
 
         return SendAsync(
             new NeuronId(NeuronId.GrainTypeNameOf(typeof(TNeuron)), Owner, name),
@@ -54,6 +54,12 @@ public sealed class DigitalBrainClient : IDigitalBrain
                 $"Client owner '{Owner}' cannot send to neuron '{receiver}' owned by '{receiver.Owner}'.");
         }
 
+        if (string.Equals(receiver.Type, ISessionNeuron.GrainTypeName, StringComparison.Ordinal))
+        {
+            throw new NeuronAuthorizationException(
+                "The owner session is the client entry gateway, not a Send target. Use SendAsync to domain neurons and EmitAsync to broadcast.");
+        }
+
         return Session().Fire(receiver, synapse);
     }
 
@@ -65,6 +71,15 @@ public sealed class DigitalBrainClient : IDigitalBrain
     }
 
     private ISessionNeuron Session()
-        => _grains.GetGrain<ISessionNeuron>(
-            new NeuronId(ISessionNeuron.GrainTypeName, Owner, SessionName).ToGrainId());
+        => _grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(Owner).ToGrainId());
+
+    private static void RequireDomainNeuronContract(Type neuronType)
+    {
+        if (neuronType == typeof(INeuron)
+            || typeof(ISessionNeuron).IsAssignableFrom(neuronType))
+        {
+            throw new NeuronAuthorizationException(
+                $"'{neuronType.Name}' is not addressable through IDigitalBrain. Address domain neuron contracts with Get; fire and emit through SendAsync and EmitAsync. Journal observation is not an IDigitalBrain API.");
+        }
+    }
 }

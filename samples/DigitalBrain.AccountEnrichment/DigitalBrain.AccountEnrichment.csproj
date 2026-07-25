@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Description>Opt-in multi-module sample: EnrichmentModule, IAccountEnrichment, Gmail→Salesforce enrichment facts.</Description>
+    <IsPackable>false</IsPackable>
+    <Description>Opt-in compiled multi-module process neuron (IAccountEnrichment / EnrichmentModule). Durable process sample over Google+Salesforce contracts + Kernel — not a composition, not a product package, not an installed Behavior.</Description>
     <RootNamespace>DigitalBrain.AccountEnrichment</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007</NoWarn>
   </PropertyGroup>

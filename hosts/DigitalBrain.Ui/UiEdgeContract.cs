@@ -16,7 +16,13 @@ public static class UiEdgeContract
 
     public const string ShellEventsPath = "/shells/{shellName}/events";
 
-    public const string ActivateControlPath = "/scenes/{sceneName}/controls/{controlId}/activate";
+    public const string ActivateControlPath = "/scenes/{sceneKey}/controls/{controlId}/activate";
+
+    public const string AfterSequenceQuery = "afterSequence";
+
+    public const string EventStreamContentType = "text/event-stream";
+
+    public const string CacheControlNoCache = "no-cache";
 
     public const string SceneOpenedEvent = "scene-opened";
 }

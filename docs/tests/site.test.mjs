@@ -231,7 +231,11 @@ test('the quickstart matches the sample that CI actually runs', () => {
   assert.ok(synapses.includes('record Greeted'), 'the contracts package must expose Greeted')
   assert.ok(module.includes('partial class QuickstartModule'), 'the runtime must expose its compiled module')
   assert.ok(host.includes('AddDigitalBrain()'), 'the compiled host must install the kernel')
-  assert.ok(appHost.includes('AddDigitalBrain("quickstart")'), 'AppHost must own infrastructure')
+  assert.match(appHost, /"quickstart"/, 'AppHost brain identity remains quickstart')
+  assert.match(
+    appHost,
+    /AddDigitalBrain\(\s*(?:Brain|"quickstart")\s*\)/,
+    'AppHost must own infrastructure via AddDigitalBrain')
   assert.ok(appHost.includes('AddModule<QuickstartModule>()'), 'AppHost must select the compiled module')
   assert.ok(fixture.includes('AddModule<QuickstartModule>()'), 'tests must select the same compiled module')
   assert.ok(quickstart.includes('interface IGreeter'), 'the quickstart must show the real contract')
@@ -239,6 +243,7 @@ test('the quickstart matches the sample that CI actually runs', () => {
   assert.ok(quickstart.includes('IDigitalBrain brain'), 'the endpoint must receive the client through DI')
   assert.ok(quickstart.includes('.WithReference(brain.AsClient())'), 'AppHost must project a client reference')
   assert.doesNotMatch(quickstart, /Host\.CreateApplicationBuilder|GetRequiredService|host\.StartAsync/)
+  assert.match(quickstart, /not a product Behavior install/)
 })
 
 test('the specification describes the retained test tiers', () => {
@@ -359,6 +364,44 @@ test('the lean runtime boundaries are explicit and current', () => {
   assert.doesNotMatch(architecture, /IMcpAuthorizationRedirect/)
   assert.doesNotMatch(architecture, /shared client factory/)
   assert.doesNotMatch(diagram, /salesforce-client-secret/)
+  assert.doesNotMatch(diagram, /Auto\/Headless|Auto\/Desktop|\bAuto host\b/)
+})
+
+test('samples and compositions honesty — pre-rail logic, no Behavior install lies', () => {
+  const readme = read('README.md')
+  const packages = read('docs', 'packages.md')
+  const architecture = read('docs', 'architecture.md')
+  const specification = read('docs', 'specification.md')
+  const quickstart = read('docs', 'quickstart.md')
+  const map = read('docs', '.vitepress', 'theme', 'ArchitectureMap.vue')
+  const diagram = read('docs', '.vitepress', 'theme', 'architecture-data.js')
+
+  assert.match(readme, /samples\/\s+.*Compositions/)
+  assert.match(readme, /pre-Behavior-rail|not installed Behaviors/)
+  assert.doesNotMatch(readme, /package consumers/)
+
+  assert.match(packages, /samples\/DigitalBrain\.Compositions/)
+  assert.match(packages, /not installed Behaviors/)
+  assert.match(packages, /pre-rail logic|pre-Behavior rail|Pre-Behavior rail/)
+  assert.match(packages, /AccountEnrichment/)
+  assert.match(packages, /not a composition/)
+
+  assert.match(architecture, /Built \(OS compositions, pre-Behavior rail\)/)
+  assert.match(architecture, /they are not Behaviors/)
+  assert.match(architecture, /No `IBehavior`/)
+  assert.match(architecture, /Runtime behavior installation is designed and not yet built/)
+  assert.match(architecture, /AccountEnrichmentSurface.*not.*Gmail/)
+
+  assert.match(specification, /DigitalBrain\.Compositions\.Tests/)
+  assert.match(specification, /not\s+installed Behaviors/)
+  assert.match(quickstart, /not a product Behavior install/)
+
+  assert.match(map, /designed · unbuilt/)
+  assert.match(map, /samples\/DigitalBrain\.Compositions/)
+  assert.match(map, /not installed Behaviors/)
+  assert.doesNotMatch(map, /designed, not built/)
+  assert.doesNotMatch(diagram, /\bAuto\/Headless\b|\bAuto\/Desktop\b/)
+  assert.match(diagram, /no Auto/)
 })
 
 test('no page resurrects rejected v1 vocabulary', () => {

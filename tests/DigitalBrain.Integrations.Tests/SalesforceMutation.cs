@@ -8,7 +8,7 @@ namespace DigitalBrain.Integrations.Tests;
 public sealed class SalesforceMutation(IntegrationsFixture fixture)
 {
     private const string Driver = "sf-mutation";
-    private const string SoqlMismatch = "provider description does not match";
+    private const string UnprovenProviderDescription = "provider description does not match";
 
     [Fact(DisplayName =
         "ISalesforce.ProposeAccountDescription returns AwaitingApproval without opening MCP")]
@@ -35,6 +35,27 @@ public sealed class SalesforceMutation(IntegrationsFixture fixture)
     }
 
     [Fact(DisplayName =
+        "ISalesforce.ProposeAccountDescription rejects CommandId reuse with different content")]
+    public async Task ProposeRejectsCommandIdReuseWithDifferentContent()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var driver = test.Neuron<IIntegrationDriver>(Driver);
+        var commandId = CommandId.New();
+        var description = IntegrationsFixture.SampleEnrichmentDescription;
+        var proposed = await ProposeAsync(driver, commandId, description, cancellationToken);
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            ProposeAsync(driver, commandId, description + "\n(amended)", cancellationToken));
+
+        Assert.Contains("fingerprint", failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, test.Mcp().SessionCount);
+        Assert.Equal(
+            proposed,
+            await ProposeAsync(driver, commandId, description, cancellationToken));
+    }
+
+    [Fact(DisplayName =
         "ISalesforce.ApproveAccountDescription rejects mismatched human approval evidence before MCP")]
     public async Task ApproveRejectsMismatchedEvidenceWithoutMcp()
     {
@@ -55,6 +76,35 @@ public sealed class SalesforceMutation(IntegrationsFixture fixture)
                 recorded,
                 cancellationToken));
 
+        Assert.Equal(0, test.Mcp().SessionCount);
+        Assert.Equal(
+            SalesforceMutationState.AwaitingApproval,
+            (await ProposeAsync(driver, commandId, description, cancellationToken)).State);
+    }
+
+    [Fact(DisplayName =
+        "ISalesforce.ApproveAccountDescription rejects fingerprint that does not match the stored proposal before MCP")]
+    public async Task ApproveRejectsMismatchedFingerprintWithoutMcp()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var driver = test.Neuron<IIntegrationDriver>(Driver);
+        var commandId = CommandId.New();
+        var description = IntegrationsFixture.SampleEnrichmentDescription;
+        var proposed = await ProposeAsync(driver, commandId, description, cancellationToken);
+
+        var wrongFingerprint = IntegrationsFixture.Approval(
+            test,
+            commandId,
+            proposed.Fingerprint + "-tampered");
+        await DeliverApprovalAsync(test, driver, wrongFingerprint, cancellationToken);
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            driver.Reference.ApproveSalesforceWithStoredEvidence(
+                wrongFingerprint,
+                cancellationToken));
+
+        Assert.Contains("fingerprint", failure.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, test.Mcp().SessionCount);
         Assert.Equal(
             SalesforceMutationState.AwaitingApproval,
@@ -90,12 +140,12 @@ public sealed class SalesforceMutation(IntegrationsFixture fixture)
         var again = await driver.Reference.ApproveSalesforceWithStoredEvidence(
             approval,
             cancellationToken);
-        Assert.Equal(SalesforceMutationState.Completed, again.State);
+        Assert.Equal(completed, again);
     }
 
     [Fact(DisplayName =
-        "ISalesforce.ApproveAccountDescription returns OutcomeUncertain when SOQL cannot prove the write")]
-    public async Task ApproveReturnsOutcomeUncertainWhenSoqlCannotProveWrite()
+        "ISalesforce.ApproveAccountDescription returns OutcomeUncertain when reconciliation cannot prove the write")]
+    public async Task ApproveReturnsOutcomeUncertainWhenReconciliationCannotProveWrite()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
@@ -109,7 +159,7 @@ public sealed class SalesforceMutation(IntegrationsFixture fixture)
             AdmittedMcpTools.SalesforceUpdateAccount(success: false),
             AdmittedMcpTools.SalesforceSoqlQuery(
                 IntegrationsFixture.SampleAccountId,
-                SoqlMismatch));
+                UnprovenProviderDescription));
 
         var approval = IntegrationsFixture.Approval(test, commandId, proposed.Fingerprint);
         await DeliverApprovalAsync(test, driver, approval, cancellationToken);

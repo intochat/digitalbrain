@@ -12,16 +12,6 @@ namespace DigitalBrain.Kernel;
 [EditorBrowsable(EditorBrowsableState.Never)]
 public static class DigitalBrainRuntime
 {
-    public static Task<TResult> InvokeAsync<TResult>(
-        CapabilityDelegation delegation,
-        Func<Task<TResult>> invoke)
-    {
-        ArgumentNullException.ThrowIfNull(delegation);
-        ArgumentNullException.ThrowIfNull(invoke);
-
-        return CapabilityRequestContext.InvokeAsync(delegation, invoke);
-    }
-
     public static IReadOnlySet<ModuleId> Add(
         ISiloBuilder builder,
         string? siloLabel,

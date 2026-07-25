@@ -1,32 +1,18 @@
-using DigitalBrain.Aspire;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Testing;
 using DigitalBrain.Ui;
+using Orleans;
 
 namespace DigitalBrain.Ui.Tests;
 
 public sealed class UiFixture : DigitalBrainFixture
 {
-    public const string HealthPath = UiEdgeContract.HealthPath;
-
-    public const string OpenScenePath = UiEdgeContract.OpenScenePath;
-
-    public const string ShellEventsPath = UiEdgeContract.ShellEventsPath;
-
-    public const string ActivateControlPath = UiEdgeContract.ActivateControlPath;
-
-    public const string SceneOpenedEvent = UiEdgeContract.SceneOpenedEvent;
-
     public const string DefaultShellName = FlutterHostingExtensions.DefaultShellName;
 
     public const string DefaultUiResourceName = FlutterHostingExtensions.DefaultUiResourceName;
 
     public const string UiBaseEnvironmentVariable = FlutterHostingExtensions.UiBaseEnvironmentVariable;
-
-    public const string DefaultOwner = FlutterHostingExtensions.DefaultOwner;
-
-    public const string OwnerConfigurationKey = DigitalBrainClientHostingExtensions.OwnerConfigurationKey;
 
     public static Uri ResolveProductUiBaseAddress()
     {
@@ -37,6 +23,24 @@ public sealed class UiFixture : DigitalBrainFixture
         }
 
         return new Uri(configured.TrimEnd('/') + "/");
+    }
+
+    public static async Task<WebApplication> StartUiEdgeAsync(
+        TestBrain test,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(test);
+
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Services.AddSingleton(test.Client);
+        builder.Services.AddSingleton<IGrainFactory>(test.Cluster.Client);
+        builder.Services.AddUiEdgeServices();
+
+        var app = builder.Build();
+        app.MapUiHost();
+        await app.StartAsync(cancellationToken);
+        return app;
     }
 
     private static readonly Uri LaunchSettingsUiBase = new("http://localhost:5080/");

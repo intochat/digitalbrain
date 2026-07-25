@@ -219,7 +219,7 @@ internal static class McpRuntimeHosting
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.AddHttpClient(McpRuntime.HttpClientName);
+        services.AddHttpClient();
         DurablePayloadProtectionHosting.Configure(services, configuration);
         services.TryAddSingleton<IMcpClientSessionFactory, HttpMcpClientSessionFactory>();
         services.TryAddSingleton<McpRuntime>();

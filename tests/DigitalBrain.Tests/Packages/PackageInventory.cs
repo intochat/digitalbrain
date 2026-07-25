@@ -73,6 +73,8 @@ internal static class PackageInventory
         Quickstart,
     ];
 
+    internal static readonly string[] AbstractionsDirectPackages = ["Microsoft.Orleans.Sdk"];
+
     internal static readonly string[] ClientDirectProjects = [Abstractions];
 
     internal static readonly string[] ClientDirectPackages = ["Microsoft.Orleans.Client"];
@@ -92,11 +94,38 @@ internal static class PackageInventory
         "ModelContextProtocol.Core",
     ];
 
+    internal static readonly string[] IntegrationsMcpAspireHostingDirectProjects = [AspireHosting];
+
+    internal static readonly string[] IntegrationsMcpAspireHostingCompileReachable =
+    [
+        Abstractions,
+        AspireHosting,
+    ];
+
     internal static readonly string[] MetapackageDirectProjects =
     [
         Abstractions,
         Aspire,
         Client,
+    ];
+
+    internal static readonly string[] AspireDirectProjects = [Client];
+
+    internal static readonly string[] AspireDirectPackages = ["Microsoft.Orleans.Client"];
+
+    internal static readonly string[] AspireCompileReachable =
+    [
+        Abstractions,
+        Client,
+    ];
+
+    internal static readonly string[] AspireHostingDirectProjects = [Abstractions];
+
+    internal static readonly string[] AspireHostingDirectPackages =
+    [
+        "Aspire.Hosting",
+        "Aspire.Hosting.Azure.Storage",
+        "Aspire.Hosting.Orleans",
     ];
 
     internal static readonly string[] TestingDirectProjects =
@@ -135,9 +164,15 @@ internal static class PackageInventory
         project is Ui || project.StartsWith(UiPrefix, StringComparison.Ordinal);
 
     internal static bool IsForbiddenOnConsumerResidual(string project) =>
-        project is Kernel or Security or Testing
+        project is Kernel or Security or Testing or AspireHosting
         || IsIntegrationsProject(project)
         || IsModulesProject(project);
+
+    internal static bool IsForbiddenOnAspireHostingProject(string project) =>
+        project is Kernel or Client or Aspire or Security or Testing
+        || IsModulesProject(project)
+        || IsIntegrationsProject(project)
+        || IsUiFamilyProject(project);
 
     internal static bool IsForbiddenOnIntegrationsMcpProject(string project) =>
         project is Kernel or Client or Testing

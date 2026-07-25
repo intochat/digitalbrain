@@ -1,5 +1,8 @@
+using System.ComponentModel;
+
 namespace DigitalBrain.Abstractions;
 
+[EditorBrowsable(EditorBrowsableState.Never)]
 [Alias("db.subscription-registry")]
 public interface ISubscriptionRegistry : IGrainWithStringKey
 {

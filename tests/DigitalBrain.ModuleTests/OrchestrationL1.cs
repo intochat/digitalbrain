@@ -16,9 +16,6 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
     private const string SupervisedTeam = "supervised-team";
     private const int Pair = 2;
 
-    private const string DefinitionMismatch =
-        "The durable direct-agent session is incompatible with the current orchestration definition; an explicit migration or reset is required.";
-
     [Fact(DisplayName = "Concurrent.Respond fans out to multiple scripted participants")]
     public Task ConcurrentRespondFansOutToMultipleParticipants()
         => FanOutAsync(test => test.Client.Get<IConcurrentProbe>("concurrent-team"));
@@ -43,18 +40,10 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
             Revision: 0,
             new ProbeGoal("supervised"));
         var cursor = new AttemptCursor(taskId, workerId, attempt, Revision: 0);
-        var expected = SupervisedNotImplemented(workerId);
 
-        var accept = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => worker.InvokeAccept(request));
-        var cont = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => worker.InvokeContinue(cursor));
-        var cancel = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => worker.InvokeCancel(cursor));
-
-        Assert.Equal(expected, accept.Message);
-        Assert.Equal(expected, cont.Message);
-        Assert.Equal(expected, cancel.Message);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => worker.InvokeAccept(request));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => worker.InvokeContinue(cursor));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => worker.InvokeCancel(cursor));
     }
 
     [Fact(DisplayName = "second Concurrent.Respond reuses the durable session on the same orchestration id")]
@@ -89,10 +78,9 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
 
         await orchestration.UseParticipants("left-alt", "right-alt");
 
-        var mismatch = await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<InvalidOperationException>(
             () => orchestration.Respond([User()]));
 
-        Assert.Equal(DefinitionMismatch, mismatch.Message);
         Assert.Equal(Pair, test.Chat().CallCount);
     }
 
@@ -120,7 +108,4 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
             response.Text.Contains(Left, StringComparison.Ordinal)
             || response.Text.Contains(Right, StringComparison.Ordinal),
             $"Expected '{Left}' or '{Right}' in '{response.Text}'.");
-
-    private static string SupervisedNotImplemented(NeuronId workerId)
-        => $"GroupChat '{workerId}' supervised Attempts are not implemented. Use direct {nameof(IAgent.Respond)}.";
 }

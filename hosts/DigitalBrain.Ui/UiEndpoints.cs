@@ -1,7 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using DigitalBrain.Flutter;
-using Orleans;
 
 namespace DigitalBrain.Ui;
 
@@ -41,14 +40,12 @@ internal static class UiEndpoints
                 HttpContext http,
                 string shellName,
                 long? afterSequence,
-                IDigitalBrain brain,
-                IGrainFactory grains,
+                OwnerSessionJournal sessionJournal,
                 CancellationToken cancellationToken) =>
             {
                 ArgumentException.ThrowIfNullOrWhiteSpace(shellName);
                 ArgumentNullException.ThrowIfNull(http);
-                ArgumentNullException.ThrowIfNull(brain);
-                ArgumentNullException.ThrowIfNull(grains);
+                ArgumentNullException.ThrowIfNull(sessionJournal);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var cursor = afterSequence.GetValueOrDefault();
@@ -58,12 +55,11 @@ internal static class UiEndpoints
                     return;
                 }
 
-                http.Response.Headers.CacheControl = "no-cache";
-                http.Response.ContentType = "text/event-stream";
+                http.Response.Headers.CacheControl = UiEdgeContract.CacheControlNoCache;
+                http.Response.ContentType = UiEdgeContract.EventStreamContentType;
                 await ShellEventFeed.WriteSceneOpenedSseAsync(
                     http.Response.Body,
-                    grains,
-                    brain,
+                    sessionJournal,
                     shellName,
                     cursor,
                     cancellationToken);
@@ -72,25 +68,27 @@ internal static class UiEndpoints
         endpoints.MapPost(
             UiEdgeContract.ActivateControlPath,
             static async Task<IResult> (
-                string sceneName,
+                string sceneKey,
                 string controlId,
                 ActivateControlRequest request,
                 IDigitalBrain brain,
                 CancellationToken cancellationToken) =>
             {
-                ArgumentException.ThrowIfNullOrWhiteSpace(sceneName);
+                ArgumentException.ThrowIfNullOrWhiteSpace(sceneKey);
                 ArgumentException.ThrowIfNullOrWhiteSpace(controlId);
                 ArgumentNullException.ThrowIfNull(request);
                 ArgumentNullException.ThrowIfNull(brain);
                 ArgumentException.ThrowIfNullOrWhiteSpace(request.Intent);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var sceneKey = string.IsNullOrWhiteSpace(request.SceneKey)
-                    ? sceneName
-                    : request.SceneKey;
+                if (!string.IsNullOrWhiteSpace(request.SceneKey)
+                    && !string.Equals(request.SceneKey, sceneKey, StringComparison.Ordinal))
+                {
+                    return Results.BadRequest();
+                }
 
                 await brain.SendAsync<IScene>(
-                    sceneName,
+                    sceneKey,
                     new ControlActivated(sceneKey, controlId, request.Intent));
 
                 return Results.Accepted();

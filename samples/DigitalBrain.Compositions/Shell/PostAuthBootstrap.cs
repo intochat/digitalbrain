@@ -16,6 +16,6 @@ public sealed class PostAuthBootstrap
         cancellationToken.ThrowIfCancellationRequested();
 
         var shell = brain.Get<IShell>(shellName);
-        await shell.Open(new OpenScene(CommandId.New(), OpenHome.SceneKey, OpenHome.SceneTitle));
+        await shell.Open(new OpenScene(CommandId.New(), "home", "Home"));
     }
 }

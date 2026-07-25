@@ -52,7 +52,7 @@ export const MODULES = [
     mcp: false, ui: true,
     aspire: [
       { res: 'digitalbrain-ui', sub: 'AsClient edge', model: '', params: ['DigitalBrain__Owner'] },
-      { res: 'digitalbrain-flutter', sub: 'Auto/Headless/FlutterDesktop', model: '', params: ['DIGITALBRAIN_UI_BASE', 'DIGITALBRAIN_SHELL'] },
+      { res: 'digitalbrain-flutter', sub: 'Desktop (default) or Headless — no Auto', model: '', params: ['DIGITALBRAIN_UI_BASE', 'DIGITALBRAIN_SHELL'] },
     ],
   },
   {

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DigitalBrain.Ui;
 
 namespace DigitalBrain.Ui.Tests;
 
@@ -13,11 +14,11 @@ internal static class UiEdgeSse
         UiEdgeContract.OpenScenePath.Replace("{shellName}", shellName, StringComparison.Ordinal);
 
     public static string ShellEvents(string shellName, long afterSequence = 0) =>
-        $"{UiEdgeContract.ShellEventsPath.Replace("{shellName}", shellName, StringComparison.Ordinal)}?afterSequence={afterSequence}";
+        $"{UiEdgeContract.ShellEventsPath.Replace("{shellName}", shellName, StringComparison.Ordinal)}?{UiEdgeContract.AfterSequenceQuery}={afterSequence}";
 
-    public static string ActivateControl(string sceneName, string controlId) =>
+    public static string ActivateControl(string sceneKey, string controlId) =>
         UiEdgeContract.ActivateControlPath
-            .Replace("{sceneName}", sceneName, StringComparison.Ordinal)
+            .Replace("{sceneKey}", sceneKey, StringComparison.Ordinal)
             .Replace("{controlId}", controlId, StringComparison.Ordinal);
 
     public static async Task<SceneOpenedEvent> ReadNextSceneOpenedAsync(

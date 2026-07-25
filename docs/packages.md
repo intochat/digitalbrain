@@ -10,17 +10,17 @@ for what ships and what each package may depend on.
 
 | Package | Contains | Depends on |
 | --- | --- | --- |
-| `DigitalBrain` | Consumer metapackage | Abstractions, Client, Aspire |
-| `DigitalBrain.Abstractions` | Leaf neuron and synapse contracts | nothing |
+| `DigitalBrain` | Consumer metapackage (no assembly; never Kernel or modules) | Abstractions, Client, Aspire |
+| `DigitalBrain.Abstractions` | Leaf neuron and synapse contracts; Orleans grain bases deliberate (`INeuron`/`IJournalObserver`) | Microsoft.Orleans.Sdk |
 | `DigitalBrain.Kernel` | Domain-neutral silo runtime | Abstractions |
-| `DigitalBrain.Client` | Typed owner-bound client | Abstractions |
+| `DigitalBrain.Client` | Owner-bound `IDigitalBrain` facade (`Get`/`Send`/`Emit` only; no product journal watch) | Abstractions, Microsoft.Orleans.Client |
 | `DigitalBrain.Testing` | Development-only real multi-silo `DigitalBrainFixture`, method-scoped `TestBrain`, scripted MCP test edges, and assembly-owned `DigitalBrainAppHostFixture<TAppHost>` with method-scoped `RunningAppHost` | Kernel, Client, Integrations.Mcp |
-| `DigitalBrain.Aspire` | Client Generic Host integration | Client |
-| `DigitalBrain.Aspire.Hosting` | One-call durable AppHost brain composition | Abstractions |
-| `DigitalBrain.Security` | Purpose-bound durable encryption | configuration and dependency-injection abstractions |
-| `DigitalBrain.Integrations.Mcp` | Southbound official MCP transport, OAuth, token cache, and session mechanics | Security |
-| `DigitalBrain.Integrations.Mcp.Aspire.Hosting` | Shared AppHost projection for MCP-backed providers | Aspire.Hosting |
-| `DigitalBrain.Modules.AI.Contracts` | Provider-free AI neuron contracts | Abstractions, Tasks.Contracts |
+| `DigitalBrain.Aspire` | Client Generic Host DI (`AddDigitalBrainClient`; owner config only; never Aspire.Hosting) | Client, Microsoft.Orleans.Client |
+| `DigitalBrain.Aspire.Hosting` | One-call durable AppHost brain (`AddDigitalBrain`; silo vs `AsClient` projection; never Client/Kernel/modules) | Abstractions, Aspire.Hosting, Aspire.Hosting.Azure.Storage, Aspire.Hosting.Orleans |
+| `DigitalBrain.Security` | Purpose-bound durable encryption (0 public exports; IVT friends only) | Microsoft.Extensions.Configuration.Abstractions, Microsoft.Extensions.DependencyInjection.Abstractions |
+| `DigitalBrain.Integrations.Mcp` | Southbound official MCP transport, OAuth, token cache, session, fingerprint (0 public exports; never Kernel/Client/modules) | Security, ModelContextProtocol.Core, Microsoft.Extensions.Http, Microsoft.Orleans.Journaling |
+| `DigitalBrain.Integrations.Mcp.Aspire.Hosting` | Friend-only OAuth AppHost projection for MCP-backed providers (0 public exports; never southbound Mcp package) | Aspire.Hosting |
+| `DigitalBrain.Modules.AI.Contracts` | Provider-free AI neuron contracts (MEAI message types only; no provider SDKs) | Abstractions, Tasks.Contracts, Microsoft.Extensions.AI.Abstractions |
 | `DigitalBrain.Modules.AI` | Typed model neurons and MAF orchestration | AI.Contracts, Kernel, Security |
 | `DigitalBrain.Modules.AI.Aspire.Hosting` | AI provider resources and parameters | AI, Aspire.Hosting |
 | `DigitalBrain.Modules.Google.Contracts` | Gmail neuron vocabulary | Abstractions |
@@ -100,22 +100,36 @@ observation and controllable clock. L2 uses exclusive `DigitalBrainAppHostFixtur
 method-scoped `RunningAppHost` for composition, health, and graph cleanup via Aspire APIs. Failures
 are ordinary exceptions; there is no public diagnostic DTO zoo.
 
-`IDigitalBrain` is the owner-scoped client contract and `DigitalBrainClient` is its implementation.
-There is no concrete brain neuron or root-neuron interface: `DigitalBrainBuilder` owns AppHost state,
-while the client addresses typed neurons within one owner.
+`IDigitalBrain` is the owner-scoped client contract and `DigitalBrainClient` is its implementation —
+the only public client facade. Surface is ambient-owner `Get`/`SendAsync`/`EmitAsync` only.
+Product journal observation on `IDigitalBrain` is **Designed, not Built**; northbound edges that need
+cursors use host-private `ISessionNeuron.ReadNeuronJournal` (or Testing journals), not a second
+client facade. There is no concrete brain neuron or root-neuron interface: `DigitalBrainBuilder` owns
+AppHost state, while the client addresses typed neurons within one owner.
 `DigitalBrain.Client` is **not** an authentication boundary. An Orleans client is a trusted cluster
 peer — authenticate the user at the application edge and bind the resulting principal to the owner
 supplied to `AddDigitalBrainClient` (or `Connect` for Testing/host wiring).
 
-`DigitalBrain.Aspire.Hosting` creates the complete durable profile with one
-`AddDigitalBrain(name)` call: brain-scoped Azure Storage provides clustering, reminders, and
-Blob-backed journals. Aspire run mode uses Azurite for that resource, while publish mode provisions
-Azure Storage. The silo executable remains an explicit project reference because its compilation
-generates the typed module catalog. Silo references receive clustering, reminders, journals,
-protection material when required, and durable-resource waits. Run mode generates and persists a
-secret Base64 256-bit state-protection key for local durability; Publish mode requires that secret
-from the deployment environment. The key is projected only to silos, never clients. Client
-references receive only the clustering connection Orleans needs for gateway discovery.
+`DigitalBrain.Aspire` is the **consumer** Generic Host integration (`AddDigitalBrainClient`): it
+registers Orleans client + ambient-owner `IDigitalBrain`. It depends on Client and
+`Microsoft.Orleans.Client` only — residual package graph forbids Kernel, modules, Integrations, and
+**`DigitalBrain.Aspire.Hosting`**. Process owner defaults to configuration key `DigitalBrain:Owner`
+(`"dev"` when unset). That is not an authentication boundary (same rule as Client).
+
+`DigitalBrain.Aspire.Hosting` is the **AppHost** composition package. It creates the complete durable
+profile with one `AddDigitalBrain(name)` call: brain-scoped Azure Storage provides clustering,
+reminders, and Blob-backed journals. Aspire run mode uses Azurite for that resource, while publish
+mode provisions Azure Storage. The silo executable remains an explicit project reference because its
+compilation generates the typed module catalog. Silo `WithReference(brain)` receives clustering,
+reminders, journals, protection material when required, and durable-resource waits. Run mode
+generates and persists a secret Base64 256-bit state-protection key for local durability; Publish
+mode requires that secret from the deployment environment. The key is projected only to silos, never
+clients. Client `WithReference(brain.AsClient())` receives only the clustering connection Orleans
+needs for gateway discovery. Hosting depends on Abstractions plus Aspire host packages
+(`Aspire.Hosting`, `Aspire.Hosting.Azure.Storage`, `Aspire.Hosting.Orleans`) — residual forbids
+Client, Kernel, modules, Integrations, and the consumer Aspire package. Projection guts and brain
+name stay internal; module `With*` packages are IVT friends. L0/L2 prove composition graph and
+projection security — **not** product AppHost OS-surface Healthy Built-live (Hold #6 residual).
 
 Each runtime module compiles to a typed capsule. Startup asks every available capsule to prepare
 serializers for its public wire contracts, then activates runtime services and broadcast handlers
@@ -133,14 +147,23 @@ resource. Each brain owns a secret `<brain-name>-ai-openai-api-key` parameter. O
 receive provider endpoints, model names, and that secret parameter; client references receive none
 of them.
 
-`DigitalBrain.Security` is the shared purpose-bound durable encryption package. AI uses it today for
-direct MAF sessions; supervised workflow checkpoints are a designed purpose on the same package and
-are not built. `DigitalBrain.Integrations.Mcp` uses it for OAuth tokens. Neither package acquires
-provider vocabulary.
+`DigitalBrain.Security` is the shared purpose-bound durable encryption package. It exports **no**
+public types — residual package graph pins configuration + DI abstraction NuGets only and asserts
+empty PE exports. AI uses it today for direct MAF sessions (IVT friend); supervised workflow
+checkpoints are a designed purpose on the same package and are not built. `DigitalBrain.Integrations.Mcp`
+uses it for OAuth tokens (IVT friend). Neither package acquires provider vocabulary.
 
-`DigitalBrain.Integrations.Mcp` is southbound shared mechanics for Gmail and Salesforce. The provider
-modules own endpoints, scopes, exact tool admission, arguments, semantic mapping, approval, fencing,
-and reconciliation. Their public contracts expose no MCP SDK type or tool dictionary.
-`hosts/DigitalBrain.Mcp` is the separate northbound server that exposes selected Neurons through
+`DigitalBrain.Integrations.Mcp` is southbound shared mechanics for Gmail and Salesforce (transport,
+OAuth, durable token cache, callback-scoped session, structured-result checks, canonical fingerprint).
+It exports **no** public types — friends only (`Google` / `Salesforce` / Testing / Integrations.Tests
+IVT). Residual forbids Kernel, Client, modules, and Aspire family on the project graph, and forbids
+server-side MCP / DataProtection / provider SDK NuGets. The provider modules own endpoints, scopes,
+exact tool admission, arguments, semantic mapping, approval, fencing, and reconciliation. Their public
+contracts expose no MCP SDK type or tool dictionary.
+`DigitalBrain.Integrations.Mcp.Aspire.Hosting` is the optional AppHost OAuth projection: **0 public
+exports**, ProjectReference to `DigitalBrain.Aspire.Hosting` only (never the southbound Mcp package),
+IVT friends Google/Salesforce module hosting for `McpProviderHosting.Register`. Selecting a provider
+module without the hosting package remains valid when config is wired elsewhere (scripted L1).
+`hosts/DigitalBrain.Mcp` is the separate **northbound** server that exposes selected Neurons through
 `IDigitalBrain`; it depends on public client/AI contracts and MCP server packages, never on the
-southbound integration package.
+southbound integration package (and never on Security).
