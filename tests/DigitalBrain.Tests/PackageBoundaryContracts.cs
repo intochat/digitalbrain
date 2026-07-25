@@ -177,21 +177,12 @@ public sealed class PackageBoundaryContracts
             .Descendants("IsPackable")
             .Any(element => string.Equals(element.Value, "true", StringComparison.OrdinalIgnoreCase));
 
-    private static HashSet<string> PackagesReachableFrom(string package) =>
-        PackagesReachableFrom(package, ProjectsReachableFrom, DirectPackageReferencesOf);
-
-    private static HashSet<string> CompilePackagesReachableFrom(string package) =>
-        PackagesReachableFrom(package, CompileProjectsReachableFrom, DirectCompilePackageReferencesOf);
-
-    private static HashSet<string> PackagesReachableFrom(
-        string package,
-        Func<string, HashSet<string>> projectsReachableFrom,
-        Func<string, IEnumerable<string>> directPackageReferencesOf)
+    private static HashSet<string> PackagesReachableFrom(string package)
     {
         var reachable = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var project in projectsReachableFrom(package).Append(package))
+        foreach (var project in ProjectsReachableFrom(package).Append(package))
         {
-            reachable.UnionWith(directPackageReferencesOf(project));
+            reachable.UnionWith(DirectPackageReferencesOf(project));
         }
 
         return reachable;
@@ -247,12 +238,6 @@ public sealed class PackageBoundaryContracts
     private static IEnumerable<string> DirectPackageReferencesOf(string package) =>
         ReferenceElements(package, "PackageReference")
             .Where(FlowsToConsumers)
-            .Select(IncludeOf);
-
-    private static IEnumerable<string> DirectCompilePackageReferencesOf(string package) =>
-        ReferenceElements(package, "PackageReference")
-            .Where(FlowsToConsumers)
-            .Where(CompilesAgainst)
             .Select(IncludeOf);
 
     private static IEnumerable<XElement> ReferenceElements(string package, string elementName) =>

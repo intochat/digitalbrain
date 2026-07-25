@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Threading.Channels;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.AI;
@@ -34,11 +33,7 @@ internal sealed class ChatEdgeScript
 {
     private readonly Lock _gate = new();
     private readonly List<ChatCall> _calls = [];
-    private readonly Queue<ChatStep> _steps = [];
-    private readonly Channel<int> _invocations =
-        Channel.CreateUnbounded<int>();
-    private readonly Channel<int> _completions =
-        Channel.CreateUnbounded<int>();
+    private readonly Queue<string> _replies = [];
 
     internal IReadOnlyList<ChatCall> Calls
     {
@@ -52,16 +47,21 @@ internal sealed class ChatEdgeScript
     }
 
     internal void Reply(string text)
-        => Enqueue(new(ChatStepKind.Reply, text));
+    {
+        lock (_gate)
+        {
+            _replies.Enqueue(text);
+        }
+    }
 
-    internal async Task<ChatResponse> Respond(
+    internal Task<ChatResponse> Respond(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options,
         CancellationToken cancellationToken)
     {
-        ChatStep step;
-        int call;
+        cancellationToken.ThrowIfCancellationRequested();
 
+        string text;
         lock (_gate)
         {
             var snapshot = messages
@@ -72,28 +72,13 @@ internal sealed class ChatEdgeScript
                         .ToArray()))
                 .ToArray();
             _calls.Add(new(snapshot, options));
-            call = _calls.Count;
-            step = _steps.Count > 0
-                ? _steps.Dequeue()
-                : new(ChatStepKind.Reply, $"reply-{call}");
+            text = _replies.Count > 0
+                ? _replies.Dequeue()
+                : $"reply-{_calls.Count}";
         }
 
-        await _invocations.Writer.WriteAsync(call, cancellationToken);
-
-        try
-        {
-            return step.Kind switch
-            {
-                ChatStepKind.Reply => new ChatResponse(
-                    new ChatMessage(ChatRole.Assistant, step.Value)),
-                _ => throw new InvalidOperationException(
-                    $"Unknown chat step '{step.Kind}'."),
-            };
-        }
-        finally
-        {
-            _completions.Writer.TryWrite(call);
-        }
+        return Task.FromResult(new ChatResponse(
+            new ChatMessage(ChatRole.Assistant, text)));
     }
 
     internal void Reset()
@@ -101,31 +86,8 @@ internal sealed class ChatEdgeScript
         lock (_gate)
         {
             _calls.Clear();
-            _steps.Clear();
+            _replies.Clear();
         }
-
-        while (_invocations.Reader.TryRead(out _))
-        {
-        }
-
-        while (_completions.Reader.TryRead(out _))
-        {
-        }
-    }
-
-    private void Enqueue(ChatStep step)
-    {
-        lock (_gate)
-        {
-            _steps.Enqueue(step);
-        }
-    }
-
-    private sealed record ChatStep(ChatStepKind Kind, string Value);
-
-    private enum ChatStepKind
-    {
-        Reply,
     }
 }
 
