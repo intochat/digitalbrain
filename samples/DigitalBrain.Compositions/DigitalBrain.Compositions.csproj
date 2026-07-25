@@ -6,9 +6,6 @@
     <NoWarn>$(NoWarn);CA2007;CA1822</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <Using Remove="Orleans" />
-    <Using Remove="Orleans.Hosting" />
-    <Using Remove="Orleans.Runtime" />
     <Using Remove="System.Net.Http" />
   </ItemGroup>
   <ItemGroup>
@@ -18,4 +15,11 @@
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Time.Contracts\DigitalBrain.Modules.Time.Contracts.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.AI.Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />
   </ItemGroup>
+  <Target Name="StripOrleansUsingsFromCompositions" BeforeTargets="CoreCompile;GenerateGlobalUsings">
+    <ItemGroup>
+      <Using Remove="Orleans" />
+      <Using Remove="Orleans.Hosting" />
+      <Using Remove="Orleans.Runtime" />
+    </ItemGroup>
+  </Target>
 </Project>
