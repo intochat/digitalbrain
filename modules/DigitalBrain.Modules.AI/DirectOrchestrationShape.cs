@@ -4,84 +4,34 @@ using Microsoft.Agents.AI.Workflows;
 
 namespace DigitalBrain.AI;
 
-internal enum DirectOrchestrationKind
-{
-    Concurrent,
-    GroupChat,
-}
-
-internal enum DirectExecutionEnvironment
-{
-    Concurrent,
-    Lockstep,
-}
-
-internal enum DirectOrchestrationManager
-{
-    None,
-    RoundRobin,
-}
-
-internal enum DirectOrchestrationAggregator
-{
-    None,
-    ConcurrentDefault,
-}
-
 internal sealed record DirectOrchestrationIdentity(
-    DirectOrchestrationKind Kind,
-    DirectExecutionEnvironment ExecutionEnvironment,
-    DirectOrchestrationManager Manager,
-    DirectOrchestrationAggregator Aggregator)
-{
-    internal string KindName => Kind switch
-    {
-        DirectOrchestrationKind.Concurrent => "concurrent",
-        DirectOrchestrationKind.GroupChat => "group-chat",
-        _ => throw new InvalidOperationException($"Unknown direct orchestration kind '{Kind}'."),
-    };
-
-    internal string ExecutionEnvironmentName => ExecutionEnvironment switch
-    {
-        DirectExecutionEnvironment.Concurrent => "in-process-concurrent",
-        DirectExecutionEnvironment.Lockstep => "in-process-lockstep",
-        _ => throw new InvalidOperationException(
-            $"Unknown direct orchestration execution environment '{ExecutionEnvironment}'."),
-    };
-
-    internal string ManagerName(int participantCount) => Manager switch
-    {
-        DirectOrchestrationManager.None => "none",
-        DirectOrchestrationManager.RoundRobin => $"round-robin:{participantCount}",
-        _ => throw new InvalidOperationException(
-            $"Unknown direct orchestration manager '{Manager}'."),
-    };
-
-    internal string AggregatorName => Aggregator switch
-    {
-        DirectOrchestrationAggregator.None => "none",
-        DirectOrchestrationAggregator.ConcurrentDefault => "concurrent-default",
-        _ => throw new InvalidOperationException(
-            $"Unknown direct orchestration aggregator '{Aggregator}'."),
-    };
-}
+    string KindName,
+    string ExecutionEnvironmentName,
+    string AggregatorName,
+    Func<int, string> ManagerName);
 
 internal sealed class DirectOrchestrationShape
 {
     private readonly IReadOnlyList<Participant> _participants;
-    private readonly DirectOrchestrationIdentity _identity;
+    private readonly Func<AIAgent[], Workflow> _buildWorkflow;
+    private readonly IWorkflowExecutionEnvironment _executionEnvironment;
 
     private DirectOrchestrationShape(
         Type orchestrationType,
         IReadOnlyList<Participant> participants,
-        DirectOrchestrationIdentity identity)
+        DirectOrchestrationIdentity identity,
+        Func<AIAgent[], Workflow> buildWorkflow,
+        IWorkflowExecutionEnvironment executionEnvironment)
     {
         ArgumentNullException.ThrowIfNull(orchestrationType);
         ArgumentNullException.ThrowIfNull(participants);
         ArgumentNullException.ThrowIfNull(identity);
+        ArgumentNullException.ThrowIfNull(buildWorkflow);
+        ArgumentNullException.ThrowIfNull(executionEnvironment);
 
         _participants = participants;
-        _identity = identity;
+        _buildWorkflow = buildWorkflow;
+        _executionEnvironment = executionEnvironment;
         Definition = OrchestrationDefinition.Describe(
             orchestrationType,
             participants,
@@ -129,10 +79,12 @@ internal sealed class DirectOrchestrationShape
             orchestrationType,
             participants,
             new(
-                DirectOrchestrationKind.Concurrent,
-                DirectExecutionEnvironment.Concurrent,
-                DirectOrchestrationManager.None,
-                DirectOrchestrationAggregator.ConcurrentDefault));
+                "concurrent",
+                "in-process-concurrent",
+                "concurrent-default",
+                static _ => "none"),
+            static agents => AgentWorkflowBuilder.BuildConcurrent(agents),
+            InProcessExecution.Concurrent);
 
     internal static DirectOrchestrationShape CreateGroupChat(
         Type orchestrationType,
@@ -141,10 +93,18 @@ internal sealed class DirectOrchestrationShape
             orchestrationType,
             participants,
             new(
-                DirectOrchestrationKind.GroupChat,
-                DirectExecutionEnvironment.Lockstep,
-                DirectOrchestrationManager.RoundRobin,
-                DirectOrchestrationAggregator.None));
+                "group-chat",
+                "in-process-lockstep",
+                "none",
+                static count => $"round-robin:{count}"),
+            static agents => AgentWorkflowBuilder
+                .CreateGroupChatBuilderWith(team => new RoundRobinGroupChatManager(team)
+                {
+                    MaximumIterationCount = agents.Length,
+                })
+                .AddParticipants(agents)
+                .Build(),
+            InProcessExecution.Lockstep);
 
     internal AIAgent CreateAgent(
         IGrainFactory grains,
@@ -157,32 +117,12 @@ internal sealed class DirectOrchestrationShape
         [
             .. _participants.Select(participant => participant.CreateAgent(grains, turnScheduler)),
         ];
-        var workflow = _identity.Kind switch
-        {
-            DirectOrchestrationKind.Concurrent => AgentWorkflowBuilder.BuildConcurrent(agents),
-            DirectOrchestrationKind.GroupChat => AgentWorkflowBuilder
-                .CreateGroupChatBuilderWith(team => new RoundRobinGroupChatManager(team)
-                {
-                    MaximumIterationCount = agents.Length,
-                })
-                .AddParticipants(agents)
-                .Build(),
-            _ => throw new InvalidOperationException(
-                $"Unknown direct orchestration kind '{_identity.Kind}'."),
-        };
-        IWorkflowExecutionEnvironment environment = _identity.ExecutionEnvironment switch
-        {
-            DirectExecutionEnvironment.Concurrent => InProcessExecution.Concurrent,
-            DirectExecutionEnvironment.Lockstep => InProcessExecution.Lockstep,
-            _ => throw new InvalidOperationException(
-                $"Unknown direct orchestration execution environment '{_identity.ExecutionEnvironment}'."),
-        };
 
-        return workflow.AsAIAgent(
+        return _buildWorkflow(agents).AsAIAgent(
             id: Definition.HostId,
             name: Definition.HostName,
             description: null,
-            executionEnvironment: environment,
+            executionEnvironment: _executionEnvironment,
             includeExceptionDetails: false,
             includeWorkflowOutputsInResponse: false);
     }
