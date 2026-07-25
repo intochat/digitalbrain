@@ -5,7 +5,8 @@ namespace DigitalBrain.HostTests;
 
 public sealed class HostedBrain(TestingAppHostFixture fixture)
 {
-    [Fact]
+    [Fact(DisplayName =
+        "TestingAppHost silo reaches Healthy and /health OK without OS surface")]
     public async Task TheSiloReachesHealthyOnTheRealHost()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

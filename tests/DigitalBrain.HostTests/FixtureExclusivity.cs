@@ -5,9 +5,10 @@ namespace DigitalBrain.HostTests;
 
 public sealed class FixtureExclusivity(
     TestingAppHostFixture testing,
-    ProductionAppHostFixture production)
+    QuickstartAppHostFixture quickstart)
 {
-    [Fact]
+    [Fact(DisplayName =
+        "a second graph waits for the first within the same AppHost fixture")]
     public async Task ASecondGraphWaitsForTheFirstWithinTheSameFixture()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -20,12 +21,13 @@ public sealed class FixtureExclusivity(
         Assert.NotNull(second);
     }
 
-    [Fact]
+    [Fact(DisplayName =
+        "a second graph waits for the first across silo-only AppHost fixture types")]
     public async Task ASecondGraphWaitsForTheFirstAcrossFixtureTypes()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var first = await testing.StartAsync(cancellationToken);
-        var waiting = production.StartAsync(cancellationToken);
+        var waiting = quickstart.StartAsync(cancellationToken);
         Assert.False(waiting.IsCompleted);
 
         await first.DisposeAsync();

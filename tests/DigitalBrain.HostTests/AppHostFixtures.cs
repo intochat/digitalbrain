@@ -3,7 +3,7 @@ using DigitalBrain.Testing;
 using Xunit;
 
 [assembly: AssemblyFixture(typeof(DigitalBrain.HostTests.TestingAppHostFixture))]
-[assembly: AssemblyFixture(typeof(DigitalBrain.HostTests.ProductionAppHostFixture))]
+[assembly: AssemblyFixture(typeof(DigitalBrain.HostTests.QuickstartAppHostFixture))]
 
 namespace DigitalBrain.HostTests;
 
@@ -18,5 +18,5 @@ public sealed class TestingAppHostFixture :
     "Design",
     "CA1515:Consider making public types internal",
     Justification = "xUnit assembly fixture types must be public.")]
-public sealed class ProductionAppHostFixture :
-    DigitalBrainAppHostFixture<Projects.DigitalBrain_AppHost>;
+public sealed class QuickstartAppHostFixture :
+    DigitalBrainAppHostFixture<Projects.DigitalBrain_Quickstart_AppHost>;
