@@ -30,14 +30,10 @@ internal static class MafParticipantAdapter
         ArgumentNullException.ThrowIfNull(participant);
         Validate(participant.Contract);
 
-        var (agentId, agentName) = AgentIdentity(participant.Contract, participant.Id);
-
         return new OrchestrationParticipant(
             participant.Contract.AssemblyQualifiedName
                 ?? throw new InvalidOperationException("A participant contract has no assembly-qualified identity."),
-            participant.Id,
-            agentId,
-            agentName);
+            participant.Id);
     }
 
     [SuppressMessage(

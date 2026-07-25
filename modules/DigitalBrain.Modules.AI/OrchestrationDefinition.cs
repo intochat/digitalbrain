@@ -9,9 +9,7 @@ namespace DigitalBrain.AI;
 
 internal sealed record OrchestrationParticipant(
     string Contract,
-    NeuronId NeuronId,
-    string AgentId,
-    string AgentName);
+    NeuronId NeuronId);
 
 internal sealed record OrchestrationDefinition(string Fingerprint)
 {
