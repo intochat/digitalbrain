@@ -9,5 +9,6 @@ public sealed class TestingFixture : DigitalBrainFixture
     {
         ArgumentNullException.ThrowIfNull(brain);
         brain.AddModule<QuickstartModule>();
+        brain.AddModule<CapabilityProbeModule>();
     }
 }
