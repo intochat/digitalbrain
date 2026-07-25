@@ -14,21 +14,21 @@ for what ships and what each package may depend on.
 | `DigitalBrain.Abstractions` | Leaf neuron and synapse contracts | nothing |
 | `DigitalBrain.Kernel` | Domain-neutral silo runtime | Abstractions |
 | `DigitalBrain.Client` | Typed owner-bound client | Abstractions |
-| `DigitalBrain.Testing` | Development-only real three-silo `DigitalBrainFixture`, method-scoped `TestBrain`, and assembly-owned `DigitalBrainAppHostFixture<TAppHost>` with method-scoped `RunningAppHost` | Kernel, Client |
+| `DigitalBrain.Testing` | Development-only real multi-silo `DigitalBrainFixture`, method-scoped `TestBrain`, scripted MCP test edges, and assembly-owned `DigitalBrainAppHostFixture<TAppHost>` with method-scoped `RunningAppHost` | Kernel, Client, Integrations.Mcp |
 | `DigitalBrain.Aspire` | Client Generic Host integration | Client |
 | `DigitalBrain.Aspire.Hosting` | One-call durable AppHost brain composition | Abstractions |
 | `DigitalBrain.Security` | Purpose-bound durable encryption | configuration and dependency-injection abstractions |
 | `DigitalBrain.Integrations.Mcp` | Southbound official MCP transport, OAuth, token cache, and session mechanics | Security |
 | `DigitalBrain.Integrations.Mcp.Aspire.Hosting` | Shared AppHost projection for MCP-backed providers | Aspire.Hosting |
 | `DigitalBrain.Modules.AI.Contracts` | Provider-free AI neuron contracts | Abstractions, Tasks.Contracts |
-| `DigitalBrain.Modules.AI` | Typed model neurons and MAF orchestration | AI.Contracts, Abstractions, Kernel, Security |
+| `DigitalBrain.Modules.AI` | Typed model neurons and MAF orchestration | AI.Contracts, Kernel, Security |
 | `DigitalBrain.Modules.AI.Aspire.Hosting` | AI provider resources and parameters | AI, Aspire.Hosting |
 | `DigitalBrain.Modules.Google.Contracts` | Gmail neuron vocabulary | Abstractions |
 | `DigitalBrain.Modules.Google` | Gmail neuron over the hosted MCP boundary | Google.Contracts, Integrations.Mcp, Kernel |
-| `DigitalBrain.Modules.Google.Aspire.Hosting` | Google module AppHost integration | Google, Aspire.Hosting, Integrations.Mcp.Aspire.Hosting |
+| `DigitalBrain.Modules.Google.Aspire.Hosting` | Google module AppHost integration | Google, Integrations.Mcp.Aspire.Hosting |
 | `DigitalBrain.Modules.Salesforce.Contracts` | Account-mutation neuron vocabulary | Abstractions |
 | `DigitalBrain.Modules.Salesforce` | Account-mutation neuron over the hosted MCP boundary | Salesforce.Contracts, Integrations.Mcp, Kernel |
-| `DigitalBrain.Modules.Salesforce.Aspire.Hosting` | Salesforce module AppHost integration | Salesforce, Aspire.Hosting, Integrations.Mcp.Aspire.Hosting |
+| `DigitalBrain.Modules.Salesforce.Aspire.Hosting` | Salesforce module AppHost integration | Salesforce, Integrations.Mcp.Aspire.Hosting |
 | `DigitalBrain.Modules.Tasks.Contracts` | Durable task, worker, attempt, and blocker vocabulary | Abstractions |
 | `DigitalBrain.Modules.Tasks` | Durable task lifecycle and worker attempt coordination | Tasks.Contracts, Kernel |
 | `DigitalBrain.Modules.Time.Contracts` | Built one-shot Countdown vocabulary | Abstractions |
@@ -42,13 +42,14 @@ for what ships and what each package may depend on.
 | Family | Contracts | Runtime | Module hosting package | Semantic proof | Status |
 | --- | --- | --- | --- | --- | --- |
 | Quickstart | yes | yes | no | `DigitalBrain.Quickstart.Tests` + Quickstart AppHost | Built |
-| AccountEnrichment (sample) | same package | same package | no | L0 shape + module registration; L1 multi-module composition in Integrations.Tests (Gmail→propose→session approval→AccountEnriched) | Built (opt-in) |
 | AI | yes | yes | yes | typed LLM smoke (`ILlama32`); L1 Concurrent/GroupChat Respond multi-participant + session reuse; supervised IWorker unbuilt | Built (direct surface); Designed (supervised) |
 | Tasks | yes | yes | no | contracts + runtime package + assembly-boundary pins; `DigitalBrain.Tasks.Tests` L1 closed loop via test-only `IWorker` | Built |
 | Time | yes | yes | no | `DigitalBrain.Time.Tests` (Countdown lifecycle and recovery) | Built: Countdown only |
 | Google | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` Gmail ReadMessage admit + annotation refusal on scripted MCP edge | Built |
 | Salesforce | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` propose / reject / approve→Completed on scripted MCP edge | Built |
 | Flutter | yes | yes | yes (OS surface) | L0 golden + namespace/boundary pins + hosting projection contracts; L1 journals in `DigitalBrain.Flutter.Tests`; L1 HTTP edge + SSE shell events in `DigitalBrain.Ui.Tests`; Dart shell surface + headless host tests; module hosting projects Ui/host when `WithUiEdge` / `WithFlutterHost` selected | Built (vocabulary + C# UI edge + SSE + `Flutter.Aspire.Hosting` + headless Dart host); Designed (Windows widget chrome polish) |
+| AccountEnrichment (sample) | non-NuGet sample | non-NuGet sample | no | L0 shape + module registration; L1 multi-module composition in Integrations.Tests (Gmail→propose→session approval→AccountEnriched) | Built (opt-in sample under `samples/`; not a shipped package) |
+| Compositions (sample) | no (consumes contracts) | no | no | `DigitalBrain.Compositions.Tests` L1 shell/countdown/AI pane compositions | Built (pre-rail logic under `samples/`; not NuGet; not installed Behaviors) |
 
 Quickstart, Tasks, and Time have no module `Aspire.Hosting` package because they need no
 module-specific AppHost resources. AI, Google, Salesforce, and **Flutter (OS surface)** do.
@@ -59,6 +60,19 @@ type). Selecting `FlutterModule` without host options is vocabulary-only; `WithU
 `WithFlutterHost` project the OS surface. The Flutter/Dart pixel host is a northbound HTTP client of
 `hosts/DigitalBrain.Ui` under `clients/` (`digitalbrain_wire` + `digitalbrain_flutter` skeletons Built;
 Windows Flutter chrome Designed) — not a packable module, not under `modules/`, and not an Orleans silo.
+
+## Not NuGet packages
+
+These trees are real and proven, but they are **not** in the packable inventory above.
+
+| Tree | Role |
+| --- | --- |
+| `samples/DigitalBrain.Compositions` | Compositions own logic: sealed classes over `IDigitalBrain` + module contracts only (`OpenHome`, `PostAuthBootstrap`, `NavigateShell`, `CountdownSurface`, `AccountEnrichmentSurface`, `AiPaneSurface`). Pre-Behavior rail; not installed Behaviors. |
+| `samples/DigitalBrain.AccountEnrichment` | Opt-in compiled multi-module process neuron (`IAccountEnrichment` / `EnrichmentModule`). Durable process vocabulary sample — not a composition and not a product package. |
+| `hosts/DigitalBrain.Ui` | Northbound C# HTTP/SSE edge (client + Flutter contracts only). Projected when Flutter hosting selects `WithUiEdge` / `WithFlutterHost`. |
+| `hosts/DigitalBrain.Mcp` | Northbound MCP server over selected neurons through `IDigitalBrain`. |
+| `clients/digitalbrain_wire`, `clients/digitalbrain_flutter` | Dart pixel/wire host — HTTP clients of Ui, never Orleans. |
+| `src/DigitalBrain.SourceGeneration` | Private analyzer used by packable projects (`PrivateAssets`); not a consumer package. |
 
 ## Boundary rules
 

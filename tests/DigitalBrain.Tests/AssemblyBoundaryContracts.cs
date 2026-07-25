@@ -39,7 +39,7 @@ public sealed class AssemblyBoundaryContracts
     public void PublicPackableTypesDoNotExportMafTypes()
     {
         var mafExports = PackableProjects.Names
-            .Where(name => name != "DigitalBrain.Testing")
+            .Where(name => name is not ("DigitalBrain" or "DigitalBrain.Testing"))
             .Select(Assembly.Load)
             .SelectMany(assembly => assembly.GetExportedTypes())
             .Where(type => type.Namespace?.StartsWith(

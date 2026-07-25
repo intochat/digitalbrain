@@ -186,13 +186,9 @@ public sealed class PackageBoundaryContracts
             .Select(Path.GetFileNameWithoutExtension!)
             .ToHashSet(StringComparer.Ordinal);
 
-        Assert.All(PackableProjects.Names, name => Assert.Contains(name, actual));
-        Assert.All(
-            actual,
-            name => Assert.True(
-                PackableProjects.Names.Contains(name, StringComparer.Ordinal)
-                || name == "DigitalBrain",
-                $"Unexpected packable project '{name}'."));
+        Assert.Equal(
+            PackableProjects.Names.Order(StringComparer.Ordinal),
+            actual.Order(StringComparer.Ordinal));
     }
 
     private static bool IsPackable(string projectFile) =>
