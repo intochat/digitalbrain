@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Collections.Concurrent;
 using DigitalBrain.Abstractions;
 using Orleans.Journaling;
 using Orleans.Runtime;
@@ -9,16 +8,12 @@ namespace DigitalBrain.Testing;
 internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider inner)
     : IJournalStorageProvider
 {
-    private readonly ConcurrentDictionary<JournalId, long> _completedWrites = new();
     private readonly Dictionary<NeuronId, JournalFaultState> _failures = [];
     private readonly Dictionary<JournalId, NeuronId> _faultTargets = [];
     private readonly object _failureLock = new();
 
     public IJournalStorage CreateStorage(JournalId journalId)
         => new RecordingJournalStorage(this, journalId, inner.CreateStorage(journalId));
-
-    internal long CompletedWrites(GrainId grain)
-        => _completedWrites.GetValueOrDefault(JournalId.FromGrainId(grain));
 
     internal JournalFaultRegistration ArmFault(
         NeuronId target,
@@ -86,9 +81,6 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
         }
     }
 
-    private void AfterWrite(JournalId journalId)
-        => _completedWrites.AddOrUpdate(journalId, 1, static (_, count) => count + 1);
-
     private void RemoveFault(NeuronId target)
     {
         _failures.Remove(target);
@@ -120,7 +112,6 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
         {
             recorder.BeforeWrite(journalId);
             await inner.AppendAsync(value, cancellationToken);
-            recorder.AfterWrite(journalId);
         }
 
         public async ValueTask ReplaceAsync(
@@ -129,7 +120,6 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
         {
             recorder.BeforeWrite(journalId);
             await inner.ReplaceAsync(value, cancellationToken);
-            recorder.AfterWrite(journalId);
         }
 
         public ValueTask<bool> CreateIfNotExistsAsync(

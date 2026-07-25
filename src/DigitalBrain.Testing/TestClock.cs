@@ -47,12 +47,10 @@ public sealed class TestClock
                 duration,
                 TimeSpan.Zero);
             await AdvanceCoreAsync(duration, cancellationToken);
-            _diagnostics.SetClock(_provider.GetUtcNow());
         }
         catch (Exception failure)
             when (failure is not BrainTestFailureException)
         {
-            _diagnostics.SetClock(_provider.GetUtcNow());
             throw _diagnostics.CaptureFailure(
                 "clock.advance",
                 failure);

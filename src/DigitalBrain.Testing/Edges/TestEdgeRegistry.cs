@@ -27,13 +27,11 @@ internal sealed class TestEdgeRegistry
         where TScript : class
     {
         ArgumentNullException.ThrowIfNull(neuronAliases);
-        var aliases = neuronAliases.ToArray();
-        if (aliases.Length == 0
-            || aliases.Any(alias =>
-                alias is null
-                || !alias.IsClass
-                || alias.IsAbstract)
-            || aliases.Distinct().Count() != aliases.Length)
+        var aliases = neuronAliases
+            .Where(alias => alias is { IsClass: true, IsAbstract: false })
+            .Distinct()
+            .ToArray();
+        if (aliases.Length == 0 || aliases.Length != neuronAliases.Count)
         {
             throw new ArgumentException(
                 "A chat-client edge requires one or more distinct concrete neuron alias types.",
