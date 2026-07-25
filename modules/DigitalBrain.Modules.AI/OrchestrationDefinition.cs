@@ -34,11 +34,6 @@ internal sealed record OrchestrationDefinition(string Fingerprint)
         ArgumentNullException.ThrowIfNull(participants);
         ArgumentException.ThrowIfNullOrWhiteSpace(applicationVersion);
 
-        if (participants.Length == 0)
-        {
-            throw new InvalidOperationException("An orchestration requires at least one participant.");
-        }
-
         var source = new FingerprintSource(
             CurrentFormatVersion,
             identity.KindName,
