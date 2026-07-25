@@ -32,7 +32,7 @@ public abstract class GroupChat : Neuron, IGroupChat
     {
         ArgumentNullException.ThrowIfNull(messages);
 
-        var snapshot = OrchestrationParticipants.Snapshot(Id, Participants);
+        var snapshot = DirectOrchestrationShape.Snapshot(Id, Participants);
         var shape = DirectOrchestrationShape.CreateGroupChat(GetType(), snapshot);
         var agent = shape.CreateAgent(GrainFactory, TaskScheduler.Current);
         return await _directSession.RunAsync(

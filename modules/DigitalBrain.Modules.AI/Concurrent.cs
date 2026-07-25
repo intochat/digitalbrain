@@ -36,7 +36,7 @@ public abstract class Concurrent : Neuron, IAgent
     {
         ArgumentNullException.ThrowIfNull(messages);
 
-        var snapshot = OrchestrationParticipants.Snapshot(Id, Participants);
+        var snapshot = DirectOrchestrationShape.Snapshot(Id, Participants);
         var shape = DirectOrchestrationShape.CreateConcurrent(GetType(), snapshot);
         var agent = shape.CreateAgent(GrainFactory, TaskScheduler.Current);
 
