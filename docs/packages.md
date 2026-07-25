@@ -47,7 +47,7 @@ for what ships and what each package may depend on.
 | Time | yes | yes | no | `DigitalBrain.Time.Tests` (Countdown lifecycle and recovery) | Built: Countdown only |
 | Google | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` Gmail ReadMessage admit + annotation refusal on scripted MCP edge | Built |
 | Salesforce | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` propose / reject / approve→Completed on scripted MCP edge | Built |
-| Flutter | yes | yes | yes (OS surface) | L0 golden + namespace/boundary pins + hosting projection contracts; L1 journals in `DigitalBrain.Flutter.Tests`; L1 HTTP edge + SSE shell events in `DigitalBrain.Ui.Tests`; Dart shell surface + headless host + Windows chrome (`lib/main.dart`/`windows/`); module hosting projects Ui/host when `WithUiEdge` / `WithFlutterHost` selected | Built (vocabulary + C# UI edge + SSE + `Flutter.Aspire.Hosting` + headless Dart host + Windows chrome); Designed (full product chrome, multi-principal IdP edge, product journal observation) |
+| Flutter | yes | yes | yes (OS surface) | L0 golden + namespace/boundary pins + hosting **projection** contracts; L1 journals in `DigitalBrain.Flutter.Tests`; L1 HTTP edge + SSE shell events in `DigitalBrain.Ui.Tests`; pure-Dart headless host + nested Windows chrome (`clients/digitalbrain_flutter` + `shell/lib/main.dart`/`shell/windows/`); module hosting **projects** Ui/host when `WithUiEdge` / `WithFlutterHost` selected (graph shape, not live Healthy) | Built (vocabulary + C# UI edge + SSE + `Flutter.Aspire.Hosting` projection + pure-Dart headless + nested `shell/` chrome — L0/L1); Designed (full product chrome, multi-principal IdP edge, product journal observation); **residual unproven:** product AppHost OS-surface Healthy / live `aspire start` topology — **not** Built-live |
 | AccountEnrichment (sample) | non-NuGet sample | non-NuGet sample | no | L0 shape + module registration; L1 multi-module composition in Integrations.Tests (Gmail→propose→session approval→AccountEnriched) | Built (opt-in sample under `samples/`; not a shipped package) |
 | Compositions (sample) | no (consumes contracts) | no | no | `DigitalBrain.Compositions.Tests` L1 shell/countdown/AI pane compositions | Built (pre-rail logic under `samples/`; not NuGet; not installed Behaviors) |
 
@@ -58,13 +58,18 @@ Flutter packages are `DigitalBrain.Modules.Flutter.Contracts`, `DigitalBrain.Mod
 `DigitalBrain.Flutter.Aspire.Hosting` (semantic neurons `IShell` / `IScene` — not an `IFlutter` god
 type). Selecting `FlutterModule` without host options is vocabulary-only; `WithUiEdge` /
 `WithFlutterHost` project the OS surface. The Flutter/Dart pixel host is a northbound HTTP client of
-`hosts/DigitalBrain.Ui` under `clients/` (`digitalbrain_wire` + `digitalbrain_flutter` Built,
-including Windows chrome via `lib/main.dart` + `windows/`) — not a packable module, not under
-`modules/`, and not an Orleans silo.
+`hosts/DigitalBrain.Ui` under `clients/`: pure-Dart `digitalbrain_wire` + `digitalbrain_flutter`
+(edge/SSE/projection + headless `bin/digitalbrain_host.dart`); Windows Material chrome is the nested
+Flutter package `clients/digitalbrain_flutter/shell/` (`shell/lib/main.dart` + `shell/windows/`,
+depends on the pure-Dart package) — not a packable module, not under `modules/`, and not an Orleans
+silo. Live product AppHost Healthy for Ui/Flutter host remains residual — do not read this packaging
+as Built-live.
 
 ## Not NuGet packages
 
-These trees are real and proven, but they are **not** in the packable inventory above.
+These trees are real in-repo (and proven at their listed L0/L1 tiers where tests exist), but they are
+**not** in the packable inventory above. Live product AppHost Healthy for Ui/Flutter host is residual
+— do not treat this table as `aspire start` green.
 
 | Tree | Role |
 | --- | --- |
@@ -72,7 +77,7 @@ These trees are real and proven, but they are **not** in the packable inventory 
 | `samples/DigitalBrain.AccountEnrichment` | Opt-in compiled multi-module process neuron (`IAccountEnrichment` / `EnrichmentModule`). Durable process vocabulary sample — not a composition and not a product package. |
 | `hosts/DigitalBrain.Ui` | Northbound C# HTTP/SSE edge (client + Flutter contracts only). Projected when Flutter hosting selects `WithUiEdge` / `WithFlutterHost`. |
 | `hosts/DigitalBrain.Mcp` | Northbound MCP server over selected neurons through `IDigitalBrain`. |
-| `clients/digitalbrain_wire`, `clients/digitalbrain_flutter` | Dart pixel/wire host — HTTP clients of Ui, never Orleans. |
+| `clients/digitalbrain_wire`, `clients/digitalbrain_flutter` (+ nested `shell/`) | Wire DTOs + pure-Dart edge/projection/headless host; nested `shell/` is Windows Flutter chrome — HTTP clients of Ui, never Orleans. |
 | `src/DigitalBrain.SourceGeneration` | Private analyzer used by packable projects (`PrivateAssets`); not a consumer package. |
 
 ## Boundary rules

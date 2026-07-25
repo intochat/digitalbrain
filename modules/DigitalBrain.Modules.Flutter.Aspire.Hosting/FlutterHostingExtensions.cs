@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
@@ -21,6 +20,8 @@ public static class FlutterHostingExtensions
     public const string OwnerEnvironmentVariable = "DigitalBrain__Owner";
     public const string HeadlessHostEntry = "bin/digitalbrain_host.dart";
     public const string DefaultShellName = "desk";
+    public const string UiHttpEndpointName = "http";
+    public const string UiHealthPath = "/health";
 
     public static DigitalBrainModuleBuilder<FlutterModule> WithUiEdge(
         this DigitalBrainModuleBuilder<FlutterModule> module,
@@ -93,6 +94,8 @@ public static class FlutterHostingExtensions
             _ui = appHost
                 .AddProject(resourceName, projectPath)
                 .WithReference(brain.AsClient())
+                .WithHttpEndpoint(name: UiHttpEndpointName)
+                .WithHttpHealthCheck(UiHealthPath)
                 .WithEnvironment(OwnerEnvironmentVariable, owner);
         }
 
@@ -110,16 +113,16 @@ public static class FlutterHostingExtensions
             }
 
             var appHost = brain.GetApplicationBuilder();
-            var workingDirectory = ResolveFlutterWorkingDirectory(
+            var packageRoot = ResolveFlutterWorkingDirectory(
                 appHost.AppHostDirectory,
                 options.WorkingDirectory);
-            if (!Directory.Exists(workingDirectory)
-                || !File.Exists(Path.Combine(workingDirectory, "pubspec.yaml")))
+            if (!Directory.Exists(packageRoot)
+                || !File.Exists(Path.Combine(packageRoot, "pubspec.yaml")))
             {
                 if (options.RequireHost)
                 {
                     throw new InvalidOperationException(
-                        $"Flutter host package was not found at '{workingDirectory}'. " +
+                        $"Flutter host package was not found at '{packageRoot}'. " +
                         "Pass FlutterHostOptions.WorkingDirectory or place clients/digitalbrain_flutter in the repo.");
                 }
 
@@ -133,122 +136,30 @@ public static class FlutterHostingExtensions
                 ? DefaultShellName
                 : options.ShellName;
             var ui = _ui!;
-            var endpoint = ui.GetEndpoint("http");
+            var endpoint = ui.GetEndpoint(UiHttpEndpointName);
 
-            var launch = ResolveHostLaunch(workingDirectory, options);
+            var launch = FlutterHostLaunch.Resolve(packageRoot, options);
             if (launch is null)
             {
                 if (options.RequireHost)
                 {
                     throw new InvalidOperationException(
-                        "Flutter host could not be launched: no desktop project markers with a working Flutter CLI, " +
-                        "and headless entry bin/digitalbrain_host.dart was not found. " +
-                        "Install Flutter with a desktop package, use Headless with the host entry, or set RequireHost false.");
+                        "Flutter host could not be launched: no runnable Auto path. " +
+                        "Need Flutter CLI plus lib/main.dart and a platform folder (package root or shell/) " +
+                        "for FlutterDesktop, or bin/digitalbrain_host.dart for Headless " +
+                        "(Flutter SDK still required when the headless package pubspec depends on sdk: flutter). " +
+                        "Install Flutter, pass an explicit mode, or set RequireHost false.");
                 }
 
                 return;
             }
 
             _flutterHost = appHost
-                .AddExecutable(resourceName, launch.Command, workingDirectory, launch.Args)
+                .AddExecutable(resourceName, launch.Command, launch.WorkingDirectory, launch.Args)
                 .WithEnvironment(UiBaseEnvironmentVariable, endpoint)
                 .WithEnvironment(ShellEnvironmentVariable, shell)
                 .WaitFor(ui);
         }
-
-        private static HostLaunch? ResolveHostLaunch(
-            string workingDirectory,
-            FlutterHostOptions options)
-        {
-            var mode = options.Mode;
-            if (mode == FlutterHostMode.Auto)
-            {
-                mode = HasFlutterDesktopProjectMarker(workingDirectory) && FlutterCliAvailable(options)
-                    ? FlutterHostMode.FlutterDesktop
-                    : FlutterHostMode.Headless;
-            }
-
-            if (mode == FlutterHostMode.FlutterDesktop)
-            {
-                var command = string.IsNullOrWhiteSpace(options.FlutterCommand)
-                    ? Environment.GetEnvironmentVariable("FLUTTER_COMMAND") ?? "flutter"
-                    : options.FlutterCommand;
-                var target = string.IsNullOrWhiteSpace(options.DeviceTarget)
-                    ? "windows"
-                    : options.DeviceTarget;
-                return new HostLaunch(command, ["run", "-d", target]);
-            }
-
-            var headlessEntry = Path.Combine(workingDirectory, HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(headlessEntry))
-            {
-                return null;
-            }
-
-            var dart = string.IsNullOrWhiteSpace(options.DartCommand)
-                ? Environment.GetEnvironmentVariable("DART_COMMAND") ?? "dart"
-                : options.DartCommand;
-            return new HostLaunch(dart, ["run", HeadlessHostEntry]);
-        }
-
-        private static bool HasFlutterDesktopProjectMarker(string workingDirectory)
-        {
-            var mainDart = Path.Combine(workingDirectory, "lib", "main.dart");
-            if (File.Exists(mainDart))
-            {
-                return true;
-            }
-
-            var windowsDir = Path.Combine(workingDirectory, "windows");
-            return Directory.Exists(windowsDir);
-        }
-
-        private static bool FlutterCliAvailable(FlutterHostOptions options)
-        {
-            var command = string.IsNullOrWhiteSpace(options.FlutterCommand)
-                ? Environment.GetEnvironmentVariable("FLUTTER_COMMAND") ?? "flutter"
-                : options.FlutterCommand;
-
-            try
-            {
-                using var process = Process.Start(new ProcessStartInfo
-                {
-                    FileName = command,
-                    Arguments = "--version",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                });
-                if (process is null)
-                {
-                    return false;
-                }
-
-                if (!process.WaitForExit(5_000))
-                {
-                    try
-                    {
-                        process.Kill(entireProcessTree: true);
-                    }
-                    catch (InvalidOperationException)
-                    {
-                    }
-
-                    return false;
-                }
-
-                return process.ExitCode == 0;
-            }
-            catch (Exception exception) when (exception is System.ComponentModel.Win32Exception
-                or FileNotFoundException
-                or InvalidOperationException)
-            {
-                return false;
-            }
-        }
-
-        private sealed record HostLaunch(string Command, string[] Args);
 
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {

@@ -1,0 +1,116 @@
+using DigitalBrain.Abstractions;
+using DigitalBrain.Tasks.Dispatch;
+using DigitalBrain.Tasks.Persistence;
+
+namespace DigitalBrain.Tasks;
+
+internal sealed partial class TaskNeuron
+{
+    public async Task<TaskSnapshot> Start(StartTask command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        Validate(command.CommandId);
+
+        if (_state.Value is { Length: > 0 })
+        {
+            var existing = Load();
+
+            if (existing.Receipts.TryGetValue(command.CommandId, out var received))
+            {
+                return received;
+            }
+
+            throw new InvalidOperationException($"Task '{Id}' has already been started.");
+        }
+
+        Validate(command);
+
+        if (command.Worker.Owner != Id.Owner)
+        {
+            throw new InvalidOperationException(
+                $"Worker '{command.Worker}' does not belong to Task '{Id}'s owner.");
+        }
+
+        await ValidatePredecessorAsync(command.RetryOf);
+
+        var attempt = new AttemptId(Guid.NewGuid());
+        var data = new TaskData(
+            command.Goal,
+            command.Worker,
+            command.Policy,
+            TaskState.Pending,
+            revision: 0,
+            activeAttempt: attempt,
+            blocker: null,
+            result: null,
+            failure: null,
+            evidence: [],
+            command.RetryOf,
+            attemptCount: 1,
+            receipts: new Dictionary<CommandId, TaskSnapshot>(),
+            pendingDispatch: null);
+        data.PendingDispatch = new AcceptWorkerDispatch(Request(data));
+        var snapshot = Snapshot(data);
+        data.Receipts.Add(command.CommandId, snapshot);
+
+        await RegisterDispatchReminderAsync();
+        await SaveAsync(data);
+        await TryDispatchPendingAsync();
+
+        return snapshot;
+    }
+
+    public async Task<TaskSnapshot> Cancel(CancelTask command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        Validate(command.CommandId);
+
+        var data = Load();
+
+        if (data.Receipts.TryGetValue(command.CommandId, out var received))
+        {
+            return received;
+        }
+
+        if (command.ExpectedRevision != data.Revision)
+        {
+            throw new InvalidOperationException(
+                $"Task '{Id}' is at revision {data.Revision}, not expected revision {command.ExpectedRevision}.");
+        }
+
+        if (IsTerminal(data.State))
+        {
+            var terminal = Snapshot(data);
+            data.Receipts.Add(command.CommandId, terminal);
+            await SaveAsync(data);
+            return terminal;
+        }
+
+        if (data.ActiveAttempt is null)
+        {
+            data.State = TaskState.Cancelled;
+            data.Blocker = null;
+            data.PendingDispatch = null;
+
+            var cancelled = Snapshot(data);
+            data.Receipts.Add(command.CommandId, cancelled);
+            await SaveAsync(data);
+            await UnregisterReminderAsync(RetryReminderName);
+            await UnregisterReminderAsync(DispatchReminderName);
+            return cancelled;
+        }
+
+        data.State = TaskState.Cancelling;
+        data.Blocker = null;
+        data.PendingDispatch = new CancelWorkerDispatch(Cursor(data));
+
+        var snapshot = Snapshot(data);
+        data.Receipts.Add(command.CommandId, snapshot);
+
+        await RegisterDispatchReminderAsync();
+        await SaveAsync(data);
+        await TryDispatchPendingAsync();
+
+        return snapshot;
+    }
+}

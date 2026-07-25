@@ -601,17 +601,19 @@ calendar, and DST record shapes. Do not implement those as though they were sett
 
 ### 4.6 Flutter
 
-Status: Built (first-vertical vocabulary + L0/L1 journal proofs + C# northbound UI edge + module-owned `Flutter.Aspire.Hosting` WithUiEdge/WithFlutterHost + headless Dart host projection + Windows chrome via `lib/main.dart`/`windows/`); Designed (full product chrome beyond key/title shell, product journal observation on IDigitalBrain, multi-principal IdP edge)
+Status: Built (first-vertical vocabulary + L0/L1 journal proofs + C# northbound UI edge + module-owned `Flutter.Aspire.Hosting` WithUiEdge/WithFlutterHost projection + **pure-Dart** headless host at `clients/digitalbrain_flutter` + Windows chrome in nested `clients/digitalbrain_flutter/shell/` (`shell/lib/main.dart` + `shell/windows/`) — **code and L0/L1 only**); Designed (full product chrome beyond key/title shell, product journal observation on IDigitalBrain, multi-principal IdP edge); **residual unproven:** live product AppHost topology (`aspire start` / `aspire run` Healthy for silo + `digitalbrain-ui` + Flutter host) — L2 today proves TestingAppHost silo **without** OS surface only; **not** Built-live
 
 The OS surface is not a Flutter app with agents behind it. It is a brain whose **UI vocabulary** is a
 Flutter module, and whose **logic** (shell policy, post-auth composition, multi-window orchestration,
 settings flows) is behaviors — or, until the Behavior rail exists, ordinary C# compositions with the
 same allowlist — composing that vocabulary the way AccountEnrichment composes Gmail and Salesforce.
 
-> **Module-owned hosting (Built):** `AddModule<FlutterModule>(f => f.WithUiEdge().WithFlutterHost())`
+> **Module-owned hosting (Built as projection API + L0 pins):** `AddModule<FlutterModule>(f => f.WithUiEdge().WithFlutterHost())`
 > is how production AppHost composes the OS surface. Vocabulary-only `AddModule<FlutterModule>()` does
 > not start Ui or Flutter resources. Aspire remains the orchestrator; ad-hoc AppHost
 > `AddProject`/`AddExecutable` Flutter wiring without those host options is incomplete packaging.
+> **Do not read Built as “product `aspire start` topology is green”** — live Healthy for
+> `digitalbrain-ui` / Flutter host is residual until L0/L2 agents quote it.
 
 #### Package family and public identity
 
@@ -707,17 +709,21 @@ Flutter / Dart host  ──HTTP/JSON (+ SSE watch)──►  hosts/DigitalBrain.
   client; gRPC UiGateway / protobuf dual vocabulary; resurrected `app/` or `workspace/` product trees;
   **Aspire-only Flutter/Ui wiring with zero `FlutterModule` selection implication**.
 - **Built (Dart host):** `clients/digitalbrain_wire` (dual golden pin + edge DTOs) and
-  `clients/digitalbrain_flutter` (HTTP/SSE edge client, SSE parse, `ShellSurfaceController`, headless
-  `bin/digitalbrain_host.dart`). `dart analyze` / `dart test` are local gates.
-- **Built (Windows chrome):** `lib/main.dart` + `windows/` Material shell projects key/title scenes
-  from `ShellSurfaceController` / SSE `SceneOpened` only (not multi-window product chrome). L0 pins
-  desktop markers; `flutter build windows` is the local desktop gate when the Flutter CLI is present.
-- **Built (module hosting):** `DigitalBrain.Modules.Flutter.Aspire.Hosting` — `WithUiEdge` /
+  `clients/digitalbrain_flutter` — **pure Dart** package (no `sdk: flutter` at root): HTTP/SSE edge
+  client, SSE parse, `ShellSurfaceController`, headless `bin/digitalbrain_host.dart`.
+  `dart analyze` / `dart test` at package root are local gates (honest Auto/Headless without Flutter SDK).
+- **Built (Windows chrome):** nested Flutter package `clients/digitalbrain_flutter/shell/`
+  (`shell/lib/main.dart` + `shell/windows/`, package `digitalbrain_flutter_shell`) Material key/title
+  list from `ShellSurfaceController` / SSE `SceneOpened` only (not multi-window product chrome).
+  Desktop markers and `flutter run|build windows` live under `shell/`, not the pure-Dart root.
+  Proof tier is code + local Flutter/Dart jobs — **not** product AppHost Built-live.
+- **Built (module hosting projection):** `DigitalBrain.Modules.Flutter.Aspire.Hosting` — `WithUiEdge` /
   `WithFlutterHost` project `digitalbrain-ui` (AsClient) and host executable
   (`DIGITALBRAIN_UI_BASE` + `DIGITALBRAIN_SHELL` only). Host mode: **Auto** (Flutter desktop only when
   CLI is available and the host package has desktop markers; otherwise headless
   `dart run bin/digitalbrain_host.dart`); explicit `FlutterDesktop` / `Headless`. Production AppHost
-  composes the surface via module selection.
+  composes the surface via module selection. Proof tier for this bullet is **L0 projection pins**, not
+  live resource Healthy.
 - **Built (OS compositions, pre-Behavior rail):** `samples/DigitalBrain.Compositions` —
   shell-only `OpenHome` / `PostAuthBootstrap` / `NavigateShell`; multi-module surfaces
   `CountdownSurface` (Flutter+Time) and `AiPaneSurface` (Flutter+AI); OS-scene-only
@@ -732,7 +738,7 @@ Flutter / Dart host  ──HTTP/JSON (+ SSE watch)──►  hosts/DigitalBrain.
   **client** under `clients/`, not a packable module and not a second Orleans host under `hosts/`.
   Do not invent a second public client facade beside `DigitalBrainClient`.
 
-#### Module-owned OS surface composition (Built)
+#### Module-owned OS surface composition (Built: projection + L0; live Healthy residual)
 
 `DigitalBrain.Modules.Flutter.Aspire.Hosting` owns AppHost composition of the OS surface when host
 options are selected. Mirror AI/Google hosting: extensions on `DigitalBrainModuleBuilder<FlutterModule>`,
@@ -763,10 +769,10 @@ var silo = builder.AddProject<…>("silo").WithReference(brain);
 | Default Flutter resource name | `digitalbrain-flutter` (overridable) | Required when SDK missing without honest skip path |
 | Ui project materialization | Path-based `AddProject(name, uiCsprojPath)` resolved from AppHost directory → `../DigitalBrain.Ui/DigitalBrain.Ui.csproj` (hosts layout); override via options | Hard dependency on Aspire `Projects.*` codegen inside the packable package |
 | Ui trust wiring | `WithReference(brain.AsClient())` + `DigitalBrain__Owner` (default `"dev"`) | Journal, state-protection, or module list projected onto Ui |
-| Flutter process | `AddExecutable` under `clients/digitalbrain_flutter`; env **edge HTTP base + shell only** (`DIGITALBRAIN_UI_BASE`, `DIGITALBRAIN_SHELL`) | Orleans/journal/reminder env; MCP tool env as UI bus; gRPC kernel |
-| Host modes | `Auto` → Flutter desktop only when CLI and desktop project markers exist, else headless Dart; `FlutterDesktop` / `Headless` explicit | Fake green when neither flutter nor headless entry exists and `RequireHost` |
+| Flutter process | `AddExecutable` default working dir `clients/digitalbrain_flutter` (pure Dart / headless); desktop chrome requires WorkingDirectory `…/shell` (or equivalent) with `lib/main.dart` + platform folder; env **edge HTTP base + shell only** (`DIGITALBRAIN_UI_BASE`, `DIGITALBRAIN_SHELL`) | Orleans/journal/reminder env; MCP tool env as UI bus; gRPC kernel; claiming root package is a Flutter app |
+| Host modes | `Auto` → Flutter desktop only when CLI and desktop project markers exist in WorkingDirectory, else headless Dart at pure-Dart root; `FlutterDesktop` / `Headless` explicit | Fake green when neither flutter nor headless entry exists and `RequireHost`; treating root `lib/main.dart` as present when chrome is only under `shell/` |
 | WaitFor graph | Host `WaitFor(Ui)` when host projected; Ui `WaitFor(silo)` in projection `Apply` on silo `WithReference(brain)` | Process-name kill; hand WaitFor only in every AppHost forever without module path |
-| Missing Flutter SDK | Headless `dart run bin/digitalbrain_host.dart` is the honest live path | Silent success when host cannot start and `RequireHost` |
+| Missing Flutter SDK | Headless `dart run bin/digitalbrain_host.dart` at pure-Dart root is the honest live path | Silent success when host cannot start and `RequireHost` |
 | MCP host | Stays AppHost-owned peer (not Flutter module packaging) | MCP folded into Flutter hosting as product UI |
 | Historical recovery | Intent only: `AddExecutable(flutter run -d …)` + edge URL env + WaitFor edge (`v0.1.18` / later `DIGITALBRAIN_V2_UI_ENDPOINT` shape). Rebind to Ui HTTP. | Restore kernel gRPC, Orleans client on Flutter, wholesale `app/` |
 
@@ -775,7 +781,7 @@ Package graph: hosting may reference `DigitalBrain.Modules.Flutter`, `DigitalBra
 Aspire.Hosting APIs — not Kernel. Ui remains free of Kernel (client + Flutter contracts only). Dart
 host never references Aspire or Orleans packages.
 
-**L0 pins (hosting, in `FlutterHostingProjectionContracts`):** vocabulary-only → no surface resources;
+**L0 pins (hosting, in `tests/DigitalBrain.Tests/Hosting/` — selection / Ui edge / host mode):** vocabulary-only → no surface resources;
 `WithUiEdge` → AsClient-only Ui; packable Kernel-free package; production AppHost uses module API;
 `WithFlutterHost` env is edge URL + shell only.
 
@@ -858,7 +864,7 @@ protocol, not a second module vocabulary.
 | --- | --- |
 | L0 | Package graph: Kernel free of Flutter; Contracts free of Dart/Flutter SDK; capsule + alias + golden + hosting projection pins |
 | L1 | Real multi-silo `TestBrain`; real Flutter-module neurons; **scene projected = committed journal fact**; Ui edge HTTP + SSE shell events; composition L1; no phone |
-| L2 | Real AppHost resources (`digitalbrain-ui` / Flutter host) with readiness — not MCP-coupled; not the default domain gate |
+| L2 | **Residual / unproven for OS surface:** designed shape is real AppHost resources (`digitalbrain-ui` / Flutter host) with readiness, not MCP-coupled, not the default domain gate. **Green today:** `HostTests` L2 proves TestingAppHost silo Healthy **without** OS surface only. Product topology Healthy is not a Built claim. |
 | L3 | Device/widget/golden — never owner of domain truth; never sole gate |
 
 Dart unit tests prove dual golden equality and host-local scene view-model mapping; they do not replace
@@ -868,9 +874,10 @@ path-filtered peers of the docs job.
 #### Still open (do not implement as settled)
 
 - Scene descriptor node algebra and richer chrome vocabulary beyond the first five types.
-- Dart host mapping beyond key/title skeleton (first-vertical Windows chrome is Built; richer
-  descriptors and product chrome remain open — `clients/digitalbrain_flutter` +
-  `clients/digitalbrain_wire` path of record).
+- Dart host mapping beyond key/title skeleton (first-vertical Windows chrome in nested `shell/` is
+  Built at code/L0/L1; richer descriptors and product chrome remain open —
+  pure-Dart `clients/digitalbrain_flutter` + nested `shell/` + `clients/digitalbrain_wire` path of
+  record; not Built-live AppHost topology).
 - Product journal observation API on `IDigitalBrain` (promote when a non-UI consumer needs it).
 - Multi-principal edge factory beyond singleton `AddDigitalBrainClient(owner)` / process owner config.
 - Full product desktop chrome, multi-window, notifications, and product-installed OS apps (sample
@@ -1254,7 +1261,9 @@ letting the rule quietly soften.
 54. Dart host is a northbound client of a C# `IDigitalBrain` edge — never an embedded silo.
 55. Auth at the edge; post-auth composition only; never tokens/passwords in journals.
 56. Drift guard: golden wire manifest from Contracts; dual-sided when Dart models exist.
-57. L1 proves UI facts on journals without a device; L2 only for real AppHost host resources.
+57. L1 proves UI facts on journals without a device; L2 is for real AppHost host resources when
+    proven. OS-surface Healthy (`digitalbrain-ui` / Flutter host) remains residual until quoted —
+    do not equate L0 projection pins or TestingAppHost silo L2 with product topology green.
 
 ## 10. Still open, known deviations, and rejected
 
@@ -1332,14 +1341,16 @@ track has proofs.
 4. Extend `DigitalBrain.Google` from the `IGmail` root to `ICalendar` once a concrete calendar story
    exists.
 5. Add recurring and calendar Time vocabulary once its library and public record shapes are approved.
-6. Flutter OS surface remaining work (do not re-open Built steps): first vertical vocabulary + L0/L1
-   journals, Ui HTTP/SSE edge, module-owned hosting (`WithUiEdge` / `WithFlutterHost` — not bare
-   `AddModule` alone), headless Dart host + dual golden, Windows chrome (`lib/main.dart` + `windows/`),
-   and sample compositions under `DigitalBrain.Compositions` are **Built**. Still open: descriptor
-   algebra, full product chrome beyond key/title shell, multi-principal IdP edge, product journal
-   observation on `IDigitalBrain`, and treating compositions as installed Behaviors (self-programming
-   track). Do not wholesale restore historical `app/` or `workspace/`. Do not ship Aspire-only Flutter
-   with zero module host options.
+6. Flutter OS surface remaining work (do not re-open Built **code/L0/L1** steps): first vertical
+   vocabulary + L0/L1 journals, Ui HTTP/SSE edge, module-owned hosting **projection**
+   (`WithUiEdge` / `WithFlutterHost` — not bare `AddModule` alone), headless Dart host + dual golden,
+   Windows chrome (`lib/main.dart` + `windows/`), and sample compositions under
+   `DigitalBrain.Compositions` are **Built at code and L0/L1**. Still open / residual: live product
+   AppHost OS-surface Healthy (`aspire start` topology), descriptor algebra, full product chrome
+   beyond key/title shell, multi-principal IdP edge, product journal observation on `IDigitalBrain`,
+   and treating compositions as installed Behaviors (self-programming track). Do not wholesale restore
+   historical `app/` or `workspace/`. Do not ship Aspire-only Flutter with zero module host options.
+   Do not claim product Aspire topology green without quoted Healthy evidence.
 7. Design `DigitalBrain.Memory` independently around its own vocabulary, never inferred from AI,
    Tasks, or Time.
 

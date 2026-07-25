@@ -589,3 +589,10 @@ without moving vocabulary into the kernel.
 
 Foundation status: hosting, compiled modules, L1/L2 testing, Quickstart, and `ICountdown` are in
 tree. Behavior install rail and calendar Time remain designed/unbuilt.
+
+**Honesty footnote (2026-07-25, residual):** “L2 testing is in tree” means the fixture surface and
+TestingAppHost silo Healthy proof exist. It does **not** mean product AppHost OS surface
+(`WithUiEdge` / `WithFlutterHost` → `digitalbrain-ui` / Flutter host) has a green L2 readiness or
+that live `aspire start` / `aspire run` topology Healthy is proven. Module-owned Flutter hosting is
+Built as projection API + L0 pins; live product topology Healthy remains residual until quoted.
+Do not claim green Aspire product topology from this design doc alone.

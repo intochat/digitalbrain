@@ -4,14 +4,15 @@ Northbound OS surface host for DigitalBrain (architecture §4.6).
 
 ## Status
 
-- **Built:** pure Dart edge client, SSE parse, `ShellSurfaceController` projection,
-  headless host `bin/digitalbrain_host.dart`.
+- **Built:** pure Dart edge client, SSE parse (`SseSceneOpenedParser` only),
+  `ShellSurfaceController` projection, headless host `bin/digitalbrain_host.dart`.
 - **Built (module hosting):** AppHost `WithFlutterHost` injects `DIGITALBRAIN_UI_BASE` +
   `DIGITALBRAIN_SHELL` only (no Orleans/journal/MCP env).
-- **Built (Windows chrome):** `lib/main.dart` + `windows/` Material shell lists scenes by
-  key/title from `ShellSurfaceController` / SSE `SceneOpened` only. Host mode **Auto**
-  selects Flutter desktop when these markers exist and the Flutter CLI is available;
-  otherwise headless.
+- **Built (Windows chrome):** nested `shell/` Flutter package (`lib/main.dart` + `windows/`)
+  Material list of scene key/title from `ShellSurfaceController` / SSE `SceneOpened`.
+- **Headless vs desktop:** root package is **pure Dart** so `dart run bin/digitalbrain_host.dart`
+  works without the Flutter SDK (honest Aspire Auto/Headless path). Desktop chrome is
+  `cd shell && flutter run -d windows` (explicit FlutterDesktop / WorkingDirectory override).
 
 Do not embed Orleans or talk MCP tools as the UI bus.
 
@@ -29,8 +30,9 @@ export DIGITALBRAIN_UI_BASE=http://localhost:<ui-port>   # or set by Aspire
 export DIGITALBRAIN_SHELL=desk
 
 cd clients/digitalbrain_flutter
+dart pub get
 dart run bin/digitalbrain_host.dart --open home:Home
-# prints scene-opened lines as SSE projects SceneOpened without restart
+# prints scene-opened lines; reconnects on SSE end/error without process exit
 ```
 
 ## Windows desktop host
@@ -39,7 +41,8 @@ dart run bin/digitalbrain_host.dart --open home:Home
 export DIGITALBRAIN_UI_BASE=http://localhost:<ui-port>
 export DIGITALBRAIN_SHELL=desk
 
-cd clients/digitalbrain_flutter
+cd clients/digitalbrain_flutter/shell
+flutter pub get
 flutter run -d windows
 # or: flutter build windows
 ```
@@ -48,12 +51,18 @@ flutter run -d windows
 
 ```bash
 cd clients/digitalbrain_flutter
+dart pub get
+dart analyze
+dart test
+
+cd shell
 flutter pub get
 flutter analyze
 flutter test
+# when Windows toolchain present:
 flutter build windows
 # dual golden (wire package)
-cd ../digitalbrain_wire && dart test
+cd ../../digitalbrain_wire && dart test
 ```
 
 Domain truth remains the root `dotnet test` solution gate. Dart jobs never sole-own shell/scene semantics.

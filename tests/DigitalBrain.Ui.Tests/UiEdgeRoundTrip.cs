@@ -185,7 +185,7 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         builder.Services.AddSingleton<IGrainFactory>(test.Cluster.Client);
 
         var app = builder.Build();
-        app.MapUi();
+        app.MapUiHost();
         await app.StartAsync(cancellationToken);
         return app;
     }

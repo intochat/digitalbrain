@@ -174,6 +174,33 @@ data: {"sequence":2,"sceneKey":"home","title":"Home","commandId":"y","shell":"sh
   });
 
   test(
+    'SseSceneOpenedParser fails closed without explicit event: scene-opened',
+    () {
+      const frames = '''
+: connected
+
+data: {"sequence":1,"sceneKey":"orphan","title":"Orphan","commandId":"x","shell":"shell:dev/desk"}
+
+event: message
+data: {"sequence":2,"sceneKey":"message","title":"Message","commandId":"y","shell":"shell:dev/desk"}
+
+event: scene-opened
+data: {"sequence":3,"sceneKey":"home","title":"Home","commandId":"z","shell":"shell:dev/desk"}
+
+''';
+
+      final parser = SseSceneOpenedParser();
+      final events = <SceneOpenedEvent>[
+        for (final line in frames.split('\n')) ...parser.addLine(line),
+        ...parser.flush(),
+      ];
+      expect(events, hasLength(1));
+      expect(events.single.sceneKey, 'home');
+      expect(events.single.sequence, 3);
+    },
+  );
+
+  test(
     'SSE multi-event feed projects live into one ShellSurfaceController without restart',
     () {
       const frames = '''

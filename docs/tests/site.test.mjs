@@ -181,15 +181,16 @@ test('the architecture page is module-organized and states each status once', ()
   const built = architecture.match(/^Status: Built$/gm) ?? []
   const builtCountdown = architecture.match(/^Status: Built — Countdown only$/gm) ?? []
   const builtFlutter = architecture.match(
-    /^Status: Built \(first-vertical vocabulary \+ L0\/L1 journal proofs \+ C# northbound UI edge \+ module-owned `Flutter\.Aspire\.Hosting` WithUiEdge\/WithFlutterHost \+ headless Dart host projection \+ Windows chrome via `lib\/main\.dart`\/`windows\/`\); Designed \([^)]+\)$/gm) ?? []
+    /^Status: Built \(first-vertical vocabulary \+ L0\/L1 journal proofs \+ C# northbound UI edge \+ module-owned `Flutter\.Aspire\.Hosting` WithUiEdge\/WithFlutterHost projection \+ \*\*pure-Dart\*\* headless host at `clients\/digitalbrain_flutter` \+ Windows chrome in nested `clients\/digitalbrain_flutter\/shell\/` \(`shell\/lib\/main\.dart` \+ `shell\/windows\/`\) — \*\*code and L0\/L1 only\*\*\); Designed \([^)]+\); \*\*residual unproven:\*\*.*\*\*not\*\* Built-live$/gm) ?? []
   const designed = architecture.match(/^Status: Designed$/gm) ?? []
   assert.equal(built.length, 4, 'AI, Tasks, Google, and Salesforce are built')
   assert.equal(builtCountdown.length, 1, 'Time is built — Countdown only')
-  assert.equal(builtFlutter.length, 1, 'Flutter vocabulary + module hosting + headless host + Windows chrome built; IdP/observation remain designed')
+  assert.equal(builtFlutter.length, 1, 'Flutter pure-Dart + nested shell/ chrome Built at code/L0/L1; residual not Built-live; IdP/observation Designed')
   assert.equal(designed.length, 1, 'Behaviors section is designed')
   assert.match(architecture, /Designed \(full product chrome beyond key\/title shell, product journal observation on IDigitalBrain, multi-principal IdP edge\)/)
   assert.match(architecture, /## 5\. Behaviors and scripting\r?\n\r?\nStatus: Designed/)
   assert.doesNotMatch(architecture, /Windows widget chrome polish/)
+  assert.doesNotMatch(architecture, /Windows chrome via `lib\/main\.dart`\/`windows\/`/)
   assert.doesNotMatch(read('docs', 'packages.md'), /Windows Flutter chrome Designed|Designed \(Windows widget chrome polish\)/)
 
   assert.match(architecture, /human-approved proposal/)
@@ -235,7 +236,7 @@ test('the specification describes the retained test tiers', () => {
 
 test('every shipped package is in the table, and the boundary is stated', () => {
   const packages = read('docs', 'packages.md')
-  const packableSource = read('tests', 'DigitalBrain.Tests', 'PackableProjects.cs')
+  const packableSource = read('tests', 'DigitalBrain.Tests', 'Packages', 'PackableProjects.cs')
 
   const packable = [...packableSource.matchAll(/"(DigitalBrain[^"]*)"/g)].map(match => match[1])
   assert.ok(packable.length >= 18, `expected the packable list, found ${packable.length}`)

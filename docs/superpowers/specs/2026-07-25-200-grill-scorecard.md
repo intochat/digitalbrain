@@ -189,6 +189,124 @@ dart analyze clients/digitalbrain_wire clients/digitalbrain_flutter
 8. **Campaign prompt file** — `prompt-200-grill.md` may remain untracked; do not treat it as
    architecture. Prefer this scorecard + `docs/architecture.md` for durable truth.
 
+## Residual table — source physical line budget (L8 cycle 48 proof)
+
+Gate: every product/test `*.cs` / `*.dart` physical line count must be **≤400**. Excludes
+`bin` / `obj` / `node_modules` / `.dart_tool` / `build`, platform embedders
+(`windows|linux|macos`/`flutter|runner`), and `*.g.cs`. Physical lines =
+`File.ReadAllLines(...).Length` (blank lines count).
+
+| Metric | Count | Evidence |
+| --- | ---: | --- |
+| Files scanned | 306 | Repo-wide `*.cs`+`*.dart` after excludes |
+| Files **>400** physical lines | **0** | Must be zero — **green** |
+| Files >350 physical lines | 1 | Headroom only; not a fail |
+| Max physical lines | 374 | `tests/DigitalBrain.Tests/Hosting/FlutterHostingHostModeContracts.cs` |
+| Splits required this cycle | 0 | No write/split work |
+
+### Scan table (top residual heads; all ≤400)
+
+| Physical lines | Path |
+| ---: | --- |
+| 374 | `tests/DigitalBrain.Tests/Hosting/FlutterHostingHostModeContracts.cs` |
+| 333 | `tests/DigitalBrain.Integrations.Tests/McpEdge.cs` |
+| 324 | `src/DigitalBrain.Testing/TestBrain.cs` |
+| 317 | `tests/DigitalBrain.Tasks.Tests/TaskLifecycle.cs` |
+| 312 | `tests/DigitalBrain.Ui.Tests/UiEdgeRoundTrip.cs` |
+| 308 | `tests/DigitalBrain.Time.Tests/CountdownRecovery.cs` |
+| 298 | `modules/DigitalBrain.Modules.Salesforce/Invoke/Invoke.cs` |
+| 290 | `tests/DigitalBrain.Tests/Boundary/AssemblyBoundaryContracts.cs` |
+| 261 | `modules/DigitalBrain.Modules.Flutter.Aspire.Hosting/FlutterHostingExtensions.cs` |
+| 255 | `clients/digitalbrain_flutter/test/shell_surface_test.dart` |
+| 250 | `tests/DigitalBrain.Tests/Boundary/CompositionBoundaryContracts.cs` |
+| 247 | `src/DigitalBrain.Testing/Cluster/ControllableTimeProvider.cs` |
+| 239 | `clients/digitalbrain_flutter/shell/test/shell_chrome_test.dart` |
+| 236 | `tests/DigitalBrain.Time.Tests/CountdownLifecycle.cs` |
+| 235 | `samples/DigitalBrain.AccountEnrichment/AccountEnrichment.cs` |
+
+**Verdict (cycle 48):** line-budget residual is empty for the fail gate (`>400` = 0). No file
+splits performed. Re-scan before claiming after large test/hosting merges — mid-session WIP on
+Flutter/AI trees is present outside this proof.
+
+## Live L8 (cycle 47 — live-aspire)
+
+Mission: quote healthy product topology if already up; restart only if needed; prove
+`POST open-scene` + SSE `scene-opened`; no product code.
+
+**Session HEAD at probe:** `8f1936b7` (tree dirty with concurrent WIP — not this agent).
+**Restart:** not performed (topology already healthy).
+
+### `aspire doctor` (quoted)
+
+```
+Aspire CLI version 13.4.6 (channel: stable)
+AppHost version 13.4.6 (hosts\DigitalBrain.AppHost\DigitalBrain.AppHost.csproj)
+.NET 11.0.100-preview.6.26359.118 installed (x64)
+Docker v29.6.2: running (auto-detected (default)) ← active
+HTTPS development certificate is trusted
+Summary: 5 passed, 0 warnings, 0 failed
+```
+
+### `aspire ps` (quoted)
+
+```
+DigitalBrain.TestingAppHost.csproj │ running │ 13.4.6 │ PID 54020 │ CLI -     │ Dashboard -
+DigitalBrain.AppHost.csproj        │ running │ 13.4.6 │ PID 56844 │ CLI 61968 │
+  Dashboard https://localhost:63047/login?t=92d1c2bb24795b5cc669007a0e81168f
+```
+
+Co-running `TestingAppHost` makes non-interactive `aspire describe` / `aspire logs` fail with a
+selection prompt. Product proof used Aspire MCP `select_apphost` → product AppHost + direct HTTP.
+
+### Product resource health (Aspire MCP `list_resources`, product AppHost)
+
+| Resource | State | Health | Endpoint |
+| --- | --- | --- | --- |
+| `silo` | Running | Healthy | `http://localhost:5310` (+ silo/gateway TCP) |
+| `digitalbrain-ui` | Running | Healthy | `http://localhost:5080` |
+| `digitalbrain-flutter` | Running | Healthy | headless `dart run bin/digitalbrain_host.dart` |
+| `digitalbrain-mcp` | Running | Healthy | `http://localhost:5000` |
+| `brain-storage` / journal / clustering / reminders | Running | Healthy | Azurite local ports |
+| `brain-ai-ollama` + `brain-ai-llama32` | Running | Healthy | `http://localhost:63048` |
+
+### `/health` probes (quoted)
+
+```
+digitalbrain-ui:  HTTP 200 body="healthy"
+digitalbrain-mcp: HTTP 200 body="healthy"
+silo:             HTTP 200 body="healthy"
+```
+
+### POST open-scene + SSE scene-opened (quoted)
+
+Shell `live-2e3ff9847254`, Ui base `http://localhost:5080`:
+
+```
+POST /shells/live-2e3ff9847254/scenes  body={"sceneKey":"live-home","title":"Live Home Cycle47"}
+  -> HTTP 202 Accepted
+
+GET  /shells/live-2e3ff9847254/events?afterSequence=0
+  -> HTTP 200 contentType=text/event-stream
+  -> data: {"sequence":1,"sceneKey":"live-home","title":"Live Home Cycle47",
+            "commandId":"3eb8e1ac031c46448dc934e6fb791c3b",
+            "shell":"shell:dev/live-2e3ff9847254"}
+     event: scene-opened
+```
+
+Headless Flutter host had already projected an earlier live open (console log search
+`scene-opened`): `scene-opened seq=1 key=agent9-live title=Agent9 Live`.
+
+### Grill verdict
+
+| Claim | Result |
+| --- | --- |
+| Product AppHost live without restart | **Pass** |
+| silo / ui / flutter / mcp Healthy | **Pass** |
+| Northbound POST Accepted | **Pass** (202) |
+| SSE projects `scene-opened` with sceneKey/title/sequence | **Pass** |
+| Product code changes this cycle | **None** |
+| Residual risk | Co-running TestingAppHost confuses CLI resource commands; use MCP select or stop TestingAppHost for clean `aspire logs/describe` |
+
 ## Authority
 
 | Doc | Role |
@@ -199,4 +317,57 @@ dart analyze clients/digitalbrain_wire clients/digitalbrain_flutter
 | `docs/superpowers/specs/2026-07-25-architecture-aligned-mass-deletion.md` | Must-not-return cut |
 | `CLAUDE.md` | Gates, grilling, agent way of working |
 
-End of 200-grill scorecard.
+---
+
+## Re-execution campaign (prompt-200-grill supersession — 2026-07-25 session)
+
+Prior G0–G8 left unit gates green while product `aspire start` topology was still unusable.
+This re-run treated that as a **failed success criterion**. Orchestrator + subagents executed
+waves L0–L8 with non-overlapping write scopes. **~50 real subagent cycles** completed this
+session (not vanity-fill to 200); remaining budget reserved for residual only — hard stop
+still 200 total if a later wave continues.
+
+**Baseline HEAD at session start:** `ab54d2f9`  
+**Mid-session commit:** `8f1936b7` (Google Gmail capability folders)  
+**Vision restatement:** A brain programmed in ordinary C# that can program itself; UI is
+Flutter vocabulary + compositions over journals — not a second Dart kernel.
+
+### Outcomes (quoted)
+
+| Gate | Result |
+| --- | --- |
+| Root `dotnet build DigitalBrain.slnx -c Release` | **0 warn / 0 err** (agent 46) |
+| Root `dotnet test DigitalBrain.slnx -c Release` | **233 passed / 0 failed** (agent 46) |
+| `npm --prefix docs test` / `build` | **22/22** + vitepress green (agent 45) |
+| Dart/Flutter clients | analyze clean; wire 4; flutter 18; shell flutter test 4 (agent 49) |
+| Physical lines `*.cs`/`*.dart` **>400** | **0** of 306 scanned (agent 48) |
+| Live product topology | silo/ui/flutter(headless)/mcp **Healthy**; POST 202 + SSE scene-opened (agents 1,11,21,41,47) |
+
+### Product deltas this re-run (summary)
+
+| Area | Change |
+| --- | --- |
+| Live Aspire P0 | Ui `WithHttpEndpoint` + health; pure-Dart headless host; `shell/` Windows chrome; `FlutterHostLaunch` shell discovery + CLI probe |
+| Ui composition | `MapUiHost` single path; Aspire `AddDigitalBrainClient()` owner default shared with MCP |
+| Clients | Root pure Dart; nested `shell/`; SSE fail-closed without explicit `event: scene-opened` |
+| Mega-file split | TaskNeuron, Salesforce, Countdown, PackageBoundary, DispatchManifest, soft overs — all ≤400 |
+| Layout | AI Clients/LLM/Orchestration; Google Gmail/; Tests Hosting/Boundary/Flutter/Packages |
+| Docs honesty | Live residual language; site.test pins pure-Dart + nested shell + not Built-live forever |
+| Trash | Session `prompt-200-grill.md` removed; dual client owner resolve collapsed |
+
+### Still residual (honest)
+
+1. Live topology can flap under multi-agent AppHost thrash — **snapshots proven, not forever Built-live**.
+2. Behavior rail, calendar Time, supervised AI workers — **Designed / unbuilt**.
+3. Windows chrome still key/title first vertical; full product chrome Designed.
+4. Co-running TestingAppHost confuses non-interactive `aspire describe`/`logs`.
+
+### Diff grill (orchestrator close)
+
+| Question | Answer |
+| --- | --- |
+| Added with no consumer? | Nested `shell/` package (Windows chrome consumer); L0 hosting pins; Explicit live Ui fact |
+| Claimed without command? | No root/live/docs green without agent-quoted output above |
+| Changed that I did not change? | Google agent committed `8f1936b7` mid-session; surfaced |
+
+End of 200-grill scorecard (includes re-execution close).

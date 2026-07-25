@@ -5,14 +5,8 @@ using Orleans.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var owner = builder.Configuration["DigitalBrain:Owner"];
-if (string.IsNullOrWhiteSpace(owner))
-{
-    owner = "dev";
-}
-
 builder.AddKeyedAzureTableServiceClient("brain-clustering");
-builder.AddDigitalBrainClient(owner, client =>
+builder.AddDigitalBrainClient(client =>
 {
     client.Services.AddSerializer(serializer => serializer.AddJsonSerializer(
         static type => type == typeof(ChatMessage) || type == typeof(ChatResponse)));
