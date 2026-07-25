@@ -4,6 +4,7 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.Salesforce;
@@ -63,6 +64,11 @@ public sealed class HostingProjectionContracts
         Assert.DoesNotContain(
             client.Resource.Annotations.OfType<WaitAnnotation>(),
             wait => wait.WaitType == WaitType.WaitUntilHealthy);
+
+        Assert.DoesNotContain(
+            builder.Resources,
+            resource => resource.Name is FlutterHostingExtensions.DefaultUiResourceName
+                or FlutterHostingExtensions.DefaultFlutterResourceName);
     }
 
     [Fact(DisplayName =

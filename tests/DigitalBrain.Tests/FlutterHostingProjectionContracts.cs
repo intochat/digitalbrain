@@ -12,26 +12,47 @@ public sealed class FlutterHostingProjectionContracts
     private static readonly string RepositoryRoot = LocateRepositoryRoot();
 
     [Fact(DisplayName =
-        "FlutterModule without host options projects no OS surface resources")]
-    public void VocabularyOnlySelectionDoesNotStartOsSurface()
+        "omit FlutterModule → runtime graph has no digitalbrain-ui / digitalbrain-flutter")]
+    public void OmitFlutterModuleProjectsNoOsSurfaceResources()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
-        brain.AddModule<FlutterModule>();
 
         _ = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
             .WithHttpEndpoint(name: "http")
             .WithReference(brain);
 
-        Assert.DoesNotContain(
-            builder.Resources,
-            resource => resource.Name is FlutterHostingExtensions.DefaultUiResourceName
-                or FlutterHostingExtensions.DefaultFlutterResourceName);
+        AssertNoOsSurfaceResources(builder);
     }
 
     [Fact(DisplayName =
-        "WithUiEdge projects digitalbrain-ui as AsClient with exclusive owner product env")]
+        "FlutterModule without With* is vocabulary-only: silo lists module, runtime graph has no OS surface")]
+    public async Task VocabularyOnlySelectionDoesNotStartOsSurface()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddDigitalBrain("brain");
+        brain.AddModule<FlutterModule>();
+
+        var silo = builder
+            .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
+            .WithHttpEndpoint(name: "http")
+            .WithReference(brain);
+
+        var siloEnvironment = await EnvironmentOf(silo.Resource).ConfigureAwait(true);
+        Assert.Contains(
+            siloEnvironment,
+            entry => entry.Key.StartsWith("DigitalBrain__Modules__", StringComparison.Ordinal)
+                && string.Equals(
+                    entry.Value?.ToString(),
+                    FlutterModule.Id.Value,
+                    StringComparison.Ordinal));
+
+        AssertNoOsSurfaceResources(builder);
+    }
+
+    [Fact(DisplayName =
+        "WithUiEdge projects digitalbrain-ui as AsClient with exclusive owner product env; omits flutter host")]
     public async Task WithUiEdgeProjectsUiEdgeAsClientOnly()
     {
         var builder = DistributedApplication.CreateBuilder();
@@ -56,6 +77,10 @@ public sealed class FlutterHostingProjectionContracts
         var ui = Assert.Single(
             builder.Resources.OfType<ProjectResource>(),
             resource => resource.Name == FlutterHostingExtensions.DefaultUiResourceName);
+
+        Assert.DoesNotContain(
+            builder.Resources,
+            resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
 
         var environment = await EnvironmentOf(ui).ConfigureAwait(true);
         AssertExclusiveUiProductEnvironment(environment);
@@ -411,6 +436,18 @@ public sealed class FlutterHostingProjectionContracts
             Assert.DoesNotContain("DigitalBrain.Ui", project, StringComparison.Ordinal);
             Assert.DoesNotContain("Flutter.Aspire.Hosting", project, StringComparison.Ordinal);
         }
+    }
+
+    private static void AssertNoOsSurfaceResources(IDistributedApplicationBuilder builder)
+    {
+        var surface = builder.Resources
+            .Where(static resource => resource.Name is FlutterHostingExtensions.DefaultUiResourceName
+                or FlutterHostingExtensions.DefaultFlutterResourceName)
+            .Select(static resource => $"{resource.GetType().Name}:{resource.Name}")
+            .ToArray();
+        Assert.True(
+            surface.Length == 0,
+            $"OS surface resources projected without With*: {string.Join(", ", surface)}");
     }
 
     private static void AssertExclusiveFlutterHostEnvironment(HashSet<string> environment)
