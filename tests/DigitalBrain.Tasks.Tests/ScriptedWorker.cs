@@ -18,6 +18,20 @@ internal sealed class ScriptedWorker : Neuron, IWorker
                 request.Attempt,
                 request.Revision));
 
+        if (request.Goal is RetryableFailureGoal && request.Revision == 0)
+        {
+            await SendAsync(
+                request.Task,
+                new AttemptFailed(
+                    request.Task,
+                    request.Worker,
+                    request.Attempt,
+                    request.Revision,
+                    new TestFailure("retryable"),
+                    Retryable: true));
+            return;
+        }
+
         if (request.Goal is not StaleProbeGoal)
         {
             return;

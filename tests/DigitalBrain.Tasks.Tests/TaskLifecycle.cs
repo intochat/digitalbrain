@@ -169,6 +169,69 @@ public sealed class TaskLifecycle(TasksFixture fixture)
         Assert.Empty(snapshot.Evidence);
     }
 
+    [Fact(DisplayName = "Retryable AttemptFailed schedules retry reminder then new Accept")]
+    public async Task RetryableAttemptFailedSchedulesRetryThenNewAccept()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var worker = test.Neuron<IWorker>("retry-worker");
+        var task = test.Neuron<ITask>("retry-task");
+        var retryDelay = TimeSpan.FromSeconds(30);
+        var policy = new TaskPolicy(
+            MaximumAttempts: 2,
+            RetryDelay: retryDelay,
+            Deadline: null);
+
+        var started = await task.Reference.Start(new StartTask(
+            CommandId.New(),
+            new RetryableFailureGoal("retry-me"),
+            worker.Id,
+            policy));
+
+        var firstAccepted = await task.Incoming.NextAsync<AttemptAccepted>(cancellationToken);
+        Assert.Equal(started.ActiveAttempt, firstAccepted.Synapse.Attempt);
+        Assert.Equal(0, firstAccepted.Synapse.Revision);
+
+        var firstRunning = await WaitForStateAsync(
+            task,
+            TaskState.Running,
+            cancellationToken);
+        Assert.Equal(started.ActiveAttempt, firstRunning.ActiveAttempt);
+        Assert.Equal(0, firstRunning.Revision);
+
+        var failed = await task.Incoming.NextAsync<AttemptFailed>(cancellationToken);
+        Assert.Equal(started.ActiveAttempt, failed.Synapse.Attempt);
+        Assert.Equal(0, failed.Synapse.Revision);
+        Assert.True(failed.Synapse.Retryable);
+        Assert.Equal(new TestFailure("retryable"), failed.Synapse.Failure);
+
+        var waiting = await WaitForStateAsync(
+            task,
+            TaskState.Waiting,
+            cancellationToken);
+        Assert.IsType<RetryScheduled>(waiting.Blocker);
+        Assert.Null(waiting.ActiveAttempt);
+        Assert.Equal(new TestFailure("retryable"), waiting.Failure);
+        Assert.Equal(0, waiting.Revision);
+
+        await test.Clock.AdvanceAsync(retryDelay, cancellationToken);
+
+        var secondAccepted = await task.Incoming.NextAsync<AttemptAccepted>(cancellationToken);
+        Assert.NotEqual(started.ActiveAttempt, secondAccepted.Synapse.Attempt);
+        Assert.Equal(1, secondAccepted.Synapse.Revision);
+        Assert.Equal(worker.Id, secondAccepted.Synapse.Worker);
+
+        var secondRunning = await WaitForStateAsync(
+            task,
+            TaskState.Running,
+            cancellationToken);
+        Assert.Equal(TaskState.Running, secondRunning.State);
+        Assert.Equal(secondAccepted.Synapse.Attempt, secondRunning.ActiveAttempt);
+        Assert.Equal(1, secondRunning.Revision);
+        Assert.Null(secondRunning.Blocker);
+        Assert.NotEqual(started.ActiveAttempt, secondRunning.ActiveAttempt);
+    }
+
     private static async Task<TaskSnapshot> WaitForStateAsync(
         TestNeuron<ITask> task,
         TaskState expected,
