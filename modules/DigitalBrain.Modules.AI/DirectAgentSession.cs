@@ -52,12 +52,10 @@ internal sealed class DirectAgentSession(
         var response = await agent.RunAsync(
             messages,
             session,
-            options: null,
-            cancellationToken);
+            cancellationToken: cancellationToken);
         var serializedSession = await agent.SerializeSessionAsync(
             session,
-            jsonSerializerOptions: null,
-            cancellationToken);
+            cancellationToken: cancellationToken);
         var protectedSession = protector.Protect(
             Purpose(definition.Fingerprint),
             Encoding.UTF8.GetBytes(serializedSession.GetRawText()));
@@ -125,8 +123,7 @@ internal sealed class DirectAgentSession(
 
             return await agent.DeserializeSessionAsync(
                 sessionJson.RootElement.Clone(),
-                jsonSerializerOptions: null,
-                cancellationToken);
+                cancellationToken: cancellationToken);
         }
         catch (Exception failure) when (failure is CryptographicException
             or JsonException
