@@ -1,13 +1,15 @@
-# MANDATORY: 200-agent DigitalBrain grill → trash → fix campaign
-# (exactly 200 · grill-first · vision-aligned · autonomous delete/fix · no menus)
+# MANDATORY: 200-agent DigitalBrain grill → trash → split → refactor → live Aspire
+# (exactly 200 · grill-first · 400-line hard cap · folder/namespace discipline · aspire must work)
 
 You are the **orchestrator** (Grok / Claude / Codex) in the DigitalBrain monorepo.
 Hard budget: **exactly 200 subagent cycles**. Cycle = one subagent, one write scope, one scoring
 rule, one grill, one verify. Waves of **8–12** non-overlapping scopes. Zero user menus unless
 irreversible — then recommend hard and proceed only if approved in-repo docs already say so.
 
-This is **not** “add features.” This is **adversarial alignment**: find trash, find architecture
-lies, find vision collapses, delete or fix until the tree matches the vision.
+This campaign **supersedes** the prior 2026-07-25 grill. That wave left unit gates green while
+**`aspire start` / product topology was still broken or unusable**. Treat that outcome as a
+**failed success criterion**, not a foundation to polish. Prefer delete + split + re-homing over
+new surface area. Prefer a live AppHost over another L0 pin theater.
 
 ---
 
@@ -34,6 +36,7 @@ lies, find vision collapses, delete or fix until the tree matches the vision.
 5. **Module-owned hosting:** selecting `FlutterModule` with `WithUiEdge` / `WithFlutterHost` composes OS surface. Aspire is orchestrator; DigitalBrain owns the product sentence.
 6. **Journals are durable truth.** OTel is diagnostics. Never OTel-driven product UI.
 7. **MCP is peer agent edge**, not product UI bus.
+8. **Live topology is part of Built.** A claim that hosting is Built while `aspire start` cannot show silo + Ui (+ Flutter host) healthy is a **lie**. Fix or demote the claim.
 
 ### Fold conditions (vision collapse — delete or reverse)
 
@@ -49,6 +52,10 @@ lies, find vision collapses, delete or fix until the tree matches the vision.
 | Tokens/secrets in journals | Never |
 | Narrative `/// <summary>` spam / commented-out code | CLAUDE.md |
 | “Tests pass” without quoting command output | False claim |
+| “Hosting Built” while Aspire topology is red/unusable | False claim |
+| File **> 400 lines** left unsplit without Explicit hold | **Trash** |
+| Flat project dump of many types in one folder with no namespace/folder map | Layout trash |
+| Mega-test class that is really N independent contracts | Test dump trash |
 
 ---
 
@@ -63,7 +70,11 @@ git branch --show-current
 If porcelain dirty and **you** did not dirty it: surface and stop that path. Do not revert foreign WIP.
 Do not sweep it into your commits.
 
-**Baseline at prompt authoring:** record HEAD when you start. Re-record every wave.
+**Baseline at prompt authoring (record and re-record every wave):**
+
+```
+git rev-parse HEAD   # authoring tip was 6a93ee79 on agent/digitalbrain-hosting-testing; re-read live
+```
 
 Obey in order:
 
@@ -72,12 +83,15 @@ Obey in order:
 3. `docs/packages.md`
 4. `docs/superpowers/specs/2026-07-24-digitalbrain-hosting-and-testing-design.md`
 5. `docs/superpowers/specs/2026-07-25-architecture-aligned-mass-deletion.md` (must-not-return)
-6. Prior campaign commits on this branch (module hosting, headless host, compositions) — **do not re-claim as missing**; grill them for residual trash
+6. Prior campaign scorecard is **historical only** — do not treat its “gates green” as product-live proof
 
-Oracles: **compiler, test suite, git**. Prefer codegraph → Context7 / Microsoft Learn / dart MCP / Aspire MCP.
-Fall back loudly. **ALWAYS verify APIs via Context7 or compiler before inventing.**
+Oracles: **compiler, test suite, git, Aspire live topology**. Prefer codegraph → Context7 /
+Microsoft Learn / dart MCP / Aspire MCP. Fall back loudly.
+**ALWAYS verify APIs via Context7 or compiler before inventing.**
 
-**Root gate before any “done” claim (never `--filter` for completion):**
+### Hard gates (never `--filter` for completion claims)
+
+**Domain (always):**
 
 ```
 dotnet build DigitalBrain.slnx -c Release
@@ -86,19 +100,58 @@ npm --prefix docs test
 npm --prefix docs run build
 ```
 
-Plus Dart/Flutter when those trees change:
+**Live product (this campaign’s primary success — not optional theater):**
 
 ```
+# Prefer aspire skill / MCP when available
+aspire stop --apphost hosts/DigitalBrain.AppHost   # if stale
+aspire start --project hosts/DigitalBrain.AppHost  # or repo-standard aspire run equivalent
+aspire ps
+# Resource health must be quoted: silo Healthy, digitalbrain-ui Healthy,
+# digitalbrain-flutter Healthy OR honest Headless when Auto chooses dart,
+# digitalbrain-mcp Healthy when selected.
+# Prove northbound:
+#   POST /shells/{shell}/scenes  → 202
+#   GET  /shells/{shell}/events  → SSE scene-opened after mutator
+```
+
+**Dart/Flutter when those trees change:**
+
+```
+# Flutter SDK expected: E:\tools\flutter (prepend to PATH if missing)
 dart analyze clients/digitalbrain_wire clients/digitalbrain_flutter
-# from each package:
-dart test
-# when Flutter SDK present (expected: E:\tools\flutter on PATH):
+# per package: dart test / flutter test
 flutter analyze
 flutter test
-# Windows (when windows/ exists):
+# when windows/ exists:
 flutter build windows
-# optional L3: flutter run -d windows
 ```
+
+**Line-count gate (new — fails the campaign if ignored):**
+
+```
+# Any product/test source *.cs / *.dart (exclude bin/obj/node_modules/.dart_tool/build/platform embedders)
+# with physical line count > 400 is FAIL unless it has an [Fact(Explicit = true)] hold naming why
+# and a tracked split plan in the residual scorecard.
+```
+
+Authoring inventory of **known >400-line trash** (must be split or Explicitly held — re-scan every wave):
+
+| Lines (approx) | Path | Split mandate |
+| --- | --- | --- |
+| ~561 | `modules/DigitalBrain.Modules.Salesforce/Salesforce.cs` | Split by concern (propose/approve/invoke/state) into folders + namespaces under module |
+| ~559 | `modules/DigitalBrain.Modules.Tasks/TaskNeuron.cs` | Partial classes or neighbor types by lifecycle stage under `Tasks/` folders |
+| ~505 | `tests/DigitalBrain.Tests/FlutterHostingProjectionContracts.cs` | One concern per file under `tests/.../Hosting/` or similar |
+| ~471 | `src/DigitalBrain.SourceGeneration/DispatchManifestGenerator.cs` | Generator helpers by phase; keep public surface stable |
+| ~442 | `modules/DigitalBrain.Modules.Time/CountdownNeuron.cs` | Lifecycle stages / recovery helpers split |
+| ~422 | `tests/DigitalBrain.Tests/PackageBoundaryContracts.cs` | Split by boundary family (Kernel, Hosting, Contracts, Packable) |
+
+Soft watch (300–400 lines — split if growing or multi-concern):
+
+- `src/DigitalBrain.Testing/Journals/TestJournal.cs`
+- `tests/DigitalBrain.Time.Tests/CountdownLifecycle.cs`
+- `src/DigitalBrain.Kernel/Neuron/Neuron.Capability.cs` (Kernel partials already exist — keep under 400)
+- `tests/DigitalBrain.Integrations.Tests/McpEdge.cs`
 
 ---
 
@@ -106,27 +159,33 @@ flutter build windows
 
 Allowed only if ≥1:
 
-1. **Architecture truth** — docs/code lie about Flutter/Behaviors/host/module hosting/compositions
-2. **Missing consumer proof** — Built without L0/L1/L2 (or Explicit)
+1. **Architecture truth** — docs/code lie about Flutter/Behaviors/host/module hosting/compositions/live Aspire
+2. **Missing consumer proof** — Built without L0/L1/L2 (or Explicit) **or Built without live topology proof when hosting is claimed**
 3. **Zero-consumer trash → delete**
 4. **Framework misuse** — Flutter/Dart/Orleans/Aspire vs official docs / Context7
 5. **Boundary violation** — Kernel purity, packages.md, Dart↔Orleans, compositions↔Kernel
 6. **Vision alignment** — modules vs behaviors; no second runtime; module owns OS surface composition
 7. **Historical recovery value** — restores proven live loop without rejected architecture
 8. **Module-owned hosting** — reduces AppHost hand-wiring; Flutter depends on DigitalBrain selection
+9. **File size / cohesion** — any source file **> 400 lines** is trash until split (or Explicit hold with residual entry)
+10. **Layout / namespace honesty** — types live in folders that match namespaces and architecture family (module contracts / runtime / hosting; kernel filters/outbox/neuron; tests by family)
 
 Forbidden: resurrect ProbeHost/UiGateway-in-Kernel; ship Behavior rail without architecture+proofs;
 widgets in C#; MCP tool dicts on UI contracts; login grain as IdP; OTel as UI truth;
-Aspire-only Flutter; Dart→Kernel; inventing chrome without consumer.
+Aspire-only Flutter; Dart→Kernel; inventing chrome without consumer; “green unit tests, red Aspire”
+as a done state; mega-files as “temporary.”
 
-**Trash definition (delete when found):**
+### Trash definition (delete or split when found)
 
 - Code with no consumer today and no failing Explicit proof held for a near consumer
 - Dead paths, husks, dual implementations of the same product sentence
-- Docs claiming Built when only Designed (or reverse)
+- Docs claiming Built when only Designed (or reverse) **or claiming live product when Aspire is red**
 - God types, second ledgers, second kernels
 - Comments that restate signatures
 - Session logs / task checklists posing as architecture
+- **Any `*.cs` / `*.dart` product or test source > 400 lines** (platform embedder scaffolding under `windows/`/`android/`/`ios/`/`linux/`/`macos/` excluded; generated `*.g.cs` excluded only if truly generated and not hand-edited)
+- Flat “junk drawer” folders where unrelated types share a directory without namespace/folder map
+- Dual product sentences (two ways to start Ui / two client connect paths / two SSE parsers)
 
 ---
 
@@ -142,6 +201,9 @@ Aspire-only Flutter; Dart→Kernel; inventing chrome without consumer.
 8. Does the Flutter host start because DigitalBrain selected `FlutterModule` — or AppHost folklore?
 9. If someone removes `AddModule<FlutterModule>` (or host options), do OS surface resources correctly disappear?
 10. Did I **delete** more than I added when possible?
+11. **Did I leave any file in scope > 400 lines?** (if yes: split now or Explicit hold + residual)
+12. **Do folders/namespaces match architecture family layout after my edit?**
+13. **Did I prove live Aspire health for any hosting claim I touched?** (quote `aspire ps` / resource state / logs)
 
 ---
 
@@ -150,169 +212,225 @@ Aspire-only Flutter; Dart→Kernel; inventing chrome without consumer.
 1. Exact write scope (paths) — non-overlapping within the wave  
 2. Architecture sections to obey (§4.6 + family layout + packages.md)  
 3. Scoring rule (copy §1)  
-4. Mission type: `adversarial` | `delete` | `proof` | `fix` | `docs-honesty`  
+4. Mission type: `adversarial` | `delete` | `split` | `refactor-layout` | `proof` | `fix` | `live-aspire` | `docs-honesty`  
 5. TDD: failing proof first for any Built behavior change  
-6. Verify commands + grill answers (10 questions)  
+6. Verify commands + grill answers (13 questions)  
 7. Protected surfaces (see §4)  
 8. Foreign dirty tree → leave unstaged  
 9. Must-not-return list  
 10. Vision quote restatement (one sentence alignment)  
 11. Module-owned hosting check  
-12. **Autonomous mandate:** if trash or bad decision is found in scope, fix or delete in the same cycle — do not only report  
+12. **400-line check** on every touched file after edit  
+13. **Layout check** — if you add types, place them under the correct folder + namespace  
+14. **Autonomous mandate:** if trash or bad decision is found in scope, fix/delete/**split** in the same cycle — do not only report  
 
 ---
 
 ## 4. Protected surfaces (do not casually rewrite)
 
-- Kernel spine, generator, Testing path (`TestBrain`, AppHost fixtures)
-- Built modules: AI, Tasks, Time Countdown, Google, Salesforce, AccountEnrichment
+- Kernel **behavior** spine (may **split** files / re-folder for layout; do not change product sentences without red→green)
+- Generator public contracts (may split implementation; pin golden/outputs)
+- Testing path public API (`TestBrain`, AppHost fixtures) — surgical only
+- Built modules’ public neuron contracts without red→green
 - Flutter contracts first-five types without red→green
-- Ui edge HTTP + SSE contract (unless proof of bug)
+- Ui edge HTTP + SSE route shapes (unless proof of bug)
 - Dual golden wire pin
-- Module hosting product sentence once green L0 pins exist
+- Module hosting product sentence once green L0 pins exist **and** live Aspire proves it
 
-Protected ≠ unreviewable: agents may grill them and open Explicit red proofs; mass rewrite requires
-evidence and phase-boundary commit grill.
+Protected ≠ unreviewable: agents **must** split mega-files and fix live Aspire. Mass behavior rewrite
+requires evidence and phase-boundary commit grill.
 
 ---
 
-## 5. Known ground (as of 2026-07-25 campaign — grill residual, do not re-build as greenfield)
+## 5. Layout and namespace rules (mandatory refactor discipline)
 
-| Item | Claimed status | Agent duty |
+### Product C#
+
+| Family | Project roots | Namespace / folder expectation |
 | --- | --- | --- |
-| Flutter vocabulary + L1 journals | Built | Adversarial: husks, god types, golden drift |
-| Ui edge open-scene + SSE | Built | Adversarial: dual vocabulary, secrets, OTel |
-| `Flutter.Aspire.Hosting` WithUiEdge/WithFlutterHost | Built | Adversarial: hand-wire leftovers, WaitFor, env leaks |
-| Headless Dart host + Auto mode | Built | Adversarial: fake Flutter, PATH lies, journal env |
-| Compositions: OpenHome, PostAuth, Navigate, Countdown, Enrichment surface, AiPane | Built (samples) | Adversarial: Kernel refs, not Behavior-shaped, zero consumer |
-| Windows Flutter widget chrome | Designed | **Implement only with Flutter SDK + L0/L1**; no fake |
+| Kernel | `src/DigitalBrain.Kernel` | `DigitalBrain.Kernel.*` under `Neuron/`, `Filters/`, `Outbox/`, `Hosting/`, `Serialization/` — already partial; keep each file ≤400 |
+| Abstractions | `src/DigitalBrain.Abstractions` | leaf contracts only |
+| Client / Aspire | `src/DigitalBrain.Client`, `Aspire`, `Aspire.Hosting` | one concern per file; hosting projections not public Kernel |
+| Module contracts | `modules/...Contracts` | vocabulary types only; no Dart/Flutter SDK |
+| Module runtime | `modules/DigitalBrain.Modules.{Family}` | neurons + module marker; **split fat neurons into folders** (`Salesforce/Propose`, `Tasks/Lifecycle`, …) matching namespaces |
+| Module hosting | `modules/...Aspire.Hosting` | thin extensions; WaitFor/env exclusive |
+| Hosts | `hosts/*` | edge/process only; no domain logic god files |
+| Samples | `samples/*` | compositions = one public class per file; Behavior-shaped |
+| Tests | `tests/*` | **one proof family per file**; prefer `tests/.../Hosting/`, `Boundary/`, `Journals/` folders over mega `*Contracts.cs` |
+
+### Dart / Flutter
+
+| Package | Layout |
+| --- | --- |
+| `clients/digitalbrain_wire` | DTOs + golden pin tests only |
+| `clients/digitalbrain_flutter` | `lib/src/` by concern (`edge/`, `projection/`, `chrome/`, `env/`); `bin/` headless; `windows/` embedder only |
+
+### Split recipe (when file > 400 lines)
+
+1. **Inventory concerns** in the file (methods / nested types / regions of behavior).  
+2. **Write or move proofs first** if public behavior might change (TDD).  
+3. **Extract** to new files: prefer `partial` only when it is one type; prefer new types when concerns are separable.  
+4. **Folder + namespace** must agree (`DigitalBrain.Tasks.Lifecycle` ↔ `.../Tasks/Lifecycle/`).  
+5. **No narrative comments** as glue. Names carry meaning.  
+6. **Re-count lines** — every resulting file ≤400.  
+7. **Verify** owning project tests + any root gate required by phase.
+
+### Project split (when a csproj is a junk drawer)
+
+Split **projects** only when packages.md / architecture family says the boundary is real (Contracts vs
+Runtime vs Aspire.Hosting already). Do **not** invent random projects. Do **re-folder inside** a
+project when types are co-packaged correctly but co-located badly.
+
+---
+
+## 6. Known ground (2026-07-25 post-campaign — assume residual trash + broken live path)
+
+| Item | Prior claim | Agent duty this campaign |
+| --- | --- | --- |
+| Flutter vocabulary + L1 journals | Built | Adversarial + split fat test pins |
+| Ui edge open-scene + SSE | Built | **Live Aspire prove**; dual path hunt |
+| `Flutter.Aspire.Hosting` With* | Built | **Live prove**; WaitFor/env/Auto honesty |
+| Headless + Windows chrome | Built (first vertical) | Live host; no second kernel |
+| Compositions samples | Built (pre-rail) | Boundary + Behavior shape; no rail invent |
+| Unit root gate | Was green | Necessary **not sufficient** |
+| **`aspire start` product topology** | **Not proven / user reports trash** | **P0 — diagnose + fix until healthy** |
+| Mega-files >400 lines | Present | **P0 split wave** |
 | Behavior install rail | Designed | **Do not invent** |
-| Descriptor algebra beyond first vertical | Open | Only if live vertical consumer exists |
+| Calendar Time / supervised AI | Designed | **Do not invent** |
 
-**Flutter SDK (this environment):** installed at `E:\tools\flutter` (stable), User PATH updated,
-`flutter build windows` smoke-proven. Agents must re-check `flutter doctor` / `flutter devices` before
-Windows claims.
+**Flutter SDK:** `E:\tools\flutter` (stable). Re-check `flutter doctor` / `flutter devices` before Windows claims.
+
+**Aspire:** use project Aspire skill/MCP. User may already have a stale AppHost running — stop/restart
+cleanly; quote PIDs and resource states. Do not claim live green from a zombie process.
 
 ---
 
-## 6. Exactly 200 agent cycles — wave plan
+## 7. Exactly 200 agent cycles — wave plan
 
-### Wave G0 — Inventory + adversarial map (agents 1–24)
+### Wave L0 — Live Aspire diagnose + stabilize (agents 1–24)
 
-Parallel non-overlapping:
+**Primary mission: make product topology real.**
 
-| Agent | Scope | Mission |
+| Agents | Scope | Mission |
 | --- | --- | --- |
-| 1–3 | `docs/architecture.md` §4.6 vs code | docs-honesty: Built/Designed lies |
-| 4–6 | `docs/packages.md` + PackableProjects + package graph L0 | proof / docs-honesty |
-| 7–9 | `hosts/DigitalBrain.AppHost` + Quickstart/Testing AppHosts | adversarial: hand-wire, dual paths |
-| 10–12 | `modules/**/Flutter*` + Aspire.Hosting | adversarial: Kernel leak, env secrets, WaitFor |
-| 13–15 | `hosts/DigitalBrain.Ui` + Ui.Tests | adversarial: second protocol, ProbeHost smell |
-| 16–18 | `clients/digitalbrain_*` | adversarial: Orleans refs, dead code, dual golden |
-| 19–21 | `samples/DigitalBrain.Compositions` + boundary L0 | adversarial: not Behavior-shaped |
-| 22–24 | git history `v0.1.18` / demolish SHAs — recovery score only | delete-or-adapt map (no wholesale restore) |
+| 1–4 | `hosts/DigitalBrain.AppHost` + Aspire run/logs | `live-aspire`: start clean; inventory red resources |
+| 5–8 | `hosts/DigitalBrain.Host` + silo health | fix silo start / module selection / journal storage |
+| 9–12 | `hosts/DigitalBrain.Ui` + Ui.Tests | edge comes up; HTTP/SSE works against live silo |
+| 13–16 | `modules/**/Flutter.Aspire.Hosting` + flutter host process | Auto/Headless/Desktop honesty; WaitFor; env |
+| 17–20 | `hosts/DigitalBrain.Mcp` | peer edge healthy; not UI bus |
+| 21–24 | end-to-end: mutator → journal → SSE → host | live proof; quote logs |
 
-**Exit:** written residual trash list committed only if durable (architecture/packages). No mass chrome yet.
+**Exit:** quoted `aspire ps` with silo + ui (+ flutter host) healthy **or** Explicit residual with
+failing proof held. Docs must not say Built for hosting if still red.
 
-### Wave G1 — Delete trash (agents 25–48)
+### Wave L1 — Hard 400-line split (agents 25–56)
 
-Each agent: one path cluster; **net reduction preferred**.
+Each agent owns **one mega-file** (or one half of a split pair). Non-overlapping.
 
-- Dead files, commented-out code, unused public APIs with no consumer
-- Dual product sentences (two ways to start Ui)
-- Doc paragraphs that contradict code
-- Fake “Built” claims
+Priority order:
 
-TDD: if deleting might break a consumer, write failing proof first or hold Explicit.
+1. `Salesforce.cs`  
+2. `TaskNeuron.cs`  
+3. `FlutterHostingProjectionContracts.cs`  
+4. `PackageBoundaryContracts.cs`  
+5. `CountdownNeuron.cs`  
+6. `DispatchManifestGenerator.cs`  
+7. Soft 300–400 watch list  
 
-### Wave G2 — Hosting + AppHost alignment (agents 49–72)
+Rules: net complexity down; public API stable unless red→green; folders/namespaces correct; every
+output file ≤400 lines.
 
-- Production AppHost only via module hosting for OS surface
-- L0 pins that omit module ⇒ no `digitalbrain-ui` / flutter host
-- Env graph: Ui = AsClient + owner; Flutter host = edge URL + shell only
-- Fix any residual hand-wire or wrong WaitFor
-- Auto/Headless/FlutterDesktop honesty when SDK present
+### Wave L2 — Project folder / namespace refactor (agents 57–88)
 
-### Wave G3 — Dart/Flutter host alignment (agents 73–104)
+- Kernel: ensure `Neuron/`, `Filters/`, `Outbox/`, `Hosting/`, `Serialization/` stay coherent; no new god folder  
+- Modules AI/Tasks/Time/Google/Salesforce/Flutter: runtime types in concern folders  
+- Tests: break mega L0 classes into `tests/DigitalBrain.Tests/{Hosting,Boundary,Flutter,Packages}/`  
+- Clients: `lib/src/{edge,projection,chrome,env}/` if not already  
+- Update usings / internals / public API only as needed; root gate after clusters  
 
-- `clients/digitalbrain_flutter`: pure projection + headless host remain correct
-- **Windows platform:** only if `flutter doctor` shows Windows device — then:
-  - add `windows/` via `flutter create` **without** resurrecting `app/` architecture
-  - pixels from `ShellSurfaceController` / SSE only
-  - `DIGITALBRAIN_UI_BASE` / `fromEnvironment`
-  - no Orleans, no MCP tool client
-- Dual golden still green
-- `flutter analyze` / `flutter test` / `flutter build windows` when platform exists
+### Wave L3 — Dual paths / trash delete (agents 89–112)
 
-### Wave G4 — Edge + journal live path (agents 105–128)
+- Dead files, commented-out code, unused public APIs  
+- Dual client connect, dual SSE parsers, dual AppHost OS surface sentences  
+- Zero-consumer theater  
+- Net reduction preferred  
 
-- C# L1: composition or MCP mutates → journal → Ui SSE projects
-- Dart: SSE parse → surface controller (no restart)
-- Integration fails if “brain moved, UI dead”
-- Integration fails if “module not selected but surface resources exist”
-- No OTel as product path
+### Wave L4 — Hosting + AppHost alignment (agents 113–136)
 
-### Wave G5 — Compositions depth & boundary (agents 129–152)
+- Production OS surface **only** via `FlutterModule` + `WithUiEdge`/`WithFlutterHost`  
+- Omit module ⇒ no surface resources (L0 + live)  
+- Env: Ui = AsClient + owner; Flutter = `DIGITALBRAIN_UI_BASE` + `DIGITALBRAIN_SHELL` only  
+- Companion AppHosts stay vocabulary/silo-only  
+- Re-prove live Aspire after hosting edits  
 
-- Grill each composition file as future Behavior file
-- L0 forbids Kernel/runtimes/Integrations in Compositions.csproj
-- Delete zero-consumer composition theater
-- Enrichment/AI/Countdown/Navigate remain honest (OS scene vs multi-module L1 split)
+### Wave L5 — Edge + Dart projection (agents 137–156)
 
-### Wave G6 — Kernel/packages purity pass (agents 153–168)
+- Ui HTTP/SSE pure journal path (no OTel product UI)  
+- Dart pure projection; dual golden green  
+- Multi-event SSE without restart  
+- Windows chrome remains pixels-only  
 
-- Kernel free of Flutter/UI
-- Contracts free of Dart/Flutter SDK
-- Hosting free of Kernel public API
-- Packable inventory matches reality
-- Alias pins if touched
+### Wave L6 — Compositions + boundaries (agents 157–172)
 
-### Wave G7 — Docs, site, CLAUDE honesty (agents 169–184)
+- Each composition = future Behavior file shape  
+- L0 forbids Kernel/runtimes/Integrations  
+- OS-scene vs multi-module honesty  
+- No Behavior rail invent  
 
-- architecture §4.6 Built vs Designed accurate
-- packages.md family table
-- site tests green
-- CLAUDE.md status only if loop improves
-- Delete session logs / checklists posing as design
+### Wave L7 — Kernel/packages purity + docs honesty (agents 173–188)
 
-### Wave G8 — Full gates + residual scorecard (agents 185–200)
+- Kernel free of Flutter/UI  
+- Contracts free of Dart/Flutter SDK  
+- Hosting free of Kernel public API  
+- Packable inventory matches packages.md  
+- architecture/packages/CLAUDE honesty for **live** vs unit-only Built  
+- Delete session logs posing as design  
 
-- Root gate (build + test, no filter)
-- docs npm test/build
-- Dart + Flutter gates
-- Scorecard: cycles used (must total **200**), commits, live demo commands, still Designed, trash deleted count
-- **Hard stop at 200.** If gaps remain, list them — do not silently continue as “almost 200.”
+### Wave L8 — Full gates + live demo + scorecard (agents 189–200)
+
+- Root domain gate (build + test, no filter)  
+- docs npm test/build  
+- Dart + Flutter gates  
+- **Live Aspire demo commands with quoted healthy resources**  
+- Line-count scan: **zero** unexplained files >400 lines  
+- Scorecard: cycles 200, commits, trash/splits, still Designed, residual gaps  
+- **Hard stop at 200**
 
 ---
 
-## 7. Orchestrator start now
+## 8. Orchestrator start now
 
 1. Record HEAD/status/branch.  
-2. Confirm Flutter: `flutter doctor`, `flutter devices` (expect `windows`).  
-3. Spawn Wave G0 (agents 1–24) in parallel, non-overlapping.  
-4. After each wave: re-read HEAD/status; stabilize Release build of touched projects; phase-boundary root gate when architecture/hosting changes.  
-5. Prefer **delete + fix** over new surface area. Prefer journaled path + module selection proofs over pixel polish.  
-6. End at agent 200 with scorecard.
+2. Confirm Flutter + Aspire CLI (`aspire --version`, `flutter doctor`).  
+3. **Stop stale AppHosts** if user has zombie topology; start clean for L0.  
+4. Spawn Wave L0 (agents 1–24) in parallel non-overlapping scopes.  
+5. After each wave: re-read HEAD/status; line-count scan on touched trees; phase-boundary root gate when hosting/architecture changes; **re-run live Aspire when hosting touched**.  
+6. Prefer **delete + split + re-folder** over new surface.  
+7. End at agent 200 with scorecard.  
 
 ### Success is not
 
-- “200 agents ran.”
+- “200 agents ran.”  
+- “Unit tests pass while Aspire is red.”  
+- “We added more L0 pins.”  
+- “Mega-file is documented.”  
 - “Flutter looks pretty.”
-- “Aspire can start Flutter.”
 
 ### Success is
 
-> **Trash is gone. Lies are gone. Bad architecture decisions are reversed or Explicitly held red.**  
-> **The OS is the brain. Flutter is how humans see synapses. Compositions are how the OS thinks.**  
+> **Trash is gone. Mega-files are split. Folders/namespaces match architecture.**  
+> **Lies about Built/live are gone.**  
+> **`aspire start` product topology works with quoted health.**  
+> **Northbound path is live: mutator → journal → SSE → host.**  
 > **Selecting `FlutterModule` composes the surface because DigitalBrain owns it.**  
-> **Gates are green with quoted evidence.**
+> **Gates are green with quoted evidence — unit and live.**
 
 ---
 
-## 8. Subagent template (copy)
+## 9. Subagent template (copy)
 
 ```
-Wave N agent K (mission: adversarial|delete|proof|fix|docs-honesty)
+Wave N agent K (mission: adversarial|delete|split|refactor-layout|proof|fix|live-aspire|docs-honesty)
 
 Vision restatement: <one sentence>
 
@@ -320,64 +438,76 @@ Write scope: <exact paths>
 Obey: CLAUDE.md; architecture §4.6; packages.md; scoring rule §1 of prompt-200-grill.md
 Protected: <list>
 Must-not-return: ProbeHost, UiGateway-in-Kernel, IFlutter god, Behavior theater, Aspire-only Flutter,
-  Dart→Orleans, tokens in journals, wholesale app/
+  Dart→Orleans, tokens in journals, wholesale app/, mega-files >400 lines without Explicit hold
 
 Actions:
-1. Inventory scope against vision + scoring rule
-2. List trash / bad decisions with evidence (git/codegraph/compiler/tests)
-3. Fix or delete autonomously in scope (net reduction preferred)
-4. TDD: red proof first for Built behavior
-5. Verify: <commands>
-6. Grill board §2 answers in commit message if committing
-7. Foreign dirty tree: leave unstaged
+1. Inventory scope against vision + scoring rule + line counts
+2. List trash / bad decisions / layout lies with evidence (git/codegraph/compiler/tests/aspire)
+3. Fix, delete, or split autonomously in scope (net reduction preferred; every file ≤400 lines)
+4. Re-home types into folders/namespaces that match architecture family
+5. TDD: red proof first for Built behavior
+6. Verify: <commands including aspire when hosting touched>
+7. Grill board §2 answers (13 questions) in commit message if committing
+8. Foreign dirty tree: leave unstaged
 
 Do not expand scope. Do not invent Behavior rail. Do not claim green without output.
+Do not claim hosting Built if Aspire topology is red.
 ```
 
 ---
 
-## 9. Live demo commands (update as you prove; start honest)
+## 10. Live demo commands (update as you prove; start honest — currently suspected broken)
 
 ```
 # Domain gate
 dotnet build DigitalBrain.slnx -c Release
 dotnet test DigitalBrain.slnx -c Release --logger "console;verbosity=minimal"
 
-# Dart
-cd clients/digitalbrain_wire && dart test
-cd clients/digitalbrain_flutter && dart test
+# Line-count audit (fail if any non-excluded source > 400)
+# (orchestrator / agents: PowerShell or rg-based scan)
 
-# Flutter (SDK: E:\tools\flutter on PATH)
-flutter doctor
-flutter devices
-# when windows/ exists on digitalbrain_flutter:
-flutter analyze
-flutter test
-flutter build windows
+# Dart / Flutter
+$env:Path = "E:\tools\flutter\bin;" + $env:Path
+dart analyze clients/digitalbrain_wire clients/digitalbrain_flutter
+# package tests + flutter analyze/test/build windows as applicable
 
-# Aspire product sentence
-aspire run --project hosts/DigitalBrain.AppHost
-# expect: silo + digitalbrain-ui (+ digitalbrain-flutter Auto: Flutter desktop or headless dart)
-# POST open-scene or composition; SSE / host shows SceneOpened without restart
+# Aspire product sentence — PRIMARY
+aspire stop --apphost hosts/DigitalBrain.AppHost   # if needed
+aspire start --project hosts/DigitalBrain.AppHost
+aspire ps
+# expect Healthy: silo, digitalbrain-ui, digitalbrain-flutter (or honest headless), digitalbrain-mcp
+# POST open-scene; SSE / host shows SceneOpened without restart
 ```
 
 ---
 
-## 10. Hard stop
-
-**Agent 200 is the hard stop.** Produce scorecard:
+## 11. Hard stop scorecard (agent 200)
 
 | Field | Content |
 | --- | --- |
 | Cycles used | 200 (or less if exhausted early with empty waves — say so) |
 | Commits | SHAs + one-line grill |
-| Trash deleted | paths / net LOC if measured |
+| Trash deleted | paths / net LOC |
+| Files split | before→after line counts; all ≤400 or Explicit holds listed |
+| Layout refactors | folders/namespaces moved |
 | Bad decisions reversed | list |
 | Still Designed | honest list |
-| Live demo | exact commands that work |
-| Gate evidence | build/test exit codes + quoted tail |
+| Live demo | exact commands + quoted Healthy resources |
+| Gate evidence | build/test exit codes + quoted tail + aspire ps |
 | Residual gaps | no silent “almost done” |
 
 ---
 
-**END — 200 AGENTS — GRILL · TRASH · FIX · VISION ALIGNMENT**
+## 12. Anti-patterns from the previous campaign (do not repeat)
+
+1. Declaring victory on unit gates while the user cannot `aspire start`.  
+2. Adding dual L0 pins instead of deleting dual product paths.  
+3. Leaving 500-line test contract dumps as “proof quality.”  
+4. Parallel agents stomping the same file — enforce non-overlapping write scopes.  
+5. Claiming Windows/Auto honesty without re-checking PATH and process health.  
+6. Inventing Behavior rail or calendar Time under pressure.  
+7. Sweeping foreign dirty trees into “cleanup” commits.  
+
+---
+
+**END — 200 AGENTS — GRILL · TRASH · SPLIT · REFACTOR LAYOUT · LIVE ASPIRE · VISION ALIGNMENT**
