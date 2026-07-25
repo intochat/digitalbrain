@@ -1,22 +1,29 @@
 name: digitalbrain_flutter
 description: >
-  DigitalBrain OS surface host (pure Dart). Built: HTTP/SSE edge client,
-  projection, headless bin/digitalbrain_host.dart. Designed: Flutter Windows
-  widget chrome (no windows/ embedder scaffolded yet). Never Orleans, never MCP-as-UI.
+  DigitalBrain OS surface host. Built: HTTP/SSE edge client, projection,
+  headless bin/digitalbrain_host.dart, Flutter Windows Material shell projecting
+  ShellSurfaceController. Never Orleans, never MCP-as-UI.
 publish_to: none
 version: 0.1.0
 
 environment:
   sdk: ^3.12.0
 
-executables:
-  digitalbrain_host:
-
 dependencies:
+  flutter:
+    sdk: flutter
   digitalbrain_wire:
     path: ../digitalbrain_wire
   http: ^1.4.0
 
 dev_dependencies:
-  lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
   test: ^1.26.0
+
+flutter:
+  uses-material-design: true
+
+executables:
+  digitalbrain_host:
