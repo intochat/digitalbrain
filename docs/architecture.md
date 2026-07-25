@@ -840,10 +840,9 @@ reconnect lifecycle are not built.
 
 **`AsClient()` remains a security boundary.** A client projection must never inherit silo-only storage
 or module secrets. Hosting implements that split (`WithReference(brain)` for silos vs
-`brain.AsClient()` for clients), but architecture tests do **not** yet pin journal connection, shared
-state key, AI resource configuration, or Google/Salesforce OAuth as silo-only. Those proofs must be
-added; until they exist, every new module reference or storage profile must not rely on convention
-alone.
+`brain.AsClient()` for clients). L0 `HostingProjectionContracts` pins journal connection, shared state
+key, module ids, AI resource configuration, and Google/Salesforce OAuth as silo-only (never on
+`AsClient()`). Every new module projection must extend that proof rather than relying on convention.
 
 **Tasks has no L1 semantic proof.** Contracts and runtime packages ship, and assembly-boundary tests
 keep Tasks free of AI/MAF/Time. There is no method-scoped cluster proof of task lifecycle, attempt
