@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-// Dart pin of modules/.../flutter-wire-contracts.golden.json (single oracle file; no forked copy).
 const _namespace = 'DigitalBrain.Flutter';
 const _recordNames = <String>{
   'ControlActivated',
