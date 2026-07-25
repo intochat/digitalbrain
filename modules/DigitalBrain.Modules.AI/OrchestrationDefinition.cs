@@ -109,11 +109,8 @@ internal sealed record OrchestrationDefinition(
             MafAssemblyIdentity(),
             identity,
             [.. participants.Select(MafParticipantAdapter.Describe)],
-            ApplicationAssemblyIdentity(orchestrationType.Assembly));
+            AssemblyIdentity(orchestrationType.Assembly, requireVersion: true));
     }
-
-    private static string ApplicationAssemblyIdentity(Assembly assembly)
-        => AssemblyIdentity(assembly, requireVersion: true);
 
     private static string MafAssemblyIdentity()
         => $"{AssemblyIdentity(typeof(AIAgent).Assembly, requireVersion: false)};{AssemblyIdentity(typeof(AgentWorkflowBuilder).Assembly, requireVersion: false)}";
