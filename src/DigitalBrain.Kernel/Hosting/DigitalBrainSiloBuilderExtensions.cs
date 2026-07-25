@@ -112,6 +112,7 @@ public static class DigitalBrainRuntime
     }
 }
 
+[EditorBrowsable(EditorBrowsableState.Never)]
 public static class DigitalBrainSiloBuilderExtensions
 {
     public static ISiloBuilder AddBroadcastHandlers(this ISiloBuilder builder, Assembly assembly)
