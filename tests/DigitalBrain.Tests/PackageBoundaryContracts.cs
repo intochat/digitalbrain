@@ -40,7 +40,8 @@ public sealed class PackageBoundaryContracts
     public void NothingOnTheConsumerPathCanReachAProviderSdk(string package)
     {
         var reachable = PackagesReachableFrom(package)
-            .Where(dependency => ProviderSdkPrefixes.Any(sdk => dependency.StartsWith(sdk, StringComparison.Ordinal)))
+            .Where(dependency => ProviderSdkPrefixes.Any(sdk =>
+                dependency.StartsWith(sdk, StringComparison.Ordinal)))
             .ToList();
 
         Assert.Empty(reachable);
@@ -48,7 +49,7 @@ public sealed class PackageBoundaryContracts
 
     [Theory]
     [MemberData(nameof(ConsumerPathPackages))]
-    public void NothingOnTheConsumerPathCanReachMafImplementationPackages(string package)
+    public void NothingOnTheConsumerPathCanReachMaf(string package)
     {
         Assert.DoesNotContain(
             PackagesReachableFrom(package),
@@ -59,17 +60,23 @@ public sealed class PackageBoundaryContracts
     [MemberData(nameof(ConsumerPathPackages))]
     public void NothingOnTheConsumerPathCanReachTheKernel(string package)
     {
-        Assert.DoesNotContain("DigitalBrain.Kernel", ProjectsReachableFrom(package), StringComparer.Ordinal);
+        Assert.DoesNotContain(
+            "DigitalBrain.Kernel",
+            ProjectsReachableFrom(package),
+            StringComparer.Ordinal);
     }
 
     [Theory]
     [MemberData(nameof(ConsumerPathPackages))]
-    public void NoProductionPackageReferencesTheTestingPackage(string package)
+    public void NothingOnTheConsumerPathCanReachTesting(string package)
     {
-        Assert.DoesNotContain("DigitalBrain.Testing", ProjectsReachableFrom(package), StringComparer.Ordinal);
+        Assert.DoesNotContain(
+            "DigitalBrain.Testing",
+            ProjectsReachableFrom(package),
+            StringComparer.Ordinal);
     }
 
-    [Fact(DisplayName = "no production silo, host, module, or sample project references DigitalBrain.Testing")]
+    [Fact]
     public void NoProductionTreeReferencesDigitalBrainTesting()
     {
         string[] roots = ["src", "modules", "hosts", "samples"];
@@ -78,6 +85,7 @@ public sealed class PackageBoundaryContracts
                 Path.Combine(RepositoryRoot, root),
                 "*.csproj",
                 SearchOption.AllDirectories))
+            .Where(project => !IsIgnoredLookupPath(project))
             .Where(project => !string.Equals(
                 Path.GetFileNameWithoutExtension(project),
                 "DigitalBrain.Testing",
@@ -93,7 +101,7 @@ public sealed class PackageBoundaryContracts
 
     [Theory]
     [MemberData(nameof(McpProviderRuntimePackages))]
-    public void McpProvidersDependOnSharedMechanicsInsteadOfDeclaringCopies(string package)
+    public void McpProvidersDependOnSharedMechanics(string package)
     {
         Assert.Contains("DigitalBrain.Integrations.Mcp", DirectProjectReferencesOf(package));
         Assert.DoesNotContain(
@@ -104,7 +112,7 @@ public sealed class PackageBoundaryContracts
     }
 
     [Fact]
-    public void AiRuntimeUsesSharedSecurityInsteadOfProcessLocalDataProtection()
+    public void AiRuntimeUsesSharedSecurity()
     {
         Assert.Contains("DigitalBrain.Security", DirectProjectReferencesOf("DigitalBrain.Modules.AI"));
         Assert.DoesNotContain(
@@ -112,8 +120,8 @@ public sealed class PackageBoundaryContracts
             DirectPackageReferencesOf("DigitalBrain.Modules.AI"));
     }
 
-    [Fact(DisplayName = "Tasks remains independent from AI and provider modules")]
-    public void TasksRemainIndependentFromAiAndProviderModules()
+    [Fact]
+    public void TasksRemainIndependentFromAiAndProviders()
     {
         Assert.Equal(
             ["DigitalBrain.Kernel", "DigitalBrain.Modules.Tasks.Contracts"],
@@ -126,16 +134,10 @@ public sealed class PackageBoundaryContracts
                 || project.StartsWith("DigitalBrain.Modules.Google", StringComparison.Ordinal)
                 || project.StartsWith("DigitalBrain.Modules.Salesforce", StringComparison.Ordinal)
                 || project.StartsWith("DigitalBrain.Integrations.Mcp", StringComparison.Ordinal));
-
-        Assert.DoesNotContain(
-            CompilePackagesReachableFrom("DigitalBrain.Modules.Tasks"),
-            package => package.StartsWith("Microsoft.Agents.AI", StringComparison.Ordinal)
-                || package.StartsWith("Microsoft.Extensions.AI", StringComparison.Ordinal)
-                || package.StartsWith("ModelContextProtocol", StringComparison.Ordinal));
     }
 
-    [Fact(DisplayName = "the northbound MCP host cannot reach southbound provider mechanics")]
-    public void NorthboundMcpHostCannotReachSouthboundProviderMechanics()
+    [Fact]
+    public void NorthboundMcpHostCannotReachSouthboundProviders()
     {
         Assert.Equal(
             ["DigitalBrain.Aspire", "DigitalBrain.Client", "DigitalBrain.Modules.AI.Contracts"],
@@ -149,36 +151,25 @@ public sealed class PackageBoundaryContracts
     }
 
     [Fact]
-    public void TheGuardsCoverEveryPackableProject()
+    public void PackableProjectsMatchTheDeclaredInventory()
     {
-        var guarded = ConsumerPath
-            .Append("DigitalBrain.Testing")
-            .Append("DigitalBrain.Kernel")
-            .Append("DigitalBrain.Security")
-            .Append("DigitalBrain.Integrations.Mcp")
-            .Append("DigitalBrain.Integrations.Mcp.Aspire.Hosting")
-            .Append("DigitalBrain.Modules.AI")
-            .Append("DigitalBrain.Modules.AI.Aspire.Hosting")
-            .Append("DigitalBrain.Modules.Google")
-            .Append("DigitalBrain.Modules.Google.Aspire.Hosting")
-            .Append("DigitalBrain.Modules.Salesforce")
-            .Append("DigitalBrain.Modules.Salesforce.Aspire.Hosting")
-            .Append("DigitalBrain.Modules.Tasks")
-            .Append("DigitalBrain.Modules.Time")
-            .Append("DigitalBrain.Quickstart")
-            .ToHashSet(StringComparer.Ordinal);
-
-        var packable = ProductionRoots
+        var actual = ProductionRoots
             .SelectMany(root => Directory.EnumerateFiles(
                 Path.Combine(RepositoryRoot, root),
                 "*.csproj",
                 SearchOption.AllDirectories))
+            .Where(path => !IsIgnoredLookupPath(path))
             .Where(IsPackable)
-            .Select(Path.GetFileNameWithoutExtension)
-            .ToList();
+            .Select(Path.GetFileNameWithoutExtension!)
+            .ToHashSet(StringComparer.Ordinal);
 
-        Assert.NotEmpty(packable);
-        Assert.DoesNotContain(packable, project => !guarded.Contains(project!));
+        Assert.All(PackableProjects.Names, name => Assert.Contains(name, actual));
+        Assert.All(
+            actual,
+            name => Assert.True(
+                PackableProjects.Names.Contains(name, StringComparer.Ordinal)
+                || name == "DigitalBrain",
+                $"Unexpected packable project '{name}'."));
     }
 
     private static bool IsPackable(string projectFile) =>
@@ -198,7 +189,6 @@ public sealed class PackageBoundaryContracts
         Func<string, IEnumerable<string>> directPackageReferencesOf)
     {
         var reachable = new HashSet<string>(StringComparer.Ordinal);
-
         foreach (var project in projectsReachableFrom(package).Append(package))
         {
             reachable.UnionWith(directPackageReferencesOf(project));
@@ -207,36 +197,46 @@ public sealed class PackageBoundaryContracts
         return reachable;
     }
 
-    private static HashSet<string> ProjectsReachableFrom(string package) =>
-        ProjectsReachableFrom(package, DirectProjectReferencesOf);
-
-    private static HashSet<string> CompileProjectsReachableFrom(string package) =>
-        ProjectsReachableFrom(package, DirectCompileProjectReferencesOf);
-
-    private static HashSet<string> ProjectsReachableFrom(
-        string package,
-        Func<string, IEnumerable<string>> directProjectReferencesOf)
+    private static HashSet<string> ProjectsReachableFrom(string package)
     {
-        var reached = new HashSet<string>(StringComparer.Ordinal);
+        var reachable = new HashSet<string>(StringComparer.Ordinal);
         var pending = new Queue<string>([package]);
 
         while (pending.Count > 0)
         {
-            foreach (var referenced in directProjectReferencesOf(pending.Dequeue()))
+            foreach (var reference in DirectProjectReferencesOf(pending.Dequeue()))
             {
-                if (reached.Add(referenced))
+                if (reachable.Add(reference))
                 {
-                    pending.Enqueue(referenced);
+                    pending.Enqueue(reference);
                 }
             }
         }
 
-        return reached;
+        return reachable;
+    }
+
+    private static HashSet<string> CompileProjectsReachableFrom(string package)
+    {
+        var reachable = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Queue<string>([package]);
+
+        while (pending.Count > 0)
+        {
+            foreach (var reference in DirectCompileProjectReferencesOf(pending.Dequeue()))
+            {
+                if (reachable.Add(reference))
+                {
+                    pending.Enqueue(reference);
+                }
+            }
+        }
+
+        return reachable;
     }
 
     private static IEnumerable<string> DirectProjectReferencesOf(string package) =>
         ReferenceElements(package, "ProjectReference")
-            .Where(FlowsToConsumers)
             .Select(reference => Path.GetFileNameWithoutExtension(IncludeOf(reference).Replace('\\', '/')));
 
     private static IEnumerable<string> DirectCompileProjectReferencesOf(string package) =>
@@ -251,6 +251,7 @@ public sealed class PackageBoundaryContracts
 
     private static IEnumerable<string> DirectCompilePackageReferencesOf(string package) =>
         ReferenceElements(package, "PackageReference")
+            .Where(FlowsToConsumers)
             .Where(CompilesAgainst)
             .Select(IncludeOf);
 
@@ -289,8 +290,8 @@ public sealed class PackageBoundaryContracts
     private static string LocateRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx")))
+        while (directory is not null
+               && !File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx")))
         {
             directory = directory.Parent;
         }

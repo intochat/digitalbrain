@@ -156,28 +156,6 @@ internal sealed class VolatileReminderTable : IReminderTable
         }
     }
 
-    internal string DescribePendingAtOrBefore(
-        DateTimeOffset target,
-        string scope)
-    {
-        lock (_gate)
-        {
-            var descriptions = _entries.Values
-                .Where(entry =>
-                    entry.NextDue <= target
-                    && BelongsToScope(entry.Entry.GrainId, scope))
-                .OrderBy(entry => entry.NextDue)
-                .ThenBy(entry => entry.Sequence)
-                .Select(entry =>
-                    $"{entry.Entry.GrainId}/{entry.Entry.ReminderName}, due={entry.NextDue:O}, period={entry.Entry.Period}, etag={entry.Entry.ETag}")
-                .ToArray();
-
-            return descriptions.Length == 0
-                ? "none"
-                : string.Join("; ", descriptions);
-        }
-    }
-
     private static bool InRange(uint hash, uint begin, uint end)
         => begin < end
             ? hash > begin && hash <= end

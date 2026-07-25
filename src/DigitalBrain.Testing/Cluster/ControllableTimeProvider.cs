@@ -1,6 +1,3 @@
-using System.Globalization;
-using DigitalBrain.Kernel;
-
 namespace DigitalBrain.Testing;
 
 internal sealed class ControllableTimeProvider : TimeProvider
@@ -136,27 +133,6 @@ internal sealed class ControllableTimeProvider : TimeProvider
             _registrations.Clear();
             _utcNow = _origin;
             _nextSequence = 0;
-        }
-    }
-
-    internal string DescribePendingAtOrBefore(DateTimeOffset target)
-    {
-        lock (_gate)
-        {
-            var descriptions = _registrations
-                .Where(registration =>
-                    registration.NextDue is { } due
-                    && due <= target)
-                .OrderBy(registration => registration.NextDue)
-                .ThenBy(registration => registration.Sequence)
-                .Select(registration => string.Create(
-                    CultureInfo.InvariantCulture,
-                    $"sequence={registration.Sequence}, due={registration.NextDue:O}, period={registration.Period?.ToString() ?? "disabled"}"))
-                .ToArray();
-
-            return descriptions.Length == 0
-                ? "none"
-                : string.Join("; ", descriptions);
         }
     }
 

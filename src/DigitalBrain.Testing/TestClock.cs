@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 
 namespace DigitalBrain.Testing;
 
@@ -49,11 +48,6 @@ public sealed class TestClock
                 TimeSpan.Zero);
             await AdvanceCoreAsync(duration, cancellationToken);
             _diagnostics.SetClock(_provider.GetUtcNow());
-            _diagnostics.RecordEvent(
-                "clock.advance",
-                "succeeded",
-                ("duration", duration.ToString("c")),
-                ("utc", _provider.GetUtcNow().ToString("O")));
         }
         catch (Exception failure)
             when (failure is not BrainTestFailureException)
@@ -129,10 +123,9 @@ public sealed class TestClock
         }
     }
 
-    private InvalidOperationException DrainLimitFailure(DateTimeOffset target)
-        => new(string.Create(
-            CultureInfo.InvariantCulture,
-            $"Deterministic time drain exceeded {MaximumDrainOperations} operations while advancing to {target:O}. Pending timers: [{_provider.DescribePendingAtOrBefore(target)}]. Pending reminders: [{_reminders.DescribePendingAtOrBefore(target)}]."));
+    private static InvalidOperationException DrainLimitFailure(DateTimeOffset target)
+        => new(
+            $"Deterministic time drain exceeded {MaximumDrainOperations} operations while advancing to {target:O}.");
 
     private DateTimeOffset? NextDueAtOrBefore(DateTimeOffset target)
     {
