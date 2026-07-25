@@ -384,11 +384,10 @@ internal sealed class CountdownNeuron :
             dueTime = TimeSpan.Zero;
         }
 
+        var generation = data.Generation;
+        var revision = data.Revision;
         _localTimer = TimeProvider.CreateTimer(
-            _ => self
-                .Wake(data.Generation, data.Revision)
-                .GetAwaiter()
-                .GetResult(),
+            _ => ObserveTimerWork(self.Wake(generation, revision)),
             state: null,
             dueTime,
             Timeout.InfiniteTimeSpan);

@@ -73,6 +73,9 @@ public abstract class Neuron :
 
     protected TimeProvider TimeProvider { get; }
 
+    protected static void ObserveTimerWork(Task work)
+        => TimerWork.Observe(work);
+
     public sealed override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         NeuronConcurrency.RequireSerializedTurns(GetType());

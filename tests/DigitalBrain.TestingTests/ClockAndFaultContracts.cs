@@ -540,7 +540,7 @@ internal sealed class ClockProbeNeuron :
         var self = GrainFactory.GetGrain<IClockProbeTimerCallback>(
             this.GetGrainId());
         _timers.Add(value, TimeProvider.CreateTimer(
-            _ => self.TimerElapsed(value).GetAwaiter().GetResult(),
+            _ => ObserveTimerWork(self.TimerElapsed(value)),
             state: null,
             dueTime,
             Timeout.InfiniteTimeSpan));
@@ -564,7 +564,7 @@ internal sealed class ClockProbeNeuron :
         var self = GrainFactory.GetGrain<IClockProbeTimerCallback>(
             this.GetGrainId());
         _timers.Add(value, TimeProvider.CreateTimer(
-            _ => self.TimerElapsed(value).GetAwaiter().GetResult(),
+            _ => ObserveTimerWork(self.TimerElapsed(value)),
             state: null,
             dueTime,
             Timeout.InfiniteTimeSpan));
@@ -579,7 +579,7 @@ internal sealed class ClockProbeNeuron :
         var self = GrainFactory.GetGrain<IClockProbeTimerCallback>(
             this.GetGrainId());
         _timers.Add(value, TimeProvider.CreateTimer(
-            _ => self.TimerElapsed(value).GetAwaiter().GetResult(),
+            _ => ObserveTimerWork(self.TimerElapsed(value)),
             state: null,
             dueTime,
             period));

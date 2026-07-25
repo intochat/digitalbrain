@@ -507,10 +507,14 @@ public sealed class CountdownLifecycle(TimeFixture fixture)
             localTimer,
             StringComparison.Ordinal);
         Assert.Contains(
+            "ObserveTimerWork",
+            localTimer,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
             ".GetAwaiter()",
             localTimer,
             StringComparison.Ordinal);
-        Assert.Contains(
+        Assert.DoesNotContain(
             ".GetResult()",
             localTimer,
             StringComparison.Ordinal);
