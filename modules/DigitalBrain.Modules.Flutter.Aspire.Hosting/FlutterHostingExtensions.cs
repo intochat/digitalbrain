@@ -162,7 +162,7 @@ public static class FlutterHostingExtensions
             var mode = options.Mode;
             if (mode == FlutterHostMode.Auto)
             {
-                mode = FlutterCliAvailable(options)
+                mode = FlutterCliAvailable(options) && HasFlutterDesktopProjectMarker(workingDirectory)
                     ? FlutterHostMode.FlutterDesktop
                     : FlutterHostMode.Headless;
             }
@@ -188,6 +188,18 @@ public static class FlutterHostingExtensions
                 ? Environment.GetEnvironmentVariable("DART_COMMAND") ?? "dart"
                 : options.DartCommand;
             return new HostLaunch(dart, ["run", HeadlessHostEntry]);
+        }
+
+        private static bool HasFlutterDesktopProjectMarker(string workingDirectory)
+        {
+            var mainDart = Path.Combine(workingDirectory, "lib", "main.dart");
+            if (File.Exists(mainDart))
+            {
+                return true;
+            }
+
+            var windowsDir = Path.Combine(workingDirectory, "windows");
+            return Directory.Exists(windowsDir);
         }
 
         private static bool FlutterCliAvailable(FlutterHostOptions options)
