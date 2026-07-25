@@ -6,11 +6,12 @@ namespace DigitalBrain.AI;
 
 internal sealed class NeuronChatClient(
     Func<IReadOnlyList<ChatMessage>, Task<ChatResponse>> invoke,
-    TaskScheduler? turnScheduler = null) : IChatClient
+    TaskScheduler turnScheduler) : IChatClient
 {
-    internal NeuronChatClient(INeuron participant, TaskScheduler? turnScheduler = null)
+    internal NeuronChatClient(INeuron participant, TaskScheduler turnScheduler)
         : this(InvocationFor(participant), turnScheduler)
     {
+        ArgumentNullException.ThrowIfNull(turnScheduler);
     }
 
     public Task<ChatResponse> GetResponseAsync(
@@ -22,14 +23,11 @@ internal sealed class NeuronChatClient(
         cancellationToken.ThrowIfCancellationRequested();
 
         var request = Request(messages, options);
-
-        var response = turnScheduler is null
-            ? invoke(request)
-            : Task.Factory.StartNew(
-                () => invoke(request),
-                cancellationToken,
-                TaskCreationOptions.DenyChildAttach,
-                turnScheduler).Unwrap();
+        var response = Task.Factory.StartNew(
+            () => invoke(request),
+            cancellationToken,
+            TaskCreationOptions.DenyChildAttach,
+            turnScheduler).Unwrap();
 
         ObserveFault(response);
         return response.WaitAsync(cancellationToken);
