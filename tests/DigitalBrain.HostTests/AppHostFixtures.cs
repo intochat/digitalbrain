@@ -1,5 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Testing;
+using Xunit;
+
+[assembly: AssemblyFixture(typeof(DigitalBrain.HostTests.TestingAppHostFixture))]
+[assembly: AssemblyFixture(typeof(DigitalBrain.HostTests.ProductionAppHostFixture))]
 
 namespace DigitalBrain.HostTests;
 

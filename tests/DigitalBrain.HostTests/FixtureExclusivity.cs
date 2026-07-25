@@ -12,27 +12,12 @@ public sealed class FixtureExclusivity(
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var first = await testing.StartAsync(cancellationToken);
-        Task<RunningAppHost>? waiting = null;
-        RunningAppHost? second = null;
+        var waiting = testing.StartAsync(cancellationToken);
+        Assert.False(waiting.IsCompleted);
 
-        try
-        {
-            waiting = testing.StartAsync(cancellationToken);
-            Assert.False(waiting.IsCompleted);
-            await first.DisposeAsync();
-
-            second = await waiting;
-            Assert.NotNull(second);
-        }
-        finally
-        {
-            await first.DisposeAsync();
-            if (waiting is not null)
-            {
-                second ??= await waiting;
-                await second.DisposeAsync();
-            }
-        }
+        await first.DisposeAsync();
+        await using var second = await waiting;
+        Assert.NotNull(second);
     }
 
     [Fact]
@@ -41,21 +26,10 @@ public sealed class FixtureExclusivity(
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var first = await testing.StartAsync(cancellationToken);
         var waiting = production.StartAsync(cancellationToken);
-        RunningAppHost? second = null;
+        Assert.False(waiting.IsCompleted);
 
-        try
-        {
-            Assert.False(waiting.IsCompleted);
-            await first.DisposeAsync();
-
-            second = await waiting;
-            Assert.NotNull(second);
-        }
-        finally
-        {
-            await first.DisposeAsync();
-            second ??= await waiting;
-            await second.DisposeAsync();
-        }
+        await first.DisposeAsync();
+        await using var second = await waiting;
+        Assert.NotNull(second);
     }
 }
