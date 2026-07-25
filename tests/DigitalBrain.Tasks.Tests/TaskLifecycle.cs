@@ -137,6 +137,50 @@ public sealed class TaskLifecycle(TasksFixture fixture)
         Assert.Equal(started.Goal, cancelled.Goal);
     }
 
+    [Fact(DisplayName = "Matching AttemptSucceeded moves task to Succeeded with result and evidence")]
+    public async Task MatchingAttemptSucceededMovesTaskToSucceededWithResultAndEvidence()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var worker = test.Neuron<IWorker>("success-worker");
+        var task = test.Neuron<ITask>("success-task");
+        var goal = new SuccessGoal("ship-it");
+
+        var started = await task.Reference.Start(new StartTask(
+            CommandId.New(),
+            goal,
+            worker.Id,
+            DefaultPolicy));
+
+        var accepted = await task.Incoming.NextAsync<AttemptAccepted>(cancellationToken);
+        Assert.Equal(started.ActiveAttempt, accepted.Synapse.Attempt);
+        Assert.Equal(0, accepted.Synapse.Revision);
+        Assert.Equal(worker.Id, accepted.Caller);
+
+        var succeededFact = await task.Incoming.NextAsync<AttemptSucceeded>(cancellationToken);
+        Assert.Equal(task.Id, succeededFact.Synapse.Task);
+        Assert.Equal(worker.Id, succeededFact.Synapse.Worker);
+        Assert.Equal(started.ActiveAttempt, succeededFact.Synapse.Attempt);
+        Assert.Equal(0, succeededFact.Synapse.Revision);
+        Assert.Equal(new TestResult("done"), succeededFact.Synapse.Result);
+        Assert.NotEmpty(succeededFact.Synapse.Evidence);
+        Assert.Equal(worker.Id, succeededFact.Caller);
+
+        var succeeded = await WaitForStateAsync(
+            task,
+            TaskState.Succeeded,
+            cancellationToken);
+
+        Assert.Equal(TaskState.Succeeded, succeeded.State);
+        Assert.Null(succeeded.ActiveAttempt);
+        Assert.Null(succeeded.Blocker);
+        Assert.Null(succeeded.Failure);
+        Assert.Equal(goal, succeeded.Goal);
+        Assert.Equal(worker.Id, succeeded.Worker);
+        Assert.Equal(succeededFact.Synapse.Result, succeeded.Result);
+        Assert.Equal(succeededFact.Synapse.Evidence, succeeded.Evidence);
+    }
+
     [Fact(DisplayName = "Stale revision attempt facts are ignored")]
     public async Task StaleRevisionAttemptFactsAreIgnored()
     {

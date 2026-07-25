@@ -16,6 +16,11 @@ public sealed record RetryableFailureGoal(
     [property: Id(0)] string Label) : Goal;
 
 [GenerateSerializer]
+[Alias("tasks.tests.success-goal")]
+public sealed record SuccessGoal(
+    [property: Id(0)] string Label) : Goal;
+
+[GenerateSerializer]
 [Alias("tasks.tests.result")]
 public sealed record TestResult(
     [property: Id(0)] string Label) : Result;

@@ -32,6 +32,23 @@ internal sealed class ScriptedWorker : Neuron, IWorker
             return;
         }
 
+        if (request.Goal is SuccessGoal)
+        {
+            await SendAsync(
+                request.Task,
+                new AttemptSucceeded(
+                    request.Task,
+                    request.Worker,
+                    request.Attempt,
+                    request.Revision,
+                    new TestResult("done"),
+                    Evidence:
+                    [
+                        new FactReference(request.Worker, SynapseId.New()),
+                    ]));
+            return;
+        }
+
         if (request.Goal is not StaleProbeGoal)
         {
             return;
