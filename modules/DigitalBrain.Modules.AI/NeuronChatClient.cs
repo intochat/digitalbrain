@@ -4,15 +4,9 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI;
 
-internal sealed class NeuronChatClient(
-    Func<IReadOnlyList<ChatMessage>, Task<ChatResponse>> invoke,
-    TaskScheduler turnScheduler) : IChatClient
+internal sealed class NeuronChatClient(INeuron participant, TaskScheduler turnScheduler) : IChatClient
 {
-    internal NeuronChatClient(INeuron participant, TaskScheduler turnScheduler)
-        : this(InvocationFor(participant), turnScheduler)
-    {
-        ArgumentNullException.ThrowIfNull(turnScheduler);
-    }
+    private readonly Func<IReadOnlyList<ChatMessage>, Task<ChatResponse>> _invoke = InvocationFor(participant);
 
     public Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
@@ -20,11 +14,12 @@ internal sealed class NeuronChatClient(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(messages);
+        ArgumentNullException.ThrowIfNull(turnScheduler);
         cancellationToken.ThrowIfCancellationRequested();
 
         var request = Request(messages, options);
         var response = Task.Factory.StartNew(
-            () => invoke(request),
+            () => _invoke(request),
             cancellationToken,
             TaskCreationOptions.DenyChildAttach,
             turnScheduler).Unwrap();
