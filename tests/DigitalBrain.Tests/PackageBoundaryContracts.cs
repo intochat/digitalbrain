@@ -151,6 +151,28 @@ public sealed class PackageBoundaryContracts
                 || project.StartsWith("DigitalBrain.Modules.Salesforce", StringComparison.Ordinal));
     }
 
+    [Fact(DisplayName = "northbound UI host is client + Flutter contracts only — never Kernel or southbound")]
+    public void NorthboundUiHostCannotReachKernelOrSouthboundProviders()
+    {
+        Assert.Equal(
+            [
+                "DigitalBrain.Aspire",
+                "DigitalBrain.Client",
+                "DigitalBrain.Modules.Flutter.Contracts",
+            ],
+            DirectCompileProjectReferencesOf("DigitalBrain.Ui").Order(StringComparer.Ordinal));
+
+        var reachable = CompileProjectsReachableFrom("DigitalBrain.Ui");
+        Assert.DoesNotContain(reachable, project => project == "DigitalBrain.Kernel");
+        Assert.DoesNotContain(
+            reachable,
+            project => project == "DigitalBrain.Modules.Flutter"
+                || project.StartsWith("DigitalBrain.Integrations.Mcp", StringComparison.Ordinal)
+                || project.StartsWith("DigitalBrain.Modules.Google", StringComparison.Ordinal)
+                || project.StartsWith("DigitalBrain.Modules.Salesforce", StringComparison.Ordinal)
+                || project.StartsWith("DigitalBrain.Modules.AI", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void PackableProjectsMatchTheDeclaredInventory()
     {

@@ -601,8 +601,7 @@ calendar, and DST record shapes. Do not implement those as though they were sett
 
 ### 4.6 Flutter
 
-Status: Built (first-vertical vocabulary + L0/L1 journal proofs); Designed (Dart host, UI transport,
-Aspire.Hosting, full chrome, product journal observation)
+Status: Built (first-vertical vocabulary + L0/L1 journal proofs + C# northbound UI edge); Designed (Dart host, full chrome, product journal observation, multi-principal IdP edge)
 
 The OS surface is not a Flutter app with agents behind it. It is a brain whose **UI vocabulary** is a
 Flutter module, and whose **logic** (shell policy, post-auth composition, multi-window orchestration,
@@ -671,30 +670,33 @@ Reject a god widget tree with side-channel HTTP that bypasses `IDigitalBrain` ty
 The Flutter/Dart host is a **client of the brain**, not a second kernel and not a silo.
 
 ```text
-Flutter / Dart host  ──deliberate UI protocol──►  C# edge (hosts/*)
-  no Orleans, no MCP tool dictionaries              auth → OwnerId
-                                                    IDigitalBrain only
-                                                    AsClient() clustering discovery
-                                                              │
-                                                              ▼
-                                                    DigitalBrain silo
-                                                    (one homogeneous catalog)
+Flutter / Dart host  ──HTTP UI protocol──►  hosts/DigitalBrain.Ui (C# edge)
+  no Orleans, no MCP tool dictionaries       auth → OwnerId (dev: config owner)
+                                             IDigitalBrain only
+                                             AppHost: brain.AsClient()
+                                                       │
+                                                       ▼
+                                             DigitalBrain silo (+ FlutterModule when selected)
 ```
 
-- **Recommend:** pure Orleans / `IDigitalBrain` C# edge process; Dart talks only to that edge.
+- **Built:** `hosts/DigitalBrain.Ui` — owner-bound `IDigitalBrain` edge with HTTP
+  `POST /shells/{shell}/scenes` and `POST /scenes/{scene}/controls/{id}/activate`. L1 proves those
+  map to journaled `SceneOpened` / `ControlActivated` without a Dart process. Production AppHost
+  selects `FlutterModule` on the silo and wires the UI host with `AsClient()` only (same trust split
+  as MCP).
 - **Keep** `hosts/DigitalBrain.Mcp` as agent/IDE northbound — not the product UI path (no tool
   dictionaries on UI contracts; MCP owner binding today is process config, not human IdP).
 - **Reject:** Dart embeds Orleans client or silo; Flutter process receives journals, protection keys,
   or reminders; attaching `brain.AsClient()` to a non-.NET Flutter resource as if it were an Orleans
   client.
-- **Transport** (HTTP, gRPC, WebSocket) under the C# edge is open until a real Flutter consumer
-  exists; the load-bearing decision is where `IDigitalBrain` lives.
+- **Designed:** Dart host consuming this HTTP surface; production IdP principal→owner bind; product
+  journal observation on `IDigitalBrain` for reconnect.
 - Edge executable lives under `hosts/` (peer of MCP and the silo host). Do not invent a second public
   client facade beside `DigitalBrainClient`.
 
 Product journal **observation** on `IDigitalBrain` remains unbuilt (§8). First vertical proves
-journaled facts at L1 in-cluster; host watch is a named gap, not permission to invent a second
-semantic protocol.
+journaled facts at L1 in-cluster and via the UI edge HTTP surface; host watch is a named gap, not
+permission to invent a second semantic protocol.
 
 #### Auth edge
 
@@ -739,12 +741,11 @@ they do not replace L1 journal proof.
 
 #### Still open (do not implement as settled)
 
-- Exact method signatures and `[Alias]` pins for `IShell` / `IScene` (freeze only with proofs).
-- Scene descriptor node algebra and revision fields.
-- UI protocol transport under the C# edge.
+- Scene descriptor node algebra and richer chrome vocabulary beyond the first five types.
+- Dart host mapping descriptors to widgets; dual-sided golden equality on the Dart side.
 - Product journal observation API on `IDigitalBrain` for host reconnect.
 - Whether / when `DigitalBrain.Modules.Flutter.Aspire.Hosting` is needed.
-- Multi-principal edge factory beyond singleton `AddDigitalBrainClient(owner)`.
+- Multi-principal edge factory beyond singleton `AddDigitalBrainClient(owner)` / process owner config.
 - Full desktop chrome, multi-window, notifications, AI pane as product surfaces.
 
 ### 4.7 Memory

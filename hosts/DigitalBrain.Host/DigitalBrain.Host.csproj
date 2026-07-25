@@ -6,6 +6,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.AI\DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Flutter\DigitalBrain.Modules.Flutter.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Google\DigitalBrain.Modules.Google.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Salesforce\DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />

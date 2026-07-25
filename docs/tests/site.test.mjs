@@ -181,7 +181,7 @@ test('the architecture page is module-organized and states each status once', ()
   const built = architecture.match(/^Status: Built$/gm) ?? []
   const builtCountdown = architecture.match(/^Status: Built — Countdown only$/gm) ?? []
   const builtFlutter = architecture.match(
-    /^Status: Built \(first-vertical vocabulary \+ L0\/L1 journal proofs\); Designed \([^)]+\)$/gm) ?? []
+    /^Status: Built \(first-vertical vocabulary \+ L0\/L1 journal proofs \+ C# northbound UI edge\); Designed \([^)]+\)$/gm) ?? []
   const designed = architecture.match(/^Status: Designed$/gm) ?? []
   assert.equal(built.length, 4, 'AI, Tasks, Google, and Salesforce are built')
   assert.equal(builtCountdown.length, 1, 'Time is built — Countdown only')

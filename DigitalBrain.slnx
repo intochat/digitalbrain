@@ -15,6 +15,7 @@
   <Folder Name="/hosts/">
     <Project Path="hosts/DigitalBrain.Host/DigitalBrain.Host.csproj" />
     <Project Path="hosts/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
+    <Project Path="hosts/DigitalBrain.Ui/DigitalBrain.Ui.csproj" />
     <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
     <Project Path="hosts/DigitalBrain.TestingAppHost/DigitalBrain.TestingAppHost.csproj" />
     <Project Path="hosts/DigitalBrain.Quickstart.Host/DigitalBrain.Quickstart.Host.csproj" />
@@ -51,6 +52,7 @@
     <Project Path="tests/DigitalBrain.Quickstart.Tests/DigitalBrain.Quickstart.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Time.Tests/DigitalBrain.Time.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Flutter.Tests/DigitalBrain.Flutter.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.Ui.Tests/DigitalBrain.Ui.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Compositions.Tests/DigitalBrain.Compositions.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Tasks.Tests/DigitalBrain.Tasks.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Integrations.Tests/DigitalBrain.Integrations.Tests.csproj" />

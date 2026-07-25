@@ -47,7 +47,7 @@ for what ships and what each package may depend on.
 | Time | yes | yes | no | `DigitalBrain.Time.Tests` (Countdown lifecycle and recovery) | Built: Countdown only |
 | Google | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` Gmail ReadMessage admit + annotation refusal on scripted MCP edge | Built |
 | Salesforce | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` propose / reject / approve→Completed on scripted MCP edge | Built |
-| Flutter | yes | yes | no | L0 golden + namespace/boundary pins in `DigitalBrain.Tests`; L1 journal round-trip in `DigitalBrain.Flutter.Tests` (`SceneOpened`, `ControlActivated`) | Built (vocabulary); Designed (Dart host, Aspire.Hosting, full chrome) |
+| Flutter | yes | yes | no | L0 golden + namespace/boundary pins; L1 journals in `DigitalBrain.Flutter.Tests`; L1 HTTP edge in `DigitalBrain.Ui.Tests`; AppHost selects `FlutterModule` + `digitalbrain-ui` AsClient | Built (vocabulary + C# UI edge); Designed (Dart host, Aspire.Hosting, full chrome) |
 
 Quickstart, Tasks, Time, and Flutter have no module `Aspire.Hosting` package because they need no
 module-specific AppHost resources. AI, Google, and Salesforce do. Flutter packages are
