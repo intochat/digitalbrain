@@ -2,7 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Kernel;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
@@ -46,29 +45,6 @@ internal static class MafParticipantAdapter
         }
 
         return [.. participants.Select(participant => participant.CreateAgent(grains, turnScheduler))];
-    }
-
-    internal static AIAgent[] CreateDelegated(
-        IGrainFactory grains,
-        IReadOnlyList<OrchestrationParticipant> participants,
-        TaskScheduler turnScheduler,
-        Func<OrchestrationParticipant, Task<CapabilityDelegation>> authorize)
-    {
-        ArgumentNullException.ThrowIfNull(grains);
-        ArgumentNullException.ThrowIfNull(participants);
-        ArgumentNullException.ThrowIfNull(turnScheduler);
-        ArgumentNullException.ThrowIfNull(authorize);
-
-        if (participants.Count == 0)
-        {
-            throw new InvalidOperationException("An orchestration requires at least one participant.");
-        }
-
-        return [.. participants.Select(participant => CreateDelegated(
-            grains,
-            participant,
-            turnScheduler,
-            authorize))];
     }
 
     [SuppressMessage(
@@ -124,44 +100,4 @@ internal static class MafParticipantAdapter
 
     private static InvalidOperationException Unsupported(Type contract)
         => new($"Participant contract '{contract.FullName}' must implement {nameof(ILLM)} or {nameof(IAgent)}.");
-
-    [SuppressMessage(
-        "Reliability",
-        "CA2000:Dispose objects before losing scope",
-        Justification = "The delegated adapter owns no disposable resource and lives with its MAF agent.")]
-    private static ChatClientAgent CreateDelegated(
-        IGrainFactory grains,
-        OrchestrationParticipant participant,
-        TaskScheduler turnScheduler,
-        Func<OrchestrationParticipant, Task<CapabilityDelegation>> authorize)
-    {
-        var contract = Type.GetType(participant.Contract, throwOnError: true)
-            ?? throw new InvalidOperationException(
-                $"Participant contract '{participant.Contract}' cannot be resolved.");
-        Validate(contract);
-
-        Func<IReadOnlyList<ChatMessage>, Task<ChatResponse>> invoke =
-            typeof(ILLM).IsAssignableFrom(contract)
-                ? grains.GetGrain<ILLM>(participant.NeuronId.ToGrainId()).Respond
-                : grains.GetGrain<IAgent>(participant.NeuronId.ToGrainId()).Respond;
-        var client = new NeuronChatClient(
-            async request =>
-            {
-                var delegation = await authorize(participant);
-
-                return await DigitalBrainRuntime.InvokeAsync(
-                    delegation,
-                    () => invoke(request));
-            },
-            turnScheduler);
-
-        return new ChatClientAgent(
-            client,
-            new ChatClientAgentOptions
-            {
-                Id = participant.AgentId,
-                Name = participant.AgentName,
-            });
-    }
-
 }
