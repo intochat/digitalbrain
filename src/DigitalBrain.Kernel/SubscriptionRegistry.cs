@@ -11,13 +11,11 @@ internal sealed class SubscriptionRegistry : DurableGrain, ISubscriptionRegistry
 
     private readonly IDurableDictionary<string, byte[]> _subscribers;
     private readonly Serializer<NeuronId[]> _neurons;
-    private readonly BroadcastCatalog _catalog;
 
     public SubscriptionRegistry()
     {
         _subscribers = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<string, byte[]>>(SubscribersStateName);
         _neurons = ServiceProvider.GetRequiredService<Serializer<NeuronId[]>>();
-        _catalog = ServiceProvider.GetRequiredService<BroadcastCatalog>();
     }
 
     internal OwnerId Owner => new(this.GetPrimaryKeyString());
@@ -43,9 +41,6 @@ internal sealed class SubscriptionRegistry : DurableGrain, ISubscriptionRegistry
 
     public Task<IReadOnlyList<NeuronId>> Subscribers(string synapseType)
         => Task.FromResult<IReadOnlyList<NeuronId>>(Read(synapseType));
-
-    public Task<int> SubscriberCount(string synapseType)
-        => Task.FromResult(_catalog.HandlerCount(synapseType) + Read(synapseType).Length);
 
     private NeuronId[] Read(string synapseType)
         => _subscribers.TryGetValue(synapseType, out var registered) ? _neurons.Deserialize(registered) : [];

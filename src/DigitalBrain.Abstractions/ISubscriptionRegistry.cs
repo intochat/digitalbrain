@@ -8,7 +8,4 @@ public interface ISubscriptionRegistry : IGrainWithStringKey
 
     [Alias(nameof(Subscribers))]
     Task<IReadOnlyList<NeuronId>> Subscribers(string synapseType);
-
-    [Alias(nameof(SubscriberCount))]
-    Task<int> SubscriberCount(string synapseType);
 }

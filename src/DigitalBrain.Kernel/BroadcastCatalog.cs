@@ -36,6 +36,4 @@ internal sealed class BroadcastCatalog
 
     public IReadOnlyCollection<string> HandlerGrainTypes(string synapseType)
         => _handlers.TryGetValue(synapseType, out var handlers) ? handlers : [];
-
-    public int HandlerCount(string synapseType) => HandlerGrainTypes(synapseType).Count;
 }
