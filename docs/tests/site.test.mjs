@@ -359,11 +359,11 @@ test('the repository README points at the v2 gate and story', () => {
   assert.doesNotMatch(readme, /kernel\/|edge\/|workspace\//)
 })
 
-test('generated VitePress, npm and specification output stays out of git', () => {
+test('generated VitePress and npm output stays out of git', () => {
   const gitignore = read('.gitignore')
 
   assert.match(gitignore, /^node_modules\/$/m)
   assert.match(gitignore, /^docs\/\.vitepress\/cache\/$/m)
   assert.match(gitignore, /^docs\/\.vitepress\/dist\/$/m)
-  assert.match(gitignore, /^docs\/specification\.md$/m)
+  assert.doesNotMatch(gitignore, /^docs\/specification\.md$/m)
 })
