@@ -107,7 +107,14 @@ internal sealed class DirectAgentSession(
             throw RecoveryRequired();
         }
 
-        OrchestrationDefinition.RequireMatch(stored.Definition, definition);
+        if (!string.Equals(
+                stored.Definition.Fingerprint,
+                definition.Fingerprint,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "The durable direct-agent session is incompatible with the current orchestration definition; an explicit migration or reset is required.");
+        }
 
         try
         {

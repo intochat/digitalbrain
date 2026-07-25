@@ -21,20 +21,6 @@ internal sealed record OrchestrationDefinition(string Fingerprint)
 
     internal string HostName => $"orchestration_{Fingerprint}";
 
-    internal static void RequireMatch(
-        OrchestrationDefinition stored,
-        OrchestrationDefinition current)
-    {
-        ArgumentNullException.ThrowIfNull(stored);
-        ArgumentNullException.ThrowIfNull(current);
-
-        if (!string.Equals(stored.Fingerprint, current.Fingerprint, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                "The durable direct-agent session is incompatible with the current orchestration definition; an explicit migration or reset is required.");
-        }
-    }
-
     internal static OrchestrationDefinition Describe(
         Type orchestrationType,
         IReadOnlyList<Participant> participants,
