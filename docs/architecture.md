@@ -601,7 +601,8 @@ calendar, and DST record shapes. Do not implement those as though they were sett
 
 ### 4.6 Flutter
 
-Status: Designed (vocabulary and host model ratified; first vertical unbuilt)
+Status: Built (first-vertical vocabulary + L0/L1 journal proofs); Designed (Dart host, UI transport,
+Aspire.Hosting, full chrome, product journal observation)
 
 The OS surface is not a Flutter app with agents behind it. It is a brain whose **UI vocabulary** is a
 Flutter module, and whose **logic** (shell policy, post-auth composition, multi-window orchestration,

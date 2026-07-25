@@ -4,6 +4,7 @@ using DigitalBrain.AI;
 using DigitalBrain.Aspire;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Client;
+using DigitalBrain.Flutter;
 using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
 using Xunit;
@@ -62,12 +63,25 @@ public sealed class AssemblyBoundaryContracts
                      typeof(INeuron).Assembly,
                      typeof(ILLM).Assembly,
                      typeof(ITask).Assembly,
+                     typeof(IShell).Assembly,
                  })
         {
             Assert.DoesNotContain(
                 assembly.GetReferencedAssemblies(),
                 reference => reference.Name == "DigitalBrain.Kernel");
         }
+    }
+
+    [Fact(DisplayName = "the kernel assembly reaches no Flutter module or Dart SDK")]
+    public void TheKernelReachesNoFlutterModuleOrDartSdk()
+    {
+        var reachable = ReachableFrom(typeof(Neuron).Assembly);
+        Assert.DoesNotContain(
+            reachable,
+            reference => reference.StartsWith("DigitalBrain.Modules.Flutter", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            reachable,
+            reference => reference.StartsWith("Dart", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

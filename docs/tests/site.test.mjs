@@ -180,10 +180,13 @@ test('the architecture page is module-organized and states each status once', ()
 
   const built = architecture.match(/^Status: Built$/gm) ?? []
   const builtCountdown = architecture.match(/^Status: Built — Countdown only$/gm) ?? []
+  const builtFlutter = architecture.match(
+    /^Status: Built \(first-vertical vocabulary \+ L0\/L1 journal proofs\); Designed \([^)]+\)$/gm) ?? []
   const designed = architecture.match(/^Status: Designed$/gm) ?? []
   assert.equal(built.length, 4, 'AI, Tasks, Google, and Salesforce are built')
   assert.equal(builtCountdown.length, 1, 'Time is built — Countdown only')
-  assert.equal(designed.length, 2, 'Flutter module and Behaviors section are designed')
+  assert.equal(builtFlutter.length, 1, 'Flutter vocabulary is built; host/chrome remain designed')
+  assert.equal(designed.length, 1, 'Behaviors section is designed')
 
   assert.match(architecture, /human-approved proposal/)
   assert.match(architecture, /Runtime behavior installation is designed and not yet built/)

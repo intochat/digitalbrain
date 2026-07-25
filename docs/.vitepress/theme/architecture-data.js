@@ -45,9 +45,11 @@ export const MODULES = [
     mcp: false, ui: false, aspire: [],
   },
   {
-    id: 'flutter', label: 'Flutter', status: 'designed', section: '#_4-6-flutter',
-    role: 'Flutter neurons and a contract drift guard. Outside the first executable proof.',
-    neurons: ['IFlutter'], synapses: [], mcp: false, ui: true, aspire: [],
+    id: 'flutter', label: 'Flutter', status: 'built', section: '#_4-6-flutter',
+    role: 'Semantic UI vocabulary (IShell, IScene) with journaled scene/control facts. Flutter/Dart host is a northbound client edge, not an embedded silo. Drift guard is a golden wire manifest over Contracts.',
+    neurons: ['IShell', 'IScene'],
+    synapses: ['SceneOpened', 'ControlActivated'],
+    mcp: false, ui: true, aspire: [],
   },
   {
     id: 'memory', label: 'Memory', status: 'scope', section: '#_4-7-memory',

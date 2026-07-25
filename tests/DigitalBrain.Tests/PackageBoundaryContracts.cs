@@ -22,6 +22,7 @@ public sealed class PackageBoundaryContracts
         "DigitalBrain.Modules.Salesforce.Contracts",
         "DigitalBrain.Modules.Tasks.Contracts",
         "DigitalBrain.Modules.Time.Contracts",
+        "DigitalBrain.Modules.Flutter.Contracts",
         "DigitalBrain.Quickstart.Contracts",
     ];
 

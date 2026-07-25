@@ -26,6 +26,8 @@ internal static class PackableProjects
         "DigitalBrain.Modules.Tasks",
         "DigitalBrain.Modules.Time.Contracts",
         "DigitalBrain.Modules.Time",
+        "DigitalBrain.Modules.Flutter.Contracts",
+        "DigitalBrain.Modules.Flutter",
         "DigitalBrain.Quickstart.Contracts",
         "DigitalBrain.Quickstart",
     ];
