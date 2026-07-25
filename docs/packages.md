@@ -39,6 +39,7 @@ for what ships and what each package may depend on.
 | Family | Contracts | Runtime | Module hosting package | Semantic proof | Status |
 | --- | --- | --- | --- | --- | --- |
 | Quickstart | yes | yes | no | `DigitalBrain.Quickstart.Tests` + Quickstart AppHost | Built |
+| AccountEnrichment (sample) | same package | same package | no | L0 shape + module registration; L1 deferred until Google/Salesforce MCP test edges land | Built (opt-in) |
 | AI | yes | yes | yes | typed LLM smoke (`ILlama32`); L1 Concurrent/GroupChat Respond multi-participant + session reuse; supervised IWorker unbuilt | Built (direct surface); Designed (supervised) |
 | Tasks | yes | yes | no | contracts + runtime package + assembly-boundary pins; `DigitalBrain.Tasks.Tests` L1 closed loop via test-only `IWorker` | Built |
 | Time | yes | yes | no | `DigitalBrain.Time.Tests` (Countdown lifecycle and recovery) | Built: Countdown only |

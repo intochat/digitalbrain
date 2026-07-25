@@ -8,9 +8,9 @@ using Orleans.Serialization;
 
 namespace DigitalBrain.AccountEnrichment;
 
-public sealed class AccountEnrichmentProcess :
+internal sealed class AccountEnrichment :
     Neuron,
-    INeuron,
+    IAccountEnrichment,
     IHandle<EnrichAccountFromEmail>,
     IHandle<SalesforceMutationApproval>,
     IEmit<AccountEnrichmentProposed>,
@@ -20,7 +20,7 @@ public sealed class AccountEnrichmentProcess :
     private readonly IDurableDictionary<Guid, byte[]> _requests;
     private readonly Serializer<Request> _states;
 
-    public AccountEnrichmentProcess()
+    public AccountEnrichment()
     {
         _requests = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(
             RequestsName);

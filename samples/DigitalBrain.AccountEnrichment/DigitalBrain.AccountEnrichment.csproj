@@ -1,13 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <Description>Opt-in multi-module sample: EnrichmentModule, IAccountEnrichment, Gmail→Salesforce enrichment facts.</Description>
     <RootNamespace>DigitalBrain.AccountEnrichment</RootNamespace>
-    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007</NoWarn>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812;CA2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Google.Contracts\DigitalBrain.Modules.Google.Contracts.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Salesforce.Contracts\DigitalBrain.Modules.Salesforce.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
   </ItemGroup>
 </Project>
