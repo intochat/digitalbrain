@@ -27,7 +27,7 @@ internal static class MafParticipantAdapter
     [SuppressMessage(
         "Reliability",
         "CA2000:Dispose objects before losing scope",
-        Justification = "Participant adapters own no disposable resource and live with their MAF agents.")]
+        Justification = "NeuronChatClient has empty disposal and is owned by the ChatClientAgent for the agent lifetime.")]
     internal static AIAgent Create<TNeuron>(
         IGrainFactory grains,
         NeuronId id,
@@ -37,21 +37,14 @@ internal static class MafParticipantAdapter
         ArgumentNullException.ThrowIfNull(turnScheduler);
         Validate(typeof(TNeuron));
 
-        var participant = grains.GetGrain<TNeuron>(id.ToGrainId());
+        var (agentId, agentName) = AgentIdentity(typeof(TNeuron), id);
         return new ChatClientAgent(
-            new NeuronChatClient(participant, turnScheduler),
-            Options(typeof(TNeuron), id));
-    }
-
-    private static ChatClientAgentOptions Options(Type contract, NeuronId id)
-    {
-        var (agentId, agentName) = AgentIdentity(contract, id);
-
-        return new ChatClientAgentOptions
-        {
-            Id = agentId,
-            Name = agentName,
-        };
+            new NeuronChatClient(grains.GetGrain<TNeuron>(id.ToGrainId()), turnScheduler),
+            new ChatClientAgentOptions
+            {
+                Id = agentId,
+                Name = agentName,
+            });
     }
 
     private static (string Id, string Name) AgentIdentity(Type contract, NeuronId id)

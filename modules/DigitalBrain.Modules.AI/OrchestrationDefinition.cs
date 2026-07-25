@@ -87,19 +87,9 @@ internal sealed record OrchestrationDefinition(
         ArgumentNullException.ThrowIfNull(stored);
         ArgumentNullException.ThrowIfNull(current);
 
-        if (stored.FormatVersion != current.FormatVersion
-            || !string.Equals(stored.MafVersion, current.MafVersion, StringComparison.Ordinal)
-            || !string.Equals(stored.Fingerprint, current.Fingerprint, StringComparison.Ordinal)
-            || !string.Equals(stored.Kind, current.Kind, StringComparison.Ordinal)
-            || !string.Equals(stored.OrchestrationType, current.OrchestrationType, StringComparison.Ordinal)
-            || !string.Equals(stored.ApplicationVersion, current.ApplicationVersion, StringComparison.Ordinal)
-            || !string.Equals(stored.ExecutionEnvironment, current.ExecutionEnvironment, StringComparison.Ordinal)
-            || !string.Equals(stored.Manager, current.Manager, StringComparison.Ordinal)
-            || !string.Equals(stored.Aggregator, current.Aggregator, StringComparison.Ordinal)
+        if (!string.Equals(stored.Fingerprint, current.Fingerprint, StringComparison.Ordinal)
             || !string.Equals(stored.HostId, current.HostId, StringComparison.Ordinal)
-            || !string.Equals(stored.HostName, current.HostName, StringComparison.Ordinal)
-            || stored.Participants is null
-            || !stored.Participants.SequenceEqual(current.Participants))
+            || !string.Equals(stored.HostName, current.HostName, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 "The durable direct-agent session is incompatible with the current orchestration definition; an explicit migration or reset is required.");
