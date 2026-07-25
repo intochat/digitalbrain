@@ -127,7 +127,13 @@ internal sealed class DirectOrchestrationShape
         var workflow = _identity.Kind switch
         {
             DirectOrchestrationKind.Concurrent => AgentWorkflowBuilder.BuildConcurrent(participants),
-            DirectOrchestrationKind.GroupChat => GroupChatWorkflow.Create(participants),
+            DirectOrchestrationKind.GroupChat => AgentWorkflowBuilder
+                .CreateGroupChatBuilderWith(team => new RoundRobinGroupChatManager(team)
+                {
+                    MaximumIterationCount = participants.Length,
+                })
+                .AddParticipants([.. participants])
+                .Build(),
             _ => throw new InvalidOperationException(
                 $"Unknown direct orchestration kind '{_identity.Kind}'."),
         };
