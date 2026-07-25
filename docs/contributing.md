@@ -27,28 +27,25 @@ that the root run caught.
 
 ## Three tiers of test
 
-**Tier 0 — contract.** No cluster. Types, boundaries, public API surface, and the guarantees that can
-be proven without hosting anything. Fast enough to run constantly.
+**Tier 0 — contract (L0).** No cluster. Types, boundaries, public API surface, and the guarantees that
+can be proven without hosting anything. Fast enough to run constantly.
 
-**Tier 1 — simulations.** Gherkin scenarios fired into a real three-silo in-process Orleans cluster and
-asserted against real journals. This is where behaviour is specified. A new guarantee belongs here, as
-a scenario, before it exists as code.
+**Tier 1 — in-process cluster (L1).** Method-scoped `TestBrain` against a real multi-silo Orleans
+cluster and typed committed journals. This is where product behaviour is proven (Quickstart, Time,
+optional module smoke). Write the failing proof first, then make it pass.
 
-**Tier 2 — hosted proof.** A real Aspire application: durable restart recovery, health, publish
-manifest. Slow, few, and load-bearing.
+**Tier 2 — hosted proof (L2).** A real Aspire application: exclusive AppHost graph health and related
+host proofs. Slow, few, and load-bearing.
 
 ## Writing a change
 
-**Write the failing proof first.** Prefer a Tier-1 scenario, because a scenario is simultaneously the
-test, the specification, and the published documentation — every `.feature` file appears on the
-[Specification](/specification) page automatically. Then make it pass, then run the gate.
+**Write the failing proof first.** Prefer a Tier 1 test on `TestBrain` / `TestNeuron` with journal
+evidence. Then make it pass, then run the gate.
 
 When the behaviour is not coming yet, keep the proof and exclude it rather than deleting it:
-`[Fact(Explicit = true)]` for xUnit, `@ignore` for Gherkin. An excluded proof still reports as explicit
-or skipped in the test run rather than disappearing, because a proof nobody runs is worth nothing
-unless its state is visible — the same reasoning behind the [Architecture](/architecture) page's
-"Known limitations" section (§8), which discloses every debt in the built system rather than burying
-it. The root gate is never red.
+`[Fact(Explicit = true)]`. An excluded proof still reports as explicit rather than disappearing —
+the same reasoning behind the [Architecture](/architecture) page's "Known limitations" section (§8).
+The root gate is never red.
 
 **Grill your own diff before you commit.** Three questions, answered in the commit message:
 

@@ -254,12 +254,7 @@ the base class says *how* it operates. Orchestrations accept both raw `ILLM` neu
 `IAgent` neurons; internal adapters convert either into an MAF participant. Participants are declared
 by typed neuron identity, never by injecting fake constructor dependencies.
 
-**Orleans is the durability authority for direct turns.** Built today: direct `Concurrent` and
-`GroupChat` `Respond` paths own a protected serialized MAF `AgentSession` through
-`DirectAgentSession` (encrypted by `DigitalBrain.Security`). There is no second transcript, and the
-MAF Durable Extension is rejected because it would duplicate Orleans. Restore reconstructs the
-composed definition first and only then restores state; a fingerprint mismatch demands explicit
-migration or reset.
+**Orleans is the durability authority for direct turns.** Built today: direct Concurrent/GroupChat `Respond` owns a protected serialized MAF AgentSession (encrypted by `DigitalBrain.Security` via the internal direct session helper). There is no second transcript, and the MAF Durable Extension is rejected because it would duplicate Orleans. Restore reconstructs the composed definition first and only then restores state; a fingerprint mismatch demands explicit migration or reset.
 
 **Supervised Task/`IWorker` orchestration is Designed, not built.** `IGroupChat` still extends
 `IWorker`, but `Accept` / `Continue` / `Cancel` throw until a thin Orleans-primary supervised path is
@@ -794,19 +789,11 @@ await using var host = await fixture.StartAsync(cancellationToken);
 var silo = host.Resource("silo");
 await silo.WaitUntilHealthyAsync(cancellationToken);
 using var client = silo.CreateHttpClient();
-await silo.RestartAsync(cancellationToken);
 ```
 
-Cleanup remains graph-owned: it uses Aspire resource commands and terminal observations, records
-bounded evidence, and never enumerates or kills processes by name. L1 remains the default for neuron
-and module semantics. Gherkin remains a thin generated vocabulary over the same `TestBrain`;
-generation may compose only existing vocabulary, never invent neuron or synapse types.
+Cleanup remains graph-owned: it uses Aspire resource commands and terminal observations, and never enumerates or kills processes by name. L1 remains the default for neuron and module semantics. Product silo restart is proven through L1 `TestNeuron.RestartHostAsync` (in-process cluster), not through AppHost resource-restart commands.
 
-Substitutes stop at the closed external edges named by `TestingEdges`: `IChatClient` and the shared
-`TimeProvider` already registered on every L1 test. Southbound MCP transport and OAuth/params test
-edges are deleted (no product or L1 consumer). Neurons, journals, filters, and module logic stay
-real. `Behavior` remains the name of a user-authored ordinary-test concept; the testing framework
-adds no behavior interfaces or behavior fixture hierarchy. Runtime behavior is not a Neuron (see §5).
+Substitutes stop at the closed external edges named by `TestingEdges`: `IChatClient` (module smoke) and the shared `TimeProvider` already registered on every L1 test. Neurons, journals, filters, and module logic stay real. `Behavior` remains the name of a user-authored ordinary-test concept; the testing framework adds no behavior interfaces or behavior fixture hierarchy. Runtime behavior is not a Neuron (see §5).
 
 ## 8. Known limitations
 
