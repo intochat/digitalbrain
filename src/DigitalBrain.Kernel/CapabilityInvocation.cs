@@ -9,8 +9,6 @@ internal static class CapabilityInvocation
     [
         typeof(INeuron),
         typeof(ISessionNeuron),
-        typeof(ISubscriptionRegistry),
-        typeof(IJournalObserver),
     ];
 
     internal static bool IsRequest(MethodInfo? method)

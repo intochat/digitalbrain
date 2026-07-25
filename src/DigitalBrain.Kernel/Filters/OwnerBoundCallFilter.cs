@@ -95,10 +95,8 @@ internal sealed class OwnerBoundCallFilter(
                     StringComparison.Ordinal)
                 || IsAdditionalTrustedSource(identified));
 
-    private bool IsAdditionalTrustedSource(GrainId? source)
-        => source is { } identified
-            && additionalReminderSources.Any(
-                allowlist => allowlist.Contains(identified));
+    private bool IsAdditionalTrustedSource(GrainId source)
+        => additionalReminderSources.Any(allowlist => allowlist.Contains(source));
 
     private static bool IsClientEntryPoint(MethodInfo? method)
         => method?.DeclaringType?.GetCustomAttribute<ClientEntryPointAttribute>() is not null;

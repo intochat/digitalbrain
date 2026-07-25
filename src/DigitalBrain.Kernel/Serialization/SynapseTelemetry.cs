@@ -6,13 +6,11 @@ public static class SynapseTelemetry
 {
     public const string ActivitySourceName = "DigitalBrain";
 
-    public const string ReceiverTag = "db.receiver";
+    internal const string ReceiverTag = "db.receiver";
 
-    public const string SynapseTag = "db.synapse";
+    internal const string SynapseTag = "db.synapse";
 
-    public const string CorrelationTag = "db.correlation";
-
-    public const string WatcherDroppedTag = "db.watcher-dropped";
+    internal const string CorrelationTag = "db.correlation";
 
     internal static readonly ActivitySource Source = new(ActivitySourceName);
 
@@ -21,6 +19,6 @@ public static class SynapseTelemetry
         using var dropped = Source.StartActivity("db.watcher-dropped");
 
         dropped?.SetTag(ReceiverTag, watched.ToString());
-        dropped?.SetTag(WatcherDroppedTag, unreachable.GetType().Name);
+        dropped?.SetTag("db.watcher-dropped", unreachable.GetType().Name);
     }
 }

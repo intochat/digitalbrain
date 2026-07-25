@@ -5,11 +5,9 @@ namespace DigitalBrain.Kernel;
 
 public sealed record SynapseWiringEntry(string Neuron, string Synapse);
 
-public sealed class DispatchManifest(IReadOnlyList<SynapseWiringEntry> handlers, IReadOnlyList<SynapseWiringEntry> emissions)
+public sealed class DispatchManifest(IReadOnlyList<SynapseWiringEntry> handlers)
 {
     public IReadOnlyList<SynapseWiringEntry> Handlers { get; } = handlers;
-
-    public IReadOnlyList<SynapseWiringEntry> Emissions { get; } = emissions;
 }
 
 public static class SynapseWiring
@@ -22,7 +20,7 @@ public static class SynapseWiring
     public static bool TryGetManifest(Assembly assembly, out DispatchManifest manifest)
     {
         var found = Manifests.GetOrAdd(assembly, static probed => Load(probed));
-        manifest = found ?? new DispatchManifest([], []);
+        manifest = found ?? new DispatchManifest([]);
 
         return found is not null;
     }
@@ -41,13 +39,15 @@ public static class SynapseWiring
         }
 
         var handlers = new List<SynapseWiringEntry>();
-        var emissions = new List<SynapseWiringEntry>();
 
         foreach (var (neuron, synapse, isHandler) in wirings)
         {
-            (isHandler ? handlers : emissions).Add(new SynapseWiringEntry(neuron, synapse));
+            if (isHandler)
+            {
+                handlers.Add(new SynapseWiringEntry(neuron, synapse));
+            }
         }
 
-        return new DispatchManifest(handlers, emissions);
+        return new DispatchManifest(handlers);
     }
 }

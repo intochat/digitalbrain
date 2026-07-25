@@ -6,12 +6,6 @@ using Orleans.Runtime.Placement;
 
 namespace DigitalBrain.Kernel;
 
-[AttributeUsage(AttributeTargets.Class)]
-public sealed class PinToSiloAttribute(string label) : PlacementFilterAttribute(new PinToSiloStrategy(label))
-{
-    public string Label { get; } = label;
-}
-
 public sealed class PinToSiloStrategy : PlacementFilterStrategy
 {
     private const string LabelProperty = "label";
@@ -20,10 +14,6 @@ public sealed class PinToSiloStrategy : PlacementFilterStrategy
         : base(order: 0)
     {
     }
-
-    public PinToSiloStrategy(string label)
-        : base(order: 0)
-        => Label = label;
 
     public string Label { get; private set; } = string.Empty;
 

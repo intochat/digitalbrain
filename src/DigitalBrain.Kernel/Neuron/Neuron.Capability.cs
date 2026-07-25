@@ -1,35 +1,9 @@
-using System.Diagnostics;
 using DigitalBrain.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
-using Orleans.Serialization;
 
 namespace DigitalBrain.Kernel;
 
 public abstract partial class Neuron
 {
-    protected SynapseId CaptureCapabilityCausation(NeuronId expectedCaller)
-    {
-        var delivery = CurrentCapabilityRequestFrom(expectedCaller);
-
-        if (_capturedCapabilityCauses.ContainsKey(delivery.SynapseId.Value))
-        {
-            return delivery.SynapseId;
-        }
-
-        if (_capturedCapabilityCauses.Count >= MaximumCapturedCapabilityCauses)
-        {
-            throw new InvalidOperationException(
-                $"Neuron '{Id}' has reached its limit of {MaximumCapturedCapabilityCauses} unresolved captured capability causes. Complete a deferred reply before capturing another request.");
-        }
-
-        _capturedCapabilityCauses.Add(
-            delivery.SynapseId.Value,
-            _deliveries.SerializeToArray(delivery));
-
-        return delivery.SynapseId;
-    }
-
     protected void ValidateCapabilityCaller(NeuronId expectedCaller)
         => _ = CurrentCapabilityRequestFrom(expectedCaller);
 
@@ -46,55 +20,12 @@ public abstract partial class Neuron
         _turnRollbacks.Add(rollback);
     }
 
-    protected async Task ReplyAsync(SynapseId causation, Synapse synapse)
-    {
-        ArgumentNullException.ThrowIfNull(synapse);
-
-        var answered = RequireCapabilityCausation(causation);
-
-        if (_handling is not null)
-        {
-            _capturedCapabilityCauses.Remove(causation.Value);
-            await FireAsync(synapse, [answered.Caller], answered);
-
-            return;
-        }
-
-        var turn = BeginCapturedCapabilityReply(answered);
-
-        try
-        {
-            _capturedCapabilityCauses.Remove(causation.Value);
-            await FireAsync(synapse, [answered.Caller], answered);
-            await CompleteIncomingCapabilityRequestAsync(turn);
-        }
-        catch
-        {
-            FailIncomingCapabilityRequest(turn);
-
-            throw;
-        }
-    }
-
     protected Task<CapabilityDelegation> DelegateCapabilityAsync(
         GrainId delegateSource,
         NeuronId target,
         Type contract,
         string method)
         => DelegateCapabilityAsync(_handling, delegateSource, target, contract, method);
-
-    protected Task<CapabilityDelegation> DelegateCapabilityAsync(
-        SynapseId causation,
-        GrainId delegateSource,
-        NeuronId target,
-        Type contract,
-        string method)
-        => DelegateCapabilityAsync(
-            RequireCapabilityCausation(causation),
-            delegateSource,
-            target,
-            contract,
-            method);
 
     private async Task<CapabilityDelegation> DelegateCapabilityAsync(
         SynapseDelivery? causation,
@@ -169,24 +100,6 @@ public abstract partial class Neuron
         await NotifyWatchersAsync();
 
         return delegation;
-    }
-
-    private SynapseDelivery RequireCapabilityCausation(SynapseId causation)
-    {
-        var delivery = _capturedCapabilityCauses.TryGetValue(causation.Value, out var serialized)
-            ? _deliveries.Deserialize(serialized)
-            ?? throw new InvalidOperationException(
-                $"Neuron '{Id}' has no captured committed incoming capability request '{causation}'.")
-            : throw new InvalidOperationException(
-                $"Neuron '{Id}' has no captured committed incoming capability request '{causation}'.");
-
-        if (delivery.Synapse is not CapabilityRequested request || request.Target != Id)
-        {
-            throw new InvalidOperationException(
-                $"Incoming delivery '{causation}' is not a committed capability request targeting neuron '{Id}'.");
-        }
-
-        return delivery;
     }
 
     private SynapseDelivery CurrentCapabilityRequestFrom(NeuronId expectedCaller)
@@ -392,32 +305,6 @@ public abstract partial class Neuron
 
         AdvanceTurnCheckpoint();
         await NotifyWatchersAsync();
-    }
-
-    private CapabilityTurn BeginCapturedCapabilityReply(SynapseDelivery answered)
-    {
-        var turn = new CapabilityTurn(
-            _outbox.Count,
-            SnapshotCapturedCapabilityCauses(),
-            _outgoing.Checkpoint(),
-            [.. _turnRollbacks],
-            _handling,
-            _handlingDepth,
-            _turnCheckpoint);
-
-        _handling = answered;
-        _handlingDepth = DeliveryPolicy.InboundDepth();
-        _turnCheckpoint = new(
-            _outbox.Count,
-            _handled.Count,
-            InboundCommitted: true,
-            SnapshotCapturedCapabilityCauses(),
-            _incoming.Checkpoint(),
-            _outgoing.Checkpoint());
-        _firedWhileHandling.Clear();
-        _turnRollbacks.Clear();
-
-        return turn;
     }
 
     internal async Task<CapabilityTurn> BeginIncomingCapabilityRequestAsync(

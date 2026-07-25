@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
@@ -22,7 +21,6 @@ public abstract partial class Neuron :
     private const string CapturedCapabilityCausesName = "captured-capability-causes";
     private const int RememberedDeliveries = 4096;
     private const int MaximumRememberedDelegations = 32;
-    private const int MaximumCapturedCapabilityCauses = 32;
     private const int ProtectedConsumedDelegations = 1;
     private const int ProtectedTerminalDelegations = 1;
 
@@ -42,7 +40,6 @@ public abstract partial class Neuron :
     private readonly Serializer<OutboxEntry> _entries;
     private readonly Serializer<Synapse> _synapses;
     private readonly Serializer<CapabilityDelegationState> _delegationStates;
-    private readonly Serializer<SynapseDelivery> _deliveries;
     private SynapseDelivery? _handling;
     private int _handlingDepth;
     private TurnCheckpoint? _turnCheckpoint;
@@ -63,7 +60,6 @@ public abstract partial class Neuron :
         _entries = ServiceProvider.GetRequiredService<Serializer<OutboxEntry>>();
         _synapses = ServiceProvider.GetRequiredService<Serializer<Synapse>>();
         _delegationStates = ServiceProvider.GetRequiredService<Serializer<CapabilityDelegationState>>();
-        _deliveries = ServiceProvider.GetRequiredService<Serializer<SynapseDelivery>>();
         TimeProvider =
             ServiceProvider.GetKeyedService<TimeProvider>(NeuronTime.ServiceKey)
             ?? System.TimeProvider.System;

@@ -1,8 +1,5 @@
-using System.Diagnostics;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
-using Orleans.Serialization;
 
 namespace DigitalBrain.Kernel;
 
@@ -13,16 +10,6 @@ public abstract partial class Neuron
         ArgumentNullException.ThrowIfNull(synapse);
 
         return FireAsync(synapse, [receiver]);
-    }
-
-    protected Task ReplyAsync(Synapse synapse)
-    {
-        ArgumentNullException.ThrowIfNull(synapse);
-
-        var answered = _handling
-            ?? throw new InvalidOperationException($"{GetType().Name} has nothing to reply to: replies are only valid while handling a synapse.");
-
-        return FireAsync(synapse, [answered.Caller]);
     }
 
     protected async Task EmitAsync(Synapse synapse)
@@ -48,7 +35,7 @@ public abstract partial class Neuron
         await FireAsync(synapse, [.. receivers], correlation);
     }
 
-    internal Task<SynapseDelivery> FireAsync(
+    private Task<SynapseDelivery> FireAsync(
         Synapse synapse,
         NeuronId[] receivers,
         CorrelationId? correlation = null)
@@ -94,5 +81,4 @@ public abstract partial class Neuron
 
         return delivery;
     }
-
 }
