@@ -13,17 +13,17 @@ and `docs/architecture.md` is the plan of record.
 
 ## The gate
 
-`CLAUDE.md` §5 is the canonical gate, covering both the root command and the documentation site's
-`node`-based gate; run it at every phase and before any completion claim.
-
-Before a release, run the full suite across the solution in Release:
+`CLAUDE.md` §5 is the canonical gate. Run it at every phase and before any completion claim:
 
 ```powershell
-dotnet test .\DigitalBrain.slnx -c Release
+dotnet build DigitalBrain.slnx -c Release
+dotnet test .\DigitalBrain.slnx -c Release --logger "console;verbosity=minimal"
+npm --prefix docs test
+npm --prefix docs run build
 ```
 
-**Never narrow it with `--filter`** — a project-scoped run has already missed a failing contract
-that the root run caught.
+**Never narrow the root test with `--filter`** — a project-scoped run has already missed a failing
+contract that the root run caught.
 
 ## Three tiers of test
 

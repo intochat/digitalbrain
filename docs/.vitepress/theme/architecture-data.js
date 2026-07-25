@@ -39,7 +39,7 @@ export const MODULES = [
   },
   {
     id: 'time', label: 'Time', status: 'designed', section: '#_4-5-time',
-    role: 'Durable one-shot and recurring schedules, separate from the kernel-private outbox timers. Reuses the shared kernel reminder provider — it adds no store of its own.',
+    role: 'Built: durable one-shot ICountdown. Designed/unbuilt: IReminder and recurring calendar schedules. Separate from kernel-private outbox timers; reuses the shared kernel reminder provider.',
     neurons: ['ICountdown', 'IReminder'],
     synapses: ['CountdownElapsed', 'ReminderElapsed', 'ReminderOverdue'],
     mcp: false, ui: false, aspire: [],

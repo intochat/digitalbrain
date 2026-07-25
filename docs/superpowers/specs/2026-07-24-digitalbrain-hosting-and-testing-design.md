@@ -1,7 +1,10 @@
 # DigitalBrain hosting and testing design
 
 **Date:** 2026-07-24
-**Status:** approved design, not yet implemented
+**Status:** approved design. Hosting, compiled modules, L1/L2 testing, Quickstart, and
+`ICountdown` landed in tree; Behavior install rail and calendar Time remain designed/unbuilt.
+Gherkin Features were later retired (2026-07-25 cut) — see architecture-aligned mass deletion and
+authored `docs/specification.md`.
 
 DigitalBrain is an AI-native operating system. It ships ready-to-use neurons and synapses; users
 describe Behaviors in natural language and compose the typed vocabulary supplied by installed
@@ -212,8 +215,9 @@ L3  user interface surface; never the owner of domain truth
 
 L0 proves package boundaries, generated capsules, aliases, public API shape, and forbidden
 dependencies. L1 is the default for module semantics, durability, authorization, routing, clocks,
-and reminders. L2 is reserved for AppHost composition, real resource readiness, endpoints, and
-process restart.
+and reminders (including in-process silo restart via `TestNeuron.RestartHostAsync`). L2 is reserved
+for AppHost composition, real resource readiness, and HTTP endpoints — not product silo restart via
+AppHost resource commands.
 
 There is no fake in-process kernel. Neurons, routing, journals, reminders, filters, and module logic
 remain real at L1.
@@ -464,12 +468,12 @@ HostedResource silo = host.Resource("silo");
 
 await silo.WaitUntilHealthyAsync(TestContext.Current.CancellationToken);
 using HttpClient http = silo.CreateHttpClient();
-await silo.RestartAsync(TestContext.Current.CancellationToken);
 ```
 
 `DigitalBrainAppHostFixture<TAppHost>` serializes full AppHost ownership in-process.
 `RunningAppHost` is method-scoped and starts one graph. `HostedResource` binds one resource name once
-and then exposes its readiness, endpoints, logs, and supported lifecycle commands.
+and exposes readiness and HTTP client creation. AppHost resource-restart commands are not part of
+the public L2 product surface; silo restart proofs use L1.
 
 The public API does not expose `DistributedApplication`, a static exclusivity semaphore, default
 process-name lists, or raw resource-command strings. Cleanup tracks processes and resources created
@@ -480,7 +484,7 @@ as ready, start two full AppHosts concurrently, or inflate timeouts to hide miss
 
 ---
 
-## 15. Behavior and Gherkin
+## 15. Behavior (and retired Gherkin)
 
 `Behavior` is user-authored product vocabulary: one approved C# file that composes installed neurons
 and synapses. It is not a neuron, fixture, test context, or test-runner interface.
@@ -488,16 +492,11 @@ and synapses. It is not a neuron, fixture, test context, or test-runner interfac
 Ordinary test classes may naturally be named `MorningDigestBehaviorTests`, but the framework defines
 no `IBehavior`, `IBehaviorTest`, `BehaviorFixture`, or alternative Behavior runtime.
 
-Gherkin remains a first-class natural-language authoring surface over `TestBrain`:
-
-- a feature obtains one method-scoped `TestBrain`;
-- generated vocabulary maps natural-language neuron and synapse names to compiled types;
-- bindings call the same typed client, owner, neuron, observation, clock, and fault APIs as C# tests;
-- bindings contain no Orleans access, assembly scan, reflection catalog, or process-global state;
-- generation composes existing module vocabulary and cannot invent a neuron, synapse, or capability.
-
-This keeps natural-language Behavior descriptions close to executable proof without allowing
-Reqnroll steps to become a second DigitalBrain implementation.
+Natural-language Gherkin over `TestBrain` was part of this design and was later deleted with the
+ModuleDriver / Features surface. Executable product proof today is C# on the public L1/L2 testing
+APIs. A generated specification from author-facing scenarios may return only when those scenarios
+exist again as durable product vocabulary — not as a second DigitalBrain implementation inside step
+bindings.
 
 ---
 
@@ -607,7 +606,6 @@ The design is implemented only when:
 - every L1 method gets a unique owner namespace, controllable clock, closed faults, and structured
   evidence;
 - every L2 method owns exactly one exclusive AppHost graph and leaves no process/resource leak;
-- Gherkin bindings call only the public typed L1 surface;
 - repository searches find none of the required-deletion public APIs or reflection catalogs;
 - L0, L1, L2, documentation, package, Release build, and full solution tests pass from a clean
   checkout.

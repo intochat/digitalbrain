@@ -778,11 +778,12 @@ receives an isolated owner namespace, deterministic clock, closed durability fau
 committed-journal evidence, and always-on failure artifacts. `TestOwner` is the isolated owner
 identity, and `TestNeuron<T>` is its typed neuron handle.
 
-**L2** is reserved for AppHost composition, real resource `Healthy` state, HTTP endpoints,
-graph/process restart, and bounded cleanup and failure evidence. An assembly-owned
-`DigitalBrainAppHostFixture<TAppHost>` creates one method-scoped `RunningAppHost`. The package-internal
-lease is the only AppHost serialization owner; test projects do not add xUnit collections or global
-parallelization switches. Each test binds each runtime resource name once and keeps that handle:
+**L2** is reserved for AppHost composition, real resource `Healthy` state, HTTP endpoints, and
+bounded cleanup and failure evidence. Product silo restart is not an L2 resource-command path (see
+below). An assembly-owned `DigitalBrainAppHostFixture<TAppHost>` creates one method-scoped
+`RunningAppHost`. The package-internal lease is the only AppHost serialization owner; test projects
+do not add xUnit collections or global parallelization switches. Each test binds each runtime
+resource name once and keeps that handle:
 
 ```csharp
 await using var host = await fixture.StartAsync(cancellationToken);

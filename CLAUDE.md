@@ -200,10 +200,14 @@ and Quickstart families are built and proven. Time is built only through the dur
 scheduling, DST records, and recurrence-library selection remain designed or open and unbuilt.
 
 Behavior proposal, approval, installation, execution, and rollback also remain designed and unbuilt;
-there is no behavior execution framework or public behavior test interface. The approved architecture is frozen in
-`docs/superpowers/specs/2026-07-24-digitalbrain-hosting-and-testing-design.md`. Its executable
-four-stage order, linked red-green plans, and completion gates are in
-`docs/superpowers/plans/2026-07-24-digitalbrain-hosting-testing-program.md`.
+there is no behavior execution framework or public behavior test interface. The approved hosting and
+testing design is frozen in
+`docs/superpowers/specs/2026-07-24-digitalbrain-hosting-and-testing-design.md` (foundation
+implemented; Behavior rail and calendar Time still open). Direction for the 2026-07-25 non-product
+surface cut is in
+`docs/superpowers/specs/2026-07-25-architecture-aligned-mass-deletion.md`. Live module status and
+ratified rules live in `docs/architecture.md` — do not resurrect deleted stage plans or session
+checklists under `docs/superpowers/plans/`.
 
 One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
 That benchmark and the behavior proposal/install rail remain deliberately outside the built

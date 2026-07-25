@@ -30,7 +30,7 @@ designed.
 - **Namespaces and type names are architecture** — `DigitalBrain.AI.Ollama.ILlama32` is identity,
   not a lookup result from a model descriptor.
 - **Behaviors own logic** — single-file C# scripts carried as durable state by one registered grain
-  type. Adding a verb needs only approval.
+  type. Adding a verb needs only approval. Designed, not yet built.
 - **Capability is the contracts package a script compiles against**, enforced where it resolves one.
 - **Every install is a human-approved proposal**, journaled and reversible.
 
@@ -40,32 +40,32 @@ See the module status lines in [docs/architecture.md](docs/architecture.md) for 
 designed.
 
 [`docs/architecture.md`](docs/architecture.md) is the plan of record: ratified architecture, known
-limitations, and build order.
+limitations, and remaining build order.
 
 ## Repository shape
 
 ```text
 src/       domain-neutral framework packages
-modules/   independently shipped domains, beginning with AI
-hosts/     runnable silo, product AppHost, Quickstart host/AppHost, TestingAppHost
-samples/   package-only consumers proven against an empty package cache
-tests/     L0 contracts, L1 TestBrain proofs, L2 hosted AppHost proof
+modules/   independently shipped domains (AI, Tasks, Time, Google, Salesforce, …)
+hosts/     AppHost, silo, MCP, TestingAppHost, Quickstart hosts
+samples/   Quickstart and AccountEnrichment package consumers
+tests/     L0 contracts, L1 Testing/Quickstart/Time/Module, L2 HostTests
 docs/      VitePress documentation and the published specification
 ```
 
 Earlier prototype generations were retired to git history rather than kept on disk. Recover any of
-them with `git log --diff-filter=D -- sources/` and `git show <sha>^:<path>`.
+them with `git log --diff-filter=D --summary` and `git show <sha>^:<path>`.
 
 ## Gate
 
-Root gate (every phase, before any completion claim):
+The root gate, every phase, no exceptions:
 
 ```powershell
 dotnet build DigitalBrain.slnx -c Release
 dotnet test DigitalBrain.slnx -c Release --logger "console;verbosity=minimal"
 ```
 
-Never `--filter` on the root gate. Documentation site gate:
+Never `--filter` for the completion gate. The documentation gate:
 
 ```powershell
 npm --prefix docs test
