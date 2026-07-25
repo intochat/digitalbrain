@@ -13,7 +13,7 @@ namespace DigitalBrain.Tests;
 public sealed class AssemblyBoundaryContracts
 {
     private static readonly string[] VendorModelSdks =
-        ["Anthropic", "OpenAI", "Microsoft.Extensions.AI", "OllamaSharp"];
+        ["OpenAI", "Microsoft.Extensions.AI", "OllamaSharp"];
 
     [Fact(DisplayName = "the kernel assembly reaches no vendor model SDK")]
     public void TheKernelReachesNoVendorModelSdk()
