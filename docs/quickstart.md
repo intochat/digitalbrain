@@ -6,7 +6,7 @@ title: Quickstart
 
 Status: Built
 
-The quickstart keeps public vocabulary, compiled behavior, hosting, and testing in separate projects. Consumers reference the contracts package; hosts compile the runtime module; Aspire owns the infrastructure topology.
+The quickstart keeps public vocabulary, compiled module runtime, hosting, and testing in separate projects. Consumers reference the contracts package; hosts compile the runtime module; Aspire owns the infrastructure topology. This is ordinary compiled C# — not a product Behavior install.
 
 ## 1. Define leaf contracts
 
@@ -32,7 +32,7 @@ public sealed record Greeted(
 
 Synapses are durable facts, so every synapse type has an explicit, stable string alias. If a neuron contract gains semantic methods, use domain names without an `Async` suffix and add `[Alias(nameof(Method))]`. Infrastructure lifecycle APIs keep their `Async` suffixes.
 
-## 2. Compile the module behavior
+## 2. Compile the module runtime
 
 The packable `DigitalBrain.Quickstart` runtime declares a partial `QuickstartModule` and keeps its `Greeter` handler internal:
 
@@ -63,7 +63,7 @@ internal sealed class Greeter :
 }
 ```
 
-The source generator discovers the internal handler and emits the module capsule. Application projects select that capsule instead of reconstructing its behavior or infrastructure.
+The source generator discovers the internal handler and emits the module capsule. Application projects select that capsule instead of reconstructing its handlers or infrastructure.
 
 ## 3. Host it with one Aspire composition call
 
@@ -94,7 +94,7 @@ aspire start --apphost hosts/DigitalBrain.Quickstart.AppHost
 
 The compiled host exposes `/health`.
 
-## 4. Prove behavior and durability
+## 4. Prove durability
 
 Tests subclass `DigitalBrainFixture`, select the same compiled capsule once, and interact through the production client:
 
@@ -109,7 +109,7 @@ public sealed class QuickstartFixture : DigitalBrainFixture
 }
 ```
 
-The behavior test sends a typed fact, observes the emitted fact, calls `RestartHostAsync`, then uses `ReadAsync<Greeted>` to prove the same journal record survives its hosting silo restart:
+The L1 test sends a typed fact, observes the emitted fact, calls `RestartHostAsync`, then uses `ReadAsync<Greeted>` to prove the same journal record survives its hosting silo restart:
 
 ```csharp
 await using var test = await fixture.CreateBrainAsync(cancellationToken);

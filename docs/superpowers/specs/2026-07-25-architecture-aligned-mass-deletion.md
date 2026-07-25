@@ -1,13 +1,13 @@
 # Architecture-aligned mass deletion (2026-07-25)
 
-Direction cut: delete non-product surface, leave a pseudocode-shaped spine. Durable decisions only —
-implementation checklists and session progress tables were discarded after the cut landed.
+Direction cut: delete non-product surface; keep the pseudocode-shaped spine. Durable decisions only.
 
 ## Non-negotiable: modules ship
 
-**Do not delete module families.** AI, Tasks, Time, Google, Salesforce, and Quickstart are
+**Do not delete module families.** AI, Tasks, Time, Google, Salesforce, Flutter, and Quickstart are
 out-of-the-box product vocabulary. Packages under `modules/` and `samples/DigitalBrain.Quickstart*`
-stay in the solution.
+stay in the solution. Pre-rail OS compositions under `samples/DigitalBrain.Compositions` and the
+AccountEnrichment sample stay as samples — not installed Behaviors.
 
 Allowed against modules:
 
@@ -20,8 +20,8 @@ Forbidden:
 - removing a module package, contracts package, or AppHost `AddModule` path because "tests don't
   prove it" or "implementation is bad"
 - treating an unproven module as trash for deletion of the product surface
-- deleting `samples/DigitalBrain.AccountEnrichment` — multi-module behavior example (rewrite thin
-  composition; keep the sample)
+- deleting `samples/DigitalBrain.AccountEnrichment` — multi-module process sample (keep the sample;
+  rewrite thin if needed)
 
 Authority: `docs/architecture.md`, hosting/testing design 2026-07-24, `CLAUDE.md` oracles.
 
@@ -64,7 +64,7 @@ await test.Client.SendAsync<IGreeter>("welcome", new SayHello("Ada"));
 var fact = await g.Outgoing.NextAsync<Greeted>(ct);
 await g.RestartHostAsync(ct);
 
-// Time — reminder-primary Countdown only
+// Time — built ICountdown only (Orleans reminder is wake authority, not public IReminder)
 var c = test.Client.Get<ICountdown>("t1");
 await c.Start(new StartCountdown(CommandId.New(), TimeSpan.FromHours(1), dest));
 await test.Clock.AdvanceAsync(TimeSpan.FromHours(1), ct);
@@ -77,3 +77,4 @@ No public Simulation/Scenario/AddBrain/storage profile. No second probe host.
 
 `docs/specification.md` is authored markdown listing the retained test tiers. Restore a generator
 from durable author-facing scenarios only when those scenarios exist again as product vocabulary.
+Do not invent Behavior execution or calendar `IReminder` product APIs to force that generator.

@@ -489,10 +489,10 @@ hands back the receipt, and nothing in this module contacts a Task — it could 
 is out of reach by construction. The decision belongs to whoever read the receipt, and the
 caller that cannot prove completion must refuse to invent success — treat any non-`Completed`
 receipt as failure or uncertainty, never as a silent retry of the mutation. The opt-in sample
-`DigitalBrain.AccountEnrichment` is the multi-module behavior example: `IAccountEnrichment` +
-`EnrichmentModule` (select with `AddModule<EnrichmentModule>()` on a silo that also selects Google
-and Salesforce). Flow: Gmail read → Salesforce propose → human approval → completed enrichment
-fact; it refuses any non-`Completed` mutation receipt.
+`DigitalBrain.AccountEnrichment` is the multi-module process sample (compiled neuron, not a product
+Behavior): `IAccountEnrichment` + `EnrichmentModule` (select with `AddModule<EnrichmentModule>()` on a
+silo that also selects Google and Salesforce). Flow: Gmail read → Salesforce propose → human approval
+→ completed enrichment fact; it refuses any non-`Completed` mutation receipt.
 
 Ratified but not built: parking the owning Task on an `OutcomeUncertain` blocker rather than letting
 the uncertainty surface as a caller-side exception. `AttemptOutcomeUncertain` has no producer under

@@ -107,8 +107,7 @@ Aliases have three different compatibility roles:
 - **Persisted facts, state, and protocol payloads** keep explicit stable aliases. Renaming a CLR type
   must not silently rename durable data that an older silo wrote.
 
-The migration is one intentional alpha break. Old `*Async` neuron aliases and duplicate compatibility
-surfaces are deleted rather than maintained indefinitely.
+Old `*Async` neuron aliases and duplicate compatibility surfaces stay deleted rather than maintained.
 
 ---
 
@@ -531,9 +530,9 @@ payloads.
 
 ---
 
-## 17. Required deletion
+## 17. Must not return
 
-The migration is complete only when the old paths are gone, not wrapped:
+These public paths stay deleted (not wrapped):
 
 - public `Simulation`, `Simulations`, `Scenario`, and `SimulationCluster`;
 - public `ScenarioClock`, `ScenarioStages`, and Scenario-named diagnostics;
@@ -548,7 +547,7 @@ The migration is complete only when the old paths are gone, not wrapped:
 - public storage-profile selection and incomplete memory durability;
 - runtime module scanning and string module manifests;
 - neuron contract method names and aliases ending in `Async`;
-- compatibility shims whose only consumer is the pre-migration repository.
+- compatibility shims whose only consumer is a retired surface.
 
 Content strings, diagnostic prose, local logical-owner labels, and runtime resource/instance names
 remain valid. Coordination identities must be typed, generated, or owned once at the external
@@ -556,26 +555,22 @@ boundary.
 
 ---
 
-## 18. First external proof
+## 18. External author shape
 
-Quickstart is the first hard acceptance proof and must look like a third-party module:
+Quickstart is the third-party-shaped module pattern:
 
-1. A Contracts package contains only neuron interfaces and synapses.
-2. A runtime package contains the module marker and neuron implementations.
-3. Aspire composition uses `AddDigitalBrain("quickstart")` and selects the module explicitly.
-4. The compiled host references the runtime and generated catalog.
-5. L0 proves package boundaries, aliases, capsule generation, and the public surface.
-6. L1 uses only `DigitalBrain.Testing` public APIs to prove a typed command, emitted fact, durable
-   journal evidence, and survival across hosting-silo restart.
-7. No manual localhost silo, raw `NeuronId`, raw grain factory, empty hosting package, or test-only
-   static probe remains.
+1. Contracts package: neuron interfaces and synapses only.
+2. Runtime package: module marker and neuron implementations.
+3. Aspire: `AddDigitalBrain("quickstart")` plus explicit `AddModule`.
+4. Compiled host references the runtime and generated catalog.
+5. L0 package/alias/capsule surface; L1 only `DigitalBrain.Testing` for command, fact, journal, and
+   hosting-silo restart.
+6. No manual localhost silo, raw `NeuronId`, raw grain factory, empty hosting package, or test-only
+   static probe.
 
-After that authoring seam is proven, the next module slice is Time's already-settled
-`ICountdown` capability. Open calendar scheduling shapes remain out of scope until their semantics
-are separately designed.
-
-The same authoring and testing pattern then deepens AI, Tasks, Salesforce, and Gmail/Google without
-moving their vocabulary into the kernel.
+Time's built surface is `ICountdown` only. Calendar/`IReminder` stay designed until semantics are
+approved. AI, Tasks, Salesforce, Google, and Flutter deepen the same authoring and testing pattern
+without moving vocabulary into the kernel.
 
 ---
 
@@ -588,24 +583,9 @@ moving their vocabulary into the kernel.
 - No replacement for xUnit lifecycle abstractions.
 - No parallel L1 methods while clock and topology are assembly-shared.
 - No substitution of internal neurons or durability mechanics.
-- No Behavior runtime implementation as part of the testing refactor.
-- No broad Time/calendar design beyond `ICountdown`.
-- No compatibility layer for the alpha Simulation/Scenario API.
+- No Behavior runtime, `IBehavior`, or `IBehaviorTest` as part of hosting/testing.
+- No broad Time/calendar product surface beyond `ICountdown`.
+- No compatibility layer for the retired Simulation/Scenario API.
 
----
-
-## 20. Acceptance
-
-The design is implemented only when:
-
-- a third-party-shaped Quickstart module composes, hosts, and tests through the intended public
-  packages;
-- AppHost contains no caller-visible storage setup;
-- a module test references neither Orleans nor Aspire;
-- the same generated module capsule drives AppHost, silo, and L1 test composition;
-- every L1 method gets a unique owner namespace, controllable clock, closed faults, and structured
-  evidence;
-- every L2 method owns exactly one exclusive AppHost graph and leaves no process/resource leak;
-- repository searches find none of the required-deletion public APIs or reflection catalogs;
-- L0, L1, L2, documentation, package, Release build, and full solution tests pass from a clean
-  checkout.
+Foundation status: hosting, compiled modules, L1/L2 testing, Quickstart, and `ICountdown` are in
+tree. Behavior install rail and calendar Time remain designed/unbuilt.
