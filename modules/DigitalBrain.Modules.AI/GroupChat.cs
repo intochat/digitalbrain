@@ -1,23 +1,19 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
-using DigitalBrain.Security;
 using DigitalBrain.Tasks;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
 
 namespace DigitalBrain.AI;
 
 public abstract class GroupChat : Neuron, IGroupChat
 {
-    private const string StateName = "ai.group-chat.session";
     private readonly DirectAgentSession _directSession;
 
     protected GroupChat()
     {
-        _directSession = new DirectAgentSession(
-            ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName),
-            ServiceProvider.GetRequiredService<IDurablePayloadProtector>(),
+        _directSession = DirectAgentSession.Create(
+            ServiceProvider,
+            "ai.group-chat.session",
             () => WriteStateAsync(),
             Id);
     }
@@ -28,14 +24,15 @@ public abstract class GroupChat : Neuron, IGroupChat
         where TNeuron : INeuron
         => new(NeuronId.For<TNeuron>(Id.Owner, name ?? Id.Name));
 
-    public async Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages)
+    public Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages)
     {
         ArgumentNullException.ThrowIfNull(messages);
 
         var snapshot = DirectOrchestrationShape.Snapshot(Id, Participants);
         var shape = DirectOrchestrationShape.CreateGroupChat(GetType(), snapshot);
         var agent = shape.CreateAgent(GrainFactory, TaskScheduler.Current);
-        return await _directSession.RunAsync(
+
+        return _directSession.RunAsync(
             agent,
             shape.Definition,
             messages,

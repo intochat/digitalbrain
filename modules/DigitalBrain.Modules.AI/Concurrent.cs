@@ -1,10 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
-using DigitalBrain.Security;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
 
 namespace DigitalBrain.AI;
 
@@ -14,14 +11,13 @@ namespace DigitalBrain.AI;
     Justification = "Concurrent is the ratified public orchestration vocabulary.")]
 public abstract class Concurrent : Neuron, IAgent
 {
-    private const string StateName = "ai.concurrent.session";
     private readonly DirectAgentSession _directSession;
 
     protected Concurrent()
     {
-        _directSession = new DirectAgentSession(
-            ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName),
-            ServiceProvider.GetRequiredService<IDurablePayloadProtector>(),
+        _directSession = DirectAgentSession.Create(
+            ServiceProvider,
+            "ai.concurrent.session",
             () => WriteStateAsync(),
             Id);
     }
@@ -32,7 +28,7 @@ public abstract class Concurrent : Neuron, IAgent
         where TNeuron : INeuron
         => new(NeuronId.For<TNeuron>(Id.Owner, name ?? Id.Name));
 
-    public async Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages)
+    public Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages)
     {
         ArgumentNullException.ThrowIfNull(messages);
 
@@ -40,7 +36,7 @@ public abstract class Concurrent : Neuron, IAgent
         var shape = DirectOrchestrationShape.CreateConcurrent(GetType(), snapshot);
         var agent = shape.CreateAgent(GrainFactory, TaskScheduler.Current);
 
-        return await _directSession.RunAsync(
+        return _directSession.RunAsync(
             agent,
             shape.Definition,
             messages,

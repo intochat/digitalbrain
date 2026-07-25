@@ -5,6 +5,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Security;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
 namespace DigitalBrain.AI;
@@ -17,6 +18,23 @@ internal sealed class DirectAgentSession(
 {
     private const int CurrentEnvelopeVersion = 2;
     private const string ProtectionPurpose = "DigitalBrain.AI.DirectAgentSession.v2";
+
+    internal static DirectAgentSession Create(
+        IServiceProvider services,
+        string stateName,
+        Func<ValueTask> commit,
+        NeuronId neuron)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(stateName);
+        ArgumentNullException.ThrowIfNull(commit);
+
+        return new(
+            services.GetRequiredKeyedService<IDurableValue<byte[]>>(stateName),
+            services.GetRequiredService<IDurablePayloadProtector>(),
+            commit,
+            neuron);
+    }
 
     internal async Task<ChatResponse> RunAsync(
         AIAgent agent,
