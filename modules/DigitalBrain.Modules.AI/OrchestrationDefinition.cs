@@ -21,36 +21,6 @@ internal sealed record OrchestrationDefinition(string Fingerprint)
 
     internal string HostName => $"orchestration_{Fingerprint}";
 
-    private static OrchestrationDefinition Create(
-        string orchestrationType,
-        string mafVersion,
-        DirectOrchestrationIdentity identity,
-        OrchestrationParticipant[] participants,
-        string applicationVersion)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(orchestrationType);
-        ArgumentException.ThrowIfNullOrWhiteSpace(mafVersion);
-        ArgumentNullException.ThrowIfNull(identity);
-        ArgumentNullException.ThrowIfNull(participants);
-        ArgumentException.ThrowIfNullOrWhiteSpace(applicationVersion);
-
-        var source = new FingerprintSource(
-            CurrentFormatVersion,
-            identity.KindName,
-            orchestrationType,
-            applicationVersion,
-            mafVersion,
-            identity.ExecutionEnvironmentName,
-            identity.ManagerName(participants.Length),
-            identity.AggregatorName,
-            "fingerprint-v2",
-            participants);
-        var fingerprint = Convert.ToHexStringLower(
-            SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(source)));
-
-        return new(fingerprint);
-    }
-
     internal static void RequireMatch(
         OrchestrationDefinition stored,
         OrchestrationDefinition current)
@@ -69,17 +39,27 @@ internal sealed record OrchestrationDefinition(string Fingerprint)
         Type orchestrationType,
         IReadOnlyList<Participant> participants,
         DirectOrchestrationIdentity identity)
-        => Create(
-            orchestrationType.AssemblyQualifiedName
-                ?? throw new InvalidOperationException("The orchestration type has no assembly-qualified identity."),
-            MafAssemblyIdentity(),
-            identity,
-            [.. participants.Select(MafParticipantAdapter.Describe)],
-            AssemblyIdentity(orchestrationType.Assembly, requireVersion: true));
+    {
+        var orchestrationTypeName = orchestrationType.AssemblyQualifiedName
+            ?? throw new InvalidOperationException("The orchestration type has no assembly-qualified identity.");
+        OrchestrationParticipant[] described =
+            [.. participants.Select(MafParticipantAdapter.Describe)];
+        var source = new FingerprintSource(
+            CurrentFormatVersion,
+            identity.KindName,
+            orchestrationTypeName,
+            AssemblyIdentity(orchestrationType.Assembly, requireVersion: true),
+            $"{AssemblyIdentity(typeof(AIAgent).Assembly, requireVersion: false)};{AssemblyIdentity(typeof(AgentWorkflowBuilder).Assembly, requireVersion: false)}",
+            identity.ExecutionEnvironmentName,
+            identity.ManagerName(described.Length),
+            identity.AggregatorName,
+            "fingerprint-v2",
+            described);
+        var fingerprint = Convert.ToHexStringLower(
+            SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(source)));
 
-
-    private static string MafAssemblyIdentity()
-        => $"{AssemblyIdentity(typeof(AIAgent).Assembly, requireVersion: false)};{AssemblyIdentity(typeof(AgentWorkflowBuilder).Assembly, requireVersion: false)}";
+        return new(fingerprint);
+    }
 
     private static string AssemblyIdentity(Assembly assembly, bool requireVersion)
     {
