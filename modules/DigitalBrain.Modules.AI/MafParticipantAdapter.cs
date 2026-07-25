@@ -61,14 +61,9 @@ internal static class MafParticipantAdapter
         Validate(typeof(TNeuron));
 
         var participant = grains.GetGrain<TNeuron>(id.ToGrainId());
-        var options = Options(typeof(TNeuron), id);
-
-        return participant switch
-        {
-            ILLM model => new ChatClientAgent(new NeuronChatClient(model, turnScheduler), options),
-            IAgent agent => new ChatClientAgent(new NeuronChatClient(agent, turnScheduler), options),
-            _ => throw Unsupported(typeof(TNeuron)),
-        };
+        return new ChatClientAgent(
+            new NeuronChatClient(participant, turnScheduler),
+            Options(typeof(TNeuron), id));
     }
 
     private static ChatClientAgentOptions Options(Type contract, NeuronId id)
