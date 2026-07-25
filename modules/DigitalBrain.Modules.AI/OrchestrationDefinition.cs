@@ -17,8 +17,6 @@ internal sealed record OrchestrationDefinition(string Fingerprint)
 
     internal string HostId => $"dba_{Fingerprint}";
 
-    internal string HostName => $"orchestration_{Fingerprint}";
-
     internal static OrchestrationDefinition Describe(
         Type orchestrationType,
         IReadOnlyList<Participant> participants,

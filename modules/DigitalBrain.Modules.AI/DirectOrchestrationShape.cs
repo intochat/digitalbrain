@@ -120,7 +120,6 @@ internal sealed class DirectOrchestrationShape
 
         return _buildWorkflow(agents).AsAIAgent(
             id: Definition.HostId,
-            name: Definition.HostName,
             executionEnvironment: _executionEnvironment);
     }
 }

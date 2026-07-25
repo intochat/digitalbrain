@@ -17,7 +17,7 @@ internal sealed class DirectAgentSession(
     NeuronId neuron)
 {
     private const int CurrentEnvelopeVersion = 2;
-    private const string ProtectionPurpose = "DigitalBrain.AI.DirectAgentSession.v2";
+    private const string ProtectionPurposeRoot = "DigitalBrain.AI.DirectAgentSession";
 
     internal static DirectAgentSession Create(
         IServiceProvider services,
@@ -136,7 +136,7 @@ internal sealed class DirectAgentSession(
     }
 
     private string Purpose(string definitionFingerprint)
-        => $"{ProtectionPurpose}\n{neuron}\n{definitionFingerprint}";
+        => $"{ProtectionPurposeRoot}.v{CurrentEnvelopeVersion}\n{neuron}\n{definitionFingerprint}";
 
     private static InvalidOperationException RecoveryRequired(Exception? failure = null)
         => new(
