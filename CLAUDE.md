@@ -206,8 +206,10 @@ multi-principal IdP edge, and product journal observation on `IDigitalBrain` rem
 re-open Built Windows chrome as Designed.
 
 Behavior proposal, approval, installation, execution, and rollback also remain designed and unbuilt;
-there is no behavior execution framework or public behavior test interface. The approved hosting and
-testing design is frozen in
+there is no behavior execution framework or public behavior test interface. Pre-rail OS activation
+(`DigitalBrainActivated` in Abstractions; pull compositions such as `ActivateDigitalBrain` /
+`BootOnActivation`) may be Built samples/L1 — still not installed Behaviors and not the install rail.
+The approved hosting and testing design is frozen in
 `docs/superpowers/specs/2026-07-24-digitalbrain-hosting-and-testing-design.md` (foundation
 implemented; Behavior rail and calendar Time still open). Direction for the 2026-07-25 non-product
 surface cut is in

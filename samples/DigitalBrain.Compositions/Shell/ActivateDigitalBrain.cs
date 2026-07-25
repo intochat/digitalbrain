@@ -1,18 +1,17 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 
 namespace DigitalBrain.Shell;
 
-public sealed class PostAuthBootstrap
+public sealed class ActivateDigitalBrain
 {
-    public async Task RunAsync(
+    public Task RunAsync(
         IDigitalBrain brain,
-        string shellName,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(brain);
-        ArgumentException.ThrowIfNullOrWhiteSpace(shellName);
         cancellationToken.ThrowIfCancellationRequested();
 
-        await new OpenHome().RunAsync(brain, shellName, cancellationToken);
+        return brain.EmitAsync(new DigitalBrainActivated(brain.Owner));
     }
 }

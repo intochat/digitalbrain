@@ -733,11 +733,13 @@ Flutter / Dart host  ──HTTP/JSON (+ SSE watch)──►  hosts/DigitalBrain.
   **Headless**. **No Auto.** Production AppHost composes the surface via module selection.
   Proof tier for this bullet is **L0 projection pins**, not live resource Healthy.
 - **Built (OS compositions, pre-Behavior rail):** `samples/DigitalBrain.Compositions` —
-  shell-only `OpenHome` / `PostAuthBootstrap` / `NavigateShell`; multi-module surfaces
-  `CountdownSurface` (Flutter+Time) and `AiPaneSurface` (Flutter+AI); OS-scene-only
-  `AccountEnrichmentSurface` (opens enrichment scene — does not run Gmail→Salesforce). Contracts
-  only; L1 journal proofs. Multi-module enrichment process remains Integrations L1
-  (`IAccountEnrichment`); OS scene journals carry no secrets.
+  shell/OS-boot `ActivateDigitalBrain` / `BootOnActivation` / `OpenHome` /
+  `PostAuthBootstrap` / `NavigateShell`; multi-module surfaces `CountdownSurface`
+  (Flutter+Time) and `AiPaneSurface` (Flutter+AI); OS-scene-only `AccountEnrichmentSurface`
+  (opens enrichment scene — does not run Gmail→Salesforce). Contracts + Abstractions activation
+  fact only; L1 journal proofs in `DigitalBrain.Compositions.Tests` (including activation →
+  home). Multi-module enrichment process remains Integrations L1 (`IAccountEnrichment`); OS
+  scene journals carry no secrets. Pre-rail compositions are **not** installed Behaviors.
 - **Designed:** full product chrome beyond the key/title shell; production IdP principal→owner bind;
   product journal observation on `IDigitalBrain` when a non-UI consumer needs the same cursor/watch;
   optional upgrade from edge journal poll to grain `WatchNeuron` push without changing the HTTP event
@@ -907,10 +909,13 @@ project synapse journals, but it may never reconstruct truth by scraping traces.
 
 Status: Designed
 
-Behavior proposal, approval, installation, execution, and rollback are unbuilt. No `IBehavior`,
-`IBehaviorTest`, behavior runner, or behavior execution framework exists. Those names are not
-ratified implementation contracts. The intended rail composes existing typed vocabulary without
-inventing public neuron contracts or Orleans grain types at runtime.
+Behavior proposal, approval, installation, execution, and rollback remain **Designed, unbuilt**.
+No `IBehavior`, `IBehaviorTest`, behavior runner, or behavior execution framework exists. Those
+names are not ratified implementation contracts. The intended rail composes existing typed
+vocabulary without inventing public neuron contracts or Orleans grain types at runtime.
+
+What *is* Built today is the pre-rail activation → shell-home product chain under ordinary C#
+compositions and one Abstractions fact — **not** the install rail (see OS composition below).
 
 The design calls for one public `Behavior` class per proposed file; namespace plus class name is its
 identity, and a replacement is the same identity at a new approved revision. That keeps a single
@@ -936,21 +941,46 @@ control, review, and a rebuild.
 
 ### OS composition before the rail
 
-Shell policy, post-auth UX orchestration, and OS surface “apps” are **logic over vocabulary**. Until
-the rail ships they live as ordinary C# under `samples/DigitalBrain.Compositions`, one public sealed
-class per file, identity = namespace + class name (the future Behavior identity). Bodies use only
-`IDigitalBrain` + selected `*.Contracts` + approved BCL + Microsoft.Extensions.AI message types where
-AI compositions need them — the future compiler allowlist. They are pull-invoked by tests today (not
-installed into the production silo and not wired as host startup); they are not Behaviors and must
-not introduce `IBehavior` product APIs.
+Shell policy, post-auth UX orchestration, activation boot, and OS surface “apps” are **logic over
+vocabulary**. Until the rail ships they live as ordinary C# under `samples/DigitalBrain.Compositions`,
+one public sealed class per file, identity = namespace + class name (the future Behavior identity).
+Bodies use only `IDigitalBrain` + selected `*.Contracts` + approved BCL + Microsoft.Extensions.AI
+message types where AI compositions need them — the future compiler allowlist. They are pull-invoked
+by tests today (not installed into the production silo and not wired as host startup); they are not Behaviors
+and must not introduce `IBehavior` product APIs.
+
+**Activation → first screen (Built pre-rail L1; install rail still Designed):**
+
+```text
+ActivateDigitalBrain.RunAsync(brain)
+  → EmitAsync(DigitalBrainActivated(Owner))     // Abstractions synapse, db.digitalbrain-activated
+  → BootOnActivation.RunAsync(brain, shell, …)  // pre-rail pull-invoke (not IHandle rail)
+    → OpenHome → IShell.Open(OpenScene home/Home)
+      → SceneOpened                             // Flutter vocabulary; Ui SSE projects this only
+```
+
+- **`DigitalBrainActivated`** — Built substrate synapse in `DigitalBrain.Abstractions`
+  (`[Alias("db.digitalbrain-activated")]`, `OwnerId Owner` only). Not Flutter vocabulary; not a
+  compositions-local type; not Kernel domain knowledge.
+- **`ActivateDigitalBrain`** — pre-rail emitter composition (`brain.EmitAsync(new
+  DigitalBrainActivated(brain.Owner))`). Not `Connect`, not session first-touch auto-emit, not Ui
+  HTTP bind, not AppHost/`Program.cs`, not module capsule `ICompiledModule.Activate`.
+- **`BootOnActivation`** — pre-rail reactor composition; composes `OpenHome` (first screen
+  `SceneKey` `"home"` / `Title` `"Home"`). Separate product sentence from the emitter.
+- **Flutter** still consumes **`SceneOpened` only** (SSE `scene-opened`). It does not know or
+  subscribe to `DigitalBrainActivated`.
+- **L1 proof:** `DigitalBrain.Compositions.Tests` journals `DigitalBrainActivated` then home
+  `SceneOpened` via the pull-invoked chain above. That is **not** product AppHost OS Healthy, not
+  installed Behaviors, and not live `aspire start` topology.
 
 Honesty split (do not blur):
 
-- **Shell-only:** `OpenHome`, `PostAuthBootstrap`, `NavigateShell` — Flutter `IShell` scenes only.
+- **Shell / OS boot:** `ActivateDigitalBrain`, `BootOnActivation`, `OpenHome`, `PostAuthBootstrap`,
+  `NavigateShell` — activation uses Abstractions + `EmitAsync`; open/nav use Flutter `IShell` scenes.
 - **Multi-module surfaces:** `CountdownSurface` (Flutter + `ICountdown`), `AiPaneSurface` (Flutter +
   `ILlama32`). Compose existing vocabulary; no new durable process type.
-- **OS-scene-only surface:** `AccountEnrichmentSurface` opens the enrichment scene. It is **not** the
-  Gmail→Salesforce enrichment process and not an approval rail.
+- **OS-scene-only surface:** `AccountEnrichmentSurface` opens the enrichment scene. It is **not** the Gmail→Salesforce
+  enrichment process and not an approval rail.
 
 Do not confuse this with `samples/DigitalBrain.AccountEnrichment`: that sample is a **compiled
 process neuron** (durable multi-module vocabulary, Integrations L1). Flows that need new durable

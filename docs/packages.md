@@ -11,7 +11,7 @@ for what ships and what each package may depend on.
 | Package | Contains | Depends on |
 | --- | --- | --- |
 | `DigitalBrain` | Consumer metapackage (no assembly; never Kernel or modules) | Abstractions, Client, Aspire |
-| `DigitalBrain.Abstractions` | Leaf neuron and synapse contracts; Orleans grain bases deliberate (`INeuron`/`IJournalObserver`) | Microsoft.Orleans.Sdk |
+| `DigitalBrain.Abstractions` | Leaf neuron and synapse contracts (incl. substrate `DigitalBrainActivated` / `db.digitalbrain-activated`); Orleans grain bases deliberate (`INeuron`/`IJournalObserver`) | Microsoft.Orleans.Sdk |
 | `DigitalBrain.Kernel` | Domain-neutral silo runtime | Abstractions |
 | `DigitalBrain.Client` | Owner-bound `IDigitalBrain` facade (`Get`/`Send`/`Emit` only; no product journal watch) | Abstractions, Microsoft.Orleans.Client |
 | `DigitalBrain.Testing` | Development-only real multi-silo `DigitalBrainFixture`, method-scoped `TestBrain`, scripted MCP test edges, and assembly-owned `DigitalBrainAppHostFixture<TAppHost>` with method-scoped `RunningAppHost` | Kernel, Client, Integrations.Mcp |
@@ -49,7 +49,7 @@ for what ships and what each package may depend on.
 | Salesforce | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` propose / reject / approve→Completed on scripted MCP edge | Built |
 | Flutter | yes | yes | yes (OS surface) | L0 golden + namespace/boundary pins + hosting **projection** contracts; L1 journals in `DigitalBrain.Flutter.Tests`; L1 HTTP edge + SSE shell events in `DigitalBrain.Ui.Tests`; pure-Dart **Headless** host + nested **Desktop** Windows chrome (`clients/digitalbrain_flutter` + `shell/lib/main.dart`/`shell/windows/`); explicit `WithFlutterHost()` = Desktop vs `WithFlutterHost<HeadlessHost>()` (**no Auto**); module hosting **projects** Ui/host when `WithUiEdge` / `WithFlutterHost` selected (graph shape, not live Healthy) | Built (vocabulary + C# UI edge + SSE + `Flutter.Aspire.Hosting` projection + pure-Dart Headless + nested Desktop `shell/` chrome — L0/L1); Designed (full product chrome, multi-principal IdP edge, product journal observation); **residual unproven:** product AppHost OS-surface Healthy / live `aspire start` topology — **not** Built-live |
 | AccountEnrichment (sample) | non-NuGet sample | non-NuGet sample | no | L0 shape + module registration; L1 multi-module composition in Integrations.Tests (Gmail→propose→session approval→AccountEnriched) | Built (opt-in sample under `samples/`; not a shipped package) |
-| Compositions (sample) | no (consumes contracts) | no | no | `DigitalBrain.Compositions.Tests` L1 shell/countdown/AI pane compositions | Built (pre-rail logic under `samples/`; not NuGet; not installed Behaviors) |
+| Compositions (sample) | no (consumes contracts + Abstractions activation fact) | no | no | `DigitalBrain.Compositions.Tests` L1 shell/activation-boot/countdown/AI pane compositions | Built (pre-rail logic under `samples/`; not NuGet; not installed Behaviors) |
 
 Quickstart, Tasks, and Time have no module `Aspire.Hosting` package because they need no
 module-specific AppHost resources. AI, Google, Salesforce, and **Flutter (OS surface)** do.
@@ -65,8 +65,9 @@ pure-Dart `digitalbrain_wire` + `digitalbrain_flutter` (edge/SSE/projection + he
 `clients/digitalbrain_flutter/shell/` (`shell/lib/main.dart` + `shell/windows/`, depends on the
 pure-Dart package) — not a packable module, not under `modules/`, and not an Orleans silo. Live
 product AppHost Healthy for Ui/Flutter host remains residual — do not read this packaging as
-Built-live. Behavior install rail and calendar Time beyond Countdown are Designed elsewhere, not
-implied Built by this table.
+Built-live. Pre-rail activation vocabulary (`DigitalBrainActivated` in `DigitalBrain.Abstractions`)
+and pull compositions may be Built samples/L1 without making the Behavior **install rail** Built.
+Calendar Time beyond Countdown stays Designed elsewhere, not implied Built by this table.
 
 ## Not NuGet packages
 
@@ -76,7 +77,7 @@ These trees are real in-repo (and proven at their listed L0/L1 tiers where tests
 
 | Tree | Role |
 | --- | --- |
-| `samples/DigitalBrain.Compositions` | Compositions own logic: sealed classes over `IDigitalBrain` + module contracts only (`OpenHome`, `PostAuthBootstrap`, `NavigateShell`, `CountdownSurface`, `AccountEnrichmentSurface`, `AiPaneSurface`). Pre-Behavior rail; not installed Behaviors. |
+| `samples/DigitalBrain.Compositions` | Compositions own logic: sealed classes over `IDigitalBrain` + module contracts / Abstractions only (`ActivateDigitalBrain`, `BootOnActivation`, `OpenHome`, `PostAuthBootstrap`, `NavigateShell`, `CountdownSurface`, `AccountEnrichmentSurface`, `AiPaneSurface`). Pre-Behavior rail; pull-invoked — not installed Behaviors. Activation fact `DigitalBrainActivated` lives in `DigitalBrain.Abstractions`, not in samples. |
 | `samples/DigitalBrain.AccountEnrichment` | Opt-in compiled multi-module process neuron (`IAccountEnrichment` / `EnrichmentModule`). Durable process vocabulary sample — not a composition and not a product package. |
 | `hosts/DigitalBrain.Ui` | Northbound C# HTTP/SSE edge (client + Flutter contracts only). Projected when Flutter hosting selects `WithUiEdge` / `WithFlutterHost`. |
 | `hosts/DigitalBrain.Mcp` | Northbound MCP server over selected neurons through `IDigitalBrain`. |

@@ -2,7 +2,7 @@ using DigitalBrain.Client;
 
 namespace DigitalBrain.Shell;
 
-public sealed class PostAuthBootstrap
+public sealed class BootOnActivation
 {
     public async Task RunAsync(
         IDigitalBrain brain,
