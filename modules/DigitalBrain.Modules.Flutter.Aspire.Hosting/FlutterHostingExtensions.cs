@@ -152,7 +152,6 @@ public static class FlutterHostingExtensions
                 .AddExecutable(resourceName, launch.Command, workingDirectory, launch.Args)
                 .WithEnvironment(UiBaseEnvironmentVariable, endpoint)
                 .WithEnvironment(ShellEnvironmentVariable, shell)
-                .WithReference(endpoint)
                 .WaitFor(ui);
         }
 
