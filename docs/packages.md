@@ -40,10 +40,10 @@ for what ships and what each package may depend on.
 | --- | --- | --- | --- | --- | --- |
 | Quickstart | yes | yes | no | `DigitalBrain.Quickstart.Tests` + Quickstart AppHost | Built |
 | AI | yes | yes | yes | typed LLM smoke + direct Concurrent/GroupChat Respond; supervised IWorker unbuilt | Built (direct); Designed (supervised) |
-| Tasks | yes | yes | no | contracts + runtime only | Built (module L1 driver proofs removed) |
+| Tasks | yes | yes | no | contracts + runtime only | Built (no L1 semantic suite yet) |
 | Time | yes | yes | no | `DigitalBrain.Time.Tests` | Built: Countdown only |
-| Google | yes | yes | yes | production AppHost selection | Built (module L1 driver proofs removed) |
-| Salesforce | yes | yes | yes | production AppHost selection | Built (module L1 driver proofs removed) |
+| Google | yes | yes | yes | production AppHost selection | Built (no L1 semantic suite yet) |
+| Salesforce | yes | yes | yes | production AppHost selection | Built (no L1 semantic suite yet) |
 
 Quickstart, Tasks, and Time have no module `Aspire.Hosting` package because they need no
 module-specific AppHost resources. AI, Google, and Salesforce do.

@@ -60,16 +60,8 @@ attached — never a neutral menu.
 watch it fail before writing the code that satisfies it. When the behaviour is not coming yet, keep
 the proof and exclude it rather than deleting it. **Never a red root gate.**
 
-The two exclusion mechanisms behave differently on demand, and the difference matters:
-
-| Kind | Marked | Prove it red with | What you get |
-|---|---|---|---|
-| xUnit | `[Fact(Explicit = true, DisplayName = "…")]` | `./tests/<proj>/bin/Debug/net10.0/<proj>.exe -explicit only` | The test **runs** and fails |
-| Gherkin | `@ignore @red-until-<reason>` | `./tests/<proj>/bin/Debug/net10.0/<proj>.exe -failSkips` | The scenario is **reported failed because it was skipped** — its body never ran |
-
-`-explicit only` does not reach `@ignore` scenarios; it reports them as not run. To actually execute
-an ignored scenario you must remove the tag locally. Prefer the xUnit form when you want a proof that
-genuinely executes on demand, and always tag the Gherkin form with the reason it is held.
+Hold unfinished proofs with `[Fact(Explicit = true, DisplayName = "…")]`. Prove one red on demand with
+`./tests/<proj>/bin/Debug/net10.0/<proj>.exe -explicit only` — the test runs and fails.
 
 **Before the commit — grill the diff.** Three questions, answered in the commit message:
 

@@ -62,8 +62,7 @@ front of you. If a step was skipped, say so. If something failed, say so with th
 ## Comments are forbidden
 
 Comments are forbidden as narrative, boilerplate, or commented-out code, in any tracked C#,
-PowerShell, YAML, XML, MSBuild or `.feature` file. No XML documentation comment that restates a
-signature.
+PowerShell, YAML, XML, or MSBuild file. No XML documentation comment that restates a signature.
 
 This is not minimalism for its own sake. A comment is an assertion nothing checks, and it rots silently
 while the code beside it changes. Put the meaning where it can be verified instead: in a name, a type,

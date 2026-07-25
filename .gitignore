@@ -17,7 +17,6 @@ sources/
 node_modules/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
-*.feature.cs
 
 # Local MCP tool installs (Codex absolute launch)
 .config/codegraph-tool/

@@ -47,9 +47,9 @@ limitations, and build order.
 ```text
 src/       domain-neutral framework packages
 modules/   independently shipped domains, beginning with AI
-hosts/     runnable silo, AppHost, and the test-only probe hosts
+hosts/     runnable silo, product AppHost, Quickstart host/AppHost, TestingAppHost
 samples/   package-only consumers proven against an empty package cache
-tests/     contract tests, simulations, hosted proof
+tests/     L0 contracts, L1 TestBrain proofs, L2 hosted AppHost proof
 docs/      VitePress documentation and the published specification
 ```
 
@@ -58,24 +58,18 @@ them with `git log --diff-filter=D -- sources/` and `git show <sha>^:<path>`.
 
 ## Gate
 
-The fast gate, run at every slice and before any completion claim:
+Root gate (every phase, before any completion claim):
 
 ```powershell
-dotnet test --logger "console;verbosity=minimal"
+dotnet build DigitalBrain.slnx -c Release
+dotnet test DigitalBrain.slnx -c Release --logger "console;verbosity=minimal"
 ```
 
-The full gate, run before a release:
+Never `--filter` on the root gate. Documentation site gate:
 
 ```powershell
-dotnet test .\DigitalBrain.slnx -c Release
-```
-
-Never `--filter`, on either. The website gate runs `node` directly rather than through npm:
-
-```powershell
-cd docs
-node tools/render-specification.mjs
-node --test tests/*.test.mjs
+npm --prefix docs test
+npm --prefix docs run build
 ```
 
 Every commit keeps the gate green.
