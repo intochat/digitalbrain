@@ -13,21 +13,13 @@ internal sealed record OrchestrationParticipant(
     string AgentId,
     string AgentName);
 
-internal sealed record OrchestrationDefinition(
-    int FormatVersion,
-    string MafVersion,
-    string Fingerprint,
-    OrchestrationParticipant[] Participants,
-    string HostId,
-    string HostName,
-    string Kind,
-    string OrchestrationType,
-    string ExecutionEnvironment,
-    string Manager,
-    string Aggregator,
-    string ApplicationVersion)
+internal sealed record OrchestrationDefinition(string Fingerprint)
 {
     internal const int CurrentFormatVersion = 2;
+
+    internal string HostId => $"dba_{Fingerprint}";
+
+    internal string HostName => $"orchestration_{Fingerprint}";
 
     private static OrchestrationDefinition Create(
         string orchestrationType,
@@ -47,37 +39,21 @@ internal sealed record OrchestrationDefinition(
             throw new InvalidOperationException("An orchestration requires at least one participant.");
         }
 
-        var kind = identity.KindName;
-        var executionEnvironment = identity.ExecutionEnvironmentName;
-        var manager = identity.ManagerName(participants.Length);
-        var aggregator = identity.AggregatorName;
         var source = new FingerprintSource(
             CurrentFormatVersion,
-            kind,
+            identity.KindName,
             orchestrationType,
             applicationVersion,
             mafVersion,
-            executionEnvironment,
-            manager,
-            aggregator,
+            identity.ExecutionEnvironmentName,
+            identity.ManagerName(participants.Length),
+            identity.AggregatorName,
             "fingerprint-v2",
             participants);
         var fingerprint = Convert.ToHexStringLower(
             SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(source)));
 
-        return new(
-            CurrentFormatVersion,
-            mafVersion,
-            fingerprint,
-            participants,
-            $"dba_{fingerprint}",
-            $"orchestration_{fingerprint}",
-            kind,
-            orchestrationType,
-            executionEnvironment,
-            manager,
-            aggregator,
-            applicationVersion);
+        return new(fingerprint);
     }
 
     internal static void RequireMatch(
