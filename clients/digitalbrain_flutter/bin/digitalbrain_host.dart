@@ -11,25 +11,28 @@ Future<void> main(List<String> args) async {
 
   stdout.writeln('digitalbrain_host shell=$shell base=${client.baseUri}');
 
-  if (open != null) {
-    final parts = open.split(':');
-    if (parts.length < 2 || parts[0].isEmpty || parts[1].isEmpty) {
-      stderr.writeln('usage: --open sceneKey:Title');
-      exitCode = 64;
-      return;
+  try {
+    if (open != null) {
+      final parts = open.split(':');
+      if (parts.length < 2 || parts[0].isEmpty || parts[1].isEmpty) {
+        stderr.writeln('usage: --open sceneKey:Title');
+        exitCode = 64;
+        return;
+      }
+      final sceneKey = parts[0];
+      final title = parts.sublist(1).join(':');
+      await client.openScene(shellName: shell, sceneKey: sceneKey, title: title);
+      stdout.writeln('opened sceneKey=$sceneKey title=$title');
     }
-    final sceneKey = parts[0];
-    final title = parts.sublist(1).join(':');
-    await client.openScene(shellName: shell, sceneKey: sceneKey, title: title);
-    stdout.writeln('opened sceneKey=$sceneKey title=$title');
-  }
 
-  await for (final event in client.watchShellEvents(shellName: shell)) {
-    surface.apply(event);
-    final view = surface.latest!;
-    stdout.writeln(
-      'scene-opened seq=${view.sequence} key=${view.sceneKey} title=${view.title}',
-    );
+    await for (final event in client.watchShellEvents(shellName: shell)) {
+      final view = surface.apply(event);
+      stdout.writeln(
+        'scene-opened seq=${view.sequence} key=${view.sceneKey} title=${view.title}',
+      );
+    }
+  } finally {
+    client.close();
   }
 }
 

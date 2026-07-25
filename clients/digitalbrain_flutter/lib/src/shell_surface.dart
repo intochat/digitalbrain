@@ -14,12 +14,13 @@ final class SceneViewModel {
 
 final class ShellSurfaceController {
   final List<SceneViewModel> _scenes = [];
+  SceneViewModel? _latest;
 
   List<SceneViewModel> get scenes => List.unmodifiable(_scenes);
 
-  SceneViewModel? get latest => _scenes.isEmpty ? null : _scenes.last;
+  SceneViewModel? get latest => _latest;
 
-  void apply(SceneOpenedEvent event) {
+  SceneViewModel apply(SceneOpenedEvent event) {
     final view = SceneViewModel(
       sceneKey: event.sceneKey,
       title: event.title,
@@ -31,5 +32,7 @@ final class ShellSurfaceController {
     } else {
       _scenes.add(view);
     }
+    _latest = view;
+    return view;
   }
 }
