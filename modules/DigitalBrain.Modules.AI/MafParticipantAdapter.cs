@@ -75,10 +75,8 @@ internal static class MafParticipantAdapter
     {
         if (!typeof(ILLM).IsAssignableFrom(contract) && !typeof(IAgent).IsAssignableFrom(contract))
         {
-            throw Unsupported(contract);
+            throw new InvalidOperationException(
+                $"Participant contract '{contract.FullName}' must implement {nameof(ILLM)} or {nameof(IAgent)}.");
         }
     }
-
-    private static InvalidOperationException Unsupported(Type contract)
-        => new($"Participant contract '{contract.FullName}' must implement {nameof(ILLM)} or {nameof(IAgent)}.");
 }
