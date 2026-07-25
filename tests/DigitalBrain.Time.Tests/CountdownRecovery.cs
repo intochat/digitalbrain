@@ -119,6 +119,42 @@ public sealed class CountdownRecovery(TimeFixture fixture)
             cancellationToken: cancellationToken));
     }
 
+    [Fact(DisplayName = "Late delivery beyond one reminder period marks CountdownElapsed as Recovered")]
+    public async Task LateDeliveryBeyondOneReminderPeriodMarksRecovered()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var countdown = test.Neuron<ICountdown>("recovered-late");
+        var destination = test.Neuron<ICountdown>("destination");
+        var started = await Start(
+            countdown,
+            destination,
+            TimeSpan.FromHours(1));
+        var lateBy = TimeSpan.FromMinutes(1) + TimeSpan.FromSeconds(1);
+
+        await test.Clock.AdvanceAsync(
+            TimeSpan.FromHours(1) + lateBy,
+            cancellationToken);
+        var elapsed = await destination.Incoming.NextAsync<CountdownElapsed>(
+            cancellationToken);
+
+        Assert.Equal(started.Generation, elapsed.Synapse.Generation);
+        Assert.Equal(started.Revision, elapsed.Synapse.Revision);
+        Assert.Equal(started.DueAt, elapsed.Synapse.DueAt);
+        Assert.Equal(started.DueAt + lateBy, elapsed.Synapse.ObservedAt);
+        Assert.Equal(test.Clock.UtcNow, elapsed.Synapse.ObservedAt);
+        Assert.Equal(CountdownResolution.Recovered, elapsed.Synapse.Resolution);
+        Assert.Equal(
+            CountdownStatus.Elapsed,
+            (await countdown.Reference.Read()).Status);
+
+        await test.Clock.AdvanceAsync(
+            TimeSpan.FromMinutes(1),
+            cancellationToken);
+        Assert.Single(await destination.Incoming.ReadAsync<CountdownElapsed>(
+            cancellationToken: cancellationToken));
+    }
+
     [Fact]
     public async Task CommittedOccurrenceSurvivesAnotherRestartWithoutDuplication()
     {

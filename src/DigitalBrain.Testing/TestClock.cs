@@ -69,26 +69,27 @@ public sealed class TestClock
             var target = Add(_provider.GetUtcNow(), duration);
             var operations = 0;
 
-            while (NextDueAtOrBefore(target) is { } due)
+            _provider.SetUtcNow(target);
+
+            while (NextDueAtOrBefore(target) is not null)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                _provider.SetUtcNow(due);
 
                 if (operations >= MaximumDrainOperations)
                 {
                     throw DrainLimitFailure(target);
                 }
 
-                if (_provider.NextDueAtOrBefore(due) is not null)
+                if (_provider.NextDueAtOrBefore(target) is not null)
                 {
-                    if (!_provider.TryFireNextDue(due))
+                    if (!_provider.TryFireNextDue(target))
                     {
                         throw new InvalidOperationException(
                             "A deterministic timer disappeared before it could be fired.");
                     }
                 }
                 else if (!await _reminders.TryDeliverNextDueAsync(
-                    due,
+                    target,
                     cancellationToken))
                 {
                     throw new InvalidOperationException(
@@ -99,8 +100,6 @@ public sealed class TestClock
                 await Task.Yield();
                 cancellationToken.ThrowIfCancellationRequested();
             }
-
-            _provider.SetUtcNow(target);
         }
         finally
         {
