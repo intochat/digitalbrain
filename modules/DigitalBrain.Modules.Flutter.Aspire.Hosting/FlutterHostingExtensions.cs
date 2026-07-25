@@ -141,8 +141,9 @@ public static class FlutterHostingExtensions
                 if (options.RequireHost)
                 {
                     throw new InvalidOperationException(
-                        "Flutter host could not be launched: Flutter CLI missing and headless entry not found. " +
-                        "Install Flutter, pass FlutterHostMode.Headless with bin/digitalbrain_host.dart, or set RequireHost false.");
+                        "Flutter host could not be launched: no desktop project markers with a working Flutter CLI, " +
+                        "and headless entry bin/digitalbrain_host.dart was not found. " +
+                        "Install Flutter with a desktop package, use Headless with the host entry, or set RequireHost false.");
                 }
 
                 return;
@@ -162,7 +163,7 @@ public static class FlutterHostingExtensions
             var mode = options.Mode;
             if (mode == FlutterHostMode.Auto)
             {
-                mode = FlutterCliAvailable(options) && HasFlutterDesktopProjectMarker(workingDirectory)
+                mode = HasFlutterDesktopProjectMarker(workingDirectory) && FlutterCliAvailable(options)
                     ? FlutterHostMode.FlutterDesktop
                     : FlutterHostMode.Headless;
             }
