@@ -47,13 +47,14 @@ for what ships and what each package may depend on.
 | Time | yes | yes | no | `DigitalBrain.Time.Tests` (Countdown lifecycle and recovery) | Built: Countdown only |
 | Google | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` Gmail ReadMessage admit + annotation refusal on scripted MCP edge | Built |
 | Salesforce | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` propose / reject / approve→Completed on scripted MCP edge | Built |
-| Flutter | yes | yes | no | L0 golden + namespace/boundary pins; L1 journals in `DigitalBrain.Flutter.Tests`; L1 HTTP edge in `DigitalBrain.Ui.Tests`; AppHost selects `FlutterModule` + `digitalbrain-ui` AsClient | Built (vocabulary + C# UI edge); Designed (Dart host, Aspire.Hosting, full chrome) |
+| Flutter | yes | yes | no | L0 golden + namespace/boundary pins; L1 journals in `DigitalBrain.Flutter.Tests`; L1 HTTP edge in `DigitalBrain.Ui.Tests`; AppHost selects `FlutterModule` + `digitalbrain-ui` AsClient | Built (vocabulary + C# UI edge); Designed (Dart host at `clients/digitalbrain_flutter`, host-facing edge watch, Aspire.Hosting, full chrome) |
 
 Quickstart, Tasks, Time, and Flutter have no module `Aspire.Hosting` package because they need no
 module-specific AppHost resources. AI, Google, and Salesforce do. Flutter packages are
 `DigitalBrain.Modules.Flutter.Contracts` and `DigitalBrain.Modules.Flutter` with public namespace
 `DigitalBrain.Flutter` (semantic neurons `IShell` / `IScene` — not an `IFlutter` god type). The
-Flutter/Dart pixel host remains a Designed northbound client edge, not a packable module and not an
+Flutter/Dart pixel host remains a Designed northbound HTTP client of `hosts/DigitalBrain.Ui` (path of
+record: `clients/digitalbrain_flutter`), not a packable module, not under `modules/`, and not an
 Orleans silo.
 
 ## Boundary rules

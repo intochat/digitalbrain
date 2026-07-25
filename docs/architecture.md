@@ -601,7 +601,7 @@ calendar, and DST record shapes. Do not implement those as though they were sett
 
 ### 4.6 Flutter
 
-Status: Built (first-vertical vocabulary + L0/L1 journal proofs + C# northbound UI edge); Designed (Dart host, full chrome, product journal observation, multi-principal IdP edge)
+Status: Built (first-vertical vocabulary + L0/L1 journal proofs + C# northbound UI edge); Designed (Dart host, host-facing edge watch, full chrome, product journal observation on IDigitalBrain, multi-principal IdP edge)
 
 The OS surface is not a Flutter app with agents behind it. It is a brain whose **UI vocabulary** is a
 Flutter module, and whose **logic** (shell policy, post-auth composition, multi-window orchestration,
@@ -670,13 +670,14 @@ Reject a god widget tree with side-channel HTTP that bypasses `IDigitalBrain` ty
 The Flutter/Dart host is a **client of the brain**, not a second kernel and not a silo.
 
 ```text
-Flutter / Dart host  ──HTTP UI protocol──►  hosts/DigitalBrain.Ui (C# edge)
-  no Orleans, no MCP tool dictionaries       auth → OwnerId (dev: config owner)
-                                             IDigitalBrain only
-                                             AppHost: brain.AsClient()
-                                                       │
-                                                       ▼
-                                             DigitalBrain silo (+ FlutterModule when selected)
+Flutter / Dart host  ──HTTP/JSON (+ SSE watch)──►  hosts/DigitalBrain.Ui (C# edge)
+  no Orleans, no MCP tool dictionaries             auth → OwnerId (dev: config owner)
+                                                   commands: IDigitalBrain only
+                                                   watch: host-private session journals
+                                                   AppHost: brain.AsClient()
+                                                             │
+                                                             ▼
+                                                   DigitalBrain silo (+ FlutterModule when selected)
 ```
 
 - **Built:** `hosts/DigitalBrain.Ui` — owner-bound `IDigitalBrain` edge with HTTP
@@ -685,18 +686,60 @@ Flutter / Dart host  ──HTTP UI protocol──►  hosts/DigitalBrain.Ui (C# 
   selects `FlutterModule` on the silo and wires the UI host with `AsClient()` only (same trust split
   as MCP).
 - **Keep** `hosts/DigitalBrain.Mcp` as agent/IDE northbound — not the product UI path (no tool
-  dictionaries on UI contracts; MCP owner binding today is process config, not human IdP).
+  dictionaries on UI contracts; MCP owner binding today is process config, not human IdP). Shared
+  brain state means MCP (or any trusted client) may mutate owner-scoped facts that the UI edge later
+  projects; that is **not** permission for Flutter to call MCP tools as the product UI bus.
 - **Reject:** Dart embeds Orleans client or silo; Flutter process receives journals, protection keys,
   or reminders; attaching `brain.AsClient()` to a non-.NET Flutter resource as if it were an Orleans
-  client.
-- **Designed:** Dart host consuming this HTTP surface; production IdP principal→owner bind; product
-  journal observation on `IDigitalBrain` for reconnect.
-- Edge executable lives under `hosts/` (peer of MCP and the silo host). Do not invent a second public
-  client facade beside `DigitalBrainClient`.
+  client; gRPC UiGateway / protobuf dual vocabulary; resurrected `app/` or `workspace/` product trees.
+- **Designed:** Dart host at `clients/digitalbrain_flutter` (optional pure-Dart wire package
+  `clients/digitalbrain_wire`); production IdP principal→owner bind; product journal observation on
+  `IDigitalBrain` when a non-UI consumer needs the same cursor/watch (not required for the first live
+  host feed).
+- Edge executable lives under `hosts/` (peer of MCP and the silo host). The pixel host is a
+  **client** under `clients/`, not a packable module and not a second Orleans host under `hosts/`.
+  Do not invent a second public client facade beside `DigitalBrainClient`.
 
-Product journal **observation** on `IDigitalBrain` remains unbuilt (§8). First vertical proves
-journaled facts at L1 in-cluster and via the UI edge HTTP surface; host watch is a named gap, not
-permission to invent a second semantic protocol.
+#### Live host observation (plan of record)
+
+Product journal **observation** on `IDigitalBrain` remains unbuilt (§8): the public facade still
+sends and emits only. That gap must not invent a second semantic protocol or a ProbeHost-shaped
+“watch any grain” surface.
+
+**H1 (ratified for the first live feed):** host-facing watch on `hosts/DigitalBrain.Ui` only.
+
+| Decision | Choice | Fold if |
+| --- | --- | --- |
+| Where | Edge projects one owner-bound shell’s **outgoing** journal | Endpoints become generic “watch any neuron journal” (ProbeHost smell) |
+| How | Reuse existing `ISessionNeuron.ReadNeuronJournal` / `WatchNeuron` inside the UI process | Kernel gains UI types |
+| Transport | HTTP **SSE** JSON under the same edge (commands stay POST); cursor = journal sequence / `afterSequence` | gRPC/proto dual vocabulary returns; or WebSocket is justified by a bidirectional need |
+| Public client | **No** `IDigitalBrain` watch in H1 | A second non-UI consumer needs the same API — then promote deliberate client observation |
+| Polling `Current()` | **Not** the primary live path | Only after a real descriptor method exists with journal-backed recovery proofs |
+
+Lessons recovered from historical `workspace/` UiSurface (design only — not a code transplant): durable
+cursor, contiguous sequence / gap resync, fail-closed wire, revision fencing on actions, snapshot
+recovery. Lessons **not** recovered: god feed, block AST as second ledger, kernel `UiSurface` types,
+grain-addressed invoke, OTel as UI truth.
+
+#### Historical recovery map
+
+Recover UX loops and assets via `git show <sha>:<path>` (notably tag `v0.1.18` tree `app/`, later
+`workspace/` UiSurface era, demolish `775cef63`). Do **not** wholesale copy either tree.
+
+| Historical surface | Disposition |
+| --- | --- |
+| Live loop “trusted client mutates brain → host projects facts without restart” (e.g. MCP→shared state at `730e1ad4`) | **Keep loop shape**; re-bind proof to Ui edge + journals, not MCP-as-UI-gateway |
+| Thin shell / theme / adaptive chrome, glass shaders as **host-local** pixels | **Optional later** host chrome only |
+| Aspire “run Flutter with env for edge base URL” shape | **Adapt** to `digitalbrain-ui` HTTP — never journals/reminders on Flutter |
+| gRPC UiGateway, dual protos, RFW product path, `ui_kit` as domain truth | **Reject** |
+| OTLP / telemetry as product UI path | **Reject** |
+| Live graph, neuron constructor, experience packs, 13MB lottie spikes, Widgetbook product | **Reject** (zero consumer on current `IShell`/`IScene`) |
+| Workspace block AST / god `feed/main` / kernel UI DTOs / `Brain.UiGateway` grain HTTP | **Reject** |
+| ProbeHost, ModuleDriver/Gherkin OS, DevTools-as-product, Simulations, `IFlutter`, Behavior APIs without rail, Flutter-embedded silo | **Must-not-return** |
+
+Scoring rule for any restored file: it must serve the current path
+**edge → `IDigitalBrain` (commands) / host-private journal watch → projection**. Pretty chrome without a
+journal path is trash.
 
 #### Auth edge
 
@@ -717,36 +760,42 @@ downstream wiring. Durable southbound tokens (if any) use `DigitalBrain.Security
 envelopes (MCP pattern), never journal payloads.
 
 Dev: fixed test/config owner (MCP’s `"dev"` pattern only on non-public edges). Production: real IdP at
-the edge, then the same `IDigitalBrain` programming model.
+the edge, then the same `IDigitalBrain` programming model. Today both Ui and MCP bind
+`DigitalBrain:Owner` (default `"dev"`) as a process-wide singleton — honest, not IdP.
 
 #### Contract drift guard
 
 Source of truth: public types in `DigitalBrain.Modules.Flutter.Contracts` (aliases, methods,
 properties). Guard: checked-in normalized **golden wire-contract manifest** extracted by reflection
-over that assembly; L0 asserts equality. When a Dart wire package exists, the same golden is the
-Dart-side oracle. Codegen Dart from Contracts may later accelerate maintenance; the gate remains
-golden equality, not “generator exit 0.” No protobuf dual vocabulary; no FFI .NET-in-Dart as the pin.
+over that assembly; L0 asserts equality. When a Dart wire package exists, the same golden file under
+Contracts is the Dart-side oracle (one file; no forked copy). Codegen Dart from Contracts may later
+accelerate maintenance; the gate remains golden equality, not “generator exit 0.” No protobuf dual
+vocabulary; no FFI .NET-in-Dart as the pin. Thin HTTP DTOs on the Ui edge (`OpenSceneRequest`, …)
+are host protocol, not a second module vocabulary.
 
 #### Testing
 
 | Tier | First vertical |
 | --- | --- |
 | L0 | Package graph: Kernel free of Flutter; Contracts free of Dart/Flutter SDK; capsule + alias + golden pins |
-| L1 | Real multi-silo `TestBrain`; real Flutter-module neurons; **scene projected = committed journal fact**; no phone |
-| L2 | Only when Flutter or the C# UI edge is a real AppHost resource with readiness |
+| L1 | Real multi-silo `TestBrain`; real Flutter-module neurons; **scene projected = committed journal fact**; Ui edge HTTP (+ SSE watch when built); no phone |
+| L2 | When `digitalbrain-ui` (and later the Flutter resource) is a real AppHost resource with readiness — not MCP-coupled |
 | L3 | Device/widget/golden — never owner of domain truth; never sole gate |
 
-Headless Dart unit tests may prove pure descriptor→view-model mapping when a Dart package exists;
-they do not replace L1 journal proof.
+Headless Dart unit tests may prove pure descriptor→view-model mapping and dual golden equality when a
+Dart package exists; they do not replace L1 journal proof. Domain gate remains the root
+`dotnet test` solution run; Dart/Flutter jobs are path-filtered peers of the docs job.
 
 #### Still open (do not implement as settled)
 
 - Scene descriptor node algebra and richer chrome vocabulary beyond the first five types.
-- Dart host mapping descriptors to widgets; dual-sided golden equality on the Dart side.
-- Product journal observation API on `IDigitalBrain` for host reconnect.
+- Dart host mapping descriptors to widgets; dual-sided golden equality on the Dart side (path of
+  record: `clients/digitalbrain_flutter`, optional `clients/digitalbrain_wire`).
+- Product journal observation API on `IDigitalBrain` (promote when a non-UI consumer needs it).
 - Whether / when `DigitalBrain.Modules.Flutter.Aspire.Hosting` is needed.
 - Multi-principal edge factory beyond singleton `AddDigitalBrainClient(owner)` / process owner config.
 - Full desktop chrome, multi-window, notifications, AI pane as product surfaces.
+- Exact SSE event schema freeze (after H1 red→green proof).
 
 ### 4.7 Memory
 
@@ -1136,11 +1185,12 @@ taken, and do not infer a shape for it from a neighbouring module.
 - **Memory architecture.** Out of scope entirely, for the reasons in §4.7.
 - **The exact CLR records for the capability-tool seam.** §4.3 ratifies that seam's architecture and
   its exclusions; the records and interfaces that would express it are unwritten.
-- **Flutter method signatures, descriptor algebra, and UI transport under the C# edge.** §4.6 ratifies
-  vocabulary shape, projection, northbound split, auth, drift guard, and testing tiers; exact
-  `[Alias]` pins and wire transport remain open until first-vertical proofs freeze them.
-- **Product journal observation on `IDigitalBrain`.** Required for a live Flutter host reconnect story;
-  not required for C#-only L1 journal proofs of the first vertical.
+- **Flutter descriptor algebra and richer chrome vocabulary.** §4.6 freezes the first five semantic
+  types and ratifies host-facing SSE watch under `hosts/DigitalBrain.Ui` for the first live feed;
+  scene descriptor node algebra and full chrome remain open.
+- **Product journal observation on `IDigitalBrain`.** Still designed for scripts and multi-edge
+  reconnect as a shared programming-model API; the first live host feed uses edge-only journal watch
+  (§4.6). Not required for C#-only L1 command→journal proofs.
 
 ### Known deviations
 
@@ -1193,10 +1243,12 @@ track has proofs.
 4. Extend `DigitalBrain.Google` from the `IGmail` root to `ICalendar` once a concrete calendar story
    exists.
 5. Add recurring and calendar Time vocabulary once its library and public record shapes are approved.
-6. Add the Flutter module family (`DigitalBrain.Modules.Flutter*`, namespace `DigitalBrain.Flutter`)
-   with semantic UI neurons, contract drift guard, and L0/L1 proofs per §4.6. C#-only first vertical
-   before a Dart host. Ordinary compositions under `samples/` may use that vocabulary; claiming
-   installed Behaviors still requires the self-programming track.
+6. Flutter OS surface (in order): (a) C#-only first vertical — **built** (vocabulary, L0/L1, Ui edge
+   commands, thin compositions); (b) host-facing SSE journal watch on `DigitalBrain.Ui` so a client
+   sees `SceneOpened` without process restart; (c) Dart host under `clients/digitalbrain_flutter`
+   over that HTTP surface + dual golden; (d) deeper compositions (shell, post-auth, countdown,
+   enrichment surface) still as samples — claiming installed Behaviors still requires the
+   self-programming track. Do not wholesale restore historical `app/` or `workspace/`.
 7. Design `DigitalBrain.Memory` independently around its own vocabulary, never inferred from AI,
    Tasks, or Time.
 
