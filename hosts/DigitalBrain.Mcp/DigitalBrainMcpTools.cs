@@ -14,14 +14,14 @@ namespace DigitalBrain.Mcp;
     Justification = "Constructed by the MCP server DI container via WithTools<DigitalBrainMcpTools>().")]
 internal sealed class DigitalBrainMcpTools(IDigitalBrain brain)
 {
-    [McpServerTool(Name = "ask_llama32")]
+    [McpServerTool(Name = McpHost.AskLlama32ToolName)]
     [Description("Ask the owner's Llama 3.2 neuron and return its ChatResponse.")]
     public Task<ChatResponse> AskLlama32Async(
         [Description("User prompt for Llama 3.2")] string prompt)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
 
-        return brain.Get<ILlama32>("default").Respond(
+        return brain.Get<ILlama32>(McpHost.DefaultLlama32Key).Respond(
             [new ChatMessage(ChatRole.User, prompt)]);
     }
 }

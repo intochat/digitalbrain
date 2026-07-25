@@ -6,20 +6,54 @@ namespace DigitalBrain.Time.Tests;
 
 public sealed partial class CountdownLifecycle
 {
-    [Fact]
-    public async Task CommandsRejectEmptyIdsInvalidDurationsAndDueOverflow()
+    private const int MaximumRetainedReceipts = 64;
+
+    [Fact(DisplayName =
+        "Empty CommandId is rejected on Start, Reschedule, Cancel, and Restart")]
+    public async Task EmptyCommandIdIsRejected()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var countdown = test.Neuron<ICountdown>("validation");
-        var destination = test.Neuron<ICountdown>("destination");
+        var (countdown, destination) = TimeFixture.Pair(test);
         var empty = default(CommandId);
 
         await Assert.ThrowsAsync<ArgumentException>(
             () => countdown.Reference.Start(new StartCountdown(
                 empty,
-                TimeSpan.FromHours(1),
+                Hour,
                 destination.Id)));
+
+        var started = await TimeFixture.Start(countdown, destination, Hour);
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => countdown.Reference.Reschedule(new RescheduleCountdown(
+                empty,
+                started.Revision,
+                Hour)));
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => countdown.Reference.Cancel(new CancelCountdown(
+                empty,
+                started.Revision)));
+
+        var cancelled = await countdown.Reference.Cancel(
+            new CancelCountdown(CommandId.New(), started.Revision));
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => countdown.Reference.Restart(new RestartCountdown(
+                empty,
+                Hour)));
+
+        Assert.Equal(cancelled, await countdown.Reference.Read());
+    }
+
+    [Fact(DisplayName =
+        "Duration must be positive and yield a due instant within the supported range")]
+    public async Task DurationMustBePositiveAndWithinRange()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var (countdown, destination) = TimeFixture.Pair(test);
+
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             () => countdown.Reference.Start(new StartCountdown(
                 CommandId.New(),
@@ -36,33 +70,17 @@ public sealed partial class CountdownLifecycle
                 TimeSpan.MaxValue,
                 destination.Id)));
 
-        var started = await Start(
-            countdown,
-            destination,
-            TimeSpan.FromHours(1));
+        var started = await TimeFixture.Start(countdown, destination, Hour);
 
-        await Assert.ThrowsAsync<ArgumentException>(
-            () => countdown.Reference.Reschedule(new RescheduleCountdown(
-                empty,
-                started.Revision,
-                TimeSpan.FromHours(1))));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             () => countdown.Reference.Reschedule(new RescheduleCountdown(
                 CommandId.New(),
                 started.Revision,
                 TimeSpan.Zero)));
-        await Assert.ThrowsAsync<ArgumentException>(
-            () => countdown.Reference.Cancel(new CancelCountdown(
-                empty,
-                started.Revision)));
 
         var cancelled = await countdown.Reference.Cancel(
             new CancelCountdown(CommandId.New(), started.Revision));
 
-        await Assert.ThrowsAsync<ArgumentException>(
-            () => countdown.Reference.Restart(new RestartCountdown(
-                empty,
-                TimeSpan.FromHours(1))));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             () => countdown.Reference.Restart(new RestartCountdown(
                 CommandId.New(),
@@ -72,32 +90,50 @@ public sealed partial class CountdownLifecycle
                 CommandId.New(),
                 TimeSpan.MaxValue)));
 
-        Assert.Equal(
-            cancelled,
-            await countdown.Reference.Read());
+        Assert.Equal(cancelled, await countdown.Reference.Read());
     }
 
-    [Fact]
+    [Fact(DisplayName =
+        "Destination must belong to the same owner as the countdown")]
+    public async Task DestinationMustBelongToTheCountdownOwner()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var (countdown, _) = TimeFixture.Pair(test);
+        var foreign = test.Owner("foreign").Neuron<ICountdown>(TimeFixture.Destination);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => countdown.Reference.Start(new StartCountdown(
+                CommandId.New(),
+                Hour,
+                foreign.Id)));
+
+        Assert.Equal(
+            CountdownStatus.Unscheduled,
+            (await countdown.Reference.Read()).Status);
+    }
+
+    [Fact(DisplayName =
+        "Command receipts retain only the latest sixty-four CommandIds")]
     public async Task ReceiptsRetainOnlyTheLatestSixtyFourCommands()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var countdown = test.Neuron<ICountdown>("receipts");
-        var destination = test.Neuron<ICountdown>("destination");
+        var (countdown, destination) = TimeFixture.Pair(test);
         var startCommand = new StartCountdown(
             CommandId.New(),
-            TimeSpan.FromHours(1),
+            Hour,
             destination.Id);
         var current = await countdown.Reference.Start(startCommand);
         RescheduleCountdown? oldestRetainedCommand = null;
         CountdownSnapshot? oldestRetainedSnapshot = null;
 
-        for (var index = 0; index < 64; index++)
+        for (var index = 0; index < MaximumRetainedReceipts; index++)
         {
             var command = new RescheduleCountdown(
                 CommandId.New(),
                 current.Revision,
-                TimeSpan.FromHours(1));
+                Hour);
             current = await countdown.Reference.Reschedule(command);
 
             if (index == 0)
@@ -114,65 +150,5 @@ public sealed partial class CountdownLifecycle
                     oldestRetainedCommand)));
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => countdown.Reference.Start(startCommand));
-    }
-
-    [Fact]
-    public async Task ReadReturnsCommittedStateAfterHostingSiloRestart()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var countdown = test.Neuron<ICountdown>("durable-read");
-        var destination = test.Neuron<ICountdown>("destination");
-        var started = await Start(
-            countdown,
-            destination,
-            TimeSpan.FromHours(1));
-
-        await countdown.RestartHostAsync(cancellationToken);
-
-        Assert.Equal(started, await countdown.Reference.Read());
-    }
-
-    [Fact]
-    public async Task CountdownEmitsExactlyOnceAtItsDueInstant()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var countdown = test.Neuron<ICountdown>("due");
-        var destination = test.Neuron<ICountdown>("destination");
-        var started = await Start(
-            countdown,
-            destination,
-            TimeSpan.FromHours(1));
-
-        await test.Clock.AdvanceAsync(
-            TimeSpan.FromMinutes(59),
-            cancellationToken);
-        Assert.Empty(await destination.Incoming.ReadAsync<CountdownElapsed>(
-            cancellationToken: cancellationToken));
-
-        await test.Clock.AdvanceAsync(
-            TimeSpan.FromMinutes(1),
-            cancellationToken);
-        var elapsed = await destination.Incoming.NextAsync<CountdownElapsed>(
-            cancellationToken);
-
-        Assert.Equal(countdown.Id, elapsed.Synapse.Countdown);
-        Assert.Equal(started.Generation, elapsed.Synapse.Generation);
-        Assert.Equal(started.Revision, elapsed.Synapse.Revision);
-        Assert.Equal(destination.Id, elapsed.Synapse.Destination);
-        Assert.Equal(started.ScheduledAt, elapsed.Synapse.ScheduledAt);
-        Assert.Equal(started.DueAt, elapsed.Synapse.DueAt);
-        Assert.Equal(test.Clock.UtcNow, elapsed.Synapse.ObservedAt);
-        Assert.Equal(CountdownResolution.OnTime, elapsed.Synapse.Resolution);
-        Assert.Equal(
-            CountdownStatus.Elapsed,
-            (await countdown.Reference.Read()).Status);
-
-        await test.Clock.AdvanceAsync(
-            TimeSpan.FromMinutes(1),
-            cancellationToken);
-        Assert.Single(await destination.Incoming.ReadAsync<CountdownElapsed>(
-            cancellationToken: cancellationToken));
     }
 }

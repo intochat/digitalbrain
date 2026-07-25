@@ -29,7 +29,7 @@ public sealed class ClientApiContracts
     public void SendDoesNotAcceptOwner()
     {
         var sends = typeof(IDigitalBrain).GetMethods()
-            .Where(method => method.Name == "SendAsync")
+            .Where(method => method.Name == nameof(IDigitalBrain.SendAsync))
             .ToArray();
 
         Assert.NotEmpty(sends);
@@ -39,28 +39,37 @@ public sealed class ClientApiContracts
             Assert.DoesNotContain(
                 method.GetParameters(),
                 parameter => parameter.Name is not null
-                    && parameter.Name.Contains("owner", StringComparison.OrdinalIgnoreCase));
+                    && parameter.Name.Contains(nameof(IDigitalBrain.Owner), StringComparison.OrdinalIgnoreCase));
         }
     }
 
     [Fact(DisplayName = "the client exposes Connect, Get, Send, and Emit")]
     public void SurfaceIsConnectGetSendAndEmit()
     {
-        var names = typeof(DigitalBrainClient).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.Static)
-            .Where(method => method.DeclaringType == typeof(DigitalBrainClient))
+        var methods = typeof(DigitalBrainClient)
+            .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.Static)
+            .Where(method => method.DeclaringType == typeof(DigitalBrainClient) && !method.IsSpecialName)
             .Select(method => method.Name)
-            .ToHashSet(StringComparer.Ordinal);
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
 
         Assert.Equal(
-            ["Connect", "EmitAsync", "Get", "SendAsync", "get_Owner"],
-            names.OrderBy(name => name, StringComparer.Ordinal));
+            [
+                nameof(DigitalBrainClient.Connect),
+                nameof(DigitalBrainClient.EmitAsync),
+                nameof(DigitalBrainClient.Get),
+                nameof(DigitalBrainClient.SendAsync),
+            ],
+            methods);
+        Assert.NotNull(typeof(DigitalBrainClient).GetProperty(nameof(DigitalBrainClient.Owner)));
     }
 
     [Fact(DisplayName = "Get is constrained to neuron contracts")]
     public void GetIsNeuronConstrained()
     {
         var get = typeof(IDigitalBrain).GetMethods()
-            .Single(method => method.Name == "Get" && method.GetParameters().Length == 1);
+            .Single(method => method.Name == nameof(IDigitalBrain.Get) && method.GetParameters().Length == 1);
 
         var constraint = get.GetGenericArguments().Single().GetGenericParameterConstraints();
 

@@ -12,10 +12,12 @@ public sealed class CapabilityReificationContracts(TestingFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var caller = test.Neuron<ICapabilityCaller>("caller");
-        var target = test.Neuron<ICapabilityTarget>("target");
+        var caller = test.Neuron<ICapabilityCaller>(TestingScenario.CapabilityCaller);
+        var target = test.Neuron<ICapabilityTarget>(TestingScenario.CapabilityTarget);
 
-        await test.Client.SendAsync<ICapabilityCaller>("caller", new CapabilityPing());
+        await test.Client.SendAsync<ICapabilityCaller>(
+            caller.Id.Name,
+            new CapabilityPing());
 
         var stimulus = await caller.Incoming.NextAsync<CapabilityPing>(cancellationToken);
         var requested = await caller.Outgoing.NextAsync<CapabilityRequested>(cancellationToken);

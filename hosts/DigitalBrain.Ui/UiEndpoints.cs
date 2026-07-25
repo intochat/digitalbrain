@@ -12,7 +12,7 @@ internal static class UiEndpoints
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints.MapPost(
-            "/shells/{shellName}/scenes",
+            UiEdgeContract.OpenScenePath,
             static async Task<IResult> (
                 string shellName,
                 OpenSceneRequest request,
@@ -36,7 +36,7 @@ internal static class UiEndpoints
             });
 
         endpoints.MapGet(
-            "/shells/{shellName}/events",
+            UiEdgeContract.ShellEventsPath,
             static async Task (
                 HttpContext http,
                 string shellName,
@@ -70,7 +70,7 @@ internal static class UiEndpoints
             });
 
         endpoints.MapPost(
-            "/scenes/{sceneName}/controls/{controlId}/activate",
+            UiEdgeContract.ActivateControlPath,
             static async Task<IResult> (
                 string sceneName,
                 string controlId,

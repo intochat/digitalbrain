@@ -1,3 +1,5 @@
+using DigitalBrain.Abstractions;
+using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
@@ -8,51 +10,30 @@ namespace DigitalBrain.ModuleTests;
 
 public sealed class OrchestrationL1(ModuleFixture fixture)
 {
+    private const string Left = "left-reply";
+    private const string Right = "right-reply";
+    private const string Prompt = "prompt";
+    private const string SupervisedTeam = "supervised-team";
+    private const int Pair = 2;
+
+    private const string DefinitionMismatch =
+        "The durable direct-agent session is incompatible with the current orchestration definition; an explicit migration or reset is required.";
+
     [Fact(DisplayName = "Concurrent.Respond fans out to multiple scripted participants")]
-    public async Task ConcurrentRespondFansOutToMultipleParticipants()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Chat().Reply("concurrent-left");
-        test.Chat().Reply("concurrent-right");
-
-        var response = await test.Client.Get<IConcurrentProbe>("concurrent-team").Respond(
-            [new ChatMessage(ChatRole.User, "fan out")]);
-
-        Assert.False(string.IsNullOrWhiteSpace(response.Text));
-        Assert.True(
-            response.Text.Contains("concurrent-left", StringComparison.Ordinal)
-            || response.Text.Contains("concurrent-right", StringComparison.Ordinal),
-            $"Expected a scripted participant reply in '{response.Text}'.");
-        Assert.Equal(2, test.Chat().CallCount);
-    }
+    public Task ConcurrentRespondFansOutToMultipleParticipants()
+        => FanOutAsync(test => test.Client.Get<IConcurrentProbe>("concurrent-team"));
 
     [Fact(DisplayName = "GroupChat.Respond runs multiple scripted participants")]
-    public async Task GroupChatRespondRunsMultipleParticipants()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Chat().Reply("group-left");
-        test.Chat().Reply("group-right");
-
-        var response = await test.Client.Get<IGroupChatProbe>("group-team").Respond(
-            [new ChatMessage(ChatRole.User, "round robin")]);
-
-        Assert.False(string.IsNullOrWhiteSpace(response.Text));
-        Assert.True(
-            response.Text.Contains("group-left", StringComparison.Ordinal)
-            || response.Text.Contains("group-right", StringComparison.Ordinal),
-            $"Expected a scripted participant reply in '{response.Text}'.");
-        Assert.Equal(2, test.Chat().CallCount);
-    }
+    public Task GroupChatRespondRunsMultipleParticipants()
+        => FanOutAsync(test => test.Client.Get<IGroupChatProbe>("group-team"));
 
     [Fact(DisplayName = "GroupChat supervised Accept/Continue/Cancel throw until the Orleans path is built")]
     public async Task GroupChatSupervisedAttemptsThrow()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var worker = test.Client.Get<IGroupChatProbe>("supervised-team");
-        var workerId = test.Neuron<IGroupChatProbe>("supervised-team").Id;
+        var worker = test.Client.Get<IGroupChatProbe>(SupervisedTeam);
+        var workerId = test.Neuron<IGroupChatProbe>(SupervisedTeam).Id;
         var taskId = test.Neuron<ILlama32>("task-placeholder").Id;
         var attempt = new AttemptId(Guid.NewGuid());
         var request = new AttemptRequest(
@@ -62,6 +43,7 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
             Revision: 0,
             new ProbeGoal("supervised"));
         var cursor = new AttemptCursor(taskId, workerId, attempt, Revision: 0);
+        var expected = SupervisedNotImplemented(workerId);
 
         var accept = await Assert.ThrowsAsync<InvalidOperationException>(
             () => worker.InvokeAccept(request));
@@ -70,10 +52,9 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
         var cancel = await Assert.ThrowsAsync<InvalidOperationException>(
             () => worker.InvokeCancel(cursor));
 
-        Assert.Contains("supervised Attempts are not implemented", accept.Message, StringComparison.Ordinal);
-        Assert.Contains("supervised Attempts are not implemented", cont.Message, StringComparison.Ordinal);
-        Assert.Contains("supervised Attempts are not implemented", cancel.Message, StringComparison.Ordinal);
-        Assert.Contains("Respond", accept.Message, StringComparison.Ordinal);
+        Assert.Equal(expected, accept.Message);
+        Assert.Equal(expected, cont.Message);
+        Assert.Equal(expected, cancel.Message);
     }
 
     [Fact(DisplayName = "second Concurrent.Respond reuses the durable session on the same orchestration id")]
@@ -81,20 +62,16 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Chat().Reply("session-a-left");
-        test.Chat().Reply("session-a-right");
-        test.Chat().Reply("session-b-left");
-        test.Chat().Reply("session-b-right");
+        ScriptPair(test);
+        ScriptPair(test);
 
         var orchestration = test.Client.Get<IConcurrentProbe>("session-team");
-        var first = await orchestration.Respond(
-            [new ChatMessage(ChatRole.User, "turn one")]);
-        var second = await orchestration.Respond(
-            [new ChatMessage(ChatRole.User, "turn two")]);
+        var first = await orchestration.Respond([User()]);
+        var second = await orchestration.Respond([User()]);
 
         Assert.False(string.IsNullOrWhiteSpace(first.Text));
         Assert.False(string.IsNullOrWhiteSpace(second.Text));
-        Assert.Equal(4, test.Chat().CallCount);
+        Assert.Equal(Pair * 2, test.Chat().CallCount);
     }
 
     [Fact(DisplayName =
@@ -103,29 +80,47 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Chat().Reply("fingerprint-left");
-        test.Chat().Reply("fingerprint-right");
+        ScriptPair(test);
 
         var orchestration = test.Client.Get<IParticipantSwapConcurrentProbe>("fingerprint-team");
-        var first = await orchestration.Respond(
-            [new ChatMessage(ChatRole.User, "turn one")]);
-        Assert.False(string.IsNullOrWhiteSpace(first.Text));
-        Assert.Equal(2, test.Chat().CallCount);
+        var first = await orchestration.Respond([User()]);
+        AssertEither(first);
+        Assert.Equal(Pair, test.Chat().CallCount);
 
         await orchestration.UseParticipants("left-alt", "right-alt");
 
         var mismatch = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => orchestration.Respond(
-                [new ChatMessage(ChatRole.User, "turn two")]));
+            () => orchestration.Respond([User()]));
 
-        Assert.Contains(
-            "incompatible with the current orchestration definition",
-            mismatch.Message,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "migration or reset",
-            mismatch.Message,
-            StringComparison.Ordinal);
-        Assert.Equal(2, test.Chat().CallCount);
+        Assert.Equal(DefinitionMismatch, mismatch.Message);
+        Assert.Equal(Pair, test.Chat().CallCount);
     }
+
+    private async Task FanOutAsync(Func<TestBrain, IAgent> resolve)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        ScriptPair(test);
+
+        var response = await resolve(test).Respond([User()]);
+        AssertEither(response);
+        Assert.Equal(Pair, test.Chat().CallCount);
+    }
+
+    private static ChatMessage User() => new(ChatRole.User, Prompt);
+
+    private static void ScriptPair(TestBrain test)
+    {
+        test.Chat().Reply(Left);
+        test.Chat().Reply(Right);
+    }
+
+    private static void AssertEither(ChatResponse response)
+        => Assert.True(
+            response.Text.Contains(Left, StringComparison.Ordinal)
+            || response.Text.Contains(Right, StringComparison.Ordinal),
+            $"Expected '{Left}' or '{Right}' in '{response.Text}'.");
+
+    private static string SupervisedNotImplemented(NeuronId workerId)
+        => $"GroupChat '{workerId}' supervised Attempts are not implemented. Use direct {nameof(IAgent.Respond)}.";
 }

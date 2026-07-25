@@ -1,75 +1,58 @@
 using System.Reflection;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
-using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.Aspire;
-using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Client;
 using DigitalBrain.Flutter;
-using DigitalBrain.Flutter.Aspire.Hosting;
-using DigitalBrain.Google;
-using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.Kernel;
-using DigitalBrain.Quickstart;
-using DigitalBrain.Salesforce;
-using DigitalBrain.Salesforce.Aspire.Hosting;
-using DigitalBrain.Tasks;
-using DigitalBrain.Time;
-using Xunit;
-
 using DigitalBrain.Tests.Packages;
+using Xunit;
 
 namespace DigitalBrain.Tests.Boundary;
 
 public sealed class AssemblyBoundaryContracts
 {
-    private static readonly string[] VendorModelSdks =
-        ["OpenAI", "Microsoft.Extensions.AI", "OllamaSharp"];
-
-    private static readonly Assembly[] ContractAssemblies =
-    [
-        typeof(ILLM).Assembly,
-        typeof(IGmail).Assembly,
-        typeof(ISalesforce).Assembly,
-        typeof(ITask).Assembly,
-        typeof(ICountdown).Assembly,
-        typeof(IShell).Assembly,
-        typeof(IGreeter).Assembly,
-    ];
-
     private static readonly Assembly[] HostingAssemblies =
-    [
-        typeof(DigitalBrainBuilder).Assembly,
-        typeof(AIHostingExtensions).Assembly,
-        typeof(FlutterHostingExtensions).Assembly,
-        typeof(GoogleHostingExtensions).Assembly,
-        typeof(SalesforceHostingExtensions).Assembly,
-    ];
+        [.. PackageBoundarySupport.HostingPackages.Select(Assembly.Load)];
 
-    [Fact(DisplayName = "the kernel assembly reaches no vendor model SDK")]
-    public void TheKernelReachesNoVendorModelSdk()
+    private static readonly string KernelPackage = PackageOf(typeof(Neuron));
+
+    private static readonly string KernelNamespace =
+        typeof(Neuron).Namespace
+        ?? throw new InvalidOperationException($"{nameof(Neuron)} has no namespace.");
+
+    [Fact(DisplayName = "the kernel assembly reaches no vendor model SDK, Dart, or Flutter SDK")]
+    public void TheKernelReachesNoVendorModelSdkOrFlutterDartSdk()
     {
         var reachable = ReachableFrom(typeof(Neuron).Assembly);
-        Assert.DoesNotContain(
-            reachable,
-            reference => VendorModelSdks.Any(sdk =>
-                reference.StartsWith(sdk, StringComparison.Ordinal)));
+
+        Assert.DoesNotContain(reachable, IsVendorModelSdkAssembly);
+        Assert.DoesNotContain(reachable, PackageBoundarySupport.IsDartOrFlutterSdkPackage);
     }
 
     [Fact(DisplayName = "provider SDKs are owned by the AI runtime assembly")]
     public void TheAiRuntimeOwnsProviderSdks()
     {
         var reachable = ReachableFrom(typeof(AIModule).Assembly);
-        Assert.Contains(reachable, r => r.StartsWith("Microsoft.Extensions.AI", StringComparison.Ordinal));
-        Assert.Contains(reachable, r => r.StartsWith("OllamaSharp", StringComparison.Ordinal));
-        Assert.Contains(reachable, r => r.StartsWith("OpenAI", StringComparison.Ordinal));
+
+        foreach (var prefix in PackageBoundarySupport.ProviderSdkPrefixes)
+        {
+            if (prefix is "ModelContextProtocol")
+            {
+                continue;
+            }
+
+            Assert.Contains(
+                reachable,
+                reference => reference.StartsWith(prefix, StringComparison.Ordinal));
+        }
     }
 
     [Fact(DisplayName = "public packable types do not export MAF implementation types")]
     public void PublicPackableTypesDoNotExportMafTypes()
     {
         var mafExports = PackableProjects.Names
-            .Where(name => name is not ("DigitalBrain" or "DigitalBrain.Testing"))
+            .Where(name => name is not (PackageInventory.Metapackage or PackageInventory.Testing))
             .Select(Assembly.Load)
             .SelectMany(assembly => assembly.GetExportedTypes())
             .Where(type => type.Namespace?.StartsWith(
@@ -85,49 +68,6 @@ public sealed class AssemblyBoundaryContracts
     public void TheAbstractionsPackageIsALeaf()
         => Assert.DoesNotContain(ReachableFrom(typeof(NeuronId).Assembly), IsDigitalBrain);
 
-    [Fact(DisplayName = "every contracts assembly is free of Kernel")]
-    public void ContractsDoNotReferenceKernel()
-    {
-        foreach (var assembly in ContractAssemblies)
-        {
-            Assert.DoesNotContain(
-                assembly.GetReferencedAssemblies(),
-                reference => reference.Name == "DigitalBrain.Kernel");
-        }
-    }
-
-    [Fact(DisplayName = "every contracts assembly is free of Dart and Flutter SDK assemblies")]
-    public void ContractsAreFreeOfDartAndFlutterSdks()
-    {
-        foreach (var assembly in ContractAssemblies)
-        {
-            var references = assembly
-                .GetReferencedAssemblies()
-                .Select(reference => reference.Name!)
-                .ToArray();
-
-            Assert.DoesNotContain(
-                references,
-                name => name.StartsWith("Dart", StringComparison.OrdinalIgnoreCase));
-            Assert.DoesNotContain(
-                references,
-                name => name.Contains("Flutter", StringComparison.OrdinalIgnoreCase)
-                    && !name.StartsWith("DigitalBrain.Modules.Flutter", StringComparison.Ordinal)
-                    && !name.StartsWith("DigitalBrain.Flutter", StringComparison.Ordinal));
-        }
-    }
-
-    [Fact(DisplayName = "every Aspire.Hosting assembly is free of a direct Kernel reference")]
-    public void HostingAssembliesDoNotReferenceKernelDirectly()
-    {
-        foreach (var assembly in HostingAssemblies)
-        {
-            Assert.DoesNotContain(
-                assembly.GetReferencedAssemblies(),
-                reference => reference.Name == "DigitalBrain.Kernel");
-        }
-    }
-
     [Fact(DisplayName = "Aspire.Hosting public API carries no Kernel types in signatures or constraints")]
     public void HostingPublicApiIsFreeOfKernelTypes()
     {
@@ -139,37 +79,20 @@ public sealed class AssemblyBoundaryContracts
         Assert.Empty(offenders);
     }
 
-    [Fact(DisplayName = "the kernel assembly reaches no Flutter module, Dart SDK, or UI host")]
-    public void TheKernelReachesNoFlutterModuleOrDartSdk()
-    {
-        var reachable = ReachableFrom(typeof(Neuron).Assembly);
-        Assert.DoesNotContain(
-            reachable,
-            reference => reference.Contains("Flutter", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(
-            reachable,
-            reference => reference.StartsWith("Dart", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(
-            reachable,
-            reference => reference is "DigitalBrain.Ui"
-                || reference.StartsWith("DigitalBrain.Ui.", StringComparison.Ordinal));
-    }
-
     [Fact(DisplayName = "the kernel assembly carries no Flutter or UI surface vocabulary")]
     public void TheKernelCarriesNoFlutterOrUiVocabulary()
     {
         string[] forbiddenNameFragments =
         [
             "Flutter",
-            "IShell",
-            "IScene",
-            "OpenScene",
-            "SceneOpened",
-            "ControlActivated",
             "UiGateway",
             "UiSurface",
             "BuildContext",
             "Widget",
+            .. typeof(IShell).Assembly
+                .GetExportedTypes()
+                .Where(type => type.Namespace == typeof(IShell).Namespace)
+                .Select(type => type.Name),
         ];
 
         var offenders = typeof(Neuron).Assembly
@@ -184,27 +107,18 @@ public sealed class AssemblyBoundaryContracts
     }
 
     [Fact]
-    public void TheClientDoesNotReachTheKernel()
-        => Assert.DoesNotContain(
-            "DigitalBrain.Kernel",
-            ReachableFrom(typeof(DigitalBrainClient).Assembly),
-            StringComparer.Ordinal);
-
-    [Fact]
     public void TheAspireClientIntegrationDoesNotReachHosting()
         => Assert.DoesNotContain(
             ReachableFrom(typeof(DigitalBrainClientHostingExtensions).Assembly),
             reference => reference.StartsWith("Aspire.Hosting", StringComparison.Ordinal));
 
-    [Fact]
-    public void TheAspireHostingIntegrationDoesNotReachTheKernel()
-        => Assert.DoesNotContain(
-            "DigitalBrain.Kernel",
-            ReachableFrom(typeof(DigitalBrainBuilder).Assembly),
-            StringComparer.Ordinal);
+    private static bool IsVendorModelSdkAssembly(string assemblyName)
+        => PackageBoundarySupport.ProviderSdkPrefixes.Any(prefix =>
+               assemblyName.StartsWith(prefix, StringComparison.Ordinal))
+           || assemblyName.StartsWith("Microsoft.Extensions.AI", StringComparison.Ordinal);
 
     private static bool IsDigitalBrain(string assemblyName)
-        => assemblyName.StartsWith("DigitalBrain", StringComparison.Ordinal);
+        => assemblyName.StartsWith(PackageInventory.Metapackage, StringComparison.Ordinal);
 
     private static IEnumerable<string> KernelTypesInPublicApi(Assembly assembly)
     {
@@ -257,17 +171,18 @@ public sealed class AssemblyBoundaryContracts
 
     private static bool IsKernelType(Type type)
     {
-        if (type.IsGenericType)
+        if (type.IsGenericType && type.GetGenericArguments().Any(IsKernelType))
         {
-            if (type.GetGenericArguments().Any(IsKernelType))
-            {
-                return true;
-            }
+            return true;
         }
 
-        return type.Assembly.GetName().Name == "DigitalBrain.Kernel"
-            || type.Namespace?.StartsWith("DigitalBrain.Kernel", StringComparison.Ordinal) is true;
+        return type.Assembly.GetName().Name == KernelPackage
+            || type.Namespace?.StartsWith(KernelNamespace, StringComparison.Ordinal) is true;
     }
+
+    private static string PackageOf(Type type)
+        => type.Assembly.GetName().Name
+           ?? throw new InvalidOperationException($"Assembly for {type.FullName} has no name.");
 
     private static HashSet<string> ReachableFrom(Assembly root)
     {

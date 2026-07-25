@@ -8,6 +8,10 @@ namespace DigitalBrain.Aspire.Hosting;
 
 public static class DigitalBrainHostingExtensions
 {
+    public const string JournalConnectionName = "journal";
+    public const string StateProtectionKeyConfigurationKey = "DigitalBrain:Security:StateProtectionKey";
+    public const string ModulesConfigurationKey = "DigitalBrain:Modules";
+
     public static DigitalBrainBuilder AddDigitalBrain(
         this IDistributedApplicationBuilder builder,
         string name)
@@ -63,7 +67,7 @@ public static class DigitalBrainHostingExtensions
 
         if (brain.Journal is not null)
         {
-            builder.WithReference(brain.Journal, "journal");
+            builder.WithReference(brain.Journal, JournalConnectionName);
         }
 
         foreach (var dependency in brain.StartupDependencies)
@@ -77,14 +81,14 @@ public static class DigitalBrainHostingExtensions
         if (brain.StateProtectionKey is not null)
         {
             builder.WithEnvironment(
-                "DigitalBrain__Security__StateProtectionKey",
+                ConfigurationEnvironment(StateProtectionKeyConfigurationKey),
                 brain.StateProtectionKey);
         }
 
         for (var index = 0; index < brain.Modules.Count; index++)
         {
             builder.WithEnvironment(
-                $"DigitalBrain__Modules__{index}",
+                $"{ConfigurationEnvironment(ModulesConfigurationKey)}__{index}",
                 brain.Modules[index].Value);
         }
 
@@ -106,4 +110,7 @@ public static class DigitalBrainHostingExtensions
 
         return builder.WithReference(client.Brain.Orleans.AsClient());
     }
+
+    private static string ConfigurationEnvironment(string configurationKey)
+        => configurationKey.Replace(":", "__", StringComparison.Ordinal);
 }

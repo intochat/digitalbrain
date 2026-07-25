@@ -1,9 +1,15 @@
+using DigitalBrain.Abstractions;
+using DigitalBrain.Kernel;
+using DigitalBrain.Tests.Packages;
 using Xunit;
 
 namespace DigitalBrain.Tests.Boundary;
 
 public sealed class KernelPackageBoundaryContracts
 {
+    private static readonly string Kernel = PackageOf(typeof(Neuron));
+    private static readonly string Abstractions = PackageOf(typeof(NeuronId));
+
     public static TheoryData<string> ConsumerPathPackages { get; } =
         [.. PackageBoundarySupport.ConsumerPath];
 
@@ -15,7 +21,7 @@ public sealed class KernelPackageBoundaryContracts
     public void NothingOnTheConsumerPathCanReachTheKernel(string package)
     {
         Assert.DoesNotContain(
-            "DigitalBrain.Kernel",
+            Kernel,
             PackageBoundarySupport.ProjectsReachableFrom(package),
             StringComparer.Ordinal);
     }
@@ -25,11 +31,11 @@ public sealed class KernelPackageBoundaryContracts
     public void HostingPackagesDoNotDirectlyReferenceKernel(string package)
     {
         Assert.DoesNotContain(
-            "DigitalBrain.Kernel",
+            Kernel,
             PackageBoundarySupport.DirectCompileProjectReferencesOf(package),
             StringComparer.Ordinal);
         Assert.DoesNotContain(
-            "DigitalBrain.Kernel",
+            Kernel,
             PackageBoundarySupport.DirectPackageReferencesOf(package),
             StringComparer.Ordinal);
     }
@@ -38,16 +44,19 @@ public sealed class KernelPackageBoundaryContracts
     public void KernelCompileGraphIsAbstractionsOnly()
     {
         Assert.Equal(
-            ["DigitalBrain.Abstractions"],
-            PackageBoundarySupport.DirectCompileProjectReferencesOf("DigitalBrain.Kernel")
+            [Abstractions],
+            PackageBoundarySupport.DirectCompileProjectReferencesOf(Kernel)
                 .Order(StringComparer.Ordinal));
 
-        var reachable = PackageBoundarySupport.CompileProjectsReachableFrom("DigitalBrain.Kernel");
+        var reachable = PackageBoundarySupport.CompileProjectsReachableFrom(Kernel);
         Assert.DoesNotContain(
             reachable,
             project => project.Contains("Flutter", StringComparison.OrdinalIgnoreCase)
-                || project is "DigitalBrain.Ui"
-                || project.StartsWith("DigitalBrain.Ui.", StringComparison.Ordinal)
-                || project.StartsWith("DigitalBrain.Modules.", StringComparison.Ordinal));
+                || PackageInventory.IsUiFamilyProject(project)
+                || PackageInventory.IsModulesProject(project));
     }
+
+    private static string PackageOf(Type type)
+        => type.Assembly.GetName().Name
+           ?? throw new InvalidOperationException($"Assembly for {type.FullName} has no name.");
 }

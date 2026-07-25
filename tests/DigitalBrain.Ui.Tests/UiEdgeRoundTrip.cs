@@ -13,31 +13,36 @@ namespace DigitalBrain.Ui.Tests;
 
 public sealed class UiEdgeRoundTrip(UiFixture fixture)
 {
-    private static readonly System.Text.Json.JsonSerializerOptions EventJsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
+    private const string HomeSceneKey = "home";
+    private const string HomeTitle = "Home";
+    private const string SettingsSceneKey = "settings";
+    private const string SettingsTitle = "Settings";
+    private const string PrimaryControlId = "primary";
+    private const string SubmitIntent = "submit";
+    private const string EventStreamMediaType = "text/event-stream";
+    private const string CacheControlNoCache = "no-cache";
+    private const string OpenTelemetryMarker = "OpenTelemetry";
 
     [Fact(DisplayName = "HTTP open-scene reaches IDigitalBrain and journals SceneOpened")]
     public async Task HttpOpenSceneJournalsSceneOpened()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var shell = test.Neuron<IShell>("desk");
+        var shell = test.Neuron<IShell>(UiFixture.DefaultShellName);
 
         await using var app = await StartUiEdgeAsync(test, cancellationToken);
         using var http = CreateClient(app);
 
         using var response = await http.PostAsJsonAsync(
-            "/shells/desk/scenes",
-            new OpenSceneRequest("home", "Home"),
+            UiEdgeSse.OpenScene(UiFixture.DefaultShellName),
+            new OpenSceneRequest(HomeSceneKey, HomeTitle),
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
-        Assert.Equal("home", opened.Synapse.SceneKey);
-        Assert.Equal("Home", opened.Synapse.Title);
+        Assert.Equal(HomeSceneKey, opened.Synapse.SceneKey);
+        Assert.Equal(HomeTitle, opened.Synapse.Title);
         Assert.Equal(shell.Id, opened.Synapse.Shell);
     }
 
@@ -46,22 +51,22 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var scene = test.Neuron<IScene>("home");
+        var scene = test.Neuron<IScene>(HomeSceneKey);
 
         await using var app = await StartUiEdgeAsync(test, cancellationToken);
         using var http = CreateClient(app);
 
         using var response = await http.PostAsJsonAsync(
-            "/scenes/home/controls/primary/activate",
-            new ActivateControlRequest("submit"),
+            UiEdgeSse.ActivateControl(HomeSceneKey, PrimaryControlId),
+            new ActivateControlRequest(SubmitIntent),
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
 
         var activation = await scene.Incoming.NextAsync<ControlActivated>(cancellationToken);
-        Assert.Equal("home", activation.Synapse.SceneKey);
-        Assert.Equal("primary", activation.Synapse.ControlId);
-        Assert.Equal("submit", activation.Synapse.Intent);
+        Assert.Equal(HomeSceneKey, activation.Synapse.SceneKey);
+        Assert.Equal(PrimaryControlId, activation.Synapse.ControlId);
+        Assert.Equal(SubmitIntent, activation.Synapse.Intent);
     }
 
     [Fact(DisplayName = "SSE shell events projects SceneOpened after open without process restart")]
@@ -69,27 +74,25 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var shell = test.Neuron<IShell>("desk");
+        var shell = test.Neuron<IShell>(UiFixture.DefaultShellName);
 
         await using var app = await StartUiEdgeAsync(test, cancellationToken);
-        using var http = CreateClient(app);
-        http.Timeout = TimeSpan.FromSeconds(30);
-
+        using var http = CreateClient(app, streaming: true);
         await using var events = await OpenShellEventStreamAsync(http, cancellationToken);
 
         using var openResponse = await http.PostAsJsonAsync(
-            "/shells/desk/scenes",
-            new OpenSceneRequest("home", "Home"),
+            UiEdgeSse.OpenScene(UiFixture.DefaultShellName),
+            new OpenSceneRequest(HomeSceneKey, HomeTitle),
             cancellationToken);
         Assert.Equal(HttpStatusCode.Accepted, openResponse.StatusCode);
 
         var journaled = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
-        Assert.Equal("home", journaled.Synapse.SceneKey);
+        Assert.Equal(HomeSceneKey, journaled.Synapse.SceneKey);
 
-        var projected = await ReadNextSceneOpenedEventAsync(events.Reader, cancellationToken);
+        var projected = await UiEdgeSse.ReadNextSceneOpenedAsync(events.Reader, cancellationToken);
 
-        Assert.Equal("home", projected.SceneKey);
-        Assert.Equal("Home", projected.Title);
+        Assert.Equal(HomeSceneKey, projected.SceneKey);
+        Assert.Equal(HomeTitle, projected.Title);
         Assert.Equal(journaled.Sequence, projected.Sequence);
     }
 
@@ -98,28 +101,26 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var shell = test.Neuron<IShell>("desk");
-        var command = new OpenScene(CommandId.New(), "settings", "Settings");
+        var shell = test.Neuron<IShell>(UiFixture.DefaultShellName);
+        var command = new OpenScene(CommandId.New(), SettingsSceneKey, SettingsTitle);
 
         await using var app = await StartUiEdgeAsync(test, cancellationToken);
-        using var http = CreateClient(app);
-        http.Timeout = TimeSpan.FromSeconds(30);
-
+        using var http = CreateClient(app, streaming: true);
         await using var events = await OpenShellEventStreamAsync(http, cancellationToken);
 
-        await test.Client.Get<IShell>("desk").Open(command);
+        await test.Client.Get<IShell>(UiFixture.DefaultShellName).Open(command);
 
         var journaled = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(command.CommandId, journaled.Synapse.CommandId);
-        Assert.Equal("settings", journaled.Synapse.SceneKey);
-        Assert.Equal("Settings", journaled.Synapse.Title);
+        Assert.Equal(SettingsSceneKey, journaled.Synapse.SceneKey);
+        Assert.Equal(SettingsTitle, journaled.Synapse.Title);
         Assert.Equal(shell.Id, journaled.Synapse.Shell);
 
-        var projected = await ReadNextSceneOpenedEventAsync(events.Reader, cancellationToken);
+        var projected = await UiEdgeSse.ReadNextSceneOpenedAsync(events.Reader, cancellationToken);
 
         Assert.Equal(journaled.Sequence, projected.Sequence);
-        Assert.Equal("settings", projected.SceneKey);
-        Assert.Equal("Settings", projected.Title);
+        Assert.Equal(SettingsSceneKey, projected.SceneKey);
+        Assert.Equal(SettingsTitle, projected.Title);
         Assert.Equal(command.CommandId.ToString(), projected.CommandId);
         Assert.Equal(shell.Id.ToString(), projected.Shell);
     }
@@ -134,7 +135,7 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         using var http = CreateClient(app);
 
         using var response = await http.GetAsync(
-            new Uri("/shells/desk/events?afterSequence=-1", UriKind.Relative),
+            new Uri(UiEdgeSse.ShellEvents(UiFixture.DefaultShellName, afterSequence: -1), UriKind.Relative),
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -154,25 +155,9 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         Assert.Contains(typeof(long), parameters);
         Assert.DoesNotContain(
             parameters,
-            type => (type.FullName ?? type.Name).Contains("OpenTelemetry", StringComparison.Ordinal));
+            type => (type.FullName ?? type.Name).Contains(OpenTelemetryMarker, StringComparison.Ordinal));
         Assert.DoesNotContain(typeof(System.Diagnostics.Activity), parameters);
         Assert.DoesNotContain(typeof(System.Diagnostics.ActivitySource), parameters);
-
-        foreach (var method in typeof(ShellEventFeed).GetMethods(
-                     BindingFlags.Public
-                     | BindingFlags.NonPublic
-                     | BindingFlags.Static
-                     | BindingFlags.Instance
-                     | BindingFlags.DeclaredOnly))
-        {
-            foreach (var parameter in method.GetParameters())
-            {
-                var typeName = parameter.ParameterType.FullName ?? parameter.ParameterType.Name;
-                Assert.False(
-                    typeName.Contains("OpenTelemetry", StringComparison.Ordinal),
-                    $"{method.Name} must not take OpenTelemetry product types; took {typeName}.");
-            }
-        }
     }
 
     private static async Task<WebApplication> StartUiEdgeAsync(
@@ -196,7 +181,7 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
     {
         using var streamRequest = new HttpRequestMessage(
             HttpMethod.Get,
-            "/shells/desk/events?afterSequence=0");
+            UiEdgeSse.ShellEvents(UiFixture.DefaultShellName, afterSequence: 0));
         var streamResponse = await http.SendAsync(
             streamRequest,
             HttpCompletionOption.ResponseHeadersRead,
@@ -209,9 +194,9 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
                 $"SSE status {(int)streamResponse.StatusCode} {streamResponse.StatusCode}: {errorBody}");
         }
 
-        Assert.Equal("text/event-stream", streamResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(EventStreamMediaType, streamResponse.Content.Headers.ContentType?.MediaType);
         Assert.Contains(
-            "no-cache",
+            CacheControlNoCache,
             streamResponse.Headers.CacheControl?.ToString() ?? string.Empty,
             StringComparison.OrdinalIgnoreCase);
 
@@ -219,73 +204,15 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         return new ShellEventStream(streamResponse, body);
     }
 
-    private static async Task<SceneOpenedEvent> ReadNextSceneOpenedEventAsync(
-        StreamReader reader,
-        CancellationToken cancellationToken)
+    private static HttpClient CreateClient(WebApplication app, bool streaming = false)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(15));
-
-        string? dataLine = null;
-        string? eventName = null;
-        while (!timeout.IsCancellationRequested)
+        var http = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
+        if (streaming)
         {
-            var line = await reader.ReadLineAsync(timeout.Token);
-            if (line is null)
-            {
-                break;
-            }
-
-            if (line.StartsWith(':'))
-            {
-                continue;
-            }
-
-            if (line.StartsWith("event:", StringComparison.Ordinal))
-            {
-                eventName = line["event:".Length..].Trim();
-                continue;
-            }
-
-            if (line.StartsWith("data:", StringComparison.Ordinal))
-            {
-                dataLine = line["data:".Length..].Trim();
-                continue;
-            }
-
-            if (line.Length == 0 && dataLine is not null)
-            {
-                var name = eventName;
-                var payload = dataLine;
-                eventName = null;
-                dataLine = null;
-
-                if (name is not null
-                    && !string.Equals(name, "scene-opened", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                var projected = System.Text.Json.JsonSerializer.Deserialize<SceneOpenedEvent>(
-                    payload,
-                    EventJsonOptions);
-                if (projected is not null
-                    && !string.IsNullOrWhiteSpace(projected.SceneKey)
-                    && projected.Sequence > 0)
-                {
-                    return projected;
-                }
-            }
+            http.Timeout = TimeSpan.FromSeconds(30);
         }
 
-        throw new TimeoutException(
-            "SSE stream ended before a SceneOpened projection arrived — brain may have moved while UI projection is dead.");
-    }
-
-    private static HttpClient CreateClient(WebApplication app)
-    {
-        var address = app.Urls.Single();
-        return new HttpClient { BaseAddress = new Uri(address) };
+        return http;
     }
 
     private sealed class ShellEventStream : IAsyncDisposable

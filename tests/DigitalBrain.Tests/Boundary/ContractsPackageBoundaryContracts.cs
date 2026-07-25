@@ -1,9 +1,22 @@
+using DigitalBrain.AI;
+using DigitalBrain.Google;
+using DigitalBrain.Kernel;
+using DigitalBrain.Salesforce;
+using DigitalBrain.Tasks;
+using DigitalBrain.Tests.Packages;
 using Xunit;
 
 namespace DigitalBrain.Tests.Boundary;
 
 public sealed class ContractsPackageBoundaryContracts
 {
+    private static readonly string Kernel = PackageOf(typeof(Neuron));
+    private static readonly string AiRuntime = PackageOf(typeof(AIModule));
+    private static readonly string TasksRuntime = PackageOf(typeof(TasksModule));
+    private static readonly string TasksContracts = PackageOf(typeof(ITask));
+    private static readonly string GoogleRuntime = PackageOf(typeof(GoogleModule));
+    private static readonly string SalesforceRuntime = PackageOf(typeof(SalesforceModule));
+
     public static TheoryData<string> ConsumerPathPackages { get; } =
         [.. PackageBoundarySupport.ConsumerPath];
 
@@ -39,7 +52,7 @@ public sealed class ContractsPackageBoundaryContracts
     public void NothingOnTheConsumerPathCanReachTesting(string package)
     {
         Assert.DoesNotContain(
-            "DigitalBrain.Testing",
+            PackageInventory.Testing,
             PackageBoundarySupport.ProjectsReachableFrom(package),
             StringComparer.Ordinal);
     }
@@ -48,12 +61,9 @@ public sealed class ContractsPackageBoundaryContracts
     [MemberData(nameof(ConsumerPathPackages))]
     public void NothingOnTheConsumerPathCanReachDartOrFlutterSdkPackages(string package)
     {
-        var offenders = PackageBoundarySupport.PackagesReachableFrom(package)
-            .Where(PackageBoundarySupport.IsDartOrFlutterSdkPackage)
-            .Order(StringComparer.Ordinal)
-            .ToList();
-
-        Assert.Empty(offenders);
+        Assert.DoesNotContain(
+            PackageBoundarySupport.PackagesReachableFrom(package),
+            PackageBoundarySupport.IsDartOrFlutterSdkPackage);
     }
 
     [Theory]
@@ -61,43 +71,28 @@ public sealed class ContractsPackageBoundaryContracts
     public void ContractsPackagesAreFreeOfKernelAndDartFlutterSdks(string package)
     {
         Assert.DoesNotContain(
-            "DigitalBrain.Kernel",
-            PackageBoundarySupport.DirectCompileProjectReferencesOf(package),
-            StringComparer.Ordinal);
-        Assert.DoesNotContain(
-            "DigitalBrain.Kernel",
+            Kernel,
             PackageBoundarySupport.ProjectsReachableFrom(package),
             StringComparer.Ordinal);
-        Assert.Empty(
-            PackageBoundarySupport.DirectPackageReferencesOf(package)
-                .Where(PackageBoundarySupport.IsDartOrFlutterSdkPackage)
-                .Order(StringComparer.Ordinal)
-                .ToList());
-        Assert.Empty(
-            PackageBoundarySupport.PackagesReachableFrom(package)
-                .Where(PackageBoundarySupport.IsDartOrFlutterSdkPackage)
-                .Order(StringComparer.Ordinal)
-                .ToList());
+        Assert.DoesNotContain(
+            PackageBoundarySupport.PackagesReachableFrom(package),
+            PackageBoundarySupport.IsDartOrFlutterSdkPackage);
     }
 
     [Fact]
     public void NoProductionTreeReferencesDigitalBrainTesting()
     {
-        string[] roots = ["src", "modules", "hosts", "samples"];
-        var offenders = roots
+        var offenders = RepositoryLayout.ProjectTreeRoots
             .SelectMany(root => Directory.EnumerateFiles(
-                Path.Combine(PackageBoundarySupport.RepositoryRoot, root),
+                Path.Combine(RepositoryLayout.Root, root),
                 "*.csproj",
                 SearchOption.AllDirectories))
-            .Where(project => !PackageBoundarySupport.IsIgnoredLookupPath(project))
-            .Where(project => !string.Equals(
-                Path.GetFileNameWithoutExtension(project),
-                "DigitalBrain.Testing",
-                StringComparison.Ordinal))
-            .Where(project => PackageBoundarySupport
-                .DirectProjectReferencesOf(Path.GetFileNameWithoutExtension(project)!)
-                .Contains("DigitalBrain.Testing", StringComparer.Ordinal))
-            .Select(Path.GetFileNameWithoutExtension)
+            .Where(project => !RepositoryLayout.IsIgnoredLookupPath(project))
+            .Select(project => Path.GetFileNameWithoutExtension(project)!)
+            .Where(name => !string.Equals(name, PackageInventory.Testing, StringComparison.Ordinal))
+            .Where(name => PackageBoundarySupport
+                .DirectProjectReferencesOf(name)
+                .Contains(PackageInventory.Testing, StringComparer.Ordinal))
             .Order(StringComparer.Ordinal)
             .ToList();
 
@@ -109,7 +104,7 @@ public sealed class ContractsPackageBoundaryContracts
     public void McpProvidersDependOnSharedMechanics(string package)
     {
         Assert.Contains(
-            "DigitalBrain.Integrations.Mcp",
+            PackageInventory.IntegrationsMcp,
             PackageBoundarySupport.DirectProjectReferencesOf(package));
         Assert.DoesNotContain(
             PackageBoundarySupport.DirectPackageReferencesOf(package),
@@ -122,27 +117,31 @@ public sealed class ContractsPackageBoundaryContracts
     public void AiRuntimeUsesSharedSecurity()
     {
         Assert.Contains(
-            "DigitalBrain.Security",
-            PackageBoundarySupport.DirectProjectReferencesOf("DigitalBrain.Modules.AI"));
+            PackageInventory.Security,
+            PackageBoundarySupport.DirectProjectReferencesOf(AiRuntime));
         Assert.DoesNotContain(
             "Microsoft.AspNetCore.DataProtection",
-            PackageBoundarySupport.DirectPackageReferencesOf("DigitalBrain.Modules.AI"));
+            PackageBoundarySupport.DirectPackageReferencesOf(AiRuntime));
     }
 
     [Fact]
     public void TasksRemainIndependentFromAiAndProviders()
     {
         Assert.Equal(
-            ["DigitalBrain.Kernel", "DigitalBrain.Modules.Tasks.Contracts"],
-            PackageBoundarySupport.DirectCompileProjectReferencesOf("DigitalBrain.Modules.Tasks")
+            new[] { Kernel, TasksContracts }.Order(StringComparer.Ordinal),
+            PackageBoundarySupport.DirectCompileProjectReferencesOf(TasksRuntime)
                 .Order(StringComparer.Ordinal));
 
-        var projects = PackageBoundarySupport.CompileProjectsReachableFrom("DigitalBrain.Modules.Tasks");
+        var projects = PackageBoundarySupport.CompileProjectsReachableFrom(TasksRuntime);
         Assert.DoesNotContain(
             projects,
-            project => project.StartsWith("DigitalBrain.Modules.AI", StringComparison.Ordinal)
-                || project.StartsWith("DigitalBrain.Modules.Google", StringComparison.Ordinal)
-                || project.StartsWith("DigitalBrain.Modules.Salesforce", StringComparison.Ordinal)
-                || project.StartsWith("DigitalBrain.Integrations.Mcp", StringComparison.Ordinal));
+            project => project.StartsWith(AiRuntime, StringComparison.Ordinal)
+                || project.StartsWith(GoogleRuntime, StringComparison.Ordinal)
+                || project.StartsWith(SalesforceRuntime, StringComparison.Ordinal)
+                || project.StartsWith(PackageInventory.IntegrationsMcp, StringComparison.Ordinal));
     }
+
+    private static string PackageOf(Type type)
+        => type.Assembly.GetName().Name
+           ?? throw new InvalidOperationException($"Assembly for {type.FullName} has no name.");
 }

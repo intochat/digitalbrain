@@ -2,12 +2,17 @@ using Aspire.Hosting;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
+using DigitalBrain.Tests.Boundary;
+using DigitalBrain.Tests.Packages;
 using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
 
 public sealed class FlutterHostingSelectionContracts
 {
+    private const string QuickstartAppHost = "DigitalBrain.Quickstart.AppHost";
+    private const string TestingAppHost = "DigitalBrain.TestingAppHost";
+
     [Fact(DisplayName =
         "omit FlutterModule → runtime graph has no digitalbrain-ui / digitalbrain-flutter")]
     public void OmitFlutterModuleProjectsNoOsSurfaceResources()
@@ -17,7 +22,7 @@ public sealed class FlutterHostingSelectionContracts
 
         _ = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: "http")
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UiHttpEndpointName)
             .WithReference(brain);
 
         FlutterHostingProjectionSupport.AssertNoOsSurfaceResources(builder);
@@ -33,7 +38,7 @@ public sealed class FlutterHostingSelectionContracts
 
         var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: "http")
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UiHttpEndpointName)
             .WithReference(brain);
 
         var siloEnvironment = await FlutterHostingProjectionSupport
@@ -51,80 +56,27 @@ public sealed class FlutterHostingSelectionContracts
     }
 
     [Fact(DisplayName =
-        "Flutter Aspire.Hosting package is Kernel-free and hosts only via Aspire.Hosting")]
-    public void FlutterHostingPackageIsKernelFreeAndHostsViaAspireHosting()
+        "product AppHost selects Flutter.Aspire.Hosting; companions cannot project or hand-wire OS surface")]
+    public void AppHostsSelectFlutterOsSurfaceOnlyOnProduct()
     {
-        Assert.Equal(
-            "DigitalBrain.Flutter.Aspire.Hosting",
-            typeof(FlutterHostingExtensions).Namespace);
-
-        var references = typeof(FlutterHostingExtensions).Assembly
-            .GetReferencedAssemblies()
-            .Select(reference => reference.Name)
+        var product = PackageBoundarySupport
+            .DirectCompileProjectReferencesOf(PackageInventory.ProductAppHost)
             .ToHashSet(StringComparer.Ordinal);
-        Assert.DoesNotContain("DigitalBrain.Kernel", references);
-        Assert.Contains("DigitalBrain.Aspire.Hosting", references);
-        Assert.Contains("DigitalBrain.Modules.Flutter", references);
-    }
+        Assert.Contains(PackageInventory.ModulesFlutterAspireHosting, product);
+        Assert.DoesNotContain(PackageInventory.Ui, product);
 
-    [Fact(DisplayName =
-        "production AppHost composes OS surface via FlutterModule host options, not hand-wire")]
-    public void ProductionAppHostComposesUiThroughModuleHosting()
-    {
-        var appHost = File.ReadAllText(Path.Combine(
-            FlutterHostingProjectionSupport.RepositoryRoot,
-            "hosts",
-            "DigitalBrain.AppHost",
-            "AppHost.cs"));
-
-        Assert.Contains("AddModule<FlutterModule>", appHost, StringComparison.Ordinal);
-        Assert.Contains("WithUiEdge", appHost, StringComparison.Ordinal);
-        Assert.Contains("WithFlutterHost", appHost, StringComparison.Ordinal);
-        FlutterHostingProjectionSupport.AssertNoOsSurfaceHandWire(appHost);
-    }
-
-    [Fact(DisplayName =
-        "Quickstart and Testing AppHosts omit OS surface selection and never hand-wire Ui/Flutter")]
-    public void CompanionAppHostsOmitOsSurfaceAndHandWire()
-    {
-        var root = FlutterHostingProjectionSupport.RepositoryRoot;
-        var quickstart = File.ReadAllText(Path.Combine(
-            root,
-            "hosts",
-            "DigitalBrain.Quickstart.AppHost",
-            "AppHost.cs"));
-        var testing = File.ReadAllText(Path.Combine(
-            root,
-            "hosts",
-            "DigitalBrain.TestingAppHost",
-            "AppHost.cs"));
-        var quickstartProject = File.ReadAllText(Path.Combine(
-            root,
-            "hosts",
-            "DigitalBrain.Quickstart.AppHost",
-            "DigitalBrain.Quickstart.AppHost.csproj"));
-        var testingProject = File.ReadAllText(Path.Combine(
-            root,
-            "hosts",
-            "DigitalBrain.TestingAppHost",
-            "DigitalBrain.TestingAppHost.csproj"));
-
-        Assert.Contains("AddModule<QuickstartModule>", quickstart, StringComparison.Ordinal);
-        Assert.DoesNotContain("AddModule", testing, StringComparison.Ordinal);
-
-        foreach (var appHost in new[] { quickstart, testing })
+        foreach (var companion in new[] { QuickstartAppHost, TestingAppHost })
         {
-            Assert.DoesNotContain("FlutterModule", appHost, StringComparison.Ordinal);
-            Assert.DoesNotContain("WithUiEdge", appHost, StringComparison.Ordinal);
-            Assert.DoesNotContain("WithFlutterHost", appHost, StringComparison.Ordinal);
-            FlutterHostingProjectionSupport.AssertNoOsSurfaceHandWire(appHost);
-        }
+            var direct = PackageBoundarySupport
+                .DirectCompileProjectReferencesOf(companion)
+                .ToHashSet(StringComparer.Ordinal);
+            Assert.DoesNotContain(PackageInventory.ModulesFlutterAspireHosting, direct);
+            Assert.DoesNotContain(PackageInventory.ModulesFlutter, direct);
+            Assert.DoesNotContain(PackageInventory.Ui, direct);
 
-        foreach (var project in new[] { quickstartProject, testingProject })
-        {
-            Assert.DoesNotContain("DigitalBrain.Modules.Flutter", project, StringComparison.Ordinal);
-            Assert.DoesNotContain("DigitalBrain.Ui", project, StringComparison.Ordinal);
-            Assert.DoesNotContain("Flutter.Aspire.Hosting", project, StringComparison.Ordinal);
+            var reachable = PackageBoundarySupport.CompileProjectsReachableFrom(companion);
+            Assert.DoesNotContain(PackageInventory.ModulesFlutterAspireHosting, reachable);
+            Assert.DoesNotContain(PackageInventory.Ui, reachable);
         }
     }
 }

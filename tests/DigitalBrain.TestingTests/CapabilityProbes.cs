@@ -29,7 +29,9 @@ internal sealed class CapabilityCaller :
 
         return GrainFactory
             .GetGrain<ICapabilityTarget>(
-                NeuronId.For<ICapabilityTarget>(Id.Owner, "target").ToGrainId())
+                NeuronId.For<ICapabilityTarget>(
+                    Id.Owner,
+                    TestingScenario.CapabilityTarget).ToGrainId())
             .Poke();
     }
 }

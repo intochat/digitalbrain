@@ -7,24 +7,37 @@ namespace DigitalBrain.TestingTests;
 
 public sealed class JournalFaultContracts(TestingFixture fixture)
 {
+    private const string BrainCleanupOperation = "brain.cleanup";
+    private const string UnconsumedJournalFaultsRemain =
+        "Unconsumed journal commit faults remain";
+    private const string SessionCommitFailure = "session journal commit failure";
+    private const string NeverFiredFault = "never fired";
+    private const string DisarmedWithoutFire = "disarmed without fire";
+
     [Fact(DisplayName = "FailNextJournalCommit fails the next journal write for the target neuron")]
     public async Task FailNextJournalCommitFailsTheNextJournalWrite()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var session = test.Neuron<ISessionNeuron>("session");
-        var greeter = test.Neuron<IGreeter>("welcome");
+        var session = test.Neuron<ISessionNeuron>(TestingScenario.Session);
+        var greeter = test.Neuron<IGreeter>(TestingScenario.WelcomeGreeter);
 
-        await using (var fault = session.FailNextJournalCommit("session journal commit failure"))
+        await using (var fault = session.FailNextJournalCommit(SessionCommitFailure))
         {
             var failure = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => test.Client.SendAsync<IGreeter>("welcome", new SayHello("Ada")));
-            Assert.Equal("session journal commit failure", failure.Message);
+                () => test.Client.SendAsync<IGreeter>(
+                    greeter.Id.Name,
+                    new SayHello(TestingScenario.Guest)));
+            Assert.Equal(SessionCommitFailure, failure.Message);
         }
 
-        await test.Client.SendAsync<IGreeter>("welcome", new SayHello("Ada"));
+        await test.Client.SendAsync<IGreeter>(
+            greeter.Id.Name,
+            new SayHello(TestingScenario.Guest));
         var greeted = await greeter.Outgoing.NextAsync<Greeted>(cancellationToken);
-        Assert.Equal("Hello, Ada.", greeted.Synapse.Message);
+        Assert.Equal(
+            TestingScenario.GreetedMessage(TestingScenario.Guest),
+            greeted.Synapse.Message);
     }
 
     [Fact(DisplayName = "An unconsumed journal fault fails TestBrain dispose with brain.cleanup diagnostics")]
@@ -32,22 +45,22 @@ public sealed class JournalFaultContracts(TestingFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var test = await fixture.CreateBrainAsync(cancellationToken);
-        var greeter = test.Neuron<IGreeter>("welcome");
-        _ = greeter.FailNextJournalCommit("never fired");
+        var greeter = test.Neuron<IGreeter>(TestingScenario.WelcomeGreeter);
+        _ = greeter.FailNextJournalCommit(NeverFiredFault);
 
         var failure = await Assert.ThrowsAsync<BrainTestFailureException>(
             async () => await test.DisposeAsync());
 
         Assert.Contains(
-            "brain.cleanup",
+            BrainCleanupOperation,
             failure.Message,
             StringComparison.Ordinal);
         var leak = Assert.IsType<InvalidOperationException>(failure.InnerException);
         Assert.Contains(
-            "Unconsumed journal commit faults remain",
+            UnconsumedJournalFaultsRemain,
             leak.Message,
             StringComparison.Ordinal);
-        Assert.Contains("never fired", leak.Message, StringComparison.Ordinal);
+        Assert.Contains(NeverFiredFault, leak.Message, StringComparison.Ordinal);
         Assert.Contains(greeter.Id.ToString(), leak.Message, StringComparison.Ordinal);
     }
 
@@ -56,14 +69,18 @@ public sealed class JournalFaultContracts(TestingFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var greeter = test.Neuron<IGreeter>("welcome");
+        var greeter = test.Neuron<IGreeter>(TestingScenario.WelcomeGreeter);
 
-        await using (greeter.FailNextJournalCommit("disarmed without fire"))
+        await using (greeter.FailNextJournalCommit(DisarmedWithoutFire))
         {
         }
 
-        await test.Client.SendAsync<IGreeter>("welcome", new SayHello("Ada"));
+        await test.Client.SendAsync<IGreeter>(
+            greeter.Id.Name,
+            new SayHello(TestingScenario.Guest));
         var greeted = await greeter.Outgoing.NextAsync<Greeted>(cancellationToken);
-        Assert.Equal("Hello, Ada.", greeted.Synapse.Message);
+        Assert.Equal(
+            TestingScenario.GreetedMessage(TestingScenario.Guest),
+            greeted.Synapse.Message);
     }
 }

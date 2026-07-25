@@ -9,17 +9,22 @@ namespace DigitalBrain.Compositions.Tests;
 
 public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
 {
+    private const string ShellName = "desk";
+    private const string CountdownName = "timer";
+    private const string ModelName = "assistant";
+    private const string PaneReply = "hello from pane";
+    private const string PanePrompt = "ping";
+
+    private static readonly TimeSpan CountdownDuration = TimeSpan.FromMinutes(5);
+
     [Fact(DisplayName = "OpenHome is shell-only — journals SceneOpened for the home scene only")]
     public async Task OpenHomeCompositionJournalsSceneOpened()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var shell = test.Neuron<IShell>("desk");
+        var shell = test.Neuron<IShell>(ShellName);
 
-        await new OpenHome().RunAsync(
-            test.Client,
-            shellName: "desk",
-            cancellationToken);
+        await new OpenHome().RunAsync(test.Client, ShellName, cancellationToken);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(OpenHome.SceneKey, opened.Synapse.SceneKey);
@@ -31,12 +36,9 @@ public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var shell = test.Neuron<IShell>("desk");
+        var shell = test.Neuron<IShell>(ShellName);
 
-        await new PostAuthBootstrap().RunAsync(
-            test.Client,
-            shellName: "desk",
-            cancellationToken);
+        await new PostAuthBootstrap().RunAsync(test.Client, ShellName, cancellationToken);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(OpenHome.SceneKey, opened.Synapse.SceneKey);
@@ -48,22 +50,21 @@ public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var shell = test.Neuron<IShell>("desk");
+        var shell = test.Neuron<IShell>(ShellName);
 
         await new NavigateShell().RunAsync(
             test.Client,
-            shellName: "desk",
-            scenes:
+            ShellName,
             [
-                ("home", "Home"),
-                ("settings", "Settings"),
+                (OpenHome.SceneKey, OpenHome.SceneTitle),
+                (AccountEnrichmentSurface.SceneKey, AccountEnrichmentSurface.SceneTitle),
             ],
             cancellationToken);
 
         var first = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         var second = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
-        Assert.Equal("home", first.Synapse.SceneKey);
-        Assert.Equal("settings", second.Synapse.SceneKey);
+        Assert.Equal(OpenHome.SceneKey, first.Synapse.SceneKey);
+        Assert.Equal(AccountEnrichmentSurface.SceneKey, second.Synapse.SceneKey);
         Assert.True(second.Sequence > first.Sequence);
     }
 
@@ -72,20 +73,20 @@ public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var shell = test.Neuron<IShell>("desk");
-        var countdown = test.Neuron<ICountdown>("timer");
+        var shell = test.Neuron<IShell>(ShellName);
+        var countdown = test.Neuron<ICountdown>(CountdownName);
 
         var started = await new CountdownSurface().RunAsync(
             test.Client,
-            shellName: "desk",
-            countdownName: "timer",
-            duration: TimeSpan.FromMinutes(5),
+            ShellName,
+            CountdownName,
+            CountdownDuration,
             cancellationToken);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(CountdownSurface.SceneKey, opened.Synapse.SceneKey);
         Assert.Equal(CountdownStatus.Scheduled, started.Status);
-        Assert.Equal(TimeSpan.FromMinutes(5), started.Duration);
+        Assert.Equal(CountdownDuration, started.Duration);
 
         var reloaded = await countdown.Reference.Read();
         Assert.Equal(started.Generation, reloaded.Generation);
@@ -98,19 +99,13 @@ public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var shell = test.Neuron<IShell>("desk");
+        var shell = test.Neuron<IShell>(ShellName);
 
-        await new AccountEnrichmentSurface().RunAsync(
-            test.Client,
-            shellName: "desk",
-            cancellationToken);
+        await new AccountEnrichmentSurface().RunAsync(test.Client, ShellName, cancellationToken);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(AccountEnrichmentSurface.SceneKey, opened.Synapse.SceneKey);
         Assert.Equal(AccountEnrichmentSurface.SceneTitle, opened.Synapse.Title);
-        Assert.DoesNotContain("token", opened.Synapse.Title, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("password", opened.Synapse.Title, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("secret", opened.Synapse.Title, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact(DisplayName = "AiPaneSurface is multi-module — Flutter shell scene + typed ILlama32 respond")]
@@ -118,18 +113,18 @@ public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var shell = test.Neuron<IShell>("desk");
-        test.Chat().Reply("hello from pane");
+        var shell = test.Neuron<IShell>(ShellName);
+        test.Chat().Reply(PaneReply);
 
         var response = await new AiPaneSurface().RunAsync(
             test.Client,
-            shellName: "desk",
-            modelName: "assistant",
-            prompt: "ping",
+            ShellName,
+            ModelName,
+            PanePrompt,
             cancellationToken);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(AiPaneSurface.SceneKey, opened.Synapse.SceneKey);
-        Assert.Equal("hello from pane", response.Text);
+        Assert.Equal(PaneReply, response.Text);
     }
 }

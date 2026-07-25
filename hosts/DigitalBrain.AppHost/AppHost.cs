@@ -11,7 +11,7 @@ using DigitalBrain.Salesforce.Aspire.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var brain = builder.AddDigitalBrain("brain");
+var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
 
 brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
 brain.AddModule<FlutterModule>(flutter => flutter
@@ -20,16 +20,21 @@ brain.AddModule<FlutterModule>(flutter => flutter
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 
-var silo = builder.AddProject<Projects.DigitalBrain_Host>("silo")
+var silo = builder.AddProject<Projects.DigitalBrain_Host>(ProductSurfaceResources.Silo)
     .WithReference(brain);
 
-builder.AddProject<Projects.DigitalBrain_Mcp>("digitalbrain-mcp")
+builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
     .WithReference(brain.AsClient())
     .WaitFor(silo)
-    .WithEnvironment("DigitalBrain__Owner", "dev")
-    .WithHttpEndpoint(port: 5000, name: "http", isProxied: false);
+    .WithEnvironment(
+        FlutterHostingExtensions.OwnerEnvironmentVariable,
+        FlutterHostingExtensions.DefaultOwner)
+    .WithHttpEndpoint(
+        port: ProductSurfaceResources.McpHttpPort,
+        name: ProductSurfaceResources.McpHttpEndpointName,
+        isProxied: false);
 
-builder.AddViteApp("website", "../../docs")
+builder.AddViteApp(ProductSurfaceResources.Website, ProductSurfaceResources.WebsiteContentPath)
     .WithExternalHttpEndpoints();
 
 builder.Build().Run();

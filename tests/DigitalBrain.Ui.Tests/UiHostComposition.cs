@@ -1,6 +1,7 @@
 using System.Net;
 using DigitalBrain.Aspire;
 using DigitalBrain.Testing;
+using DigitalBrain.Ui;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
@@ -8,32 +9,33 @@ namespace DigitalBrain.Ui.Tests;
 
 public sealed class UiHostComposition(UiFixture fixture)
 {
-    [Fact(DisplayName = "product client owner defaults to dev when DigitalBrain:Owner is absent")]
+    [Fact(DisplayName = "product client owner defaults to DefaultOwner when DigitalBrain:Owner is absent")]
     public void ResolveOwnerDefaultsToDev()
     {
         var configuration = new ConfigurationBuilder().Build();
         Assert.Equal(
             DigitalBrainClientHostingExtensions.DefaultOwner,
             DigitalBrainClientHostingExtensions.ResolveOwner(configuration));
-        Assert.Equal("dev", DigitalBrainClientHostingExtensions.DefaultOwner);
+        Assert.Equal(UiFixture.DefaultOwner, DigitalBrainClientHostingExtensions.DefaultOwner);
     }
 
     [Fact(DisplayName = "product client owner reads DigitalBrain:Owner configuration key")]
     public void ResolveOwnerReadsConfiguredOwner()
     {
+        const string configuredOwner = "edge-owner";
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                [DigitalBrainClientHostingExtensions.OwnerConfigurationKey] = "edge-owner",
+                [UiFixture.OwnerConfigurationKey] = configuredOwner,
             })
             .Build();
 
         Assert.Equal(
-            "edge-owner",
+            configuredOwner,
             DigitalBrainClientHostingExtensions.ResolveOwner(configuration));
     }
 
-    [Fact(DisplayName = "MapUiHost exposes /health and product shell routes on one composition path")]
+    [Fact(DisplayName = "MapUiHost exposes health and product shell routes on one composition path")]
     public async Task MapUiHostExposesHealthAndShellRoutes()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -50,18 +52,22 @@ public sealed class UiHostComposition(UiFixture fixture)
 
         using var http = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
 
-        using var health = await http.GetAsync(new Uri("/health", UriKind.Relative), cancellationToken);
+        using var health = await http.GetAsync(
+            new Uri(UiFixture.HealthPath, UriKind.Relative),
+            cancellationToken);
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
-        Assert.Equal("\"healthy\"", (await health.Content.ReadAsStringAsync(cancellationToken)).Trim());
+        Assert.Equal(
+            $"\"{UiEdgeContract.HealthResponse}\"",
+            (await health.Content.ReadAsStringAsync(cancellationToken)).Trim());
 
         using var open = await http.PostAsJsonAsync(
-            "/shells/desk/scenes",
+            UiEdgeSse.OpenScene(UiFixture.DefaultShellName),
             new OpenSceneRequest("home", "Home"),
             cancellationToken);
         Assert.Equal(HttpStatusCode.Accepted, open.StatusCode);
 
         using var badCursor = await http.GetAsync(
-            new Uri("/shells/desk/events?afterSequence=-1", UriKind.Relative),
+            new Uri(UiEdgeSse.ShellEvents(UiFixture.DefaultShellName, afterSequence: -1), UriKind.Relative),
             cancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, badCursor.StatusCode);
     }

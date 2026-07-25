@@ -12,7 +12,12 @@ namespace DigitalBrain.HostTests;
     "CA1515:Consider making public types internal",
     Justification = "xUnit assembly fixture types must be public.")]
 public sealed class TestingAppHostFixture :
-    DigitalBrainAppHostFixture<Projects.DigitalBrain_TestingAppHost>;
+    DigitalBrainAppHostFixture<Projects.DigitalBrain_TestingAppHost>
+{
+    public const string SiloResourceName = "silo";
+
+    public const string HealthPath = "/health";
+}
 
 [SuppressMessage(
     "Design",

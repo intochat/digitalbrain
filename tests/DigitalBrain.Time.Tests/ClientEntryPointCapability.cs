@@ -12,13 +12,12 @@ public sealed class ClientEntryPointCapability(TimeFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var countdown = test.Neuron<ICountdown>("entry");
-        var destination = test.Neuron<ICountdown>("destination");
+        var (countdown, destination) = TimeFixture.Pair(test);
 
-        var started = await countdown.Reference.Start(new StartCountdown(
-            CommandId.New(),
-            TimeSpan.FromHours(1),
-            destination.Id));
+        var started = await TimeFixture.Start(
+            countdown,
+            destination,
+            TimeSpan.FromHours(1));
 
         Assert.Equal(CountdownStatus.Scheduled, started.Status);
 

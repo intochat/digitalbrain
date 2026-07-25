@@ -47,7 +47,7 @@ internal static class FlutterHostLaunch
     private static Result ResolveDesktop(string packageRoot, FlutterHostOptions options)
     {
         var deviceTarget = string.IsNullOrWhiteSpace(options.DeviceTarget)
-            ? "windows"
+            ? FlutterHostingExtensions.DefaultDeviceTarget
             : options.DeviceTarget;
         var workDir = ResolveDesktopPackageDirectory(packageRoot, deviceTarget)
             ?? throw new InvalidOperationException(
@@ -74,7 +74,7 @@ internal static class FlutterHostLaunch
         }
 
         var dart = string.IsNullOrWhiteSpace(options.DartCommand)
-            ? Environment.GetEnvironmentVariable("DART_COMMAND") ?? "dart"
+            ? Environment.GetEnvironmentVariable(FlutterHostingExtensions.DartCommandEnvironmentVariable) ?? "dart"
             : options.DartCommand;
         return new Result(
             dart,
@@ -100,7 +100,8 @@ internal static class FlutterHostLaunch
             return options.FlutterCommand;
         }
 
-        var fromEnv = Environment.GetEnvironmentVariable("FLUTTER_COMMAND");
+        var fromEnv = Environment.GetEnvironmentVariable(
+            FlutterHostingExtensions.FlutterCommandEnvironmentVariable);
         if (!string.IsNullOrWhiteSpace(fromEnv))
         {
             return fromEnv;

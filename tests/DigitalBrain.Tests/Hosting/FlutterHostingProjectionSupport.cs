@@ -1,17 +1,22 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Flutter.Aspire.Hosting;
+using DigitalBrain.Tests.Boundary;
 using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
 
 internal static class FlutterHostingProjectionSupport
 {
-    public static readonly string RepositoryRoot = LocateRepositoryRoot();
+    public const string JournalConnectionEnvironmentKey =
+        "ConnectionStrings__" + DigitalBrainHostingExtensions.JournalConnectionName;
+
+    public static readonly string RepositoryRoot = PackageBoundarySupport.RepositoryRoot;
 
     public static string UiProjectPath => Path.Combine(
         RepositoryRoot,
-        "hosts",
+        RepositoryLayout.Hosts,
         "DigitalBrain.Ui",
         "DigitalBrain.Ui.csproj");
 
@@ -35,7 +40,7 @@ internal static class FlutterHostingProjectionSupport
             File.Exists(Path.Combine(shellDirectory, "lib", "main.dart")),
             "shell Windows chrome requires lib/main.dart (Desktop host uses shell/ under pure-Dart root).");
         Assert.True(
-            Directory.Exists(Path.Combine(shellDirectory, "windows")),
+            Directory.Exists(Path.Combine(shellDirectory, FlutterHostingExtensions.DefaultDeviceTarget)),
             "shell Windows chrome requires windows/ (Desktop host uses shell/ under pure-Dart root).");
         Assert.False(
             File.Exists(Path.Combine(
@@ -59,12 +64,12 @@ internal static class FlutterHostingProjectionSupport
             File.Exists(Path.Combine(
                 clientDirectory,
                 FlutterHostingExtensions.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar))),
-            "pure-Dart package hosts bin/digitalbrain_host.dart.");
+            $"pure-Dart package hosts {FlutterHostingExtensions.HeadlessHostEntry}.");
         Assert.False(
             File.Exists(Path.Combine(clientDirectory, "lib", "main.dart")),
             "desktop entry moved to shell/ — root must not claim lib/main.dart.");
         Assert.False(
-            Directory.Exists(Path.Combine(clientDirectory, "windows")),
+            Directory.Exists(Path.Combine(clientDirectory, FlutterHostingExtensions.DefaultDeviceTarget)),
             "desktop runner moved to shell/ — root must not claim windows/.");
         var pubspec = await File.ReadAllTextAsync(
             Path.Combine(clientDirectory, "pubspec.yaml"),
@@ -99,7 +104,7 @@ internal static class FlutterHostingProjectionSupport
                 endpoint.Name,
                 FlutterHostingExtensions.UiHttpEndpointName,
                 StringComparison.Ordinal));
-        Assert.Equal("http", http.UriScheme, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(FlutterHostingExtensions.UiHttpEndpointName, http.UriScheme, StringComparer.OrdinalIgnoreCase);
     }
 
     public static void AssertExclusiveFlutterHostEnvironment(HashSet<string> environment)
@@ -119,7 +124,7 @@ internal static class FlutterHostingProjectionSupport
             .Where(static key =>
                 key.StartsWith("DigitalBrain", StringComparison.Ordinal)
                 || key.StartsWith("DIGITALBRAIN", StringComparison.Ordinal)
-                || string.Equals(key, "ConnectionStrings__journal", StringComparison.Ordinal))
+                || string.Equals(key, JournalConnectionEnvironmentKey, StringComparison.Ordinal))
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.Equal(
@@ -128,19 +133,6 @@ internal static class FlutterHostingProjectionSupport
                 FlutterHostingExtensions.OwnerEnvironmentVariable,
             },
             productKeys);
-    }
-
-    public static void AssertNoOsSurfaceHandWire(string appHost)
-    {
-        Assert.DoesNotContain(
-            "builder.AddProject<Projects.DigitalBrain_Ui>",
-            appHost,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain("digitalbrain-ui", appHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("digitalbrain-flutter", appHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("DIGITALBRAIN_UI_BASE", appHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("DIGITALBRAIN_SHELL", appHost, StringComparison.Ordinal);
-        Assert.DoesNotContain("AddExecutable", appHost, StringComparison.Ordinal);
     }
 
     public static async Task<HashSet<string>> EnvironmentKeysOf(IResource resource)
@@ -172,59 +164,5 @@ internal static class FlutterHostingProjectionSupport
         }
 
         return args.Select(static arg => arg?.ToString() ?? string.Empty).ToList();
-    }
-
-    public static string MethodBody(string source, string signatureMarker)
-    {
-        var signatureIndex = source.IndexOf(signatureMarker, StringComparison.Ordinal);
-        Assert.True(signatureIndex >= 0, $"Signature marker '{signatureMarker}' was not found.");
-
-        var openBrace = source.IndexOf('{', signatureIndex);
-        Assert.True(openBrace >= 0, $"Opening brace after '{signatureMarker}' was not found.");
-
-        var depth = 0;
-        for (var index = openBrace; index < source.Length; index++)
-        {
-            if (source[index] == '{')
-            {
-                depth++;
-            }
-            else if (source[index] == '}')
-            {
-                depth--;
-                if (depth == 0)
-                {
-                    return source[(openBrace + 1)..index];
-                }
-            }
-        }
-
-        throw new InvalidOperationException($"Could not balance braces for '{signatureMarker}'.");
-    }
-
-    public static int CountOccurrences(string source, string token)
-    {
-        var count = 0;
-        var index = 0;
-        while ((index = source.IndexOf(token, index, StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            index += token.Length;
-        }
-
-        return count;
-    }
-
-    private static string LocateRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null
-               && !File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx")))
-        {
-            directory = directory.Parent;
-        }
-
-        return directory?.FullName
-            ?? throw new InvalidOperationException("DigitalBrain.slnx was not found above the test assembly.");
     }
 }

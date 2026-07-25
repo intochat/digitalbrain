@@ -13,23 +13,23 @@ public sealed class GmailReadMessage(IntegrationsFixture fixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         test.Mcp().Catalog(
-            "google.gmail",
+            IntegrationsFixture.GmailServerKey,
             AdmittedMcpTools.GmailGetMessage(
-                id: "msg-42",
-                subject: "Pipeline status",
-                sender: "ops@example.com",
-                plaintextBody: "All green."));
+                id: IntegrationsFixture.SampleMessageId,
+                subject: IntegrationsFixture.SampleSubject,
+                sender: IntegrationsFixture.SampleSender,
+                plaintextBody: IntegrationsFixture.SampleBody));
 
         var driver = test.Neuron<IIntegrationDriver>("gmail-driver");
         var message = await driver.Reference.ReadGmailMessage(
-            "reader@example.com",
-            "msg-42",
+            IntegrationsFixture.SampleGmailAccount,
+            IntegrationsFixture.SampleMessageId,
             cancellationToken);
 
-        Assert.Equal("msg-42", message.Id);
-        Assert.Equal("Pipeline status", message.Subject);
-        Assert.Equal("ops@example.com", message.Sender);
-        Assert.Equal("All green.", message.PlaintextBody);
+        Assert.Equal(IntegrationsFixture.SampleMessageId, message.Id);
+        Assert.Equal(IntegrationsFixture.SampleSubject, message.Subject);
+        Assert.Equal(IntegrationsFixture.SampleSender, message.Sender);
+        Assert.Equal(IntegrationsFixture.SampleBody, message.PlaintextBody);
         Assert.True(test.Mcp().SessionCount >= 1);
     }
 
@@ -40,19 +40,18 @@ public sealed class GmailReadMessage(IntegrationsFixture fixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         test.Mcp().Catalog(
-            "google.gmail",
+            IntegrationsFixture.GmailServerKey,
             AdmittedMcpTools.GmailGetMessageWithIncompatibleAnnotations());
 
         var driver = test.Neuron<IIntegrationDriver>("gmail-refuse");
         var failure = await Assert.ThrowsAnyAsync<Exception>(() =>
             driver.Reference.ReadGmailMessage(
-                "reader@example.com",
-                "msg-bad",
+                IntegrationsFixture.SampleGmailAccount,
+                IntegrationsFixture.SampleMessageId,
                 cancellationToken));
 
         Assert.Contains("incompatible with the admitted", failure.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("get_message", failure.Message, StringComparison.Ordinal);
+        Assert.Contains(IntegrationsFixture.GmailGetMessageTool, failure.Message, StringComparison.Ordinal);
         Assert.True(test.Mcp().SessionCount >= 1);
     }
 }
-

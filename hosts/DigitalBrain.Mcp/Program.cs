@@ -18,8 +18,5 @@ builder.Services
     .WithTools<DigitalBrainMcpTools>();
 
 var app = builder.Build();
-
-app.MapGet("/health", () => Results.Ok("healthy"));
-app.MapMcp("/mcp");
-
+app.MapMcpHost();
 app.Run();

@@ -4,7 +4,7 @@ namespace DigitalBrain.TestingTests;
 
 public sealed class FixtureLifecycleContracts(TestingFixture fixture)
 {
-    [Fact]
+    [Fact(DisplayName = "A method lease does not stop the assembly-scoped fixture cluster")]
     public async Task AMethodLeaseDoesNotStopTheAssemblyCluster()
     {
         await using (var first =
@@ -18,7 +18,7 @@ public sealed class FixtureLifecycleContracts(TestingFixture fixture)
         Assert.NotNull(second);
     }
 
-    [Fact]
+    [Fact(DisplayName = "A second method lease waits until the first is disposed")]
     public async Task ASecondMethodLeaseWaitsUntilTheFirstIsDisposed()
     {
         await using var first =

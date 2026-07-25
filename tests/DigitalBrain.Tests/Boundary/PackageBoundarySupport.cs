@@ -1,68 +1,86 @@
 using System.Xml.Linq;
+using DigitalBrain.Tests.Packages;
 
 namespace DigitalBrain.Tests.Boundary;
 
 internal static class PackageBoundarySupport
 {
-    internal static readonly string RepositoryRoot = LocateRepositoryRoot();
+    private const string OpenAiSdkPrefix = "OpenAI";
+    private const string MicrosoftOpenAiSdkPrefix = "Microsoft.Extensions.AI.OpenAI";
+    private const string OllamaSharpSdkPrefix = "OllamaSharp";
+    private const string ModelContextProtocolSdkPrefix = "ModelContextProtocol";
 
-    internal static readonly string[] ConsumerPath =
-    [
-        "DigitalBrain",
-        "DigitalBrain.Abstractions",
-        "DigitalBrain.Client",
-        "DigitalBrain.Aspire",
-        "DigitalBrain.Aspire.Hosting",
-        "DigitalBrain.Modules.AI.Contracts",
-        "DigitalBrain.Modules.Google.Contracts",
-        "DigitalBrain.Modules.Salesforce.Contracts",
-        "DigitalBrain.Modules.Tasks.Contracts",
-        "DigitalBrain.Modules.Time.Contracts",
-        "DigitalBrain.Modules.Flutter.Contracts",
-        "DigitalBrain.Quickstart.Contracts",
-    ];
+    private const string ProjectReferenceElement = "ProjectReference";
+    private const string PackageReferenceElement = "PackageReference";
+    private const string IsPackableElement = "IsPackable";
+    private const string IncludeAttribute = "Include";
+    private const string PrivateAssetsAttribute = "PrivateAssets";
+    private const string ReferenceOutputAssemblyAttribute = "ReferenceOutputAssembly";
+    private const string PrivateAssetsAll = "all";
+    private const string FalseLiteral = "false";
+    private const string TrueLiteral = "true";
+
+    internal static readonly string RepositoryRoot = RepositoryLayout.Root;
+
+    internal static readonly string[] ProductionRoots = RepositoryLayout.PackableTreeRoots;
 
     internal static readonly string[] ContractsPackages =
     [
-        "DigitalBrain.Modules.AI.Contracts",
-        "DigitalBrain.Modules.Google.Contracts",
-        "DigitalBrain.Modules.Salesforce.Contracts",
-        "DigitalBrain.Modules.Tasks.Contracts",
-        "DigitalBrain.Modules.Time.Contracts",
-        "DigitalBrain.Modules.Flutter.Contracts",
-        "DigitalBrain.Quickstart.Contracts",
+        PackageInventory.ModulesAiContracts,
+        PackageInventory.ModulesGoogleContracts,
+        PackageInventory.ModulesSalesforceContracts,
+        PackageInventory.ModulesTasksContracts,
+        PackageInventory.ModulesTimeContracts,
+        PackageInventory.ModulesFlutterContracts,
+        PackageInventory.QuickstartContracts,
+    ];
+
+    internal static readonly string[] ConsumerPath =
+    [
+        PackageInventory.Metapackage,
+        PackageInventory.Abstractions,
+        PackageInventory.Client,
+        PackageInventory.Aspire,
+        PackageInventory.AspireHosting,
+        .. ContractsPackages,
     ];
 
     internal static readonly string[] HostingPackages =
     [
-        "DigitalBrain.Aspire.Hosting",
-        "DigitalBrain.Modules.AI.Aspire.Hosting",
-        "DigitalBrain.Modules.Flutter.Aspire.Hosting",
-        "DigitalBrain.Modules.Google.Aspire.Hosting",
-        "DigitalBrain.Modules.Salesforce.Aspire.Hosting",
-        "DigitalBrain.Integrations.Mcp.Aspire.Hosting",
+        PackageInventory.AspireHosting,
+        PackageInventory.ModulesAiAspireHosting,
+        PackageInventory.ModulesFlutterAspireHosting,
+        PackageInventory.ModulesGoogleAspireHosting,
+        PackageInventory.ModulesSalesforceAspireHosting,
+        PackageInventory.IntegrationsMcpAspireHosting,
     ];
 
     internal static readonly string[] McpProviderRuntimePackages =
     [
-        "DigitalBrain.Modules.Google",
-        "DigitalBrain.Modules.Salesforce",
+        PackageInventory.ModulesGoogle,
+        PackageInventory.ModulesSalesforce,
     ];
 
     internal static readonly string[] ProviderSdkPrefixes =
-        ["OpenAI", "Microsoft.Extensions.AI.OpenAI", "OllamaSharp", "ModelContextProtocol"];
-
-    internal static readonly string[] ProductionRoots = ["src", "modules", "samples"];
+    [
+        OpenAiSdkPrefix,
+        MicrosoftOpenAiSdkPrefix,
+        OllamaSharpSdkPrefix,
+        ModelContextProtocolSdkPrefix,
+    ];
 
     internal static bool IsDartOrFlutterSdkPackage(string package) =>
-        !package.StartsWith("DigitalBrain", StringComparison.Ordinal)
+        !package.StartsWith(PackageInventory.Metapackage, StringComparison.Ordinal)
         && (package.Contains("Flutter", StringComparison.OrdinalIgnoreCase)
             || package.StartsWith("Dart", StringComparison.OrdinalIgnoreCase));
 
     internal static bool IsPackable(string projectFile) =>
         XDocument.Load(projectFile)
-            .Descendants("IsPackable")
-            .Any(element => string.Equals(element.Value, "true", StringComparison.OrdinalIgnoreCase));
+            .Descendants(IsPackableElement)
+            .Any(element => string.Equals(element.Value, TrueLiteral, StringComparison.OrdinalIgnoreCase));
+
+    internal static bool IsIgnoredLookupPath(string file) =>
+        RepositoryLayout.IsIgnoredLookupPath(file);
 
     internal static HashSet<string> PackagesReachableFrom(string package)
     {
@@ -114,61 +132,38 @@ internal static class PackageBoundarySupport
     }
 
     internal static IEnumerable<string> DirectProjectReferencesOf(string package) =>
-        ReferenceElements(package, "ProjectReference")
+        ReferenceElements(package, ProjectReferenceElement)
             .Select(reference => Path.GetFileNameWithoutExtension(IncludeOf(reference).Replace('\\', '/')));
 
     internal static IEnumerable<string> DirectCompileProjectReferencesOf(string package) =>
-        ReferenceElements(package, "ProjectReference")
+        ReferenceElements(package, ProjectReferenceElement)
             .Where(CompilesAgainst)
             .Select(reference => Path.GetFileNameWithoutExtension(IncludeOf(reference).Replace('\\', '/')));
 
     internal static IEnumerable<string> DirectPackageReferencesOf(string package) =>
-        ReferenceElements(package, "PackageReference")
+        ReferenceElements(package, PackageReferenceElement)
             .Where(FlowsToConsumers)
             .Select(IncludeOf);
-
-    internal static bool IsIgnoredLookupPath(string file)
-    {
-        var relative = Path.GetRelativePath(RepositoryRoot, file);
-        var segments = relative.Split(
-            Path.DirectorySeparatorChar,
-            Path.AltDirectorySeparatorChar);
-        return segments.Any(segment =>
-            segment.Equals("bin", StringComparison.OrdinalIgnoreCase)
-            || segment.Equals("obj", StringComparison.OrdinalIgnoreCase)
-            || segment.Equals(".worktrees", StringComparison.OrdinalIgnoreCase)
-            || segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase));
-    }
 
     private static IEnumerable<XElement> ReferenceElements(string package, string elementName) =>
         XDocument.Load(ProjectFileOf(package)).Descendants(elementName);
 
     private static bool FlowsToConsumers(XElement reference) =>
-        !string.Equals((string?)reference.Attribute("PrivateAssets"), "all", StringComparison.OrdinalIgnoreCase)
+        !string.Equals((string?)reference.Attribute(PrivateAssetsAttribute), PrivateAssetsAll, StringComparison.OrdinalIgnoreCase)
         && CompilesAgainst(reference);
 
     private static bool CompilesAgainst(XElement reference) =>
-        !string.Equals((string?)reference.Attribute("ReferenceOutputAssembly"), "false", StringComparison.OrdinalIgnoreCase);
+        !string.Equals((string?)reference.Attribute(ReferenceOutputAssemblyAttribute), FalseLiteral, StringComparison.OrdinalIgnoreCase);
 
     private static string IncludeOf(XElement reference) =>
-        reference.Attribute("Include")?.Value
-        ?? throw new InvalidOperationException($"A {reference.Name.LocalName} element carries no Include attribute.");
+        reference.Attribute(IncludeAttribute)?.Value
+        ?? throw new InvalidOperationException($"A {reference.Name.LocalName} element carries no {IncludeAttribute} attribute.");
 
     private static string ProjectFileOf(string package) =>
-        Directory.EnumerateFiles(RepositoryRoot, $"{package}.csproj", SearchOption.AllDirectories)
-            .Where(file => !IsIgnoredLookupPath(file))
+        Directory.EnumerateFiles(
+                RepositoryLayout.Root,
+                RepositoryLayout.ProjectFileName(package),
+                SearchOption.AllDirectories)
+            .Where(file => !RepositoryLayout.IsIgnoredLookupPath(file))
             .Single();
-
-    private static string LocateRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null
-               && !File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx")))
-        {
-            directory = directory.Parent;
-        }
-
-        return directory?.FullName
-            ?? throw new InvalidOperationException("DigitalBrain.slnx was not found above the test assembly.");
-    }
 }

@@ -11,16 +11,16 @@ public sealed class ShellSceneRoundTrip(FlutterFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var shell = test.Neuron<IShell>("desk");
-        var command = new OpenScene(CommandId.New(), "home", "Home");
+        var shell = test.Neuron<IShell>(FlutterFixture.ShellName);
+        var command = new OpenScene(CommandId.New(), FlutterFixture.HomeSceneKey, FlutterFixture.HomeSceneTitle);
 
         await shell.Reference.Open(command);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(command.CommandId, opened.Synapse.CommandId);
         Assert.Equal(shell.Id, opened.Synapse.Shell);
-        Assert.Equal("home", opened.Synapse.SceneKey);
-        Assert.Equal("Home", opened.Synapse.Title);
+        Assert.Equal(command.SceneKey, opened.Synapse.SceneKey);
+        Assert.Equal(command.Title, opened.Synapse.Title);
     }
 
     [Fact(DisplayName = "control activation is journaled on the scene as a directed fact")]
@@ -28,14 +28,15 @@ public sealed class ShellSceneRoundTrip(FlutterFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var scene = test.Neuron<IScene>("home");
-        var activation = new ControlActivated("home", "primary", "submit");
+        var scene = test.Neuron<IScene>(FlutterFixture.HomeSceneKey);
+        var activation = new ControlActivated(
+            FlutterFixture.HomeSceneKey, FlutterFixture.PrimaryControlId, FlutterFixture.SubmitIntent);
 
-        await test.Client.SendAsync<IScene>("home", activation);
+        await test.Client.SendAsync<IScene>(FlutterFixture.HomeSceneKey, activation);
 
         var received = await scene.Incoming.NextAsync<ControlActivated>(cancellationToken);
-        Assert.Equal("home", received.Synapse.SceneKey);
-        Assert.Equal("primary", received.Synapse.ControlId);
-        Assert.Equal("submit", received.Synapse.Intent);
+        Assert.Equal(activation.SceneKey, received.Synapse.SceneKey);
+        Assert.Equal(activation.ControlId, received.Synapse.ControlId);
+        Assert.Equal(activation.Intent, received.Synapse.Intent);
     }
 }

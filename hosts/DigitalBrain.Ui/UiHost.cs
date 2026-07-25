@@ -6,7 +6,7 @@ internal static class UiHost
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        app.MapGet("/health", static () => Results.Ok("healthy"));
+        app.MapGet(UiEdgeContract.HealthPath, static () => Results.Ok(UiEdgeContract.HealthResponse));
         app.MapUi();
         return app;
     }

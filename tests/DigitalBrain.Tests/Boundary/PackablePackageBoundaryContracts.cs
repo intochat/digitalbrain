@@ -9,12 +9,12 @@ public sealed class PackablePackageBoundaryContracts
     [Fact]
     public void PackableProjectsMatchTheDeclaredInventory()
     {
-        var actual = PackageBoundarySupport.ProductionRoots
+        var actual = RepositoryLayout.PackableTreeRoots
             .SelectMany(root => Directory.EnumerateFiles(
-                Path.Combine(PackageBoundarySupport.RepositoryRoot, root),
+                Path.Combine(RepositoryLayout.Root, root),
                 "*.csproj",
                 SearchOption.AllDirectories))
-            .Where(path => !PackageBoundarySupport.IsIgnoredLookupPath(path))
+            .Where(path => !RepositoryLayout.IsIgnoredLookupPath(path))
             .Where(PackageBoundarySupport.IsPackable)
             .Select(Path.GetFileNameWithoutExtension!)
             .ToHashSet(StringComparer.Ordinal);

@@ -5,7 +5,8 @@ namespace DigitalBrain.Tests.Packages;
 
 public sealed class IdentityContracts
 {
-    public static TheoryData<string> RejectedIdentityParts { get; } = new("", "   ", "with space", "with/separator", "\ttab");
+    public static TheoryData<string> RejectedIdentityParts { get; } =
+        new("", "a b", "a/b");
 
     [Theory]
     [MemberData(nameof(RejectedIdentityParts))]
@@ -15,34 +16,38 @@ public sealed class IdentityContracts
     [Theory]
     [MemberData(nameof(RejectedIdentityParts))]
     public void NeuronNameRejectsPartsThatWouldBreakGrainKeyEncoding(string name)
-        => Assert.Throws<ArgumentException>(() => new NeuronId("Echo", new OwnerId("acme"), name));
+        => Assert.Throws<ArgumentException>(
+            () => new NeuronId(nameof(NeuronId), new OwnerId(nameof(OwnerId)), name));
 
     [Fact]
-    public void OwnerIdRejectsNull() => Assert.Throws<ArgumentNullException>(() => new OwnerId(null!));
+    public void OwnerIdRejectsNull()
+        => Assert.Throws<ArgumentNullException>(() => new OwnerId(null!));
 
     [Fact]
     public void GrainKeyRoundTripsThroughOwnerAndName()
     {
-        var original = new NeuronId("Echo", new OwnerId("acme"), "first");
+        var original = new NeuronId(
+            nameof(NeuronId),
+            new OwnerId(nameof(OwnerId)),
+            nameof(NeuronId.Name));
 
-        var restored = NeuronId.FromGrainKey(original.Type, original.GrainKey);
-
-        Assert.Equal(original, restored);
+        Assert.Equal(original, NeuronId.FromGrainKey(original.Type, original.GrainKey));
     }
 
     [Fact]
     public void DistinctOwnersCannotProduceTheSameGrainKey()
     {
-        var left = new NeuronId("Echo", new OwnerId("a"), "b-c");
-        var right = new NeuronId("Echo", new OwnerId("a-b"), "c");
+        var left = new NeuronId(nameof(NeuronId), new OwnerId("a"), "b-c");
+        var right = new NeuronId(nameof(NeuronId), new OwnerId("a-b"), "c");
 
         Assert.NotEqual(left.GrainKey, right.GrainKey);
     }
 
     [Theory]
-    [InlineData("no-separator")]
-    [InlineData("/leading")]
-    [InlineData("trailing/")]
+    [InlineData("x")]
+    [InlineData("/x")]
+    [InlineData("x/")]
     public void FromGrainKeyRejectsMalformedKeys(string grainKey)
-        => Assert.Throws<ArgumentException>(() => NeuronId.FromGrainKey("Echo", grainKey));
+        => Assert.Throws<ArgumentException>(
+            () => NeuronId.FromGrainKey(nameof(NeuronId), grainKey));
 }

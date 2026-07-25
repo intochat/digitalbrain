@@ -1,3 +1,4 @@
+using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
 
 namespace DigitalBrain.Tasks.Tests;

@@ -9,6 +9,10 @@ namespace DigitalBrain.Tests.Boundary;
 
 public sealed class AiContractBoundaries
 {
+    private static readonly string AiRootNamespace =
+        typeof(ILLM).Namespace
+        ?? throw new InvalidOperationException("ILLM has no namespace.");
+
     [Fact(DisplayName = "ILLM does not inherit IAgent")]
     public void IllmDoesNotInheritIAgent()
         => Assert.False(typeof(IAgent).IsAssignableFrom(typeof(ILLM)));
@@ -26,8 +30,8 @@ public sealed class AiContractBoundaries
             Assert.False(
                 string.IsNullOrEmpty(model.Namespace),
                 $"{model.FullName} must declare a namespace.");
-            Assert.StartsWith("DigitalBrain.AI.", model.Namespace, StringComparison.Ordinal);
-            Assert.NotEqual("DigitalBrain.AI", model.Namespace);
+            Assert.StartsWith(AiRootNamespace + ".", model.Namespace, StringComparison.Ordinal);
+            Assert.NotEqual(AiRootNamespace, model.Namespace);
 
             var contract = typeof(ILLM).Assembly
                 .GetExportedTypes()

@@ -27,8 +27,12 @@ public static class FlutterHostingExtensions
     public const string UiBaseEnvironmentVariable = "DIGITALBRAIN_UI_BASE";
     public const string ShellEnvironmentVariable = "DIGITALBRAIN_SHELL";
     public const string OwnerEnvironmentVariable = "DigitalBrain__Owner";
+    public const string FlutterCommandEnvironmentVariable = "FLUTTER_COMMAND";
+    public const string DartCommandEnvironmentVariable = "DART_COMMAND";
     public const string HeadlessHostEntry = "bin/digitalbrain_host.dart";
     public const string DefaultShellName = "desk";
+    public const string DefaultOwner = "dev";
+    public const string DefaultDeviceTarget = "windows";
     public const string UiHttpEndpointName = "http";
     public const string UiHealthPath = "/health";
 
@@ -120,7 +124,7 @@ public static class FlutterHostingExtensions
                 ? DefaultUiResourceName
                 : options.ResourceName;
             var owner = string.IsNullOrWhiteSpace(options.Owner)
-                ? "dev"
+                ? DefaultOwner
                 : options.Owner;
 
             _ui = appHost
@@ -247,7 +251,7 @@ public sealed class FlutterUiEdgeOptions
 {
     public string ResourceName { get; set; } = FlutterHostingExtensions.DefaultUiResourceName;
 
-    public string Owner { get; set; } = "dev";
+    public string Owner { get; set; } = FlutterHostingExtensions.DefaultOwner;
 
     public string? ProjectPath { get; set; }
 }
@@ -256,7 +260,7 @@ public sealed class FlutterHostOptions
 {
     public string ResourceName { get; set; } = FlutterHostingExtensions.DefaultFlutterResourceName;
 
-    public string DeviceTarget { get; set; } = "windows";
+    public string DeviceTarget { get; set; } = FlutterHostingExtensions.DefaultDeviceTarget;
 
     public string ShellName { get; set; } = FlutterHostingExtensions.DefaultShellName;
 

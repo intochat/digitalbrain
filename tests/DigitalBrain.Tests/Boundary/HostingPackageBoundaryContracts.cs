@@ -1,132 +1,170 @@
+using DigitalBrain.Abstractions;
+using DigitalBrain.AI;
+using DigitalBrain.Aspire;
+using DigitalBrain.Client;
+using DigitalBrain.Flutter;
+using DigitalBrain.Google;
+using DigitalBrain.Kernel;
+using DigitalBrain.Quickstart;
+using DigitalBrain.Salesforce;
+using DigitalBrain.Tasks;
+using DigitalBrain.Tests.Packages;
 using Xunit;
 
 namespace DigitalBrain.Tests.Boundary;
 
 public sealed class HostingPackageBoundaryContracts
 {
-    [Fact]
+    private const string McpHost = "DigitalBrain.Mcp";
+    private const string ProductSiloHost = "DigitalBrain.Host";
+    private const string QuickstartSiloHost = "DigitalBrain.Quickstart.Host";
+
+    private static readonly string[] SiloAzureStoragePackages =
+    [
+        "Aspire.Azure.Data.Tables",
+        "Microsoft.Orleans.Clustering.AzureStorage",
+        "Microsoft.Orleans.Reminders.AzureStorage",
+    ];
+
+    private static readonly string[] McpDirectProjects =
+    [
+        PackageOf(typeof(DigitalBrainClientHostingExtensions)),
+        PackageOf(typeof(DigitalBrainClient)),
+        PackageOf(typeof(ILLM)),
+    ];
+
+    private static readonly string[] McpCompileReachable =
+    [
+        PackageOf(typeof(NeuronId)),
+        PackageOf(typeof(DigitalBrainClientHostingExtensions)),
+        PackageOf(typeof(DigitalBrainClient)),
+        PackageOf(typeof(ILLM)),
+        PackageOf(typeof(ITask)),
+    ];
+
+    private static readonly string[] UiDirectProjects =
+    [
+        PackageOf(typeof(DigitalBrainClientHostingExtensions)),
+        PackageOf(typeof(DigitalBrainClient)),
+        PackageOf(typeof(IShell)),
+    ];
+
+    private static readonly string[] UiCompileReachable =
+    [
+        PackageOf(typeof(NeuronId)),
+        PackageOf(typeof(DigitalBrainClientHostingExtensions)),
+        PackageOf(typeof(DigitalBrainClient)),
+        PackageOf(typeof(IShell)),
+    ];
+
+    private static readonly string[] ProductSiloDirectProjects =
+    [
+        PackageOf(typeof(Neuron)),
+        PackageOf(typeof(AIModule)),
+        PackageOf(typeof(FlutterModule)),
+        PackageOf(typeof(GoogleModule)),
+        PackageOf(typeof(SalesforceModule)),
+    ];
+
+    private static readonly string[] ProductSiloCompileReachable =
+    [
+        PackageOf(typeof(NeuronId)),
+        PackageInventory.IntegrationsMcp,
+        PackageOf(typeof(Neuron)),
+        PackageOf(typeof(AIModule)),
+        PackageOf(typeof(ILLM)),
+        PackageOf(typeof(FlutterModule)),
+        PackageOf(typeof(IShell)),
+        PackageOf(typeof(GoogleModule)),
+        PackageOf(typeof(IGmail)),
+        PackageOf(typeof(SalesforceModule)),
+        PackageOf(typeof(ISalesforce)),
+        PackageOf(typeof(ITask)),
+        PackageInventory.Security,
+    ];
+
+    private static readonly string[] QuickstartSiloDirectProjects =
+    [
+        PackageOf(typeof(Neuron)),
+        PackageOf(typeof(QuickstartModule)),
+    ];
+
+    private static readonly string[] QuickstartSiloCompileReachable =
+    [
+        PackageOf(typeof(NeuronId)),
+        PackageOf(typeof(Neuron)),
+        PackageOf(typeof(QuickstartModule)),
+        PackageOf(typeof(IGreeter)),
+    ];
+
+    [Fact(DisplayName = "northbound MCP host is client + AI contracts only — never southbound providers")]
     public void NorthboundMcpHostCannotReachSouthboundProviders()
     {
-        Assert.Equal(
-            ["DigitalBrain.Aspire", "DigitalBrain.Client", "DigitalBrain.Modules.AI.Contracts"],
-            PackageBoundarySupport.DirectCompileProjectReferencesOf("DigitalBrain.Mcp")
-                .Order(StringComparer.Ordinal));
-
-        Assert.DoesNotContain(
-            PackageBoundarySupport.CompileProjectsReachableFrom("DigitalBrain.Mcp"),
-            project => project.StartsWith("DigitalBrain.Integrations.Mcp", StringComparison.Ordinal)
-                || project.StartsWith("DigitalBrain.Modules.Google", StringComparison.Ordinal)
-                || project.StartsWith("DigitalBrain.Modules.Salesforce", StringComparison.Ordinal));
+        AssertGraph(
+            McpHost,
+            McpDirectProjects,
+            McpCompileReachable,
+            packageReferences: null);
     }
 
     [Fact(DisplayName = "northbound UI host is client + Flutter contracts only — never Kernel or southbound")]
     public void NorthboundUiHostCannotReachKernelOrSouthboundProviders()
     {
-        Assert.Equal(
-            [
-                "DigitalBrain.Aspire",
-                "DigitalBrain.Client",
-                "DigitalBrain.Modules.Flutter.Contracts",
-            ],
-            PackageBoundarySupport.DirectCompileProjectReferencesOf("DigitalBrain.Ui")
-                .Order(StringComparer.Ordinal));
-
-        var reachable = PackageBoundarySupport.CompileProjectsReachableFrom("DigitalBrain.Ui");
-        Assert.DoesNotContain(reachable, project => project == "DigitalBrain.Kernel");
-        Assert.DoesNotContain(
-            reachable,
-            project => project == "DigitalBrain.Modules.Flutter"
-                || project.StartsWith("DigitalBrain.Integrations.Mcp", StringComparison.Ordinal)
-                || project.StartsWith("DigitalBrain.Modules.Google", StringComparison.Ordinal)
-                || project.StartsWith("DigitalBrain.Modules.Salesforce", StringComparison.Ordinal)
-                || project.StartsWith("DigitalBrain.Modules.AI", StringComparison.Ordinal));
+        AssertGraph(
+            PackageInventory.Ui,
+            UiDirectProjects,
+            UiCompileReachable,
+            packageReferences: null);
     }
 
     [Fact(DisplayName =
         "product silo host ships Kernel + available product module runtimes — never Ui, Client, or Aspire.Hosting")]
     public void ProductSiloHostShipsModuleRuntimesNotNorthboundEdges()
     {
-        Assert.Equal(
-            [
-                "DigitalBrain.Kernel",
-                "DigitalBrain.Modules.AI",
-                "DigitalBrain.Modules.Flutter",
-                "DigitalBrain.Modules.Google",
-                "DigitalBrain.Modules.Salesforce",
-            ],
-            PackageBoundarySupport.DirectCompileProjectReferencesOf("DigitalBrain.Host")
-                .Order(StringComparer.Ordinal));
-
-        Assert.Equal(
-            [
-                "Aspire.Azure.Data.Tables",
-                "Microsoft.Orleans.Clustering.AzureStorage",
-                "Microsoft.Orleans.Reminders.AzureStorage",
-            ],
-            PackageBoundarySupport.DirectPackageReferencesOf("DigitalBrain.Host")
-                .Order(StringComparer.Ordinal));
-
-        var reachable = PackageBoundarySupport.CompileProjectsReachableFrom("DigitalBrain.Host");
-        Assert.DoesNotContain(reachable, project => project == "DigitalBrain.Ui");
-        Assert.DoesNotContain(reachable, project => project == "DigitalBrain.Client");
-        Assert.DoesNotContain(reachable, project => project == "DigitalBrain.Mcp");
-        Assert.DoesNotContain(reachable, project => project == "DigitalBrain.Testing");
-        Assert.DoesNotContain(
-            reachable,
-            project => project.StartsWith("DigitalBrain.Aspire.Hosting", StringComparison.Ordinal)
-                || project.EndsWith(".Aspire.Hosting", StringComparison.Ordinal));
+        AssertGraph(
+            ProductSiloHost,
+            ProductSiloDirectProjects,
+            ProductSiloCompileReachable,
+            SiloAzureStoragePackages);
     }
 
     [Fact(DisplayName =
         "Quickstart silo host ships only Quickstart + Kernel — never product modules or northbound edges")]
     public void QuickstartSiloHostShipsOnlySampleCatalog()
     {
-        Assert.Equal(
-            [
-                "DigitalBrain.Kernel",
-                "DigitalBrain.Quickstart",
-            ],
-            PackageBoundarySupport.DirectCompileProjectReferencesOf("DigitalBrain.Quickstart.Host")
-                .Order(StringComparer.Ordinal));
-
-        Assert.Equal(
-            [
-                "Aspire.Azure.Data.Tables",
-                "Microsoft.Orleans.Clustering.AzureStorage",
-                "Microsoft.Orleans.Reminders.AzureStorage",
-            ],
-            PackageBoundarySupport.DirectPackageReferencesOf("DigitalBrain.Quickstart.Host")
-                .Order(StringComparer.Ordinal));
-
-        var reachable = PackageBoundarySupport.CompileProjectsReachableFrom("DigitalBrain.Quickstart.Host");
-        Assert.DoesNotContain(reachable, project => project == "DigitalBrain.Ui");
-        Assert.DoesNotContain(reachable, project => project == "DigitalBrain.Host");
-        Assert.DoesNotContain(
-            reachable,
-            project => project.StartsWith("DigitalBrain.Modules.", StringComparison.Ordinal));
+        AssertGraph(
+            QuickstartSiloHost,
+            QuickstartSiloDirectProjects,
+            QuickstartSiloCompileReachable,
+            SiloAzureStoragePackages);
     }
 
-    [Fact(DisplayName =
-        "silo Program.cs is env-selected AddDigitalBrain only — no Ui hand-wire or module activation in source")]
-    public void SiloProgramsAreHonestEnvSelectedActivation()
+    private static void AssertGraph(
+        string host,
+        string[] directProjects,
+        string[] compileReachable,
+        string[]? packageReferences)
     {
-        foreach (var relative in new[]
-                 {
-                     Path.Combine("hosts", "DigitalBrain.Host", "Program.cs"),
-                     Path.Combine("hosts", "DigitalBrain.Quickstart.Host", "Program.cs"),
-                 })
+        Assert.Equal(
+            directProjects.Order(StringComparer.Ordinal),
+            PackageBoundarySupport.DirectCompileProjectReferencesOf(host)
+                .Order(StringComparer.Ordinal));
+
+        if (packageReferences is not null)
         {
-            var program = File.ReadAllText(Path.Combine(PackageBoundarySupport.RepositoryRoot, relative));
-            Assert.Contains("AddDigitalBrain()", program, StringComparison.Ordinal);
-            Assert.Contains("AddDigitalBrainJournalStorage", program, StringComparison.Ordinal);
-            Assert.Contains("MapGet(\"/health\"", program, StringComparison.Ordinal);
-            Assert.DoesNotContain("MapUi", program, StringComparison.Ordinal);
-            Assert.DoesNotContain("AddModule", program, StringComparison.Ordinal);
-            Assert.DoesNotContain("WithUiEdge", program, StringComparison.Ordinal);
-            Assert.DoesNotContain("WithFlutterHost", program, StringComparison.Ordinal);
-            Assert.DoesNotContain("DigitalBrain.Ui", program, StringComparison.Ordinal);
-            Assert.DoesNotContain("IGrainFactory", program, StringComparison.Ordinal);
-            Assert.DoesNotContain("AddDigitalBrainClient", program, StringComparison.Ordinal);
+            Assert.Equal(
+                packageReferences.Order(StringComparer.Ordinal),
+                PackageBoundarySupport.DirectPackageReferencesOf(host)
+                    .Order(StringComparer.Ordinal));
         }
+
+        Assert.Equal(
+            compileReachable.Order(StringComparer.Ordinal),
+            PackageBoundarySupport.CompileProjectsReachableFrom(host)
+                .Order(StringComparer.Ordinal));
     }
+
+    private static string PackageOf(Type type)
+        => type.Assembly.GetName().Name
+           ?? throw new InvalidOperationException($"Assembly for {type.FullName} has no name.");
 }

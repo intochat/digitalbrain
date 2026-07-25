@@ -65,7 +65,7 @@ internal static class ShellEventFeed
     {
         var payload = JsonSerializer.Serialize(projected, EventJson);
         var frame = FormattableString.Invariant(
-            $"id: {projected.Sequence}\nevent: scene-opened\ndata: {payload}\n\n");
+            $"id: {projected.Sequence}\nevent: {UiEdgeContract.SceneOpenedEvent}\ndata: {payload}\n\n");
         return WriteAsync(responseBody, frame, cancellationToken);
     }
 

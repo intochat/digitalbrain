@@ -1,21 +1,24 @@
 using System.Reflection;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Flutter;
+using DigitalBrain.Tests.Boundary;
+using DigitalBrain.Tests.Packages;
 using Xunit;
 
 namespace DigitalBrain.Tests.Flutter;
 
 public sealed class FlutterContracts
 {
-    [Fact(DisplayName = "Flutter public vocabulary is the first-vertical surface only")]
-    public void FlutterPublicVocabularyIsTheFirstVerticalSurfaceOnly()
+    [Fact]
+    public void PublicVocabularyIsFirstVerticalSurfaceOnly()
     {
         var contracts = typeof(IShell).Assembly;
+        var flutterNamespace = typeof(IShell).Namespace;
+
         var vocabulary = contracts
             .GetExportedTypes()
-            .Where(type => type.Namespace == "DigitalBrain.Flutter")
+            .Where(type => type.Namespace == flutterNamespace)
             .Select(type => type.Name)
             .Order(StringComparer.Ordinal)
             .ToArray();
@@ -29,74 +32,41 @@ public sealed class FlutterContracts
                 nameof(SceneOpened),
             ],
             vocabulary);
-        Assert.Null(contracts.GetType("DigitalBrain.Flutter.IFlutter"));
-        Assert.Null(contracts.GetType("DigitalBrain.UI.IShell"));
+        Assert.Null(contracts.GetType($"DigitalBrain.UI.{nameof(IShell)}"));
     }
 
-    [Fact(DisplayName = "Flutter namespace identity is DigitalBrain.Flutter not Modules or UI")]
-    public void FlutterNamespaceIdentityIsDigitalBrainFlutter()
-    {
-        Assert.Equal("DigitalBrain.Flutter", typeof(IShell).Namespace);
-        Assert.Equal("DigitalBrain.Flutter", typeof(IScene).Namespace);
-        Assert.Equal("DigitalBrain.Flutter", typeof(SceneOpened).Namespace);
-        Assert.Equal("DigitalBrain.Modules.Flutter.Contracts", typeof(IShell).Assembly.GetName().Name);
-    }
-
-    [Fact(DisplayName = "IShell Open is unsuffixed and alias-pinned")]
-    public void IShellOpenIsUnsuffixedAndAliasPinned()
-    {
-        var open = typeof(IShell).GetMethod(
-            nameof(IShell.Open),
-            BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-
-        Assert.NotNull(open);
-        Assert.DoesNotContain("Async", open.Name, StringComparison.Ordinal);
-        Assert.Equal(nameof(IShell.Open), FirstAlias(open));
-        Assert.Equal(typeof(Task), open.ReturnType);
-        Assert.Equal(typeof(OpenScene), open.GetParameters().Single().ParameterType);
-    }
-
-    [Fact(DisplayName = "Flutter wire-contract golden matches Contracts assembly")]
-    public void FlutterWireContractGoldenMatchesContractsAssembly()
+    [Fact]
+    public void WireContractGoldenMatchesContractsAssembly()
     {
         var actual = ExtractWireManifest(typeof(IShell).Assembly);
         var goldenPath = Path.Combine(
-            LocateRepositoryRoot(),
-            "modules",
-            "DigitalBrain.Modules.Flutter.Contracts",
+            PackageBoundarySupport.RepositoryRoot,
+            RepositoryLayout.Modules,
+            PackageInventory.ModulesFlutterContracts,
             "flutter-wire-contracts.golden.json");
-        Assert.True(File.Exists(goldenPath), $"Missing golden at {goldenPath}");
+        Assert.True(File.Exists(goldenPath));
 
         var expected = JsonNode.Parse(File.ReadAllText(goldenPath))!;
-        Assert.True(
-            JsonNode.DeepEquals(expected, actual),
-            $"Wire contract drift.\nExpected:\n{expected.ToJsonString(Indented)}\nActual:\n{actual.ToJsonString(Indented)}");
+        Assert.True(JsonNode.DeepEquals(expected, actual));
     }
 
-    [Fact(DisplayName = "Flutter contracts reach neither Flutter nor Dart SDKs")]
-    public void FlutterContractsReachNeitherFlutterNorDartSdks()
+    [Fact]
+    public void ContractsReachNeitherFlutterNorDartSdks()
     {
         var references = typeof(IShell).Assembly
             .GetReferencedAssemblies()
             .Select(name => name.Name!)
             .ToArray();
 
-        Assert.DoesNotContain(
-            references,
-            name => name.Contains("Flutter", StringComparison.OrdinalIgnoreCase)
-                && name != "DigitalBrain.Modules.Flutter.Contracts");
-        Assert.DoesNotContain(
-            references,
-            name => name.StartsWith("Dart", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(references, PackageBoundarySupport.IsDartOrFlutterSdkPackage);
     }
-
-    private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
 
     private static JsonObject ExtractWireManifest(Assembly assembly)
     {
+        var flutterNamespace = typeof(IShell).Namespace;
         var types = assembly
             .GetExportedTypes()
-            .Where(type => type.Namespace == "DigitalBrain.Flutter")
+            .Where(type => type.Namespace == flutterNamespace)
             .OrderBy(type => type.Name, StringComparer.Ordinal)
             .Select(DescribeType)
             .ToArray();
@@ -104,14 +74,13 @@ public sealed class FlutterContracts
         return new JsonObject
         {
             ["version"] = 1,
-            ["namespace"] = "DigitalBrain.Flutter",
+            ["namespace"] = flutterNamespace,
             ["types"] = new JsonArray(types.Select(node => (JsonNode)node).ToArray()),
         };
     }
 
     private static JsonObject DescribeType(Type type)
     {
-        var alias = FirstAlias(type);
         var properties = type
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(property => property.GetMethod is { IsPublic: true, IsStatic: false })
@@ -147,7 +116,7 @@ public sealed class FlutterContracts
         {
             ["name"] = type.Name,
             ["kind"] = type.IsInterface ? "interface" : "record",
-            ["alias"] = alias,
+            ["alias"] = FirstAlias(type),
             ["properties"] = new JsonArray(properties.Select(node => (JsonNode)node).ToArray()),
             ["methods"] = new JsonArray(methods.Select(node => (JsonNode)node).ToArray()),
         };
@@ -161,52 +130,31 @@ public sealed class FlutterContracts
             .SingleOrDefault();
 
     private static bool IsWireMethod(MethodInfo method)
-    {
-        if (method.IsSpecialName)
-        {
-            return false;
-        }
-
-        return method.Name is not (
-            "Equals"
-            or "GetHashCode"
-            or "ToString"
-            or "Deconstruct"
-            or "<Clone>$");
-    }
+        => !method.IsSpecialName
+            && method.Name is not (
+                nameof(object.Equals)
+                or nameof(object.GetHashCode)
+                or nameof(object.ToString)
+                or "Deconstruct"
+                or "<Clone>$");
 
     private static string TypeDisplayName(Type type)
     {
         if (type == typeof(string))
         {
-            return "String";
+            return nameof(String);
         }
 
         if (type == typeof(Task))
         {
-            return "Task";
+            return nameof(Task);
         }
 
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>))
         {
-            return $"Task<{TypeDisplayName(type.GetGenericArguments()[0])}>";
+            return $"{nameof(Task)}<{TypeDisplayName(type.GetGenericArguments()[0])}>";
         }
 
         return type.Name;
-    }
-
-    private static string LocateRepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
-             directory is not null;
-             directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx")))
-            {
-                return directory.FullName;
-            }
-        }
-
-        throw new InvalidOperationException("Could not locate DigitalBrain.slnx from the test output directory.");
     }
 }

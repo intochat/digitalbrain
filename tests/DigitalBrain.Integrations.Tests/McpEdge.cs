@@ -1,317 +1,170 @@
-using System.IO.Pipelines;
+using System.Diagnostics;
 using System.Text.Json;
-using DigitalBrain.Integrations.Mcp;
-using DigitalBrain.Testing;
-using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using Orleans.Journaling;
 
 namespace DigitalBrain.Integrations.Tests;
 
-internal static class McpEdgeExtensions
-{
-    internal static void ConfigureMcpEdge(this DigitalBrainTestBuilder builder)
-    {
-        var script = new McpEdgeScript();
-        builder.ConfigureMcpSessionFactory(
-            new ScriptedMcpSessionFactory(script),
-            script,
-            static edge => edge.Reset());
-    }
-
-    internal static McpEdgeScript Mcp(this TestBrain brain)
-        => brain.McpSessionScript<McpEdgeScript>();
-}
-
-internal sealed class McpEdgeScript
-{
-    private readonly Lock _gate = new();
-    private readonly Dictionary<string, IReadOnlyList<McpServerTool>> _catalogs =
-        new(StringComparer.Ordinal);
-    private int _sessionCount;
-
-    internal int SessionCount
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _sessionCount;
-            }
-        }
-    }
-
-    internal void Catalog(string serverKey, params McpServerTool[] tools)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(serverKey);
-        ArgumentNullException.ThrowIfNull(tools);
-
-        lock (_gate)
-        {
-            _catalogs[serverKey] = tools.ToArray();
-        }
-    }
-
-    internal void Reset()
-    {
-        lock (_gate)
-        {
-            _sessionCount = 0;
-            _catalogs.Clear();
-        }
-    }
-
-    internal IReadOnlyList<McpServerTool> ToolsFor(string serverKey)
-    {
-        lock (_gate)
-        {
-            _sessionCount++;
-            return _catalogs.TryGetValue(serverKey, out var tools)
-                ? tools
-                : [];
-        }
-    }
-}
-
-internal sealed class ScriptedMcpSessionFactory(McpEdgeScript script) : IMcpClientSessionFactory
-{
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Reliability",
-        "CA2000:Dispose objects before losing scope",
-        Justification = "Stream transports are owned by the MCP client/server session and disposed with it.")]
-    public async ValueTask<IMcpClientSession> OpenAsync(
-        McpServerDefinition server,
-        IDurableValue<byte[]> tokenState,
-        Func<ValueTask> commit,
-        string durableIdentity,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(server);
-        ArgumentNullException.ThrowIfNull(tokenState);
-        ArgumentNullException.ThrowIfNull(commit);
-        ArgumentException.ThrowIfNullOrWhiteSpace(durableIdentity);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var tools = script.ToolsFor(server.Key);
-        var clientToServer = new Pipe();
-        var serverToClient = new Pipe();
-        var serverTransport = new StreamServerTransport(
-            clientToServer.Reader.AsStream(),
-            serverToClient.Writer.AsStream());
-        var clientTransport = new StreamClientTransport(
-            clientToServer.Writer.AsStream(),
-            serverToClient.Reader.AsStream());
-
-        var mcpServer = McpServer.Create(
-            serverTransport,
-            new McpServerOptions
-            {
-                ServerInfo = new Implementation
-                {
-                    Name = server.DisplayName,
-                    Version = "test",
-                },
-                ToolCollection = [.. tools],
-            });
-        var run = mcpServer.RunAsync(CancellationToken.None);
-        var client = await McpClient.CreateAsync(clientTransport, cancellationToken: cancellationToken);
-        return new ScriptedMcpSession(client, mcpServer, run);
-    }
-
-    private sealed class ScriptedMcpSession(
-        McpClient client,
-        McpServer server,
-        Task run) : IMcpClientSession
-    {
-        public McpClient Client { get; } = client;
-
-        public async ValueTask DisposeAsync()
-        {
-            await Client.DisposeAsync();
-            await server.DisposeAsync();
-            try
-            {
-                await run;
-            }
-            catch (OperationCanceledException)
-            {
-            }
-        }
-    }
-}
-
 internal static class AdmittedMcpTools
 {
+    private const string Type = "type";
+    private const string Properties = "properties";
+    private const string Required = "required";
+    private const string Enum = "enum";
+    private const string Items = "items";
+    private const string String = "string";
+    private const string Object = "object";
+    private const string Boolean = "boolean";
+    private const string Array = "array";
+
+    private const string MessageId = "messageId";
+    private const string MessageFormat = "messageFormat";
+    private const string Id = "id";
+    private const string SalesforceUpdateAccountName = "updateSobjectRecord";
+    private const string SalesforceSoqlQueryName = "soqlQuery";
+
+    private static readonly string[] GmailMessageFormats =
+    [
+        "MESSAGE_FORMAT_UNSPECIFIED",
+        "MINIMAL",
+        "FULL_CONTENT",
+        "METADATA_ONLY",
+    ];
+
+    private static readonly Dictionary<string, object?> StringProp = new() { [Type] = String };
+    private static readonly Dictionary<string, object?> ObjectProp = new() { [Type] = Object };
+    private static readonly Dictionary<string, object?> BooleanProp = new() { [Type] = Boolean };
+    private static readonly Dictionary<string, object?> ArrayOfObjects = new()
+    {
+        [Type] = Array,
+        [Items] = ObjectProp,
+    };
+    private static readonly Dictionary<string, object?> MessageFormatProp = new()
+    {
+        [Type] = String,
+        [Enum] = GmailMessageFormats,
+    };
+
+    private static readonly ToolAnnotations ReadOnlyAdmitted = new()
+    {
+        ReadOnlyHint = true,
+        DestructiveHint = false,
+        IdempotentHint = true,
+        OpenWorldHint = false,
+    };
+
+    private static readonly ToolAnnotations DestructiveAdmitted = new()
+    {
+        ReadOnlyHint = false,
+        DestructiveHint = true,
+        IdempotentHint = false,
+        OpenWorldHint = false,
+    };
+
     internal static McpServerTool GmailGetMessage(
         string id,
         string subject,
         string sender,
         string plaintextBody)
-        => new FixedSchemaTool(
-            GmailGetMessageProtocolTool(
-                readOnlyHint: true,
-                destructiveHint: false,
-                idempotentHint: true,
-                openWorldHint: false),
-            _ => new CallToolResult
-            {
-                StructuredContent = JsonSerializer.SerializeToElement(new
-                {
-                    id,
-                    subject,
-                    sender,
-                    plaintextBody,
-                }),
-            });
+        => Fixed(
+            GmailGetMessageProtocolTool(ReadOnlyAdmitted),
+            _ => Structured(new { id, subject, sender, plaintextBody }));
 
     internal static McpServerTool GmailGetMessageWithIncompatibleAnnotations()
-        => new FixedSchemaTool(
-            GmailGetMessageProtocolTool(
-                readOnlyHint: true,
-                destructiveHint: true,
-                idempotentHint: true,
-                openWorldHint: false),
-            _ => throw new InvalidOperationException(
-                "Incompatible Gmail get_message must not be invoked."));
-
-    private static Tool GmailGetMessageProtocolTool(
-        bool? readOnlyHint,
-        bool? destructiveHint,
-        bool? idempotentHint,
-        bool? openWorldHint)
-        => new()
-        {
-            Name = "get_message",
-            InputSchema = Parse(
-                """
-                {
-                  "type": "object",
-                  "properties": {
-                    "messageId": { "type": "string" },
-                    "messageFormat": {
-                      "type": "string",
-                      "enum": [
-                        "MESSAGE_FORMAT_UNSPECIFIED",
-                        "MINIMAL",
-                        "FULL_CONTENT",
-                        "METADATA_ONLY"
-                      ]
-                    }
-                  },
-                  "required": [ "messageId" ]
-                }
-                """),
-            OutputSchema = Parse(
-                """
-                {
-                  "type": "object",
-                  "properties": {
-                    "id": { "type": "string" },
-                    "subject": { "type": "string" },
-                    "sender": { "type": "string" },
-                    "plaintextBody": { "type": "string" }
-                  }
-                }
-                """),
-            Annotations = new ToolAnnotations
+        => Fixed(
+            GmailGetMessageProtocolTool(new ToolAnnotations
             {
-                ReadOnlyHint = readOnlyHint,
-                DestructiveHint = destructiveHint,
-                IdempotentHint = idempotentHint,
-                OpenWorldHint = openWorldHint,
-            },
-        };
+                ReadOnlyHint = true,
+                DestructiveHint = true,
+                IdempotentHint = true,
+                OpenWorldHint = false,
+            }),
+            static _ => throw new UnreachableException());
 
     internal static McpServerTool SalesforceUpdateAccount(bool success = true)
-        => new FixedSchemaTool(
+        => Fixed(
             new Tool
             {
-                Name = "updateSobjectRecord",
-                InputSchema = Parse(
-                    """
-                    {
-                      "type": "object",
-                      "properties": {
-                        "sobject-name": { "type": "string" },
-                        "id": { "type": "string" },
-                        "body": { "type": "object" }
-                      },
-                      "required": [ "sobject-name", "id", "body" ]
-                    }
-                    """),
-                OutputSchema = Parse(
-                    """
-                    {
-                      "type": "object",
-                      "properties": {
-                        "success": { "type": "boolean" }
-                      },
-                      "required": [ "success" ]
-                    }
-                    """),
-                Annotations = new ToolAnnotations
-                {
-                    ReadOnlyHint = false,
-                    DestructiveHint = true,
-                    IdempotentHint = false,
-                    OpenWorldHint = false,
-                },
+                Name = SalesforceUpdateAccountName,
+                InputSchema = ObjectSchema(
+                    ("sobject-name", StringProp),
+                    (Id, StringProp),
+                    ("body", ObjectProp)),
+                OutputSchema = ObjectSchema(("success", BooleanProp)),
+                Annotations = DestructiveAdmitted,
             },
-            _ => new CallToolResult
-            {
-                StructuredContent = JsonSerializer.SerializeToElement(new { success }),
-            });
+            _ => Structured(new { success }));
 
     internal static McpServerTool SalesforceSoqlQuery(string accountId, string description)
-        => new FixedSchemaTool(
+        => Fixed(
             new Tool
             {
-                Name = "soqlQuery",
-                InputSchema = Parse(
-                    """
-                    {
-                      "type": "object",
-                      "properties": {
-                        "query": { "type": "string" }
-                      },
-                      "required": [ "query" ]
-                    }
-                    """),
-                OutputSchema = Parse(
-                    """
-                    {
-                      "type": "object",
-                      "properties": {
-                        "records": {
-                          "type": "array",
-                          "items": { "type": "object" }
-                        }
-                      },
-                      "required": [ "records" ]
-                    }
-                    """),
-                Annotations = new ToolAnnotations
-                {
-                    ReadOnlyHint = true,
-                    DestructiveHint = false,
-                    IdempotentHint = true,
-                    OpenWorldHint = false,
-                },
+                Name = SalesforceSoqlQueryName,
+                InputSchema = ObjectSchema(("query", StringProp)),
+                OutputSchema = ObjectSchema(("records", ArrayOfObjects)),
+                Annotations = ReadOnlyAdmitted,
             },
-            _ => new CallToolResult
+            _ => Structured(new
             {
-                StructuredContent = JsonSerializer.SerializeToElement(new
+                records = new[]
                 {
-                    records = new[]
-                    {
-                        new { Id = accountId, Description = description },
-                    },
-                }),
-            });
+                    new { Id = accountId, Description = description },
+                },
+            }));
 
-    private static JsonElement Parse(string json)
-        => JsonDocument.Parse(json).RootElement.Clone();
+    private static Tool GmailGetMessageProtocolTool(ToolAnnotations annotations)
+        => new()
+        {
+            Name = IntegrationsFixture.GmailGetMessageTool,
+            InputSchema = ObjectSchema(
+                required: [MessageId],
+                (MessageId, StringProp),
+                (MessageFormat, MessageFormatProp)),
+            OutputSchema = ObjectSchema(
+                required: null,
+                (Id, StringProp),
+                ("subject", StringProp),
+                ("sender", StringProp),
+                ("plaintextBody", StringProp)),
+            Annotations = annotations,
+        };
+
+    private static JsonElement ObjectSchema(
+        params (string Name, object Definition)[] properties)
+        => ObjectSchema(
+            required: properties.Select(property => property.Name).ToArray(),
+            properties);
+
+    private static JsonElement ObjectSchema(
+        string[]? required,
+        params (string Name, object Definition)[] properties)
+    {
+        var shape = new Dictionary<string, object?>
+        {
+            [Type] = Object,
+            [Properties] = properties.ToDictionary(
+                property => property.Name,
+                property => property.Definition,
+                StringComparer.Ordinal),
+        };
+        if (required is not null)
+        {
+            shape[Required] = required;
+        }
+
+        return JsonSerializer.SerializeToElement(shape);
+    }
+
+    private static CallToolResult Structured(object payload)
+        => new()
+        {
+            StructuredContent = JsonSerializer.SerializeToElement(payload),
+        };
+
+    private static FixedSchemaTool Fixed(
+        Tool protocolTool,
+        Func<RequestContext<CallToolRequestParams>, CallToolResult> invoke)
+        => new(protocolTool, invoke);
 
     private sealed class FixedSchemaTool(
         Tool protocolTool,

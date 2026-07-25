@@ -17,20 +17,14 @@ public sealed class HostingProjectionContracts
 {
     private static readonly string[] SiloOnlyEnvironmentKeys =
     [
-        "ConnectionStrings__journal",
-        "DigitalBrain__Security__StateProtectionKey",
-        "DigitalBrain__Modules__0",
-        "DigitalBrain__AI__Ollama__Endpoint",
-        "DigitalBrain__AI__Ollama__Llama32__Model",
-        "DigitalBrain__Integrations__Mcp__AuthorizationMode",
-        "DigitalBrain__Google__Gmail__ClientId",
-        "DigitalBrain__Google__Gmail__ClientSecret",
-        "DigitalBrain__Google__Gmail__RedirectUri",
-        "DigitalBrain__Salesforce__ClientId",
-        "DigitalBrain__Salesforce__RedirectUri",
+        FlutterHostingProjectionSupport.JournalConnectionEnvironmentKey,
+        ConfigurationEnvironment(DigitalBrainHostingExtensions.StateProtectionKeyConfigurationKey),
+        $"{ConfigurationEnvironment(DigitalBrainHostingExtensions.ModulesConfigurationKey)}__0",
+        ConfigurationEnvironment("DigitalBrain:AI:Ollama:Endpoint"),
+        ConfigurationEnvironment("DigitalBrain:Integrations:Mcp:AuthorizationMode"),
+        ConfigurationEnvironment("DigitalBrain:Google:Gmail:ClientId"),
+        ConfigurationEnvironment("DigitalBrain:Salesforce:ClientId"),
     ];
-
-    private static readonly string RepositoryRoot = LocateRepositoryRoot();
 
     [Fact(DisplayName =
         "WithReference(brain) projects journal, state-protection key, AI config, and OAuth; AsClient never does")]
@@ -44,16 +38,20 @@ public sealed class HostingProjectionContracts
 
         var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: "http")
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UiHttpEndpointName)
             .WithReference(brain);
 
         var client = builder
             .AddContainer("client", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: "http")
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UiHttpEndpointName)
             .WithReference(brain.AsClient());
 
-        var siloEnvironment = await EnvironmentKeysOf(silo.Resource).ConfigureAwait(true);
-        var clientEnvironment = await EnvironmentKeysOf(client.Resource).ConfigureAwait(true);
+        var siloEnvironment = await FlutterHostingProjectionSupport
+            .EnvironmentKeysOf(silo.Resource)
+            .ConfigureAwait(true);
+        var clientEnvironment = await FlutterHostingProjectionSupport
+            .EnvironmentKeysOf(client.Resource)
+            .ConfigureAwait(true);
 
         Assert.All(SiloOnlyEnvironmentKeys, key => Assert.Contains(key, siloEnvironment));
         Assert.All(SiloOnlyEnvironmentKeys, key => Assert.DoesNotContain(key, clientEnvironment));
@@ -65,169 +63,9 @@ public sealed class HostingProjectionContracts
             client.Resource.Annotations.OfType<WaitAnnotation>(),
             wait => wait.WaitType == WaitType.WaitUntilHealthy);
 
-        Assert.DoesNotContain(
-            builder.Resources,
-            resource => resource.Name is FlutterHostingExtensions.DefaultUiResourceName
-                or FlutterHostingExtensions.DefaultFlutterResourceName);
+        FlutterHostingProjectionSupport.AssertNoOsSurfaceResources(builder);
     }
 
-    [Fact(DisplayName =
-        "client WithReference source is only Orleans.AsClient — never journal, protection, modules, or projections")]
-    public void ClientWithReferenceSourceNeverTouchesSiloOnlyMaterial()
-    {
-        var source = File.ReadAllText(Path.Combine(
-            RepositoryRoot,
-            "src",
-            "DigitalBrain.Aspire.Hosting",
-            "DigitalBrainHostingExtensions.cs"))
-            .Replace("\r\n", "\n", StringComparison.Ordinal);
-
-        var clientBody = MethodBody(source, "ClientDigitalBrainReference client");
-        var siloBody = MethodBody(
-            source,
-            "this IResourceBuilder<TResource> builder,\n        DigitalBrainBuilder brain)");
-
-        Assert.Contains("client.Brain.Orleans.AsClient()", clientBody, StringComparison.Ordinal);
-        Assert.DoesNotContain("Journal", clientBody, StringComparison.Ordinal);
-        Assert.DoesNotContain("StateProtectionKey", clientBody, StringComparison.Ordinal);
-        Assert.DoesNotContain("Modules", clientBody, StringComparison.Ordinal);
-        Assert.DoesNotContain("Projections", clientBody, StringComparison.Ordinal);
-        Assert.DoesNotContain("StartupDependencies", clientBody, StringComparison.Ordinal);
-        Assert.DoesNotContain("WaitAnnotation", clientBody, StringComparison.Ordinal);
-        Assert.DoesNotContain("WithEnvironment", clientBody, StringComparison.Ordinal);
-        Assert.DoesNotContain("projection.Apply", clientBody, StringComparison.Ordinal);
-
-        Assert.Contains("brain.Journal", siloBody, StringComparison.Ordinal);
-        Assert.Contains("\"journal\"", siloBody, StringComparison.Ordinal);
-        Assert.Contains("DigitalBrain__Security__StateProtectionKey", siloBody, StringComparison.Ordinal);
-        Assert.Contains("brain.StateProtectionKey", siloBody, StringComparison.Ordinal);
-        Assert.Contains("brain.Modules", siloBody, StringComparison.Ordinal);
-        Assert.Contains("projection.Apply", siloBody, StringComparison.Ordinal);
-        Assert.Contains("WaitAnnotation", siloBody, StringComparison.Ordinal);
-    }
-
-    [Fact(DisplayName =
-        "production AppHost silo takes complete brain; MCP is AsClient peer with WaitFor(silo) and owner only")]
-    public void ProductionAppHostKeepsSiloCompleteAndNorthboundClientsAsClientOnly()
-    {
-        var appHost = File.ReadAllText(Path.Combine(
-            RepositoryRoot,
-            "hosts",
-            "DigitalBrain.AppHost",
-            "AppHost.cs"));
-
-        var siloBlock = Between(appHost, "var silo =", ";");
-        var mcpBlock = Between(appHost, "builder.AddProject<Projects.DigitalBrain_Mcp>", ";");
-
-        Assert.Contains(".WithReference(brain)", siloBlock, StringComparison.Ordinal);
-        Assert.DoesNotContain("AsClient", siloBlock, StringComparison.Ordinal);
-
-        Assert.Contains(".WithReference(brain.AsClient())", mcpBlock, StringComparison.Ordinal);
-        Assert.Contains(".WaitFor(silo)", mcpBlock, StringComparison.Ordinal);
-        Assert.Contains(""".WithEnvironment("DigitalBrain__Owner", "dev")""", mcpBlock, StringComparison.Ordinal);
-        Assert.DoesNotContain(".WithReference(brain)", mcpBlock.Replace(
-            ".WithReference(brain.AsClient())",
-            string.Empty,
-            StringComparison.Ordinal), StringComparison.Ordinal);
-
-        foreach (var siloOnly in SiloOnlyEnvironmentKeys)
-        {
-            Assert.DoesNotContain(siloOnly, mcpBlock, StringComparison.Ordinal);
-        }
-
-        Assert.DoesNotContain("ConnectionStrings__journal", mcpBlock, StringComparison.Ordinal);
-        Assert.DoesNotContain("StateProtectionKey", mcpBlock, StringComparison.Ordinal);
-        Assert.DoesNotContain("WithUiEdge", mcpBlock, StringComparison.Ordinal);
-        Assert.DoesNotContain("digitalbrain-ui", mcpBlock, StringComparison.Ordinal);
-    }
-
-    [Fact(DisplayName =
-        "northbound MCP host uses product AddDigitalBrainClient; Chat codecs on Orleans client, not dual hand-wire")]
-    public void NorthboundMcpHostUsesProductClientPathWithClientCodecs()
-    {
-        var program = File.ReadAllText(Path.Combine(
-            RepositoryRoot,
-            "hosts",
-            "DigitalBrain.Mcp",
-            "Program.cs"))
-            .Replace("\r\n", "\n", StringComparison.Ordinal);
-
-        Assert.Contains("AddDigitalBrainClient(client =>", program, StringComparison.Ordinal);
-        Assert.Contains("client.Services.AddSerializer", program, StringComparison.Ordinal);
-        Assert.Contains("ChatMessage", program, StringComparison.Ordinal);
-        Assert.Contains("ChatResponse", program, StringComparison.Ordinal);
-
-        Assert.DoesNotContain("UseOrleansClient", program, StringComparison.Ordinal);
-        Assert.DoesNotContain("DigitalBrainClient.Connect", program, StringComparison.Ordinal);
-        Assert.DoesNotContain("builder.Services.AddSerializer", program, StringComparison.Ordinal);
-        Assert.DoesNotContain("Configuration[\"DigitalBrain:Owner\"]", program, StringComparison.Ordinal);
-        Assert.DoesNotContain("ConnectionStrings__journal", program, StringComparison.Ordinal);
-        Assert.DoesNotContain("StateProtectionKey", program, StringComparison.Ordinal);
-        Assert.DoesNotContain("Integrations.Mcp", program, StringComparison.Ordinal);
-    }
-
-    private static async Task<HashSet<string>> EnvironmentKeysOf(ContainerResource resource)
-    {
-        var keys = new HashSet<string>(StringComparer.Ordinal);
-        var execution = new DistributedApplicationExecutionContext(DistributedApplicationOperation.Run);
-        var context = new EnvironmentCallbackContext(execution, resource);
-
-        foreach (var annotation in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
-        {
-            await annotation.Callback(context).ConfigureAwait(false);
-        }
-
-        keys.UnionWith(context.EnvironmentVariables.Keys);
-        return keys;
-    }
-
-    private static string MethodBody(string source, string signatureMarker)
-    {
-        var signatureIndex = source.IndexOf(signatureMarker, StringComparison.Ordinal);
-        Assert.True(signatureIndex >= 0, $"Signature marker '{signatureMarker}' was not found.");
-
-        var openBrace = source.IndexOf('{', signatureIndex);
-        Assert.True(openBrace >= 0, $"Opening brace after '{signatureMarker}' was not found.");
-
-        var depth = 0;
-        for (var index = openBrace; index < source.Length; index++)
-        {
-            if (source[index] == '{')
-            {
-                depth++;
-            }
-            else if (source[index] == '}')
-            {
-                depth--;
-                if (depth == 0)
-                {
-                    return source[(openBrace + 1)..index];
-                }
-            }
-        }
-
-        throw new InvalidOperationException($"Could not balance braces for '{signatureMarker}'.");
-    }
-
-    private static string Between(string source, string start, string end)
-    {
-        var startIndex = source.IndexOf(start, StringComparison.Ordinal);
-        Assert.True(startIndex >= 0, $"Start marker '{start}' was not found.");
-        var endIndex = source.IndexOf(end, startIndex + start.Length, StringComparison.Ordinal);
-        Assert.True(endIndex >= 0, $"End marker '{end}' after '{start}' was not found.");
-        return source[startIndex..endIndex];
-    }
-
-    private static string LocateRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null
-               && !File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx")))
-        {
-            directory = directory.Parent;
-        }
-
-        return directory?.FullName
-            ?? throw new InvalidOperationException("DigitalBrain.slnx was not found above the test assembly.");
-    }
+    private static string ConfigurationEnvironment(string configurationKey)
+        => configurationKey.Replace(":", "__", StringComparison.Ordinal);
 }

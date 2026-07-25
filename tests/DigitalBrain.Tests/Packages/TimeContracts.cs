@@ -11,9 +11,11 @@ public sealed class TimeContracts
     public void CountdownIsTheOnlyTimeNeuronCapability()
     {
         var contracts = typeof(ICountdown).Assembly;
+        var timeNamespace = typeof(ICountdown).Namespace;
+
         var vocabulary = contracts
             .GetExportedTypes()
-            .Where(type => type.Namespace == "DigitalBrain.Time")
+            .Where(type => type.Namespace == timeNamespace)
             .Select(type => type.Name)
             .Order(StringComparer.Ordinal)
             .ToArray();
@@ -31,7 +33,7 @@ public sealed class TimeContracts
                 nameof(StartCountdown),
             ],
             vocabulary);
-        Assert.Null(contracts.GetType("DigitalBrain.Time.IReminder"));
+        Assert.Null(contracts.GetType($"{timeNamespace}.IReminder"));
     }
 
     [Fact]

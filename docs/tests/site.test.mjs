@@ -193,6 +193,24 @@ test('the architecture page is module-organized and states each status once', ()
   assert.doesNotMatch(architecture, /Windows chrome via `lib\/main\.dart`\/`windows\/`/)
   assert.doesNotMatch(read('docs', 'packages.md'), /Windows Flutter chrome Designed|Designed \(Windows widget chrome polish\)/)
 
+  assert.match(architecture, /WithFlutterHost\(\)` = Desktop/)
+  assert.match(architecture, /WithFlutterHost<DesktopHost>\(\)/)
+  assert.match(architecture, /WithFlutterHost<HeadlessHost>\(\)/)
+  assert.match(architecture, /WithFlutterHost\(\)` \/ `<DesktopHost>`/)
+  assert.match(architecture, /\*\*No Auto\.\*\*|\*\*no Auto\*\*|no silent Auto fallback/)
+  assert.doesNotMatch(architecture, /honest Auto\//)
+  assert.match(
+    read('docs', 'packages.md'),
+    /WithFlutterHost\(\)[\s\S]{0,120}?Desktop|Desktop[\s\S]{0,80}?WithFlutterHost\(\)/)
+  assert.match(read('docs', 'packages.md'), /HeadlessHost/)
+  assert.match(read('docs', 'packages.md'), /not\*\* Built-live|not Built-live|as Built-live/)
+  assert.doesNotMatch(read('docs', 'packages.md'), /\bAuto host\b|WithFlutterHost\s*<\s*Auto/)
+
+  const productAppHost = read('hosts', 'DigitalBrain.AppHost', 'AppHost.cs')
+  assert.match(productAppHost, /\.WithFlutterHost\(\)/)
+  assert.doesNotMatch(productAppHost, /WithFlutterHost\s*<\s*HeadlessHost\s*>/)
+  assert.doesNotMatch(productAppHost, /WithFlutterHost\s*<\s*Auto/)
+
   assert.match(architecture, /human-approved proposal/)
   assert.match(architecture, /Runtime behavior installation is designed and not yet built/)
   assert.doesNotMatch(architecture, /REFINED-ARCHITECTURE|APPROVED-ARCHITECTURE/)
@@ -236,9 +254,14 @@ test('the specification describes the retained test tiers', () => {
 
 test('every shipped package is in the table, and the boundary is stated', () => {
   const packages = read('docs', 'packages.md')
-  const packableSource = read('tests', 'DigitalBrain.Tests', 'Packages', 'PackableProjects.cs')
-
-  const packable = [...packableSource.matchAll(/"(DigitalBrain[^"]*)"/g)].map(match => match[1])
+  const packableSource = read('tests', 'DigitalBrain.Tests', 'Packages', 'PackageInventory.cs')
+  const consts = Object.fromEntries(
+    [...packableSource.matchAll(/internal const string (\w+) = "([^"]+)"/g)].map(match => [match[1], match[2]]))
+  const packableBlock = packableSource.match(/static readonly string\[\] Packable\s*=\s*\[([\s\S]*?)\];/)
+  assert.ok(packableBlock, 'PackageInventory must declare Packable')
+  const packable = [...packableBlock[1].matchAll(/\b([A-Z][A-Za-z0-9]*)\b/g)]
+    .map(match => consts[match[1]])
+    .filter(Boolean)
   assert.ok(packable.length >= 18, `expected the packable list, found ${packable.length}`)
 
   for (const name of packable) {

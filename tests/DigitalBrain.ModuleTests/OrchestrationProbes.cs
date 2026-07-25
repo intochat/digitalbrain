@@ -5,6 +5,12 @@ using DigitalBrain.Tasks;
 
 namespace DigitalBrain.ModuleTests;
 
+public static class ProbeParticipants
+{
+    public const string Left = "left";
+    public const string Right = "right";
+}
+
 [Alias("DigitalBrain.ModuleTests.IConcurrentProbe")]
 public interface IConcurrentProbe : IAgent;
 
@@ -34,15 +40,15 @@ public sealed class ConcurrentProbe : Concurrent, IConcurrentProbe
 {
     protected override IReadOnlyList<Participant> Participants =>
     [
-        Participant<ILlama32>("left"),
-        Participant<ILlama32>("right"),
+        Participant<ILlama32>(ProbeParticipants.Left),
+        Participant<ILlama32>(ProbeParticipants.Right),
     ];
 }
 
 public sealed class ParticipantSwapConcurrentProbe : Concurrent, IParticipantSwapConcurrentProbe
 {
-    private string _left = "left";
-    private string _right = "right";
+    private string _left = ProbeParticipants.Left;
+    private string _right = ProbeParticipants.Right;
 
     protected override IReadOnlyList<Participant> Participants =>
     [
@@ -64,8 +70,8 @@ public sealed class GroupChatProbe : GroupChat, IGroupChatProbe
 {
     protected override IReadOnlyList<Participant> Participants =>
     [
-        Participant<ILlama32>("left"),
-        Participant<ILlama32>("right"),
+        Participant<ILlama32>(ProbeParticipants.Left),
+        Participant<ILlama32>(ProbeParticipants.Right),
     ];
 
     public Task InvokeAccept(AttemptRequest request) => Accept(request);

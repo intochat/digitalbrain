@@ -11,12 +11,16 @@ public sealed class RestartHostContracts(TestingFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var greeter = test.Neuron<IGreeter>("welcome");
+        var greeter = test.Neuron<IGreeter>(TestingScenario.WelcomeGreeter);
 
-        await test.Client.SendAsync<IGreeter>("welcome", new SayHello("Ada"));
+        await test.Client.SendAsync<IGreeter>(
+            greeter.Id.Name,
+            new SayHello(TestingScenario.Guest));
 
         var first = await greeter.Outgoing.NextAsync<Greeted>(cancellationToken);
-        Assert.Equal("Hello, Ada.", first.Synapse.Message);
+        Assert.Equal(
+            TestingScenario.GreetedMessage(TestingScenario.Guest),
+            first.Synapse.Message);
 
         await greeter.RestartHostAsync(cancellationToken);
 

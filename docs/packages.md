@@ -47,7 +47,7 @@ for what ships and what each package may depend on.
 | Time | yes | yes | no | `DigitalBrain.Time.Tests` (Countdown lifecycle and recovery) | Built: Countdown only |
 | Google | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` Gmail ReadMessage admit + annotation refusal on scripted MCP edge | Built |
 | Salesforce | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` propose / reject / approve→Completed on scripted MCP edge | Built |
-| Flutter | yes | yes | yes (OS surface) | L0 golden + namespace/boundary pins + hosting **projection** contracts; L1 journals in `DigitalBrain.Flutter.Tests`; L1 HTTP edge + SSE shell events in `DigitalBrain.Ui.Tests`; pure-Dart headless host + nested Windows chrome (`clients/digitalbrain_flutter` + `shell/lib/main.dart`/`shell/windows/`); module hosting **projects** Ui/host when `WithUiEdge` / `WithFlutterHost` selected (graph shape, not live Healthy) | Built (vocabulary + C# UI edge + SSE + `Flutter.Aspire.Hosting` projection + pure-Dart headless + nested `shell/` chrome — L0/L1); Designed (full product chrome, multi-principal IdP edge, product journal observation); **residual unproven:** product AppHost OS-surface Healthy / live `aspire start` topology — **not** Built-live |
+| Flutter | yes | yes | yes (OS surface) | L0 golden + namespace/boundary pins + hosting **projection** contracts; L1 journals in `DigitalBrain.Flutter.Tests`; L1 HTTP edge + SSE shell events in `DigitalBrain.Ui.Tests`; pure-Dart **Headless** host + nested **Desktop** Windows chrome (`clients/digitalbrain_flutter` + `shell/lib/main.dart`/`shell/windows/`); explicit `WithFlutterHost()` = Desktop vs `WithFlutterHost<HeadlessHost>()` (**no Auto**); module hosting **projects** Ui/host when `WithUiEdge` / `WithFlutterHost` selected (graph shape, not live Healthy) | Built (vocabulary + C# UI edge + SSE + `Flutter.Aspire.Hosting` projection + pure-Dart Headless + nested Desktop `shell/` chrome — L0/L1); Designed (full product chrome, multi-principal IdP edge, product journal observation); **residual unproven:** product AppHost OS-surface Healthy / live `aspire start` topology — **not** Built-live |
 | AccountEnrichment (sample) | non-NuGet sample | non-NuGet sample | no | L0 shape + module registration; L1 multi-module composition in Integrations.Tests (Gmail→propose→session approval→AccountEnriched) | Built (opt-in sample under `samples/`; not a shipped package) |
 | Compositions (sample) | no (consumes contracts) | no | no | `DigitalBrain.Compositions.Tests` L1 shell/countdown/AI pane compositions | Built (pre-rail logic under `samples/`; not NuGet; not installed Behaviors) |
 
@@ -57,13 +57,16 @@ Flutter packages are `DigitalBrain.Modules.Flutter.Contracts`, `DigitalBrain.Mod
 `DigitalBrain.Modules.Flutter.Aspire.Hosting` with public namespaces `DigitalBrain.Flutter` and
 `DigitalBrain.Flutter.Aspire.Hosting` (semantic neurons `IShell` / `IScene` — not an `IFlutter` god
 type). Selecting `FlutterModule` without host options is vocabulary-only; `WithUiEdge` /
-`WithFlutterHost` project the OS surface. The Flutter/Dart pixel host is a northbound HTTP client of
-`hosts/DigitalBrain.Ui` under `clients/`: pure-Dart `digitalbrain_wire` + `digitalbrain_flutter`
-(edge/SSE/projection + headless `bin/digitalbrain_host.dart`); Windows Material chrome is the nested
-Flutter package `clients/digitalbrain_flutter/shell/` (`shell/lib/main.dart` + `shell/windows/`,
-depends on the pure-Dart package) — not a packable module, not under `modules/`, and not an Orleans
-silo. Live product AppHost Healthy for Ui/Flutter host remains residual — do not read this packaging
-as Built-live.
+`WithFlutterHost` project the OS surface. Host mode is explicit: default `WithFlutterHost()` =
+Desktop under `shell/`; `WithFlutterHost<HeadlessHost>()` = pure-Dart Headless — **no Auto**. The
+Flutter/Dart pixel host is a northbound HTTP client of `hosts/DigitalBrain.Ui` under `clients/`:
+pure-Dart `digitalbrain_wire` + `digitalbrain_flutter` (edge/SSE/projection + headless
+`bin/digitalbrain_host.dart`); Windows Material chrome is the nested Flutter package
+`clients/digitalbrain_flutter/shell/` (`shell/lib/main.dart` + `shell/windows/`, depends on the
+pure-Dart package) — not a packable module, not under `modules/`, and not an Orleans silo. Live
+product AppHost Healthy for Ui/Flutter host remains residual — do not read this packaging as
+Built-live. Behavior install rail and calendar Time beyond Countdown are Designed elsewhere, not
+implied Built by this table.
 
 ## Not NuGet packages
 
