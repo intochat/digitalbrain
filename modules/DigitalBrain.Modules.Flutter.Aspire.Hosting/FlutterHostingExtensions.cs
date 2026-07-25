@@ -158,7 +158,11 @@ public static class FlutterHostingExtensions
                     "Pass FlutterHostOptions.WorkingDirectory or place clients/digitalbrain_flutter in the repo.");
             }
 
-            var launch = FlutterHostLaunch.Resolve(kind, packageRoot, options);
+            var launch = FlutterHostLaunch.Resolve(
+                kind,
+                packageRoot,
+                options,
+                appHost.Configuration);
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
                 ? DefaultFlutterResourceName
                 : options.ResourceName;
