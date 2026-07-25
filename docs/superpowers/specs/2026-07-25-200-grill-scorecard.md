@@ -12,11 +12,11 @@ journals; compositions own shell/OS logic until the Behavior rail exists; select
 | Field | Content |
 | --- | --- |
 | Cycles used | 200 (8 waves G0–G8 covering agents 1–200). Hard stop at 200 — no agent 201+. |
-| Close HEAD | `d3ec36f9` (`fix(hosting): drop Kernel-rooted LLM constraint; pin Contracts/Hosting L0`) |
+| Close HEAD | `f9f5ee25` (scorecard) on tip after product work `d3ec36f9` |
 | Branch | `agent/digitalbrain-hosting-testing` |
 | Baseline (exclusive) | `d9ecee85` (`feat(compositions): shell nav, enrichment surface, AI pane OS apps`) |
-| Commits | 39 on `d9ecee85..HEAD` (listed below) |
-| Gate evidence | Full root gate (`dotnet build` + `dotnet test` on `DigitalBrain.slnx -c Release`, docs npm) is the completion oracle per `CLAUDE.md`. This close cycle is **docs-honesty / scorecard only** and did **not** re-run the root gate. Orchestrator or a follow-on human must quote green gate output before any “gates green” product claim. |
+| Commits | 40 on `d9ecee85..HEAD` (39 product/honesty + this scorecard) |
+| Gate evidence | **Green** (G8 agents 185–192). `dotnet build DigitalBrain.slnx -c Release` → exit 0, 0 warn / 0 err. `dotnet test DigitalBrain.slnx -c Release` → exit 0, **Failed 0 / Passed 226**. `npm --prefix docs test` → 22/22. `npm --prefix docs run build` → green. `dart analyze` wire+flutter clean; wire `dart test` 4/4; `flutter analyze` clean; `flutter test` 21/21. |
 | Close tree | Clean of campaign WIP except untracked `prompt-200-grill.md` (orchestrator prompt; leave unstaged). |
 
 ## Commits (`d9ecee85..HEAD`)
