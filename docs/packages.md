@@ -39,11 +39,11 @@ for what ships and what each package may depend on.
 | Family | Contracts | Runtime | Module hosting package | Semantic proof | Status |
 | --- | --- | --- | --- | --- | --- |
 | Quickstart | yes | yes | no | `DigitalBrain.Quickstart.Tests` + Quickstart AppHost | Built |
-| AI | yes | yes | yes | typed LLM smoke (`ILlama32`); direct Concurrent/GroupChat exist, no L1 orchestration proof yet; supervised IWorker unbuilt | Built (direct surface); Designed (supervised) |
-| Tasks | yes | yes | no | contracts + runtime package | Built |
-| Time | yes | yes | no | `DigitalBrain.Time.Tests` | Built: Countdown only |
-| Google | yes | yes | yes | AppHost selection | Built |
-| Salesforce | yes | yes | yes | AppHost selection | Built |
+| AI | yes | yes | yes | typed LLM smoke (`ILlama32`); direct Concurrent/GroupChat code exists, no L1 orchestration proof; supervised IWorker unbuilt | Built (direct surface); Designed (supervised) |
+| Tasks | yes | yes | no | contracts + runtime package + assembly-boundary pins; no L1 semantic proof | Built |
+| Time | yes | yes | no | `DigitalBrain.Time.Tests` (Countdown lifecycle and recovery) | Built: Countdown only |
+| Google | yes | yes | yes | AppHost selection + package graph; no L1 semantic proof | Built |
+| Salesforce | yes | yes | yes | AppHost selection + package graph; no L1 semantic proof | Built |
 
 Quickstart, Tasks, and Time have no module `Aspire.Hosting` package because they need no
 module-specific AppHost resources. AI, Google, and Salesforce do.
@@ -98,9 +98,10 @@ resource. Each brain owns a secret `<brain-name>-ai-openai-api-key` parameter. O
 receive provider endpoints, model names, and that secret parameter; client references receive none
 of them.
 
-`DigitalBrain.Security` is the shared purpose-bound durable encryption package. AI uses it for direct
-MAF sessions and supervised workflow checkpoints; `DigitalBrain.Integrations.Mcp` uses it for OAuth
-tokens. Neither package acquires provider vocabulary.
+`DigitalBrain.Security` is the shared purpose-bound durable encryption package. AI uses it today for
+direct MAF sessions; supervised workflow checkpoints are a designed purpose on the same package and
+are not built. `DigitalBrain.Integrations.Mcp` uses it for OAuth tokens. Neither package acquires
+provider vocabulary.
 
 `DigitalBrain.Integrations.Mcp` is southbound shared mechanics for Gmail and Salesforce. The provider
 modules own endpoints, scopes, exact tool admission, arguments, semantic mapping, approval, fencing,

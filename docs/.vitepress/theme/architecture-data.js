@@ -20,7 +20,7 @@ export const MODULES = [
   },
   {
     id: 'tasks', label: 'Tasks', status: 'built', section: '#_4-2-tasks',
-    role: 'Durable desired-outcome identity. Exactly one Attempt is active at a time; a MAF workflow runs each attempt. Workers report typed facts.',
+    role: 'Durable desired-outcome identity and attempt/worker vocabulary. Exactly one Attempt is active at a time. Supervised MAF-per-attempt workers are designed; no live worker producer ships yet. Attempt facts are accepted when produced.',
     neurons: ['ITask', 'IWorker'],
     synapses: ['AttemptSucceeded', 'AttemptFailed', 'AttemptWaiting', 'AttemptProgressed', 'AttemptOutcomeUncertain'],
     mcp: false, ui: false, aspire: [],
@@ -40,8 +40,8 @@ export const MODULES = [
   {
     id: 'time', label: 'Time', status: 'built', section: '#_4-5-time',
     role: 'Built: durable one-shot ICountdown. Designed/unbuilt: IReminder and recurring calendar schedules. Separate from kernel-private outbox timers; reuses the shared kernel reminder provider.',
-    neurons: ['ICountdown', 'IReminder'],
-    synapses: ['CountdownElapsed', 'ReminderElapsed', 'ReminderOverdue'],
+    neurons: ['ICountdown'],
+    synapses: ['CountdownElapsed'],
     mcp: false, ui: false, aspire: [],
   },
   {
@@ -69,14 +69,14 @@ export const ACTORS = [
 
 export const BEHAVIORS = [
   {
-    id: 'digest', label: 'Morning digest', status: 'designed', trigger: 'on ReminderElapsed',
-    uses: ['ReminderElapsed', 'IReminder', 'IGmail', 'ILlama32'],
-    role: 'When the daily reminder elapses, read a message and summarise it with a local model. Composes Time, Google, and AI vocabulary — no new contract.',
+    id: 'digest', label: 'Morning digest', status: 'designed', trigger: 'on CountdownElapsed',
+    uses: ['CountdownElapsed', 'ICountdown', 'IGmail', 'ILlama32'],
+    role: 'When a one-shot countdown elapses, read a message and summarise it with a local model. Composes shipped Time, Google, and AI vocabulary — no new contract. (A future IReminder would replace the daily re-arm pattern.)',
     script: `public sealed class MorningDigest(
-    IReminder daily, IGmail gmail, ILlama32 llama)
-    : Behavior, IHandle<ReminderElapsed>
+    ICountdown daily, IGmail gmail, ILlama32 llama)
+    : Behavior, IHandle<CountdownElapsed>
 {
-    public async Task HandleAsync(ReminderElapsed e, ...)
+    public async Task HandleAsync(CountdownElapsed e, ...)
     {
         var message = await gmail.ReadMessage(...);
         await llama.Respond([new ChatMessage(ChatRole.User, Summarise(message))]);

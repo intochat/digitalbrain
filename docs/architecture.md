@@ -722,8 +722,9 @@ Any selected AI or MCP-backed module also causes AppHost to declare one brain-sc
 a Base64-encoded 256-bit durable-state key. Run mode generates a cryptographically random key and
 persists it for local durability; Publish mode has no default and requires the secret from the
 deployment environment. The key is projected only to silos, never clients, and is shared by every
-silo in that brain. It encrypts MAF sessions, workflow checkpoints, and MCP OAuth tokens with distinct
-purposes; provider modules do not create their own keys or process-local key rings.
+silo in that brain. It encrypts MAF direct sessions and MCP OAuth tokens with distinct purposes today;
+supervised workflow checkpoints are a designed purpose on the same package (§8). Provider modules do
+not create their own keys or process-local key rings.
 
 The production AppHost also exposes this documentation through Aspire's official JavaScript resource
 lifecycle:
@@ -838,10 +839,32 @@ facade itself has no observation surface — it sends and it emits. A durable pe
 reconnect lifecycle are not built.
 
 **`AsClient()` remains a security boundary.** A client projection must never inherit silo-only storage
-or module secrets. Architecture tests currently guard the durable journal connection, shared state
-key, AI resource configuration, and Google and Salesforce OAuth configuration: each reaches
-`WithReference(brain)` and never `brain.AsClient()`. Every new module reference or storage profile has
-to extend that proof rather than relying on the convention.
+or module secrets. Hosting implements that split (`WithReference(brain)` for silos vs
+`brain.AsClient()` for clients), but architecture tests do **not** yet pin journal connection, shared
+state key, AI resource configuration, or Google/Salesforce OAuth as silo-only. Those proofs must be
+added; until they exist, every new module reference or storage profile must not rely on convention
+alone.
+
+**Tasks has no L1 semantic proof.** Contracts and runtime packages ship, and assembly-boundary tests
+keep Tasks free of AI/MAF/Time. There is no method-scoped cluster proof of task lifecycle, attempt
+facts, or worker coordination. Supervised MAF-per-attempt workers remain designed; nothing constructs
+live attempt facts under `modules/`, `src/`, `samples/`, or `tests/` today.
+
+**Google and Salesforce have no L1 semantic proof.** Contracts, runtime, MCP hosting, and AppHost
+selection ship. There is no cluster-level proof of Gmail reads, Salesforce mutations, approval fencing,
+or reconciliation against a real or scripted provider edge.
+
+**AI has no Concurrent/GroupChat L1 proof.** Typed LLM smoke (`ILlama32`) exercises a direct model
+turn. Direct Concurrent/GroupChat `Respond` surfaces exist in code; no L1 test asserts multi-participant
+orchestration. Supervised `IWorker` Accept/Continue/Cancel paths throw until rewritten.
+
+**Supervised workflow checkpoints are not built.** `DigitalBrain.Security` is purpose-ready for them;
+the supervised Orleans-primary runner and checkpoint adoption path do not ship. Present-tense claims
+about encrypting live supervised checkpoints describe design, not running product.
+
+**The OpenTelemetry MAF chain is not built.** Journals remain the durable truth. The correlated
+kernel → MAF → model-client span chain is ratified target shape, not an implemented diagnostic
+projection in this repository.
 
 **DevUI is not part of the current architecture.** No interactive agent UI is wired, and
 `Microsoft.Agents.AI.DevUI` is referenced nowhere in the repository.

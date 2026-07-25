@@ -11,7 +11,7 @@ Executable product proofs live in the test tiers:
 | L0 | `tests/DigitalBrain.Tests` | Package graph boundaries and reflection on public shapes |
 | L1 | `tests/DigitalBrain.TestingTests` | Testing product lifecycle (fixture, journals, clock, faults) |
 | L1 | `tests/DigitalBrain.Quickstart.Tests` | External author greeter durability |
-| L1 | `tests/DigitalBrain.Time.Tests` | Reminder-primary `ICountdown` |
+| L1 | `tests/DigitalBrain.Time.Tests` | Durable `ICountdown` lifecycle and recovery (Orleans reminder as wake authority) |
 | L1 | `tests/DigitalBrain.ModuleTests` | Optional typed LLM smoke |
 | L2 | `tests/DigitalBrain.HostTests` | Exclusive AppHost graph health |
 
