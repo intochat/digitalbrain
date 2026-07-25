@@ -1,4 +1,6 @@
 bin/
+!clients/**/bin/
+!clients/**/bin/**
 obj/
 artifacts/
 TestResults/
