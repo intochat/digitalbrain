@@ -29,7 +29,7 @@ internal sealed record OrchestrationDefinition(
 {
     internal const int CurrentFormatVersion = 2;
 
-    internal static OrchestrationDefinition Create(
+    private static OrchestrationDefinition Create(
         string orchestrationType,
         string mafVersion,
         DirectOrchestrationIdentity identity,
