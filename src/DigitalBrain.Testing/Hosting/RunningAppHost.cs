@@ -8,7 +8,6 @@ namespace DigitalBrain.Testing;
 
 public sealed class RunningAppHost : IAsyncDisposable
 {
-    private const string RestartCommand = "resource-restart";
     private static readonly TimeSpan CleanupTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(5);
 
@@ -105,34 +104,6 @@ public sealed class RunningAppHost : IAsyncDisposable
     {
         ThrowIfDisposed();
         using var operation = Linked(cancellationToken);
-        await _application.ResourceNotifications.WaitForResourceHealthyAsync(
-            resourceName,
-            operation.Token);
-    }
-
-    internal async Task RestartAsync(
-        string resourceName,
-        CancellationToken cancellationToken)
-    {
-        ThrowIfDisposed();
-        using var operation = Linked(cancellationToken);
-        var result = await _application.ResourceCommands.ExecuteCommandAsync(
-            resourceName,
-            RestartCommand,
-            operation.Token);
-
-#pragma warning disable CS0618
-        var errorMessage = result.ErrorMessage;
-#pragma warning restore CS0618
-
-        if (!result.Success)
-        {
-            throw new AppHostTestFailureException(
-                $"Restart failed for resource '{resourceName}': "
-                + $"ErrorMessage='{errorMessage ?? "(null)"}', "
-                + $"Message='{result.Message ?? "(null)"}'.");
-        }
-
         await _application.ResourceNotifications.WaitForResourceHealthyAsync(
             resourceName,
             operation.Token);

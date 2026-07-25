@@ -18,8 +18,4 @@ public sealed class HostedResource
 
     public HttpClient CreateHttpClient(string? endpointName = null)
         => _host.CreateHttpClient(Name, endpointName);
-
-    public Task RestartAsync(
-        CancellationToken cancellationToken = default)
-        => _host.RestartAsync(Name, cancellationToken);
 }
