@@ -37,7 +37,6 @@ internal sealed record OrchestrationDefinition(string Fingerprint)
             identity.ExecutionEnvironmentName,
             identity.ManagerName(described.Length),
             identity.AggregatorName,
-            "fingerprint-v2",
             described);
         var fingerprint = Convert.ToHexStringLower(
             SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(source)));
@@ -77,6 +76,5 @@ internal sealed record OrchestrationDefinition(string Fingerprint)
         string ExecutionEnvironment,
         string Manager,
         string Aggregator,
-        string HostIdentityScheme,
         IReadOnlyList<OrchestrationParticipant> Participants);
 }
