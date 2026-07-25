@@ -422,11 +422,24 @@ public sealed class FlutterHostingProjectionContracts
             "hosts",
             "DigitalBrain.AppHost",
             "AppHost.cs"));
+        var project = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.AppHost",
+            "DigitalBrain.AppHost.csproj"));
 
         Assert.Contains("AddModule<FlutterModule>", appHost, StringComparison.Ordinal);
         Assert.Contains("WithUiEdge", appHost, StringComparison.Ordinal);
         Assert.Contains("WithFlutterHost", appHost, StringComparison.Ordinal);
         AssertNoOsSurfaceHandWire(appHost);
+
+        Assert.Contains(
+            "DigitalBrain.Modules.Flutter.Aspire.Hosting",
+            project,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("DigitalBrain.Ui", project, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProbeHost", project, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProbeHost", appHost, StringComparison.Ordinal);
     }
 
     [Fact(DisplayName =
@@ -503,15 +516,14 @@ public sealed class FlutterHostingProjectionContracts
 
     private static void AssertNoOsSurfaceHandWire(string appHost)
     {
-        Assert.DoesNotContain(
-            "builder.AddProject<Projects.DigitalBrain_Ui>",
-            appHost,
-            StringComparison.Ordinal);
+        Assert.DoesNotContain("Projects.DigitalBrain_Ui", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("DigitalBrain_Ui", appHost, StringComparison.Ordinal);
         Assert.DoesNotContain("digitalbrain-ui", appHost, StringComparison.Ordinal);
         Assert.DoesNotContain("digitalbrain-flutter", appHost, StringComparison.Ordinal);
         Assert.DoesNotContain("DIGITALBRAIN_UI_BASE", appHost, StringComparison.Ordinal);
         Assert.DoesNotContain("DIGITALBRAIN_SHELL", appHost, StringComparison.Ordinal);
         Assert.DoesNotContain("AddExecutable", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProbeHost", appHost, StringComparison.Ordinal);
     }
 
     private static async Task<HashSet<string>> EnvironmentKeysOf(IResource resource)
