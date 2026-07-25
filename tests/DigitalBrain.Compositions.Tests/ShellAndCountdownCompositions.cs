@@ -9,7 +9,7 @@ namespace DigitalBrain.Compositions.Tests;
 
 public sealed class ShellAndCountdownCompositions(CompositionsFixture fixture)
 {
-    [Fact(DisplayName = "OpenHome composition journals SceneOpened without Kernel references")]
+    [Fact(DisplayName = "OpenHome composition journals SceneOpened for the home scene only")]
     public async Task OpenHomeCompositionJournalsSceneOpened()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -19,13 +19,11 @@ public sealed class ShellAndCountdownCompositions(CompositionsFixture fixture)
         await new OpenHome().RunAsync(
             test.Client,
             shellName: "desk",
-            sceneKey: "home",
-            title: "Home",
             cancellationToken);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
-        Assert.Equal("home", opened.Synapse.SceneKey);
-        Assert.Equal("Home", opened.Synapse.Title);
+        Assert.Equal(OpenHome.SceneKey, opened.Synapse.SceneKey);
+        Assert.Equal(OpenHome.SceneTitle, opened.Synapse.Title);
     }
 
     [Fact(DisplayName = "PostAuthBootstrap opens home after owner-bound client exists")]
@@ -41,7 +39,7 @@ public sealed class ShellAndCountdownCompositions(CompositionsFixture fixture)
             cancellationToken);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
-        Assert.Equal("home", opened.Synapse.SceneKey);
+        Assert.Equal(OpenHome.SceneKey, opened.Synapse.SceneKey);
     }
 
     [Fact(DisplayName = "NavigateShell journals multiple SceneOpened facts in order")]
@@ -84,7 +82,7 @@ public sealed class ShellAndCountdownCompositions(CompositionsFixture fixture)
             cancellationToken);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
-        Assert.Equal("countdown", opened.Synapse.SceneKey);
+        Assert.Equal(CountdownSurface.SceneKey, opened.Synapse.SceneKey);
         Assert.Equal(CountdownStatus.Scheduled, started.Status);
         Assert.Equal(TimeSpan.FromMinutes(5), started.Duration);
 

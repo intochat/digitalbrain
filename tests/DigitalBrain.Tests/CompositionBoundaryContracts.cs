@@ -7,7 +7,16 @@ public sealed class CompositionBoundaryContracts
 {
     private static readonly string RepositoryRoot = LocateRepositoryRoot();
 
-    [Fact(DisplayName = "pre-rail compositions never reference Kernel or module runtimes")]
+    private static readonly string[] AllowedProjectReferences =
+    [
+        "DigitalBrain.Abstractions",
+        "DigitalBrain.Client",
+        "DigitalBrain.Modules.AI.Contracts",
+        "DigitalBrain.Modules.Flutter.Contracts",
+        "DigitalBrain.Modules.Time.Contracts",
+    ];
+
+    [Fact(DisplayName = "pre-rail compositions reference only client + contracts — never Kernel or runtimes")]
     public void PreRailCompositionsNeverReferenceKernelOrModuleRuntimes()
     {
         var projectPath = Path.Combine(
@@ -17,25 +26,76 @@ public sealed class CompositionBoundaryContracts
             "DigitalBrain.Compositions.csproj");
         Assert.True(File.Exists(projectPath), projectPath);
 
-        var references = XDocument.Load(projectPath)
+        var document = XDocument.Load(projectPath);
+        var projectReferences = document
             .Descendants("ProjectReference")
             .Select(element => element.Attribute("Include")?.Value)
             .Where(path => path is not null)
             .Select(path => Path.GetFileNameWithoutExtension(path!))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var packageReferences = document
+            .Descendants("PackageReference")
+            .Select(element => element.Attribute("Include")?.Value)
+            .Where(name => name is not null)
+            .Select(name => name!)
             .ToArray();
 
-        Assert.Contains("DigitalBrain.Client", references);
-        Assert.Contains("DigitalBrain.Abstractions", references);
-        Assert.Contains("DigitalBrain.Modules.Flutter.Contracts", references);
-        Assert.Contains("DigitalBrain.Modules.Time.Contracts", references);
-        Assert.Contains("DigitalBrain.Modules.AI.Contracts", references);
-        Assert.DoesNotContain(references, name => name == "DigitalBrain.Kernel");
-        Assert.DoesNotContain(references, name => name == "DigitalBrain.Modules.Flutter");
-        Assert.DoesNotContain(references, name => name == "DigitalBrain.Modules.Time");
-        Assert.DoesNotContain(references, name => name == "DigitalBrain.Modules.AI");
-        Assert.DoesNotContain(references, name => name.Contains("Integrations", StringComparison.Ordinal));
-        Assert.DoesNotContain(references, name => name == "DigitalBrain.AccountEnrichment");
+        Assert.Equal(AllowedProjectReferences, projectReferences);
+        Assert.DoesNotContain(projectReferences, name => name == "DigitalBrain.Kernel");
+        Assert.DoesNotContain(
+            projectReferences,
+            name => name.Contains("Integrations", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            packageReferences,
+            name => name.Contains("Orleans", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("Kernel", StringComparison.OrdinalIgnoreCase)
+                || name.StartsWith("ModelContextProtocol", StringComparison.Ordinal)
+                || name.StartsWith("Microsoft.Agents.AI", StringComparison.Ordinal)
+                || name.StartsWith("OllamaSharp", StringComparison.Ordinal)
+                || name.StartsWith("OpenAI", StringComparison.Ordinal));
     }
+
+    [Fact(DisplayName = "pre-rail composition sources never import Kernel, Orleans, Integrations, or IChatClient")]
+    public void PreRailCompositionSourcesStayOnClientAndContracts()
+    {
+        var compositionsRoot = Path.Combine(
+            RepositoryRoot,
+            "samples",
+            "DigitalBrain.Compositions");
+        Assert.True(Directory.Exists(compositionsRoot), compositionsRoot);
+
+        var sources = Directory.EnumerateFiles(compositionsRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !IsBuildOutput(path))
+            .ToArray();
+        Assert.NotEmpty(sources);
+
+        string[] forbiddenSnippets =
+        [
+            "DigitalBrain.Kernel",
+            "DigitalBrain.Integrations",
+            "Orleans.",
+            "IGrainFactory",
+            "IChatClient",
+            "IServiceProvider",
+            "HttpClient",
+            "IFlutter",
+            "IBehavior",
+        ];
+
+        foreach (var sourcePath in sources)
+        {
+            var text = File.ReadAllText(sourcePath);
+            foreach (var snippet in forbiddenSnippets)
+            {
+                Assert.DoesNotContain(snippet, text, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    private static bool IsBuildOutput(string path)
+        => path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+            || path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
 
     private static string LocateRepositoryRoot()
     {

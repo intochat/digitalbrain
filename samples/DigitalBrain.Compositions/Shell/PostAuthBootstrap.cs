@@ -13,11 +13,6 @@ public sealed class PostAuthBootstrap
         ArgumentException.ThrowIfNullOrWhiteSpace(shellName);
         cancellationToken.ThrowIfCancellationRequested();
 
-        await new OpenHome().RunAsync(
-            brain,
-            shellName,
-            sceneKey: "home",
-            title: "Home",
-            cancellationToken);
+        await new OpenHome().RunAsync(brain, shellName, cancellationToken);
     }
 }

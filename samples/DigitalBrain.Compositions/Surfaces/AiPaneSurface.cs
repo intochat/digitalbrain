@@ -1,6 +1,8 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Client;
+using DigitalBrain.Flutter;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Surfaces;
@@ -23,12 +25,8 @@ public sealed class AiPaneSurface
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
         cancellationToken.ThrowIfCancellationRequested();
 
-        await new Shell.OpenHome().RunAsync(
-            brain,
-            shellName,
-            sceneKey: SceneKey,
-            title: SceneTitle,
-            cancellationToken);
+        var shell = brain.Get<IShell>(shellName);
+        await shell.Open(new OpenScene(CommandId.New(), SceneKey, SceneTitle));
 
         var model = brain.Get<ILlama32>(modelName);
         return await model.Respond([new ChatMessage(ChatRole.User, prompt)]);
