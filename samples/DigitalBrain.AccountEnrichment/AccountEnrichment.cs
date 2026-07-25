@@ -13,6 +13,7 @@ internal sealed class AccountEnrichment :
     IAccountEnrichment,
     IHandle<EnrichAccountFromEmail>,
     IHandle<SalesforceMutationApproval>,
+    IHandle<ExecuteApprovedAccountEnrichment>,
     IEmit<AccountEnrichmentProposed>,
     IEmit<AccountEnriched>
 {
@@ -73,18 +74,19 @@ internal sealed class AccountEnrichment :
             mutation.Fingerprint));
     }
 
-    public async Task HandleAsync(
+    public Task HandleAsync(
         SalesforceMutationApproval synapse,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var request = Load(synapse.CommandId)
             ?? throw new InvalidOperationException(
                 $"Account enrichment '{synapse.CommandId}' has no durable request.");
         if (request.Completed)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         if (!string.Equals(
@@ -96,11 +98,38 @@ internal sealed class AccountEnrichment :
                 $"Salesforce approval '{synapse.ApprovalId}' does not match the enrichment proposal.");
         }
 
-        var evidence = await ApprovalEvidenceAsync(synapse);
+        return SendAsync(Id, new ExecuteApprovedAccountEnrichment(synapse));
+    }
+
+    public async Task HandleAsync(
+        ExecuteApprovedAccountEnrichment synapse,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        var approval = synapse.Approval;
+
+        var request = Load(approval.CommandId)
+            ?? throw new InvalidOperationException(
+                $"Account enrichment '{approval.CommandId}' has no durable request.");
+        if (request.Completed)
+        {
+            return;
+        }
+
+        if (!string.Equals(
+                request.MutationFingerprint,
+                approval.Fingerprint,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Salesforce approval '{approval.ApprovalId}' does not match the enrichment proposal.");
+        }
+
+        var evidence = await ApprovalEvidenceAsync(approval);
         var salesforce = GrainFactory.GetGrain<ISalesforce>(
             NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
         var mutation = await salesforce.ApproveAccountDescription(
-            synapse,
+            approval,
             evidence,
             cancellationToken);
 
@@ -111,7 +140,7 @@ internal sealed class AccountEnrichment :
         }
 
         Stage(
-            synapse.CommandId,
+            approval.CommandId,
             request with { Completed = true });
         await EmitAsync(new AccountEnriched(
             mutation.CommandId,
