@@ -5,9 +5,6 @@ namespace DigitalBrain.Kernel;
 
 internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
 {
-    private const string OutcomeCallbackFailureDataKey =
-        "DigitalBrain.Kernel.CapabilityOutcomeCallbackFailure";
-
     public async Task Invoke(IOutgoingGrainCallContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -65,7 +62,7 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
-        Justification = "Any outcome callback failure must remain diagnostic so the original semantic exception is rethrown unchanged.")]
+        Justification = "FinishAsync failures must not replace the original semantic exception.")]
     private static async Task InvokeDelegatedAsync(IOutgoingGrainCallContext context)
     {
         var delegation = CapabilityRequestContext.CurrentDelegation
@@ -93,37 +90,19 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
         {
             await CapabilityRequestContext.InvokeRedeemedAsync(delegation, context.Invoke);
         }
-        catch (Exception semanticFailure)
+        catch
         {
             try
             {
                 await authority.FinishAsync(delegation, succeeded: false);
             }
-            catch (Exception callbackFailure)
+            catch
             {
-                TryAttachOutcomeCallbackFailure(semanticFailure, callbackFailure);
             }
 
             throw;
         }
 
         await authority.FinishAsync(delegation, succeeded: true);
-    }
-
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "Diagnostic attachment is best-effort and must never replace the original semantic exception.")]
-    private static void TryAttachOutcomeCallbackFailure(
-        Exception semanticFailure,
-        Exception callbackFailure)
-    {
-        try
-        {
-            semanticFailure.Data[OutcomeCallbackFailureDataKey] = callbackFailure.ToString();
-        }
-        catch
-        {
-        }
     }
 }
