@@ -1,10 +1,20 @@
 # MANDATORY: 200-agent DigitalBrain **Behavior OS** campaign
-# (exactly 200 · framework = neurons+synapses · OS = behaviors · UI is behavior · BDD-first)
+# (exactly 200 · framework = neurons+synapses · OS = behaviors · UI is behavior · BDD-first
+#  · grill-or-fold · codegraph-first)
 
 You are the **orchestrator** (Grok / Claude / Codex) in the DigitalBrain monorepo.
 Hard budget: **exactly 200 subagent cycles**. Cycle = one subagent, **one write scope**, one
-scoring rule, one grill, one verify. Waves of **8–12** non-overlapping scopes. Zero user menus
+scoring rule, **one grill**, one verify. Waves of **8–12** non-overlapping scopes. Zero user menus
 unless irreversible — then recommend hard and proceed only if architecture already decides.
+
+**Non-negotiable tools every cycle:**
+
+1. **Grilling** (CLAUDE.md §3) — before keep, before move, before claim: state recommendation,
+   strongest counter-argument, defend or fold; evidence over vibes; write the proof that fails first.
+2. **codegraph** (`codegraph_explore`) — **first** action before editing any symbol or package you
+   did not author in this cycle. Paste what it does, callers, dependents, dual paths, public vs
+   internal. If codegraph is unavailable, **say so loudly** and fall back to compiler + package
+   graph + tests + git — never silent skip.
 
 This campaign **supersedes** pure ownership-grill as the primary mission. Prior campaign
 (`prompt-200-architecture-grill.md`, scorecard
@@ -22,6 +32,9 @@ unless Behavior OS work forces a move/delete.
 Prefer **red BDD → green behavior → journal proof** over new host chrome. Prefer **one public
 behavior identity** (namespace + class) over god shells. Prefer **broadcast facts** that Flutter
 reacts to over imperative “start the app” host scripts.
+
+**Grill before keep.** Prefer **delete · move · encapsulate · re-home as behavior** over new public
+product API. Prefer **codegraph blast radius** over guessing call graphs.
 
 ---
 
@@ -99,8 +112,17 @@ Obey in order:
 6. Must-not-return:
    `docs/superpowers/specs/2026-07-25-architecture-aligned-mass-deletion.md`
 
-**Oracles:** compiler, package graph, test suite, git, **codegraph first**, Context7 / Microsoft
-Learn / dart MCP / Aspire MCP. Fall back loudly.
+**Oracles (order matters):**
+
+| Priority | Oracle | Use for |
+| --- | --- | --- |
+| 1 | **codegraph** (`codegraph_explore`) | What does it do? Who calls it? Blast radius before any edit |
+| 2 | **compiler** | Does this API exist? Signature right? (no silent invent) |
+| 3 | **test suite** | Does the system behave this way? BDD red→green |
+| 4 | **git** | What was here before? Foreign dirty tree? |
+| 5 | Context7 / Microsoft Learn / dart MCP / Aspire MCP | Package/framework APIs only when needed |
+
+Fall back loudly when an accelerator is unavailable. **Do not skip codegraph silently.**
 
 ### Hard gates (never `--filter` for completion claims)
 
@@ -141,6 +163,8 @@ Allowed only if ≥1:
 9. **Live proof** — only when product hosting sentence changes; quote aspire health
 10. **Vision alignment** — ordinary C# that can install as behavior; human-approved rail when install
     is claimed Built
+11. **Grill honesty** — recommendation form + 13 answers with evidence; fold when counter wins
+12. **Codegraph-first** — blast radius pasted before edit; dual paths found via graph not vibes
 
 Forbidden:
 
@@ -166,14 +190,41 @@ Forbidden:
 
 ---
 
-## 2. Grill board (every agent — 13 answers before done)
+## 2. Grilling (mandatory discipline — every cycle)
+
+Grilling is how step-1 of CLAUDE.md’s loop stays real. It applies **before building and during it**.
+
+### Before the step — write the proof that fails
+
+Assert the product sentence (BDD Given/When/Then or journal assert) and watch it **fail** before
+writing the code that satisfies it. When the behavior is not coming yet, keep the proof and mark
+`[Fact(Explicit = true, DisplayName = "…")]` rather than deleting it. **Never a red root gate.**
+
+### Before keep / move / invent — recommendation form
+
+```
+Recommendation: <delete | move to X | internalize | keep | re-home as behavior | invent synapse Y>
+Strongest argument against:
+Defense / fold:
+Evidence (codegraph paste | compiler | red test | git):
+```
+
+No neutral menus. Recommend hard. Fold when the counter-argument wins.
+
+### Before the commit / claim — three questions (answer in return + commit message later)
+
+1. **What did I add that has no consumer today?**
+2. **What did I claim without running a command?**
+3. **What changed that I did not change?** (foreign dirty tree)
+
+### Grill board (every agent — 13 answers before done)
 
 1. **What does this thing do** (one sentence)?
 2. **Is it framework vocabulary, module neuron, OS behavior, edge, or test witness?**
 3. **Who is the consumer today** (type, package, BDD scenario, or person)?
 4. **Does architecture.md place it here?** Quote section or say “silent invent / deliberate extension.”
 5. **If UI-related: which synapse does Flutter react to? Which vocabulary opens the screen?**
-6. **What would break if we deleted it?**
+6. **What would break if we deleted it?** (use codegraph dependents)
 7. **Does this invent Behavior install rail without human-approval design?**
 8. **Does Kernel/Hosting learn a domain word it must not know?**
 9. **Is the proof BDD + journal/edge, or compile-only theater?**
@@ -182,20 +233,68 @@ Forbidden:
 12. **Could this live one layer in / out?** (framework vs OS vs edge)
 13. **Would a new engineer find the right home by reading vision + architecture alone?**
 
+**No cycle is done without grill board + recommendation form.** “Looks fine” is not a grill.
+
 ---
 
-## 3. Each subagent prompt MUST include
+## 3. Codegraph mandate (mandatory — every edit cycle)
+
+### Rule
+
+**ALWAYS codegraph before editing a symbol, type, or package path you did not author in this cycle.**
+
+Use MCP `codegraph_explore` (project root = this repo). Query can be natural language or symbol bag.
+
+### Required paste into agent return (minimum)
+
+```
+Codegraph query: <exact query>
+What it does (1 sentence):
+Callers / consumers:
+Dependents / blast radius:
+Dual paths (if any):
+Public vs internal:
+Framework vs OS vs edge:
+```
+
+### When codegraph is unavailable
+
+1. State: `codegraph unavailable: <reason>`  
+2. Fall back: package graph + compiler + git + tests  
+3. Still grill — do not invent call graphs from memory  
+
+### Orchestrator pre-scan (re-run every 2 waves)
+
+| Cluster | Why grill with codegraph |
+| --- | --- |
+| architecture §5 + compositions | Pre-rail logic → Behavior home candidates |
+| Activation / session / shell open | Synapse-driven boot chain |
+| `hosts/DigitalBrain.Ui/**` + Flutter clients | Edge vs OS behavior duals |
+| Flutter.Contracts first-five | Vocabulary for screens (no widgets) |
+| `IDigitalBrain` / Client | Programming model honesty for behaviors |
+| Testing harness | BDD / journal proof path |
+| Zero-consumer public types | Delete candidates |
+
+### Edit safety
+
+- Codegraph blast radius **before** move/delete  
+- After edit: re-query affected symbols if public surface changed  
+- Dual paths discovered by codegraph → grill delete one side  
+
+---
+
+## 4. Each subagent prompt MUST include
 
 1. Exact write scope (paths) — non-overlapping within the wave  
 2. Architecture sections to obey  
 3. Scoring rule (§1)  
 4. Mission type: `design-behavior` | `bdd-red` | `behavior-impl` | `synapse-vocab` |
    `flutter-react` | `edge-project` | `rail-proposal` | `test-contract` | `docs-honesty` |
-   `live-aspire` | `delete-trash`  
-5. Codegraph first (or required first action)  
-6. Verify commands (owning project first; root gate at phase boundaries)  
-7. Grill answers (13)  
-8. Protected surfaces (§4)  
+   `live-aspire` | `delete-trash` | `own-audit`  
+5. **Codegraph first:** exact query string + “paste blast radius before edit”  
+6. **Grill mandate:** recommendation form + 13 answers required in return  
+7. Verify commands (owning project first; root gate at phase boundaries)  
+8. Protected surfaces (§5)  
 9. Must-not-return list  
 10. Vision restatement (one sentence)  
 11. **Autonomous mandate:** if wrong home found, fix (delete/move/internalize/re-home to behavior)
@@ -204,7 +303,7 @@ Forbidden:
 
 ---
 
-## 4. Protected surfaces (surgical only)
+## 5. Protected surfaces (surgical only)
 
 - Kernel **behavior spine** (neuron mechanics) — may encapsulate; no domain knowledge in  
 - Generator public contracts + alias wire names  
@@ -219,29 +318,11 @@ Forbidden:
 
 ---
 
-## 5. Codegraph mandate
-
-**Before editing**, each agent runs `codegraph_explore` on symbols in write scope and pastes:
-what it does, callers, dependents, dual paths, public vs internal.
-
-Orchestrator pre-scan (re-run every 2 waves):
-
-| Cluster | Why grill |
-| --- | --- |
-| `docs/architecture.md` §5 Behaviors | Design home for rail |
-| `samples/DigitalBrain.Compositions/**` | Pre-rail logic → Behavior home candidates |
-| `hosts/DigitalBrain.Ui/**` + Flutter clients | Edge vs OS behavior split |
-| `modules/**/Flutter.Contracts/**` | Vocabulary for screens (no widgets) |
-| Activation / session / shell open paths | Synapse-driven boot chain |
-| `src/DigitalBrain.Testing/**` | BDD / journal proof harness |
-| Zero-consumer public types | Delete candidates |
-
----
-
 ## 6. Assess template (paste into return)
 
 ```
 Scope: …
+Codegraph query + blast radius (paste §3):
 What it does (1 sentence):
 Layer: framework | module-vocab | os-behavior | edge | test | docs
 Consumer today:
@@ -255,6 +336,7 @@ Belongs here? Y/N — if N: delete | move to … | internalize | re-home as beha
 Aligns with framework=neurons+synapses, OS=behaviors? Y/N:
 Dual path / host hand-wire? …
 Delete candidates: …
+Recommendation form (§2): …
 Verify: …
 Grill 13: …
 ```
@@ -355,11 +437,13 @@ Root build/test, docs npm, line-count, residual table, hard stop at 200.
 ## 8. Orchestrator start now
 
 1. Record HEAD/status/branch.  
-2. codegraph + architecture §5 pre-scan.  
-3. Spawn Wave B0 (agents 1–16).  
-4. After each wave: re-read HEAD/status; phase root gate when product moved.  
-5. Prefer **behavior + synapse + BDD** over host special cases.  
-6. End at agent 200 with scorecard under  
+2. **codegraph pre-scan** (architecture §5, compositions, Ui/Flutter boot, Client) → residual table.  
+3. **Grill** the design recommendation (activation synapse name + first screen) before Wave B0 code.  
+4. Spawn Wave B0 (agents 1–16) with codegraph query + grill board in every prompt.  
+5. After each wave: re-read HEAD/status; re-run codegraph cluster scan every 2 waves; phase root gate when product moved.  
+6. Prefer **behavior + synapse + BDD** over host special cases; **grill before keep**.  
+7. Reject agent returns that lack codegraph paste or grill 13.  
+8. End at agent 200 with scorecard under  
    `docs/superpowers/specs/2026-07-25-behavior-os-scorecard.md`  
    and design under  
    `docs/superpowers/specs/2026-07-25-behavior-os-design.md`.
@@ -371,7 +455,9 @@ Root build/test, docs npm, line-count, residual table, hard stop at 200.
 - “Host `Program.cs` opens login without a synapse.”  
 - “Flutter widgets in C# Contracts.”  
 - “Gates green while Behavior install is silently claimed Built.”  
-- “Overview refactor document with no red BDD.”
+- “Overview refactor document with no red BDD.”  
+- “Edited without codegraph.”  
+- “Kept without a grill recommendation form.”
 
 ### Success is
 
@@ -379,6 +465,7 @@ Root build/test, docs npm, line-count, residual table, hard stop at 200.
 > **OS product logic is behaviors — including UI boot.**  
 > **Activation is a broadcast synapse; Flutter OS reacts and presents first screen.**  
 > **BDD covers the product sentence with journal/edge evidence.**  
+> **Every keep/move was grilled; every edit was codegraph-first.**  
 > **Human-approved install rail is Designed until proven — not faked.**  
 > **Root gates green with quoted evidence.**  
 > **Desktop product host still explicit `WithFlutterHost()`.**  
@@ -389,28 +476,37 @@ Root build/test, docs npm, line-count, residual table, hard stop at 200.
 ## 9. Subagent template (copy)
 
 ```
-Wave B* agent K (mission: design-behavior|bdd-red|behavior-impl|synapse-vocab|flutter-react|edge-project|rail-proposal|test-contract|docs-honesty|live-aspire|delete-trash)
+Wave B* agent K (mission: design-behavior|bdd-red|behavior-impl|synapse-vocab|flutter-react|edge-project|rail-proposal|test-contract|docs-honesty|live-aspire|delete-trash|own-audit)
 
 Vision restatement: Framework = neurons+synapses; OS = behaviors (including UI); activation is a synapse Flutter reacts to.
 
 Write scope: <exact paths>
-Obey: CLAUDE.md; architecture §§1–3, 4.x, 4.6, 5; packages.md; ownership scorecard residuals; scoring §1 of prompt-200-behavior-os.md
-Codegraph first: <query>
+Obey: CLAUDE.md grilling §3; architecture §§1–3, 4.x, 4.6, 5; packages.md;
+  ownership scorecard residuals; scoring + grill + codegraph §§1–3 of prompt-200-behavior-os.md
+
+Codegraph first (required):
+  query: <exact symbols/paths>
+  paste: what it does | callers | dependents | dual paths | public vs internal | framework vs OS
+
 Protected: <list>
 Must-not-return: ProbeHost, UiGateway-in-Kernel, IFlutter god, Behavior-by-name dispatch,
   Auto hosting, Dart→Orleans, tokens in journals, widgets in C# Contracts, calendar IReminder invent,
-  fake Built install rail, mega-files >400 without Explicit hold, Kernel domain knowledge
+  fake Built install rail, mega-files >400 without Explicit hold, Kernel domain knowledge,
+  edit-without-codegraph, keep-without-grill
 
 Actions:
-1. codegraph + answer: framework or OS? which synapse?
-2. Assess with template §6
-3. Prefer red BDD before public surface
-4. Fix wrong home autonomously when safe
-5. Verify: <owning project; root at phase boundary>
-6. Grill board §2 (13 answers)
-7. Foreign dirty tree: leave unstaged
+1. codegraph_explore FIRST — paste blast radius (§3)
+2. Grill recommendation form (§2) before keep/move/invent
+3. Assess with template §6
+4. Prefer red BDD before public surface
+5. Fix wrong home autonomously when safe (delete/move/internalize/re-home as behavior)
+6. Verify: <owning project; root at phase boundary>
+7. Grill board §2 (all 13 answers)
+8. Diff-grill three questions (no consumer / no command / foreign dirty)
+9. Foreign dirty tree: leave unstaged
 
 Do not expand scope. Do not claim green without output.
+Do not edit without codegraph. Do not keep without grill.
 ```
 
 ---
@@ -432,7 +528,7 @@ aspire start --project hosts/DigitalBrain.AppHost
 
 ---
 
-## 11. Logical grill patterns
+## 11. Logical grill patterns (agents apply with codegraph)
 
 ### “Framework vs OS” decision tree
 
@@ -475,14 +571,24 @@ DigitalBrain activated (owner-scoped)
 
 Exact type names, package homes, and whether login is first screen vs shell home are **design grill outputs** in Wave B0 — not silent invent mid-impl.
 
-### Recommendation form (before any move)
+### Recommendation form (before any move) — same as §2
 
 ```
 Recommendation: <delete | move to X | internalize | keep | re-home as behavior>
 Strongest argument against:
 Defense / fold:
-Evidence (command or codegraph or red test):
+Evidence (codegraph paste | command | red test):
 ```
+
+### Codegraph + grill anti-patterns (reject agent return)
+
+| Anti-pattern | Fold |
+| --- | --- |
+| Edited files with no codegraph paste | **Incomplete** — re-dispatch |
+| “Looks correct” without recommendation form | **Incomplete** — re-grill |
+| Claimed dual path gone without codegraph callers check | **False claim** |
+| Invented synapse/API without red BDD | **Architecture regression** |
+| Skipped codegraph “to save time” | **Forbidden** — say unavailable or run it |
 
 ---
 
@@ -494,7 +600,7 @@ Create/update:
 
 Must include: HEAD baseline, cycle log, per-wave findings, Explicit holds, activation synapse
 name, first-screen decision, BDD scenario status (red/green), remaining dual host paths,
-Desktop host live quote if re-proven, hard stop at 200.
+Desktop host live quote if re-proven, **codegraph pre-scan notes every 2 waves**, hard stop at 200.
 
 Design record:
 
