@@ -195,9 +195,15 @@ and the public surface should stop changing without review.
 
 The durable neuron and synapse foundation, owner-scoped client facade, generated module activation,
 one-call durable AppHost composition, public testing path, and typed AI, Tasks, Google, Salesforce,
-and Quickstart families are built and proven. Time is built only through the durable one-shot
+Flutter, and Quickstart families are built and proven. Time is built only through the durable one-shot
 `ICountdown` capability and its deterministic recovery tests. Reminder, recurring interval/calendar
 scheduling, DST records, and recurrence-library selection remain designed or open and unbuilt.
+
+Flutter first vertical is Built: shell/scene vocabulary, Ui HTTP/SSE edge, module-owned
+`WithUiEdge`/`WithFlutterHost`, headless Dart host, and Windows Material shell chrome
+(`clients/digitalbrain_flutter` key/title list from `SceneOpened`). Full product chrome polish,
+multi-principal IdP edge, and product journal observation on `IDigitalBrain` remain designed — do not
+re-open Built Windows chrome as Designed.
 
 Behavior proposal, approval, installation, execution, and rollback also remain designed and unbuilt;
 there is no behavior execution framework or public behavior test interface. The approved hosting and
