@@ -352,10 +352,11 @@ Settled but not yet standing up: a pending MAF request mapping to Task `Waiting`
 and a workflow error feeding Task retry policy rather than terminating the Task on its own. Neither
 exists in the repository. The retired private `WorkflowRunner` / checkpoint stack that once watched
 MAF workflow events was deleted with overbuilt supervised reinvention (§4.1). `TaskNeuron` still
-handles attempt facts, but nothing under `modules/`, `src/`, `samples/`, or `tests/` constructs
-`AttemptWaiting` / `AttemptFailed` (or the other attempt facts) today — there is no live worker
-producer until the supervised path returns. `GroupChat.Accept` / `Continue` / `Cancel` throw until
-that thin Orleans-primary path is rewritten; direct `Respond` does not consult Task policy.
+handles attempt facts. `DigitalBrain.Tasks.Tests` closes the L1 loop with a test-only `IWorker`
+that emits `AttemptAccepted` / `AttemptCancelled` (and a stale `AttemptSucceeded` for revision
+fencing). Supervised product workers remain unbuilt: `GroupChat.Accept` / `Continue` / `Cancel`
+throw until that thin Orleans-primary path is rewritten; direct `Respond` does not consult Task
+policy.
 
 ### 4.3 Google
 
@@ -844,10 +845,11 @@ or module secrets. Hosting implements that split (`WithReference(brain)` for sil
 key, module ids, AI resource configuration, and Google/Salesforce OAuth as silo-only (never on
 `AsClient()`). Every new module projection must extend that proof rather than relying on convention.
 
-**Tasks has no L1 semantic proof.** Contracts and runtime packages ship, and assembly-boundary tests
-keep Tasks free of AI/MAF/Time. There is no method-scoped cluster proof of task lifecycle, attempt
-facts, or worker coordination. Supervised MAF-per-attempt workers remain designed; nothing constructs
-live attempt facts under `modules/`, `src/`, `samples/`, or `tests/` today.
+**Tasks L1 is closed via a test-only worker, not product supervised orchestration.**
+`DigitalBrain.Tasks.Tests` proves Start → Accept → `AttemptAccepted` → Running, idempotent Start
+receipts, Cancel → Cancelling → `AttemptCancelled` → Cancelled, and stale-revision fact ignore.
+Assembly-boundary tests still keep Tasks free of AI/MAF/Time. Supervised MAF-per-attempt workers
+remain designed; no product `IWorker` under `modules/` emits attempt facts yet.
 
 **Google and Salesforce have no L1 semantic proof.** Contracts, runtime, MCP hosting, and AppHost
 selection ship. There is no cluster-level proof of Gmail reads, Salesforce mutations, approval fencing,

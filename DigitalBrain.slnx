@@ -47,5 +47,6 @@
     <Project Path="tests/DigitalBrain.HostTests/DigitalBrain.HostTests.csproj" />
     <Project Path="tests/DigitalBrain.Quickstart.Tests/DigitalBrain.Quickstart.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Time.Tests/DigitalBrain.Time.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.Tasks.Tests/DigitalBrain.Tasks.Tests.csproj" />
   </Folder>
 </Solution>

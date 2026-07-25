@@ -40,7 +40,7 @@ for what ships and what each package may depend on.
 | --- | --- | --- | --- | --- | --- |
 | Quickstart | yes | yes | no | `DigitalBrain.Quickstart.Tests` + Quickstart AppHost | Built |
 | AI | yes | yes | yes | typed LLM smoke (`ILlama32`); direct Concurrent/GroupChat code exists, no L1 orchestration proof; supervised IWorker unbuilt | Built (direct surface); Designed (supervised) |
-| Tasks | yes | yes | no | contracts + runtime package + assembly-boundary pins; no L1 semantic proof | Built |
+| Tasks | yes | yes | no | contracts + runtime package + assembly-boundary pins; `DigitalBrain.Tasks.Tests` L1 closed loop via test-only `IWorker` | Built |
 | Time | yes | yes | no | `DigitalBrain.Time.Tests` (Countdown lifecycle and recovery) | Built: Countdown only |
 | Google | yes | yes | yes | AppHost selection + package graph; no L1 semantic proof | Built |
 | Salesforce | yes | yes | yes | AppHost selection + package graph; no L1 semantic proof | Built |
