@@ -31,7 +31,7 @@ public sealed class FlutterHostingProjectionContracts
     }
 
     [Fact(DisplayName =
-        "WithUiEdge projects digitalbrain-ui as AsClient with owner env")]
+        "WithUiEdge projects digitalbrain-ui as AsClient with exclusive owner product env")]
     public async Task WithUiEdgeProjectsUiEdgeAsClientOnly()
     {
         var builder = DistributedApplication.CreateBuilder();
@@ -57,13 +57,75 @@ public sealed class FlutterHostingProjectionContracts
             builder.Resources.OfType<ProjectResource>(),
             resource => resource.Name == FlutterHostingExtensions.DefaultUiResourceName);
 
-        var environment = await EnvironmentKeysOf(ui).ConfigureAwait(true);
-        Assert.Contains(FlutterHostingExtensions.OwnerEnvironmentVariable, environment);
+        var environment = await EnvironmentOf(ui).ConfigureAwait(true);
+        AssertExclusiveUiProductEnvironment(environment);
+        Assert.Equal(
+            "edge-owner",
+            environment[FlutterHostingExtensions.OwnerEnvironmentVariable]?.ToString());
 
         Assert.Contains(
             ui.Annotations.OfType<WaitAnnotation>(),
             wait => wait.WaitType == WaitType.WaitUntilHealthy
                 && ReferenceEquals(wait.Resource, silo.Resource));
+    }
+
+    [Fact(DisplayName =
+        "OS surface source: Ui is AsClient + owner only; Flutter host is UI_BASE + SHELL only")]
+    public void OsSurfaceSourcePinsExclusiveEnvComposition()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "modules",
+            "DigitalBrain.Modules.Flutter.Aspire.Hosting",
+            "FlutterHostingExtensions.cs"))
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        var uiEdge = MethodBody(source, "internal void EnsureUiEdge");
+        Assert.Contains("brain.AsClient()", uiEdge, StringComparison.Ordinal);
+        Assert.Contains("OwnerEnvironmentVariable", uiEdge, StringComparison.Ordinal);
+        Assert.Equal(1, CountOccurrences(uiEdge, "WithEnvironment"));
+        Assert.DoesNotContain("UiBaseEnvironmentVariable", uiEdge, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShellEnvironmentVariable", uiEdge, StringComparison.Ordinal);
+        Assert.DoesNotContain("Journal", uiEdge, StringComparison.Ordinal);
+        Assert.DoesNotContain("StateProtectionKey", uiEdge, StringComparison.Ordinal);
+        Assert.DoesNotContain("Modules", uiEdge, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            ".WithReference(brain)",
+            uiEdge.Replace(".WithReference(brain.AsClient())", string.Empty, StringComparison.Ordinal),
+            StringComparison.Ordinal);
+
+        var flutterHost = MethodBody(source, "internal void EnsureFlutterHost");
+        Assert.Equal(2, CountOccurrences(flutterHost, "WithEnvironment"));
+        Assert.Contains("UiBaseEnvironmentVariable", flutterHost, StringComparison.Ordinal);
+        Assert.Contains("ShellEnvironmentVariable", flutterHost, StringComparison.Ordinal);
+        Assert.Contains(".WaitFor(ui)", flutterHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("OwnerEnvironmentVariable", flutterHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("AsClient", flutterHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("WithReference", flutterHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("Journal", flutterHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("StateProtectionKey", flutterHost, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName =
+        "Auto mode short-circuits on project markers before spawning a Flutter CLI probe")]
+    public void AutoModeProbesMarkersBeforeFlutterCli()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "modules",
+            "DigitalBrain.Modules.Flutter.Aspire.Hosting",
+            "FlutterHostingExtensions.cs"))
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        var resolve = MethodBody(source, "private static HostLaunch? ResolveHostLaunch");
+        Assert.Contains(
+            "HasFlutterDesktopProjectMarker(workingDirectory) && FlutterCliAvailable(options)",
+            resolve,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "FlutterCliAvailable(options) && HasFlutterDesktopProjectMarker(workingDirectory)",
+            resolve,
+            StringComparison.Ordinal);
     }
 
     [Fact(DisplayName =
@@ -92,7 +154,7 @@ public sealed class FlutterHostingProjectionContracts
                 options.ShellName = "desk";
             }));
 
-        _ = builder
+        var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
             .WithHttpEndpoint(name: "http")
             .WithReference(brain);
@@ -120,6 +182,116 @@ public sealed class FlutterHostingProjectionContracts
             host.Annotations.OfType<WaitAnnotation>(),
             wait => wait.WaitType == WaitType.WaitUntilHealthy
                 && ReferenceEquals(wait.Resource, ui));
+        Assert.DoesNotContain(
+            host.Annotations.OfType<WaitAnnotation>(),
+            wait => ReferenceEquals(wait.Resource, silo.Resource));
+    }
+
+    [Fact(DisplayName =
+        "WithFlutterHost RequireHost true throws when package directory is missing")]
+    public void WithFlutterHostRequireHostThrowsWhenPackageMissing()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddDigitalBrain("brain");
+        var uiProject = Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.Ui",
+            "DigitalBrain.Ui.csproj");
+        var missingPackage = Path.Combine(
+            Path.GetTempPath(),
+            "digitalbrain-flutter-missing-" + Guid.NewGuid().ToString("N"));
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            brain.AddModule<FlutterModule>(flutter => flutter
+                .WithUiEdge(options => options.ProjectPath = uiProject)
+                .WithFlutterHost(options =>
+                {
+                    options.WorkingDirectory = missingPackage;
+                    options.RequireHost = true;
+                })));
+
+        Assert.Contains("was not found", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(
+            builder.Resources,
+            resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
+    }
+
+    [Fact(DisplayName =
+        "WithFlutterHost RequireHost false omits host when package directory is missing")]
+    public void WithFlutterHostRequireHostFalseOmitsMissingPackage()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddDigitalBrain("brain");
+        var uiProject = Path.Combine(
+            RepositoryRoot,
+            "hosts",
+            "DigitalBrain.Ui",
+            "DigitalBrain.Ui.csproj");
+        var missingPackage = Path.Combine(
+            Path.GetTempPath(),
+            "digitalbrain-flutter-missing-" + Guid.NewGuid().ToString("N"));
+
+        brain.AddModule<FlutterModule>(flutter => flutter
+            .WithUiEdge(options => options.ProjectPath = uiProject)
+            .WithFlutterHost(options =>
+            {
+                options.WorkingDirectory = missingPackage;
+                options.RequireHost = false;
+            }));
+
+        _ = builder
+            .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
+            .WithHttpEndpoint(name: "http")
+            .WithReference(brain);
+
+        Assert.Contains(
+            builder.Resources,
+            resource => resource.Name == FlutterHostingExtensions.DefaultUiResourceName);
+        Assert.DoesNotContain(
+            builder.Resources,
+            resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
+    }
+
+    [Fact(DisplayName =
+        "WithFlutterHost Headless RequireHost true throws when headless entry is missing")]
+    public void WithFlutterHostHeadlessRequireHostThrowsWhenEntryMissing()
+    {
+        var packageDir = Path.Combine(
+            Path.GetTempPath(),
+            "digitalbrain-flutter-no-entry-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(packageDir);
+        File.WriteAllText(Path.Combine(packageDir, "pubspec.yaml"), "name: probe\n");
+
+        try
+        {
+            var builder = DistributedApplication.CreateBuilder();
+            var brain = builder.AddDigitalBrain("brain");
+            var uiProject = Path.Combine(
+                RepositoryRoot,
+                "hosts",
+                "DigitalBrain.Ui",
+                "DigitalBrain.Ui.csproj");
+
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                brain.AddModule<FlutterModule>(flutter => flutter
+                    .WithUiEdge(options => options.ProjectPath = uiProject)
+                    .WithFlutterHost(options =>
+                    {
+                        options.WorkingDirectory = packageDir;
+                        options.Mode = FlutterHostMode.Headless;
+                        options.RequireHost = true;
+                    })));
+
+            Assert.Contains("could not be launched", exception.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(
+                builder.Resources,
+                resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
+        }
+        finally
+        {
+            Directory.Delete(packageDir, recursive: true);
+        }
     }
 
     [Fact(DisplayName =
@@ -312,6 +484,23 @@ public sealed class FlutterHostingProjectionContracts
             environment);
     }
 
+    private static void AssertExclusiveUiProductEnvironment(IReadOnlyDictionary<string, object> environment)
+    {
+        var productKeys = environment.Keys
+            .Where(static key =>
+                key.StartsWith("DigitalBrain", StringComparison.Ordinal)
+                || key.StartsWith("DIGITALBRAIN", StringComparison.Ordinal)
+                || string.Equals(key, "ConnectionStrings__journal", StringComparison.Ordinal))
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Equal(
+            new HashSet<string>(StringComparer.Ordinal)
+            {
+                FlutterHostingExtensions.OwnerEnvironmentVariable,
+            },
+            productKeys);
+    }
+
     private static void AssertNoOsSurfaceHandWire(string appHost)
     {
         Assert.DoesNotContain(
@@ -327,7 +516,12 @@ public sealed class FlutterHostingProjectionContracts
 
     private static async Task<HashSet<string>> EnvironmentKeysOf(IResource resource)
     {
-        var keys = new HashSet<string>(StringComparer.Ordinal);
+        var environment = await EnvironmentOf(resource).ConfigureAwait(true);
+        return environment.Keys.ToHashSet(StringComparer.Ordinal);
+    }
+
+    private static async Task<Dictionary<string, object>> EnvironmentOf(IResource resource)
+    {
         var execution = new DistributedApplicationExecutionContext(DistributedApplicationOperation.Run);
         var context = new EnvironmentCallbackContext(execution, resource);
 
@@ -336,8 +530,7 @@ public sealed class FlutterHostingProjectionContracts
             await annotation.Callback(context).ConfigureAwait(true);
         }
 
-        keys.UnionWith(context.EnvironmentVariables.Keys);
-        return keys;
+        return new Dictionary<string, object>(context.EnvironmentVariables, StringComparer.Ordinal);
     }
 
     private static async Task<List<string>> ResolvedArgsOf(ExecutableResource resource)
@@ -350,6 +543,47 @@ public sealed class FlutterHostingProjectionContracts
         }
 
         return args.Select(static arg => arg?.ToString() ?? string.Empty).ToList();
+    }
+
+    private static string MethodBody(string source, string signatureMarker)
+    {
+        var signatureIndex = source.IndexOf(signatureMarker, StringComparison.Ordinal);
+        Assert.True(signatureIndex >= 0, $"Signature marker '{signatureMarker}' was not found.");
+
+        var openBrace = source.IndexOf('{', signatureIndex);
+        Assert.True(openBrace >= 0, $"Opening brace after '{signatureMarker}' was not found.");
+
+        var depth = 0;
+        for (var index = openBrace; index < source.Length; index++)
+        {
+            if (source[index] == '{')
+            {
+                depth++;
+            }
+            else if (source[index] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return source[(openBrace + 1)..index];
+                }
+            }
+        }
+
+        throw new InvalidOperationException($"Could not balance braces for '{signatureMarker}'.");
+    }
+
+    private static int CountOccurrences(string source, string token)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = source.IndexOf(token, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += token.Length;
+        }
+
+        return count;
     }
 
     private static string LocateRepositoryRoot()
