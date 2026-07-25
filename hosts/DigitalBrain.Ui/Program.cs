@@ -1,4 +1,4 @@
-using DigitalBrain.Client;
+using DigitalBrain.Aspire;
 using DigitalBrain.Ui;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,11 +10,7 @@ if (string.IsNullOrWhiteSpace(owner))
 }
 
 builder.AddKeyedAzureTableServiceClient("brain-clustering");
-builder.UseOrleansClient();
-builder.Services.AddSingleton<IDigitalBrain>(
-    services => DigitalBrainClient.Connect(
-        services.GetRequiredService<IGrainFactory>(),
-        owner));
+builder.AddDigitalBrainClient(owner);
 
 var app = builder.Build();
 

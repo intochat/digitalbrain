@@ -88,6 +88,10 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         }
 
         Assert.Equal("text/event-stream", streamResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Contains(
+            "no-cache",
+            streamResponse.Headers.CacheControl?.ToString() ?? string.Empty,
+            StringComparison.OrdinalIgnoreCase);
 
         await using var body = await streamResponse.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(body);
@@ -108,6 +112,22 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         Assert.True(projected.Sequence > 0);
     }
 
+    [Fact(DisplayName = "SSE shell events rejects negative afterSequence")]
+    public async Task HttpShellEventsRejectsNegativeAfterSequence()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+
+        await using var app = await StartUiEdgeAsync(test, cancellationToken);
+        using var http = CreateClient(app);
+
+        using var response = await http.GetAsync(
+            new Uri("/shells/desk/events?afterSequence=-1", UriKind.Relative),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     private static async Task<WebApplication> StartUiEdgeAsync(
         TestBrain test,
         CancellationToken cancellationToken)
@@ -118,7 +138,6 @@ public sealed class UiEdgeRoundTrip(UiFixture fixture)
         builder.Services.AddSingleton<IGrainFactory>(test.Cluster.Client);
 
         var app = builder.Build();
-        app.MapGet("/health", () => Results.Ok("healthy"));
         app.MapUi();
         await app.StartAsync(cancellationToken);
         return app;

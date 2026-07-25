@@ -37,7 +37,8 @@ internal static class UiEndpoints
 
         endpoints.MapGet(
             "/shells/{shellName}/events",
-            static (
+            static async Task (
+                HttpContext http,
                 string shellName,
                 long? afterSequence,
                 IDigitalBrain brain,
@@ -45,6 +46,7 @@ internal static class UiEndpoints
                 CancellationToken cancellationToken) =>
             {
                 ArgumentException.ThrowIfNullOrWhiteSpace(shellName);
+                ArgumentNullException.ThrowIfNull(http);
                 ArgumentNullException.ThrowIfNull(brain);
                 ArgumentNullException.ThrowIfNull(grains);
                 cancellationToken.ThrowIfCancellationRequested();
@@ -52,18 +54,19 @@ internal static class UiEndpoints
                 var cursor = afterSequence.GetValueOrDefault();
                 if (cursor < 0)
                 {
-                    return Results.BadRequest();
+                    http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                    return;
                 }
 
-                return Results.Stream(
-                    async stream => await ShellEventFeed.WriteSceneOpenedSseAsync(
-                        stream,
-                        grains,
-                        brain,
-                        shellName,
-                        cursor,
-                        cancellationToken),
-                    contentType: "text/event-stream");
+                http.Response.Headers.CacheControl = "no-cache";
+                http.Response.ContentType = "text/event-stream";
+                await ShellEventFeed.WriteSceneOpenedSseAsync(
+                    http.Response.Body,
+                    grains,
+                    brain,
+                    shellName,
+                    cursor,
+                    cancellationToken);
             });
 
         endpoints.MapPost(
