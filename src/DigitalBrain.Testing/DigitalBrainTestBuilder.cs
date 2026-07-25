@@ -40,21 +40,6 @@ public sealed class DigitalBrainTestBuilder
             reset);
     }
 
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public void ConfigureSouthboundMcpTransport<TService, TScript>(
-        TService adapter,
-        TScript script,
-        Action<TScript> reset)
-        where TService : class
-        where TScript : class
-    {
-        ThrowIfSealed();
-        _edges.ConfigureSouthboundMcpTransport(
-            adapter,
-            script,
-            reset);
-    }
-
     internal TestFixtureComposition Seal()
     {
         _sealed = true;

@@ -180,7 +180,6 @@ internal sealed class FixtureCluster : IAsyncDisposable
                 moduleIndex++;
             }
 
-            _edges.ConfigureConfiguration(silo.Configuration);
             DigitalBrainRuntime.Add(silo, FixtureCluster.LabelOf(options.SiloName), _modules);
             silo.Services.AddSingleton(new ReminderSourceAllowlist(
                 [TestReminderDeliveryService.SourceType]));

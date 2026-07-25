@@ -802,11 +802,11 @@ bounded evidence, and never enumerates or kills processes by name. L1 remains th
 and module semantics. Gherkin remains a thin generated vocabulary over the same `TestBrain`;
 generation may compose only existing vocabulary, never invent neuron or synapse types.
 
-Substitutes stop at the closed external edges named by `TestingEdges`: `IChatClient`, southbound MCP
-protocol transport, OAuth/params, and the shared `TimeProvider` already registered on every L1
-test. Neurons, journals, filters, and module logic stay real. `Behavior` remains the name of a
-user-authored ordinary-test concept; the testing framework adds no behavior interfaces or behavior
-fixture hierarchy. Runtime behavior is not a Neuron (see §5).
+Substitutes stop at the closed external edges named by `TestingEdges`: `IChatClient` and the shared
+`TimeProvider` already registered on every L1 test. Southbound MCP transport and OAuth/params test
+edges are deleted (no product or L1 consumer). Neurons, journals, filters, and module logic stay
+real. `Behavior` remains the name of a user-authored ordinary-test concept; the testing framework
+adds no behavior interfaces or behavior fixture hierarchy. Runtime behavior is not a Neuron (see §5).
 
 ## 8. Known limitations
 

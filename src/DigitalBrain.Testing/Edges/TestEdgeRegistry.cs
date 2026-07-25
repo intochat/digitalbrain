@@ -1,5 +1,4 @@
 using DigitalBrain.Kernel;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Testing;
@@ -7,16 +6,11 @@ namespace DigitalBrain.Testing;
 internal sealed class TestEdgeRegistry
 {
     private readonly Dictionary<TestEdgeKind, EdgeRegistration> _adapters = [];
-    private readonly MethodScopedConfigurationProvider _configuration = new();
-    private readonly MethodScopedConfigurationSource _configurationSource;
     private readonly Lock _gate = new();
     private TimeProvider? _timeProvider;
     private Action? _timeReset;
     private long _methodGeneration;
     private bool _sealed;
-
-    internal TestEdgeRegistry()
-        => _configurationSource = new(_configuration);
 
     internal void ConfigureChatClient<TService, TScript>(
         IReadOnlyCollection<Type> neuronAliases,
@@ -47,21 +41,6 @@ internal sealed class TestEdgeRegistry
             script,
             reset);
     }
-
-    internal void ConfigureSouthboundMcpTransport<TService, TScript>(
-        TService adapter,
-        TScript script,
-        Action<TScript> reset)
-        where TService : class
-        where TScript : class
-        => Configure(
-            TestEdgeKind.SouthboundMcpTransport,
-            typeof(TService),
-            serviceKeys: [],
-            keyed: false,
-            adapter,
-            script,
-            reset);
 
     internal void AttachTimeProvider(
         TimeProvider provider,
@@ -123,19 +102,6 @@ internal sealed class TestEdgeRegistry
             timeProvider);
     }
 
-    internal void ConfigureConfiguration(
-        IConfiguration configuration)
-    {
-        ArgumentNullException.ThrowIfNull(configuration);
-        if (configuration is not IConfigurationBuilder builder)
-        {
-            throw new InvalidOperationException(
-                "The silo configuration does not support the framework-owned test edge projection.");
-        }
-
-        builder.Add(_configurationSource);
-    }
-
     internal long ResetMethodScope()
     {
         Action[] resets;
@@ -144,7 +110,6 @@ internal sealed class TestEdgeRegistry
 
         lock (_gate)
         {
-            _configuration.Clear();
             generation = checked(++_methodGeneration);
             resets = _adapters.Values
                 .Select(registration => registration.Reset)
@@ -181,35 +146,6 @@ internal sealed class TestEdgeRegistry
             return registration.Script as TScript
                 ?? throw new InvalidOperationException(
                     $"The '{kind}' test edge script is '{registration.Script.GetType().FullName}', not '{typeof(TScript).FullName}'.");
-        }
-    }
-
-    internal void SetOAuthParameter(
-        string name,
-        string? value,
-        long generation)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-
-        lock (_gate)
-        {
-            EnsureCurrentGeneration(generation);
-            _configuration.Set(name, value);
-        }
-    }
-
-    internal string? OAuthParameter(
-        string name,
-        long generation)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-
-        lock (_gate)
-        {
-            EnsureCurrentGeneration(generation);
-            return _configuration.TryGet(name, out var value)
-                ? value
-                : null;
         }
     }
 

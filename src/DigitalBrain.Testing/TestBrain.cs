@@ -82,30 +82,6 @@ public sealed class TestBrain : IAsyncDisposable
             _edgeGeneration);
     }
 
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public TScript SouthboundMcpTransportScript<TScript>()
-        where TScript : class
-    {
-        ThrowIfDisposed();
-        return _edges.Script<TScript>(
-            TestEdgeKind.SouthboundMcpTransport,
-            _edgeGeneration);
-    }
-
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public void SetOAuthParameter(string name, string? value)
-    {
-        ThrowIfDisposed();
-        _edges.SetOAuthParameter(name, value, _edgeGeneration);
-    }
-
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public string? OAuthParameter(string name)
-    {
-        ThrowIfDisposed();
-        return _edges.OAuthParameter(name, _edgeGeneration);
-    }
-
     public TestNeuron<TNeuron> Neuron<TNeuron>(string name = "default")
         where TNeuron : class, INeuron
         => _defaultOwner.Neuron<TNeuron>(name);
