@@ -423,11 +423,6 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
         foreach (var type in scope.GetTypeMembers())
         {
             yield return type;
-
-            foreach (var nested in NestedTypesIn(type))
-            {
-                yield return nested;
-            }
         }
 
         foreach (var child in scope.GetNamespaceMembers())
@@ -435,19 +430,6 @@ public sealed class DispatchManifestGenerator : IIncrementalGenerator
             foreach (var type in TypesIn(child))
             {
                 yield return type;
-            }
-        }
-    }
-
-    private static IEnumerable<INamedTypeSymbol> NestedTypesIn(INamedTypeSymbol containing)
-    {
-        foreach (var nested in containing.GetTypeMembers())
-        {
-            yield return nested;
-
-            foreach (var descendant in NestedTypesIn(nested))
-            {
-                yield return descendant;
             }
         }
     }

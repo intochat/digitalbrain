@@ -2,7 +2,6 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <IncludeBuildOutput>false</IncludeBuildOutput>
-    <SuppressDependenciesWhenPacking>false</SuppressDependenciesWhenPacking>
     <Description>Consumer metapackage: Abstractions + Client + Aspire. Kernel stays separate so silo hosts and model credentials never land in pure clients. Rationale holds after AI left the kernel — silo-only packages must not ride a client restore.</Description>
   </PropertyGroup>
   <ItemGroup>

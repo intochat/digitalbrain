@@ -20,7 +20,6 @@
     <Project Path="hosts/DigitalBrain.Quickstart.Host/DigitalBrain.Quickstart.Host.csproj" />
     <Project Path="hosts/DigitalBrain.Quickstart.AppHost/DigitalBrain.Quickstart.AppHost.csproj" />
   </Folder>
-
   <Folder Name="/modules/">
     <Project Path="modules/DigitalBrain.Modules.AI.Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <Project Path="modules/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
