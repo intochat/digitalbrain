@@ -608,9 +608,10 @@ Flutter module, and whose **logic** (shell policy, post-auth composition, multi-
 settings flows) is behaviors — or, until the Behavior rail exists, ordinary C# compositions with the
 same allowlist — composing that vocabulary the way AccountEnrichment composes Gmail and Salesforce.
 
-> **Module-owned hosting (plan of record):** Selecting `FlutterModule` with explicit host options is how
-> DigitalBrain composes the OS surface. Aspire remains the orchestrator; ad-hoc AppHost
-> `AddProject`/`AddExecutable` Flutter wiring without module selection is incomplete packaging.
+> **Module-owned hosting (Built):** `AddModule<FlutterModule>(f => f.WithUiEdge().WithFlutterHost())`
+> is how production AppHost composes the OS surface. Vocabulary-only `AddModule<FlutterModule>()` does
+> not start Ui or Flutter resources. Aspire remains the orchestrator; ad-hoc AppHost
+> `AddProject`/`AddExecutable` Flutter wiring without those host options is incomplete packaging.
 
 #### Package family and public identity
 
@@ -656,15 +657,19 @@ The same two primitives as the rest of the brain:
 - **Synapse** = fact (broadcast or directed, no reply). Surface lifecycle and domain-relevant user
   intent use synapses (`EmitAsync` / `SendAsync`).
 - **Interface method** = request (directed, replies), reified as `CapabilityRequested` → outcome.
-  Snapshot/query paths (`Current` / present) use methods when the host needs a typed reply.
+  First vertical: `IShell.Open(OpenScene)`. Snapshot/query methods (`Current` / present) are not in
+  the first five types; add them only with journal-backed recovery proofs.
 
-Flutter rebuild is a **projection of committed journals and serializable scene descriptors**, never
-the ledger. Widget trees, scroll offsets, hover, and frame timing stay host-local. Only
-domain-relevant intent and scene lifecycle that other neurons may consume cross the boundary.
+Flutter rebuild is a **projection of committed journals**, never the ledger. Widget trees, scroll
+offsets, hover, and frame timing stay host-local. Only domain-relevant intent and scene lifecycle that
+other neurons may consume cross the boundary.
 
-C# contracts carry **serializable descriptors only** — primitives, stable ids, closed node kinds,
-action identities, revision/causation fencing. No `Widget`, `BuildContext`, Dart types, callbacks, or
-Flutter SDK types in any C# assembly. Dart materializes widgets from descriptors.
+**First vertical (Built):** projection input is `SceneOpened` (scene key + title + journal sequence)
+and control intents via `ControlActivated`. Host-local view models map those facts to pixels;
+there is no scene-descriptor node algebra yet. C# contracts carry serializable primitives and stable
+ids only — no `Widget`, `BuildContext`, Dart types, callbacks, or Flutter SDK types. **Designed:**
+richer serializable descriptors (closed node kinds, action identities, revision fencing) when a
+consumer needs more than key/title chrome.
 
 Reject driving product UI from OTel or traces (journals are durable truth; OTel is diagnostic).
 Reject a god widget tree with side-channel HTTP that bypasses `IDigitalBrain` typed contracts
@@ -721,14 +726,14 @@ Flutter / Dart host  ──HTTP/JSON (+ SSE watch)──►  hosts/DigitalBrain.
   **client** under `clients/`, not a packable module and not a second Orleans host under `hosts/`.
   Do not invent a second public client facade beside `DigitalBrainClient`.
 
-#### Module-owned OS surface composition (plan of record)
+#### Module-owned OS surface composition (Built)
 
-**Recommendation (accepted):** `DigitalBrain.Modules.Flutter.Aspire.Hosting` owns AppHost composition of
-the OS surface when the Flutter module is selected with explicit host options. Mirror AI/Google
-hosting: extensions on `DigitalBrainModuleBuilder<FlutterModule>`, state via `GetOrAddState`, register
-a `DigitalBrainModuleProjection`. Unlike AI (which injects silo env in `Apply`), Flutter hosting
-creates **peer resources** eagerly and uses `Apply` only to finish the WaitFor graph once the silo
-takes `WithReference(brain)`.
+`DigitalBrain.Modules.Flutter.Aspire.Hosting` owns AppHost composition of the OS surface when host
+options are selected. Mirror AI/Google hosting: extensions on `DigitalBrainModuleBuilder<FlutterModule>`,
+state via `GetOrAddState`, register a `DigitalBrainModuleProjection`. Unlike AI (which injects silo env
+in `Apply`), Flutter hosting creates **peer resources** eagerly and uses `Apply` only to finish the
+WaitFor graph once the silo takes `WithReference(brain)`. Production `DigitalBrain.AppHost` uses this
+path only (L0 pins no hand-wired `DigitalBrain_Ui` project).
 
 **Product sentence:**
 
@@ -759,31 +764,22 @@ var silo = builder.AddProject<…>("silo").WithReference(brain);
 | MCP host | Stays AppHost-owned peer (not Flutter module packaging) | MCP folded into Flutter hosting as product UI |
 | Historical recovery | Intent only: `AddExecutable(flutter run -d …)` + edge URL env + WaitFor edge (`v0.1.18` / later `DIGITALBRAIN_V2_UI_ENDPOINT` shape). Rebind to Ui HTTP. | Restore kernel gRPC, Orleans client on Flutter, wholesale `app/` |
 
-**AppHost cutover:** Production `DigitalBrain.AppHost` must stop hand-duplicating Ui once hosting owns it
-(L0 pins the single path). Temporary dual-path is allowed only until the pin flips. Removing
-`AddModule<FlutterModule>` (or omitting `With*`) must omit OS surface resources.
+Removing `AddModule<FlutterModule>`, or keeping the module without `With*`, omits OS surface resources.
+Package graph: hosting may reference `DigitalBrain.Modules.Flutter`, `DigitalBrain.Aspire.Hosting`, and
+Aspire.Hosting APIs — not Kernel. Ui remains free of Kernel (client + Flutter contracts only). Dart
+host never references Aspire or Orleans packages.
 
-**Package graph:** Hosting may reference `DigitalBrain.Modules.Flutter`, `DigitalBrain.Aspire.Hosting`,
-and Aspire.Hosting APIs. It must not reference Kernel. Ui remains free of Kernel (client + Flutter
-contracts only). Dart host never references Aspire or Orleans packages.
+**L0 pins (hosting, in `FlutterHostingProjectionContracts`):** vocabulary-only → no surface resources;
+`WithUiEdge` → AsClient-only Ui; packable Kernel-free package; production AppHost uses module API;
+`WithFlutterHost` env is edge URL + shell only.
 
-**L0/L1 pins (hosting):**
-
-| Proof | Claim |
-| --- | --- |
-| L0 inventory | Packable package present; namespace; no Kernel on hosting public graph |
-| L0 selection | Module without `With*` → no `digitalbrain-ui` / flutter host resources |
-| L0 surface | `WithUiEdge` → Ui resource present with AsClient-only wiring |
-| L0 cutover | Production AppHost composes Ui via module API (not permanent hand-wire) |
-| L1/L2 | Existing Ui HTTP + SSE tests remain green; readiness graph-owned when resources run |
-
-#### Live host observation (plan of record)
+#### Live host observation
 
 Product journal **observation** on `IDigitalBrain` remains unbuilt (§8): the public facade still
 sends and emits only. That gap must not invent a second semantic protocol or a ProbeHost-shaped
 “watch any grain” surface.
 
-**First live feed (built on the edge):** host-facing SSE on `hosts/DigitalBrain.Ui` only.
+**First live feed (Built on the edge):** host-facing SSE on `hosts/DigitalBrain.Ui` only.
 
 | Decision | Choice | Fold if |
 | --- | --- | --- |
@@ -844,34 +840,34 @@ the edge, then the same `IDigitalBrain` programming model. Today both Ui and MCP
 
 Source of truth: public types in `DigitalBrain.Modules.Flutter.Contracts` (aliases, methods,
 properties). Guard: checked-in normalized **golden wire-contract manifest** extracted by reflection
-over that assembly; L0 asserts equality. When a Dart wire package exists, the same golden file under
-Contracts is the Dart-side oracle (one file; no forked copy). Codegen Dart from Contracts may later
-accelerate maintenance; the gate remains golden equality, not “generator exit 0.” No protobuf dual
-vocabulary; no FFI .NET-in-Dart as the pin. Thin HTTP DTOs on the Ui edge (`OpenSceneRequest`, …)
-are host protocol, not a second module vocabulary.
+over that assembly; L0 asserts equality. `clients/digitalbrain_wire` uses that same Contracts golden
+as the Dart-side oracle (one file; no forked copy). Codegen Dart from Contracts may later accelerate
+maintenance; the gate remains golden equality, not “generator exit 0.” No protobuf dual vocabulary;
+no FFI .NET-in-Dart as the pin. Thin HTTP DTOs on the Ui edge (`OpenSceneRequest`, …) are host
+protocol, not a second module vocabulary.
 
 #### Testing
 
 | Tier | First vertical |
 | --- | --- |
-| L0 | Package graph: Kernel free of Flutter; Contracts free of Dart/Flutter SDK; capsule + alias + golden pins |
-| L1 | Real multi-silo `TestBrain`; real Flutter-module neurons; **scene projected = committed journal fact**; Ui edge HTTP (+ SSE watch when built); no phone |
-| L2 | When `digitalbrain-ui` (and later the Flutter resource) is a real AppHost resource with readiness — not MCP-coupled |
+| L0 | Package graph: Kernel free of Flutter; Contracts free of Dart/Flutter SDK; capsule + alias + golden + hosting projection pins |
+| L1 | Real multi-silo `TestBrain`; real Flutter-module neurons; **scene projected = committed journal fact**; Ui edge HTTP + SSE shell events; composition L1; no phone |
+| L2 | Real AppHost resources (`digitalbrain-ui` / Flutter host) with readiness — not MCP-coupled; not the default domain gate |
 | L3 | Device/widget/golden — never owner of domain truth; never sole gate |
 
-Headless Dart unit tests may prove pure descriptor→view-model mapping and dual golden equality when a
-Dart package exists; they do not replace L1 journal proof. Domain gate remains the root
-`dotnet test` solution run; Dart/Flutter jobs are path-filtered peers of the docs job.
+Dart unit tests prove dual golden equality and host-local scene view-model mapping; they do not replace
+L1 journal proof. Domain gate remains the root `dotnet test` solution run; Dart/Flutter jobs are
+path-filtered peers of the docs job.
 
 #### Still open (do not implement as settled)
 
 - Scene descriptor node algebra and richer chrome vocabulary beyond the first five types.
-- Dart host mapping descriptors to widgets beyond the skeleton; Windows chrome polish (path of
-  record: `clients/digitalbrain_flutter` + `clients/digitalbrain_wire`).
+- Dart host mapping beyond key/title skeleton; Windows widget chrome polish
+  (`clients/digitalbrain_flutter` + `clients/digitalbrain_wire` path of record).
 - Product journal observation API on `IDigitalBrain` (promote when a non-UI consumer needs it).
-- Flutter Windows widget chrome (headless Dart host is Built; desktop embedder polish still open).
 - Multi-principal edge factory beyond singleton `AddDigitalBrainClient(owner)` / process owner config.
-- Full desktop chrome, multi-window, notifications, AI pane as product surfaces.
+- Full desktop chrome, multi-window, notifications, and product-installed OS apps (sample compositions
+  exist; they are not installed Behaviors).
 - Optional `WatchNeuron` push upgrade (SSE poll is acceptable and Built on the edge).
 
 ### 4.7 Memory
@@ -919,11 +915,11 @@ control, review, and a rebuild.
 
 Shell policy, post-auth UX orchestration, and multi-module “OS apps” (countdown scene, enrichment
 approval surface, AI pane) are **logic over vocabulary**. Until the rail ships they live as ordinary
-C# under `samples/` (recommended: `samples/DigitalBrain.Compositions`), one public sealed class per
-file, identity = namespace + class name (the future Behavior identity). Bodies use only
-`IDigitalBrain` + selected `*.Contracts` + approved BCL — the same denylist as the future compiler.
-They are pull-invoked by hosts and tests; they are not installed Behaviors and must not introduce
-`IBehavior` product APIs.
+C# under `samples/DigitalBrain.Compositions`, one public sealed class per file, identity = namespace +
+class name (the future Behavior identity). Bodies use only `IDigitalBrain` + selected `*.Contracts` +
+approved BCL + Microsoft.Extensions.AI message types where AI compositions need them — the future
+compiler allowlist. They are pull-invoked by tests today (not installed into the production silo and
+not wired as host startup); they are not Behaviors and must not introduce `IBehavior` product APIs.
 
 Do not confuse this with `samples/DigitalBrain.AccountEnrichment`: that sample is a **compiled
 process neuron** (durable multi-module vocabulary). Flows that need new durable process state stay
@@ -1238,7 +1234,7 @@ letting the rule quietly soften.
 49. Modules own UI vocabulary; behaviors (or pre-rail compositions) own shell/login/window *logic*.
 50. Semantic neurons (`IShell`, `IScene`, …); never a public `IFlutter` god type or central UI root.
 51. Package family `DigitalBrain.Modules.Flutter*`; public namespace `DigitalBrain.Flutter`.
-52. Flutter rebuild projects journals + serializable descriptors; journals remain durable truth.
+52. Flutter rebuild projects committed journal facts (first vertical: `SceneOpened` key/title); richer descriptors stay open; journals remain durable truth.
 53. C# contracts carry no Dart/Flutter SDK types; Kernel carries no UI vocabulary.
 54. Dart host is a northbound client of a C# `IDigitalBrain` edge — never an embedded silo.
 55. Auth at the edge; post-auth composition only; never tokens/passwords in journals.
@@ -1263,11 +1259,11 @@ taken, and do not infer a shape for it from a neighbouring module.
 - **The exact CLR records for the capability-tool seam.** §4.3 ratifies that seam's architecture and
   its exclusions; the records and interfaces that would express it are unwritten.
 - **Flutter descriptor algebra and richer chrome vocabulary.** §4.6 freezes the first five semantic
-  types and ratifies host-facing SSE watch under `hosts/DigitalBrain.Ui` for the first live feed;
-  scene descriptor node algebra and full chrome remain open.
+  types; host-facing SSE on `hosts/DigitalBrain.Ui` is Built for the first live feed. Scene
+  descriptor node algebra and full Windows product chrome remain open.
 - **Product journal observation on `IDigitalBrain`.** Still designed for scripts and multi-edge
   reconnect as a shared programming-model API; the first live host feed uses edge-only journal watch
-  (§4.6). Not required for C#-only L1 command→journal proofs.
+  (§4.6). Not required for L1 command→journal proofs.
 
 ### Known deviations
 
@@ -1320,14 +1316,13 @@ track has proofs.
 4. Extend `DigitalBrain.Google` from the `IGmail` root to `ICalendar` once a concrete calendar story
    exists.
 5. Add recurring and calendar Time vocabulary once its library and public record shapes are approved.
-6. Flutter OS surface (in order): (a) C#-only first vertical — **built** (vocabulary, L0/L1, Ui edge
-   commands + SSE shell events, thin compositions); (b) **module-owned hosting**
-   (`Flutter.Aspire.Hosting` — `WithUiEdge` / `WithFlutterHost`) so selecting the module composes the
-   OS surface; (c) Dart host under `clients/digitalbrain_flutter` over that HTTP surface + dual golden;
-   (d) deeper compositions (shell navigation, post-auth, countdown, enrichment surface, AI pane)
-   as samples under `DigitalBrain.Compositions` — claiming installed Behaviors still requires the
-   self-programming track. Do not wholesale restore historical `app/` or `workspace/`. Do not ship
-   Aspire-only Flutter with no module selection.
+6. Flutter OS surface remaining work (do not re-open Built steps): first vertical vocabulary + L0/L1
+   journals, Ui HTTP/SSE edge, module-owned hosting (`WithUiEdge` / `WithFlutterHost` — not bare
+   `AddModule` alone), headless Dart host + dual golden, and sample compositions under
+   `DigitalBrain.Compositions` are **Built**. Still open: descriptor algebra, Windows chrome polish,
+   multi-principal IdP edge, product journal observation on `IDigitalBrain`, and treating compositions
+   as installed Behaviors (self-programming track). Do not wholesale restore historical `app/` or
+   `workspace/`. Do not ship Aspire-only Flutter with zero module host options.
 7. Design `DigitalBrain.Memory` independently around its own vocabulary, never inferred from AI,
    Tasks, or Time.
 
