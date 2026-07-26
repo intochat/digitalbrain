@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(byte[]))]
