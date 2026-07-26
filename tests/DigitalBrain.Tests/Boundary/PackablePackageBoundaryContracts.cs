@@ -1,6 +1,5 @@
-using Xunit;
-
 using DigitalBrain.Tests.Packages;
+using Xunit;
 
 namespace DigitalBrain.Tests.Boundary;
 
