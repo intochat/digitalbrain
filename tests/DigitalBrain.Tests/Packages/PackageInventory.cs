@@ -4,6 +4,7 @@ internal static class PackageInventory
 {
     internal const string Metapackage = "DigitalBrain";
     internal const string Abstractions = "DigitalBrain.Abstractions";
+    internal const string Behaviors = "DigitalBrain.Behaviors";
     internal const string Client = "DigitalBrain.Client";
     internal const string Kernel = "DigitalBrain.Kernel";
     internal const string Security = "DigitalBrain.Security";
@@ -45,6 +46,7 @@ internal static class PackageInventory
     [
         Metapackage,
         Abstractions,
+        Behaviors,
         Kernel,
         Client,
         Testing,
