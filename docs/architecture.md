@@ -1,183 +1,271 @@
 # Architecture
 
-DigitalBrain is an AI-native operating system built around ready-to-use durable neurons and typed
-causal facts. It is designed as a common substrate on which modules supply domain vocabulary and
-behaviors, once the approved install rail exists, compose that vocabulary into product logic. This
-root URL is the stable architecture entry point: it distinguishes what is built from what is designed
-and indexes the responsibility authorities below.
+DigitalBrain is an AI-native operating system for durable agents on Orleans and Aspire. The kernel
+owns durable, typed neuron mechanics; modules own domain vocabulary; behaviors compose that
+vocabulary into logic. This page is the plan of record. Code is the source of truth for detail — what
+lives here is the reasoning that code cannot state about itself.
 
 <ArchitectureMap />
 
-## 1. The vision
+## The vision
 
-DigitalBrain is not a generic agent framework or an application shell. Its kernel owns durable,
-typed neuron mechanics; modules own domain vocabulary; and behaviors compose that vocabulary. This
-index remains the canonical route for the architecture, status framing, and topic authorities.
+> A brain you program by writing ordinary C#, and that can program itself.
 
-## Authority index
+Users compose neurons and synapses in C# today, and ultimately describe behaviors in natural
+language. DigitalBrain is not a generic agent framework and not an application shell.
 
-- [Kernel and module model](./architecture/kernel-and-module-model.md) — the Built substrate,
-  vocabulary, and explicit module selection.
-- [AI and Tasks](./architecture/modules-ai-tasks.md) — Built module surfaces and the Designed
-  supervised path.
-- [Google and Salesforce integrations](./architecture/modules-integrations.md) — semantic
-  capability roots, MCP admission, approval, and provider boundaries.
-- [Time](./architecture/modules-time.md) — Built Countdown and designed schedule work.
-- [Flutter and Memory](./architecture/modules-flutter-memory.md) — code/L0/L1 Flutter status,
-  residual product topology, and Memory’s deliberate out-of-scope boundary.
-- [Behaviors, registry, and discovery](./architecture/behaviors-registry-and-discovery.md) —
-  Designed install/execution rail and explicit pre-rail parity.
-- [Hosting, durability, and testing](./architecture/hosting-durability-testing.md) — durable
-  hosting profile, journals, observability, and proof tiers.
-- [Ratified rules and open deviations](./architecture/ratified-rules-and-open-deviations.md) —
-  checklist, deviations, rejections, and build order.
+## The shape in six lines
 
-## Status and ordinary build
+- The typed interface is the surface, the synapse is the substrate, the generator is the bridge.
+- A synapse is a **fact** — a thin record, broadcast, no reply.
+- An interface method is a **request** — directed at a capability, and it replies.
+- Both are journaled; neither is privileged.
+- **Modules own vocabulary.** Compile-time, needs a rebuild.
+- **Behaviors own logic.** Every future install is a human-approved, journaled, reversible proposal.
 
-“Built” means the named contracts and runtime exist and have the stated proof; “Designed” means a
-ratified target is not claimed as shipped. The Behavior foundation is Built. The builder, worker,
-capability broker, installation rail, and product Behavior execution remain Designed. The fixed
-activation address/state/wire facts and pre-rail compositions remain explicit in the Behaviors
-authority.
+## The kernel
 
-Ordinary repository validation uses the compiler, tests, and Git. It does not refresh CodeGraph;
-removing the former floating CodeGraph build hook is the dedicated cleanup-042 change.
+`DigitalBrain.Kernel.Neuron` owns neuron mechanics and nothing else: receive and dispatch incoming
+synapses, emit and send outgoing ones, journal traffic in both directions, persist operational state,
+and enforce owner, delivery, and concurrency invariants.
 
-## Compatibility status synopsis
+The test for a proposed kernel change is simple:
 
-This concise index preserves the former root’s status-facing headings and proof vocabulary. The
-linked authority owns the detailed rationale; this synopsis does not change a Built claim into a
-product-topology claim.
+> If the kernel would have to know what an LLM, a mailbox, or a CRM record is, the change belongs in
+> a module.
 
-<a id="_2-the-kernel"></a>
+### Typed requests are reified as causal facts
 
-### The kernel
+A typed interface call is a request, not a synapse — but it still has to be visible in the journal.
+The kernel commits a fact *about* the call rather than turning the call into one:
 
-The kernel is Built substrate mechanics. See [kernel and module model](./architecture/kernel-and-module-model.md)
-for causal facts, the capability exception, and the module model.
+1. Before invoking, the caller commits `CapabilityRequested`.
+2. Its `SynapseDelivery` travels through the Orleans `RequestContext`.
+3. The target commits that delivery to its incoming journal *before* the method body runs.
+4. The target executes with that delivery as its causal context.
+5. Synapses emitted during the call inherit the correlation and use the request's `SynapseId` as
+   their causation.
+6. `CapabilityCompleted`, `CapabilityFailed`, or `CapabilityRejected` records the outcome.
 
-<a id="_3-the-module-model"></a>
+These facts carry identity, caller, target, contract, method, correlation, causation, timestamp, and
+outcome — and deliberately nothing else. Arguments, prompts, secrets, tokens, return values, and
+exception content never enter a kernel journal. A module that needs payload-level audit emits its own
+typed fact.
 
-### The module model
+Be clear about what this buys: it records attempted, accepted, completed, failed, rejected, and
+visibly incomplete requests. It is **not** exactly-once RPC. Safe retries remain the responsibility of
+domain `CommandId`, revision fencing, provider idempotency, and reconciliation.
 
-The module model is explicit selection and typed vocabulary. The modules below retain their stable
-status lines; their detailed boundaries are in the linked authorities.
+### The one deliberate exception
 
-<a id="_4-the-modules"></a>
+A private off-turn runner has to carry an already-committed request across the Kernel/AI assembly
+boundary, and it is not a neuron. `CapabilityDelegation` is the single public type that exists for
+this. It is sealed, opaque, non-constructible by consumers, hidden from IntelliSense, and
+non-semantic — never a neuron contract, synapse, registry entry, or behavior vocabulary. The kernel
+alone mints, carries, validates, durably redeems, and records outcomes for it.
 
-### The modules
+A raw non-neuron call, a forged context, a replay, or a mismatched source, owner, target, or
+operation is rejected before the target's method body starts. Consumption is durable before
+invocation, so a crash may require a fresh request and delegation — the cross-grain boundary is not
+exactly once.
 
-<a id="_4-1-ai"></a>
+## The module model
 
-### 4.1 AI — status
+Each domain ships as its own package family: `.Contracts`, the runtime, and an optional
+`.Aspire.Hosting`. Contracts reference only `DigitalBrain.Abstractions` — never a provider SDK. The
+one deliberate exception is `AI.Contracts`, whose bridge references `Tasks.Contracts`; the reverse is
+forbidden.
 
-Status: Built
+Cross-provider mechanics live in deeper packages rather than copied module code: `DigitalBrain.Security`
+owns purpose-bound durable encryption, and `DigitalBrain.Integrations.Mcp` owns southbound transport,
+OAuth and token-cache mechanics, and canonical fingerprint mechanics. Those shared packages never
+acquire Gmail or Salesforce vocabulary and never decide which tools are safe.
 
-Direct `Respond` owns a protected `AgentSession`; supervised durable checkpoint work remains
-Designed. Microsoft.Extensions.AI is the public conversation boundary, MAF types stay internal, and
-AI-to-Tasks.Contracts preserves the one-way boundary.
+### Namespaces are the vocabulary
 
-<a id="_4-2-tasks"></a>
+Package names carry packaging detail and may say `Modules` and `Contracts`. Public namespaces carry
+meaning and never do:
 
-### 4.2 Tasks — status
+```text
+DigitalBrain.AI.ILLM
+DigitalBrain.AI.Ollama.ILlama32
+DigitalBrain.Google.IGmail
+DigitalBrain.Tasks.ITask
+```
 
-Status: Built
+The namespace and type name **are** the identity. There is no descriptor, enum, tier, or lookup table
+that resolves to them. This is also the vocabulary a future natural-language layer resolves against,
+which is why it is architecture rather than naming taste.
 
-<a id="_4-3-google"></a>
+### Selection is explicit
 
-### 4.3 Google — status
+```csharp
+var brain = builder.AddDigitalBrain("brain");
 
-Status: Built
+brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
+brain.AddModule<GoogleModule>(google => google.WithGmail());
 
-Google remains a southbound semantic capability boundary.
+builder.AddProject<Projects.DigitalBrain_Host>("silo").WithReference(brain);
+```
 
-<a id="_4-4-salesforce"></a>
+Package reference means *available*. `AddModule<T>()` means *selected and configured*. Each module is
+added exactly once; a repeat call is a composition error, not a merge.
 
-### 4.4 Salesforce — status
+Compilation turns every referenced module into a typed executable capsule and generates the catalog
+from those capsules. Startup fails when AppHost selects a module the compiled catalog does not
+contain. Runtime assembly scanning is not a mechanism this framework has — a catalog discoverable at
+runtime is a catalog that can drift from the code that was compiled.
 
-Status: Built
+One brain is one homogeneous Orleans cluster. Executables with different catalogs must not share a
+brain and rely on placement luck.
 
-Salesforce keeps human-approved proposal and approval evidence at the provider boundary.
+## The modules
 
-<a id="_4-5-time"></a>
+| Module | Status |
+| --- | --- |
+| <a id="ai"></a>**AI** | Built. Direct `Respond` owns a protected `AgentSession`. Microsoft.Extensions.AI is the public conversation boundary; MAF types stay internal. Supervised durable checkpoints are designed. |
+| <a id="tasks"></a>**Tasks** | Built. Start/Cancel lifecycle closed by a test-only `IWorker`. Supervised MAF-per-attempt workers remain designed. |
+| <a id="google"></a>**Google** | Built. A southbound semantic capability boundary (`IGmail`). L1 proves an admitted `get_message` and refusal on failed safety annotations, against a scripted MCP edge rather than live cloud. |
+| <a id="salesforce"></a>**Salesforce** | Built. Human-approved proposal and approval evidence at the provider boundary. |
+| <a id="time"></a>**Time** | Built — `ICountdown` only. Reminder, interval, and calendar scheduling and DST records remain designed and unbuilt. |
+| <a id="flutter"></a>**Flutter** | Built at code and L0/L1: first-vertical vocabulary, journal proofs, the C# northbound UI edge, module-owned `WithUiEdge`/`WithFlutterHost` projection, a pure-Dart headless host, and Windows chrome. Full product chrome, multi-principal IdP edge, and live product AppHost topology remain unproven. |
+| <a id="memory"></a>**Memory** | Deliberately out of scope. |
 
-### 4.5 Time — status
+## Behaviors
 
-Status: Built — Countdown only
+**Status: Designed.** Proposal, approval, installation, execution, and rollback are not built. No
+compiler, worker, broker, or installer exists in code.
 
-<a id="_4-6-flutter"></a>
+The distinction that governs the design:
 
-### 4.6 Flutter — status
+```text
+BehaviorNeuron = owner-scoped neuron identity, journal, state, authority, and revisions
+Behavior program = immutable single-file C# logic executed on behalf of that neuron
+```
 
-Status: Built (first-vertical vocabulary + L0/L1 journal proofs + C# northbound UI edge + module-owned `Flutter.Aspire.Hosting` WithUiEdge/WithFlutterHost projection + **pure-Dart** headless host at `clients/digitalbrain_flutter` + Windows chrome in nested `clients/digitalbrain_flutter/shell/` (`shell/lib/main.dart` + `shell/windows/`) — **code and L0/L1 only**); Designed (full product chrome beyond key/title shell, product journal observation on IDigitalBrain, multi-principal IdP edge); **residual unproven:** live product AppHost topology (`aspire start` / `aspire run` Healthy for silo + `digitalbrain-ui` + Flutter host) — L2 today proves TestingAppHost silo **without** OS surface only; **not** Built-live
+`BehaviorNeuron : Neuron, IBehavior`; the program does **not** inherit `Neuron`. One registered grain
+implementation hosts every `(OwnerId, BehaviorId)` instance and its immutable approved revisions.
 
-`WithFlutterHost()` = Desktop; `WithFlutterHost<DesktopHost>()` and
-`WithFlutterHost<HeadlessHost>()` remain explicit alternatives. `WithFlutterHost()` / `<DesktopHost>`
-has **no Auto** or silent Auto fallback.
+When the compiler exists it will be contract-only. Allowed: the Behavior API,
+`DigitalBrain.Abstractions`, selected module contracts, approved BCL types, and the Behavior SDK.
+Forbidden: `IGrainFactory`, `IChatClient`, provider SDKs, MCP protocol types, `HttpClient`,
+`IServiceProvider`, filesystem and process APIs, reflection, ambient time and random, and native
+interop.
 
-<a id="_4-7-memory"></a>
+Unknown code executes **outside** the silo through a constrained context and capability broker. A
+file-based app, single-file deployment, or `AssemblyLoadContext` is not treated as a security
+boundary.
 
-### 4.7 Memory — status
-
-Memory remains deliberately out of scope.
-
-## 5. Behaviors and scripting
-
-Status: Designed
-
-`IBehavior` marks the Built foundation, but the Behavior builder, worker, broker, installation
-rail, and product execution are Designed. Runtime behavior installation is designed and not yet built.
-The fixed activation path uses `IDigitalBrainNeuron` / `DigitalBrainNeuron`; built OS compositions are
-pre-rail helpers, not installed Behaviors. The rail begins only with a human-approved proposal.
+Until the rail exists, OS composition lives as ordinary C# under `samples/DigitalBrain.Compositions`.
+Those are pre-rail helpers, not installed Behaviors. Changes arrive the ordinary way — through source
+control and a rebuild.
 
 ### Registry and discovery
 
-See the [Behavior authority](./architecture/behaviors-registry-and-discovery.md) for detail.
+Two catalogs with different authority. The generated module catalog owns the compile-time CLR
+universe; runtime installation never adds CLR neuron or synapse types. The owner-scoped Behavior
+catalog owns installed revisions, subscriptions, intent schemas, and grants.
 
-### Hosting and durability
+Vector indexes are derived projections over both. The rule that keeps natural-language programming
+safe:
 
-The [hosting authority](./architecture/hosting-durability-testing.md) records the durable profile.
-An AppHost build must not be read as a CodeGraph refresh.
+> An index may **rank** candidates. It may never execute an invented type or bypass exact catalog
+> resolution. The index is derived and disposable; the catalog is the source of truth.
 
-### Testing
+Losing the index costs discovery quality, never correctness.
 
-L1 uses the real three-silo DigitalBrainFixture; L2 uses the assembly-owned `DigitalBrainAppHostFixture<TAppHost>`
-and method-scoped RunningAppHost. Resource checks use host.Resource("silo"), and cleanup never enumerates or kills processes by name.
-Test chat setup uses ConfigureChatClient. `BehaviorNeuron` is the Neuron and its single-file program is not.
-<!-- assembly-owned DigitalBrainAppHostFixture<TAppHost> -->
+## Hosting and durability
 
-The bounded debts remain explicit: trusted cluster peer, Journal history is bounded, Effectively-once processing is also windowed,
-FIFO per target, Delivery ordering, Broadcast addressing, handler **types**, timeline stream, and
-AsClient. DevUI is not part of the current architecture. The named durable token remains protected.
-The documentation host uses AddViteApp("website", "../../docs").
+`AddDigitalBrain(name)` creates one complete durable profile: a brain-scoped Azure Storage resource
+supplying Blob-backed journals and Table-backed clustering and reminders. Run mode uses Azurite;
+deployment points the same profile at Azure Storage. No generic durability-provider abstraction is
+introduced until a second *complete* profile actually exists — one profile does not justify an
+abstraction over profiles.
 
-Built (OS compositions, pre-Behavior rail) means the samples are pre-rail helpers, not the install
-rail and not installed Behaviors; AccountEnrichmentSurface is not Gmail.
+Any selected AI or MCP-backed module causes AppHost to declare one brain-scoped 256-bit durable-state
+key, projected only to silos and never to clients. It encrypts MAF direct sessions and MCP OAuth
+tokens under distinct purposes.
 
-## 9. Ratified rules
+`AsClient()` is a security boundary. A client projection receives the clustering connection required
+for gateway discovery and nothing else — never reminders, journals, protection material, or
+durable-resource waits.
 
-1. Follow the detailed [ratified rules and open deviations](./architecture/ratified-rules-and-open-deviations.md);
-   no detailed rule is weakened by this index.
+Synapse journals are the durable causal truth. OpenTelemetry is a diagnostic projection and never the
+audit source: traces sample, expire, and get dropped, and an audit trail that does any of those things
+is not an audit trail.
 
-## 10. Still open, known deviations, and rejected
+## Testing
 
-Ical.Net, the MAF Durable Extension, a model tier, and raw invoke remain rejected or open exactly as
-the detailed authority records.
+`DigitalBrain.Testing` is the one public packable testing product, and it is development-only. Proofs
+run at three tiers, with no parallel fake runtime:
 
-## Previous root-anchor map
+```text
+L0  Contracts and generators   public surface, vocabulary, wire goldens
+L1  Kernel semantics           real three-silo DigitalBrainFixture + method-scoped TestBrain
+L2  AppHost system             assembly-owned DigitalBrainAppHostFixture<TAppHost>
+```
 
-The root URL remains authoritative. These former root anchors resolve to their responsibility
-authority; headings retain their text at the destination.
+**A test earns its place by failing when product behavior breaks. It does not earn its place by
+failing when the build graph changes.** Prefer product types and product constants over test-local
+string tables, and runtime evidence over source-grep. A pin on project counts, package counts,
+assembly references, or filesystem layout is theater — it restates the build system to itself.
 
-| Former anchor | Authority |
-| --- | --- |
-| `#_1-the-vision` | this index |
-| `#_2-the-kernel`, `#typed-requests-are-reified-as-causal-facts`, `#the-one-deliberate-exception` | [kernel and module model](./architecture/kernel-and-module-model.md) |
-| `#_3-the-module-model`, `#namespaces-are-the-vocabulary`, `#selection-is-explicit` | [kernel and module model](./architecture/kernel-and-module-model.md) |
-| `#_4-the-modules`, `#_4-1-ai`, `#_4-2-tasks` | [AI and Tasks](./architecture/modules-ai-tasks.md) |
-| `#_4-3-google`, `#_4-4-salesforce` | [Google and Salesforce integrations](./architecture/modules-integrations.md) |
-| `#_4-5-time` | [Time](./architecture/modules-time.md) |
-| `#_4-6-flutter`, `#package-family-and-public-identity`, `#semantic-neurons-not-iflutter`, `#projection-model`, `#northbound-path`, `#module-owned-os-surface-composition-built-projection-l0-live-healthy-residual`, `#live-host-observation`, `#historical-recovery-map`, `#auth-edge`, `#contract-drift-guard`, `#testing`, `#still-open-do-not-implement-as-settled`, `#_4-7-memory` | [Flutter and Memory](./architecture/modules-flutter-memory.md) |
-| `#_5-behaviors-and-scripting`, `#os-composition-before-the-rail`, `#_6-registry-and-discovery` | [Behaviors, registry, and discovery](./architecture/behaviors-registry-and-discovery.md) |
-| `#_7-hosting-and-durability`, `#observability`, `#testing` | [hosting, durability, and testing](./architecture/hosting-durability-testing.md) |
-| `#_8-known-limitations`, `#_9-ratified-rules`, `#kernel-and-modules`, `#ai-and-maf`, `#behaviors`, `#integrations-and-mcp`, `#tasks`, `#time-and-hosting`, `#flutter-and-os-surface`, `#_10-still-open-known-deviations-and-rejected`, `#still-open`, `#known-deviations`, `#rejected`, `#_11-build-order` | [ratified rules and open deviations](./architecture/ratified-rules-and-open-deviations.md) |
+L1 is the default depth. One fixture owns one real three-silo cluster and permits one active
+`TestBrain` at a time, each with an isolated owner namespace, deterministic clock, closed durability
+faults, and typed committed-journal evidence. Substitutes stop at the closed external edges: a
+scripted `IChatClient`, scripted southbound MCP sessions, and the framework-owned `TimeProvider`.
+Neurons, journals, filters, and module logic stay real.
+
+## Known limitations
+
+Each is a boundary someone chose, not a defect waiting to be found.
+
+- **An Orleans client is a trusted cluster peer.** Owner binding is a correctness boundary, not an
+  authentication claim — a process that can reach the cluster can name any owner. Authenticate at the
+  edge and do not publish clustering endpoints.
+- **Journal history is bounded.** A feed retains 512 entries or 512 KB, whichever binds first, and
+  compacts behind it, answering older cursors with a snapshot and a reset. Effectively-once
+  processing is windowed too: a neuron remembers its last 4096 handled deliveries.
+- **Delivery ordering is local.** FIFO per target and at least once. A refusing receiver blocks only
+  later deliveries aimed at itself. There is no cross-target ordering, and none is promised.
+- **Broadcast addresses handler types**, resolving one correlation-derived instance of each rather
+  than a standing subscriber.
+- **Client observation is not a timeline stream.** The facade sends and emits; a durable per-owner
+  timeline and reconnect lifecycle are not built.
+- **Supervised workflow checkpoints, the OpenTelemetry MAF chain, and DevUI are not built.**
+
+## Rejected
+
+Each was argued and turned down. Reintroducing one is a design change with a case to make, not a
+configuration choice.
+
+- **AI logic in the kernel** — inference, provider names, prompts, OAuth, UI contracts, semantic
+  memory all belong to modules.
+- **Provider routing tiers, balancing, capability scores, or fallback catalogs.** Hosting is the
+  easiest way to smuggle these back.
+- **Public model metadata** — no descriptor, enum, or lookup table that resolves to a model.
+- **Runtime module scanning**, **raw MCP clients crossing module boundaries**, and **any raw invoke
+  escape hatch**. A model receives selected exact function schemas or nothing.
+- **A second client facade** and **compatibility shims** for shapes already deleted.
+- **The MAF Durable Extension and MAF Harness-as-core** — the first duplicates Orleans durability,
+  the second would make DigitalBrain a second agent loop.
+- **A recurrence library adopted because it is the obvious one.** Ical.Net with Noda Time remains
+  open; treating it as decided is what is rejected.
+- **A public `IFlutter` god neuron**, a Flutter-embedded silo, and Behavior product APIs before the
+  install rail exists.
+
+## Still open
+
+Nothing here is settled. Do not implement one as though a decision has been taken, and do not infer
+its shape from a neighbouring module.
+
+- The internal calendar recurrence library, and the reminder, recurring, calendar, and DST record
+  shapes.
+- The exact CLR records for the capability-tool seam.
+- Flutter descriptor algebra and richer chrome vocabulary.
+- Product journal observation on `IDigitalBrain`.
+- Memory architecture, entirely.
+
+One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
+That benchmark, and the proposal and install rail it justifies, remain deliberately outside the built
+foundation.

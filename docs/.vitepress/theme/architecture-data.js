@@ -1,6 +1,6 @@
 export const KERNEL = {
   label: 'Kernel',
-  section: '#_2-the-kernel',
+  section: '#the-kernel',
   role: 'DigitalBrain.Kernel.Neuron mechanics only — receive and dispatch synapses, journal both directions, enforce owner and delivery invariants, mint the one opaque CapabilityDelegation. No AI, provider, integration, or memory concepts live here.',
   owns: ['Neuron', 'Synapse', 'CapabilityDelegation'],
   synapses: ['CapabilityRequested', 'CapabilityCompleted'],
@@ -8,7 +8,7 @@ export const KERNEL = {
 
 export const MODULES = [
   {
-    id: 'ai', label: 'AI', status: 'built', section: '#_4-1-ai',
+    id: 'ai', label: 'AI', status: 'built', section: '#ai',
     role: 'MAF-backed agents and orchestration over typed models. The public wire is Microsoft.Extensions.AI; MAF types stay internal.',
     neurons: ['ILLM', 'IAgent', 'IGroupChat', 'ILlama32', 'IGpt56'], synapses: [],
     mcp: false, ui: false,
@@ -19,33 +19,33 @@ export const MODULES = [
     example: true,
   },
   {
-    id: 'tasks', label: 'Tasks', status: 'built', section: '#_4-2-tasks',
+    id: 'tasks', label: 'Tasks', status: 'built', section: '#tasks',
     role: 'Durable desired-outcome identity and attempt/worker vocabulary. Exactly one Attempt is active at a time. Supervised MAF-per-attempt workers are designed; no live worker producer ships yet. Attempt facts are accepted when produced.',
     neurons: ['ITask', 'IWorker'],
     synapses: ['AttemptSucceeded', 'AttemptFailed', 'AttemptWaiting', 'AttemptProgressed', 'AttemptOutcomeUncertain'],
     mcp: false, ui: false, aspire: [],
   },
   {
-    id: 'google', label: 'Google', status: 'built', section: '#_4-3-google',
+    id: 'google', label: 'Google', status: 'built', section: '#google',
     role: 'Gmail as a semantic capability root. Exact hosted-MCP admission and mapping stay module-private; raw MCP types never cross IGmail.',
     neurons: ['IGmail'], synapses: [], mcp: true, ui: false,
     aspire: [{ res: 'Google OAuth', sub: 'loopback callback', model: '', params: ['google-client-id', 'google-client-secret', 'google-redirect-uri'] }],
   },
   {
-    id: 'salesforce', label: 'Salesforce', status: 'built', section: '#_4-4-salesforce',
+    id: 'salesforce', label: 'Salesforce', status: 'built', section: '#salesforce',
     role: 'Approved, reconciled external mutations bound to a CommandId. Never claims exactly-once effects.',
     neurons: ['ISalesforce'], synapses: [], mcp: true, ui: false,
     aspire: [{ res: 'Salesforce OAuth', sub: 'external client app', model: '', params: ['salesforce-client-id', 'salesforce-redirect-uri'] }],
   },
   {
-    id: 'time', label: 'Time', status: 'built', section: '#_4-5-time',
+    id: 'time', label: 'Time', status: 'built', section: '#time',
     role: 'Built: durable one-shot ICountdown. Designed/unbuilt: IReminder and recurring calendar schedules. Separate from kernel-private outbox timers; reuses the shared kernel reminder provider.',
     neurons: ['ICountdown'],
     synapses: ['CountdownElapsed'],
     mcp: false, ui: false, aspire: [],
   },
   {
-    id: 'flutter', label: 'Flutter', status: 'built', section: '#_4-6-flutter',
+    id: 'flutter', label: 'Flutter', status: 'built', section: '#flutter',
     role: 'Semantic UI vocabulary (IShell, IScene) with journaled scene/control facts. Flutter/Dart host is a northbound client edge, not an embedded silo. Module Aspire.Hosting composes the OS surface when host options are selected. Drift guard is a golden wire manifest over Contracts.',
     neurons: ['IShell', 'IScene'],
     synapses: ['SceneOpened', 'ControlActivated'],
@@ -56,7 +56,7 @@ export const MODULES = [
     ],
   },
   {
-    id: 'memory', label: 'Memory', status: 'scope', section: '#_4-7-memory',
+    id: 'memory', label: 'Memory', status: 'scope', section: '#memory',
     role: 'Deliberately out of scope. Designed independently around its own vocabulary, later.',
     neurons: [], synapses: [], mcp: false, ui: false, aspire: [],
   },

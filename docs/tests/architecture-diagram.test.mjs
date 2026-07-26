@@ -1,15 +1,23 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { KERNEL, MODULES, ACTORS, BEHAVIORS } from '../.vitepress/theme/architecture-data.js'
+import { read } from './support.mjs'
 
-test('every diagram module is typed and links into the architecture page', () => {
+const resolves = anchor => {
+  const architecture = read('docs', 'architecture.md')
+  const slug = anchor.replace(/^#/, '')
+  return architecture.includes(`<a id="${slug}">`)
+    || new RegExp(`^#{2,3} ${slug.replace(/-/g, '[ -]')}$`, 'im').test(architecture)
+}
+
+test('every diagram module is typed and links to a section that exists', () => {
   assert.ok(MODULES.length > 0)
 
   for (const module of MODULES) {
     assert.ok(
       ['built', 'designed', 'scope'].includes(module.status),
       `${module.id} has status '${module.status}'`)
-    assert.match(module.section, /^#[\w-]+$/, `${module.id} needs an in-page anchor`)
+    assert.ok(resolves(module.section), `${module.id} links to missing ${module.section}`)
     assert.ok(Array.isArray(module.neurons))
     assert.ok(Array.isArray(module.synapses))
 
@@ -50,5 +58,5 @@ test('the kernel and its actors are typed', () => {
   assert.ok(ACTORS.every(actor => ['built', 'designed'].includes(actor.status)))
   assert.ok(KERNEL.owns.includes('Neuron'))
   assert.ok(KERNEL.owns.includes('Synapse'))
-  assert.match(KERNEL.section, /^#[\w-]+$/)
+  assert.ok(resolves(KERNEL.section), `the kernel links to missing ${KERNEL.section}`)
 })

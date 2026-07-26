@@ -211,16 +211,17 @@ Behavior proposal, approval, installation, execution, and rollback also remain d
 `DigitalBrain.Behaviors` is a packable SDK foundation for public authoring interfaces, constrained
 context, manifests, and revision/artifact identities; the nonpackable `DigitalBrain.Behaviors.Runtime`
 contains only the canonical artifact codec. Neither project is a compiler, builder, worker, broker,
-or execution rail. The current [Behavior authority](docs/architecture/behaviors-registry-and-discovery.md)
-defines the post-rail model: one owner-scoped `BehaviorNeuron` implementation owns
-journals/state/revisions; its single-file program is not a Neuron and unknown code executes outside
-the silo through a capability broker. Pre-rail OS activation
+or execution rail. The post-rail model in `docs/architecture.md` holds: one owner-scoped
+`BehaviorNeuron` implementation owns journals/state/revisions; its single-file program is not a Neuron
+and unknown code executes outside the silo through a capability broker. Pre-rail OS activation
 (`DigitalBrainActivated` in Abstractions; pull compositions such as `ActivateDigitalBrain` /
 `BootOnActivation`) may be Built samples/L1 — still not installed Behaviors and not the install rail.
-The [hosting authority](docs/architecture/hosting-durability-testing.md) records the implemented
-foundation and remaining Behavior-rail and calendar-Time work. Live module status and ratified rules
-live in `docs/architecture.md`; dated campaign records are history, not current authority. Do not
-resurrect deleted stage plans or session checklists under `docs/superpowers/plans/`.
+
+`docs/architecture.md` is the single architecture authority: vision, module status, ratified rules,
+known limitations, and rejected shapes. The eight `docs/architecture/*` topic authorities and the
+`docs/superpowers/` and `docs/research/` trees were folded into it and deleted — 94% of documentation
+described a rail with no code. Do not resurrect stage plans, scorecards, grills, or session
+checklists. Docs carry vision; code carries detail.
 
 One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
 That benchmark and the behavior proposal/install rail remain deliberately outside the built

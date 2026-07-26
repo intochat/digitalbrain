@@ -5,7 +5,6 @@ export default defineConfig({
   description: 'Neurons, synapses, and TestBrain — durable agents for .NET on Orleans and Aspire',
   base: '/',
   cleanUrls: true,
-  srcExclude: ['superpowers/**'],
   sitemap: {
     hostname: 'https://digitalbrain.tech'
   },
@@ -19,8 +18,7 @@ export default defineConfig({
       { text: 'Quickstart', link: '/quickstart' },
       { text: 'Concepts', link: '/concepts' },
       { text: 'Architecture', link: '/architecture' },
-      { text: 'Specification', link: '/specification' },
-      { text: 'Packages', link: '/packages' }
+      { text: 'Specification', link: '/specification' }
     ],
     sidebar: [
       {
@@ -29,8 +27,7 @@ export default defineConfig({
           { text: 'Quickstart', link: '/quickstart' },
           { text: 'Concepts', link: '/concepts' },
           { text: 'Architecture', link: '/architecture' },
-          { text: 'Specification', link: '/specification' },
-          { text: 'Packages', link: '/packages' }
+          { text: 'Specification', link: '/specification' }
         ]
       },
       {
