@@ -12,6 +12,7 @@ for what ships and what each package may depend on.
 | --- | --- | --- |
 | `DigitalBrain` | Consumer metapackage (no assembly; never Kernel or modules) | Abstractions, Client, Aspire |
 | `DigitalBrain.Abstractions` | Leaf neuron and synapse contracts (incl. substrate `DigitalBrainActivated`, `IDigitalBrainNeuron`, marker `IBehavior`); Orleans grain bases deliberate (`INeuron`/`IJournalObserver`) | Microsoft.Orleans.Sdk |
+| `DigitalBrain.Behaviors` | Packable Behavior authoring SDK foundation: public program/context, manifest, and revision/artifact identity contracts; no compiler, builder/worker, broker, or install/execution rail | Abstractions |
 | `DigitalBrain.Kernel` | Domain-neutral silo runtime (incl. `DigitalBrainNeuron` activation emitter) | Abstractions |
 | `DigitalBrain.Client` | Owner-bound `IDigitalBrain` facade (`ActivateAsync`/`Get`/`Send`/`Emit`; no product journal watch) | Abstractions, Microsoft.Orleans.Client |
 | `DigitalBrain.Testing` | Development-only real multi-silo `DigitalBrainFixture`, method-scoped `TestBrain`, scripted MCP test edges, and assembly-owned `DigitalBrainAppHostFixture<TAppHost>` with method-scoped `RunningAppHost` | Kernel, Client, Integrations.Mcp |
@@ -48,6 +49,7 @@ for what ships and what each package may depend on.
 | Google | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` Gmail ReadMessage admit + annotation refusal on scripted MCP edge | Built |
 | Salesforce | yes | yes | yes | AppHost selection + package graph; `DigitalBrain.Integrations.Tests` propose / reject / approve→Completed on scripted MCP edge | Built |
 | Flutter | yes | yes | yes (OS surface) | L0 golden + namespace/boundary pins + hosting **projection** contracts; L1 journals in `DigitalBrain.Flutter.Tests`; L1 HTTP edge + SSE shell events in `DigitalBrain.Ui.Tests`; pure-Dart **Headless** host + nested **Desktop** Windows chrome (`clients/digitalbrain_flutter` + `shell/lib/main.dart`/`shell/windows/`); explicit `WithFlutterHost()` = Desktop vs `WithFlutterHost<HeadlessHost>()` (**no Auto**); module hosting **projects** Ui/host when `WithUiEdge` / `WithFlutterHost` selected (graph shape, not live Healthy) | Built (vocabulary + C# UI edge + SSE + `Flutter.Aspire.Hosting` projection + pure-Dart Headless + nested Desktop `shell/` chrome — L0/L1); Designed (full product chrome, multi-principal IdP edge, product journal observation); **residual unproven:** product AppHost OS-surface Healthy / live `aspire start` topology — **not** Built-live |
+| Behaviors | SDK only | nonpackable canonical-artifact codec only | no | `DigitalBrain.Behaviors.Tests` L0 SDK/manifest/artifact-codec proof | Built foundation; Designed proposal, approval, installation, execution, and rollback |
 | AccountEnrichment (sample) | non-NuGet sample | non-NuGet sample | no | L0 shape + module registration; L1 multi-module composition in Integrations.Tests (Gmail→propose→session approval→AccountEnriched) | Built (opt-in sample under `samples/`; not a shipped package) |
 | Compositions (sample) | no (consumes contracts + Abstractions activation fact) | no | no | `DigitalBrain.Compositions.Tests` L1 shell/activation-boot/countdown/AI pane compositions | Built (pre-rail logic under `samples/`; not NuGet; not installed Behaviors) |
 
@@ -79,6 +81,7 @@ These trees are real in-repo (and proven at their listed L0/L1 tiers where tests
 | --- | --- |
 | `samples/DigitalBrain.Compositions` | Compositions own logic: sealed classes over `IDigitalBrain` + module contracts / Abstractions only (`ActivateDigitalBrain`, `BootOnActivation`, `OpenHome`, `PostAuthBootstrap`, `NavigateShell`, `CountdownSurface`, `AccountEnrichmentSurface`, `AiPaneSurface`). Pre-Behavior rail; pull-invoked — not installed Behaviors. Activation fact `DigitalBrainActivated` lives in `DigitalBrain.Abstractions`, not in samples. |
 | `samples/DigitalBrain.AccountEnrichment` | Opt-in compiled multi-module process neuron (`IAccountEnrichment` / `EnrichmentModule`). Durable process vocabulary sample — not a composition and not a product package. |
+| `src/DigitalBrain.Behaviors.Runtime` | Nonpackable canonical artifact codec foundation. It is not a Behavior execution runtime, compiler, builder, worker, broker, or installed rail. |
 | `hosts/DigitalBrain.Ui` | Northbound C# HTTP/SSE edge (client + Flutter contracts only). Projected when Flutter hosting selects `WithUiEdge` / `WithFlutterHost`. |
 | `hosts/DigitalBrain.Mcp` | Northbound MCP server over selected neurons through `IDigitalBrain`. |
 | `clients/digitalbrain_wire`, `clients/digitalbrain_flutter` (+ nested `shell/`) | Wire DTOs + pure-Dart edge/projection/headless host; nested `shell/` is Windows Flutter chrome — HTTP clients of Ui, never Orleans. |

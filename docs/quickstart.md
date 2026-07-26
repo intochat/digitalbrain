@@ -4,7 +4,8 @@ title: Quickstart
 
 # Quickstart
 
-Status: Built
+Status: Built (compiled Quickstart contracts/runtime and L1 durability); this page does not claim a
+live Quickstart AppHost L2 health result.
 
 The quickstart keeps public vocabulary, compiled module runtime, hosting, and testing in separate projects. Consumers reference the contracts package; hosts compile the runtime module; Aspire owns the infrastructure topology. This is ordinary compiled C# — not a product Behavior install.
 
@@ -92,7 +93,8 @@ Run the complete topology from the repository root:
 aspire start --apphost hosts/DigitalBrain.Quickstart.AppHost
 ```
 
-The compiled host exposes `/health`.
+The compiled host maps `/health`. That source route is not a live Quickstart AppHost L2 health claim;
+the executable evidence shown here is the L1 durability proof below.
 
 ## 4. Prove durability
 

@@ -1,7 +1,8 @@
 # Concepts
 
 DigitalBrain is an AI-native operating system built from ready-to-use neurons, synapses, modules,
-and executable tests. Its natural-language behavior rail is designed but not implemented.
+and executable tests. Its natural-language behavior rail is designed but not implemented; the
+shipped `DigitalBrain.Behaviors` SDK is only an authoring and artifact-identity foundation.
 
 ## Neuron
 
@@ -69,8 +70,9 @@ An independently shipped domain vocabulary and its runtime implementation.
 _Avoid_: Plugin, feature flag
 
 **Behavior**:
-A designed, unbuilt human-approved runtime C# composition of existing typed vocabulary. There is no
-behavior execution framework or public behavior interface today.
+A human-approved runtime C# composition of existing typed vocabulary. The public Behavior SDK
+already defines program, constrained-context, manifest, and identity contracts, but it does not
+compile, approve, install, or execute a Behavior; that rail remains designed and unbuilt.
 _Avoid_: Dynamic neuron type, script-generated contract
 
 **Registry**:

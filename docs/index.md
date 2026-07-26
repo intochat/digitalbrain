@@ -30,5 +30,5 @@ features:
   - title: TestBrain
     details: The method-scoped testing primitive. Fire a synapse into a real three-silo cluster, advance deterministic time, and assert on typed committed-journal evidence.
   - title: Programmable
-    details: The goal is a brain you program by writing ordinary C#, and that can program itself. Modules contribute vocabulary at compile time; behaviors contribute logic as single-file scripts, live. Designed, not yet built — see Architecture.
+    details: The goal is a brain you program by writing ordinary C#, and that can program itself. Modules contribute vocabulary at compile time; the Behavior SDK supplies a foundation for future single-file logic. Proposal, installation, and execution remain Designed, not Built — see Architecture.
 ---

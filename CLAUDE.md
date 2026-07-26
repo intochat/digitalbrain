@@ -21,8 +21,9 @@ The architecture in six lines:
 - **Modules own vocabulary** — synapse records and neuron interfaces. Compile-time, needs a rebuild.
 - **Behaviors own OS logic** — an approved single-file C# program runs on behalf of an owner-scoped
   `BehaviorNeuron`; the installation rail remains designed and unbuilt.
-- **The Behavior SDK is the program boundary.** Compile and BDD-test a revision once, approve its
-  immutable hash, then execute that artifact through a constrained context.
+- **The Behavior SDK is the program-boundary foundation.** The shipped package supplies authoring
+  interfaces, a constrained context, manifests, and artifact identities. Compilation, BDD
+  verification, approval, and constrained execution remain part of the designed rail.
 - **Every future install is a human-approved proposal**, journaled and reversible.
 
 `docs/architecture.md` is the plan of record. Read its ratified architecture before changing
@@ -206,21 +207,20 @@ Flutter first vertical is Built: shell/scene vocabulary, Ui HTTP/SSE edge, modul
 multi-principal IdP edge, and product journal observation on `IDigitalBrain` remain designed — do not
 re-open Built Windows chrome as Designed.
 
-Behavior proposal, approval, installation, execution, and rollback also remain designed and unbuilt;
-there is no behavior execution framework or public behavior test interface. The approved post-rail
-model is frozen in
-`docs/superpowers/specs/2026-07-26-behavior-operating-system-runtime-design.md`: one owner-scoped
-`BehaviorNeuron` implementation owns journals/state/revisions; its single-file program is not a
-Neuron and unknown code executes outside the silo through a capability broker. Pre-rail OS activation
+Behavior proposal, approval, installation, execution, and rollback also remain designed and unbuilt.
+`DigitalBrain.Behaviors` is a packable SDK foundation for public authoring interfaces, constrained
+context, manifests, and revision/artifact identities; the nonpackable `DigitalBrain.Behaviors.Runtime`
+contains only the canonical artifact codec. Neither project is a compiler, builder, worker, broker,
+or execution rail. The current [Behavior authority](docs/architecture/behaviors-registry-and-discovery.md)
+defines the post-rail model: one owner-scoped `BehaviorNeuron` implementation owns
+journals/state/revisions; its single-file program is not a Neuron and unknown code executes outside
+the silo through a capability broker. Pre-rail OS activation
 (`DigitalBrainActivated` in Abstractions; pull compositions such as `ActivateDigitalBrain` /
 `BootOnActivation`) may be Built samples/L1 — still not installed Behaviors and not the install rail.
-The approved hosting and testing design is frozen in
-`docs/superpowers/specs/2026-07-24-digitalbrain-hosting-and-testing-design.md` (foundation
-implemented; Behavior rail and calendar Time still open). Direction for the 2026-07-25 non-product
-surface cut is in
-`docs/superpowers/specs/2026-07-25-architecture-aligned-mass-deletion.md`. Live module status and
-ratified rules live in `docs/architecture.md` — do not resurrect deleted stage plans or session
-checklists under `docs/superpowers/plans/`.
+The [hosting authority](docs/architecture/hosting-durability-testing.md) records the implemented
+foundation and remaining Behavior-rail and calendar-Time work. Live module status and ratified rules
+live in `docs/architecture.md`; dated campaign records are history, not current authority. Do not
+resurrect deleted stage plans or session checklists under `docs/superpowers/plans/`.
 
 One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
 That benchmark and the behavior proposal/install rail remain deliberately outside the built

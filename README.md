@@ -29,8 +29,9 @@ designed.
   resources. Kernel stays domain-neutral.
 - **Namespaces and type names are architecture** — `DigitalBrain.AI.Ollama.ILlama32` is identity,
   not a lookup result from a model descriptor.
-- **Behaviors own logic** — single-file C# scripts carried as durable state by one registered grain
-  type. Adding a verb needs only approval. Designed, not yet built.
+- **Behavior SDK foundation** — `DigitalBrain.Behaviors` supplies public program/context/manifest and
+  artifact-identity contracts. Human-approved proposal, installation, and execution remain Designed,
+  not Built.
 - **Capability is the contracts package a script compiles against**, enforced where it resolves one.
 - **Every install is a human-approved proposal**, journaled and reversible.
 
@@ -72,7 +73,8 @@ npm --prefix docs test
 npm --prefix docs run build
 ```
 
-Every commit keeps the gate green.
+Run these gates before asserting a commit is green; this page is not evidence that an arbitrary
+commit has passed them.
 
 Published docs: **https://digitalbrain.tech** (GitHub Pages via `.github/workflows/docs-pages.yml`).
 Domain and DNS steps live in [docs/contributing.md](docs/contributing.md#documentation-site-on-github-pages).
