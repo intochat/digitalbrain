@@ -50,12 +50,19 @@ internal sealed partial class Gmail : Neuron, IGmail
                     },
                     cancellationToken: callbackCancellation);
                 var content = McpRuntime.RequireStructuredContent(result, Server, GetMessageName);
+                var responseId = Required(content, "id");
+
+                if (!string.Equals(messageId, responseId, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Gmail get_message returned id '{responseId}' for requested message '{messageId}'.");
+                }
 
                 return new GmailMessage(
-                    Required(content, "id"),
-                    Required(content, "subject"),
+                    responseId,
+                    RequiredContent(content, "subject"),
                     Required(content, "sender"),
-                    Required(content, "plaintextBody"));
+                    RequiredContent(content, "plaintextBody"));
             },
             cancellationToken);
     }
@@ -67,6 +74,19 @@ internal sealed partial class Gmail : Neuron, IGmail
             && !string.IsNullOrWhiteSpace(value.GetString()))
         {
             return value.GetString()!;
+        }
+
+        throw new InvalidOperationException($"Gmail get_message returned no {property}.");
+    }
+
+    private static string RequiredContent(JsonElement content, string property)
+    {
+        if (content.TryGetProperty(property, out var value)
+            && value.ValueKind == JsonValueKind.String
+            && value.GetString() is { } text
+            && (text.Length == 0 || !string.IsNullOrWhiteSpace(text)))
+        {
+            return text;
         }
 
         throw new InvalidOperationException($"Gmail get_message returned no {property}.");

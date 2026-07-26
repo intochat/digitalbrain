@@ -70,6 +70,19 @@ internal static class AdmittedMcpTools
             GmailGetMessageProtocolTool(ReadOnlyAdmitted),
             _ => Structured(new { id, subject, sender, plaintextBody }));
 
+    internal static McpServerTool GmailGetMessageWithPayload(object payload)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        return Fixed(
+            GmailGetMessageProtocolTool(ReadOnlyAdmitted),
+            _ => Structured(payload));
+    }
+
+    internal static McpServerTool GmailGetMessageWithToolError()
+        => Fixed(
+            GmailGetMessageProtocolTool(ReadOnlyAdmitted),
+            _ => new CallToolResult { IsError = true });
+
     internal static McpServerTool GmailGetMessageWithIncompatibleAnnotations()
         => Fixed(
             GmailGetMessageProtocolTool(new ToolAnnotations
