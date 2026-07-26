@@ -2,6 +2,8 @@
   <Folder Name="/src/">
     <Project Path="src/DigitalBrain/DigitalBrain.csproj" />
     <Project Path="src/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+    <Project Path="src/DigitalBrain.Behaviors/DigitalBrain.Behaviors.csproj" />
+    <Project Path="src/DigitalBrain.Behaviors.Runtime/DigitalBrain.Behaviors.Runtime.csproj" />
     <Project Path="src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
     <Project Path="src/DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <Project Path="src/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
@@ -17,6 +19,7 @@
     <Project Path="hosts/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
     <Project Path="hosts/DigitalBrain.Ui/DigitalBrain.Ui.csproj" />
     <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
+    <Project Path="hosts/DigitalBrain.BehaviorBuilder/DigitalBrain.BehaviorBuilder.csproj" />
     <Project Path="hosts/DigitalBrain.TestingAppHost/DigitalBrain.TestingAppHost.csproj" />
     <Project Path="hosts/DigitalBrain.Quickstart.Host/DigitalBrain.Quickstart.Host.csproj" />
     <Project Path="hosts/DigitalBrain.Quickstart.AppHost/DigitalBrain.Quickstart.AppHost.csproj" />
@@ -47,6 +50,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.Behaviors.Tests/DigitalBrain.Behaviors.Tests.csproj" />
     <Project Path="tests/DigitalBrain.TestingTests/DigitalBrain.TestingTests.csproj" />
     <Project Path="tests/DigitalBrain.ModuleTests/DigitalBrain.ModuleTests.csproj" />
     <Project Path="tests/DigitalBrain.HostTests/DigitalBrain.HostTests.csproj" />

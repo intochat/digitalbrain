@@ -9,6 +9,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
+    <ProjectReference Include="..\..\src\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.AI.Aspire.Hosting\DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Tasks\DigitalBrain.Modules.Tasks.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Time\DigitalBrain.Modules.Time.csproj" />
