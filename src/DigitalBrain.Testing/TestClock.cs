@@ -71,7 +71,7 @@ public sealed class TestClock
 
             _provider.SetUtcNow(target);
 
-            while (NextDueAtOrBefore(target) is not null)
+            while (TrySelectNextDue(target, out var nextIsTimer))
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -80,7 +80,7 @@ public sealed class TestClock
                     throw DrainLimitFailure(target);
                 }
 
-                if (_provider.NextDueAtOrBefore(target) is not null)
+                if (nextIsTimer)
                 {
                     if (!_provider.TryFireNextDue(target))
                     {
@@ -124,22 +124,23 @@ public sealed class TestClock
         => new(
             $"Deterministic time drain exceeded {MaximumDrainOperations} operations while advancing to {target:O}.");
 
-    private DateTimeOffset? NextDueAtOrBefore(DateTimeOffset target)
+    private bool TrySelectNextDue(
+        DateTimeOffset target,
+        out bool nextIsTimer)
     {
         var timer = _provider.NextDueAtOrBefore(target);
         var reminder = _reminders.NextDueAtOrBefore(target);
 
-        if (timer is null)
+        if (timer is null && reminder is null)
         {
-            return reminder;
+            nextIsTimer = false;
+            return false;
         }
 
-        if (reminder is null)
-        {
-            return timer;
-        }
-
-        return timer <= reminder ? timer : reminder;
+        // Equal due instants favor timers, preserving one stable cross-source tie rule.
+        nextIsTimer = timer is not null
+            && (reminder is null || timer <= reminder);
+        return true;
     }
 
     private static DateTimeOffset Add(
