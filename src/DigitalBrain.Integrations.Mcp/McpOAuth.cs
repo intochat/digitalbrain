@@ -100,13 +100,25 @@ internal static class McpAuthorizationRedirect
 
 internal static class LocalLoopbackMcpAuthorizationRedirect
 {
-    internal static async Task<string?> AuthorizeAsync(
+    internal static Task<string?> AuthorizeAsync(
         Uri authorizationUri,
         Uri redirectUri,
+        CancellationToken cancellationToken)
+        => AuthorizeAsyncCore(
+            authorizationUri,
+            redirectUri,
+            static startInfo => { Process.Start(startInfo); },
+            cancellationToken);
+
+    private static async Task<string?> AuthorizeAsyncCore(
+        Uri authorizationUri,
+        Uri redirectUri,
+        Action<ProcessStartInfo> startBrowser,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(authorizationUri);
         ArgumentNullException.ThrowIfNull(redirectUri);
+        ArgumentNullException.ThrowIfNull(startBrowser);
 
         if (!redirectUri.IsLoopback || redirectUri.Scheme != Uri.UriSchemeHttp)
         {
@@ -120,7 +132,7 @@ internal static class LocalLoopbackMcpAuthorizationRedirect
         listener.Prefixes.Add($"{redirectUri.GetLeftPart(UriPartial.Authority)}/");
         listener.Start();
 
-        Process.Start(new ProcessStartInfo(authorizationUri.AbsoluteUri) { UseShellExecute = true });
+        startBrowser(new ProcessStartInfo(authorizationUri.AbsoluteUri) { UseShellExecute = true });
 
         while (true)
         {
@@ -130,14 +142,22 @@ internal static class LocalLoopbackMcpAuthorizationRedirect
 
             try
             {
-                code = callback is null
-                    ? throw new InvalidOperationException("The OAuth callback URI is missing.")
-                    : ValidateCallback(authorizationUri, redirectUri, callback);
+                code = ValidateCallback(authorizationUri, redirectUri, callback);
             }
             catch (InvalidOperationException)
             {
                 await RespondAsync(context.Response, HttpStatusCode.BadRequest, "Invalid OAuth callback.", cancellationToken);
                 continue;
+            }
+
+            if (code is null)
+            {
+                await RespondAsync(
+                    context.Response,
+                    HttpStatusCode.OK,
+                    "DigitalBrain authorization was denied. You can close this window.",
+                    cancellationToken);
+                return null;
             }
 
             await RespondAsync(
@@ -149,13 +169,14 @@ internal static class LocalLoopbackMcpAuthorizationRedirect
         }
     }
 
-    private static string ValidateCallback(
+    private static string? ValidateCallback(
         Uri authorizationUri,
         Uri redirectUri,
-        Uri callbackUri)
+        Uri? callbackUri)
     {
         ArgumentNullException.ThrowIfNull(authorizationUri);
         ArgumentNullException.ThrowIfNull(redirectUri);
+
         ArgumentNullException.ThrowIfNull(callbackUri);
 
         if (!redirectUri.IsLoopback || redirectUri.Scheme != Uri.UriSchemeHttp)
@@ -171,6 +192,11 @@ internal static class LocalLoopbackMcpAuthorizationRedirect
             || !string.Equals(QueryValue(callbackUri, "state"), expectedState, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("The OAuth callback does not match the SDK redirect contract.");
+        }
+
+        if (QueryValue(callbackUri, "error") is not null)
+        {
+            return null;
         }
 
         return QueryValue(callbackUri, "code")
