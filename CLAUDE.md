@@ -19,9 +19,10 @@ The architecture in six lines:
 - **A synapse is a fact** — a thin record, broadcast, no reply. **An interface method is a request** —
   directed at a capability, replies. Both are journaled; neither is privileged.
 - **Modules own vocabulary** — synapse records and neuron interfaces. Compile-time, needs a rebuild.
-- **Behaviors will own logic** — single-file C# scripts behind a designed, unbuilt approval rail.
-- **The client API is the programming model.** The same file runs outside the cluster as a script and
-  installs inside it as a behavior.
+- **Behaviors own OS logic** — an approved single-file C# program runs on behalf of an owner-scoped
+  `BehaviorNeuron`; the installation rail remains designed and unbuilt.
+- **The Behavior SDK is the program boundary.** Compile and BDD-test a revision once, approve its
+  immutable hash, then execute that artifact through a constrained context.
 - **Every future install is a human-approved proposal**, journaled and reversible.
 
 `docs/architecture.md` is the plan of record. Read its ratified architecture before changing
@@ -206,7 +207,11 @@ multi-principal IdP edge, and product journal observation on `IDigitalBrain` rem
 re-open Built Windows chrome as Designed.
 
 Behavior proposal, approval, installation, execution, and rollback also remain designed and unbuilt;
-there is no behavior execution framework or public behavior test interface. Pre-rail OS activation
+there is no behavior execution framework or public behavior test interface. The approved post-rail
+model is frozen in
+`docs/superpowers/specs/2026-07-26-behavior-operating-system-runtime-design.md`: one owner-scoped
+`BehaviorNeuron` implementation owns journals/state/revisions; its single-file program is not a
+Neuron and unknown code executes outside the silo through a capability broker. Pre-rail OS activation
 (`DigitalBrainActivated` in Abstractions; pull compositions such as `ActivateDigitalBrain` /
 `BootOnActivation`) may be Built samples/L1 — still not installed Behaviors and not the install rail.
 The approved hosting and testing design is frozen in

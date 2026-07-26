@@ -21,10 +21,10 @@ Five sentences carry the rest of the design:
   directed at a capability, and it replies. Both are journaled; neither is privileged.
 - **Modules own vocabulary.** Synapse records and neuron interfaces are compile-time artifacts; adding
   one needs a rebuild.
-- **Behaviors own logic.** Single-file C# scripts are runtime artifacts; installing one needs only
-  approval.
-- **The client API is the programming model.** The same file runs outside the cluster as a script and
-  installs inside it as a behavior.
+- **Behaviors own logic.** A single-file C# program is compiled and tested once as an immutable
+  revision; installation selects that exact human-approved artifact.
+- **The Behavior SDK is the programming model.** The same constrained program runs in local BDD and
+  through the installed executor; it never receives direct Orleans authority.
 
 Every install is a human-approved proposal, journaled and reversible. That is the product, not a
 feature of it, which is why the rest of this document spends so much effort keeping domain knowledge
@@ -910,11 +910,22 @@ project synapse journals, but it may never reconstruct truth by scraping traces.
 Status: Designed
 
 Behavior **proposal, approval, installation, execution, and rollback** remain **Designed,
-unbuilt**. There is no name-dispatch `Run("behavior")` API, no `IBehaviorTest`, and no
-BehaviorRunner. The intended human-approved install rail still composes typed vocabulary without
-bypassing journals. **Runtime behavior is not a Neuron** as a user-installed product type until
-that rail exists — first-vertical **compiled** OS Behavior hosts (`IBehavior` + `IHandle`) ship as
-module grains through rebuild, which is honest substrate, not the install rail.
+unbuilt**. The approved post-rail design is
+`docs/superpowers/specs/2026-07-26-behavior-operating-system-runtime-design.md`. It still composes
+typed module vocabulary without bypassing journals.
+
+The final distinction is:
+
+```text
+BehaviorNeuron = owner-scoped neuron identity, journal, state, authority, and revisions
+Behavior program = immutable single-file C# logic executed on behalf of that neuron
+```
+
+`BehaviorNeuron : Neuron, IBehavior`; the program does not inherit `Neuron`. One registered grain
+implementation hosts all `(OwnerId, BehaviorId)` instances and their immutable approved revisions.
+Installed revisions may react to typed synapse subscriptions and expose schema-validated intent
+entry points. Semantic search discovers candidates, but exact catalog identity, schema, active
+revision, ownership, and grants authorize execution.
 
 What *is* Built today for OS boot (does not flip §5 Status to Built):
 
@@ -928,21 +939,25 @@ What *is* Built today for OS boot (does not flip §5 Status to Built):
 - Pre-rail compositions under `samples/DigitalBrain.Compositions` remain helpers
   (`ActivateDigitalBrain` → `ActivateAsync`; `BootOnActivation` pull path still valid).
 
-The design still calls for one public Behavior identity per file (namespace + class / grain type);
-replacement is the same identity at a new approved revision. Behaviors are activated externally by
-**existing typed synapses** — never dispatched by name.
+These compiled grains are migration inputs, not the final identity model. The approved migration
+moves OS policy out of Flutter, folds the compositions into installed revisions, and deletes the
+duplicate path only after journal-backed BDD proves the replacement.
 
 When the behavior compiler exists it will be contract-only:
 
 - **Allowed:** the Behavior API, `DigitalBrain.Abstractions`, selected module contracts, approved BCL
-  types, and Microsoft.Extensions.AI message types.
+  types, and the small Behavior SDK.
 - **Forbidden:** `IGrainFactory`, `IChatClient`, provider SDKs, MCP protocol types, `HttpClient`,
-  `IServiceProvider`, filesystem and process APIs, and reflection (author scripts; Kernel host may
-  hold implementation details until then).
+  `IServiceProvider`, filesystem and process APIs, reflection, ambient time/random, and native
+  interop.
 
 Runtime behavior installation is designed and not yet built. The only path to a *user-authored*
 live behavior remains a human-approved proposal with a journaled, reversible decision. Compiled
 first-vertical OS Behaviors ship through source control and a rebuild — honest, not the full rail.
+The approved rail compiles a proposal once in an isolated build worker, runs BDD, stores a
+content-addressed revision, and executes that exact artifact through a constrained context and
+capability broker. Unknown AI/community code runs outside the silo. A .NET file-based app,
+single-file deployment, or `AssemblyLoadContext` is not treated as a security boundary.
 
 ### OS composition before the rail
 
@@ -983,14 +998,17 @@ Honesty split (do not blur):
 - **OS-scene-only surface:** `AccountEnrichmentSurface` opens the enrichment scene. It is **not** the Gmail→Salesforce
   enrichment process and not an approval rail.
 
-Do not confuse this with `samples/DigitalBrain.AccountEnrichment`: that sample is a **compiled
-process neuron** (durable multi-module vocabulary, Integrations L1). Flows that need new durable
-process state stay modules; flows that only compose existing vocabulary stay compositions.
+`samples/DigitalBrain.AccountEnrichment` is currently a **compiled process neuron** and remains
+Built Integrations L1 until migration. In the approved model it becomes a Behavior over Google and
+Salesforce contracts: its durable private process state belongs to `BehaviorNeuron`; it does not
+justify new public module vocabulary. Delete the compiled sample only after equivalent recovery and
+journal BDD is green.
 
-The client API is what makes this coherent rather than a second language: the same file runs outside
-the cluster as a script and installs inside it as a behavior. Production apps take `IDigitalBrain`
-from DI (`AddDigitalBrainClient(owner)`). `DigitalBrainClient.Connect` remains only for Testing and
-host wiring that already hold an `IGrainFactory` — it is not the author story.
+The Behavior SDK keeps this coherent rather than creating a second language: the same constrained
+program is exercised by local BDD and by the installed executor. Production applications take
+`IDigitalBrain` from DI (`AddDigitalBrainClient(owner)`). `DigitalBrainClient.Connect` remains only
+for Testing and host wiring that already hold an `IGrainFactory` — it is not the Behavior program
+boundary.
 
 ```csharp
 // IDigitalBrain brain from DI, TestBrain.Client, or Connect wiring
@@ -1020,10 +1038,18 @@ public sealed class Analyst(ILlama32 llama) : Neuron, IAnalyst, IHandle<SummaryR
 
 ## 6. Registry and discovery
 
-The generated catalog is the canonical registry. Its entries derive from the public namespace and
-contract type name, the XML documentation, method names and parameter types, the handled and emitted
-synapse types, and the owning module. Nothing else is authoritative, and nothing is registered at
-runtime.
+There are two canonical catalogs with different authority:
+
+- The generated module catalog owns the compile-time CLR universe. Its entries derive from the
+  public namespace and contract type name, documentation, method and parameter types, handled and
+  emitted synapse aliases, and owning module. Runtime installation never adds CLR neuron or synapse
+  types.
+- The owner-scoped Behavior catalog owns installed immutable revisions, subscriptions, intent
+  schemas, grants, descriptions, and provenance. Installation updates this catalog and the
+  subscription projection atomically.
+
+Vector indexes are derived projections over both catalogs. They rank candidates only; they never
+authorize an invocation or resolve a runtime type by similarity.
 
 Natural-language programming is intended to follow one path:
 
@@ -1148,9 +1174,9 @@ Substitutes stop at the closed external edges: scripted `IChatClient` via
 `DigitalBrainTestBuilder.ConfigureChatClient` (module smoke), scripted southbound MCP sessions via
 internal `ConfigureMcpSessionFactory` / `IMcpClientSessionFactory` (Integrations L1), and the
 framework-owned `TimeProvider` already registered on every L1 test. Neurons, journals, filters, and
-module logic stay real. `Behavior` remains the name of a user-authored ordinary-test concept; the
-testing framework adds no behavior interfaces or behavior fixture hierarchy.
-Runtime behavior is not a Neuron (see §5).
+module logic stay real. The current testing framework adds no Behavior program interface or fixture
+hierarchy because the rail is unbuilt. In the approved runtime model, the owner-scoped
+`BehaviorNeuron` is the Neuron and its single-file program is not (see §5).
 
 ## 8. Known limitations
 
@@ -1258,57 +1284,64 @@ letting the rule quietly soften.
 
 ### Behaviors
 
-19. Scripts compose existing vocabulary; never create neuron types at runtime.
-20. One Behavior class per file; identity = namespace + class.
-21. Contract-only compilation; auto-derived capability manifest.
-22. Synapse activation externally; typed requests allowed internally.
-23. Dynamic prompts/personas OK; dynamic capabilities forbidden.
+19. Single-file programs compose existing vocabulary; never create neuron or synapse CLR types at
+    runtime.
+20. Behavior identity = `(OwnerId, BehaviorId)`; one `BehaviorNeuron` implementation hosts immutable
+    approved revisions.
+21. The program is not a Neuron; `BehaviorNeuron` owns journal, state, authority, and lifecycle.
+22. Contract-only isolated compilation produces one content-addressed artifact; BDD and human
+    approval bind to its hash.
+23. Typed event subscriptions and schema-validated intent entry points are both supported.
+24. Unknown code executes outside the silo through a constrained context and capability broker.
+25. Vector search discovers; exact catalog records and grants authorize.
+26. Dynamic prompts/personas and private schemas are allowed; dynamic public CLR vocabulary and
+    capabilities are forbidden.
 
 ### Integrations and MCP
 
-24. Public interfaces = semantic capabilities (`IGmail`, `ISalesforce`), not toolsets.
-25. Shared MCP infrastructure owns official SDK/OAuth/token/session/fingerprint mechanics; providers own endpoint, scopes, exact policy, arguments, authority, and semantic mapping.
-26. MCP stays internal behind positive admission; a durable fence is fingerprint-rechecked before its later invocation.
-27. Production interactive authorization is an authenticated-edge responsibility; silo loopback callbacks require explicit development mode.
-28. Human authority is explicit: proposal performs zero provider operations; exact approval evidence precedes catalog inspection and the durable mutation fence.
-29. Progressive tool disclosure remains token-budgeted with no raw string invoke escape hatch; capability roots expose no MCP-shaped methods.
-30. No exactly-once claim; durable dedupe, pre-invocation fencing, reconciliation, and uncertainty handling for mutations.
+27. Public interfaces = semantic capabilities (`IGmail`, `ISalesforce`), not toolsets.
+28. Shared MCP infrastructure owns official SDK/OAuth/token/session/fingerprint mechanics; providers own endpoint, scopes, exact policy, arguments, authority, and semantic mapping.
+29. MCP stays internal behind positive admission; a durable fence is fingerprint-rechecked before its later invocation.
+30. Production interactive authorization is an authenticated-edge responsibility; silo loopback callbacks require explicit development mode.
+31. Human authority is explicit: proposal performs zero provider operations; exact approval evidence precedes catalog inspection and the durable mutation fence.
+32. Progressive tool disclosure remains token-budgeted with no raw string invoke escape hatch; capability roots expose no MCP-shaped methods.
+33. No exactly-once claim; durable dedupe, pre-invocation fencing, reconciliation, and uncertainty handling for mutations.
 
 ### Tasks
 
-31. Independent `DigitalBrain.Tasks` module now.
-32. Task = durable desired outcome; MAF Workflow = one Attempt's execution.
-33. Tasks knows nothing about AI/MAF.
-34. `IWorker` short requests + attempt facts; only session-owning orchestrations implement it.
-35. One active Attempt per Task.
-36. Attempt failure ≠ Task failure; terminal Tasks immutable; retries are successors.
-37. Small lifecycle + typed blockers.
-38. Cooperative truthful cancellation.
-39. Fenced async runner; no long MAF work on grain turn.
-40. Typed Goal/Result/Failure + fact references; no untyped payload bag.
+34. Independent `DigitalBrain.Tasks` module now.
+35. Task = durable desired outcome; MAF Workflow = one Attempt's execution.
+36. Tasks knows nothing about AI/MAF.
+37. `IWorker` short requests + attempt facts; only session-owning orchestrations implement it.
+38. One active Attempt per Task.
+39. Attempt failure ≠ Task failure; terminal Tasks immutable; retries are successors.
+40. Small lifecycle + typed blockers.
+41. Cooperative truthful cancellation.
+42. Fenced async runner; no long MAF work on grain turn.
+43. Typed Goal/Result/Failure + fact references; no untyped payload bag.
 
 ### Time and hosting
 
-41. Semantic Time ≠ Kernel private timing.
-42. Public schedule names: built `ICountdown`; designed `IReminder` (not `ITimer`).
-43. One schedule per neuron; explicit destination; revision + CommandId.
-44. Designed and unbuilt: Interval vs Calendar schedules; deterministic DST; coalesce overdue recurrence.
-45. Persisted Time state authoritative; shared Kernel reminder store.
-46. `AddDigitalBrain(name)` owns one complete durable Azure Storage profile per brain; run mode uses Azurite.
-47. One silo-only brain key protects durable AI and MCP payloads with distinct purposes.
-48. Deterministic test time via `TimeProvider` + the `TestBrain` driver.
+44. Semantic Time ≠ Kernel private timing.
+45. Public schedule names: built `ICountdown`; designed `IReminder` (not `ITimer`).
+46. One schedule per neuron; explicit destination; revision + CommandId.
+47. Designed and unbuilt: Interval vs Calendar schedules; deterministic DST; coalesce overdue recurrence.
+48. Persisted Time state authoritative; shared Kernel reminder store.
+49. `AddDigitalBrain(name)` owns one complete durable Azure Storage profile per brain; run mode uses Azurite.
+50. One silo-only brain key protects durable AI and MCP payloads with distinct purposes.
+51. Deterministic test time via `TimeProvider` + the `TestBrain` driver.
 
 ### Flutter and OS surface
 
-49. Modules own UI vocabulary; behaviors (or pre-rail compositions) own shell/login/window *logic*.
-50. Semantic neurons (`IShell`, `IScene`, …); never a public `IFlutter` god type or central UI root.
-51. Package family `DigitalBrain.Modules.Flutter*`; public namespace `DigitalBrain.Flutter`.
-52. Flutter rebuild projects committed journal facts (first vertical: `SceneOpened` key/title); richer descriptors stay open; journals remain durable truth.
-53. C# contracts carry no Dart/Flutter SDK types; Kernel carries no UI vocabulary.
-54. Dart host is a northbound client of a C# `IDigitalBrain` edge — never an embedded silo.
-55. Auth at the edge; post-auth composition only; never tokens/passwords in journals.
-56. Drift guard: golden wire manifest from Contracts; dual-sided when Dart models exist.
-57. L1 proves UI facts on journals without a device; L2 is for real AppHost host resources when
+52. Modules own UI vocabulary; behaviors (or pre-rail compositions) own shell/login/window *logic*.
+53. Semantic neurons (`IShell`, `IScene`, …); never a public `IFlutter` god type or central UI root.
+54. Package family `DigitalBrain.Modules.Flutter*`; public namespace `DigitalBrain.Flutter`.
+55. Flutter rebuild projects committed journal facts (first vertical: `SceneOpened` key/title); richer descriptors stay open; journals remain durable truth.
+56. C# contracts carry no Dart/Flutter SDK types; Kernel carries no UI vocabulary.
+57. Dart host is a northbound client of a C# `IDigitalBrain` edge — never an embedded silo.
+58. Auth at the edge; post-auth composition only; never tokens/passwords in journals.
+59. Drift guard: golden wire manifest from Contracts; dual-sided when Dart models exist.
+60. L1 proves UI facts on journals without a device; L2 is for real AppHost host resources when
     proven. OS-surface Healthy (`digitalbrain-ui` / Flutter host) remains residual until quoted —
     do not equate L0 projection pins or TestingAppHost silo L2 with product topology green.
 

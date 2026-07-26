@@ -159,7 +159,7 @@ test('the architecture page is module-organized and states each status once', ()
   assert.match(architecture, /host\.Resource\("silo"\)/)
   assert.match(architecture, /never enumerates or kills processes by name/)
   assert.match(architecture, /ConfigureChatClient/)
-  assert.match(architecture, /Runtime behavior is not a Neuron/)
+  assert.match(architecture, /`BehaviorNeuron` is the Neuron and its single-file program is not/)
   assert.match(architecture, /IDigitalBrainNeuron|DigitalBrainNeuron/)
   assert.match(architecture, /IBehavior/)
 

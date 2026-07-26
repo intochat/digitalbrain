@@ -1,5 +1,12 @@
 # Behavior OS design — activation → shell home
 
+> **Post-rail execution model superseded:** This document remains the historical record of the
+> current compiled pre-rail activation path. The approved owner-scoped `BehaviorNeuron` plus
+> single-file program model is defined in
+> [`2026-07-26-behavior-operating-system-runtime-design.md`](2026-07-26-behavior-operating-system-runtime-design.md).
+> Where the documents conflict about future Behavior identity, installation, or execution, the
+> 2026-07-26 design wins.
+
 **Date:** 2026-07-25  
 **Status:** Design lock + **L1 pre-rail Built green** (Wave B7 docs-honesty). Product chain journals-proven; **not** install rail; **not** auto `IHandle` reaction; **not** product AppHost OS Healthy.  
 **Vision:** Framework = neurons + synapses; OS = behaviors (including UI); activation is a synapse Flutter reacts to **via projection of shell facts**, not by consuming activation.
