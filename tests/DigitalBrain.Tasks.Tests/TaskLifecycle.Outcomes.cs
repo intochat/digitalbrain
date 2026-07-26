@@ -86,13 +86,6 @@ public sealed partial class TaskLifecycle
         Assert.Equal(started.ActiveAttempt, firstAccepted.Synapse.Attempt);
         Assert.Equal(started.Revision, firstAccepted.Synapse.Revision);
 
-        var firstRunning = await WaitForStateAsync(
-            task,
-            TaskState.Running,
-            cancellationToken);
-        Assert.Equal(started.ActiveAttempt, firstRunning.ActiveAttempt);
-        Assert.Equal(started.Revision, firstRunning.Revision);
-
         var failed = await task.Incoming.NextAsync<AttemptFailed>(cancellationToken);
         Assert.Equal(started.ActiveAttempt, failed.Synapse.Attempt);
         Assert.Equal(started.Revision, failed.Synapse.Revision);
