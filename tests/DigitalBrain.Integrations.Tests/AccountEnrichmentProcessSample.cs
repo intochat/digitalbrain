@@ -7,10 +7,10 @@ using Xunit;
 
 namespace DigitalBrain.Integrations.Tests;
 
-public sealed class AccountEnrichmentComposition(IntegrationsFixture fixture)
+public sealed class AccountEnrichmentProcessSample(IntegrationsFixture fixture)
 {
     [Fact(DisplayName =
-        "IAccountEnrichment composes Gmail→propose→session approval→AccountEnriched on scripted MCP edges")]
+        "IAccountEnrichment processes Gmail→propose→session approval→AccountEnriched on scripted MCP edges")]
     public async Task EnrichmentCompletesThroughGmailProposeAndSessionApproval()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
