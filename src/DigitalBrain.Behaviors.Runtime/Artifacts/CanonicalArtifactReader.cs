@@ -8,6 +8,7 @@ using DigitalBrain.Behaviors.Manifest;
 
 public static class CanonicalArtifactReader
 {
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly string[] RequiredEntries =
     [
         "manifest.json",
@@ -22,31 +23,37 @@ public static class CanonicalArtifactReader
 
     public static BehaviorArtifactEnvelope Read(ReadOnlyMemory<byte> bytes)
     {
-        EnsureNoTrailingBytes(bytes.Span);
-
         try
         {
+            var layout = CanonicalZip.Validate(bytes.Span);
             using var stream = new MemoryStream(bytes.ToArray(), writable: false);
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
-            var entries = ValidateEntries(archive);
-            var manifest = ReadManifest(entries["manifest.json"]);
+            var entries = ValidateEntries(archive, layout);
+            var manifest = ReadManifest(entries["manifest.json"].Entry, entries["manifest.json"].Layout);
             var features = entries
                 .Where(entry => entry.Key.StartsWith("features/", StringComparison.Ordinal))
                 .ToDictionary(
                     entry => entry.Key["features/".Length..^".feature".Length],
-                    entry => ReadText(entry.Value),
+                    entry => ReadText(entry.Value.Entry, entry.Value.Layout),
                     StringComparer.Ordinal);
 
-            return new BehaviorArtifactEnvelope(
+            var envelope = new BehaviorArtifactEnvelope(
                 manifest,
-                ReadText(entries["program.cs"]),
-                ReadCanonicalJson(entries["dependencies/packages.lock.json"]),
-                ReadBytes(entries["artifact/Behavior.dll"]),
-                ReadCanonicalJson(entries["artifact/Behavior.deps.json"]),
+                ReadText(entries["program.cs"].Entry, entries["program.cs"].Layout),
+                ReadCanonicalJson(entries["dependencies/packages.lock.json"].Entry, entries["dependencies/packages.lock.json"].Layout),
+                ReadBytes(entries["artifact/Behavior.dll"].Entry, entries["artifact/Behavior.dll"].Layout),
+                ReadCanonicalJson(entries["artifact/Behavior.deps.json"].Entry, entries["artifact/Behavior.deps.json"].Layout),
                 features,
-                ReadCanonicalJson(entries["evidence/compiler.json"]),
-                ReadCanonicalJson(entries["evidence/admission.json"]),
-                ReadCanonicalJson(entries["evidence/bdd.json"]));
+                ReadCanonicalJson(entries["evidence/compiler.json"].Entry, entries["evidence/compiler.json"].Layout),
+                ReadCanonicalJson(entries["evidence/admission.json"].Entry, entries["evidence/admission.json"].Layout),
+                ReadCanonicalJson(entries["evidence/bdd.json"].Entry, entries["evidence/bdd.json"].Layout));
+
+            if (!CanonicalArtifactWriter.Write(envelope).Bytes.AsSpan().SequenceEqual(bytes.Span))
+            {
+                throw new BehaviorArtifactException("The behavior artifact ZIP envelope is not a writer-emitted canonical artifact.");
+            }
+
+            return envelope;
         }
         catch (BehaviorArtifactException)
         {
@@ -56,16 +63,37 @@ public static class CanonicalArtifactReader
         {
             throw new BehaviorArtifactException("The behavior artifact is not a valid ZIP envelope.", exception);
         }
+        catch (DecoderFallbackException exception)
+        {
+            throw new BehaviorArtifactException("The behavior artifact contains non-UTF-8 text.", exception);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new BehaviorArtifactException("The behavior artifact contains invalid manifest or ZIP values.", exception);
+        }
+        catch (OverflowException exception)
+        {
+            throw new BehaviorArtifactException("The behavior artifact contains values beyond supported limits.", exception);
+        }
+        catch (IOException exception)
+        {
+            throw new BehaviorArtifactException("The behavior artifact could not be read safely.", exception);
+        }
     }
 
-    private static Dictionary<string, ZipArchiveEntry> ValidateEntries(ZipArchive archive)
+    private static Dictionary<string, ArchiveEntry> ValidateEntries(ZipArchive archive, IReadOnlyDictionary<string, CanonicalZip.Entry> layout)
     {
         if (archive.Entries.Count > CanonicalArtifactWriter.MaximumEntries)
         {
             throw new BehaviorArtifactException($"A behavior artifact cannot contain more than {CanonicalArtifactWriter.MaximumEntries} entries.");
         }
 
-        var entries = new Dictionary<string, ZipArchiveEntry>(StringComparer.Ordinal);
+        if (archive.Entries.Count != layout.Count)
+        {
+            throw new BehaviorArtifactException("The ZIP parser did not expose the validated central directory.");
+        }
+
+        var entries = new Dictionary<string, ArchiveEntry>(StringComparer.Ordinal);
         var caseInsensitiveNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         long total = 0;
 
@@ -76,6 +104,11 @@ public static class CanonicalArtifactReader
             if (!caseInsensitiveNames.Add(entry.FullName))
             {
                 throw new BehaviorArtifactException("A behavior artifact cannot contain duplicate or case-colliding names.");
+            }
+
+            if (!layout.TryGetValue(entry.FullName, out var raw) || entry.Length != raw.Length || entry.CompressedLength != raw.Length)
+            {
+                throw new BehaviorArtifactException("The ZIP parser entry differs from the validated raw metadata.");
             }
 
             if (entry.Length > CanonicalArtifactWriter.MaximumEntryBytes)
@@ -95,7 +128,7 @@ public static class CanonicalArtifactReader
                 throw new BehaviorArtifactException($"The behavior artifact contains unknown entry '{entry.FullName}'.");
             }
 
-            entries.Add(entry.FullName, entry);
+            entries.Add(entry.FullName, new ArchiveEntry(entry, raw));
         }
 
         foreach (var required in RequiredEntries)
@@ -135,9 +168,9 @@ public static class CanonicalArtifactReader
                 && name.EndsWith(".feature", StringComparison.Ordinal)
                 && CanonicalArtifactWriter.IsFeatureName(name["features/".Length..^".feature".Length]));
 
-    private static BehaviorDefinitionManifest ReadManifest(ZipArchiveEntry entry)
+    private static BehaviorDefinitionManifest ReadManifest(ZipArchiveEntry entry, CanonicalZip.Entry layout)
     {
-        var canonical = ReadCanonicalJson(entry);
+        var canonical = ReadCanonicalJson(entry, layout);
 
         try
         {
@@ -146,7 +179,7 @@ public static class CanonicalArtifactReader
             manifest.Behavior.EnsureValid();
             var canonicalManifest = CanonicalJson.Serialize(CanonicalArtifactWriter.CanonicalizeManifest(manifest));
 
-            if (!canonicalManifest.Span.SequenceEqual(Encoding.UTF8.GetBytes(canonical)))
+            if (!canonicalManifest.Span.SequenceEqual(StrictUtf8.GetBytes(canonical)))
             {
                 throw new BehaviorArtifactException("The behavior artifact manifest is not in canonical order.");
             }
@@ -159,11 +192,11 @@ public static class CanonicalArtifactReader
         }
     }
 
-    private static string ReadCanonicalJson(ZipArchiveEntry entry)
+    private static string ReadCanonicalJson(ZipArchiveEntry entry, CanonicalZip.Entry layout)
     {
-        var text = ReadText(entry);
+        var text = ReadText(entry, layout);
         var canonical = CanonicalJson.Normalize(text, entry.FullName);
-        var normalized = Encoding.UTF8.GetString(canonical.Span);
+        var normalized = StrictUtf8.GetString(canonical.Span);
 
         if (!string.Equals(text, normalized, StringComparison.Ordinal))
         {
@@ -173,36 +206,32 @@ public static class CanonicalArtifactReader
         return normalized;
     }
 
-    private static string ReadText(ZipArchiveEntry entry)
-        => Encoding.UTF8.GetString(ReadBytes(entry));
+    private static string ReadText(ZipArchiveEntry entry, CanonicalZip.Entry layout)
+        => StrictUtf8.GetString(ReadBytes(entry, layout));
 
-    private static byte[] ReadBytes(ZipArchiveEntry entry)
+    private static byte[] ReadBytes(ZipArchiveEntry entry, CanonicalZip.Entry layout)
     {
         using var input = entry.Open();
-        using var output = new MemoryStream(checked((int)entry.Length));
-        input.CopyTo(output);
-
-        if (output.Length != entry.Length)
+        var bytes = new byte[layout.Length];
+        var offset = 0;
+        while (offset < bytes.Length)
         {
-            throw new BehaviorArtifactException($"The behavior artifact entry '{entry.FullName}' ended before its declared length.");
+            var read = input.Read(bytes, offset, bytes.Length - offset);
+            if (read == 0)
+            {
+                throw new BehaviorArtifactException($"The behavior artifact entry '{entry.FullName}' ended before its declared length.");
+            }
+
+            offset += read;
         }
 
-        return output.ToArray();
-    }
-
-    private static void EnsureNoTrailingBytes(ReadOnlySpan<byte> bytes)
-    {
-        const int endOfCentralDirectoryLength = 22;
-
-        if (bytes.Length < endOfCentralDirectoryLength
-            || bytes[^22] != 0x50
-            || bytes[^21] != 0x4B
-            || bytes[^20] != 0x05
-            || bytes[^19] != 0x06
-            || bytes[^2] != 0x00
-            || bytes[^1] != 0x00)
+        if (input.ReadByte() != -1)
         {
-            throw new BehaviorArtifactException("A behavior artifact must end exactly at the ZIP end-of-central-directory record.");
+            throw new BehaviorArtifactException($"The behavior artifact entry '{entry.FullName}' exceeded its declared length.");
         }
+
+        return bytes;
     }
+
+    private sealed record ArchiveEntry(ZipArchiveEntry Entry, CanonicalZip.Entry Layout);
 }

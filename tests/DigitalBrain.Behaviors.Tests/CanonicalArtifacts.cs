@@ -1,5 +1,7 @@
 namespace DigitalBrain.Behaviors.Tests;
 
+using System;
+using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Text;
 using DigitalBrain.Abstractions;
@@ -18,7 +20,7 @@ public sealed class CanonicalArtifacts
 
         Assert.Equal(first.Digest, second.Digest);
         Assert.Equal(first.Bytes, second.Bytes);
-        Assert.Equal("f8bae55042660db69f22c47d665b1899d08600d3ec42e8445e254f76b8d66bb1", first.Digest.Value);
+        Assert.Equal("694ea25c6cb996e4c9b16cfe19e5692c58c7015b6fa12c9651a4d6f8ebb8aaba", first.Digest.Value);
     }
 
     [Fact(DisplayName = "Canonical artifact writes the closed ordered envelope with stored entries and fixed timestamps")]
@@ -48,6 +50,16 @@ public sealed class CanonicalArtifacts
         });
     }
 
+    [Fact(DisplayName = "Writer normalizes central-directory host and external-attribute metadata")]
+    public void WriterNormalizesCentralDirectoryMetadata()
+    {
+        var bytes = CanonicalArtifactWriter.Write(CreateEnvelope(reverseOrder: false)).Bytes;
+        var central = FindSignature(bytes, 0x02014B50u);
+
+        Assert.Equal((ushort)0x0014, BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(central + 4, 2)));
+        Assert.Equal(0u, BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(central + 36, 4)));
+    }
+
     [Fact(DisplayName = "Reader round-trips every required artifact payload and canonicalizes JSON evidence")]
     public void ReaderRoundTripsAValidEnvelope()
     {
@@ -55,6 +67,11 @@ public sealed class CanonicalArtifacts
         var envelope = CanonicalArtifactReader.Read(artifact.Bytes);
 
         Assert.Equal("com.digitalbrain.start-ui", envelope.Manifest.Behavior.Value);
+        var intent = Assert.Single(envelope.Manifest.EntryPoints.IntentSchemas);
+        Assert.Equal("com.digitalbrain.start-ui", intent.SchemaId);
+        Assert.Equal(1, intent.SchemaVersion);
+        Assert.Equal("{\"properties\":{\"scene\":{\"type\":\"string\"}},\"type\":\"object\"}", intent.RequestSchemaJson);
+        Assert.Equal("{\"properties\":{\"opened\":{\"type\":\"boolean\"}},\"type\":\"object\"}", intent.ResultSchemaJson);
         Assert.Equal("public sealed class StartUi { }\n", envelope.ProgramSource);
         Assert.Equal("{\"libraries\":{},\"version\":1}", envelope.PackageLockJson);
         Assert.Equal([0, 1, 2, 3], envelope.BehaviorAssembly.ToArray());
@@ -167,6 +184,20 @@ public sealed class CanonicalArtifacts
         Assert.Throws<BehaviorArtifactException>(() => CanonicalArtifactReader.Read(bytes));
     }
 
+    [Fact(DisplayName = "Reader rejects forged end records and central compression metadata before extraction")]
+    public void ReaderRejectsForgedOrCompressedRawZipMetadata()
+    {
+        var artifact = CanonicalArtifactWriter.Write(CreateEnvelope(reverseOrder: false));
+        var forged = artifact.Bytes.Concat(new byte[22]).ToArray();
+        BinaryPrimitives.WriteUInt32LittleEndian(forged.AsSpan(forged.Length - 22, 4), 0x06054B50u);
+        Assert.Throws<BehaviorArtifactException>(() => CanonicalArtifactReader.Read(forged));
+
+        var compressed = artifact.Bytes.ToArray();
+        var central = FindSignature(compressed, 0x02014B50u);
+        BinaryPrimitives.WriteUInt16LittleEndian(compressed.AsSpan(central + 10, 2), 8);
+        Assert.Throws<BehaviorArtifactException>(() => CanonicalArtifactReader.Read(compressed));
+    }
+
     [Fact(DisplayName = "Artifact digest accepts only lowercase SHA-256 and exposes the exact revision value")]
     public void ArtifactDigestIsCanonicalLowercaseSha256()
     {
@@ -177,7 +208,39 @@ public sealed class CanonicalArtifacts
         Assert.Throws<FormatException>(() => new BehaviorArtifactDigest(digest[..63]));
     }
 
-    private static BehaviorArtifactEnvelope CreateEnvelope(bool reverseOrder)
+    [Fact(DisplayName = "Intent request and result schemas are canonical manifest evidence and alter the artifact identity")]
+    public void IntentSchemasAreCanonicalAndHashed()
+    {
+        var canonical = CanonicalArtifactWriter.Write(CreateEnvelope(reverseOrder: false));
+        var reordered = CanonicalArtifactWriter.Write(CreateEnvelope(reverseOrder: true));
+        var changedRequest = CanonicalArtifactWriter.Write(CreateEnvelope(reverseOrder: false, requestSchema: "{\"type\":\"array\"}"));
+        var changedResult = CanonicalArtifactWriter.Write(CreateEnvelope(reverseOrder: false, resultSchema: "{\"type\":\"array\"}"));
+
+        Assert.Equal(canonical.Bytes, reordered.Bytes);
+        Assert.NotEqual(canonical.Digest, changedRequest.Digest);
+        Assert.NotEqual(canonical.Digest, changedResult.Digest);
+    }
+
+    [Fact(DisplayName = "Writer rejects duplicate nested JSON members and incomplete manifest graphs")]
+    public void WriterRejectsAmbiguousSchemaJsonAndInvalidManifestGraphs()
+    {
+        Assert.Throws<BehaviorArtifactException>(() => CanonicalArtifactWriter.Write(
+            CreateEnvelope(reverseOrder: false, requestSchema: "{\"nested\":{\"value\":1,\"value\":2}}")));
+
+        var invalid = CreateEnvelope(reverseOrder: false) with
+        {
+            Manifest = CreateEnvelope(reverseOrder: false).Manifest with
+            {
+                ResourceLimits = new BehaviorResourceLimits(0, 1, 1),
+            },
+        };
+        Assert.Throws<BehaviorArtifactException>(() => CanonicalArtifactWriter.Write(invalid));
+    }
+
+    private static BehaviorArtifactEnvelope CreateEnvelope(
+        bool reverseOrder,
+        string requestSchema = "{\"type\":\"object\",\"properties\":{\"scene\":{\"type\":\"string\"}}}",
+        string resultSchema = "{\"type\":\"object\",\"properties\":{\"opened\":{\"type\":\"boolean\"}}}")
     {
         IReadOnlyDictionary<string, string> features = reverseOrder
             ? new Dictionary<string, string>(StringComparer.Ordinal) { ["zulu"] = "Feature: zulu\n", ["alpha"] = "Feature: alpha\n" }
@@ -189,8 +252,20 @@ public sealed class CanonicalArtifacts
                 "Start UI",
                 "Open the first scene.",
                 reverseOrder
-                    ? new BehaviorEntryPoints(["db.ready", "db.activated"], ["com.digitalbrain.start-ui/v2", "com.digitalbrain.start-ui/v1"])
-                    : new BehaviorEntryPoints(["db.activated", "db.ready"], ["com.digitalbrain.start-ui/v1", "com.digitalbrain.start-ui/v2"]),
+                    ? new BehaviorEntryPoints(
+                        ["db.ready", "db.activated"],
+                        [new BehaviorIntentSchema(
+                            "com.digitalbrain.start-ui",
+                            1,
+                            requestSchema == "{\"type\":\"object\",\"properties\":{\"scene\":{\"type\":\"string\"}}}"
+                                ? "{\"properties\":{\"scene\":{\"type\":\"string\"}},\"type\":\"object\"}"
+                                : requestSchema,
+                            resultSchema == "{\"type\":\"object\",\"properties\":{\"opened\":{\"type\":\"boolean\"}}}"
+                                ? "{\"properties\":{\"opened\":{\"type\":\"boolean\"}},\"type\":\"object\"}"
+                                : resultSchema)])
+                    : new BehaviorEntryPoints(
+                        ["db.activated", "db.ready"],
+                        [new BehaviorIntentSchema("com.digitalbrain.start-ui", 1, requestSchema, resultSchema)]),
                 reverseOrder
                     ? [new BehaviorCapabilityGrant("db.time", "schedule", "clock"), new BehaviorCapabilityGrant("db.shell", "open", "desk")]
                     : [new BehaviorCapabilityGrant("db.shell", "open", "desk"), new BehaviorCapabilityGrant("db.time", "schedule", "clock")],
@@ -252,5 +327,18 @@ public sealed class CanonicalArtifacts
     {
         using var stream = entry.Open();
         stream.Write(value);
+    }
+
+    private static int FindSignature(byte[] bytes, uint signature)
+    {
+        for (var index = 0; index <= bytes.Length - 4; index++)
+        {
+            if (BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(index, 4)) == signature)
+            {
+                return index;
+            }
+        }
+
+        throw new InvalidOperationException("ZIP signature was not found.");
     }
 }

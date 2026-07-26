@@ -12,8 +12,10 @@ public static class CanonicalArtifactWriter
     internal const int MaximumEntries = 128;
     internal const int MaximumEntryBytes = 16 * 1024 * 1024;
     internal const int MaximumExpandedBytes = 64 * 1024 * 1024;
+    internal const int MaximumSerializedBytes = MaximumExpandedBytes + (MaximumEntries * 1024 * 1024);
 
     private static readonly DateTimeOffset CanonicalTimestamp = new(1980, 1, 1, 0, 0, 0, TimeSpan.Zero);
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     public static (BehaviorArtifactDigest Digest, byte[] Bytes) Write(BehaviorArtifactEnvelope envelope)
     {
@@ -36,6 +38,8 @@ public static class CanonicalArtifactWriter
         }
 
         var bytes = stream.ToArray();
+        CanonicalZip.NormalizeWriterMetadata(bytes);
+        _ = CanonicalZip.Validate(bytes);
         return (BehaviorArtifactDigest.Compute(bytes), bytes);
     }
 
@@ -72,7 +76,14 @@ public static class CanonicalArtifactWriter
     private static ReadOnlyMemory<byte> Encode(string value, string parameterName)
     {
         ArgumentNullException.ThrowIfNull(value, parameterName);
-        return Encoding.UTF8.GetBytes(value);
+        try
+        {
+            return StrictUtf8.GetBytes(value);
+        }
+        catch (EncoderFallbackException exception)
+        {
+            throw new BehaviorArtifactException($"{parameterName} must be valid UTF-8 text.", exception);
+        }
     }
 
     internal static bool IsFeatureName(string value)
@@ -82,19 +93,18 @@ public static class CanonicalArtifactWriter
 
     internal static BehaviorDefinitionManifest CanonicalizeManifest(BehaviorDefinitionManifest manifest)
     {
-        ArgumentNullException.ThrowIfNull(manifest);
-        ArgumentNullException.ThrowIfNull(manifest.EntryPoints);
-        ArgumentNullException.ThrowIfNull(manifest.EntryPoints.EventAliases);
-        ArgumentNullException.ThrowIfNull(manifest.EntryPoints.IntentSchemas);
-        ArgumentNullException.ThrowIfNull(manifest.CapabilityGrants);
-        ArgumentNullException.ThrowIfNull(manifest.ResourceLimits);
+        ValidateManifest(manifest);
 
         return manifest with
         {
             EntryPoints = manifest.EntryPoints with
             {
                 EventAliases = manifest.EntryPoints.EventAliases.Order(StringComparer.Ordinal).ToArray(),
-                IntentSchemas = manifest.EntryPoints.IntentSchemas.Order(StringComparer.Ordinal).ToArray(),
+                IntentSchemas = manifest.EntryPoints.IntentSchemas
+                    .Select(schema => CanonicalizeSchema(schema))
+                    .OrderBy(schema => schema.SchemaId, StringComparer.Ordinal)
+                    .ThenBy(schema => schema.SchemaVersion)
+                    .ToArray(),
             },
             CapabilityGrants = manifest.CapabilityGrants
                 .OrderBy(grant => grant.ContractAlias, StringComparer.Ordinal)
@@ -102,6 +112,67 @@ public static class CanonicalArtifactWriter
                 .ThenBy(grant => grant.Target, StringComparer.Ordinal)
                 .ToArray(),
         };
+    }
+
+    private static BehaviorIntentSchema CanonicalizeSchema(BehaviorIntentSchema schema)
+    {
+        if (schema is null || string.IsNullOrWhiteSpace(schema.SchemaId)
+            || schema.RequestSchemaJson is null || schema.ResultSchemaJson is null)
+        {
+            throw new BehaviorArtifactException("Intent schemas must have an identifier and request/result contracts.");
+        }
+
+        if (schema.SchemaVersion < 1)
+        {
+            throw new BehaviorArtifactException("Intent schema versions must be positive.");
+        }
+
+        return schema with
+        {
+            RequestSchemaJson = CanonicalJson.NormalizeToString(schema.RequestSchemaJson, nameof(schema.RequestSchemaJson)),
+            ResultSchemaJson = CanonicalJson.NormalizeToString(schema.ResultSchemaJson, nameof(schema.ResultSchemaJson)),
+        };
+    }
+
+    private static void ValidateManifest(BehaviorDefinitionManifest manifest)
+    {
+        try
+        {
+            if (manifest is null || manifest.EntryPoints is null
+                || manifest.EntryPoints.EventAliases is null || manifest.EntryPoints.IntentSchemas is null
+                || manifest.CapabilityGrants is null || manifest.ResourceLimits is null
+                || manifest.DisplayName is null || manifest.Description is null)
+            {
+                throw new BehaviorArtifactException("The behavior manifest has missing required members.");
+            }
+
+            manifest.Behavior.EnsureValid();
+            if (manifest.EntryPoints.EventAliases.Any(string.IsNullOrWhiteSpace)
+                || manifest.EntryPoints.EventAliases.Distinct(StringComparer.Ordinal).Count() != manifest.EntryPoints.EventAliases.Count
+                || manifest.EntryPoints.IntentSchemas.Any(schema => schema is null)
+                || manifest.EntryPoints.IntentSchemas.Select(schema => (schema.SchemaId, schema.SchemaVersion)).Distinct().Count() != manifest.EntryPoints.IntentSchemas.Count
+                || manifest.CapabilityGrants.Any(grant => grant is null || string.IsNullOrWhiteSpace(grant.ContractAlias) || string.IsNullOrWhiteSpace(grant.MethodAlias) || string.IsNullOrWhiteSpace(grant.Target))
+                || manifest.ResourceLimits.CpuMilliseconds <= 0 || manifest.ResourceLimits.MemoryBytes <= 0 || manifest.ResourceLimits.WallClockMilliseconds <= 0)
+            {
+                throw new BehaviorArtifactException("The behavior manifest contains invalid entry points, grants, or resource limits.");
+            }
+        }
+        catch (BehaviorArtifactException)
+        {
+            throw;
+        }
+        catch (ArgumentException exception)
+        {
+            throw new BehaviorArtifactException("The behavior manifest contains invalid values.", exception);
+        }
+        catch (FormatException exception)
+        {
+            throw new BehaviorArtifactException("The behavior manifest contains invalid values.", exception);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new BehaviorArtifactException("The behavior manifest contains invalid values.", exception);
+        }
     }
 
     internal static void ValidateEntries(IReadOnlyList<ArtifactEntry> entries)
@@ -140,6 +211,7 @@ public static class CanonicalArtifactWriter
 
 internal static class CanonicalJson
 {
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     public static ReadOnlyMemory<byte> Serialize<T>(T value)
         => Normalize(JsonSerializer.Serialize(value));
 
@@ -150,6 +222,7 @@ internal static class CanonicalJson
         try
         {
             using var document = JsonDocument.Parse(value);
+            RejectDuplicateProperties(document.RootElement);
             var buffer = new ArrayBufferWriter<byte>();
 
             using (var writer = new Utf8JsonWriter(buffer))
@@ -162,6 +235,37 @@ internal static class CanonicalJson
         catch (JsonException exception)
         {
             throw new BehaviorArtifactException($"{parameterName} must be valid JSON.", exception);
+        }
+    }
+
+    public static string NormalizeToString(string value, string parameterName)
+        => StrictUtf8.GetString(Normalize(value, parameterName).Span);
+
+    private static void RejectDuplicateProperties(JsonElement value)
+    {
+        if (value.ValueKind is JsonValueKind.Object)
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var property in value.EnumerateObject())
+            {
+                if (!names.Add(property.Name))
+                {
+                    throw new BehaviorArtifactException("Canonical JSON cannot contain duplicate object member names.");
+                }
+
+                RejectDuplicateProperties(property.Value);
+            }
+
+            return;
+        }
+
+        if (value.ValueKind is JsonValueKind.Array)
+        {
+            foreach (var item in value.EnumerateArray())
+            {
+                RejectDuplicateProperties(item);
+            }
         }
     }
 
