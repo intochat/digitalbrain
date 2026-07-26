@@ -41,9 +41,9 @@ public sealed class DigitalBrainClient : IDigitalBrain
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         RequireDomainNeuronContract(typeof(TNeuron));
+        ArgumentNullException.ThrowIfNull(synapse);
 
-        await ActivateAsync();
-        await SendAsync(
+        await SendValidatedAsync(
             new NeuronId(NeuronId.GrainTypeNameOf(typeof(TNeuron)), Owner, name),
             synapse);
     }
@@ -65,8 +65,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
                 "The owner DigitalBrain and session are not Send targets. Use ActivateAsync, domain Get, SendAsync to domain neurons, and EmitAsync to broadcast.");
         }
 
-        await ActivateAsync();
-        await Session().Fire(receiver, synapse);
+        await SendValidatedAsync(receiver, synapse);
     }
 
     public async Task EmitAsync(Synapse synapse)
@@ -82,6 +81,12 @@ public sealed class DigitalBrainClient : IDigitalBrain
 
     private ISessionNeuron Session()
         => _grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(Owner).ToGrainId());
+
+    private async Task SendValidatedAsync(NeuronId receiver, Synapse synapse)
+    {
+        await ActivateAsync();
+        await Session().Fire(receiver, synapse);
+    }
 
     private static void RequireDomainNeuronContract(Type neuronType)
     {
