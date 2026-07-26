@@ -87,9 +87,32 @@ public static class CanonicalArtifactWriter
     }
 
     internal static bool IsFeatureName(string value)
-        => !string.IsNullOrEmpty(value)
-            && value.IndexOfAny(['/', '\\', '\0']) < 0
-            && value is not "." and not "..";
+    {
+        if (string.IsNullOrEmpty(value) || value.Length > 128 || !IsAsciiAlphaNumeric(value[0]) || !IsAsciiAlphaNumeric(value[^1]))
+        {
+            return false;
+        }
+
+        foreach (var character in value)
+        {
+            if (!IsAsciiAlphaNumeric(character) && character is not '-' and not '_' and not '.')
+            {
+                return false;
+            }
+        }
+
+        var baseNameLength = value.IndexOf('.', StringComparison.Ordinal);
+        var baseName = baseNameLength < 0 ? value : value[..baseNameLength];
+        return !IsWindowsDeviceName(baseName);
+    }
+
+    private static bool IsAsciiAlphaNumeric(char value)
+        => value is >= 'a' and <= 'z' or >= '0' and <= '9';
+
+    private static bool IsWindowsDeviceName(string value)
+        => value is "con" or "prn" or "aux" or "nul"
+            || (value.Length == 4 && value.StartsWith("com", StringComparison.Ordinal) && value[3] is >= '1' and <= '9')
+            || (value.Length == 4 && value.StartsWith("lpt", StringComparison.Ordinal) && value[3] is >= '1' and <= '9');
 
     internal static BehaviorDefinitionManifest CanonicalizeManifest(BehaviorDefinitionManifest manifest)
     {

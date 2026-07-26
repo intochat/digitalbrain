@@ -71,6 +71,14 @@ public static class CanonicalArtifactReader
         {
             throw new BehaviorArtifactException("The behavior artifact contains invalid manifest or ZIP values.", exception);
         }
+        catch (FormatException exception)
+        {
+            throw new BehaviorArtifactException("The behavior artifact contains invalid manifest values.", exception);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new BehaviorArtifactException("The behavior artifact contains invalid manifest values.", exception);
+        }
         catch (OverflowException exception)
         {
             throw new BehaviorArtifactException("The behavior artifact contains values beyond supported limits.", exception);
@@ -176,7 +184,6 @@ public static class CanonicalArtifactReader
         {
             var manifest = JsonSerializer.Deserialize<BehaviorDefinitionManifest>(canonical)
                 ?? throw new BehaviorArtifactException("The behavior artifact manifest cannot be null.");
-            manifest.Behavior.EnsureValid();
             var canonicalManifest = CanonicalJson.Serialize(CanonicalArtifactWriter.CanonicalizeManifest(manifest));
 
             if (!canonicalManifest.Span.SequenceEqual(StrictUtf8.GetBytes(canonical)))

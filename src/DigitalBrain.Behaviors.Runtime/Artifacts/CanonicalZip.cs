@@ -4,7 +4,6 @@ using System.Buffers.Binary;
 using System.Text;
 using DigitalBrain.Behaviors.Artifacts;
 
-/// <summary>Validates the deliberately tiny ZIP profile used for immutable artifacts.</summary>
 internal static class CanonicalZip
 {
     private const int LocalHeaderLength = 30;
@@ -55,7 +54,8 @@ internal static class CanonicalZip
                     || U16(bytes, cursor + 8) != 0 || U16(bytes, cursor + 10) != 0
                     || U16(bytes, cursor + 12) != 0 || U16(bytes, cursor + 14) != CanonicalDosDate
                     || U16(bytes, cursor + 30) != 0 || U16(bytes, cursor + 32) != 0
-                    || U16(bytes, cursor + 34) != 0 || U32(bytes, cursor + 36) != 0)
+                    || U16(bytes, cursor + 34) != 0 || U16(bytes, cursor + 36) != 0
+                    || U32(bytes, cursor + 38) != 0)
                 {
                     throw new BehaviorArtifactException("The behavior artifact contains non-canonical ZIP metadata.");
                 }
@@ -118,7 +118,8 @@ internal static class CanonicalZip
         {
             RequireSignature(bytes, cursor, 0x02014B50u);
             BinaryPrimitives.WriteUInt16LittleEndian(bytes.Slice(cursor + 4, 2), CanonicalVersionMadeBy);
-            bytes.Slice(cursor + 36, 4).Clear();
+            bytes.Slice(cursor + 36, 2).Clear();
+            bytes.Slice(cursor + 38, 4).Clear();
             cursor = checked(cursor + CentralHeaderLength + U16(bytes, cursor + 28));
         }
     }

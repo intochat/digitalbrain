@@ -57,7 +57,8 @@ public sealed class CanonicalArtifacts
         var central = FindSignature(bytes, 0x02014B50u);
 
         Assert.Equal((ushort)0x0014, BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(central + 4, 2)));
-        Assert.Equal(0u, BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(central + 36, 4)));
+        Assert.Equal((ushort)0, BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(central + 36, 2)));
+        Assert.Equal(0u, BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(central + 38, 4)));
     }
 
     [Fact(DisplayName = "Reader round-trips every required artifact payload and canonicalizes JSON evidence")]
@@ -198,6 +199,95 @@ public sealed class CanonicalArtifacts
         Assert.Throws<BehaviorArtifactException>(() => CanonicalArtifactReader.Read(compressed));
     }
 
+    [Fact(DisplayName = "Reader rejects each non-canonical raw ZIP invariant")]
+    public void ReaderRejectsRawZipInvariantMutations()
+    {
+        var artifact = CanonicalArtifactWriter.Write(CreateEnvelope(reverseOrder: false)).Bytes;
+        var central = FindSignature(artifact, 0x02014B50u);
+        var secondCentral = FindSignature(artifact, 0x02014B50u, central + 1);
+        var local = FindSignature(artifact, 0x04034B50u);
+
+        var mutations = new Action<byte[]>[]
+        {
+            bytes => BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(central + 36, 2), 1),
+            bytes => BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(central + 38, 4), 0xA1B20000u),
+            bytes => BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(central + 8, 2), 0x0008),
+            bytes => BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(central + 16, 4), 1),
+            bytes => BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(central + 12, 2), 1),
+            bytes => BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(central + 30, 2), 1),
+            bytes => BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(central + 32, 2), 1),
+            bytes => bytes[0] = 0,
+            bytes => BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(secondCentral + 42, 4), 1),
+            bytes => bytes[local + 30] = (byte)'X',
+            bytes => BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(local + 22, 4), 1),
+            bytes =>
+            {
+                BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(central + 20, 4), 1);
+                BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(central + 24, 4), 1);
+            },
+            bytes => BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(central + 10, 2), 8),
+            bytes => bytes[central + 46] = 0xFF,
+        };
+
+        foreach (var mutate in mutations)
+        {
+            var bytes = artifact.ToArray();
+            mutate(bytes);
+            Assert.Throws<BehaviorArtifactException>(() => CanonicalArtifactReader.Read(bytes));
+        }
+
+        var malformedText = MutateStoredEntryBytes(artifact, "program.cs", bytes => bytes[0] = 0xFF);
+        Assert.Throws<BehaviorArtifactException>(() => CanonicalArtifactReader.Read(malformedText));
+    }
+
+    [Fact(DisplayName = "Reader contains hostile manifest construction failures as artifact exceptions")]
+    public void ReaderContainsHostileManifestFailures()
+    {
+        var artifact = CanonicalArtifactWriter.Write(CreateEnvelope(reverseOrder: false)).Bytes;
+        var mutations = new[]
+        {
+            ("\"Behavior\"", "\"missingx\""),
+            ("com.digitalbrain.start-ui", "INVALID.BEHAVIOR........."),
+            ("\"EntryPoints\"", "\"missingData\""),
+            ("\"CapabilityGrants\"", "\"missingCapabilit\""),
+            ("\"db.shell\"", "null      "),
+        };
+
+        foreach (var (original, replacement) in mutations)
+        {
+            var bytes = ReplaceStoredEntryText(artifact, "manifest.json", original, replacement);
+            Assert.Throws<BehaviorArtifactException>(() => CanonicalArtifactReader.Read(bytes));
+        }
+    }
+
+    [Theory(DisplayName = "Writer rejects non-portable feature filenames")]
+    [InlineData("CON")]
+    [InlineData("prn.feature")]
+    [InlineData("LPT9")]
+    [InlineData("bad:name")]
+    [InlineData("bad*name")]
+    [InlineData("bad/name")]
+    [InlineData("bad\\name")]
+    [InlineData("bad.")]
+    [InlineData("bad ")]
+    [InlineData("-bad")]
+    [InlineData("bad-")]
+    [InlineData("bad\u0001name")]
+    public void WriterRejectsNonPortableFeatureNames(string featureName)
+        => Assert.Throws<BehaviorArtifactException>(() => CanonicalArtifactWriter.Write(CreateEnvelope(reverseOrder: false) with
+        {
+            Features = new Dictionary<string, string> { [featureName] = "Feature: invalid\n" },
+        }));
+
+    [Fact(DisplayName = "Writer bounds portable feature filenames")]
+    public void WriterBoundsPortableFeatureNames()
+    {
+        Assert.Throws<BehaviorArtifactException>(() => CanonicalArtifactWriter.Write(CreateEnvelope(reverseOrder: false) with
+        {
+            Features = new Dictionary<string, string> { [new string('a', 129)] = "Feature: invalid\n" },
+        }));
+    }
+
     [Fact(DisplayName = "Artifact digest accepts only lowercase SHA-256 and exposes the exact revision value")]
     public void ArtifactDigestIsCanonicalLowercaseSha256()
     {
@@ -329,9 +419,99 @@ public sealed class CanonicalArtifacts
         stream.Write(value);
     }
 
-    private static int FindSignature(byte[] bytes, uint signature)
+    private static byte[] ReplaceStoredEntryText(byte[] artifact, string name, string original, string replacement)
     {
-        for (var index = 0; index <= bytes.Length - 4; index++)
+        Assert.Equal(original.Length, replacement.Length);
+        var text = Encoding.UTF8.GetString(GetStoredEntryBytes(artifact, name));
+        var index = text.IndexOf(original, StringComparison.Ordinal);
+        Assert.True(index >= 0, $"Could not find '{original}' in {name}.");
+        text = string.Concat(text.AsSpan(0, index), replacement, text.AsSpan(index + replacement.Length));
+        return MutateStoredEntryBytes(artifact, name, bytes => Encoding.UTF8.GetBytes(text).CopyTo(bytes, 0));
+    }
+
+    private static byte[] MutateStoredEntryBytes(byte[] artifact, string name, Action<byte[]> mutate)
+    {
+        var bytes = artifact.ToArray();
+        var local = FindEntryLocalHeader(bytes, name);
+        var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(local + 26, 2));
+        var dataOffset = local + 30 + nameLength;
+        var length = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(local + 22, 4));
+        var content = bytes.AsSpan(dataOffset, checked((int)length)).ToArray();
+        mutate(content);
+        content.CopyTo(bytes, dataOffset);
+
+        var crc = ComputeCrc32(content);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(local + 14, 4), crc);
+        var central = FindCentralEntry(bytes, name);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(central + 16, 4), crc);
+        return bytes;
+    }
+
+    private static byte[] GetStoredEntryBytes(byte[] artifact, string name)
+    {
+        var local = FindEntryLocalHeader(artifact, name);
+        var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(artifact.AsSpan(local + 26, 2));
+        var dataOffset = local + 30 + nameLength;
+        var length = BinaryPrimitives.ReadUInt32LittleEndian(artifact.AsSpan(local + 22, 4));
+        return artifact.AsSpan(dataOffset, checked((int)length)).ToArray();
+    }
+
+    private static int FindEntryLocalHeader(byte[] bytes, string name)
+    {
+        for (var offset = 0; offset < bytes.Length;)
+        {
+            if (BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(offset, 4)) != 0x04034B50u)
+            {
+                break;
+            }
+
+            var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(offset + 26, 2));
+            var length = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(offset + 22, 4));
+            if (Encoding.UTF8.GetString(bytes, offset + 30, nameLength) == name)
+            {
+                return offset;
+            }
+
+            offset += checked(30 + nameLength + (int)length);
+        }
+
+        throw new InvalidOperationException($"ZIP entry '{name}' was not found.");
+    }
+
+    private static int FindCentralEntry(byte[] bytes, string name)
+    {
+        for (var offset = FindSignature(bytes, 0x02014B50u); offset >= 0;)
+        {
+            var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(offset + 28, 2));
+            if (Encoding.UTF8.GetString(bytes, offset + 46, nameLength) == name)
+            {
+                return offset;
+            }
+
+            offset = FindSignature(bytes, 0x02014B50u, offset + 1);
+        }
+
+        throw new InvalidOperationException($"Central ZIP entry '{name}' was not found.");
+    }
+
+    private static uint ComputeCrc32(byte[] bytes)
+    {
+        var crc = 0xFFFFFFFFu;
+        foreach (var value in bytes)
+        {
+            crc ^= value;
+            for (var bit = 0; bit < 8; bit++)
+            {
+                crc = (crc >> 1) ^ ((crc & 1) == 0 ? 0u : 0xEDB88320u);
+            }
+        }
+
+        return ~crc;
+    }
+
+    private static int FindSignature(byte[] bytes, uint signature, int start = 0)
+    {
+        for (var index = start; index <= bytes.Length - 4; index++)
         {
             if (BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(index, 4)) == signature)
             {
