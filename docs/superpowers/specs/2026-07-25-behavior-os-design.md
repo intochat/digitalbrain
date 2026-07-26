@@ -21,7 +21,6 @@
 | `2026-07-25-behavior-os-emitter-grill.md` | Who emits |
 | `2026-07-25-behavior-os-flutter-reaction-grill.md` | Flutter path + first screen |
 | `2026-07-25-behavior-os-package-graph-grill.md` | Package homes table |
-| Live residual board | `2026-07-25-behavior-os-scorecard.md` |
 
 **Codegraph (B7 docs-honesty):** query `DigitalBrainActivated BootOnActivation BehaviorOsActivationBoot`.
 
@@ -395,7 +394,7 @@ Proofs that are not green yet stay `[Fact(Explicit = true, …)]` or red→green
 | R7 | Live product AppHost Healthy for OS surface? | Remain residual (Hold #6) | Live-aspire wave |
 | R8 | Idempotency of double emit | Prefer journal-visible re-emit over hidden Kernel dedupe until a real once-only consumer | Production invoker |
 
-Live residual board: **`docs/superpowers/specs/2026-07-25-behavior-os-scorecard.md`**. Historical B0 grills listed in the header table.
+Historical B0 grills are listed in the header table.
 
 ---
 
