@@ -133,10 +133,3 @@ public sealed class DigitalBrainBuilder
                 "Local state-protection defaults cannot be published.");
     }
 }
-
-public sealed class ClientDigitalBrainReference
-{
-    internal ClientDigitalBrainReference(DigitalBrainBuilder brain) => Brain = brain;
-
-    internal DigitalBrainBuilder Brain { get; }
-}
