@@ -2,7 +2,7 @@ bin/
 !clients/**/bin/
 !clients/**/bin/**
 obj/
-artifacts/
+/artifacts/
 TestResults/
 *.binlog
 *.user
