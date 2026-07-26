@@ -1,3 +1,0 @@
-<Project>
-  <!-- Stop MSBuild walk before repo-root .NET props poison Flutter Windows native probes. -->
-</Project>

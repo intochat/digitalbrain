@@ -1,3 +1,0 @@
-<Project>
-  <!-- Stop MSBuild walk before repo-root Directory.Build.targets (TrimEndingDirectorySeparator) hits VCTargetsPath. -->
-</Project>
