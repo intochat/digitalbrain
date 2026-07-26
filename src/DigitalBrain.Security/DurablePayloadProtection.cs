@@ -22,10 +22,11 @@ internal static class DurablePayloadProtectionHosting
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.TryAddSingleton<IDurablePayloadProtector>(_ => new DurablePayloadProtector(
+        var protector = new DurablePayloadProtector(
             configuration[ConfigurationKey]
             ?? throw new InvalidOperationException(
-                $"Missing shared durable state-protection key '{ConfigurationKey}'.")));
+                $"Missing shared durable state-protection key '{ConfigurationKey}'."));
+        services.TryAddSingleton<IDurablePayloadProtector>(protector);
     }
 }
 
