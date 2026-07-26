@@ -12,6 +12,7 @@ public sealed class RunningAppHost : IAsyncDisposable
     private static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(5);
 
     private readonly DistributedApplication _application;
+    private readonly TimeSpan _cleanupTimeout;
     private readonly AppHostExclusiveLease _lease;
     private readonly Action<RunningAppHost> _release;
     private readonly HashSet<string> _resourceNames;
@@ -23,11 +24,13 @@ public sealed class RunningAppHost : IAsyncDisposable
     internal RunningAppHost(
         DistributedApplication application,
         AppHostExclusiveLease lease,
-        Action<RunningAppHost> release)
+        Action<RunningAppHost> release,
+        TimeSpan? cleanupTimeout = null)
     {
         _application = application;
         _lease = lease;
         _release = release;
+        _cleanupTimeout = cleanupTimeout ?? CleanupTimeout;
 
         _resourceNames = application.Services
             .GetRequiredService<DistributedApplicationModel>()
@@ -72,21 +75,28 @@ public sealed class RunningAppHost : IAsyncDisposable
 
         GC.SuppressFinalize(this);
 
-        try
-        {
-            await DisposeCoreAsync();
-        }
-        finally
-        {
-            try
-            {
-                _release(this);
-            }
-            finally
-            {
-                await _lease.DisposeAsync();
-            }
-        }
+        using var cleanup = new CancellationTokenSource(_cleanupTimeout);
+        var failures = new List<Exception>();
+
+        await AttemptAsync(
+            () => StopRuntimeResourcesAsync(cleanup.Token),
+            failures,
+            cleanup.Token);
+        await AttemptAsync(
+            () => _application.StopAsync(cleanup.Token),
+            failures,
+            cleanup.Token);
+        await AttemptAsync(
+            () => _application.DisposeAsync().AsTask(),
+            failures,
+            cleanup.Token);
+        Attempt(_ => _release(this), failures, cleanup.Token);
+        await AttemptAsync(
+            () => _lease.DisposeAsync().AsTask(),
+            failures,
+            cleanup.Token);
+
+        ReportFailures(failures);
     }
 
     internal HttpClient CreateHttpClient(string resourceName)
@@ -118,45 +128,58 @@ public sealed class RunningAppHost : IAsyncDisposable
     [SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
-        Justification = "Graph dispose must attempt stop then dispose and surface the first failure.")]
-    private async Task DisposeCoreAsync()
+        Justification = "Graph cleanup attempts every terminal stage and preserves all failures.")]
+    private static async Task AttemptAsync(
+        Func<Task> operation,
+        List<Exception> failures,
+        CancellationToken cancellationToken)
     {
-        Exception? primary = null;
-        using var cleanup = new CancellationTokenSource(CleanupTimeout);
-
         try
         {
-            await StopRuntimeResourcesAsync(cleanup.Token);
+            await operation().WaitAsync(cancellationToken);
         }
         catch (Exception failure)
         {
-            primary = failure;
+            failures.Add(failure);
         }
+    }
 
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Graph cleanup attempts every terminal stage and preserves all failures.")]
+    private static void Attempt(
+        Action<CancellationToken> operation,
+        List<Exception> failures,
+        CancellationToken cancellationToken)
+    {
         try
         {
-            await _application.StopAsync(cleanup.Token);
+            operation(cancellationToken);
         }
         catch (Exception failure)
         {
-            primary ??= failure;
+            failures.Add(failure);
+        }
+    }
+
+    private static void ReportFailures(List<Exception> failures)
+    {
+        if (failures.Count == 0)
+        {
+            return;
         }
 
-        try
+        var primary = failures[0];
+        if (failures.Count > 1)
         {
-            await _application.DisposeAsync();
-        }
-        catch (Exception failure)
-        {
-            primary ??= failure;
+            primary.Data["AppHost cleanup secondary failures"] =
+                new AggregateException(failures.Skip(1));
         }
 
-        if (primary is not null)
-        {
-            throw new AppHostTestFailureException(
-                "AppHost graph cleanup failed.",
-                primary);
-        }
+        throw new AppHostTestFailureException(
+            "AppHost graph cleanup failed.",
+            primary);
     }
 
     private async Task StopRuntimeResourcesAsync(
