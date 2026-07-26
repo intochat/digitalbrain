@@ -161,7 +161,7 @@ public static class CanonicalArtifactReader
         }
 
         if (string.IsNullOrWhiteSpace(name)
-            || name.EndsWith('/')
+            || name.EndsWith('/', StringComparison.Ordinal)
             || name.IndexOfAny(['\\', '\0']) >= 0
             || Path.IsPathRooted(name)
             || name.Split('/').Any(segment => segment is "." or ".." or ""))

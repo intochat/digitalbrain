@@ -1,7 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Flutter;
 using DigitalBrain.Shell;
-using DigitalBrain.Testing;
 using Xunit;
 
 namespace DigitalBrain.Compositions.Tests;

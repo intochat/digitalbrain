@@ -1,5 +1,4 @@
 using System.Globalization;
-using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Time;
 
@@ -114,7 +113,7 @@ internal sealed partial class CountdownNeuron
         var separator = suffix.IndexOf('.', StringComparison.Ordinal);
 
         return separator > 0
-            && separator == suffix.LastIndexOf('.')
+            && separator == suffix.LastIndexOf('.', StringComparison.Ordinal)
             && long.TryParse(
                 suffix.AsSpan(0, separator),
                 NumberStyles.None,

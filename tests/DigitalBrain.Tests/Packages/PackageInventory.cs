@@ -107,11 +107,7 @@ internal static class PackageInventory
 
     internal static readonly string[] ClientDirectPackages = ["Microsoft.Orleans.Client"];
 
-    internal static readonly string[] SecurityDirectPackages =
-    [
-        "Microsoft.Extensions.Configuration.Abstractions",
-        "Microsoft.Extensions.DependencyInjection.Abstractions",
-    ];
+    internal static readonly string[] SecurityDirectPackages = [];
 
     internal static readonly string[] IntegrationsMcpDirectProjects = [Security];
 

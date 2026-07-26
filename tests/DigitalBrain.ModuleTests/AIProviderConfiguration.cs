@@ -1,4 +1,3 @@
-using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Kernel;
@@ -7,7 +6,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using OllamaSharp;
-using Orleans.Hosting;
 using Xunit;
 
 namespace DigitalBrain.ModuleTests;

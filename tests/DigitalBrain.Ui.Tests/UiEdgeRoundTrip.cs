@@ -1,9 +1,6 @@
 using System.Net;
-using System.Net.Http.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Flutter;
-using DigitalBrain.Testing;
-using DigitalBrain.Ui;
 using Xunit;
 
 namespace DigitalBrain.Ui.Tests;

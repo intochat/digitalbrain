@@ -1,6 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
-using DigitalBrain.Ui;
 using Xunit;
 
 namespace DigitalBrain.Ui.Tests;

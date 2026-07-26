@@ -2,8 +2,6 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
-using Orleans.Runtime;
-using Orleans.Runtime.Services;
 using Orleans.TestingHost;
 
 namespace DigitalBrain.Testing;
@@ -96,7 +94,7 @@ internal sealed class FixtureCluster : IAsyncDisposable
 
     internal static string LabelOf(string siloName)
     {
-        var separator = siloName.LastIndexOf('_');
+        var separator = siloName.LastIndexOf('_', StringComparison.Ordinal);
         var instance = short.Parse(
             siloName.AsSpan(separator + 1),
             System.Globalization.CultureInfo.InvariantCulture);

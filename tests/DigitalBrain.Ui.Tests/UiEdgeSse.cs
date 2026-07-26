@@ -1,5 +1,4 @@
 using System.Text.Json;
-using DigitalBrain.Ui;
 
 namespace DigitalBrain.Ui.Tests;
 
@@ -57,7 +56,7 @@ internal static class UiEdgeSse
                 break;
             }
 
-            if (line.StartsWith(':'))
+            if (line.StartsWith(':', StringComparison.Ordinal))
             {
                 continue;
             }

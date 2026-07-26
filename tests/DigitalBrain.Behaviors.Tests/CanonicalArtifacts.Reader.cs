@@ -1,7 +1,6 @@
 namespace DigitalBrain.Behaviors.Tests;
 
 using System.IO.Compression;
-using System.Text;
 using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Runtime.Artifacts;
 using Xunit;

@@ -5,14 +5,14 @@ namespace DigitalBrain.Tests.Hosting;
 
 public sealed class ProductModuleSet
 {
-    [Fact(DisplayName = "evaluated repository graph is 52 projects, 157 references, 76 packages, 32 IDs, and 32 pins")]
+    [Fact(DisplayName = "evaluated repository graph is 52 projects, 157 references, 74 packages, 32 IDs, and 32 pins")]
     public void EvaluatedRepositoryGraphHasNoPackageOrProjectResidue()
     {
         var graph = PackageInventory.EvaluateRepositoryGraph();
 
         Assert.Equal(52, graph.ProjectCount);
         Assert.Equal(157, graph.ProjectReferenceCount);
-        Assert.Equal(76, graph.PackageReferenceCount);
+        Assert.Equal(74, graph.PackageReferenceCount);
         Assert.Equal(32, graph.PackageIdCount);
         Assert.Equal(32, graph.CentralPackageVersionCount);
     }

@@ -2,7 +2,6 @@ using System.Reflection;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.Aspire;
-using DigitalBrain.Client;
 using DigitalBrain.Flutter;
 using DigitalBrain.Kernel;
 using DigitalBrain.Tests.Packages;

@@ -2,8 +2,6 @@ using System.Net;
 using System.Reflection;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
-using DigitalBrain.Ui;
-using Orleans;
 using Xunit;
 
 namespace DigitalBrain.Ui.Tests;

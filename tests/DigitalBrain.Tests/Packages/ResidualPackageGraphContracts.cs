@@ -25,7 +25,7 @@ public sealed class ResidualPackageGraphContracts
             isForbiddenProject: PackageInventory.IsForbiddenOnConsumerResidual);
 
     [Fact(DisplayName =
-        "Security is configuration + DI abstractions only — no DigitalBrain projects or provider packages")]
+        "Security has no explicit package or project dependencies — configuration and DI abstractions are framework-provided on net11")]
     public void SecurityGraphIsConfigurationAndDiAbstractionsOnly()
     {
         AssertResidualGraph(

@@ -1,4 +1,3 @@
-using DigitalBrain.Testing;
 using Xunit;
 
 namespace DigitalBrain.Quickstart.Tests;

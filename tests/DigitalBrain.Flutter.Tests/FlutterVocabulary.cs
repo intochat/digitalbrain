@@ -1,6 +1,5 @@
 using System.Reflection;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Flutter;
 using Xunit;
 
 namespace DigitalBrain.Flutter.Tests;

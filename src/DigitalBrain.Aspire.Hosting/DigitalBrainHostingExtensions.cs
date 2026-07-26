@@ -1,7 +1,5 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.Azure;
-using Aspire.Hosting.Orleans;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Aspire.Hosting;

@@ -3,7 +3,6 @@ using DigitalBrain.Kernel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orleans.Hosting;
 using Xunit;
 
 namespace DigitalBrain.ModuleTests;
