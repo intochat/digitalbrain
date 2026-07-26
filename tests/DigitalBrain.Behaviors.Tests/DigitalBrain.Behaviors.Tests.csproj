@@ -9,7 +9,6 @@
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\hosts\DigitalBrain.BehaviorBuilder\DigitalBrain.BehaviorBuilder.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Behaviors.Runtime\DigitalBrain.Behaviors.Runtime.csproj" />
   </ItemGroup>

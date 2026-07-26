@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Serialization" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
-  </ItemGroup>
-</Project>

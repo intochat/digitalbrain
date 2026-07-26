@@ -19,7 +19,6 @@
     <Project Path="hosts/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
     <Project Path="hosts/DigitalBrain.Ui/DigitalBrain.Ui.csproj" />
     <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
-    <Project Path="hosts/DigitalBrain.BehaviorBuilder/DigitalBrain.BehaviorBuilder.csproj" />
     <Project Path="hosts/DigitalBrain.TestingAppHost/DigitalBrain.TestingAppHost.csproj" />
     <Project Path="hosts/DigitalBrain.Quickstart.Host/DigitalBrain.Quickstart.Host.csproj" />
     <Project Path="hosts/DigitalBrain.Quickstart.AppHost/DigitalBrain.Quickstart.AppHost.csproj" />
