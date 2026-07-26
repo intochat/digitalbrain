@@ -4,9 +4,9 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using Xunit;
 
-namespace DigitalBrain.Tests.Packages;
+namespace DigitalBrain.Tests.Contracts;
 
-public sealed class ClientApiContracts
+public sealed class ClientSurface
 {
     [Fact(DisplayName = "Client package exports only IDigitalBrain and DigitalBrainClient")]
     public void PublicExportsAreProgrammingModelOnly()

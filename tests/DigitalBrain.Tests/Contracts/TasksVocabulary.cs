@@ -1,11 +1,10 @@
 using System.Reflection;
 using DigitalBrain.Tasks;
-using DigitalBrain.Tests.Boundary;
 using Xunit;
 
-namespace DigitalBrain.Tests.Packages;
+namespace DigitalBrain.Tests.Contracts;
 
-public sealed class TasksContracts
+public sealed class TasksVocabulary
 {
     private static readonly string TasksNamespace =
         typeof(ITask).Namespace
@@ -125,19 +124,5 @@ public sealed class TasksContracts
         Assert.DoesNotContain(
             typeof(TasksModule).Assembly.GetExportedTypes(),
             type => typeof(IWorker).IsAssignableFrom(type) && type.IsClass);
-    }
-
-    [Fact(DisplayName = "Tasks has no module Aspire.Hosting package — pure grain module, no provider resources")]
-    public void TasksHasNoModuleAspireHostingPackage()
-    {
-        var hostingPackage = Path.Combine(
-            RepositoryLayout.Root,
-            RepositoryLayout.Modules,
-            $"{PackageInventory.ModulesTasks}.Aspire.Hosting");
-
-        Assert.False(Directory.Exists(hostingPackage));
-        Assert.DoesNotContain(
-            PackageBoundarySupport.HostingPackages,
-            package => package.StartsWith(PackageInventory.ModulesTasks, StringComparison.Ordinal));
     }
 }

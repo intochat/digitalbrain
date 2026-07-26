@@ -1,9 +1,9 @@
 using DigitalBrain.Abstractions;
 using Xunit;
 
-namespace DigitalBrain.Tests.Packages;
+namespace DigitalBrain.Tests.Identity;
 
-public sealed class IdentityContracts
+public sealed class GrainKeyEncoding
 {
     public static TheoryData<string> RejectedIdentityParts { get; } =
         new("", "a b", "a/b");

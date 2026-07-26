@@ -5,9 +5,9 @@ using DigitalBrain.Client;
 using DigitalBrain.Quickstart;
 using Xunit;
 
-namespace DigitalBrain.Tests.Packages;
+namespace DigitalBrain.Tests.Client;
 
-public sealed class ClientSendOrdering
+public sealed class SendOrdering
 {
     [Fact(DisplayName = "typed Send rejects a null synapse before any grain call")]
     public async Task TypedSendRejectsNullSynapseBeforeAnyGrainCall()

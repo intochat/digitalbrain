@@ -2,7 +2,6 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Flutter.Aspire.Hosting;
-using DigitalBrain.Tests.Boundary;
 using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
@@ -12,16 +11,12 @@ internal static class FlutterHostingProjectionSupport
     public const string JournalConnectionEnvironmentKey =
         "ConnectionStrings__" + DigitalBrainHostingExtensions.JournalConnectionName;
 
-    public static readonly string RepositoryRoot = PackageBoundarySupport.RepositoryRoot;
-
-    public static string UiProjectPath => Path.Combine(
-        RepositoryRoot,
-        RepositoryLayout.Hosts,
+    public static string UiProjectPath => RepositoryAssets.Path(
+        "hosts",
         "DigitalBrain.Ui",
         "DigitalBrain.Ui.csproj");
 
-    public static string FlutterClientDirectory => Path.Combine(
-        RepositoryRoot,
+    public static string FlutterClientDirectory => RepositoryAssets.Path(
         "clients",
         "digitalbrain_flutter");
 

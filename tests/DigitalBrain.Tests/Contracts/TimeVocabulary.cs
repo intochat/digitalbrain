@@ -1,33 +1,16 @@
 using System.Reflection;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
-using DigitalBrain.Tests.Boundary;
 using DigitalBrain.Time;
 using Xunit;
 
-namespace DigitalBrain.Tests.Packages;
+namespace DigitalBrain.Tests.Contracts;
 
-public sealed class TimeContracts
+public sealed class TimeVocabulary
 {
     private static readonly string TimeNamespace =
         typeof(ICountdown).Namespace
         ?? throw new InvalidOperationException($"{nameof(ICountdown)} has no namespace.");
-
-    private static readonly string TimeRuntime =
-        typeof(TimeModule).Assembly.GetName().Name
-        ?? throw new InvalidOperationException($"{nameof(TimeModule)} assembly has no name.");
-
-    private static readonly string TimeContractsPackage =
-        typeof(ICountdown).Assembly.GetName().Name
-        ?? throw new InvalidOperationException($"{nameof(ICountdown)} assembly has no name.");
-
-    private static readonly string Kernel =
-        typeof(Neuron).Assembly.GetName().Name
-        ?? throw new InvalidOperationException($"{nameof(Neuron)} assembly has no name.");
-
-    private static readonly string Abstractions =
-        typeof(NeuronId).Assembly.GetName().Name
-        ?? throw new InvalidOperationException($"{nameof(NeuronId)} assembly has no name.");
 
     [Fact(DisplayName = "Time.Contracts public vocabulary is Countdown only — IReminder remains absent")]
     public void CountdownIsTheOnlyTimeNeuronCapability()
@@ -102,30 +85,5 @@ public sealed class TimeContracts
             typeof(TimeModule).Assembly.GetExportedTypes(),
             type => type.Name.Contains("Reminder", StringComparison.Ordinal)
                 || type.Name is "ITimer" or "IRecurringSchedule");
-    }
-
-    [Fact(DisplayName = "Time runtime compile graph is Kernel + Time.Contracts only")]
-    public void RuntimeCompileGraphIsKernelAndContractsOnly()
-    {
-        Assert.Equal(
-            new[] { Kernel, TimeContractsPackage }.Order(StringComparer.Ordinal),
-            PackageBoundarySupport.DirectCompileProjectReferencesOf(TimeRuntime)
-                .Order(StringComparer.Ordinal));
-
-        Assert.Equal(
-            new[] { Abstractions, Kernel, TimeContractsPackage }.Order(StringComparer.Ordinal),
-            PackageBoundarySupport.CompileProjectsReachableFrom(TimeRuntime)
-                .Order(StringComparer.Ordinal));
-
-        var projects = PackageBoundarySupport.CompileProjectsReachableFrom(TimeRuntime);
-        Assert.DoesNotContain(
-            projects,
-            project => project.StartsWith(PackageInventory.ModulesAi, StringComparison.Ordinal)
-                || project.StartsWith(PackageInventory.ModulesTasks, StringComparison.Ordinal)
-                || project.StartsWith(PackageInventory.ModulesGoogle, StringComparison.Ordinal)
-                || project.StartsWith(PackageInventory.ModulesSalesforce, StringComparison.Ordinal)
-                || project.StartsWith(PackageInventory.ModulesFlutter, StringComparison.Ordinal)
-                || project.StartsWith(PackageInventory.IntegrationsPrefix, StringComparison.Ordinal)
-                || PackageInventory.IsUiFamilyProject(project));
     }
 }

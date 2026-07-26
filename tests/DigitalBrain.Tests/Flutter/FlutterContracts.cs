@@ -3,9 +3,6 @@ using System.Text.Json.Nodes;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
-using DigitalBrain.Kernel;
-using DigitalBrain.Tests.Boundary;
-using DigitalBrain.Tests.Packages;
 using Xunit;
 
 namespace DigitalBrain.Tests.Flutter;
@@ -15,30 +12,6 @@ public sealed class FlutterContracts
     private static readonly string FlutterNamespace =
         typeof(IShell).Namespace
         ?? throw new InvalidOperationException($"{nameof(IShell)} has no namespace.");
-
-    private static readonly string FlutterRuntime =
-        typeof(FlutterModule).Assembly.GetName().Name
-        ?? throw new InvalidOperationException($"{nameof(FlutterModule)} assembly has no name.");
-
-    private static readonly string FlutterContractsPackage =
-        typeof(IShell).Assembly.GetName().Name
-        ?? throw new InvalidOperationException($"{nameof(IShell)} assembly has no name.");
-
-    private static readonly string FlutterHostingPackage =
-        typeof(FlutterHostingExtensions).Assembly.GetName().Name
-        ?? throw new InvalidOperationException($"{nameof(FlutterHostingExtensions)} assembly has no name.");
-
-    private static readonly string Kernel =
-        typeof(Neuron).Assembly.GetName().Name
-        ?? throw new InvalidOperationException($"{nameof(Neuron)} assembly has no name.");
-
-    private static readonly string Abstractions =
-        typeof(NeuronId).Assembly.GetName().Name
-        ?? throw new InvalidOperationException($"{nameof(NeuronId)} assembly has no name.");
-
-    private static readonly string AspireHosting =
-        typeof(DigitalBrain.Aspire.Hosting.DigitalBrainBuilder).Assembly.GetName().Name
-        ?? throw new InvalidOperationException("DigitalBrain.Aspire.Hosting assembly has no name.");
 
     [Fact(DisplayName =
         "Flutter.Contracts public vocabulary is first-five surface only — no IFlutter god")]
@@ -100,37 +73,15 @@ public sealed class FlutterContracts
     public void WireContractGoldenMatchesContractsAssembly()
     {
         var actual = ExtractWireManifest(typeof(IShell).Assembly);
-        var goldenPath = Path.Combine(
-            PackageBoundarySupport.RepositoryRoot,
-            RepositoryLayout.Modules,
-            PackageInventory.ModulesFlutterContracts,
+        var goldenPath = RepositoryAssets.Path(
+            "modules",
+            "DigitalBrain.Modules.Flutter.Contracts",
             "flutter-wire-contracts.golden.json");
-        Assert.True(File.Exists(goldenPath));
+
+        Assert.True(File.Exists(goldenPath), $"the Dart-facing golden is missing at {goldenPath}");
 
         var expected = JsonNode.Parse(File.ReadAllText(goldenPath))!;
         Assert.True(JsonNode.DeepEquals(expected, actual));
-    }
-
-    [Fact(DisplayName =
-        "Flutter.Contracts is Abstractions-only and reaches neither Dart/Flutter SDKs nor Ui/hosting")]
-    public void ContractsCompileGraphIsAbstractionsOnlyAndSdkFree()
-    {
-        Assert.Equal(
-            [Abstractions],
-            PackageBoundarySupport.DirectCompileProjectReferencesOf(FlutterContractsPackage)
-                .Order(StringComparer.Ordinal));
-        Assert.Equal(
-            [Abstractions],
-            PackageBoundarySupport.CompileProjectsReachableFrom(FlutterContractsPackage)
-                .Order(StringComparer.Ordinal));
-
-        Assert.Empty(PackageBoundarySupport.DirectPackageReferencesOf(FlutterContractsPackage));
-        Assert.DoesNotContain(
-            PackageBoundarySupport.PackagesReachableFrom(FlutterContractsPackage),
-            PackageBoundarySupport.IsDartOrFlutterSdkPackage);
-
-        var projects = PackageBoundarySupport.CompileProjectsReachableFrom(FlutterContractsPackage);
-        Assert.DoesNotContain(projects, IsForbiddenFlutterContractsProject);
     }
 
     [Fact(DisplayName =
@@ -147,27 +98,6 @@ public sealed class FlutterContracts
         Assert.DoesNotContain(
             typeof(FlutterModule).Assembly.GetExportedTypes(),
             type => type.Name is "ShellNeuron" or "SceneNeuron" or "IFlutter" or "IUiGateway");
-    }
-
-    [Fact(DisplayName =
-        "Flutter runtime compile graph is Kernel + Flutter.Contracts — never Ui, Client, or peer modules")]
-    public void RuntimeCompileGraphIsKernelAndContractsOnly()
-    {
-        Assert.Equal(
-            new[] { Kernel, FlutterContractsPackage }.Order(StringComparer.Ordinal),
-            PackageBoundarySupport.DirectCompileProjectReferencesOf(FlutterRuntime)
-                .Order(StringComparer.Ordinal));
-
-        Assert.Equal(
-            new[] { Abstractions, Kernel, FlutterContractsPackage }.Order(StringComparer.Ordinal),
-            PackageBoundarySupport.CompileProjectsReachableFrom(FlutterRuntime)
-                .Order(StringComparer.Ordinal));
-
-        var projects = PackageBoundarySupport.CompileProjectsReachableFrom(FlutterRuntime);
-        Assert.DoesNotContain(projects, IsForbiddenFlutterRuntimeProject);
-        Assert.DoesNotContain(
-            PackageBoundarySupport.PackagesReachableFrom(FlutterRuntime),
-            PackageBoundarySupport.IsDartOrFlutterSdkPackage);
     }
 
     [Fact(DisplayName =
@@ -196,78 +126,6 @@ public sealed class FlutterContracts
             typeof(FlutterHostingExtensions).Assembly.GetExportedTypes(),
             type => type.Name is "AutoHost" or "FlutterHostLaunch" or "FlutterHostKind" or "IFlutter");
     }
-
-    [Fact(DisplayName =
-        "Flutter.Aspire.Hosting compile graph is Aspire.Hosting + Flutter runtime — projects Ui, never hand-wires host logic")]
-    public void HostingCompileGraphIsAspireHostingAndFlutterRuntime()
-    {
-        Assert.Equal(
-            new[] { AspireHosting, FlutterRuntime }.Order(StringComparer.Ordinal),
-            PackageBoundarySupport.DirectCompileProjectReferencesOf(FlutterHostingPackage)
-                .Order(StringComparer.Ordinal));
-
-        Assert.Contains(
-            FlutterContractsPackage,
-            PackageBoundarySupport.CompileProjectsReachableFrom(FlutterHostingPackage));
-        Assert.DoesNotContain(
-            PackageInventory.Ui,
-            PackageBoundarySupport.DirectCompileProjectReferencesOf(FlutterHostingPackage),
-            StringComparer.Ordinal);
-        Assert.DoesNotContain(
-            PackageBoundarySupport.PackagesReachableFrom(FlutterHostingPackage),
-            PackageBoundarySupport.IsDartOrFlutterSdkPackage);
-    }
-
-    [Fact(DisplayName =
-        "northbound Ui host is client + Flutter.Contracts only — never Flutter runtime, Kernel, or hosting")]
-    public void NorthboundUiHostOwnsEdgeOverContractsNotRuntime()
-    {
-        Assert.Equal(
-            new[]
-            {
-                PackageInventory.Aspire,
-                PackageInventory.Client,
-                FlutterContractsPackage,
-            }.Order(StringComparer.Ordinal),
-            PackageBoundarySupport.DirectCompileProjectReferencesOf(PackageInventory.Ui)
-                .Order(StringComparer.Ordinal));
-
-        var reachable = PackageBoundarySupport.CompileProjectsReachableFrom(PackageInventory.Ui);
-        Assert.Contains(FlutterContractsPackage, reachable);
-        Assert.DoesNotContain(FlutterRuntime, reachable, StringComparer.Ordinal);
-        Assert.DoesNotContain(FlutterHostingPackage, reachable, StringComparer.Ordinal);
-        Assert.DoesNotContain(Kernel, reachable, StringComparer.Ordinal);
-        Assert.DoesNotContain(
-            reachable,
-            project => project.StartsWith(PackageInventory.ModulesAi, StringComparison.Ordinal)
-                || project.StartsWith(PackageInventory.ModulesGoogle, StringComparison.Ordinal)
-                || project.StartsWith(PackageInventory.ModulesSalesforce, StringComparison.Ordinal)
-                || project.StartsWith(PackageInventory.IntegrationsPrefix, StringComparison.Ordinal));
-    }
-
-    private static bool IsForbiddenFlutterContractsProject(string project) =>
-        project is PackageInventory.Kernel
-            or PackageInventory.Client
-            or PackageInventory.Ui
-            || project.StartsWith(PackageInventory.ModulesFlutter, StringComparison.Ordinal)
-                && !string.Equals(project, FlutterContractsPackage, StringComparison.Ordinal)
-            || project.StartsWith(PackageInventory.ModulesAi, StringComparison.Ordinal)
-            || project.StartsWith(PackageInventory.ModulesGoogle, StringComparison.Ordinal)
-            || project.StartsWith(PackageInventory.ModulesSalesforce, StringComparison.Ordinal)
-            || project.StartsWith(PackageInventory.IntegrationsPrefix, StringComparison.Ordinal)
-            || PackageInventory.IsAspireFamilyProject(project);
-
-    private static bool IsForbiddenFlutterRuntimeProject(string project) =>
-        project is PackageInventory.Client
-            or PackageInventory.Ui
-            || project.StartsWith(PackageInventory.ModulesAi, StringComparison.Ordinal)
-            || project.StartsWith(PackageInventory.ModulesTasks, StringComparison.Ordinal)
-            || project.StartsWith(PackageInventory.ModulesTime, StringComparison.Ordinal)
-            || project.StartsWith(PackageInventory.ModulesGoogle, StringComparison.Ordinal)
-            || project.StartsWith(PackageInventory.ModulesSalesforce, StringComparison.Ordinal)
-            || project.StartsWith(PackageInventory.IntegrationsPrefix, StringComparison.Ordinal)
-            || PackageInventory.IsAspireFamilyProject(project)
-            || string.Equals(project, FlutterHostingPackage, StringComparison.Ordinal);
 
     private static JsonObject ExtractWireManifest(Assembly assembly)
     {

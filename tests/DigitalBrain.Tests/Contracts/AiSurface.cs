@@ -5,9 +5,9 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Tests.Boundary;
+namespace DigitalBrain.Tests.Contracts;
 
-public sealed class AiContractBoundaries
+public sealed class AiSurface
 {
     private static readonly string AiRootNamespace =
         typeof(ILLM).Namespace
