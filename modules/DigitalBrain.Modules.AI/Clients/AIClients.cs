@@ -25,10 +25,19 @@ internal static class AIClients
 
     private static OllamaApiClient Ollama(IConfiguration configuration)
     {
-        var endpoint = configuration[$"{ConfigurationRoot}:Ollama:Endpoint"] ?? "http://localhost:11434";
+        var endpoint = configuration[$"{ConfigurationRoot}:Ollama:Endpoint"];
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)
+            || endpointUri is null
+            || (!string.Equals(endpointUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(endpointUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException(
+                "Llama32 requires DigitalBrain:AI:Ollama:Endpoint to be an absolute HTTP(S) URI. Configure it through AIModule.WithLlm<Llama32>() in AppHost.");
+        }
+
         var model = configuration[$"{ConfigurationRoot}:Ollama:Llama32:Model"] ?? "llama3.2";
 
-        return new OllamaApiClient(new Uri(endpoint, UriKind.Absolute), model);
+        return new OllamaApiClient(endpointUri, model);
     }
 
     private static IChatClient OpenAI(IConfiguration configuration)
