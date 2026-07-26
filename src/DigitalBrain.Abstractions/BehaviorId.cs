@@ -1,9 +1,12 @@
 namespace DigitalBrain.Abstractions;
 
+using System.Text.Json.Serialization;
+
 [GenerateSerializer]
 [Alias("db.behavior-id")]
 public readonly record struct BehaviorId
 {
+    [JsonConstructor]
     public BehaviorId(string value) => Value = Validate(value);
 
     [Id(0)]
@@ -11,7 +14,34 @@ public readonly record struct BehaviorId
 
     public static BehaviorId Parse(string value) => new(value);
 
-    public override string ToString() => Value;
+    public void EnsureValid()
+    {
+        if (Value is null)
+        {
+            throw new InvalidOperationException("A behavior id has not been initialized.");
+        }
+
+        Validate(Value);
+    }
+
+    public bool Equals(BehaviorId other)
+    {
+        EnsureValid();
+        other.EnsureValid();
+        return string.Equals(Value, other.Value, StringComparison.Ordinal);
+    }
+
+    public override int GetHashCode()
+    {
+        EnsureValid();
+        return StringComparer.Ordinal.GetHashCode(Value);
+    }
+
+    public override string ToString()
+    {
+        EnsureValid();
+        return Value;
+    }
 
     private static string Validate(string value)
     {

@@ -1,7 +1,11 @@
 namespace DigitalBrain.Behaviors.Tests;
 
 using System.Reflection;
+using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 using Xunit;
 
 public sealed class BehaviorIdentities
@@ -48,6 +52,59 @@ public sealed class BehaviorIdentities
         Assert.Throws<ArgumentException>(() => new BehaviorExecutionId(Guid.Empty));
     }
 
+    [Fact(DisplayName = "Uninitialized behavior identities reject identity operations before they can become durable keys")]
+    public void DefaultBehaviorIdentitiesRejectIdentityOperations()
+    {
+        var validBehavior = new BehaviorId("com.digitalbrain.start-ui");
+        var validRevision = new BehaviorRevisionId("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+        var validExecution = new BehaviorExecutionId(new Guid("4b050fe8-45d0-4a16-b6a5-1b4b6683880a"));
+
+        Assert.Throws<InvalidOperationException>(() => default(BehaviorId).ToString());
+        Assert.Throws<InvalidOperationException>(() => default(BehaviorRevisionId).ToString());
+        Assert.Throws<InvalidOperationException>(() => default(BehaviorExecutionId).ToString());
+        Assert.Throws<InvalidOperationException>(() => default(BehaviorId).Equals(validBehavior));
+        Assert.Throws<InvalidOperationException>(() => default(BehaviorRevisionId).Equals(validRevision));
+        Assert.Throws<InvalidOperationException>(() => default(BehaviorExecutionId).Equals(validExecution));
+    }
+
+    [Fact(DisplayName = "Behavior identities remain value-equal and usable as durable dictionary keys")]
+    public void BehaviorIdentitiesKeepValueEqualityAndDictionarySemantics()
+    {
+        var left = new BehaviorId("com.digitalbrain.start-ui");
+        var right = new BehaviorId("com.digitalbrain.start-ui");
+        var values = new Dictionary<BehaviorId, string> { [left] = "approved" };
+
+        Assert.Equal(left, right);
+        Assert.Equal("approved", values[right]);
+    }
+
+    [Fact(DisplayName = "Behavior identity JSON invokes validating constructors and preserves valid values")]
+    public void BehaviorIdentityJsonRoundTripsAndRejectsMalformedValues()
+    {
+        var behavior = new BehaviorId("com.digitalbrain.start-ui");
+        var revision = new BehaviorRevisionId("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+        var execution = new BehaviorExecutionId(new Guid("4b050fe8-45d0-4a16-b6a5-1b4b6683880a"));
+
+        Assert.Equal(behavior, JsonSerializer.Deserialize<BehaviorId>(JsonSerializer.Serialize(behavior)));
+        Assert.Equal(revision, JsonSerializer.Deserialize<BehaviorRevisionId>(JsonSerializer.Serialize(revision)));
+        Assert.Equal(execution, JsonSerializer.Deserialize<BehaviorExecutionId>(JsonSerializer.Serialize(execution)));
+        Assert.Throws<FormatException>(() => JsonSerializer.Deserialize<BehaviorId>("{\"Value\":\"StartUi\"}"));
+        Assert.Throws<FormatException>(() => JsonSerializer.Deserialize<BehaviorRevisionId>("{\"Value\":\"g123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"}"));
+        Assert.Throws<ArgumentException>(() => JsonSerializer.Deserialize<BehaviorExecutionId>("{\"Value\":\"00000000-0000-0000-0000-000000000000\"}"));
+    }
+
+    [Fact(DisplayName = "Behavior identities and execution metadata retain their Orleans wire values")]
+    public void BehaviorIdentityOrleansRoundTripsPreserveValues()
+    {
+        var metadata = new BehaviorExecutionMetadata(
+            new OwnerId("owner"),
+            new BehaviorId("com.digitalbrain.start-ui"),
+            new BehaviorRevisionId("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+            new BehaviorExecutionId(new Guid("4b050fe8-45d0-4a16-b6a5-1b4b6683880a")));
+
+        Assert.Equal(metadata, OrleansRoundTrip(metadata));
+    }
+
     [Theory(DisplayName = "Behavior identities retain stable Orleans aliases and field identifiers")]
     [InlineData(typeof(BehaviorId), "db.behavior-id")]
     [InlineData(typeof(BehaviorRevisionId), "db.behavior-revision-id")]
@@ -58,6 +115,13 @@ public sealed class BehaviorIdentities
 
         Assert.NotNull(type.GetCustomAttribute<GenerateSerializerAttribute>());
         Assert.Equal(alias, type.GetCustomAttribute<AliasAttribute>()?.Alias);
-        Assert.NotNull(Assert.Single(type.GetProperties()).GetCustomAttribute<IdAttribute>());
+        Assert.Equal(0u, Assert.Single(type.GetProperties()).GetCustomAttribute<IdAttribute>()?.Id);
+    }
+
+    private static T OrleansRoundTrip<T>(T value)
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer<T>>();
+        return serializer.Deserialize(serializer.SerializeToArray(value));
     }
 }

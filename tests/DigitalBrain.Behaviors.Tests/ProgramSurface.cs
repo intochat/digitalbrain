@@ -35,7 +35,11 @@ public sealed class ProgramSurface
         var program = typeof(IBehaviorProgram<>);
         var execute = Assert.Single(program.GetMethods());
 
-        Assert.True(program.GetGenericArguments()[0].GetGenericParameterConstraints().Contains(typeof(Synapse)));
+        var trigger = Assert.Single(program.GetGenericArguments());
+
+        Assert.Equal(GenericParameterAttributes.Contravariant, trigger.GenericParameterAttributes & GenericParameterAttributes.VarianceMask);
+        Assert.Equal([typeof(Synapse)], trigger.GetGenericParameterConstraints());
+        Assert.Equal(nameof(IBehaviorProgram<Synapse>.ExecuteAsync), execute.Name);
         Assert.Equal(typeof(ValueTask), execute.ReturnType);
         Assert.Equal(
             [program.GetGenericArguments()[0], typeof(IBehaviorContext), typeof(CancellationToken)],
@@ -49,10 +53,25 @@ public sealed class ProgramSurface
         var execute = Assert.Single(program.GetMethods());
         var arguments = program.GetGenericArguments();
 
+        Assert.All(arguments, argument => Assert.Equal(GenericParameterAttributes.None, argument.GenericParameterAttributes & GenericParameterAttributes.VarianceMask));
+        Assert.Equal(nameof(IIntentProgram<object, object>.ExecuteAsync), execute.Name);
         Assert.Equal(typeof(ValueTask<>).MakeGenericType(arguments[1]), execute.ReturnType);
         Assert.Equal(
             [arguments[0], typeof(IBehaviorContext), typeof(CancellationToken)],
             execute.GetParameters().Select(parameter => parameter.ParameterType));
+    }
+
+    [Fact(DisplayName = "Behavior context Get keeps the exact class and INeuron constraints")]
+    public void ContextGetKeepsTheExactNeuronContractConstraint()
+    {
+        var get = typeof(IBehaviorContext).GetMethod(nameof(IBehaviorContext.Get));
+        Assert.NotNull(get);
+        var contract = Assert.Single(get!.GetGenericArguments());
+
+        Assert.Equal(GenericParameterAttributes.ReferenceTypeConstraint, contract.GenericParameterAttributes & GenericParameterAttributes.SpecialConstraintMask);
+        Assert.Equal([typeof(INeuron)], contract.GetGenericParameterConstraints());
+        Assert.Equal(typeof(string), Assert.Single(get.GetParameters()).ParameterType);
+        Assert.Equal(contract, get.ReturnType);
     }
 
     [Fact(DisplayName = "Execution metadata carries the immutable owner, behavior, revision, and execution identities")]
@@ -73,21 +92,62 @@ public sealed class ProgramSurface
             properties);
         Assert.NotNull(typeof(BehaviorExecutionMetadata).GetCustomAttribute<GenerateSerializerAttribute>());
         Assert.Equal("db.behavior-execution-metadata", typeof(BehaviorExecutionMetadata).GetCustomAttribute<AliasAttribute>()?.Alias);
-        Assert.Equal(
-            [0, 1, 2, 3],
-            typeof(BehaviorExecutionMetadata).GetProperties()
-                .OrderBy(property => property.GetCustomAttribute<IdAttribute>()?.Id)
-                .Select(property => property.GetCustomAttribute<IdAttribute>()?.Id));
+        Assert.Equal(0u, typeof(BehaviorExecutionMetadata).GetProperty(nameof(BehaviorExecutionMetadata.Owner))?.GetCustomAttribute<IdAttribute>()?.Id);
+        Assert.Equal(1u, typeof(BehaviorExecutionMetadata).GetProperty(nameof(BehaviorExecutionMetadata.Behavior))?.GetCustomAttribute<IdAttribute>()?.Id);
+        Assert.Equal(2u, typeof(BehaviorExecutionMetadata).GetProperty(nameof(BehaviorExecutionMetadata.Revision))?.GetCustomAttribute<IdAttribute>()?.Id);
+        Assert.Equal(3u, typeof(BehaviorExecutionMetadata).GetProperty(nameof(BehaviorExecutionMetadata.Execution))?.GetCustomAttribute<IdAttribute>()?.Id);
+    }
+
+    [Fact(DisplayName = "Execution metadata rejects uninitialized behavior identities")]
+    public void ExecutionMetadataRejectsUninitializedBehaviorIdentities()
+    {
+        Assert.Throws<InvalidOperationException>(() => new BehaviorExecutionMetadata(
+            new OwnerId("owner"),
+            default,
+            new BehaviorRevisionId("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+            new BehaviorExecutionId(new Guid("4b050fe8-45d0-4a16-b6a5-1b4b6683880a"))));
     }
 }
 
 internal static class MemberSignature
 {
     public static IEnumerable<Type> AllTypes(MemberInfo member)
+        => DirectTypes(member)
+            .Concat(member is MethodInfo method ? method.GetGenericArguments() : [])
+            .SelectMany(Expand);
+
+    private static IEnumerable<Type> DirectTypes(MemberInfo member)
         => member switch
         {
             MethodInfo method => [method.ReturnType, .. method.GetParameters().Select(parameter => parameter.ParameterType)],
             PropertyInfo property => [property.PropertyType],
             _ => [],
         };
+
+    private static IEnumerable<Type> Expand(Type type)
+    {
+        yield return type;
+
+        if (type.IsGenericParameter)
+        {
+            foreach (var constraint in type.GetGenericParameterConstraints())
+            {
+                foreach (var nested in Expand(constraint))
+                {
+                    yield return nested;
+                }
+            }
+        }
+
+        if (type.IsGenericType)
+        {
+            foreach (var argument in type.GetGenericArguments())
+            {
+                foreach (var nested in Expand(argument))
+                {
+                    yield return nested;
+                }
+            }
+        }
+    }
 }
