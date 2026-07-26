@@ -7,19 +7,19 @@ using DigitalBrain.Abstractions;
 public sealed record BehaviorExecutionMetadata
 {
     public BehaviorExecutionMetadata(
-        OwnerId owner,
-        BehaviorId behavior,
-        BehaviorRevisionId revision,
-        BehaviorExecutionId execution)
+        OwnerId Owner,
+        BehaviorId Behavior,
+        BehaviorRevisionId Revision,
+        BehaviorExecutionId Execution)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(owner.Value);
-        behavior.EnsureValid();
-        revision.EnsureValid();
-        execution.EnsureValid();
-        Owner = owner;
-        Behavior = behavior;
-        Revision = revision;
-        Execution = execution;
+        ArgumentException.ThrowIfNullOrWhiteSpace(Owner.Value);
+        Behavior.EnsureValid();
+        Revision.EnsureValid();
+        Execution.EnsureValid();
+        this.Owner = Owner;
+        this.Behavior = Behavior;
+        this.Revision = Revision;
+        this.Execution = Execution;
     }
 
     [Id(0)]

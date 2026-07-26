@@ -107,6 +107,21 @@ public sealed class ProgramSurface
             new BehaviorRevisionId("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
             new BehaviorExecutionId(new Guid("4b050fe8-45d0-4a16-b6a5-1b4b6683880a"))));
     }
+
+    [Fact(DisplayName = "Execution metadata preserves its PascalCase named-argument constructor contract")]
+    public void ExecutionMetadataAcceptsOriginalPascalCaseNamedArguments()
+    {
+        var metadata = new BehaviorExecutionMetadata(
+            Owner: new OwnerId("owner"),
+            Behavior: new BehaviorId("com.digitalbrain.start-ui"),
+            Revision: new BehaviorRevisionId("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+            Execution: new BehaviorExecutionId(new Guid("4b050fe8-45d0-4a16-b6a5-1b4b6683880a")));
+
+        Assert.Equal("owner", metadata.Owner.Value);
+        Assert.Equal("com.digitalbrain.start-ui", metadata.Behavior.Value);
+        Assert.Equal("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", metadata.Revision.Value);
+        Assert.Equal(new Guid("4b050fe8-45d0-4a16-b6a5-1b4b6683880a"), metadata.Execution.Value);
+    }
 }
 
 internal static class MemberSignature
