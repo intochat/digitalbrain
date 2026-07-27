@@ -5,12 +5,12 @@
     <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.AI\DigitalBrain.Modules.AI.csproj" />
-    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Chat\DigitalBrain.Modules.Chat.csproj" />
+    <ProjectReference Include="..\..\src\modules\ai\DigitalBrain.Modules.AI\DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="..\..\src\modules\chat\DigitalBrain.Modules.Chat\DigitalBrain.Modules.Chat.csproj" />
     <ProjectReference Include="..\..\behaviors\DigitalBrain.Behaviors.Os\DigitalBrain.Behaviors.Os.csproj" />
-    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Flutter\DigitalBrain.Modules.Flutter.csproj" />
-    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Google\DigitalBrain.Modules.Google.csproj" />
-    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Salesforce\DigitalBrain.Modules.Salesforce.csproj" />
+    <ProjectReference Include="..\..\src\modules\flutter\DigitalBrain.Modules.Flutter\DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="..\..\src\modules\google\DigitalBrain.Modules.Google\DigitalBrain.Modules.Google.csproj" />
+    <ProjectReference Include="..\..\src\modules\salesforce\DigitalBrain.Modules.Salesforce\DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain\DigitalBrain.csproj" />
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>

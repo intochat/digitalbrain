@@ -12,9 +12,11 @@ internal static class FlutterHostingProjectionSupport
         "ConnectionStrings__" + DigitalBrainHostingExtensions.JournalConnectionName;
 
     public static string UIProjectPath => RepositoryAssets.Path(
-        "hosts",
-        "DigitalBrain.Ui",
-        "DigitalBrain.Ui.csproj");
+        "src",
+        "modules",
+        "flutter",
+        "DigitalBrain.Modules.Flutter.Http",
+        "DigitalBrain.Modules.Flutter.Http.csproj");
 
     public static string FlutterClientDirectory => RepositoryAssets.Path(
         "clients",

@@ -11,9 +11,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
-    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Flutter.Contracts\DigitalBrain.Modules.Flutter.Contracts.csproj" />
-    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Time.Contracts\DigitalBrain.Modules.Time.Contracts.csproj" />
-    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.AI.Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\modules\flutter\DigitalBrain.Modules.Flutter.Contracts\DigitalBrain.Modules.Flutter.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\modules\time\DigitalBrain.Modules.Time.Contracts\DigitalBrain.Modules.Time.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\modules\ai\DigitalBrain.Modules.AI.Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />
   </ItemGroup>
   <Target Name="StripOrleansUsingsFromCompositions" BeforeTargets="CoreCompile;GenerateGlobalUsings">
     <ItemGroup>

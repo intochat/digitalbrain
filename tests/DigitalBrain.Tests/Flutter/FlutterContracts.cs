@@ -74,7 +74,9 @@ public sealed class FlutterContracts
     {
         var actual = ExtractWireManifest(typeof(IShell).Assembly);
         var goldenPath = RepositoryAssets.Path(
+            "src",
             "modules",
+            "flutter",
             "DigitalBrain.Modules.Flutter.Contracts",
             "flutter-wire-contracts.golden.json");
 
