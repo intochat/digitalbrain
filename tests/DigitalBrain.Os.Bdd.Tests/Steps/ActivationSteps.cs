@@ -25,7 +25,7 @@ public sealed class ActivationSteps(BrainWorld world)
         var brain = world.Neuron<IDigitalBrainNeuron>(IDigitalBrainNeuron.InstanceName);
 
         var activated = await brain.Outgoing.NextAsync<DigitalBrainActivated>(
-            BrainWorld.CancellationToken);
+            world.CancellationToken);
 
         Assert.Equal(world.Brain.Client.Owner, activated.Synapse.Owner);
     }
@@ -35,7 +35,7 @@ public sealed class ActivationSteps(BrainWorld world)
     {
         var shell = world.Neuron<IShell>(shellName);
 
-        var opened = await shell.Outgoing.NextAsync<SceneOpened>(BrainWorld.CancellationToken);
+        var opened = await shell.Outgoing.NextAsync<SceneOpened>(world.CancellationToken);
 
         Assert.Equal(sceneKey, opened.Synapse.SceneKey);
         Assert.Equal(title, opened.Synapse.Title);
@@ -48,7 +48,7 @@ public sealed class ActivationSteps(BrainWorld world)
 
         var activations = await brain.Outgoing.ReadAsync<DigitalBrainActivated>(
             afterSequence: 0,
-            BrainWorld.CancellationToken);
+            world.CancellationToken);
 
         Assert.Equal(expected, activations.Count);
     }

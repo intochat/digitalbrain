@@ -1,35 +1,15 @@
 using System.Runtime.CompilerServices;
-using DigitalBrain.AI.Ollama;
-using DigitalBrain.Testing;
 using Microsoft.Extensions.AI;
 
-namespace DigitalBrain.ModuleTests;
+namespace DigitalBrain.Testing;
 
-internal static class ChatEdgeExtensions
-{
-    internal static void ConfigureChatEdge(this DigitalBrainTestBuilder builder)
-    {
-#pragma warning disable CA2000 // Empty Dispose; edge outlives builder configuration
-        var chat = new ChatEdgeScript();
-        builder.ConfigureChatClient<IChatClient, ChatEdgeScript>(
-            [typeof(Llama32)],
-            chat,
-            chat,
-            static script => script.Reset());
-#pragma warning restore CA2000
-    }
-
-    internal static ChatEdgeScript Chat(this TestBrain brain)
-        => brain.ChatClientScript<ChatEdgeScript>();
-}
-
-internal sealed class ChatEdgeScript : IChatClient
+public sealed class ScriptedChatClient : IChatClient
 {
     private readonly Lock _gate = new();
     private readonly Queue<ChatMessage> _replies = [];
     private int _callCount;
 
-    internal int CallCount
+    public int CallCount
     {
         get
         {
@@ -40,21 +20,28 @@ internal sealed class ChatEdgeScript : IChatClient
         }
     }
 
-    internal void Reply(string text)
-        => Enqueue(new ChatMessage(ChatRole.Assistant, text));
+    public void Reply(string text)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        Enqueue(new ChatMessage(ChatRole.Assistant, text));
+    }
 
-    internal void ReplyWithCapabilityCall(
-        string tool,
-        IDictionary<string, object?> arguments)
-        => Enqueue(new ChatMessage(
+    public void ReplyWithCapabilityCall(string tool, IDictionary<string, object?> arguments)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tool);
+        ArgumentNullException.ThrowIfNull(arguments);
+
+        Enqueue(new ChatMessage(
             ChatRole.Assistant,
             [new FunctionCallContent(Guid.NewGuid().ToString("N"), tool, arguments)]));
+    }
 
-    private void Enqueue(ChatMessage reply)
+    public void Reset()
     {
         lock (_gate)
         {
-            _replies.Enqueue(reply);
+            _callCount = 0;
+            _replies.Clear();
         }
     }
 
@@ -70,6 +57,7 @@ internal sealed class ChatEdgeScript : IChatClient
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var response = await GetResponseAsync(messages, options, cancellationToken);
+
         foreach (var update in response.ToChatResponseUpdates())
         {
             yield return update;
@@ -77,18 +65,20 @@ internal sealed class ChatEdgeScript : IChatClient
     }
 
     public object? GetService(Type serviceType, object? serviceKey = null)
-        => serviceType.IsInstanceOfType(this) ? this : null;
+    {
+        ArgumentNullException.ThrowIfNull(serviceType);
+        return serviceType.IsInstanceOfType(this) ? this : null;
+    }
 
     public void Dispose()
     {
     }
 
-    internal void Reset()
+    private void Enqueue(ChatMessage reply)
     {
         lock (_gate)
         {
-            _callCount = 0;
-            _replies.Clear();
+            _replies.Enqueue(reply);
         }
     }
 
@@ -103,7 +93,10 @@ internal sealed class ChatEdgeScript : IChatClient
         lock (_gate)
         {
             _callCount++;
-            reply = _replies.Dequeue();
+            reply = _replies.Count > 0
+                ? _replies.Dequeue()
+                : throw new InvalidOperationException(
+                    "The scripted chat client ran out of replies. Script one reply per model call, including the call that follows a capability invocation.");
         }
 
         return new ChatResponse(reply);

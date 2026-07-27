@@ -31,6 +31,8 @@
     <Project Path="modules/DigitalBrain.Modules.Tasks/DigitalBrain.Modules.Tasks.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" />
+    <Project Path="modules/DigitalBrain.Modules.Chat.Contracts/DigitalBrain.Modules.Chat.Contracts.csproj" />
+    <Project Path="modules/DigitalBrain.Modules.Chat/DigitalBrain.Modules.Chat.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Flutter.Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
@@ -40,6 +42,9 @@
     <Project Path="modules/DigitalBrain.Modules.Salesforce.Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <Project Path="modules/DigitalBrain.Modules.Salesforce.Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" />
+  </Folder>
+  <Folder Name="/behaviors/">
+    <Project Path="behaviors/DigitalBrain.Behaviors.Os/DigitalBrain.Behaviors.Os.csproj" />
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/DigitalBrain.AccountEnrichment/DigitalBrain.AccountEnrichment.csproj" />

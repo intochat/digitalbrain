@@ -1,4 +1,5 @@
 using DigitalBrain.AI;
+using DigitalBrain.Testing;
 using Xunit;
 
 namespace DigitalBrain.ModuleTests;

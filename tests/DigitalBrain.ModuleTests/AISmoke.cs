@@ -1,4 +1,5 @@
 using DigitalBrain.AI.Ollama;
+using DigitalBrain.Testing;
 using Microsoft.Extensions.AI;
 using Xunit;
 

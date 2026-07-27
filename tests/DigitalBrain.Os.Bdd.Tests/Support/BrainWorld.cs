@@ -6,13 +6,17 @@ namespace DigitalBrain.Os.Bdd.Tests;
 
 public sealed class BrainWorld
 {
+    private static readonly TimeSpan ScenarioDeadline = TimeSpan.FromSeconds(60);
+
+    private CancellationTokenSource? _deadline;
     private TestBrain? _brain;
 
     public TestBrain Brain =>
         _brain ?? throw new InvalidOperationException(
             "No DigitalBrain is open. A scenario must start with a Given that opens one.");
 
-    public static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
+    public CancellationToken CancellationToken =>
+        _deadline?.Token ?? TestContext.Current.CancellationToken;
 
     public TestNeuron<TNeuron> Neuron<TNeuron>(string name)
         where TNeuron : class, INeuron
@@ -21,7 +25,11 @@ public sealed class BrainWorld
     internal async Task OpenAsync()
     {
         await CloseAsync();
-        _brain = await OsCluster.Fixture.CreateBrainAsync(CancellationToken);
+
+        _deadline = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        _deadline.CancelAfter(ScenarioDeadline);
+        _brain = await OsCluster.Fixture.CreateBrainAsync(_deadline.Token);
     }
 
     internal async Task CloseAsync()
@@ -29,6 +37,11 @@ public sealed class BrainWorld
         if (Interlocked.Exchange(ref _brain, null) is { } brain)
         {
             await brain.DisposeAsync();
+        }
+
+        if (Interlocked.Exchange(ref _deadline, null) is { } deadline)
+        {
+            deadline.Dispose();
         }
     }
 }
