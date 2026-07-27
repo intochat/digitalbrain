@@ -38,7 +38,4 @@ builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
         name: ProductSurfaceResources.McpHttpEndpointName,
         isProxied: false);
 
-builder.AddViteApp(ProductSurfaceResources.Website, ProductSurfaceResources.WebsiteContentPath)
-    .WithExternalHttpEndpoints();
-
 builder.Build().Run();

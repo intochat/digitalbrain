@@ -10,15 +10,12 @@ TestResults/
 .vs/
 logs/
 .codegraph/
-.config/.codegraph-initialized
 .digitalbrain/
 .agents/
 .superpowers/
 .worktrees/
 sources/
 node_modules/
-docs/.vitepress/cache/
-docs/.vitepress/dist/
 
 # Local MCP tool installs (Codex absolute launch)
 .config/codegraph-tool/

@@ -1,11 +1,8 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+<Project Sdk="Aspire.AppHost.Sdk/13.5.0-preview.1.26376.5">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.JavaScript" />
-  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.AI.Aspire.Hosting\DigitalBrain.Modules.AI.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Chat\DigitalBrain.Modules.Chat.csproj" IsAspireProjectResource="false" />
@@ -17,5 +14,19 @@
     <ProjectReference Include="..\DigitalBrain.Host\DigitalBrain.Host.csproj" />
     <ProjectReference Include="..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
   </ItemGroup>
+  <PropertyGroup>
+    <CodeGraphRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..'))</CodeGraphRoot>
+  </PropertyGroup>
+  <Target Name="RefreshCodeGraph" BeforeTargets="Build">
+    <PropertyGroup>
+      <CodeGraphIndexed>$([System.IO.File]::Exists('$(CodeGraphRoot)\.codegraph\codegraph.db'))</CodeGraphIndexed>
+    </PropertyGroup>
+    <Exec Command="npx -y @colbymchenry/codegraph@latest init &quot;$(CodeGraphRoot)&quot;"
+          WorkingDirectory="$(CodeGraphRoot)"
+          Condition="'$(CodeGraphIndexed)' != 'True'" />
+    <Exec Command="npx -y @colbymchenry/codegraph@latest sync &quot;$(CodeGraphRoot)&quot;"
+          WorkingDirectory="$(CodeGraphRoot)"
+          Condition="'$(CodeGraphIndexed)' == 'True'" />
+  </Target>
 </Project>
 

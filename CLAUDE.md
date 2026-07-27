@@ -26,9 +26,10 @@ The architecture in six lines:
   verification, approval, and constrained execution remain part of the designed rail.
 - **Every future install is a human-approved proposal**, journaled and reversible.
 
-`docs/architecture.md` is the plan of record. Read its ratified architecture before changing
-framework code. Do not silently reverse its decisions. If evidence invalidates one, record the
-reversal in that file.
+There is no architecture document. Section 7 of this file records what is Built versus Designed, and
+that is the whole of the written plan of record — everything else is read from the code and the
+tests. Do not silently reverse a decision recorded there. If evidence invalidates one, change section
+7 in the same commit as the code.
 
 ---
 
@@ -118,9 +119,16 @@ adapter is `.codex/config.toml` with the same servers. Project `.grok/config.tom
 lockstep. Do not enable plugins that inject MCP.
 
 **If an accelerator is unavailable, say so and fall back to the oracles. Do not skip silently.**
-`codegraph` maintains its index during `dotnet build` — which `aspire run` triggers — and is served
-from `.mcp.json` when the session root is this repository. A session rooted above the repo cannot
-reach that index; that absence is the environment, not a broken tool. `context7` needs
+`codegraph` keeps its index through the `RefreshCodeGraph` target in
+`hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj`, which runs `init` then `sync` over the
+repository root — so `aspire run` and the root gate both refresh it, and the index spans C#, Dart and
+the Flutter Windows runner alike. **That target belongs to the AppHost project and nowhere else.**
+There is no `Directory.Build.targets`: a repository-root one is walked by Flutter's Windows native
+build and has to be fenced off with empty stub files under `clients/`, which is why the last attempt
+was deleted. Do not reintroduce either. The index lives in gitignored `.codegraph/`, so a fresh clone
+has none until that build; if the server answers "isn't indexed", build the AppHost or run
+`codegraph init` and retry rather than giving up on the tool. A session rooted above the repo cannot
+reach the index at all; that absence is the environment, not a broken tool. `context7` needs
 `CONTEXT7_API_KEY` in the process environment — fall back to Microsoft Learn when it is unset.
 Note: Microsoft Learn returns the older `Orleans.EventSourcing.JournaledGrain` for journaling
 queries. That is a different API from `Microsoft.Orleans.Journaling`. Do not conflate them.
@@ -155,12 +163,9 @@ dotnet test DigitalBrain.slnx -c Release --logger "console;verbosity=minimal"
 failing contract that the root run caught. During TDD you may run the smallest owning project in the
 foreground, but the root gate is what permits a completion claim.
 
-**The website package scripts invoke the direct Node proofs:**
-
-```
-npm --prefix docs test
-npm --prefix docs run build
-```
+That gate is the whole gate. The public site is a separate repository — `intochat/digitalbrain.docs`,
+published at https://digitalbrain.tech — with its own `npm test` and `npm run build`. Nothing in this
+repository builds, tests, or serves it, and no change here can break it.
 
 One guard fails the build by design, and that is correct:
 
@@ -182,8 +187,9 @@ and the public surface should stop changing without review.
 - **Code is the source of truth. Do not spend effort on documentation.** Ratified by the owner. Do
   not write design prose, decision records, or architecture narrative as a deliverable — express the
   design in types, names, and tests, and put durable operational rules here in `CLAUDE.md` instead.
-  Touch `docs/` only where a gate demands it. This supersedes the earlier "keep decision records"
-  rule and any task instruction to record a design in `docs/architecture.md`.
+  This repository holds no `docs/` tree at all — `CLAUDE.md` and `README.md` are the only prose it
+  carries. This supersedes the earlier "keep decision records" rule and any task instruction to
+  record a design in an architecture document.
 - **One top-level type per file, unless the types are one closed co-evolving vocabulary.** Split when
   a type has an independent lifetime or an independent consumer. Keep together only for a closed set
   read as a set — an abstract base with its sealed cases, a type with a satellite enum that is
@@ -220,17 +226,18 @@ Behavior proposal, approval, installation, execution, and rollback also remain d
 `DigitalBrain.Behaviors` is a packable SDK foundation for public authoring interfaces, constrained
 context, manifests, and revision/artifact identities; the nonpackable `DigitalBrain.Behaviors.Runtime`
 contains only the canonical artifact codec. Neither project is a compiler, builder, worker, broker,
-or execution rail. The post-rail model in `docs/architecture.md` holds: one owner-scoped
+or execution rail. The post-rail model holds: one owner-scoped
 `BehaviorNeuron` implementation owns journals/state/revisions; its single-file program is not a Neuron
 and unknown code executes outside the silo through a capability broker. Pre-rail OS activation
 (`DigitalBrainActivated` in Abstractions; pull compositions such as `ActivateDigitalBrain` /
 `BootOnActivation`) may be Built samples/L1 — still not installed Behaviors and not the install rail.
 
-`docs/architecture.md` is the single architecture authority: vision, module status, ratified rules,
-known limitations, and rejected shapes. The eight `docs/architecture/*` topic authorities and the
-`docs/superpowers/` and `docs/research/` trees were folded into it and deleted — 94% of documentation
-described a rail with no code. Do not resurrect stage plans, scorecards, grills, or session
-checklists. Docs carry vision; code carries detail.
+This section is the single architecture authority: module status, ratified rules, known limitations,
+and rejected shapes. Everything else was deleted — the eight `docs/architecture/*` topic authorities
+and the `docs/superpowers/` and `docs/research/` trees folded into one page, and that page then left
+for `intochat/digitalbrain.docs`, because 94% of documentation described a rail with no code. Do not
+resurrect stage plans, scorecards, grills, session checklists, or a `docs/` tree. The site carries
+vision for readers; code carries detail for everyone.
 
 One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
 That benchmark and the behavior proposal/install rail remain deliberately outside the built

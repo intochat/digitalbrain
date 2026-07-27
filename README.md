@@ -18,8 +18,7 @@ await brain.SendAsync<IAnalyst>(
 
 The owner-bound `IDigitalBrain` facade enters through a session; neurons call typed capabilities such
 as `ILlama32` inside the brain. The same vocabulary will later support approved C# behaviors generated
-from natural language. See [docs/architecture.md](docs/architecture.md) for what is built versus
-designed.
+from natural language.
 
 ## The shape of it
 
@@ -37,11 +36,9 @@ designed.
 
 ## Status
 
-See the module status lines in [docs/architecture.md](docs/architecture.md) for what is built versus
-designed.
-
-[`docs/architecture.md`](docs/architecture.md) is the plan of record: ratified architecture, known
-limitations, and remaining build order.
+Section 7 of [CLAUDE.md](CLAUDE.md) is the plan of record: what is Built versus Designed, ratified
+rules, known limitations, and rejected shapes. It is the only such document â€” everything finer-grained
+is read from the code and the tests.
 
 ## Repository shape
 
@@ -51,8 +48,11 @@ modules/   independently shipped domains (AI, Tasks, Time, Google, Salesforce, â
 hosts/     AppHost, silo, MCP, Ui, TestingAppHost, Quickstart hosts
 samples/   Quickstart greeter module; AccountEnrichment process sample; Compositions (pre-Behavior-rail logic, not NuGet, not installed Behaviors)
 tests/     L0 contracts; L1 suites (incl. Quickstart/Compositions); L2 HostTests
-docs/      VitePress documentation and the published specification
+clients/   Flutter shell and the Dart wire package
 ```
+
+There is no `docs/` tree. `CLAUDE.md` and this file are the only prose the repository carries; the
+public site lives in [intochat/digitalbrain.docs](https://github.com/intochat/digitalbrain.docs).
 
 Earlier prototype generations were retired to git history rather than kept on disk. Recover any of
 them with `git log --diff-filter=D --summary` and `git show <sha>^:<path>`.
@@ -66,20 +66,14 @@ dotnet build DigitalBrain.slnx -c Release
 dotnet test DigitalBrain.slnx -c Release --logger "console;verbosity=minimal"
 ```
 
-Never `--filter` for the completion gate. The documentation gate:
+Never `--filter` for the completion gate. Run it before asserting a commit is green; this page is not
+evidence that an arbitrary commit has passed it.
 
-```powershell
-npm --prefix docs test
-npm --prefix docs run build
-```
-
-Run these gates before asserting a commit is green; this page is not evidence that an arbitrary
-commit has passed them.
-
-Published docs: **https://digitalbrain.tech** (GitHub Pages via `.github/workflows/docs-pages.yml`).
-Domain and DNS steps live in [docs/contributing.md](docs/contributing.md#documentation-site-on-github-pages).
+Published docs: **https://digitalbrain.tech**, built and deployed from
+[intochat/digitalbrain.docs](https://github.com/intochat/digitalbrain.docs). Its gates are that
+repository's, not this one's.
 
 ## Way of working
 
 [CLAUDE.md](CLAUDE.md) is the canonical working discipline for every agent and contributor, and
-`AGENTS.md` points there. The contributing guide is [docs/contributing.md](docs/contributing.md).
+`AGENTS.md` points there.

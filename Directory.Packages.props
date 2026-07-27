@@ -13,13 +13,12 @@
     <PackageVersion Include="Reqnroll.xunit.v3" Version="3.3.4" />
   </ItemGroup>
   <ItemGroup>
-    <PackageVersion Include="Aspire.Hosting" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.JavaScript" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.OpenAI" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting" Version="13.5.0-preview.1.26376.5" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.5.0-preview.1.26376.5" />
+    <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.5.0-preview.1.26376.5" />
+    <PackageVersion Include="Aspire.Hosting.OpenAI" Version="13.5.0-preview.1.26376.5" />
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.5.0-preview.1.26376.5" />
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.4.0" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="11.0.0-preview.6.26359.118" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="11.0.0-preview.6.26359.118" />
