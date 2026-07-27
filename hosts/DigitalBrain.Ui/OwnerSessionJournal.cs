@@ -1,5 +1,4 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Client;
 using DigitalBrain.Chat;
 using DigitalBrain.Flutter;
 

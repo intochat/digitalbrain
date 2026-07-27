@@ -115,7 +115,6 @@
     "hookify@claude-plugins-official": true,
     "security-guidance@claude-plugins-official": true,
     "csharp-lsp@claude-plugins-official": true,
-    "typescript-lsp@claude-plugins-official": true,
     "mattpocock-skills@mattpocock": true,
     "dotnet11@dotnet-agent-skills": true,
     "dotnet-msbuild@dotnet-agent-skills": true,

@@ -1,4 +1,3 @@
-using DigitalBrain.Security;
 using Microsoft.Extensions.Configuration;
 using ModelContextProtocol.Authentication;
 

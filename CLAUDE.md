@@ -137,8 +137,8 @@ parallel agents, give them the rule by which a finding counts, or they return su
 Harness adapters — `.claude/settings.json`, `.codex/config.toml`, `.grok/config.toml` — hold only
 harness-native settings plus Codex's required MCP mirror. Keep the server list in lockstep; never
 fork it; never enable plugins that inject MCP. .NET skills come from the `dotnet-agent-skills`
-marketplace, curated in `.claude/settings.json`; the rest are off because every enabled skill costs
-context every session.
+marketplace, curated in `.claude/settings.json`. Every enabled plugin costs context every session —
+add one only when it earns that, and drop it when the tree stops matching it.
 
 ## Conventions
 

@@ -10,13 +10,16 @@ updates:
         patterns:
           - '*'
 
-  - package-ecosystem: npm
-    directory: /docs
+  - package-ecosystem: pub
+    directories:
+      - /clients/digitalbrain_wire
+      - /clients/digitalbrain_flutter
+      - /clients/digitalbrain_flutter/shell
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
     groups:
-      docs-npm:
+      dart:
         patterns:
           - '*'
 

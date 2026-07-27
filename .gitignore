@@ -25,3 +25,6 @@ node_modules/
 **/.dart_tool/
 **/packages/pubspec_overrides.yaml
 
+# Reqnroll code-behind: generated into obj/, never source
+*.feature.cs
+
