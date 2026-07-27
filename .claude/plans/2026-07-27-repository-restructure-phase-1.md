@@ -8,6 +8,73 @@
 
 **Tech Stack:** .NET 11 (`net11.0`), Orleans 10.2.2, Aspire 13.5.0-preview.1.26376.5, xunit.v3 3.2.2, Reqnroll 3.3.4, Flutter/Dart clients, MSBuild `.slnx` solution format.
 
+## The destination — what the tree must look like when phase 1 is done
+
+This is the contract. If the finished tree differs from this in any way, phase 1 is not done. Every task below exists only to move the repository into this shape.
+
+```
+DigitalBrain/
+├─ src/                                          every project here is a published package
+│  ├─ DigitalBrain.PublishGate.Tests/            guards src/ as a whole: no MAF leak·
+│  │                                             no Kernel leak· no UI in kernel
+│  ├─ core/                                      shipped, but NOT an IModule
+│  │  ├─ kernel/
+│  │  │  ├─ DigitalBrain/                        was Kernel · package id "DigitalBrain"
+│  │  │  │                                       namespace PINNED to DigitalBrain.Kernel
+│  │  │  ├─ DigitalBrain.Abstractions/
+│  │  │  ├─ DigitalBrain.Client/
+│  │  │  └─ DigitalBrain.SourceGeneration/
+│  │  ├─ aspire/
+│  │  │  ├─ DigitalBrain.Aspire/
+│  │  │  └─ DigitalBrain.Aspire.Hosting/
+│  │  ├─ testing/
+│  │  │  ├─ DigitalBrain.Testing/                Orleans InProcessTestCluster harness
+│  │  │  └─ DigitalBrain.Testing.Tests/          was TestingTests
+│  │  ├─ security/
+│  │  │  └─ DigitalBrain.Security/
+│  │  ├─ behaviors/
+│  │  │  ├─ DigitalBrain.Behaviors/              SDK + artifact codec MERGED
+│  │  │  └─ DigitalBrain.Behaviors.Tests/
+│  │  └─ mcp/                                    OUTBOUND — the brain calls out
+│  │     ├─ DigitalBrain.Mcp/                    was Integrations.Mcp
+│  │     ├─ DigitalBrain.Mcp.Aspire.Hosting/
+│  │     └─ DigitalBrain.Mcp.Tests/              was Integrations.Tests
+│  └─ modules/                                   ONLY IModule implementations
+│     ├─ ai/          DigitalBrain.Modules.AI{,.Contracts,.Aspire.Hosting,.Tests}
+│     ├─ chat/        DigitalBrain.Modules.Chat{,.Contracts}
+│     ├─ flutter/     DigitalBrain.Modules.Flutter{,.Contracts,.Aspire.Hosting,.Tests}
+│     │               DigitalBrain.Modules.Flutter.Http{,.Tests}   was hosts/DigitalBrain.Ui
+│     ├─ google/      DigitalBrain.Modules.Google{,.Contracts,.Aspire.Hosting}
+│     ├─ salesforce/  DigitalBrain.Modules.Salesforce{,.Contracts,.Aspire.Hosting}
+│     ├─ tasks/       DigitalBrain.Modules.Tasks{,.Contracts,.Tests}
+│     └─ time/        DigitalBrain.Modules.Time{,.Contracts,.Tests}
+├─ os/                                           the product · nothing packable
+│  ├─ DigitalBrain.OS.Host/                      THE silo
+│  ├─ DigitalBrain.OS.Mcp/                       INBOUND MCP server
+│  ├─ DigitalBrain.OS.Behaviors/                 was Behaviors.Os · library the silo links
+│  ├─ DigitalBrain.OS.AppHost/                   deployment descriptor
+│  └─ tests/
+│     ├─ DigitalBrain.OS.Bdd.Tests/
+│     ├─ DigitalBrain.OS.Composition.Tests/      was Compositions.Tests
+│     └─ DigitalBrain.OS.Host.Tests/             was HostTests
+├─ clients/                                      UNTOUCHED — Flutter native-build fence
+│  ├─ digitalbrain_wire/
+│  └─ digitalbrain_flutter/  + shell/
+└─ tests/
+   └─ fixtures/                                  was samples/
+      ├─ DigitalBrain.Quickstart{,.Contracts}/   the 1-module minimal brain
+      ├─ DigitalBrain.Quickstart.Tests/
+      ├─ DigitalBrain.AccountEnrichment/
+      ├─ DigitalBrain.Compositions/
+      └─ apphosts/  DigitalBrain.Quickstart.Host· .Quickstart.AppHost· .TestingAppHost
+```
+
+**Deleted by phase 1:** `src/DigitalBrain/` (metapackage), `src/DigitalBrain.Behaviors.Runtime/` (merged).
+**Directories that must NOT exist when done:** `hosts/`, `modules/`, `behaviors/`, `samples/`.
+**Aspire resource ids are unchanged** and stay lowercase-kebab: `brain`, `silo`, `digitalbrain-mcp`, `digitalbrain-ui`, `digitalbrain-flutter`, `brain-storage`.
+
+The organizing rule, which is a predicate rather than a preference: **`src/modules/` holds exactly the projects implementing `IModule`; everything else that ships is `src/core/`; `os/` ships nothing.**
+
 ## Global Constraints
 
 - **Starting commit:** `439c5b4a` on branch `agent/digitalbrain-hosting-testing`. Verify with `git rev-parse HEAD` before starting.
