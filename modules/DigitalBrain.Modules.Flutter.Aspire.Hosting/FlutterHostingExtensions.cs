@@ -4,20 +4,6 @@ using DigitalBrain.Aspire.Hosting;
 
 namespace DigitalBrain.Flutter.Aspire.Hosting;
 
-public sealed class DesktopHost
-{
-    private DesktopHost()
-    {
-    }
-}
-
-public sealed class HeadlessHost
-{
-    private HeadlessHost()
-    {
-    }
-}
-
 public static class FlutterHostingExtensions
 {
     public const string DefaultUiResourceName = "digitalbrain-ui";
@@ -249,26 +235,3 @@ public static class FlutterHostingExtensions
     }
 }
 
-public sealed class FlutterUiEdgeOptions
-{
-    public string ResourceName { get; set; } = FlutterHostingExtensions.DefaultUiResourceName;
-
-    public string Owner { get; set; } = FlutterHostingExtensions.DefaultOwner;
-
-    public string? ProjectPath { get; set; }
-}
-
-public sealed class FlutterHostOptions
-{
-    public string ResourceName { get; set; } = FlutterHostingExtensions.DefaultFlutterResourceName;
-
-    public string DeviceTarget { get; set; } = FlutterHostingExtensions.DefaultDeviceTarget;
-
-    public string ShellName { get; set; } = FlutterHostingExtensions.DefaultShellName;
-
-    public string? FlutterCommand { get; set; }
-
-    public string? DartCommand { get; set; }
-
-    public string? WorkingDirectory { get; set; }
-}

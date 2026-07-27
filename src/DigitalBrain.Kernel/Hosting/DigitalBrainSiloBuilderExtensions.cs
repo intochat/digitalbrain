@@ -17,13 +17,3 @@ public static class DigitalBrainSiloBuilderExtensions
         return builder;
     }
 }
-
-internal interface IConfigureBroadcastCatalog
-{
-    void Configure(BroadcastCatalog catalog);
-}
-
-internal sealed class AssemblyBroadcastHandlers(Assembly assembly) : IConfigureBroadcastCatalog
-{
-    public void Configure(BroadcastCatalog catalog) => catalog.AddAssembly(assembly);
-}

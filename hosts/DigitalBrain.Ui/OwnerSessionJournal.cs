@@ -1,7 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using DigitalBrain.Flutter;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.Ui;
 
@@ -35,20 +34,5 @@ internal sealed class OwnerSessionJournal
             NeuronId.For<IShell>(_owner, shellName),
             JournalKind.Outgoing,
             afterSequence);
-    }
-}
-
-internal static class UiEdgeServices
-{
-    public static IServiceCollection AddUiEdgeServices(this IServiceCollection services)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-
-        services.TryAddSingleton(static services =>
-            OwnerSessionJournal.Open(
-                services.GetRequiredService<IGrainFactory>(),
-                services.GetRequiredService<IDigitalBrain>().Owner));
-
-        return services;
     }
 }

@@ -1,6 +1,5 @@
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.AI;
 
@@ -11,14 +10,5 @@ public abstract class LLM(IChatClient chatClient) : Neuron, ILLM
         ArgumentNullException.ThrowIfNull(messages);
 
         return chatClient.GetResponseAsync(messages);
-    }
-}
-
-[AttributeUsage(AttributeTargets.Parameter)]
-internal sealed class LlmAttribute<TModel> : FromKeyedServicesAttribute
-    where TModel : LLM
-{
-    public LlmAttribute() : base(typeof(TModel))
-    {
     }
 }

@@ -5,12 +5,6 @@ using Orleans.Serialization;
 
 namespace DigitalBrain.Kernel;
 
-[GenerateSerializer]
-[Alias("db.journal-entry")]
-internal sealed record JournalEntry(
-    [property: Id(0)] long Sequence,
-    [property: Id(1)] SynapseDelivery Delivery);
-
 internal sealed class NeuronFeed
 {
     private const int MaxRetainedEntries = 512;
@@ -118,8 +112,3 @@ internal sealed class NeuronFeed
         }
     }
 }
-
-internal readonly record struct NeuronFeedCheckpoint(
-    IReadOnlyList<byte[]> Retained,
-    IReadOnlyDictionary<string, long> Tallies,
-    long LastSequence);

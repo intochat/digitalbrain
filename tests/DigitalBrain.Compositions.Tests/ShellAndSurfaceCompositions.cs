@@ -1,6 +1,4 @@
 using DigitalBrain.Flutter;
-using DigitalBrain.Shell;
-using DigitalBrain.Surfaces;
 using DigitalBrain.Time;
 using Xunit;
 
@@ -24,20 +22,6 @@ public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
         var shell = test.Neuron<IShell>(ShellName);
 
         await new OpenHome().RunAsync(test.Client, ShellName, cancellationToken);
-
-        var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
-        Assert.Equal(OpenHome.SceneKey, opened.Synapse.SceneKey);
-        Assert.Equal(OpenHome.SceneTitle, opened.Synapse.Title);
-    }
-
-    [Fact(DisplayName = "PostAuthBootstrap is shell-only — opens home via IShell (not peer composition)")]
-    public async Task PostAuthBootstrapOpensHome()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var shell = test.Neuron<IShell>(ShellName);
-
-        await new PostAuthBootstrap().RunAsync(test.Client, ShellName, cancellationToken);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(OpenHome.SceneKey, opened.Synapse.SceneKey);

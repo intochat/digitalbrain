@@ -97,7 +97,3 @@ internal static class UiEndpoints
         return endpoints;
     }
 }
-
-internal sealed record OpenSceneRequest(string SceneKey, string Title);
-
-internal sealed record ActivateControlRequest(string Intent, string? SceneKey = null);

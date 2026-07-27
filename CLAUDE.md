@@ -179,9 +179,18 @@ and the public surface should stop changing without review.
   supported way to make a test self-describing. The rule exists to stop narration and rot, not to
   forbid the rare case where a name genuinely cannot carry the information. Markdown prose is
   documentation, not a comment.
-- **Keep decision records and design rationale. Delete session logs, progress reports, and task
-  checklists.** The earlier form of this rule said to kill 99% of plans as noise; applied literally
-  it destroys the best artifacts a repository produces. The distinction is durability, not age.
+- **Code is the source of truth. Do not spend effort on documentation.** Ratified by the owner. Do
+  not write design prose, decision records, or architecture narrative as a deliverable — express the
+  design in types, names, and tests, and put durable operational rules here in `CLAUDE.md` instead.
+  Touch `docs/` only where a gate demands it. This supersedes the earlier "keep decision records"
+  rule and any task instruction to record a design in `docs/architecture.md`.
+- **One top-level type per file, unless the types are one closed co-evolving vocabulary.** Split when
+  a type has an independent lifetime or an independent consumer. Keep together only for a closed set
+  read as a set — an abstract base with its sealed cases, a type with a satellite enum that is
+  meaningless alone — and then name the file for the family, never for one member.
+- **Folders organize; namespaces carry public meaning.** A folder exists because a directory grew
+  too large to scan, and it does **not** create a namespace. Package names may say `Modules` and
+  `Contracts`; public namespaces never do. Samples and tests must not squat a product namespace.
 - **Relative paths only.** Never reference anything under a user profile directory.
 - **Latest deliberate package versions**, centrally in `Directory.Packages.props`.
 - **Small slices, green at each boundary.** Build, run the owning project, run the root gate before

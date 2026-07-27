@@ -1,6 +1,5 @@
 using System.Reflection;
 using DigitalBrain.Client;
-using DigitalBrain.Shell;
 using Xunit;
 
 namespace DigitalBrain.Compositions.Tests;

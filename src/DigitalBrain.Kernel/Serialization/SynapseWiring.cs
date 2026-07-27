@@ -3,13 +3,6 @@ using System.Reflection;
 
 namespace DigitalBrain.Kernel;
 
-internal sealed record SynapseWiringEntry(string Neuron, string Synapse);
-
-internal sealed class DispatchManifest(IReadOnlyList<SynapseWiringEntry> handlers)
-{
-    internal IReadOnlyList<SynapseWiringEntry> Handlers { get; } = handlers;
-}
-
 internal static class SynapseWiring
 {
     private const string GeneratedManifestType = "DigitalBrain.Generated.DispatchManifest";
