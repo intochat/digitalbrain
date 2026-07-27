@@ -82,7 +82,7 @@ File _locateGolden() {
   var dir = Directory.current;
   for (var i = 0; i < 8; i++) {
     final candidate = File(
-      '${dir.path}/modules/DigitalBrain.Modules.Flutter.Contracts/flutter-wire-contracts.golden.json',
+      '${dir.path}/src/modules/flutter/DigitalBrain.Modules.Flutter.Contracts/flutter-wire-contracts.golden.json',
     );
     if (candidate.existsSync()) {
       return candidate;

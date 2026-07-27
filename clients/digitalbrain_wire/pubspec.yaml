@@ -1,7 +1,8 @@
 name: digitalbrain_wire
 description: >
-  Dart UI-edge DTOs for hosts/DigitalBrain.Ui. Golden pin lives in tests against
-  modules/.../flutter-wire-contracts.golden.json (single oracle; no forked copy).
+  Dart UI-edge DTOs for src/modules/flutter/DigitalBrain.Modules.Flutter.Http. Golden
+  pin lives in tests against src/modules/flutter/DigitalBrain.Modules.Flutter.Contracts/
+  flutter-wire-contracts.golden.json (single oracle; no forked copy).
 publish_to: none
 version: 0.1.0
 

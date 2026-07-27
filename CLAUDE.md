@@ -41,7 +41,8 @@ attached — never a neutral menu.
 
 **Before the step:** write the proof that fails and watch it fail. If the behaviour is not coming
 yet, exclude the proof rather than delete it — `[Fact(Explicit = true, DisplayName = "…")]`, run with
-`./tests/<proj>/bin/Debug/net11.0/<proj>.exe -explicit only`. **Never a red root gate.**
+`./<proj-dir>/bin/Debug/net11.0/<proj>.exe -explicit only` — suites live beside what they test, so
+`<proj-dir>` is under `src/`, `os/tests/` or `tests/fixtures/`. **Never a red root gate.**
 
 **Before the commit:** answer these in the message.
 

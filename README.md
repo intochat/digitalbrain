@@ -36,7 +36,7 @@ The plan of record. Nothing is shipped unless it says Built.
 |---|---|
 | Neuron/synapse foundation, owner-scoped client, module activation, AppHost composition, testing path | **Built** |
 | Typed AI, Tasks, Google, Salesforce, Chat, Flutter, Quickstart families | **Built** |
-| Flutter vertical — shell/scene vocabulary, Ui HTTP/SSE edge, `WithUiEdge`/`WithFlutterHost`, headless Dart host, Windows chrome | **Built** |
+| Flutter vertical — shell/scene vocabulary, UI HTTP/SSE edge, `WithUIEdge`/`WithFlutterHost`, headless Dart host, Windows chrome | **Built** |
 | Time — durable one-shot `ICountdown` and its recovery tests | **Built** |
 | Time — reminders, recurring interval/calendar scheduling, DST | Designed |
 | Product chrome polish, multi-principal IdP edge, journal observation on `IDigitalBrain` | Designed |
@@ -53,10 +53,11 @@ One assumption is load-bearing and unmeasured: **that a model can reliably emit 
 ## Repository shape
 
 ```text
-src/       published packages: core/ (framework) and modules/ (IModule domains)
+src/       published packages: core/ (framework) and modules/ (IModule domains),
+           plus the publish gate that polices them
 os/        the product: silo, MCP server, OS behaviours, AppHost
 clients/   Flutter shell and the Dart wire package
-tests/     the publish gate and shared fixtures
+tests/     fixtures/ — shared test subjects and their scaffolding AppHosts
 ```
 
 Retired prototype generations live in git history — `git log --diff-filter=D --summary`, then
