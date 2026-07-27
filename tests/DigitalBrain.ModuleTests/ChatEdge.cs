@@ -26,7 +26,7 @@ internal static class ChatEdgeExtensions
 internal sealed class ChatEdgeScript : IChatClient
 {
     private readonly Lock _gate = new();
-    private readonly Queue<string> _replies = [];
+    private readonly Queue<ChatMessage> _replies = [];
     private int _callCount;
 
     internal int CallCount
@@ -41,10 +41,20 @@ internal sealed class ChatEdgeScript : IChatClient
     }
 
     internal void Reply(string text)
+        => Enqueue(new ChatMessage(ChatRole.Assistant, text));
+
+    internal void ReplyWithCapabilityCall(
+        string tool,
+        IDictionary<string, object?> arguments)
+        => Enqueue(new ChatMessage(
+            ChatRole.Assistant,
+            [new FunctionCallContent(Guid.NewGuid().ToString("N"), tool, arguments)]));
+
+    private void Enqueue(ChatMessage reply)
     {
         lock (_gate)
         {
-            _replies.Enqueue(text);
+            _replies.Enqueue(reply);
         }
     }
 
@@ -89,13 +99,13 @@ internal sealed class ChatEdgeScript : IChatClient
         ArgumentNullException.ThrowIfNull(messages);
         cancellationToken.ThrowIfCancellationRequested();
 
-        string text;
+        ChatMessage reply;
         lock (_gate)
         {
             _callCount++;
-            text = _replies.Dequeue();
+            reply = _replies.Dequeue();
         }
 
-        return new ChatResponse(new ChatMessage(ChatRole.Assistant, text));
+        return new ChatResponse(reply);
     }
 }
