@@ -60,6 +60,6 @@
     <Project Path="tests/DigitalBrain.Compositions.Tests/DigitalBrain.Compositions.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Tasks.Tests/DigitalBrain.Tasks.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Integrations.Tests/DigitalBrain.Integrations.Tests.csproj" />
-
+    <Project Path="tests/DigitalBrain.Os.Bdd.Tests/DigitalBrain.Os.Bdd.Tests.csproj" />
   </Folder>
 </Solution>
