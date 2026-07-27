@@ -8,6 +8,8 @@
     <AnalysisLevel>10.0-all</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <IsPackable>false</IsPackable>
+    <AspireUseCliBundle>false</AspireUseCliBundle>
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
   </PropertyGroup>
   <PropertyGroup>
     <VersionPrefix>0.1.0</VersionPrefix>
