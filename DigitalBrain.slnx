@@ -1,31 +1,42 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/DigitalBrain.PublishGate.Tests/DigitalBrain.PublishGate.Tests.csproj" />
+  </Folder>
+  <Folder Name="/src/core/">
     <Project Path="src/core/kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
     <Project Path="src/core/behaviors/DigitalBrain.Behaviors/DigitalBrain.Behaviors.csproj" />
+    <Project Path="src/core/behaviors/DigitalBrain.Behaviors.Tests/DigitalBrain.Behaviors.Tests.csproj" />
     <Project Path="src/core/kernel/DigitalBrain/DigitalBrain.csproj" />
     <Project Path="src/core/kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <Project Path="src/core/testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <Project Path="src/core/testing/DigitalBrain.Testing.Tests/DigitalBrain.Testing.Tests.csproj" />
     <Project Path="src/core/aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="src/core/aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
     <Project Path="src/core/kernel/DigitalBrain.SourceGeneration/DigitalBrain.SourceGeneration.csproj" />
     <Project Path="src/core/security/DigitalBrain.Security/DigitalBrain.Security.csproj" />
     <Project Path="src/core/mcp/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
     <Project Path="src/core/mcp/DigitalBrain.Mcp.Aspire.Hosting/DigitalBrain.Mcp.Aspire.Hosting.csproj" />
+    <Project Path="src/core/mcp/DigitalBrain.Mcp.Tests/DigitalBrain.Mcp.Tests.csproj" />
   </Folder>
   <Folder Name="/src/modules/">
     <Project Path="src/modules/ai/DigitalBrain.Modules.AI.Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <Project Path="src/modules/ai/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
     <Project Path="src/modules/ai/DigitalBrain.Modules.AI.Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
+    <Project Path="src/modules/ai/DigitalBrain.Modules.AI.Tests/DigitalBrain.Modules.AI.Tests.csproj" />
     <Project Path="src/modules/tasks/DigitalBrain.Modules.Tasks.Contracts/DigitalBrain.Modules.Tasks.Contracts.csproj" />
     <Project Path="src/modules/tasks/DigitalBrain.Modules.Tasks/DigitalBrain.Modules.Tasks.csproj" />
+    <Project Path="src/modules/tasks/DigitalBrain.Modules.Tasks.Tests/DigitalBrain.Modules.Tasks.Tests.csproj" />
     <Project Path="src/modules/time/DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/modules/time/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" />
+    <Project Path="src/modules/time/DigitalBrain.Modules.Time.Tests/DigitalBrain.Modules.Time.Tests.csproj" />
     <Project Path="src/modules/chat/DigitalBrain.Modules.Chat.Contracts/DigitalBrain.Modules.Chat.Contracts.csproj" />
     <Project Path="src/modules/chat/DigitalBrain.Modules.Chat/DigitalBrain.Modules.Chat.csproj" />
     <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
     <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
     <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter.Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
     <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter.Http/DigitalBrain.Modules.Flutter.Http.csproj" />
+    <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter.Tests/DigitalBrain.Modules.Flutter.Tests.csproj" />
+    <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter.Http.Tests/DigitalBrain.Modules.Flutter.Http.Tests.csproj" />
     <Project Path="src/modules/google/DigitalBrain.Modules.Google.Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
     <Project Path="src/modules/google/DigitalBrain.Modules.Google/DigitalBrain.Modules.Google.csproj" />
     <Project Path="src/modules/google/DigitalBrain.Modules.Google.Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />
@@ -39,6 +50,11 @@
     <Project Path="os/DigitalBrain.OS.AppHost/DigitalBrain.OS.AppHost.csproj" />
     <Project Path="os/DigitalBrain.OS.Behaviors/DigitalBrain.OS.Behaviors.csproj" />
   </Folder>
+  <Folder Name="/os/tests/">
+    <Project Path="os/tests/DigitalBrain.OS.Bdd.Tests/DigitalBrain.OS.Bdd.Tests.csproj" />
+    <Project Path="os/tests/DigitalBrain.OS.Composition.Tests/DigitalBrain.OS.Composition.Tests.csproj" />
+    <Project Path="os/tests/DigitalBrain.OS.Host.Tests/DigitalBrain.OS.Host.Tests.csproj" />
+  </Folder>
   <Folder Name="/hosts/">
     <Project Path="hosts/DigitalBrain.TestingAppHost/DigitalBrain.TestingAppHost.csproj" />
     <Project Path="hosts/DigitalBrain.Quickstart.Host/DigitalBrain.Quickstart.Host.csproj" />
@@ -51,18 +67,6 @@
     <Project Path="samples/DigitalBrain.Quickstart/DigitalBrain.Quickstart.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
-    <Project Path="tests/DigitalBrain.Behaviors.Tests/DigitalBrain.Behaviors.Tests.csproj" />
-    <Project Path="tests/DigitalBrain.TestingTests/DigitalBrain.TestingTests.csproj" />
-    <Project Path="tests/DigitalBrain.ModuleTests/DigitalBrain.ModuleTests.csproj" />
-    <Project Path="tests/DigitalBrain.HostTests/DigitalBrain.HostTests.csproj" />
-    <Project Path="tests/DigitalBrain.Quickstart.Tests/DigitalBrain.Quickstart.Tests.csproj" />
-    <Project Path="tests/DigitalBrain.Time.Tests/DigitalBrain.Time.Tests.csproj" />
-    <Project Path="tests/DigitalBrain.Flutter.Tests/DigitalBrain.Flutter.Tests.csproj" />
-    <Project Path="tests/DigitalBrain.Ui.Tests/DigitalBrain.Ui.Tests.csproj" />
-    <Project Path="tests/DigitalBrain.Compositions.Tests/DigitalBrain.Compositions.Tests.csproj" />
-    <Project Path="tests/DigitalBrain.Tasks.Tests/DigitalBrain.Tasks.Tests.csproj" />
-    <Project Path="tests/DigitalBrain.Integrations.Tests/DigitalBrain.Integrations.Tests.csproj" />
-    <Project Path="tests/DigitalBrain.Os.Bdd.Tests/DigitalBrain.Os.Bdd.Tests.csproj" />
+    <Project Path="tests/fixtures/DigitalBrain.Quickstart.Tests/DigitalBrain.Quickstart.Tests.csproj" />
   </Folder>
 </Solution>

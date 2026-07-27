@@ -10,8 +10,8 @@
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\hosts\DigitalBrain.Quickstart.AppHost\DigitalBrain.Quickstart.AppHost.csproj" />
-    <ProjectReference Include="..\..\hosts\DigitalBrain.TestingAppHost\DigitalBrain.TestingAppHost.csproj" />
-    <ProjectReference Include="..\..\src\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="..\..\..\hosts\DigitalBrain.Quickstart.AppHost\DigitalBrain.Quickstart.AppHost.csproj" />
+    <ProjectReference Include="..\..\..\hosts\DigitalBrain.TestingAppHost\DigitalBrain.TestingAppHost.csproj" />
+    <ProjectReference Include="..\..\..\src\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
   </ItemGroup>
 </Project>

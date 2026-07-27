@@ -14,6 +14,6 @@
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Ui.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Flutter.Http.Tests" />
   </ItemGroup>
 </Project>

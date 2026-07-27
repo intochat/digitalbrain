@@ -9,7 +9,8 @@
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
-    <ProjectReference Include="..\..\src\modules\ai\DigitalBrain.Modules.AI\DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Modules.Time.Contracts\DigitalBrain.Modules.Time.Contracts.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Modules.Time\DigitalBrain.Modules.Time.csproj" />
+    <ProjectReference Include="..\..\..\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
   </ItemGroup>
 </Project>
