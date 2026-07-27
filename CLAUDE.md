@@ -1,35 +1,37 @@
 # CLAUDE.md — how to work in this repository
 
-Canonical for every agent and contributor. `AGENTS.md` points here. Written to be followable by
-any harness — Claude Code, Codex, Grok — with nothing but a shell and this repository.
+This file is the harness: how an agent operates here, what it may claim, and what it must prove
+first. It is not product documentation — `README.md` carries what DigitalBrain is and what is Built
+versus Designed. These two files are the only prose in the repository, and that is deliberate.
+
+Written to be followable by any harness — Claude Code, Codex, Grok — with nothing but a shell and
+this repository.
 
 ---
 
-## 1. What is being built
+## 1. Starting a session
 
-DigitalBrain is an AI-native operating system for durable agents on Orleans and Aspire. Its
-ready-to-use primitives are **neurons and synapses**; users compose them in C# today and ultimately
-describe behaviors in natural language. The thing that makes it worth building is:
+Order matters. Two of these bite silently if skipped.
 
-> **A brain you program by writing ordinary C#, and that can program itself.**
+1. **Build before you open an agent session.** `aspire run` or `dotnet build DigitalBrain.slnx`
+   refreshes the CodeGraph index. The index lives in gitignored `.codegraph/`, so a fresh clone has
+   none, and a session opened first will be told the repository "isn't indexed". That is a cold
+   index, not a broken tool — build, or run `codegraph init`, and retry.
+2. **Record the ground.** `git rev-parse HEAD` and `git status --porcelain`. Check both again before
+   staging. This repository has been modified mid-session by other tools. If something changed that
+   you did not change, **surface it and stop** — do not revert it, do not sweep it into your commit.
+3. **Open at the repository root** with a plain start (`claude` / `codex` / `grok`). A session rooted
+   above the repo cannot reach the index or the project MCP catalog.
 
-The architecture in six lines:
+First run from nothing must work with exactly two commands, and this is a gate, not an aspiration:
 
-- **The typed interface is the surface, the synapse is the substrate, the generator is the bridge.**
-- **A synapse is a fact** — a thin record, broadcast, no reply. **An interface method is a request** —
-  directed at a capability, replies. Both are journaled; neither is privileged.
-- **Modules own vocabulary** — synapse records and neuron interfaces. Compile-time, needs a rebuild.
-- **Behaviors own OS logic** — an approved single-file C# program runs on behalf of an owner-scoped
-  `BehaviorNeuron`; the installation rail remains designed and unbuilt.
-- **The Behavior SDK is the program-boundary foundation.** The shipped package supplies authoring
-  interfaces, a constrained context, manifests, and artifact identities. Compilation, BDD
-  verification, approval, and constrained execution remain part of the designed rail.
-- **Every future install is a human-approved proposal**, journaled and reversible.
+```powershell
+git clean -fdx
+aspire run
+```
 
-There is no architecture document. Section 7 of this file records what is Built versus Designed, and
-that is the whole of the written plan of record — everything else is read from the code and the
-tests. Do not silently reverse a decision recorded there. If evidence invalidates one, change section
-7 in the same commit as the code.
+`aspire.config.json` points the CLI at `hosts/DigitalBrain.AppHost`, so no `--project` is needed from
+the root.
 
 ---
 
@@ -49,104 +51,77 @@ Apply in order. Order matters — jumping to optimise or automate locks in waste
 
 ## 3. Grilling
 
-Grilling is the discipline that makes step 1 real. It applies before building **and during it**.
+**Before building.** State a recommendation, state the strongest argument against it, and defend or
+fold. Present evidence, not opinion. When a decision belongs to a person, put it to them with your
+recommendation attached — never a neutral menu.
 
-### Before building
-
-State a recommendation, state the strongest argument against it, and defend or fold. Present
-evidence, not opinion. When a decision belongs to a person, put it to them with your recommendation
-attached — never a neutral menu.
-
-### During implementation — three moves
-
-**Before the step — write the proof that fails.** Assert the behaviour the system *should* have and
+**Before the step, write the proof that fails.** Assert the behaviour the system *should* have and
 watch it fail before writing the code that satisfies it. When the behaviour is not coming yet, keep
-the proof and exclude it rather than deleting it. **Never a red root gate.**
+the proof and exclude it rather than deleting it — `[Fact(Explicit = true, DisplayName = "…")]`, run
+on demand with `./tests/<proj>/bin/Debug/net11.0/<proj>.exe -explicit only`. **Never a red root gate.**
 
-Hold unfinished proofs with `[Fact(Explicit = true, DisplayName = "…")]`. Prove one red on demand with
-`./tests/<proj>/bin/Debug/net10.0/<proj>.exe -explicit only` — the test runs and fails.
-
-**Before the commit — grill the diff.** Three questions, answered in the commit message:
+**Before the commit, grill the diff.** Answer these three in the commit message:
 
 - What did I add that has no consumer today?
 - What did I claim without running a command to check?
 - What changed that I did not change?
 
-**Before the claim — run it and quote it.** Evidence precedes assertion, always. "Tests pass" is not
-a claim you may make without the output in front of you. If a step was skipped, say so. If something
-failed, say so with the failure.
+**Before the claim, run it and quote it.** Evidence precedes assertion, always. If a step was
+skipped, say so. If something failed, say so with the failure.
 
-### Per phase
-
-A real adversarial review at every phase boundary, and **verify its findings yourself**. Reviews are
-worth their cost — a prior phase raised six findings and all six were real — but a review is a claim
-like any other. Check its method, not only its conclusions.
+**Per phase**, run a real adversarial review and **verify its findings yourself**. A review is a claim
+like any other; check its method, not only its conclusions.
 
 ---
 
-## 4. Oracles and tools
+## 4. Verification — behaviour first, never build-and-test alone
 
-**The mandatory path uses only the compiler, the test suite, and git.** These exist in every harness.
+**A green test suite proves the code compiles and its logic holds. It does not prove the feature
+works.** Most tests here drive `ScriptedChatClient`, a deterministic double: they prove plumbing,
+journaling and wiring, and nothing whatsoever about a live model, a real silo, or a running edge.
 
-| Question | Oracle |
-|---|---|
-| Does this API exist? Is this signature right? | **The compiler.** Write a throwaway file referencing it and build. No `CS0246` proves the type exists |
-| Does the system behave this way? | **The test suite.** Not the docs — several docs have been wrong |
-| What was here before? Is this recoverable? | **git.** Retired trees live at `git show <sha>^:<path>` |
+If you reach for `dotnet test` first to validate a *behaviour* change, stop and drive the live system
+instead. Tests are the regression net, not the proof.
 
-Optional accelerators ship as **project MCP** in root `.mcp.json` only:
+### The ladder — climb all of it before claiming a behaviour works
 
-| Server | Role |
-|---|---|
-| `aspire` | AppHost resource control |
-| `codegraph` | repo architecture index |
-| `context7` | package/docs lookup (`CONTEXT7_API_KEY`) |
-| `microsoft-learn` | official Microsoft docs (HTTP) |
-| `dart` | Dart/Flutter analysis MCP |
-| `digitalbrain-mcp` | product MCP HTTP at `http://localhost:5000/mcp` — Aspire client over `IDigitalBrain.Get<ILlama32>`; tool `ask_llama32` returns `ChatResponse` (requires silo + MCP host) |
+1. **Compile.** `dotnet build DigitalBrain.slnx -c Release`.
+2. **Bring it up.** `aspire run` (foreground) or `aspire start` (background, `aspire stop` to end).
+   Then `mcp__aspire__list_resources` — every resource Running and Healthy. Not "probably up".
+3. **Drive the real scenario** through the real edge — an HTTP call to `digitalbrain-ui`, or the
+   Flutter shell. Not a unit test standing in for it.
+4. **Read the journal.** `digitalbrain-mcp` is the audit source: `read_neuron_journal` for the causal
+   facts, `read_chat_transcript` for the conversation, `list_active_neurons` for what activated.
+   Confirm the synapses you expected fired, under one correlation id, in the order you expected.
+5. **Cross-check Aspire telemetry** — see the table below for what that can currently tell you.
+6. **Run the root gate** for regression safety.
+7. **Only now** state the result, quoting the output you actually saw.
 
-That file is the sole catalog. Shape matches sibling DigitalBrain projects: direct `aspire` / `dart`,
-Windows `cmd /c npx -y …` for Node MCPs, native `"type":"http"` for remote HTTP. No `gcf-proxy`, no
-user-profile paths, no global npm MCP installs as a requirement.
+### Journals are the audit source; telemetry is a projection
 
-Claude project trust is in `.claude/settings.json`: `enableAllProjectMcpServers`,
-`enabledMcpjsonServers` (same names as `.mcp.json`), and `permissions.allow` for `mcp__*` tools.
-Open agents at the repository root with a **plain** start (`claude` / `grok` / `codex`) — do not use
-`--strict-mcp-config` or isolated homes as proof of health. Codex cannot read `.mcp.json`; its only
-adapter is `.codex/config.toml` with the same servers. Project `.grok/config.toml` holds matching
-`[mcp_servers.*]` so name collisions with `~/.claude.json` still resolve to the project lines. Keep
-`.mcp.json`, `.claude/settings.json` allow-lists, `.codex/config.toml`, and `.grok` MCP blocks in
-lockstep. Do not enable plugins that inject MCP.
+That ordering is ratified and load-bearing: the kernel's durable journals are the truth, and
+telemetry never becomes the audit source. Journals deliberately record causal facts only — synapse
+type, caller, correlation, timestamp — never arguments, payloads, prompts or secrets. Telemetry tags
+follow the same discipline.
 
-**If an accelerator is unavailable, say so and fall back to the oracles. Do not skip silently.**
-`codegraph` keeps its index through the `RefreshCodeGraph` target in
-`hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj`, which runs `init` then `sync` over the
-repository root — so `aspire run` and the root gate both refresh it, and the index spans C#, Dart and
-the Flutter Windows runner alike. **That target belongs to the AppHost project and nowhere else.**
-There is no `Directory.Build.targets`: a repository-root one is walked by Flutter's Windows native
-build and has to be fenced off with empty stub files under `clients/`, which is why the last attempt
-was deleted. Do not reintroduce either. The index lives in gitignored `.codegraph/`, so a fresh clone
-has none until that build; if the server answers "isn't indexed", build the AppHost or run
-`codegraph init` and retry rather than giving up on the tool. A session rooted above the repo cannot
-reach the index at all; that absence is the environment, not a broken tool. `context7` needs
-`CONTEXT7_API_KEY` in the process environment — fall back to Microsoft Learn when it is unset.
-Note: Microsoft Learn returns the older `Orleans.EventSourcing.JournaledGrain` for journaling
-queries. That is a different API from `Microsoft.Orleans.Journaling`. Do not conflate them.
+### What telemetry actually works today
 
-**Check whether the ground moved.** Record `git rev-parse HEAD` and `git status --porcelain` at the
-start of a session, and check both again before staging. This repository has been modified mid-session
-by other tools. If something changed that you did not change, **surface it and stop** — do not revert
-it and do not sweep it into your commit.
+Measured against a running AppHost after a real chat turn. Do not claim more than this.
 
-**Fan-out needs a scoring rule.** When dispatching parallel agents, give them the rule by which a
-finding counts — for example "changes a decision that is currently open", not "find valuable
-content". Without a rule they return summaries; with one they return findings.
+| Channel | Tool | State |
+|---|---|---|
+| Resource health | `mcp__aspire__list_resources` | **Works** |
+| Console logs | `mcp__aspire__list_console_logs` | **Works** — noisy; Azurite request spam dominates |
+| Durable journals | `digitalbrain-mcp` | **Works** — and is the audit source |
+| Structured logs | `mcp__aspire__list_structured_logs` | **Empty.** Zero entries |
+| Distributed traces | `mcp__aspire__list_traces` | **Empty of application spans** — only `dotnet-cli` |
+| GenAI spans, metrics | `aspire otel` | **Do not exist** |
 
-**Agent harness (Claude / Grok / Codex).** MCP lives in `.mcp.json`. Harness adapters
-(`.claude/settings.json`, `.grok/config.toml`, `.codex/config.toml`) hold only harness-native
-non-MCP settings, except Codex’s required MCP TOML mirror. Do not fork the server list in three
-places. If a tool only appears from user-level config or a marketplace plugin, treat it as outside
-this repository’s harness and do not depend on it.
+**This gap is the repository's top open defect, not a fact of life.** No host calls
+`ConfigureOpenTelemetry`; no `IChatClient` pipeline calls `UseOpenTelemetry`; the kernel's
+`ActivitySource("DigitalBrain")` is never registered with an exporter. Until that spine is built,
+step 5 of the ladder can only confirm health and console output — say exactly that rather than
+implying traces were checked. When you build it, this table is the thing to update.
 
 ---
 
@@ -154,93 +129,145 @@ this repository’s harness and do not depend on it.
 
 **The root gate, every phase, no exceptions:**
 
-```
+```powershell
 dotnet build DigitalBrain.slnx -c Release
 dotnet test DigitalBrain.slnx -c Release --logger "console;verbosity=minimal"
 ```
 
-**Never `--filter` for the completion gate.** Run it with a long timeout and poll. A project-scoped run has already missed a
-failing contract that the root run caught. During TDD you may run the smallest owning project in the
-foreground, but the root gate is what permits a completion claim.
+**Never `--filter` for the completion gate.** Run it with a long timeout and poll. A project-scoped
+run has already missed a failing contract that the root run caught. During TDD you may run the
+smallest owning project in the foreground, but the root gate is what permits a completion claim.
 
-That gate is the whole gate. The public site is a separate repository — `intochat/digitalbrain.docs`,
-published at https://digitalbrain.tech — with its own `npm test` and `npm run build`. Nothing in this
-repository builds, tests, or serves it, and no change here can break it.
+**The client gates**, when you touch `clients/`:
 
-One guard fails the build by design, and that is correct:
+```powershell
+cd clients/digitalbrain_wire       ; dart test
+cd clients/digitalbrain_flutter    ; dart analyze ; dart test
+cd clients/digitalbrain_flutter/shell ; flutter analyze ; flutter test ; flutter build windows
+```
 
-- Adding an `[Alias]` means updating the pinned-alias contract.
+Dart never sole-owns shell or scene semantics — the root `dotnet test` gate remains domain truth.
 
-Public API is not baseline-locked while the framework is a pre-release alpha in flux; the
-`PublicApiAnalyzers` baseline files were removed. Re-introduce them when a real release approaches
-and the public surface should stop changing without review.
+One guard fails the build by design, and that is correct: adding an `[Alias]` means updating the
+pinned-alias contract. Public API is not baseline-locked while the framework is a pre-release alpha;
+re-introduce `PublicApiAnalyzers` baselines when a real release approaches.
 
 ---
 
-## 6. Rules
+## 6. Oracles and tools
+
+**The mandatory path uses only the compiler, the test suite, and git.** These exist in every harness.
+
+| Question | Oracle |
+|---|---|
+| Does this API exist? Is this signature right? | **The compiler.** Reference it and build. No `CS0246` proves the type exists |
+| Does the system behave this way? | **The live system**, then the test suite. Not prose — prose has been wrong |
+| What was here before? Is this recoverable? | **git.** Retired trees live at `git show <sha>^:<path>` |
+
+**Context7 before any library-touching code.** Resolve the id, query the docs, then write. Applies to
+Orleans, Aspire, Microsoft.Extensions.AI, Flutter, MCP — every time, including APIs you think you
+know. Fall back to `microsoft-learn` when `CONTEXT7_API_KEY` is unset. Note that Microsoft Learn
+returns the older `Orleans.EventSourcing.JournaledGrain` for journaling queries; that is a different
+API from `Microsoft.Orleans.Journaling`. Do not conflate them.
+
+**CodeGraph before any non-trivial edit.** One `codegraph_explore` call returns the relevant source
+plus call paths plus a blast radius, replacing a grep-and-read loop. It indexes what git tracks — C#,
+Dart, and the Flutter Windows runner alike, 443 files out of 11,342 on disk. Two consequences worth
+knowing: it honours `.gitignore` including negations and nested files, and because `obj/` is ignored
+**source-generated code is invisible to it** — 96 `*.g.cs` on disk, none indexed. For generated
+activation code, use the compiler.
+
+The index is refreshed by the `RefreshCodeGraph` target in
+`hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj`, so `aspire run` and the root gate both
+refresh it. **That target belongs to the AppHost project and nowhere else** — see the traps below.
+
+**Project MCP lives in root `.mcp.json` and nowhere else:**
+
+| Server | Role |
+|---|---|
+| `aspire` | AppHost resource control, logs, traces |
+| `codegraph` | repository index — source and call paths |
+| `context7` | package and framework docs |
+| `microsoft-learn` | official Microsoft docs |
+| `dart` | Dart/Flutter analysis |
+| `digitalbrain-mcp` | the running brain at `http://localhost:5000/mcp` — needs silo + MCP host up |
+
+**If an accelerator is unavailable, say so and fall back to the oracles. Do not skip silently.**
+
+**Fan-out needs a scoring rule.** When dispatching parallel agents, give them the rule by which a
+finding counts — "changes a decision that is currently open", not "find valuable content". Without a
+rule they return summaries; with one they return findings.
+
+---
+
+## 7. Harness configuration
+
+MCP servers live in `.mcp.json`. Harness adapters hold only harness-native settings, except Codex's
+required MCP mirror: `.claude/settings.json`, `.codex/config.toml`, `.grok/config.toml`. Keep the
+server list in lockstep across all four; do not fork it. Do not enable plugins that inject MCP.
+
+Skills and plugins are enabled declaratively in `.claude/settings.json`. Alongside the general-purpose
+plugins, the `dotnet-agent-skills` marketplace (`dotnet/skills`) supplies .NET-specific skills; the
+curated set enabled here is `dotnet11`, `dotnet-msbuild`, `dotnet-nuget`, `dotnet-test`, `dotnet-diag`,
+`dotnet-ai`, `dotnet-aspnetcore`. The rest of that marketplace is deliberately off — `dotnet-data`
+(no EF), `dotnet-maui` and `dotnet-blazor` (the client is Flutter), `dotnet-template-engine`,
+`dotnet-test-migration` (already on xunit.v3), and `dotnet` itself, whose LSP overlaps the existing
+`csharp-lsp` plugin. Enable one on demand rather than enabling all of them by default; every enabled
+skill costs context on every session.
+
+---
+
+## 8. Repository conventions
 
 - **No comments as narrative, boilerplate, or commented-out code.** No `/// <summary>` restating a
-  signature. Carry meaning in names, types, and tests instead — `[Fact(DisplayName = "...")]` is the
-  supported way to make a test self-describing. The rule exists to stop narration and rot, not to
-  forbid the rare case where a name genuinely cannot carry the information. Markdown prose is
-  documentation, not a comment.
+  signature. Carry meaning in names, types, and tests — `[Fact(DisplayName = "...")]` is the
+  supported way to make a test self-describing. The rule stops narration and rot; it does not forbid
+  the rare case where a name genuinely cannot carry the information.
 - **Code is the source of truth. Do not spend effort on documentation.** Ratified by the owner. Do
-  not write design prose, decision records, or architecture narrative as a deliverable — express the
-  design in types, names, and tests, and put durable operational rules here in `CLAUDE.md` instead.
-  This repository holds no `docs/` tree at all — `CLAUDE.md` and `README.md` are the only prose it
-  carries. This supersedes the earlier "keep decision records" rule and any task instruction to
-  record a design in an architecture document.
-- **One top-level type per file, unless the types are one closed co-evolving vocabulary.** Split when
-  a type has an independent lifetime or an independent consumer. Keep together only for a closed set
-  read as a set — an abstract base with its sealed cases, a type with a satellite enum that is
-  meaningless alone — and then name the file for the family, never for one member.
-- **Folders organize; namespaces carry public meaning.** A folder exists because a directory grew
-  too large to scan, and it does **not** create a namespace. Package names may say `Modules` and
-  `Contracts`; public namespaces never do. Samples and tests must not squat a product namespace.
+  not write design prose, decision records, or architecture narrative as a deliverable. Durable
+  operational rules go here; product status goes in `README.md`. There is no `docs/` tree and none
+  should be created — the public site is a separate repository, `intochat/digitalbrain.docs`.
+- **One top-level type per file**, unless the types are one closed co-evolving vocabulary read as a
+  set. Then name the file for the family, never for one member.
+- **Folders organize; namespaces carry public meaning.** A folder does not create a namespace.
+  Package names may say `Modules` and `Contracts`; public namespaces never do. Samples and tests must
+  not squat a product namespace.
 - **Relative paths only.** Never reference anything under a user profile directory.
 - **Latest deliberate package versions**, centrally in `Directory.Packages.props`.
-- **Small slices, green at each boundary.** Build, run the owning project, run the root gate before
-  claiming the slice is done.
-- **Commit at green boundaries** with the diff-grill answers in the message.
-- **Self-evolution is the product.** The only path to a live behaviour is a human-approved proposal
-  through the journaled rail. That rail is not built yet — until it is, changes arrive the ordinary
-  way.
+- **Small slices, green at each boundary.** Commit at green boundaries with the grill answers in the
+  message. One logical change per commit. Never `--no-verify`; never `reset --hard`, `push --force`
+  or `checkout --` without confirming first.
 
 ---
 
-## 7. Where things stand
+## 9. Known traps — verified here, do not re-hit
 
-The durable neuron and synapse foundation, owner-scoped client facade, generated module activation,
-one-call durable AppHost composition, public testing path, and typed AI, Tasks, Google, Salesforce,
-Flutter, and Quickstart families are built and proven. Time is built only through the durable one-shot
-`ICountdown` capability and its deterministic recovery tests. Reminder, recurring interval/calendar
-scheduling, DST records, and recurrence-library selection remain designed or open and unbuilt.
+Every entry below was hit in this repository and cost real time. Add to it only what you have
+actually reproduced.
 
-Flutter first vertical is Built: shell/scene vocabulary, Ui HTTP/SSE edge, module-owned
-`WithUiEdge`/`WithFlutterHost`, headless Dart host, and Windows Material shell chrome
-(`clients/digitalbrain_flutter` key/title list from `SceneOpened`). Full product chrome polish,
-multi-principal IdP edge, and product journal observation on `IDigitalBrain` remain designed — do not
-re-open Built Windows chrome as Designed.
+- **Reentrancy deadlock.** `DrainAsync` awaits `Deliver` *inside the emitting neuron's turn*, and
+  `NeuronConcurrency.RequireSerializedTurns` forbids reentrancy. A handler that calls back
+  synchronously into the neuron that emitted its trigger **hangs indefinitely**. Facts flow one way:
+  `UserMessaged` carries the transcript, and the answer returns as a directed `AssistantAnswered`.
+- **No repository-root `Directory.Build.targets`.** Flutter's Windows native build walks up into it
+  and has to be fenced off with empty stub `Directory.Build.props`/`.targets` under `clients/`. That
+  is why the previous root targets file and all four stubs were deleted. Per-project targets only.
+- **CodeGraph follows `.gitignore`**, so generated sources under `obj/` are absent from the index.
+  Do not conclude a generated symbol does not exist because CodeGraph cannot see it.
+- **`DOTNET_ROOT` breaks `aspire run` while `dotnet build`/`test` still pass.** The CLI resolves the
+  SDK itself, but the AppHost executable resolves the runtime through `DOTNET_ROOT`. If it points at
+  a .NET 10 location the AppHost fails to start with a missing `Microsoft.NETCore.App` 11 message.
+- **llama3.2 selects tools badly.** A 3B-class model with one registered tool calls that tool on
+  prompts that ask for nothing — reproduced on every live greeting so far, including a bare "Hi".
+  The mis-selection is journaled as `CapabilityToolSelected`, so it is visible rather than silent.
+  Mitigate by registering tools only under real intent, or switch model; the seam is model-agnostic.
+- **One conversation is single-threaded end to end.** While a turn is being answered, the chat neuron
+  is occupied for the whole model-plus-capability chain. Fine for one owner in dev; a real constraint
+  at scale.
+- **Windows file locks masquerade as build breaks.** A running `digitalbrain_flutter.exe` fails the
+  Windows build with `LNK1168`; a stale VitePress or esbuild process blocks directory deletion. Check
+  for a holding process before believing the error.
 
-Behavior proposal, approval, installation, execution, and rollback also remain designed and unbuilt.
-`DigitalBrain.Behaviors` is a packable SDK foundation for public authoring interfaces, constrained
-context, manifests, and revision/artifact identities; the nonpackable `DigitalBrain.Behaviors.Runtime`
-contains only the canonical artifact codec. Neither project is a compiler, builder, worker, broker,
-or execution rail. The post-rail model holds: one owner-scoped
-`BehaviorNeuron` implementation owns journals/state/revisions; its single-file program is not a Neuron
-and unknown code executes outside the silo through a capability broker. Pre-rail OS activation
-(`DigitalBrainActivated` in Abstractions; pull compositions such as `ActivateDigitalBrain` /
-`BootOnActivation`) may be Built samples/L1 — still not installed Behaviors and not the install rail.
-
-This section is the single architecture authority: module status, ratified rules, known limitations,
-and rejected shapes. Everything else was deleted — the eight `docs/architecture/*` topic authorities
-and the `docs/superpowers/` and `docs/research/` trees folded into one page, and that page then left
-for `intochat/digitalbrain.docs`, because 94% of documentation described a rail with no code. Do not
-resurrect stage plans, scorecards, grills, session checklists, or a `docs/` tree. The site carries
-vision for readers; code carries detail for everyone.
-
-One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
-That benchmark and the behavior proposal/install rail remain deliberately outside the built
-foundation. Do not describe designed behavior execution or recurring/calendar Time as shipped.
+---
 
 Update this file through the same rail as everything else, and only when the loop actually improves.
