@@ -44,22 +44,19 @@ The plan of record. Nothing is shipped unless it says Built.
 | Observability spine — host OpenTelemetry, instrumented chat clients, GenAI spans | **Not built — top open defect** |
 
 `DigitalBrain.Behaviors` is a packable SDK foundation (authoring interfaces, constrained context,
-manifests, artifact identities); `DigitalBrain.Behaviors.Runtime` holds only the canonical artifact
-codec. Neither is a compiler, builder, broker or execution rail. Chat today is *behaviour-shaped, not
-behaviour-installed* — its program is a real `IIntentProgram` composed at build time.
+manifests, artifact identities) and holds the canonical artifact codec. It is not a compiler, builder,
+broker or execution rail. Chat today is *behaviour-shaped, not behaviour-installed* — its program is a
+real `IIntentProgram` composed at build time.
 
 One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
 
 ## Repository shape
 
 ```text
-src/       domain-neutral framework packages
-modules/   independently shipped domains (AI, Tasks, Time, Google, Salesforce, Chat, Flutter)
-behaviors/ OS behaviour programs composed at build time
-hosts/     AppHost, silo, MCP, Ui, TestingAppHost, Quickstart hosts
+src/       published packages: core/ (framework) and modules/ (IModule domains)
+os/        the product: silo, MCP server, OS behaviours, AppHost
 clients/   Flutter shell and the Dart wire package
-samples/   Quickstart greeter; AccountEnrichment; Compositions
-tests/     L0 contracts; L1 suites; L2 HostTests
+tests/     the publish gate and shared fixtures
 ```
 
 Retired prototype generations live in git history — `git log --diff-filter=D --summary`, then

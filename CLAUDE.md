@@ -127,7 +127,7 @@ different API from `Microsoft.Orleans.Journaling`. Do not conflate them.
 blast radius, replacing a grep-and-read loop. It indexes what git tracks, across C# and Dart alike;
 because it honours `.gitignore`, **source-generated code under `obj/` is invisible to it** — use the
 compiler for generated symbols. The index is refreshed by `RefreshCodeGraph` in
-`hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj`, which belongs to that project alone.
+`os/DigitalBrain.OS.AppHost/DigitalBrain.OS.AppHost.csproj`, which belongs to that project alone.
 
 MCP lives in root `.mcp.json`: `aspire` (resources, logs, traces), `codegraph`, `context7`,
 `microsoft-learn`, `dart`, and `digitalbrain-mcp` (the running brain; needs silo + MCP host up).
