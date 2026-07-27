@@ -38,12 +38,12 @@ public sealed class HostingProjectionContracts
 
         var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiHttpEndpointName)
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UIHttpEndpointName)
             .WithReference(brain);
 
         var client = builder
             .AddContainer("client", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiHttpEndpointName)
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UIHttpEndpointName)
             .WithReference(brain.AsClient());
 
         var siloEnvironment = await FlutterHostingProjectionSupport
@@ -63,7 +63,7 @@ public sealed class HostingProjectionContracts
             client.Resource.Annotations.OfType<WaitAnnotation>(),
             wait => wait.WaitType == WaitType.WaitUntilHealthy);
 
-        FlutterHostingProjectionSupport.AssertNoOsSurfaceResources(builder);
+        FlutterHostingProjectionSupport.AssertNoOSSurfaceResources(builder);
     }
 
     private static string ConfigurationEnvironment(string configurationKey)

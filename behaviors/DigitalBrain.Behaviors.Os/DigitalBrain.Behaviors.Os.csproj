@@ -2,7 +2,7 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <Description>Operating-system behaviour programs. Behaviour-shaped and composed at build time; the install rail does not exist yet.</Description>
-    <RootNamespace>DigitalBrain.Os</RootNamespace>
+    <RootNamespace>DigitalBrain.OS</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812;CA2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>

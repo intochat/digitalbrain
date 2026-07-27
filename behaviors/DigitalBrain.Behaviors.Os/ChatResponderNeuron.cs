@@ -7,7 +7,7 @@ using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Os;
+namespace DigitalBrain.OS;
 
 [GrainType("os-chat-responder")]
 internal sealed class ChatResponderNeuron :

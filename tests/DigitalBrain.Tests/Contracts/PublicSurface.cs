@@ -51,8 +51,8 @@ public sealed class PublicSurface
         string[] forbidden =
         [
             "Flutter",
-            "UiGateway",
-            "UiSurface",
+            "UIGateway",
+            "UISurface",
             "BuildContext",
             "Widget",
             .. typeof(IShell).Assembly

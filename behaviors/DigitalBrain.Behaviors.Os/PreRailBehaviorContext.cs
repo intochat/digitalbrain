@@ -5,7 +5,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Os;
+namespace DigitalBrain.OS;
 
 internal sealed class PreRailBehaviorContext(
     IGrainFactory grains,

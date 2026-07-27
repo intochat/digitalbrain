@@ -7,7 +7,7 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
-using DigitalBrain.Os;
+using DigitalBrain.OS;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
 
@@ -17,9 +17,9 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
 
 brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
 brain.AddModule<ChatModule>();
-brain.AddModule<OsBehaviorsModule>();
+brain.AddModule<OSBehaviorsModule>();
 brain.AddModule<FlutterModule>(flutter => flutter
-    .WithUiEdge()
+    .WithUIEdge()
     .WithFlutterHost());
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());

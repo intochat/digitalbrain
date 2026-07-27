@@ -11,7 +11,7 @@ internal static class ChatEndpoints
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints.MapPost(
-            UiEdgeContract.SendMessagePath,
+            UIEdgeContract.SendMessagePath,
             static async Task<IResult> (
                 string chatName,
                 SendMessageRequest request,
@@ -34,7 +34,7 @@ internal static class ChatEndpoints
             });
 
         endpoints.MapGet(
-            UiEdgeContract.ChatEventsPath,
+            UIEdgeContract.ChatEventsPath,
             static async Task (
                 HttpContext http,
                 string chatName,
@@ -54,8 +54,8 @@ internal static class ChatEndpoints
                     return;
                 }
 
-                http.Response.Headers.CacheControl = UiEdgeContract.CacheControlNoCache;
-                http.Response.ContentType = UiEdgeContract.EventStreamContentType;
+                http.Response.Headers.CacheControl = UIEdgeContract.CacheControlNoCache;
+                http.Response.ContentType = UIEdgeContract.EventStreamContentType;
                 await ChatEventFeed.WriteChatTurnSseAsync(
                     http.Response.Body,
                     sessionJournal,

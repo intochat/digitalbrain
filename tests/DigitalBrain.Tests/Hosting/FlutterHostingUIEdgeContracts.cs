@@ -7,36 +7,36 @@ using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
 
-public sealed class FlutterHostingUiEdgeContracts
+public sealed class FlutterHostingUIEdgeContracts
 {
     [Fact(DisplayName =
-        "WithUiEdge projects " + FlutterHostingExtensions.DefaultUiResourceName
+        "WithUIEdge projects " + FlutterHostingExtensions.DefaultUIResourceName
         + " as AsClient with named http endpoint, exclusive owner env; omits flutter host")]
-    public async Task WithUiEdgeProjectsNamedHttpEndpointAsClientOnly()
+    public async Task WithUIEdgeProjectsNamedHttpEndpointAsClientOnly()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
 
-        brain.AddModule<FlutterModule>(flutter => flutter.WithUiEdge(options =>
+        brain.AddModule<FlutterModule>(flutter => flutter.WithUIEdge(options =>
         {
-            options.ProjectPath = FlutterHostingProjectionSupport.UiProjectPath;
+            options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath;
             options.Owner = "edge-owner";
         }));
 
         var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiHttpEndpointName)
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UIHttpEndpointName)
             .WithReference(brain);
 
         var ui = Assert.Single(
             builder.Resources.OfType<ProjectResource>(),
-            resource => resource.Name == FlutterHostingExtensions.DefaultUiResourceName);
+            resource => resource.Name == FlutterHostingExtensions.DefaultUIResourceName);
 
         FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);
-        FlutterHostingProjectionSupport.AssertUiHasNamedHttpEndpoint(ui);
+        FlutterHostingProjectionSupport.AssertUIHasNamedHttpEndpoint(ui);
 
         var environment = await FlutterHostingProjectionSupport.EnvironmentOf(ui).ConfigureAwait(true);
-        FlutterHostingProjectionSupport.AssertExclusiveUiProductEnvironment(environment);
+        FlutterHostingProjectionSupport.AssertExclusiveUIProductEnvironment(environment);
         Assert.Equal(
             "edge-owner",
             environment[FlutterHostingExtensions.OwnerEnvironmentVariable]?.ToString());

@@ -5,7 +5,7 @@ using Xunit;
 
 namespace DigitalBrain.Compositions.Tests;
 
-public sealed class BehaviorOsActivationHonesty
+public sealed class BehaviorOSActivationHonesty
 {
     private static readonly Type[] ForbiddenBehaviorDispatchNames =
         new[]

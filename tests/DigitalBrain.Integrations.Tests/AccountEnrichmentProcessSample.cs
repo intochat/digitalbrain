@@ -21,7 +21,7 @@ public sealed class AccountEnrichmentProcessSample(IntegrationsFixture fixture)
 
     [Fact(DisplayName =
         "multi-module enrichment then OS enrichment scene journals without secrets")]
-    public async Task EnrichmentThenOsSurfaceOpensEnrichmentScene()
+    public async Task EnrichmentThenOSSurfaceOpensEnrichmentScene()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);

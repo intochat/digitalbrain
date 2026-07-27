@@ -3,7 +3,7 @@ using Xunit;
 
 namespace DigitalBrain.Ui.Tests;
 
-public sealed class LiveProductUiNorthbound
+public sealed class LiveProductUINorthbound
 {
     [Fact(
         Explicit = true,
@@ -12,7 +12,7 @@ public sealed class LiveProductUiNorthbound
     public async Task PostOpenSceneAndSseProjectsSceneOpened()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var baseAddress = UiFixture.ResolveProductUiBaseAddress();
+        var baseAddress = UIFixture.ResolveProductUIBaseAddress();
         var shellName = $"live-{Guid.NewGuid():N}"[..16];
         var sceneKey = "live-home";
         var title = "Live Home";
@@ -24,36 +24,36 @@ public sealed class LiveProductUiNorthbound
         };
 
         using (var health = await http.GetAsync(
-                   new Uri(UiEdgeContract.HealthPath, UriKind.Relative),
+                   new Uri(UIEdgeContract.HealthPath, UriKind.Relative),
                    cancellationToken))
         {
             Assert.True(
                 health.IsSuccessStatusCode,
-                $"Product {UiFixture.DefaultUiResourceName} {UiEdgeContract.HealthPath} not OK at {baseAddress}. Start: aspire start --project hosts/DigitalBrain.AppHost. Status={(int)health.StatusCode}. Override with {UiFixture.UiBaseEnvironmentVariable}.");
+                $"Product {UIFixture.DefaultUIResourceName} {UIEdgeContract.HealthPath} not OK at {baseAddress}. Start: aspire start --project hosts/DigitalBrain.AppHost. Status={(int)health.StatusCode}. Override with {UIFixture.UIBaseEnvironmentVariable}.");
         }
 
         using var streamRequest = new HttpRequestMessage(
             HttpMethod.Get,
-            UiEdgeSse.ShellEvents(shellName, afterSequence: 0));
+            UIEdgeSse.ShellEvents(shellName, afterSequence: 0));
         using var streamResponse = await http.SendAsync(
             streamRequest,
             HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
         Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
         Assert.Equal(
-            UiEdgeContract.EventStreamContentType,
+            UIEdgeContract.EventStreamContentType,
             streamResponse.Content.Headers.ContentType?.MediaType);
 
         await using var body = await streamResponse.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(body);
 
         using var openResponse = await http.PostAsJsonAsync(
-            UiEdgeSse.OpenScene(shellName),
+            UIEdgeSse.OpenScene(shellName),
             new OpenSceneRequest(sceneKey, title),
             cancellationToken);
         Assert.Equal(HttpStatusCode.Accepted, openResponse.StatusCode);
 
-        var projected = await UiEdgeSse.ReadNextSceneOpenedAsync(
+        var projected = await UIEdgeSse.ReadNextSceneOpenedAsync(
             reader,
             cancellationToken,
             timeout: TimeSpan.FromSeconds(20));

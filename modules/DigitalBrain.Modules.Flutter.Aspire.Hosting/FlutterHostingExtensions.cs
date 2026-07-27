@@ -6,9 +6,9 @@ namespace DigitalBrain.Flutter.Aspire.Hosting;
 
 public static class FlutterHostingExtensions
 {
-    public const string DefaultUiResourceName = "digitalbrain-ui";
+    public const string DefaultUIResourceName = "digitalbrain-ui";
     public const string DefaultFlutterResourceName = "digitalbrain-flutter";
-    public const string UiBaseEnvironmentVariable = "DIGITALBRAIN_UI_BASE";
+    public const string UIBaseEnvironmentVariable = "DIGITALBRAIN_UI_BASE";
     public const string ShellEnvironmentVariable = "DIGITALBRAIN_SHELL";
     public const string ChatEnvironmentVariable = "DIGITALBRAIN_CHAT";
     public const string OwnerEnvironmentVariable = "DigitalBrain__Owner";
@@ -19,18 +19,18 @@ public static class FlutterHostingExtensions
     public const string DefaultChatName = "main";
     public const string DefaultOwner = "dev";
     public const string DefaultDeviceTarget = "windows";
-    public const string UiHttpEndpointName = "http";
-    public const string UiHealthPath = "/health";
+    public const string UIHttpEndpointName = "http";
+    public const string UIHealthPath = "/health";
 
-    public static DigitalBrainModuleBuilder<FlutterModule> WithUiEdge(
+    public static DigitalBrainModuleBuilder<FlutterModule> WithUIEdge(
         this DigitalBrainModuleBuilder<FlutterModule> module,
-        Action<FlutterUiEdgeOptions>? configure = null)
+        Action<FlutterUIEdgeOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(module);
 
-        var options = new FlutterUiEdgeOptions();
+        var options = new FlutterUIEdgeOptions();
         configure?.Invoke(options);
-        GetOrCreateState(module).EnsureUiEdge(options);
+        GetOrCreateState(module).EnsureUIEdge(options);
         return module;
     }
 
@@ -89,25 +89,25 @@ public static class FlutterHostingExtensions
         private IResourceBuilder<ProjectResource>? _ui;
         private IResourceBuilder<ExecutableResource>? _flutterHost;
 
-        internal void EnsureUiEdge(FlutterUiEdgeOptions options)
+        internal void EnsureUIEdge(FlutterUIEdgeOptions options)
         {
             if (_ui is not null)
             {
                 throw new InvalidOperationException(
-                    $"Ui edge is already configured on brain '{brain.Name}'. Call WithUiEdge exactly once.");
+                    $"Ui edge is already configured on brain '{brain.Name}'. Call WithUIEdge exactly once.");
             }
 
             var appHost = brain.GetApplicationBuilder();
-            var projectPath = ResolveUiProjectPath(appHost.AppHostDirectory, options.ProjectPath);
+            var projectPath = ResolveUIProjectPath(appHost.AppHostDirectory, options.ProjectPath);
             if (!File.Exists(projectPath))
             {
                 throw new InvalidOperationException(
                     $"Flutter Ui edge project was not found at '{projectPath}'. " +
-                    "Pass FlutterUiEdgeOptions.ProjectPath or place DigitalBrain.Ui next to the AppHost under hosts/.");
+                    "Pass FlutterUIEdgeOptions.ProjectPath or place DigitalBrain.Ui next to the AppHost under hosts/.");
             }
 
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
-                ? DefaultUiResourceName
+                ? DefaultUIResourceName
                 : options.ResourceName;
             var owner = string.IsNullOrWhiteSpace(options.Owner)
                 ? DefaultOwner
@@ -116,8 +116,8 @@ public static class FlutterHostingExtensions
             _ui = appHost
                 .AddProject(resourceName, projectPath)
                 .WithReference(brain.AsClient())
-                .WithHttpEndpoint(name: UiHttpEndpointName)
-                .WithHttpHealthCheck(UiHealthPath)
+                .WithHttpEndpoint(name: UIHttpEndpointName)
+                .WithHttpHealthCheck(UIHealthPath)
                 .WithEnvironment(OwnerEnvironmentVariable, owner);
         }
 
@@ -131,7 +131,7 @@ public static class FlutterHostingExtensions
 
             if (_ui is null)
             {
-                EnsureUiEdge(new FlutterUiEdgeOptions());
+                EnsureUIEdge(new FlutterUIEdgeOptions());
             }
 
             var appHost = brain.GetApplicationBuilder();
@@ -164,7 +164,7 @@ public static class FlutterHostingExtensions
 
             _flutterHost = appHost
                 .AddExecutable(resourceName, launch.Command, launch.WorkingDirectory, launch.Args)
-                .WithEnvironment(UiBaseEnvironmentVariable, ui.GetEndpoint(UiHttpEndpointName))
+                .WithEnvironment(UIBaseEnvironmentVariable, ui.GetEndpoint(UIHttpEndpointName))
                 .WithEnvironment(ShellEnvironmentVariable, shell)
                 .WithEnvironment(ChatEnvironmentVariable, chat)
                 .WaitFor(ui);
@@ -183,7 +183,7 @@ public static class FlutterHostingExtensions
             }
         }
 
-        private static string ResolveUiProjectPath(string appHostDirectory, string? configured)
+        private static string ResolveUIProjectPath(string appHostDirectory, string? configured)
         {
             if (!string.IsNullOrWhiteSpace(configured))
             {

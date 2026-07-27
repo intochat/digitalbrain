@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace DigitalBrain.Ui.Tests;
 
-internal static class UiEdgeSse
+internal static class UIEdgeSse
 {
     private static readonly JsonSerializerOptions EventJsonOptions = new()
     {
@@ -10,13 +10,13 @@ internal static class UiEdgeSse
     };
 
     public static string OpenScene(string shellName) =>
-        UiEdgeContract.OpenScenePath.Replace("{shellName}", shellName, StringComparison.Ordinal);
+        UIEdgeContract.OpenScenePath.Replace("{shellName}", shellName, StringComparison.Ordinal);
 
     public static string ShellEvents(string shellName, long afterSequence = 0) =>
-        $"{UiEdgeContract.ShellEventsPath.Replace("{shellName}", shellName, StringComparison.Ordinal)}?{UiEdgeContract.AfterSequenceQuery}={afterSequence}";
+        $"{UIEdgeContract.ShellEventsPath.Replace("{shellName}", shellName, StringComparison.Ordinal)}?{UIEdgeContract.AfterSequenceQuery}={afterSequence}";
 
     public static string ActivateControl(string sceneKey, string controlId) =>
-        UiEdgeContract.ActivateControlPath
+        UIEdgeContract.ActivateControlPath
             .Replace("{sceneKey}", sceneKey, StringComparison.Ordinal)
             .Replace("{controlId}", controlId, StringComparison.Ordinal);
 
@@ -81,7 +81,7 @@ internal static class UiEdgeSse
                 dataLine = null;
 
                 if (name is not null
-                    && !string.Equals(name, UiEdgeContract.SceneOpenedEvent, StringComparison.Ordinal))
+                    && !string.Equals(name, UIEdgeContract.SceneOpenedEvent, StringComparison.Ordinal))
                 {
                     continue;
                 }

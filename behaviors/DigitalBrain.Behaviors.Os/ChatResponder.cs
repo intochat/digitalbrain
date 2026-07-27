@@ -3,7 +3,7 @@ using DigitalBrain.Behaviors;
 using DigitalBrain.Chat;
 using Microsoft.Extensions.AI;
 
-namespace DigitalBrain.Os;
+namespace DigitalBrain.OS;
 
 public sealed class ChatResponder : IIntentProgram<UserMessaged, string>
 {

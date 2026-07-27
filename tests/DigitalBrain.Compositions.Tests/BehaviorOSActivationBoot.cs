@@ -4,13 +4,13 @@ using Xunit;
 
 namespace DigitalBrain.Compositions.Tests;
 
-public sealed class BehaviorOsActivationBoot(CompositionsFixture fixture)
+public sealed class BehaviorOSActivationBoot(CompositionsFixture fixture)
 {
     private const string ShellName = "desk";
 
     [Fact(DisplayName =
         "Given DigitalBrain is activated for an owner; When DigitalBrainActivated is committed by the brain neuron; Then first Behavior opens home via IShell")]
-    public async Task ActivationSynapseDrivesOsBehaviorToStartUi()
+    public async Task ActivationSynapseDrivesOSBehaviorToStartUi()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);

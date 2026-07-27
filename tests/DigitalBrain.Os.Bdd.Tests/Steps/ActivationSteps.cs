@@ -3,7 +3,7 @@ using DigitalBrain.Flutter;
 using Reqnroll;
 using Xunit;
 
-namespace DigitalBrain.Os.Bdd.Tests;
+namespace DigitalBrain.OS.Bdd.Tests;
 
 [Binding]
 public sealed class ActivationSteps(BrainWorld world)

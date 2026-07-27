@@ -7,7 +7,7 @@ using DigitalBrain.Salesforce;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Os;
+namespace DigitalBrain.OS;
 
 internal sealed class Assistant(
     [FromKeyedServices(typeof(Llama32))] IChatClient chatClient)

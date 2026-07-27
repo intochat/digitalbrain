@@ -85,7 +85,7 @@ internal static class ChatEventFeed
     {
         var payload = JsonSerializer.Serialize(turn, EventJson);
         var frame = FormattableString.Invariant(
-            $"id: {turn.Sequence}\nevent: {UiEdgeContract.ChatTurnEvent}\ndata: {payload}\n\n");
+            $"id: {turn.Sequence}\nevent: {UIEdgeContract.ChatTurnEvent}\ndata: {payload}\n\n");
         return WriteAsync(responseBody, frame, cancellationToken);
     }
 

@@ -1,20 +1,20 @@
 using Reqnroll;
 
-namespace DigitalBrain.Os.Bdd.Tests;
+namespace DigitalBrain.OS.Bdd.Tests;
 
 [Binding]
-public static class OsCluster
+public static class OSCluster
 {
-    private static OsFixture? _fixture;
+    private static OSFixture? _fixture;
 
-    internal static OsFixture Fixture =>
+    internal static OSFixture Fixture =>
         _fixture ?? throw new InvalidOperationException(
             "The BDD cluster has not started. Reqnroll [BeforeTestRun] did not run.");
 
     [BeforeTestRun]
     public static async Task StartAsync()
     {
-        var fixture = new OsFixture();
+        var fixture = new OSFixture();
         await fixture.InitializeAsync();
         _fixture = fixture;
     }

@@ -40,7 +40,7 @@ public sealed class FlutterContracts
         Assert.Null(contracts.GetType($"{FlutterNamespace}.IFlutter"));
         Assert.DoesNotContain(
             contracts.GetExportedTypes().Concat(typeof(FlutterModule).Assembly.GetExportedTypes()),
-            type => type.Name is "IFlutter" or "Flutter" or "IUiRoot" or "IUiGateway" or "AutoHost");
+            type => type.Name is "IFlutter" or "Flutter" or "IUIRoot" or "IUIGateway" or "AutoHost");
     }
 
     [Fact(DisplayName =
@@ -97,7 +97,7 @@ public sealed class FlutterContracts
         Assert.Equal([nameof(FlutterModule)], exported);
         Assert.DoesNotContain(
             typeof(FlutterModule).Assembly.GetExportedTypes(),
-            type => type.Name is "ShellNeuron" or "SceneNeuron" or "IFlutter" or "IUiGateway");
+            type => type.Name is "ShellNeuron" or "SceneNeuron" or "IFlutter" or "IUIGateway");
     }
 
     [Fact(DisplayName =
@@ -117,7 +117,7 @@ public sealed class FlutterContracts
                 nameof(DesktopHost),
                 nameof(FlutterHostOptions),
                 nameof(FlutterHostingExtensions),
-                nameof(FlutterUiEdgeOptions),
+                nameof(FlutterUIEdgeOptions),
                 nameof(HeadlessHost),
             ],
             exported);

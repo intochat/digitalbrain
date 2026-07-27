@@ -10,22 +10,22 @@ public sealed class FlutterHostingSelectionContracts
 {
     [Fact(DisplayName =
         "omit FlutterModule → runtime graph has no digitalbrain-ui / digitalbrain-flutter")]
-    public void OmitFlutterModuleProjectsNoOsSurfaceResources()
+    public void OmitFlutterModuleProjectsNoOSSurfaceResources()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
 
         _ = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiHttpEndpointName)
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UIHttpEndpointName)
             .WithReference(brain);
 
-        FlutterHostingProjectionSupport.AssertNoOsSurfaceResources(builder);
+        FlutterHostingProjectionSupport.AssertNoOSSurfaceResources(builder);
     }
 
     [Fact(DisplayName =
         "FlutterModule without With* is vocabulary-only: silo lists module, runtime graph has no OS surface")]
-    public async Task VocabularyOnlySelectionDoesNotStartOsSurface()
+    public async Task VocabularyOnlySelectionDoesNotStartOSSurface()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
@@ -33,7 +33,7 @@ public sealed class FlutterHostingSelectionContracts
 
         var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiHttpEndpointName)
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UIHttpEndpointName)
             .WithReference(brain);
 
         var siloEnvironment = await FlutterHostingProjectionSupport
@@ -47,6 +47,6 @@ public sealed class FlutterHostingSelectionContracts
                     FlutterModule.Id.Value,
                     StringComparison.Ordinal));
 
-        FlutterHostingProjectionSupport.AssertNoOsSurfaceResources(builder);
+        FlutterHostingProjectionSupport.AssertNoOSSurfaceResources(builder);
     }
 }

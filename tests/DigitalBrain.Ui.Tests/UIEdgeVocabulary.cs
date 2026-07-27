@@ -6,41 +6,41 @@ using Xunit;
 
 namespace DigitalBrain.Ui.Tests;
 
-public sealed class UiEdgeVocabulary(UiFixture fixture)
+public sealed class UIEdgeVocabulary(UIFixture fixture)
 {
     private const string OpenTelemetryMarker = "OpenTelemetry";
 
     [Fact(DisplayName =
-        "Ui host public edge vocabulary is UiEdgeContract — health, shell/scene routes, scene-opened event")]
-    public void PublicEdgeVocabularyIsUiEdgeContract()
+        "Ui host public edge vocabulary is UIEdgeContract — health, shell/scene routes, scene-opened event")]
+    public void PublicEdgeVocabularyIsUIEdgeContract()
     {
-        var vocabulary = typeof(UiEdgeContract).Assembly
+        var vocabulary = typeof(UIEdgeContract).Assembly
             .GetExportedTypes()
-            .Where(type => type.Namespace == typeof(UiEdgeContract).Namespace)
+            .Where(type => type.Namespace == typeof(UIEdgeContract).Namespace)
             .Select(type => type.Name)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal([nameof(UiEdgeContract)], vocabulary);
+        Assert.Equal([nameof(UIEdgeContract)], vocabulary);
 
         Assert.DoesNotContain(
-            typeof(UiEdgeContract).Assembly.GetExportedTypes(),
-            type => type.Name is "ShellEventFeed" or "UiHost" or "UiEndpoints"
-                or "OwnerSessionJournal" or "UiEdgeServices"
+            typeof(UIEdgeContract).Assembly.GetExportedTypes(),
+            type => type.Name is "ShellEventFeed" or "UIHost" or "UIEndpoints"
+                or "OwnerSessionJournal" or "UIEdgeServices"
                 or "OpenSceneRequest" or "ActivateControlRequest" or "SceneOpenedEvent"
                 or "IFlutter");
 
-        Assert.Equal("/health", UiEdgeContract.HealthPath);
-        Assert.Equal("healthy", UiEdgeContract.HealthResponse);
-        Assert.Equal("/shells/{shellName}/scenes", UiEdgeContract.OpenScenePath);
-        Assert.Equal("/shells/{shellName}/events", UiEdgeContract.ShellEventsPath);
+        Assert.Equal("/health", UIEdgeContract.HealthPath);
+        Assert.Equal("healthy", UIEdgeContract.HealthResponse);
+        Assert.Equal("/shells/{shellName}/scenes", UIEdgeContract.OpenScenePath);
+        Assert.Equal("/shells/{shellName}/events", UIEdgeContract.ShellEventsPath);
         Assert.Equal(
             "/scenes/{sceneKey}/controls/{controlId}/activate",
-            UiEdgeContract.ActivateControlPath);
-        Assert.Equal("afterSequence", UiEdgeContract.AfterSequenceQuery);
-        Assert.Equal("text/event-stream", UiEdgeContract.EventStreamContentType);
-        Assert.Equal("no-cache", UiEdgeContract.CacheControlNoCache);
-        Assert.Equal("scene-opened", UiEdgeContract.SceneOpenedEvent);
+            UIEdgeContract.ActivateControlPath);
+        Assert.Equal("afterSequence", UIEdgeContract.AfterSequenceQuery);
+        Assert.Equal("text/event-stream", UIEdgeContract.EventStreamContentType);
+        Assert.Equal("no-cache", UIEdgeContract.CacheControlNoCache);
+        Assert.Equal("scene-opened", UIEdgeContract.SceneOpenedEvent);
     }
 
     [Fact(DisplayName =
@@ -90,21 +90,21 @@ public sealed class UiEdgeVocabulary(UiFixture fixture)
                 .ToArray());
     }
 
-    [Fact(DisplayName = "MapUiHost serves UiEdgeContract health on the product edge composition path")]
-    public async Task MapUiHostServesHealth()
+    [Fact(DisplayName = "MapUIHost serves UIEdgeContract health on the product edge composition path")]
+    public async Task MapUIHostServesHealth()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        await using var app = await UiFixture.StartUiEdgeAsync(test, cancellationToken);
+        await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
 
         using var http = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
         using var health = await http.GetAsync(
-            new Uri(UiEdgeContract.HealthPath, UriKind.Relative),
+            new Uri(UIEdgeContract.HealthPath, UriKind.Relative),
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
         Assert.Equal(
-            $"\"{UiEdgeContract.HealthResponse}\"",
+            $"\"{UIEdgeContract.HealthResponse}\"",
             (await health.Content.ReadAsStringAsync(cancellationToken)).Trim());
     }
 }

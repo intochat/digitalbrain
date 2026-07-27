@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Testing;
 using Xunit;
 
-namespace DigitalBrain.Os.Bdd.Tests;
+namespace DigitalBrain.OS.Bdd.Tests;
 
 public sealed class BrainWorld
 {
@@ -29,7 +29,7 @@ public sealed class BrainWorld
         _deadline = CancellationTokenSource.CreateLinkedTokenSource(
             TestContext.Current.CancellationToken);
         _deadline.CancelAfter(ScenarioDeadline);
-        _brain = await OsCluster.Fixture.CreateBrainAsync(_deadline.Token);
+        _brain = await OSCluster.Fixture.CreateBrainAsync(_deadline.Token);
     }
 
     internal async Task CloseAsync()

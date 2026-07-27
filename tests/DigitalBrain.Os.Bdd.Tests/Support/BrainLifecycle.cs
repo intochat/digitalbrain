@@ -1,6 +1,6 @@
 using Reqnroll;
 
-namespace DigitalBrain.Os.Bdd.Tests;
+namespace DigitalBrain.OS.Bdd.Tests;
 
 [Binding]
 public sealed class BrainLifecycle(BrainWorld world)

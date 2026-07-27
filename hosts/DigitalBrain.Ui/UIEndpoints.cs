@@ -4,14 +4,14 @@ using DigitalBrain.Flutter;
 
 namespace DigitalBrain.Ui;
 
-internal static class UiEndpoints
+internal static class UIEndpoints
 {
     public static IEndpointRouteBuilder MapUi(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints.MapPost(
-            UiEdgeContract.OpenScenePath,
+            UIEdgeContract.OpenScenePath,
             static async Task<IResult> (
                 string shellName,
                 OpenSceneRequest request,
@@ -35,7 +35,7 @@ internal static class UiEndpoints
             });
 
         endpoints.MapGet(
-            UiEdgeContract.ShellEventsPath,
+            UIEdgeContract.ShellEventsPath,
             static async Task (
                 HttpContext http,
                 string shellName,
@@ -55,8 +55,8 @@ internal static class UiEndpoints
                     return;
                 }
 
-                http.Response.Headers.CacheControl = UiEdgeContract.CacheControlNoCache;
-                http.Response.ContentType = UiEdgeContract.EventStreamContentType;
+                http.Response.Headers.CacheControl = UIEdgeContract.CacheControlNoCache;
+                http.Response.ContentType = UIEdgeContract.EventStreamContentType;
                 await ShellEventFeed.WriteSceneOpenedSseAsync(
                     http.Response.Body,
                     sessionJournal,
@@ -66,7 +66,7 @@ internal static class UiEndpoints
             });
 
         endpoints.MapPost(
-            UiEdgeContract.ActivateControlPath,
+            UIEdgeContract.ActivateControlPath,
             static async Task<IResult> (
                 string sceneKey,
                 string controlId,

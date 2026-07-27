@@ -4,26 +4,26 @@ using DigitalBrain.Testing;
 
 namespace DigitalBrain.Ui.Tests;
 
-public sealed class UiFixture : DigitalBrainFixture
+public sealed class UIFixture : DigitalBrainFixture
 {
     public const string DefaultShellName = FlutterHostingExtensions.DefaultShellName;
 
-    public const string DefaultUiResourceName = FlutterHostingExtensions.DefaultUiResourceName;
+    public const string DefaultUIResourceName = FlutterHostingExtensions.DefaultUIResourceName;
 
-    public const string UiBaseEnvironmentVariable = FlutterHostingExtensions.UiBaseEnvironmentVariable;
+    public const string UIBaseEnvironmentVariable = FlutterHostingExtensions.UIBaseEnvironmentVariable;
 
-    public static Uri ResolveProductUiBaseAddress()
+    public static Uri ResolveProductUIBaseAddress()
     {
-        var configured = Environment.GetEnvironmentVariable(UiBaseEnvironmentVariable);
+        var configured = Environment.GetEnvironmentVariable(UIBaseEnvironmentVariable);
         if (string.IsNullOrWhiteSpace(configured))
         {
-            return LaunchSettingsUiBase;
+            return LaunchSettingsUIBase;
         }
 
         return new Uri(configured.TrimEnd('/') + "/");
     }
 
-    public static async Task<WebApplication> StartUiEdgeAsync(
+    public static async Task<WebApplication> StartUIEdgeAsync(
         TestBrain test,
         CancellationToken cancellationToken)
     {
@@ -33,15 +33,15 @@ public sealed class UiFixture : DigitalBrainFixture
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddSingleton(test.Client);
         builder.Services.AddSingleton<IGrainFactory>(test.Cluster.Client);
-        builder.Services.AddUiEdgeServices();
+        builder.Services.AddUIEdgeServices();
 
         var app = builder.Build();
-        app.MapUiHost();
+        app.MapUIHost();
         await app.StartAsync(cancellationToken);
         return app;
     }
 
-    private static readonly Uri LaunchSettingsUiBase = new("http://localhost:5080/");
+    private static readonly Uri LaunchSettingsUIBase = new("http://localhost:5080/");
 
     protected override void Configure(DigitalBrainTestBuilder brain)
     {

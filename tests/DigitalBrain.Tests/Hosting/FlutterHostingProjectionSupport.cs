@@ -11,7 +11,7 @@ internal static class FlutterHostingProjectionSupport
     public const string JournalConnectionEnvironmentKey =
         "ConnectionStrings__" + DigitalBrainHostingExtensions.JournalConnectionName;
 
-    public static string UiProjectPath => RepositoryAssets.Path(
+    public static string UIProjectPath => RepositoryAssets.Path(
         "hosts",
         "DigitalBrain.Ui",
         "DigitalBrain.Ui.csproj");
@@ -72,10 +72,10 @@ internal static class FlutterHostingProjectionSupport
         Assert.DoesNotContain("sdk: flutter", pubspec, StringComparison.OrdinalIgnoreCase);
     }
 
-    public static void AssertNoOsSurfaceResources(IDistributedApplicationBuilder builder)
+    public static void AssertNoOSSurfaceResources(IDistributedApplicationBuilder builder)
     {
         var surface = builder.Resources
-            .Where(static resource => resource.Name is FlutterHostingExtensions.DefaultUiResourceName
+            .Where(static resource => resource.Name is FlutterHostingExtensions.DefaultUIResourceName
                 or FlutterHostingExtensions.DefaultFlutterResourceName)
             .Select(static resource => $"{resource.GetType().Name}:{resource.Name}")
             .ToArray();
@@ -91,15 +91,15 @@ internal static class FlutterHostingProjectionSupport
             resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
     }
 
-    public static void AssertUiHasNamedHttpEndpoint(IResource ui)
+    public static void AssertUIHasNamedHttpEndpoint(IResource ui)
     {
         var http = Assert.Single(
             ui.Annotations.OfType<EndpointAnnotation>(),
             endpoint => string.Equals(
                 endpoint.Name,
-                FlutterHostingExtensions.UiHttpEndpointName,
+                FlutterHostingExtensions.UIHttpEndpointName,
                 StringComparison.Ordinal));
-        Assert.Equal(FlutterHostingExtensions.UiHttpEndpointName, http.UriScheme, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(FlutterHostingExtensions.UIHttpEndpointName, http.UriScheme, StringComparer.OrdinalIgnoreCase);
     }
 
     public static void AssertExclusiveFlutterHostEnvironment(HashSet<string> environment)
@@ -107,14 +107,14 @@ internal static class FlutterHostingProjectionSupport
         Assert.Equal(
             new HashSet<string>(StringComparer.Ordinal)
             {
-                FlutterHostingExtensions.UiBaseEnvironmentVariable,
+                FlutterHostingExtensions.UIBaseEnvironmentVariable,
                 FlutterHostingExtensions.ShellEnvironmentVariable,
                 FlutterHostingExtensions.ChatEnvironmentVariable,
             },
             environment);
     }
 
-    public static void AssertExclusiveUiProductEnvironment(IReadOnlyDictionary<string, object> environment)
+    public static void AssertExclusiveUIProductEnvironment(IReadOnlyDictionary<string, object> environment)
     {
         var productKeys = environment.Keys
             .Where(static key =>
