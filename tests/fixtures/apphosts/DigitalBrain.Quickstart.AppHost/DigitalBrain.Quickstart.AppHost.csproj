@@ -4,8 +4,8 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\samples\DigitalBrain.Quickstart\DigitalBrain.Quickstart.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\DigitalBrain.Quickstart\DigitalBrain.Quickstart.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\..\..\src\core\aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\DigitalBrain.Quickstart.Host\DigitalBrain.Quickstart.Host.csproj" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Data.Tables" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\DigitalBrain.Quickstart\DigitalBrain.Quickstart.csproj" />
+    <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain\DigitalBrain.csproj" />
+    <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

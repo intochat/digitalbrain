@@ -13,7 +13,7 @@
     <ProjectReference Include="..\..\..\modules\google\DigitalBrain.Modules.Google\DigitalBrain.Modules.Google.csproj" />
     <ProjectReference Include="..\..\..\modules\salesforce\DigitalBrain.Modules.Salesforce.Contracts\DigitalBrain.Modules.Salesforce.Contracts.csproj" />
     <ProjectReference Include="..\..\..\modules\salesforce\DigitalBrain.Modules.Salesforce\DigitalBrain.Modules.Salesforce.csproj" />
-    <ProjectReference Include="..\..\..\..\samples\DigitalBrain.AccountEnrichment\DigitalBrain.AccountEnrichment.csproj" />
+    <ProjectReference Include="..\..\..\..\tests\fixtures\DigitalBrain.AccountEnrichment\DigitalBrain.AccountEnrichment.csproj" />
     <ProjectReference Include="..\..\..\modules\flutter\DigitalBrain.Modules.Flutter\DigitalBrain.Modules.Flutter.csproj" />
     <ProjectReference Include="..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
     <ProjectReference Include="..\..\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />

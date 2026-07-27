@@ -9,8 +9,8 @@
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\samples\DigitalBrain.Quickstart.Contracts\DigitalBrain.Quickstart.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\samples\DigitalBrain.Quickstart\DigitalBrain.Quickstart.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Quickstart.Contracts\DigitalBrain.Quickstart.Contracts.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Quickstart\DigitalBrain.Quickstart.csproj" />
     <ProjectReference Include="..\..\..\src\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
   </ItemGroup>
 </Project>
