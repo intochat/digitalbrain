@@ -16,10 +16,12 @@ internal sealed class ChatResponderNeuron :
     IHandle<UserMessaged>
 {
     private const string StateName = "os.chat-responder.state";
+    private const string DeclaredProgramRevision = "1";
 
     private static readonly ChatResponder Program = new();
     private static readonly BehaviorId Identity = new("com.digitalbrain.chat-responder");
-    private static readonly BehaviorRevisionId Revision = CompiledRevisionOf(typeof(ChatResponder));
+    private static readonly BehaviorRevisionId Revision =
+        RevisionOf($"{Identity.Value}@{DeclaredProgramRevision}");
 
     private readonly IDurableDictionary<string, byte[]> _state;
 
@@ -56,7 +58,7 @@ internal sealed class ChatResponderNeuron :
         await WriteStateAsync(CancellationToken.None);
     }
 
-    private static BehaviorRevisionId CompiledRevisionOf(Type program)
+    private static BehaviorRevisionId RevisionOf(string seed)
         => new(Convert.ToHexStringLower(
-            SHA256.HashData(Encoding.UTF8.GetBytes(program.AssemblyQualifiedName!))));
+            SHA256.HashData(Encoding.UTF8.GetBytes(seed))));
 }
