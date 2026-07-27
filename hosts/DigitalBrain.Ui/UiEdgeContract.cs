@@ -25,4 +25,10 @@ public static class UiEdgeContract
     public const string CacheControlNoCache = "no-cache";
 
     public const string SceneOpenedEvent = "scene-opened";
+
+    public const string SendMessagePath = "/chats/{chatName}/messages";
+
+    public const string ChatEventsPath = "/chats/{chatName}/events";
+
+    public const string ChatTurnEvent = "chat-turn";
 }

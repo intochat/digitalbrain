@@ -47,3 +47,34 @@ final class SceneOpenedEvent {
     );
   }
 }
+
+final class SendMessageRequest {
+  const SendMessageRequest({required this.text});
+
+  final String text;
+
+  Map<String, Object?> toJson() => {'text': text};
+}
+
+final class ChatTurnEvent {
+  const ChatTurnEvent({
+    required this.sequence,
+    required this.fromUser,
+    required this.text,
+    required this.commandId,
+  });
+
+  final int sequence;
+  final bool fromUser;
+  final String text;
+  final String commandId;
+
+  factory ChatTurnEvent.fromJson(Map<String, Object?> json) {
+    return ChatTurnEvent(
+      sequence: (json['sequence'] as num).toInt(),
+      fromUser: json['fromUser'] as bool,
+      text: json['text'] as String,
+      commandId: json['commandId'] as String,
+    );
+  }
+}

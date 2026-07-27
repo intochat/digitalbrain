@@ -4,6 +4,7 @@ import 'package:digitalbrain_wire/digitalbrain_wire.dart';
 import 'package:http/http.dart' as http;
 
 import 'host_environment.dart';
+import 'sse_chat_frames.dart';
 import 'sse_frames.dart';
 
 final class DigitalBrainUiEdgeClient {
@@ -91,6 +92,52 @@ final class DigitalBrainUiEdgeClient {
         .transform(const LineSplitter());
 
     final parser = SseSceneOpenedParser();
+    await for (final line in lines) {
+      for (final event in parser.addLine(line)) {
+        yield event;
+      }
+    }
+    for (final event in parser.flush()) {
+      yield event;
+    }
+  }
+
+  Future<void> sendMessage({
+    required String chatName,
+    required String text,
+  }) async {
+    final uri = baseUri.replace(path: '/chats/$chatName/messages');
+    final response = await _http.post(
+      uri,
+      headers: {'content-type': 'application/json'},
+      body: jsonEncode(SendMessageRequest(text: text).toJson()),
+    );
+    if (response.statusCode != 202) {
+      throw StateError(
+        'send-message failed: ${response.statusCode} ${response.body}',
+      );
+    }
+  }
+
+  Stream<ChatTurnEvent> watchChatTurns({
+    required String chatName,
+    int afterSequence = 0,
+  }) async* {
+    final uri = baseUri.replace(
+      path: '/chats/$chatName/events',
+      queryParameters: {'afterSequence': '$afterSequence'},
+    );
+    final request = http.Request('GET', uri);
+    final response = await _http.send(request);
+    if (response.statusCode != 200) {
+      throw StateError('chat events failed: ${response.statusCode}');
+    }
+
+    final lines = response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+
+    final parser = SseChatTurnParser();
     await for (final line in lines) {
       for (final event in parser.addLine(line)) {
         yield event;

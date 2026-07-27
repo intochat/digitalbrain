@@ -1,13 +1,12 @@
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
-import 'shell_chrome.dart';
+import 'chat_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final shell = DigitalBrainHostEnv.resolveShell();
-  final surface = ShellSurfaceController();
+  final chat = DigitalBrainHostEnv.resolveChat();
 
   DigitalBrainUiEdgeClient? client;
   String? status;
@@ -17,12 +16,16 @@ void main() {
     status = error.toString();
   }
 
+  final edge = client;
+
   runApp(
-    ShellSurfaceApp(
-      controller: surface,
-      shellName: shell,
+    BrainChatApp(
+      chatName: chat,
       statusMessage: status,
-      events: client?.watchShellEvents(shellName: shell),
+      turns: edge?.watchChatTurns(chatName: chat),
+      onSend: edge == null
+          ? null
+          : (text) => edge.sendMessage(chatName: chat, text: text),
     ),
   );
 }

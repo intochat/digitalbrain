@@ -8,6 +8,7 @@ internal static class UiHost
 
         app.MapGet(UiEdgeContract.HealthPath, static () => Results.Ok(UiEdgeContract.HealthResponse));
         app.MapUi();
+        app.MapChat();
         return app;
     }
 }

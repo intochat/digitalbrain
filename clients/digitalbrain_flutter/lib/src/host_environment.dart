@@ -4,10 +4,13 @@ abstract final class DigitalBrainHostEnv {
   static const uiBaseVariable = 'DIGITALBRAIN_UI_BASE';
   static const shellVariable = 'DIGITALBRAIN_SHELL';
   static const defaultShellName = 'desk';
+  static const chatVariable = 'DIGITALBRAIN_CHAT';
+  static const defaultChatName = 'main';
 
   static const hostProcessVariables = {
     uiBaseVariable,
     shellVariable,
+    chatVariable,
   };
 
   static String resolveUiBaseRaw({
@@ -48,6 +51,21 @@ abstract final class DigitalBrainHostEnv {
     final raw = process[shellVariable] ?? '';
     if (raw.isEmpty) {
       return defaultShellName;
+    }
+    return raw;
+  }
+
+  static String resolveChat({
+    String fromDefine = const String.fromEnvironment(chatVariable),
+    Map<String, String>? processEnvironment,
+  }) {
+    if (fromDefine.isNotEmpty) {
+      return fromDefine;
+    }
+    final process = processEnvironment ?? Platform.environment;
+    final raw = process[chatVariable] ?? '';
+    if (raw.isEmpty) {
+      return defaultChatName;
     }
     return raw;
   }

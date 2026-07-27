@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
+using DigitalBrain.Chat;
 using DigitalBrain.Flutter;
 
 namespace DigitalBrain.Ui;
@@ -32,6 +33,17 @@ internal sealed class OwnerSessionJournal
 
         return _session.ReadNeuronJournal(
             NeuronId.For<IShell>(_owner, shellName),
+            JournalKind.Outgoing,
+            afterSequence);
+    }
+
+    public Task<JournalRead> ReadChatOutgoingAsync(string chatName, long afterSequence)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
+        ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
+
+        return _session.ReadNeuronJournal(
+            NeuronId.For<IChat>(_owner, chatName),
             JournalKind.Outgoing,
             afterSequence);
     }

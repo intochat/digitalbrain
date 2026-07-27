@@ -7,6 +7,7 @@
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Chat.Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Flutter.Contracts\DigitalBrain.Modules.Flutter.Contracts.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Client\DigitalBrain.Client.csproj" />
