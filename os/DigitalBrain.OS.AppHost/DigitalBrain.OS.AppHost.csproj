@@ -6,13 +6,13 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\modules\ai\DigitalBrain.Modules.AI.Aspire.Hosting\DigitalBrain.Modules.AI.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\src\modules\chat\DigitalBrain.Modules.Chat\DigitalBrain.Modules.Chat.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\..\behaviors\DigitalBrain.Behaviors.Os\DigitalBrain.Behaviors.Os.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\DigitalBrain.OS.Behaviors\DigitalBrain.OS.Behaviors.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\src\modules\flutter\DigitalBrain.Modules.Flutter.Aspire.Hosting\DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\src\modules\google\DigitalBrain.Modules.Google.Aspire.Hosting\DigitalBrain.Modules.Google.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\src\modules\salesforce\DigitalBrain.Modules.Salesforce.Aspire.Hosting\DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\DigitalBrain.Host\DigitalBrain.Host.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
+    <ProjectReference Include="..\DigitalBrain.OS.Host\DigitalBrain.OS.Host.csproj" />
+    <ProjectReference Include="..\DigitalBrain.OS.Mcp\DigitalBrain.OS.Mcp.csproj" />
   </ItemGroup>
   <PropertyGroup>
     <CodeGraphRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..'))</CodeGraphRoot>

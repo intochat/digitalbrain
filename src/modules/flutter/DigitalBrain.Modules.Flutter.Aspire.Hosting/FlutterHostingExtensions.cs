@@ -103,7 +103,7 @@ public static class FlutterHostingExtensions
             {
                 throw new InvalidOperationException(
                     $"Flutter Ui edge project was not found at '{projectPath}'. " +
-                    "Pass FlutterUIEdgeOptions.ProjectPath or place DigitalBrain.Modules.Flutter.Http under src/modules/flutter/.");
+                    "Pass FlutterUIEdgeOptions.ProjectPath, or place DigitalBrain.Modules.Flutter.Http under src/modules/flutter/.");
             }
 
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
@@ -192,11 +192,11 @@ public static class FlutterHostingExtensions
                     : Path.GetFullPath(Path.Combine(appHostDirectory, configured));
             }
 
-            var candidates = new[]
-            {
+            string[] candidates =
+            [
+                Path.Combine(appHostDirectory, "..", "DigitalBrain.Modules.Flutter.Http", "DigitalBrain.Modules.Flutter.Http.csproj"),
                 Path.Combine(appHostDirectory, "..", "..", "src", "modules", "flutter", "DigitalBrain.Modules.Flutter.Http", "DigitalBrain.Modules.Flutter.Http.csproj"),
-                Path.Combine(appHostDirectory, "..", "src", "modules", "flutter", "DigitalBrain.Modules.Flutter.Http", "DigitalBrain.Modules.Flutter.Http.csproj"),
-            };
+            ];
 
             foreach (var candidate in candidates)
             {

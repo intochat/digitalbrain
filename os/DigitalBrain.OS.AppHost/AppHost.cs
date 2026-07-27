@@ -24,10 +24,10 @@ brain.AddModule<FlutterModule>(flutter => flutter
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 
-var silo = builder.AddProject<Projects.DigitalBrain_Host>(ProductSurfaceResources.Silo)
+var silo = builder.AddProject<Projects.DigitalBrain_OS_Host>(ProductSurfaceResources.Silo)
     .WithReference(brain);
 
-builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
+builder.AddProject<Projects.DigitalBrain_OS_Mcp>(ProductSurfaceResources.Mcp)
     .WithReference(brain.AsClient())
     .WaitFor(silo)
     .WithEnvironment(

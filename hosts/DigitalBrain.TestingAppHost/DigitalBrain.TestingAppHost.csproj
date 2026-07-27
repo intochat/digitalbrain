@@ -5,6 +5,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\DigitalBrain.Host\DigitalBrain.Host.csproj" />
+    <ProjectReference Include="..\..\os\DigitalBrain.OS.Host\DigitalBrain.OS.Host.csproj" />
   </ItemGroup>
 </Project>

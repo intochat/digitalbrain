@@ -29,7 +29,7 @@ public sealed class LiveProductUINorthbound
         {
             Assert.True(
                 health.IsSuccessStatusCode,
-                $"Product {UIFixture.DefaultUIResourceName} {UIEdgeContract.HealthPath} not OK at {baseAddress}. Start: aspire start --project hosts/DigitalBrain.AppHost. Status={(int)health.StatusCode}. Override with {UIFixture.UIBaseEnvironmentVariable}.");
+                $"Product {UIFixture.DefaultUIResourceName} {UIEdgeContract.HealthPath} not OK at {baseAddress}. Start: aspire start --project os/DigitalBrain.OS.AppHost. Status={(int)health.StatusCode}. Override with {UIFixture.UIBaseEnvironmentVariable}.");
         }
 
         using var streamRequest = new HttpRequestMessage(

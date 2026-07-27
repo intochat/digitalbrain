@@ -33,16 +33,16 @@
     <Project Path="src/modules/salesforce/DigitalBrain.Modules.Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <Project Path="src/modules/salesforce/DigitalBrain.Modules.Salesforce.Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" />
   </Folder>
+  <Folder Name="/os/">
+    <Project Path="os/DigitalBrain.OS.Host/DigitalBrain.OS.Host.csproj" />
+    <Project Path="os/DigitalBrain.OS.Mcp/DigitalBrain.OS.Mcp.csproj" />
+    <Project Path="os/DigitalBrain.OS.AppHost/DigitalBrain.OS.AppHost.csproj" />
+    <Project Path="os/DigitalBrain.OS.Behaviors/DigitalBrain.OS.Behaviors.csproj" />
+  </Folder>
   <Folder Name="/hosts/">
-    <Project Path="hosts/DigitalBrain.Host/DigitalBrain.Host.csproj" />
-    <Project Path="hosts/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
-    <Project Path="hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
     <Project Path="hosts/DigitalBrain.TestingAppHost/DigitalBrain.TestingAppHost.csproj" />
     <Project Path="hosts/DigitalBrain.Quickstart.Host/DigitalBrain.Quickstart.Host.csproj" />
     <Project Path="hosts/DigitalBrain.Quickstart.AppHost/DigitalBrain.Quickstart.AppHost.csproj" />
-  </Folder>
-  <Folder Name="/behaviors/">
-    <Project Path="behaviors/DigitalBrain.Behaviors.Os/DigitalBrain.Behaviors.Os.csproj" />
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/DigitalBrain.AccountEnrichment/DigitalBrain.AccountEnrichment.csproj" />
