@@ -9,8 +9,8 @@
     <Using Remove="System.Net.Http" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\DigitalBrain.Client\DigitalBrain.Client.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
+    <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Flutter.Contracts\DigitalBrain.Modules.Flutter.Contracts.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Time.Contracts\DigitalBrain.Modules.Time.Contracts.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.AI.Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />

@@ -4,6 +4,6 @@
     <Description>The DigitalBrain Behavior authoring SDK.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
+    <ProjectReference Include="..\..\kernel\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
   </ItemGroup>
 </Project>

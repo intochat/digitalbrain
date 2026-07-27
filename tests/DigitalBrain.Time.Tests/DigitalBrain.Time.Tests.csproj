@@ -11,6 +11,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Time.Contracts\DigitalBrain.Modules.Time.Contracts.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Time\DigitalBrain.Modules.Time.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="..\..\src\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
   </ItemGroup>
 </Project>

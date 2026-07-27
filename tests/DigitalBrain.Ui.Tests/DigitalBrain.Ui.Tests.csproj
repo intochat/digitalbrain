@@ -11,7 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\hosts\DigitalBrain.Ui\DigitalBrain.Ui.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Flutter\DigitalBrain.Modules.Flutter.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="..\..\src\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Flutter.Aspire.Hosting\DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

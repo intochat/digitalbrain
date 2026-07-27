@@ -1,16 +1,16 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
-    <Project Path="src/DigitalBrain.Behaviors/DigitalBrain.Behaviors.csproj" />
-    <Project Path="src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
-    <Project Path="src/DigitalBrain.Client/DigitalBrain.Client.csproj" />
-    <Project Path="src/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
-    <Project Path="src/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
-    <Project Path="src/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
-    <Project Path="src/DigitalBrain.SourceGeneration/DigitalBrain.SourceGeneration.csproj" />
-    <Project Path="src/DigitalBrain.Security/DigitalBrain.Security.csproj" />
-    <Project Path="src/DigitalBrain.Integrations.Mcp/DigitalBrain.Integrations.Mcp.csproj" />
-    <Project Path="src/DigitalBrain.Integrations.Mcp.Aspire.Hosting/DigitalBrain.Integrations.Mcp.Aspire.Hosting.csproj" />
+    <Project Path="src/core/kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+    <Project Path="src/core/behaviors/DigitalBrain.Behaviors/DigitalBrain.Behaviors.csproj" />
+    <Project Path="src/core/kernel/DigitalBrain/DigitalBrain.csproj" />
+    <Project Path="src/core/kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
+    <Project Path="src/core/testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <Project Path="src/core/aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
+    <Project Path="src/core/aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+    <Project Path="src/core/kernel/DigitalBrain.SourceGeneration/DigitalBrain.SourceGeneration.csproj" />
+    <Project Path="src/core/security/DigitalBrain.Security/DigitalBrain.Security.csproj" />
+    <Project Path="src/core/mcp/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
+    <Project Path="src/core/mcp/DigitalBrain.Mcp.Aspire.Hosting/DigitalBrain.Mcp.Aspire.Hosting.csproj" />
   </Folder>
   <Folder Name="/hosts/">
     <Project Path="hosts/DigitalBrain.Host/DigitalBrain.Host.csproj" />

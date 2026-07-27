@@ -7,6 +7,6 @@
     <PackageReference Include="Microsoft.Orleans.Client" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DigitalBrain.Client\DigitalBrain.Client.csproj" />
+    <ProjectReference Include="..\..\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
   </ItemGroup>
 </Project>

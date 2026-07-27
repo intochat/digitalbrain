@@ -14,6 +14,6 @@
     <ProjectReference Include="..\..\behaviors\DigitalBrain.Behaviors.Os\DigitalBrain.Behaviors.Os.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Chat\DigitalBrain.Modules.Chat.csproj" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Flutter\DigitalBrain.Modules.Flutter.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="..\..\src\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
   </ItemGroup>
 </Project>
