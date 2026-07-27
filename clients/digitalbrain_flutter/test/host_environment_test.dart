@@ -7,15 +7,18 @@ void main() {
     () {
       expect(DigitalBrainHostEnv.uiBaseVariable, 'DIGITALBRAIN_UI_BASE');
       expect(DigitalBrainHostEnv.shellVariable, 'DIGITALBRAIN_SHELL');
+      expect(DigitalBrainHostEnv.chatVariable, 'DIGITALBRAIN_CHAT');
       expect(DigitalBrainHostEnv.defaultShellName, 'desk');
+      expect(DigitalBrainHostEnv.defaultChatName, 'main');
       expect(
         DigitalBrainHostEnv.hostProcessVariables,
         unorderedEquals(const {
           'DIGITALBRAIN_UI_BASE',
           'DIGITALBRAIN_SHELL',
+          'DIGITALBRAIN_CHAT',
         }),
       );
-      expect(DigitalBrainHostEnv.hostProcessVariables, hasLength(2));
+      expect(DigitalBrainHostEnv.hostProcessVariables, hasLength(3));
     },
   );
 

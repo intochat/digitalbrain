@@ -8,6 +8,8 @@ public sealed class FlutterHostOptions
 
     public string ShellName { get; set; } = FlutterHostingExtensions.DefaultShellName;
 
+    public string ChatName { get; set; } = FlutterHostingExtensions.DefaultChatName;
+
     public string? FlutterCommand { get; set; }
 
     public string? DartCommand { get; set; }

@@ -10,11 +10,13 @@ public static class FlutterHostingExtensions
     public const string DefaultFlutterResourceName = "digitalbrain-flutter";
     public const string UiBaseEnvironmentVariable = "DIGITALBRAIN_UI_BASE";
     public const string ShellEnvironmentVariable = "DIGITALBRAIN_SHELL";
+    public const string ChatEnvironmentVariable = "DIGITALBRAIN_CHAT";
     public const string OwnerEnvironmentVariable = "DigitalBrain__Owner";
     public const string FlutterCommandEnvironmentVariable = "FLUTTER_COMMAND";
     public const string DartCommandEnvironmentVariable = "DART_COMMAND";
     public const string HeadlessHostEntry = "bin/digitalbrain_host.dart";
     public const string DefaultShellName = "desk";
+    public const string DefaultChatName = "main";
     public const string DefaultOwner = "dev";
     public const string DefaultDeviceTarget = "windows";
     public const string UiHttpEndpointName = "http";
@@ -155,12 +157,16 @@ public static class FlutterHostingExtensions
             var shell = string.IsNullOrWhiteSpace(options.ShellName)
                 ? DefaultShellName
                 : options.ShellName;
+            var chat = string.IsNullOrWhiteSpace(options.ChatName)
+                ? DefaultChatName
+                : options.ChatName;
             var ui = _ui!;
 
             _flutterHost = appHost
                 .AddExecutable(resourceName, launch.Command, launch.WorkingDirectory, launch.Args)
                 .WithEnvironment(UiBaseEnvironmentVariable, ui.GetEndpoint(UiHttpEndpointName))
                 .WithEnvironment(ShellEnvironmentVariable, shell)
+                .WithEnvironment(ChatEnvironmentVariable, chat)
                 .WaitFor(ui);
         }
 

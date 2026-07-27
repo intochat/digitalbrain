@@ -8,6 +8,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.AI.Aspire.Hosting\DigitalBrain.Modules.AI.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Chat\DigitalBrain.Modules.Chat.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\behaviors\DigitalBrain.Behaviors.Os\DigitalBrain.Behaviors.Os.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Flutter.Aspire.Hosting\DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Google.Aspire.Hosting\DigitalBrain.Modules.Google.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Salesforce.Aspire.Hosting\DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" IsAspireProjectResource="false" />

@@ -15,7 +15,8 @@ builder.AddDigitalBrainClient(client =>
 builder.Services
     .AddMcpServer()
     .WithHttpTransport()
-    .WithTools<DigitalBrainMcpTools>();
+    .WithTools<DigitalBrainMcpTools>()
+    .WithTools<DigitalBrainIntrospectionTools>();
 
 var app = builder.Build();
 app.MapMcpHost();

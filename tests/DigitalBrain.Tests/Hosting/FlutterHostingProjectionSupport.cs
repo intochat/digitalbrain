@@ -109,6 +109,7 @@ internal static class FlutterHostingProjectionSupport
             {
                 FlutterHostingExtensions.UiBaseEnvironmentVariable,
                 FlutterHostingExtensions.ShellEnvironmentVariable,
+                FlutterHostingExtensions.ChatEnvironmentVariable,
             },
             environment);
     }

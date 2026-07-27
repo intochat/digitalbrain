@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA2007</NoWarn>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Azure.Data.Tables" />
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
@@ -7,6 +10,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\modules\DigitalBrain.Modules.AI.Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />
+    <ProjectReference Include="..\..\modules\DigitalBrain.Modules.Chat.Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="..\..\src\DigitalBrain.Client\DigitalBrain.Client.csproj" />
   </ItemGroup>
