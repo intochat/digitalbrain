@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
+    <RootNamespace>DigitalBrain.UI</RootNamespace>
     <NoWarn>$(NoWarn);CA2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>

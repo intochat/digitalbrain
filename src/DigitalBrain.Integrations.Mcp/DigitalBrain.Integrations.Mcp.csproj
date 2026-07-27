@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <RootNamespace>DigitalBrain.Mcp</RootNamespace>
     <IsPackable>true</IsPackable>
     <Description>Southbound official MCP SDK transport, OAuth, token cache, session, and fingerprint mechanics for DigitalBrain modules.</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007</NoWarn>
