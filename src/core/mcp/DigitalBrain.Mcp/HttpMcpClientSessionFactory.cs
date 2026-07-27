@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using ModelContextProtocol.Client;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Integrations.Mcp;
+namespace DigitalBrain.Mcp;
 
 internal sealed class HttpMcpClientSessionFactory(
     IConfiguration configuration,

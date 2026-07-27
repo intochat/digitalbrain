@@ -5,7 +5,7 @@ using DigitalBrain.Chat;
 using DigitalBrain.Client;
 using ModelContextProtocol.Server;
 
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.OS.Mcp;
 
 [McpServerToolType]
 [SuppressMessage(

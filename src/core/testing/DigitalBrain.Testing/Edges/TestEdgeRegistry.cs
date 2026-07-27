@@ -1,4 +1,4 @@
-using DigitalBrain.Integrations.Mcp;
+using DigitalBrain.Mcp;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;

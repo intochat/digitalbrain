@@ -1,14 +1,14 @@
 using System.Net;
 using Xunit;
 
-namespace DigitalBrain.Ui.Tests;
+namespace DigitalBrain.UI.Tests;
 
 public sealed class LiveProductUINorthbound
 {
     [Fact(
         Explicit = true,
         DisplayName =
-            "LIVE product Ui: POST open-scene Accepted and SSE projects scene-opened (requires aspire start product AppHost)")]
+            "LIVE product UI: POST open-scene Accepted and SSE projects scene-opened (requires aspire start product AppHost)")]
     public async Task PostOpenSceneAndSseProjectsSceneOpened()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

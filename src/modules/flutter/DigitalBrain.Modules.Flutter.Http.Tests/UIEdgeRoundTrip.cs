@@ -3,7 +3,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Flutter;
 using Xunit;
 
-namespace DigitalBrain.Ui.Tests;
+namespace DigitalBrain.UI.Tests;
 
 public sealed class UIEdgeRoundTrip(UIFixture fixture)
 {

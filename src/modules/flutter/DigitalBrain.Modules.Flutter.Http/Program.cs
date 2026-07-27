@@ -1,5 +1,5 @@
 using DigitalBrain.Aspire;
-using DigitalBrain.Ui;
+using DigitalBrain.UI;
 
 var builder = WebApplication.CreateBuilder(args);
 

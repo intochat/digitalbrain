@@ -3,11 +3,11 @@ using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Integrations.Mcp;
+namespace DigitalBrain.Mcp;
 
 internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
 {
-    internal const string HttpClientName = "DigitalBrain.Integrations.Mcp";
+    internal const string HttpClientName = "DigitalBrain.Mcp";
 
     internal async ValueTask<T> RunAsync<T>(
         McpServerDefinition server,

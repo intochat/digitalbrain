@@ -4,14 +4,14 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using Xunit;
 
-namespace DigitalBrain.Ui.Tests;
+namespace DigitalBrain.UI.Tests;
 
 public sealed class UIEdgeVocabulary(UIFixture fixture)
 {
     private const string OpenTelemetryMarker = "OpenTelemetry";
 
     [Fact(DisplayName =
-        "Ui host public edge vocabulary is UIEdgeContract — health, shell/scene routes, scene-opened event")]
+        "UI host public edge vocabulary is UIEdgeContract — health, shell/scene routes, scene-opened event")]
     public void PublicEdgeVocabularyIsUIEdgeContract()
     {
         var vocabulary = typeof(UIEdgeContract).Assembly

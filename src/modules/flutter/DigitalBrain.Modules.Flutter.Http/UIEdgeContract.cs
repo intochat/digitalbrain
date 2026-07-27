@@ -1,11 +1,11 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace DigitalBrain.Ui;
+namespace DigitalBrain.UI;
 
 [SuppressMessage(
     "Design",
     "CA1515:Consider making public types internal",
-    Justification = "Product Ui edge route and SSE names are the single public constant source for host, tests, and peers.")]
+    Justification = "Product UI edge route and SSE names are the single public constant source for host, tests, and peers.")]
 public static class UIEdgeContract
 {
     public const string HealthPath = "/health";

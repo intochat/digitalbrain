@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "DigitalBrain.Ui.Tests": {
+    "DigitalBrain.Modules.Flutter.Http.Tests": {
       "commandName": "Project",
       "launchBrowser": true,
       "environmentVariables": {

@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace DigitalBrain.Ui.Tests;
+namespace DigitalBrain.UI.Tests;
 
 internal static class UIEdgeSse
 {

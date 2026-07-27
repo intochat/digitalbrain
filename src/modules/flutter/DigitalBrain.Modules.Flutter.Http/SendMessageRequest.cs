@@ -1,3 +1,3 @@
-namespace DigitalBrain.Ui;
+namespace DigitalBrain.UI;
 
 internal sealed record SendMessageRequest(string Text);

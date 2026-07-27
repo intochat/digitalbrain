@@ -1,5 +1,5 @@
 using System.IO.Pipelines;
-using DigitalBrain.Integrations.Mcp;
+using DigitalBrain.Mcp;
 using DigitalBrain.Testing;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;

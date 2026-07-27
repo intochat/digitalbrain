@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "DigitalBrain.Mcp": {
+    "DigitalBrain.OS.Mcp": {
       "commandName": "Project",
       "applicationUrl": "http://localhost:5000",
       "environmentVariables": {

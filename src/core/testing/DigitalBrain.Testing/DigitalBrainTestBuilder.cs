@@ -1,6 +1,6 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Integrations.Mcp;
+using DigitalBrain.Mcp;
 using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Testing;

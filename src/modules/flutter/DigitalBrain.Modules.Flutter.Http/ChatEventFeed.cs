@@ -3,7 +3,7 @@ using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 
-namespace DigitalBrain.Ui;
+namespace DigitalBrain.UI;
 
 internal static class ChatEventFeed
 {

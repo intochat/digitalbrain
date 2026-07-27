@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Flutter;
 
-namespace DigitalBrain.Ui;
+namespace DigitalBrain.UI;
 
 internal sealed class OwnerSessionJournal
 {

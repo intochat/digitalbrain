@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Text;
 
-namespace DigitalBrain.Integrations.Mcp;
+namespace DigitalBrain.Mcp;
 
 internal static class LocalLoopbackMcpAuthorizationRedirect
 {

@@ -94,7 +94,7 @@ public static class FlutterHostingExtensions
             if (_ui is not null)
             {
                 throw new InvalidOperationException(
-                    $"Ui edge is already configured on brain '{brain.Name}'. Call WithUIEdge exactly once.");
+                    $"UI edge is already configured on brain '{brain.Name}'. Call WithUIEdge exactly once.");
             }
 
             var appHost = brain.GetApplicationBuilder();
@@ -102,7 +102,7 @@ public static class FlutterHostingExtensions
             if (!File.Exists(projectPath))
             {
                 throw new InvalidOperationException(
-                    $"Flutter Ui edge project was not found at '{projectPath}'. " +
+                    $"Flutter UI edge project was not found at '{projectPath}'. " +
                     "Pass FlutterUIEdgeOptions.ProjectPath, or place DigitalBrain.Modules.Flutter.Http under src/modules/flutter/.");
             }
 

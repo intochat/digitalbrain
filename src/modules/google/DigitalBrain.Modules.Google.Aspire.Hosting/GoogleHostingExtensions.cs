@@ -1,5 +1,5 @@
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Integrations.Mcp.Aspire.Hosting;
+using DigitalBrain.Mcp.Aspire.Hosting;
 
 namespace DigitalBrain.Google.Aspire.Hosting;
 

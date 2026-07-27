@@ -4,7 +4,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Aspire.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Integrations.Mcp.Aspire.Hosting;
+namespace DigitalBrain.Mcp.Aspire.Hosting;
 
 internal sealed record McpProviderHostingDefinition(
     string Key,

@@ -1,4 +1,4 @@
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.OS.Mcp;
 
 internal sealed record NeuronJournalPage(
     string Neuron,

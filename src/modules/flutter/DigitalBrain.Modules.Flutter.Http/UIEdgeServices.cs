@@ -1,7 +1,7 @@
 using DigitalBrain.Client;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace DigitalBrain.Ui;
+namespace DigitalBrain.UI;
 
 internal static class UIEdgeServices
 {

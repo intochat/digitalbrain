@@ -2,7 +2,7 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Testing;
 
-namespace DigitalBrain.Ui.Tests;
+namespace DigitalBrain.UI.Tests;
 
 public sealed class UIFixture : DigitalBrainFixture
 {

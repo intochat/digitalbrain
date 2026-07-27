@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using ModelContextProtocol.Authentication;
 
-namespace DigitalBrain.Integrations.Mcp;
+namespace DigitalBrain.Mcp;
 
 internal static class McpAuthorizationRedirect
 {

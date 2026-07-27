@@ -1,4 +1,4 @@
-using DigitalBrain.Ui.Tests;
+using DigitalBrain.UI.Tests;
 using Xunit;
 
 [assembly: AssemblyFixture(typeof(UIFixture))]

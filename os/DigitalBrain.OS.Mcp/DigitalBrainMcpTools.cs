@@ -5,7 +5,7 @@ using DigitalBrain.Client;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Server;
 
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.OS.Mcp;
 
 [McpServerToolType]
 [SuppressMessage(

@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace DigitalBrain.Integrations.Mcp;
+namespace DigitalBrain.Mcp;
 
 internal static class McpRuntimeHosting
 {

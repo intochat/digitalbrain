@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
-using DigitalBrain.Integrations.Mcp;
+using DigitalBrain.Mcp;
 using ModelContextProtocol.Client;
 
 namespace DigitalBrain.Salesforce;

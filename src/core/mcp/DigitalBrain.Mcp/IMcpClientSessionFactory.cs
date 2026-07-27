@@ -1,7 +1,7 @@
 using ModelContextProtocol.Client;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Integrations.Mcp;
+namespace DigitalBrain.Mcp;
 
 internal interface IMcpClientSession : IAsyncDisposable
 {

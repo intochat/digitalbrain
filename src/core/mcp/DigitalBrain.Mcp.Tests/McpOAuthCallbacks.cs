@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
-using DigitalBrain.Integrations.Mcp;
+using DigitalBrain.Mcp;
 using Xunit;
 
 namespace DigitalBrain.Integrations.Tests;

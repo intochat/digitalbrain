@@ -1,4 +1,4 @@
-namespace DigitalBrain.Ui;
+namespace DigitalBrain.UI;
 
 internal sealed record ChatTurnEvent(
     long Sequence,

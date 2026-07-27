@@ -2,7 +2,7 @@ using System.Buffers;
 using System.Security.Cryptography;
 using System.Text.Json;
 
-namespace DigitalBrain.Integrations.Mcp;
+namespace DigitalBrain.Mcp;
 
 internal static class McpToolFingerprint
 {

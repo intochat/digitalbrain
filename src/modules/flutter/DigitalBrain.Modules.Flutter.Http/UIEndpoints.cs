@@ -2,11 +2,11 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using DigitalBrain.Flutter;
 
-namespace DigitalBrain.Ui;
+namespace DigitalBrain.UI;
 
 internal static class UIEndpoints
 {
-    public static IEndpointRouteBuilder MapUi(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapUI(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 

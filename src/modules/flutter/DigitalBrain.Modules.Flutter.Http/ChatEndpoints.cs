@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
 
-namespace DigitalBrain.Ui;
+namespace DigitalBrain.UI;
 
 internal static class ChatEndpoints
 {

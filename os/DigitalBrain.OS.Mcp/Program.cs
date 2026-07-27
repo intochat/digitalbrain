@@ -1,5 +1,5 @@
 using DigitalBrain.Aspire;
-using DigitalBrain.Mcp;
+using DigitalBrain.OS.Mcp;
 using Microsoft.Extensions.AI;
 using Orleans.Serialization;
 

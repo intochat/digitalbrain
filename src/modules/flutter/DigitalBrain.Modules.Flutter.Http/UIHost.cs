@@ -1,4 +1,4 @@
-namespace DigitalBrain.Ui;
+namespace DigitalBrain.UI;
 
 internal static class UIHost
 {
@@ -7,7 +7,7 @@ internal static class UIHost
         ArgumentNullException.ThrowIfNull(app);
 
         app.MapGet(UIEdgeContract.HealthPath, static () => Results.Ok(UIEdgeContract.HealthResponse));
-        app.MapUi();
+        app.MapUI();
         app.MapChat();
         return app;
     }

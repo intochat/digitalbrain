@@ -1,4 +1,4 @@
-namespace DigitalBrain.Integrations.Mcp;
+namespace DigitalBrain.Mcp;
 
 internal sealed class McpServerDefinition
 {
