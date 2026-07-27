@@ -5,7 +5,7 @@ using System.Text;
 using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
 
-public static class CanonicalArtifactWriter
+internal static class CanonicalArtifactWriter
 {
     internal const int MaximumEntries = 128;
     internal const int MaximumEntryBytes = 16 * 1024 * 1024;

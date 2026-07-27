@@ -6,7 +6,7 @@ using System.Text.Json;
 using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
 
-public static class CanonicalArtifactReader
+internal static class CanonicalArtifactReader
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly string[] RequiredEntries =

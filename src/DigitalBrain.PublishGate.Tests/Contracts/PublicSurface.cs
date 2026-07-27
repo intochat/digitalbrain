@@ -28,6 +28,10 @@ public sealed class PublicSurface
         Assert.Empty(leaked);
     }
 
+    [Fact(DisplayName = "the kernel assembly is inside the shipped set the publish gate scans")]
+    public void TheKernelAssemblyIsInsideTheShippedSet()
+        => Assert.Contains(ShippedAssemblies(), assembly => NameOf(assembly) == KernelAssemblyName);
+
     [Fact(DisplayName = "Aspire hosting exposes no Kernel type in a public signature")]
     public void AspireHostingExposesNoKernelTypeInPublicSignatures()
     {
@@ -101,7 +105,8 @@ public sealed class PublicSurface
     }
 
     private static bool IsShipped(string assemblyName)
-        => assemblyName.StartsWith("DigitalBrain.", StringComparison.Ordinal)
+        => (assemblyName == KernelAssemblyName
+            || assemblyName.StartsWith("DigitalBrain.", StringComparison.Ordinal))
         && !assemblyName.EndsWith(".Testing", StringComparison.Ordinal)
         && !assemblyName.EndsWith(".Tests", StringComparison.Ordinal);
 
