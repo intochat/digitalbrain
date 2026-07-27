@@ -10,6 +10,5 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
-    <ProjectReference Include="..\..\src\DigitalBrain.Behaviors.Runtime\DigitalBrain.Behaviors.Runtime.csproj" />
   </ItemGroup>
 </Project>

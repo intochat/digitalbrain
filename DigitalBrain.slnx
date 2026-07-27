@@ -1,9 +1,7 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/DigitalBrain/DigitalBrain.csproj" />
     <Project Path="src/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
     <Project Path="src/DigitalBrain.Behaviors/DigitalBrain.Behaviors.csproj" />
-    <Project Path="src/DigitalBrain.Behaviors.Runtime/DigitalBrain.Behaviors.Runtime.csproj" />
     <Project Path="src/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
     <Project Path="src/DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <Project Path="src/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />

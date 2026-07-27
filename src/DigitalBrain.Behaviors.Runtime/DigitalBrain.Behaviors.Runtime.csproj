@@ -1,5 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="..\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
-  </ItemGroup>
-</Project>
