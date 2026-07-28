@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.AI;
 
@@ -23,7 +24,9 @@ public abstract class Agent : Neuron, IAgent
     protected static CapabilityTool Capability(string name, string description, Delegate invoke)
         => new(name, description, invoke);
 
-    public async Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages)
+    public async IAsyncEnumerable<ChatResponseUpdate> RespondStreaming(
+        IReadOnlyList<ChatMessage> messages,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(messages);
 
@@ -38,21 +41,25 @@ public abstract class Agent : Neuron, IAgent
             ? messages
             : [new ChatMessage(ChatRole.System, instructions), .. messages];
 
-        var response = await _toolCallingClient
-            .GetStreamingResponseAsync(request, options)
-            .ToChatResponseAsync();
+        var selected = new List<string>();
 
-        foreach (var selected in SelectedCapabilities(response))
+        await foreach (var update in _toolCallingClient
+            .GetStreamingResponseAsync(request, options, cancellationToken))
         {
-            await EmitAsync(new CapabilityToolSelected(selected));
+            selected.AddRange(update.Contents.OfType<FunctionCallContent>().Select(call => call.Name));
+            yield return update;
         }
 
-        return response;
+        foreach (var capability in selected)
+        {
+            await EmitAsync(new CapabilityToolSelected(capability));
+        }
     }
 
-    private static IEnumerable<string> SelectedCapabilities(ChatResponse response)
-        => response.Messages
-            .SelectMany(message => message.Contents)
-            .OfType<FunctionCallContent>()
-            .Select(call => call.Name);
+    public Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+
+        return RespondStreaming(messages).ToChatResponseAsync();
+    }
 }
