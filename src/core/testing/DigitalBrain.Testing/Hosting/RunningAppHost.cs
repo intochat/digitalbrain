@@ -9,7 +9,7 @@ namespace DigitalBrain.Testing;
 public sealed class RunningAppHost : IAsyncDisposable
 {
     private static readonly TimeSpan CleanupTimeout = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(2);
 
     private readonly DistributedApplication _application;
     private readonly TimeSpan _cleanupTimeout;
@@ -218,19 +218,30 @@ public sealed class RunningAppHost : IAsyncDisposable
         string resourceId,
         CancellationToken cancellationToken)
     {
-        var result = await _application.ResourceCommands.ExecuteCommandAsync(
-            resourceId,
-            KnownResourceCommands.StopCommand,
-            cancellationToken);
+        try
+        {
+            var result = await _application.ResourceCommands.ExecuteCommandAsync(
+                resourceId,
+                KnownResourceCommands.StopCommand,
+                cancellationToken);
 
 #pragma warning disable CS0618
-        var errorMessage = result.ErrorMessage;
+            var errorMessage = result.ErrorMessage;
 #pragma warning restore CS0618
 
-        if (!result.Success && !IsTerminal(resourceId))
+            if (!result.Success && !IsTerminal(resourceId))
+            {
+                throw new InvalidOperationException(
+                    $"Stop failed for '{resourceId}': {errorMessage ?? result.Message}");
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            throw new InvalidOperationException(
-                $"Stop failed for '{resourceId}': {errorMessage ?? result.Message}");
+            if (!IsTerminal(resourceId))
+            {
+                throw new TimeoutException(
+                    $"Stop timed out for '{resourceId}' within the AppHost cleanup budget.");
+            }
         }
     }
 
