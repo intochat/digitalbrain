@@ -16,11 +16,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
 
 brain.AddModule<AIModule>(ai => ai
-    .WithLlm<Gemma4>()
-    //.WithLlm<Qwen35>()
-    //.WithLlm<Granite41>()
-    //.WithLlm<Llama32>()
-    );
+    .WithLlm<Gemma4>());
 brain.AddModule<ChatModule>();
 brain.AddModule<OSBehaviorsModule>();
 brain.AddModule<FlutterModule>(flutter => flutter
