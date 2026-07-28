@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
@@ -29,6 +30,17 @@ public abstract class GroupChat : Neuron, IGroupChat
         var agent = shape.CreateAgent(GrainFactory, TaskScheduler.Current);
 
         return _directSession.RunAsync(agent, shape.Definition, messages, CancellationToken.None);
+    }
+
+    public async IAsyncEnumerable<ChatResponseUpdate> RespondStreaming(
+        IReadOnlyList<ChatMessage> messages,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var response = await Respond(messages).WaitAsync(cancellationToken);
+        foreach (var update in response.ToChatResponseUpdates())
+        {
+            yield return update;
+        }
     }
 
     public Task Accept(AttemptRequest request)

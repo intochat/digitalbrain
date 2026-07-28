@@ -21,6 +21,7 @@ public sealed class AgentStreaming(ModuleFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var enrichment = test.Neuron<IEnrichmentProbe>(ToolAgentProbe.ProbeName);
         test.Chat().ReplyWithCapabilityCall(
             ToolAgentProbe.EnrichTool,
             new Dictionary<string, object?>(StringComparer.Ordinal)
@@ -37,6 +38,9 @@ public sealed class AgentStreaming(ModuleFixture fixture)
             text.Append(update.Text);
         }
 
+        var enriched = await enrichment.Outgoing.NextAsync<ProbeAccountEnriched>(cancellationToken);
+        Assert.Equal(AccountId, enriched.Synapse.AccountId);
+        Assert.Equal(MessageId, enriched.Synapse.MessageId);
         Assert.Equal(FinalReply, text.ToString());
     }
 
