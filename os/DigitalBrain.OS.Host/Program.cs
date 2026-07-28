@@ -1,10 +1,9 @@
 using DigitalBrain.Kernel;
-
-const string HealthPath = "/health";
-const string HealthResponse = "healthy";
+using DigitalBrain.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.AddServiceDefaults();
 builder.AddKeyedAzureTableServiceClient("brain-clustering");
 builder.AddKeyedAzureTableServiceClient("brain-reminders");
 builder.UseOrleans(silo => silo
@@ -12,5 +11,5 @@ builder.UseOrleans(silo => silo
     .AddDigitalBrainJournalStorage(builder.Configuration));
 
 var app = builder.Build();
-app.MapGet(HealthPath, static () => Results.Ok(HealthResponse));
+app.MapDefaultEndpoints();
 app.Run();

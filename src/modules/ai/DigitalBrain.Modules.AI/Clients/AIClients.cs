@@ -1,4 +1,5 @@
 using System.ClientModel;
+using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
 using Microsoft.Extensions.AI;
@@ -12,6 +13,7 @@ namespace DigitalBrain.AI;
 internal static class AIClients
 {
     private const string ConfigurationRoot = "DigitalBrain:AI";
+    private const string TelemetrySource = "DigitalBrain.AI";
 
     internal static void Add(IServiceCollection services)
     {
@@ -34,7 +36,11 @@ internal static class AIClients
                 typeof(TModel).Name,
                 defaultTag));
 
-    private static OllamaApiClient Ollama(
+    [SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "The telemetry middleware owns and disposes the inner Ollama client.")]
+    private static IChatClient Ollama(
         IConfiguration configuration,
         string modelName,
         string defaultTag)
@@ -51,7 +57,9 @@ internal static class AIClients
 
         var tag = configuration[$"{ConfigurationRoot}:Ollama:{modelName}:Model"] ?? defaultTag;
 
-        return new OllamaApiClient(endpointUri, tag);
+        return new ChatClientBuilder(new OllamaApiClient(endpointUri, tag))
+            .UseOpenTelemetry(sourceName: $"{TelemetrySource}.{modelName}")
+            .Build();
     }
 
     private static IChatClient OpenAI(IConfiguration configuration)
@@ -67,8 +75,12 @@ internal static class AIClients
             options.Endpoint = new Uri(endpoint, UriKind.Absolute);
         }
 
-        return new OpenAIClient(new ApiKeyCredential(apiKey), options)
+        var client = new OpenAIClient(new ApiKeyCredential(apiKey), options)
             .GetChatClient(model)
             .AsIChatClient();
+
+        return new ChatClientBuilder(client)
+            .UseOpenTelemetry(sourceName: $"{TelemetrySource}.{nameof(Gpt56)}")
+            .Build();
     }
 }

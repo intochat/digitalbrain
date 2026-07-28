@@ -55,8 +55,10 @@ public sealed class AIProviderConfiguration
         using var provider = Compose(endpoint);
 
         var client = provider.GetRequiredKeyedService<IChatClient>(modelType);
-        var ollama = Assert.IsAssignableFrom<IOllamaApiClient>(client);
+        var ollama = Assert.IsAssignableFrom<IOllamaApiClient>(
+            client.GetService(typeof(IOllamaApiClient)));
 
+        Assert.NotSame(ollama, client);
         Assert.Equal(new Uri(endpoint), ollama.Uri);
         Assert.False(string.Equals("localhost", ollama.Uri.Host, StringComparison.OrdinalIgnoreCase));
         Assert.Equal(expectedTag, ollama.SelectedModel);

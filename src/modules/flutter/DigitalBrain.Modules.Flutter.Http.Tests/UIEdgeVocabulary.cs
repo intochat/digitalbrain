@@ -31,7 +31,6 @@ public sealed class UIEdgeVocabulary(UIFixture fixture)
                 or "IFlutter");
 
         Assert.Equal("/health", UIEdgeContract.HealthPath);
-        Assert.Equal("healthy", UIEdgeContract.HealthResponse);
         Assert.Equal("/shells/{shellName}/scenes", UIEdgeContract.OpenScenePath);
         Assert.Equal("/shells/{shellName}/events", UIEdgeContract.ShellEventsPath);
         Assert.Equal(
@@ -103,8 +102,5 @@ public sealed class UIEdgeVocabulary(UIFixture fixture)
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
-        Assert.Equal(
-            $"\"{UIEdgeContract.HealthResponse}\"",
-            (await health.Content.ReadAsStringAsync(cancellationToken)).Trim());
     }
 }

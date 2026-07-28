@@ -10,8 +10,6 @@ public static class UIEdgeContract
 {
     public const string HealthPath = "/health";
 
-    public const string HealthResponse = "healthy";
-
     public const string OpenScenePath = "/shells/{shellName}/scenes";
 
     public const string ShellEventsPath = "/shells/{shellName}/events";

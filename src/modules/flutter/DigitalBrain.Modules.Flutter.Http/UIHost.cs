@@ -6,7 +6,6 @@ internal static class UIHost
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        app.MapGet(UIEdgeContract.HealthPath, static () => Results.Ok(UIEdgeContract.HealthResponse));
         app.MapUI();
         app.MapChat();
         return app;

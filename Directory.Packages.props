@@ -24,8 +24,16 @@
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.8.3" />
     <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.8.3" />
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.8.3" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.8.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.8.0" />
     <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.15.0" />
     <PackageVersion Include="OllamaSharp" Version="5.4.30" />
+    <PackageVersion Include="OpenTelemetry.Api" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Journaling" Version="10.2.2-rc.2.alpha.1" />

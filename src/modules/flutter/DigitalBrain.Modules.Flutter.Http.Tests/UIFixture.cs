@@ -1,5 +1,6 @@
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
+using DigitalBrain.ServiceDefaults;
 using DigitalBrain.Testing;
 
 namespace DigitalBrain.UI.Tests;
@@ -31,11 +32,13 @@ public sealed class UIFixture : DigitalBrainFixture
 
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.AddServiceDefaults();
         builder.Services.AddSingleton(test.Client);
         builder.Services.AddSingleton<IGrainFactory>(test.Cluster.Client);
         builder.Services.AddUIEdgeServices();
 
         var app = builder.Build();
+        app.MapDefaultEndpoints();
         app.MapUIHost();
         await app.StartAsync(cancellationToken);
         return app;
