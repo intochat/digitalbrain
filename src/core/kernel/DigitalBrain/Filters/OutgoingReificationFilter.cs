@@ -144,9 +144,28 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
         {
             await context.Invoke();
         }
-        finally
+        catch
+        {
+            await ClaimAbandonmentWithoutMaskingAsync(caller, enumerationId);
+
+            throw;
+        }
+
+        await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Abandoned);
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "An abandonment journal failure must not replace the original disposal exception.")]
+    private static async Task ClaimAbandonmentWithoutMaskingAsync(Neuron caller, Guid enumerationId)
+    {
+        try
         {
             await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Abandoned);
+        }
+        catch
+        {
         }
     }
 

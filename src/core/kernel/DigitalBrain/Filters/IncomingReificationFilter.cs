@@ -28,7 +28,8 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
 
         if (CapabilityInvocation.ContractMethod(context.InterfaceMethod, context.Request) is not { } contract
             || context.Grain is not Neuron target
-            || !contract.DeclaringType!.IsInstanceOfType(target))
+            || (CapabilityInvocation.IsEnumerationDispatch(context.InterfaceMethod)
+                && !contract.DeclaringType!.IsInstanceOfType(target)))
         {
             await context.Invoke();
 
@@ -54,7 +55,7 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
             }
 
             throw new NeuronAuthorizationException(
-                $"Semantic capability '{contract.DeclaringType.FullName}.{contract.Name}' requires a committed capability request.");
+                $"Semantic capability '{contract.DeclaringType!.FullName}.{contract.Name}' requires a committed capability request.");
         }
 
         SynapseDelivery delivery;

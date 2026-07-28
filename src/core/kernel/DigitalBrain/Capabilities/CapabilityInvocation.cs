@@ -83,12 +83,10 @@ internal static class CapabilityInvocation
 
     internal static CapabilityOutcome? EnumerationTerminus(object? dispatchedResult)
     {
-        if (dispatchedResult is not ValueTuple<EnumerationResult, object> hop)
+        if (dispatchedResult is not ValueTuple<EnumerationResult, object>(var status, _))
         {
             return null;
         }
-
-        var status = hop.Item1;
 
         if ((status & EnumerationResult.Completed) != 0)
         {
@@ -98,9 +96,9 @@ internal static class CapabilityInvocation
         return (status & AbortedEnumeration) != 0 ? CapabilityOutcome.Failed : null;
     }
 
-    private static bool IsEnumerationDispatch(MethodInfo? dispatchedMethod, string hopName)
+    private static bool IsEnumerationDispatch(MethodInfo? dispatchedMethod, string dispatchedMethodName)
         => IsEnumerationDispatch(dispatchedMethod)
-            && string.Equals(dispatchedMethod!.Name, hopName, StringComparison.Ordinal);
+            && string.Equals(dispatchedMethod!.Name, dispatchedMethodName, StringComparison.Ordinal);
 
     private const EnumerationResult AbortedEnumeration =
         EnumerationResult.MissingEnumeratorError | EnumerationResult.Error | EnumerationResult.Canceled;
