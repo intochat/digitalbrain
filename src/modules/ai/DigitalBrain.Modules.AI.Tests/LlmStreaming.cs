@@ -15,6 +15,18 @@ public partial interface IStreamingRelayProbe : INeuron
     [Alias(nameof(CollectStreamingUpdates))]
     Task<IReadOnlyList<ChatResponseUpdate>> CollectStreamingUpdates(string modelName, string prompt);
 
+    [Alias(nameof(DrainStreamingOneUpdatePerBatch))]
+    Task<int> DrainStreamingOneUpdatePerBatch(string modelName, string prompt);
+
+    [Alias(nameof(AbandonStreamingAfterFirstUpdate))]
+    Task AbandonStreamingAfterFirstUpdate(string modelName, string prompt);
+
+    [Alias(nameof(StreamFromTargetWithoutTheContract))]
+    Task StreamFromTargetWithoutTheContract(string relayName);
+
+    [Alias(nameof(CountPendingStreamedRequests))]
+    Task<int> CountPendingStreamedRequests();
+
     [Alias(nameof(RelayRespond))]
     Task<ChatResponse> RelayRespond(string modelName, string prompt);
 }
@@ -26,10 +38,9 @@ public sealed class StreamingRelayProbe : Neuron, IStreamingRelayProbe
         ArgumentException.ThrowIfNullOrWhiteSpace(modelName);
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
 
-        var llm = GrainFactory.GetGrain<ILlama32>(NeuronId.For<ILlama32>(Id.Owner, modelName).ToGrainId());
         var updates = new List<ChatResponseUpdate>();
 
-        await foreach (var update in llm.RespondStreaming([new ChatMessage(ChatRole.User, prompt)]))
+        await foreach (var update in Model(modelName).RespondStreaming([new ChatMessage(ChatRole.User, prompt)]))
         {
             updates.Add(update);
         }
@@ -37,15 +48,60 @@ public sealed class StreamingRelayProbe : Neuron, IStreamingRelayProbe
         return updates;
     }
 
+    public async Task<int> DrainStreamingOneUpdatePerBatch(string modelName, string prompt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(modelName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
+
+        var drained = 0;
+
+        await foreach (var _ in Model(modelName)
+            .RespondStreaming([new ChatMessage(ChatRole.User, prompt)])
+            .WithBatchSize(1))
+        {
+            drained++;
+        }
+
+        return drained;
+    }
+
+    public async Task AbandonStreamingAfterFirstUpdate(string modelName, string prompt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(modelName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
+
+        await foreach (var _ in Model(modelName)
+            .RespondStreaming([new ChatMessage(ChatRole.User, prompt)])
+            .WithBatchSize(1))
+        {
+            break;
+        }
+    }
+
+    public async Task StreamFromTargetWithoutTheContract(string relayName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(relayName);
+
+        var mismatched = GrainFactory.GetGrain<ILLM>(
+            NeuronId.For<IStreamingRelayProbe>(Id.Owner, relayName).ToGrainId());
+
+        await foreach (var _ in mismatched.RespondStreaming([new ChatMessage(ChatRole.User, "hi")]))
+        {
+        }
+    }
+
+    public Task<int> CountPendingStreamedRequests() => Task.FromResult(PendingStreamedCapabilityRequests);
+
     public Task<ChatResponse> RelayRespond(string modelName, string prompt)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modelName);
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
 
-        var llm = GrainFactory.GetGrain<ILlama32>(NeuronId.For<ILlama32>(Id.Owner, modelName).ToGrainId());
-
-        return llm.Respond([new ChatMessage(ChatRole.User, prompt)]);
+        return Model(modelName).Respond([new ChatMessage(ChatRole.User, prompt)]);
     }
+
+    private ILlama32 Model(string modelName)
+        => GrainFactory.GetGrain<ILlama32>(NeuronId.For<ILlama32>(Id.Owner, modelName).ToGrainId());
 }
 
 public sealed class LlmStreaming(ModuleFixture fixture)

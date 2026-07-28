@@ -5,4 +5,5 @@ internal enum CapabilityOutcome
     Completed,
     Failed,
     Rejected,
+    Abandoned,
 }

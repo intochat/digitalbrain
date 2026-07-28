@@ -63,4 +63,45 @@ internal static class CapabilityInvocation
     private static bool IsEnumerationRequest(IInvokable candidate)
         => candidate.GetType().GetInterfaces().Any(contract =>
             contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IAsyncEnumerableRequest<>));
+
+    internal static bool IsEnumerationDispatch(MethodInfo? dispatchedMethod)
+        => dispatchedMethod?.DeclaringType == typeof(IAsyncEnumerableGrainExtension);
+
+    internal static bool IsEnumerationStart(MethodInfo? dispatchedMethod)
+        => IsEnumerationDispatch(dispatchedMethod, nameof(IAsyncEnumerableGrainExtension.StartEnumeration));
+
+    internal static bool IsEnumerationContinuation(MethodInfo? dispatchedMethod)
+        => IsEnumerationDispatch(dispatchedMethod, nameof(IAsyncEnumerableGrainExtension.MoveNext));
+
+    internal static bool IsEnumerationDisposal(MethodInfo? dispatchedMethod)
+        => IsEnumerationDispatch(dispatchedMethod, nameof(IAsyncEnumerableGrainExtension.DisposeAsync));
+
+    internal static Guid? EnumerationId(IInvokable? dispatchedRequest)
+        => dispatchedRequest?.GetArgumentCount() > 0 && dispatchedRequest.GetArgument(0) is Guid enumerationId
+            ? enumerationId
+            : null;
+
+    internal static CapabilityOutcome? EnumerationTerminus(object? dispatchedResult)
+    {
+        if (dispatchedResult is not ValueTuple<EnumerationResult, object> hop)
+        {
+            return null;
+        }
+
+        var status = hop.Item1;
+
+        if ((status & EnumerationResult.Completed) != 0)
+        {
+            return CapabilityOutcome.Completed;
+        }
+
+        return (status & AbortedEnumeration) != 0 ? CapabilityOutcome.Failed : null;
+    }
+
+    private static bool IsEnumerationDispatch(MethodInfo? dispatchedMethod, string hopName)
+        => IsEnumerationDispatch(dispatchedMethod)
+            && string.Equals(dispatchedMethod!.Name, hopName, StringComparison.Ordinal);
+
+    private const EnumerationResult AbortedEnumeration =
+        EnumerationResult.MissingEnumeratorError | EnumerationResult.Error | EnumerationResult.Canceled;
 }

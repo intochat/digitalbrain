@@ -146,6 +146,14 @@ public abstract partial class Neuron
         return delivery;
     }
 
+    internal void RegisterStreamedCapabilityRequest(Guid enumerationId, SynapseDelivery request)
+        => _streamedCapabilityRequests[enumerationId] = request;
+
+    internal bool TryClaimStreamedCapabilityRequest(Guid enumerationId, out SynapseDelivery request)
+        => _streamedCapabilityRequests.TryRemove(enumerationId, out request!);
+
+    internal int PendingStreamedCapabilityRequests => _streamedCapabilityRequests.Count;
+
     internal async Task RecordCapabilityOutcomeAsync(CapabilityOutcome outcome, SynapseDelivery request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -155,6 +163,7 @@ public abstract partial class Neuron
             CapabilityOutcome.Completed => new CapabilityCompleted(request.SynapseId),
             CapabilityOutcome.Failed => new CapabilityFailed(request.SynapseId),
             CapabilityOutcome.Rejected => new CapabilityRejected(request.SynapseId),
+            CapabilityOutcome.Abandoned => new CapabilityAbandoned(request.SynapseId),
             _ => throw new ArgumentOutOfRangeException(nameof(outcome)),
         };
 

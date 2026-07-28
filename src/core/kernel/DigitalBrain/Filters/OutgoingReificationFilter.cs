@@ -9,6 +9,15 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        if (context.SourceContext?.GrainInstance is Neuron streamingCaller
+            && CapabilityInvocation.IsEnumerationDispatch(context.InterfaceMethod)
+            && CapabilityInvocation.EnumerationId(context.Request) is { } enumerationId)
+        {
+            await InvokeStreamedAsync(context, streamingCaller, enumerationId);
+
+            return;
+        }
+
         if (!CapabilityInvocation.IsRequest(context.InterfaceMethod))
         {
             await context.Invoke();
@@ -27,10 +36,7 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
 
         var interfaceName = context.InterfaceMethod!.DeclaringType!.FullName!;
         var methodName = context.InterfaceMethod.Name;
-        var target = NeuronId.FromGrainKey(
-            context.TargetId.Type.ToString()
-                ?? throw new InvalidOperationException("The capability target has no grain type."),
-            context.TargetId.Key.ToString());
+        var target = TargetOf(context);
         var request = await caller.BeginCapabilityRequestAsync(interfaceName, methodName, target);
 
         try
@@ -52,6 +58,116 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
 
         await caller.RecordCapabilityOutcomeAsync(CapabilityOutcome.Completed, request);
     }
+
+    private static Task InvokeStreamedAsync(IOutgoingGrainCallContext context, Neuron caller, Guid enumerationId)
+    {
+        if (CapabilityInvocation.IsEnumerationStart(context.InterfaceMethod))
+        {
+            return StartStreamedRequestAsync(context, caller, enumerationId);
+        }
+
+        if (CapabilityInvocation.IsEnumerationContinuation(context.InterfaceMethod))
+        {
+            return ContinueStreamedRequestAsync(context, caller, enumerationId);
+        }
+
+        return CapabilityInvocation.IsEnumerationDisposal(context.InterfaceMethod)
+            ? AbandonStreamedRequestAsync(context, caller, enumerationId)
+            : context.Invoke();
+    }
+
+    private static async Task StartStreamedRequestAsync(
+        IOutgoingGrainCallContext context,
+        Neuron caller,
+        Guid enumerationId)
+    {
+        if (CapabilityInvocation.ContractMethod(context.InterfaceMethod, context.Request) is not { } contract)
+        {
+            await context.Invoke();
+
+            return;
+        }
+
+        var target = TargetOf(context);
+        var request = await caller.BeginCapabilityRequestAsync(
+            contract.DeclaringType!.FullName!,
+            contract.Name,
+            target);
+
+        caller.RegisterStreamedCapabilityRequest(enumerationId, request);
+
+        try
+        {
+            await CapabilityRequestContext.InvokeAsync(request, context.Invoke);
+        }
+        catch (NeuronAuthorizationException) when (caller.Id.Owner != target.Owner)
+        {
+            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Rejected);
+
+            throw;
+        }
+        catch
+        {
+            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Failed);
+
+            throw;
+        }
+
+        await ClaimStreamedTerminusAsync(caller, enumerationId, context.Result);
+    }
+
+    private static async Task ContinueStreamedRequestAsync(
+        IOutgoingGrainCallContext context,
+        Neuron caller,
+        Guid enumerationId)
+    {
+        try
+        {
+            await context.Invoke();
+        }
+        catch
+        {
+            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Failed);
+
+            throw;
+        }
+
+        await ClaimStreamedTerminusAsync(caller, enumerationId, context.Result);
+    }
+
+    private static async Task AbandonStreamedRequestAsync(
+        IOutgoingGrainCallContext context,
+        Neuron caller,
+        Guid enumerationId)
+    {
+        try
+        {
+            await context.Invoke();
+        }
+        finally
+        {
+            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Abandoned);
+        }
+    }
+
+    private static Task ClaimStreamedTerminusAsync(Neuron caller, Guid enumerationId, object? dispatchedResult)
+        => CapabilityInvocation.EnumerationTerminus(dispatchedResult) is { } outcome
+            ? ClaimStreamedOutcomeAsync(caller, enumerationId, outcome)
+            : Task.CompletedTask;
+
+    private static async Task ClaimStreamedOutcomeAsync(Neuron caller, Guid enumerationId, CapabilityOutcome outcome)
+    {
+        if (caller.TryClaimStreamedCapabilityRequest(enumerationId, out var request))
+        {
+            await caller.RecordCapabilityOutcomeAsync(outcome, request);
+        }
+    }
+
+    private static NeuronId TargetOf(IOutgoingGrainCallContext context)
+        => NeuronId.FromGrainKey(
+            context.TargetId.Type.ToString()
+                ?? throw new InvalidOperationException("The capability target has no grain type."),
+            context.TargetId.Key.ToString());
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Design",

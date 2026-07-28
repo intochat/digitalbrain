@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
@@ -33,6 +34,7 @@ public abstract partial class Neuron :
     private readonly IDurableList<Guid> _delegationConsumed;
     private readonly IDurableList<Guid> _delegationTerminals;
     private readonly HashSet<SynapseId> _remembered = [];
+    private readonly ConcurrentDictionary<Guid, SynapseDelivery> _streamedCapabilityRequests = new();
     private readonly List<SynapseDelivery> _firedWhileHandling = [];
     private readonly List<Action> _turnRollbacks = [];
     private readonly Serializer<OutboxEntry> _entries;

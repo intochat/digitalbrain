@@ -26,8 +26,9 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
             return;
         }
 
-        if (!CapabilityInvocation.IsRequest(context.InterfaceMethod)
-            || context.Grain is not Neuron target)
+        if (CapabilityInvocation.ContractMethod(context.InterfaceMethod, context.Request) is not { } contract
+            || context.Grain is not Neuron target
+            || !contract.DeclaringType!.IsInstanceOfType(target))
         {
             await context.Invoke();
 
@@ -41,7 +42,7 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
         {
             if (IsUnattributed(context.SourceId))
             {
-                if (IsClientEntryPoint(context.InterfaceMethod))
+                if (IsClientEntryPoint(contract))
                 {
                     await context.Invoke();
 
@@ -49,11 +50,11 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
                 }
 
                 throw new NeuronAuthorizationException(
-                    $"'{context.InterfaceMethod?.Name}' is not a client entry point, so an unattributed caller cannot be authorized to reach '{target.Id}'. Reach a neuron through a session of the owner you are acting as.");
+                    $"'{contract.Name}' is not a client entry point, so an unattributed caller cannot be authorized to reach '{target.Id}'. Reach a neuron through a session of the owner you are acting as.");
             }
 
             throw new NeuronAuthorizationException(
-                $"Semantic capability '{context.InterfaceMethod!.DeclaringType!.FullName}.{context.InterfaceMethod.Name}' requires a committed capability request.");
+                $"Semantic capability '{contract.DeclaringType.FullName}.{contract.Name}' requires a committed capability request.");
         }
 
         SynapseDelivery delivery;
