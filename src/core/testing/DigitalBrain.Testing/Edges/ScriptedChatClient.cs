@@ -8,6 +8,7 @@ public sealed class ScriptedChatClient : IChatClient
     private readonly Lock _gate = new();
     private readonly Queue<ChatMessage> _replies = [];
     private int _callCount;
+    private ChatMessage[] _lastMessages = [];
 
     public int CallCount
     {
@@ -16,6 +17,17 @@ public sealed class ScriptedChatClient : IChatClient
             lock (_gate)
             {
                 return _callCount;
+            }
+        }
+    }
+
+    public IReadOnlyList<ChatMessage> LastMessages
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. _lastMessages];
             }
         }
     }
@@ -41,6 +53,7 @@ public sealed class ScriptedChatClient : IChatClient
         lock (_gate)
         {
             _callCount = 0;
+            _lastMessages = [];
             _replies.Clear();
         }
     }
@@ -90,9 +103,11 @@ public sealed class ScriptedChatClient : IChatClient
         cancellationToken.ThrowIfCancellationRequested();
 
         ChatMessage reply;
+        var request = messages.ToArray();
         lock (_gate)
         {
             _callCount++;
+            _lastMessages = request;
             reply = _replies.Count > 0
                 ? _replies.Dequeue()
                 : throw new InvalidOperationException(

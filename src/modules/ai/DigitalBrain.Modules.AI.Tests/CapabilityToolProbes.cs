@@ -41,6 +41,10 @@ public sealed class ToolAgentProbe(
 {
     public const string EnrichTool = "enrich_account_from_email";
     public const string ProbeName = "enrichment";
+    public const string ProbeInstructions =
+        "You are the capability seam probe. Use only the supplied tools.";
+
+    protected override string? Instructions => ProbeInstructions;
 
     protected override IReadOnlyList<CapabilityTool> Tools =>
     [

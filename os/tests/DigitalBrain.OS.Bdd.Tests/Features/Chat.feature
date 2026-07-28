@@ -11,6 +11,14 @@ Feature: The operating system answers through a behaviour
     Then the conversation "main" journals the user message "how is my account?"
     And the conversation "main" journals the assistant reply "Your account is up to date."
 
+  Scenario: a greeting stays conversational
+    Given a DigitalBrain for the default owner
+    And the conversation "main" is observed
+    And the assistant will reply "Hello! How can I help?"
+    When the owner sends "hi" to the conversation "main"
+    Then the conversation "main" journals the assistant reply "Hello! How can I help?"
+    And the assistant selects no external capability
+
   Scenario: the conversation remembers earlier turns
     Given a DigitalBrain for the default owner
     And the conversation "main" is observed

@@ -10,7 +10,33 @@ public sealed class CapabilityToolSeam(ModuleFixture fixture)
     private const string AccountId = "001AAAAAAAAAAAAAAA";
     private const string MessageId = "msg-42";
     private const string FinalReply = "Account updated.";
+    private const string IdentityPrompt = "Who are you?";
     private const int SeamTimeout = 60_000;
+
+    [Fact(Timeout = SeamTimeout, DisplayName =
+        "agent instructions reach the model as the first system turn")]
+    public async Task AgentInstructionsReachModelAsFirstSystemTurn()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        test.Chat().Reply(FinalReply);
+
+        await test.Client.Get<IToolAgentProbe>(AgentName).Respond(
+            [new(Microsoft.Extensions.AI.ChatRole.User, IdentityPrompt)]);
+
+        Assert.Collection(
+            test.Chat().LastMessages,
+            system =>
+            {
+                Assert.Equal(Microsoft.Extensions.AI.ChatRole.System, system.Role);
+                Assert.Equal(ToolAgentProbe.ProbeInstructions, system.Text);
+            },
+            user =>
+            {
+                Assert.Equal(Microsoft.Extensions.AI.ChatRole.User, user.Role);
+                Assert.Equal(IdentityPrompt, user.Text);
+            });
+    }
 
     [Fact(Timeout = SeamTimeout, DisplayName =
         "a model tool call reaches the real neuron capability with the model's own arguments")]
