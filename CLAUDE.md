@@ -65,7 +65,7 @@ the live system. Tests are the regression net, not the proof.
 3. Drive the real scenario through the real edge — HTTP to `digitalbrain-ui`, or the Flutter shell.
 4. **Read the journal** via `digitalbrain-mcp`: `read_neuron_journal`, `read_chat_transcript`,
    `list_active_neurons`. Confirm the expected synapses fired, one correlation id, right order.
-5. Cross-check Aspire — but only for what the table below says works.
+5. Cross-check Aspire against structured logs and spans.
 6. Root gate for regression.
 7. Only now claim, quoting what you saw.
 
@@ -78,20 +78,20 @@ causal facts only — never arguments, prompts or secrets. Telemetry tags follow
 |---|---|
 | `list_resources`, `list_console_logs` | works — console output is noisy with Azurite spam |
 | `digitalbrain-mcp` journals | works, and is authoritative |
-| `list_structured_logs` | **empty** |
-| `list_traces` | **no application spans** — `dotnet-cli` only |
-| GenAI spans, metrics | **do not exist** |
+| Structured logs | works — MCP invocation completion includes tool name and error state |
+| Application traces | works — ASP.NET, Orleans and kernel spans carry causal identifiers |
+| GenAI spans, metrics | works — provider, model, duration, token usage and finish reason; no prompt or response content |
 
-No host calls `ConfigureOpenTelemetry`, no chat client calls `UseOpenTelemetry`, and the kernel's
-`ActivitySource("DigitalBrain")` has no exporter. **This is the top open defect.** Until it lands,
-step 5 confirms health and console output only — say that, rather than implying traces were checked.
-Update this table when you fix it.
+`scripts/verify-product.ps1` is the one-command live oracle. It builds Release, waits for the product
+resources, checks the exact MCP catalog, drives a real Gemma4 turn, confirms the durable transcript
+and correlation, checks telemetry content hygiene, and stops the AppHost unless `-KeepRunning` is
+specified.
 
 ## Gates
 
 ```powershell
 dotnet build DigitalBrain.slnx -c Release
-dotnet test DigitalBrain.slnx -c Release --logger "console;verbosity=minimal"
+dotnet test DigitalBrain.slnx -c Release
 ```
 
 **Never `--filter` for the completion gate** — a project-scoped run has already missed a failing
