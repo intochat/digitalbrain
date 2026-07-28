@@ -24,6 +24,7 @@ public partial interface ISessionNeuron : INeuron
     Task<JournalRead> ReadNeuronJournal(NeuronId subject, JournalKind kind, long afterSequence);
 
     [Alias(nameof(WatchNeuron))]
+    [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
     Task WatchNeuron(NeuronId subject, JournalKind kind, long afterSequence, IJournalObserver observer);
 
     [Alias(nameof(UnwatchNeuron))]

@@ -11,6 +11,7 @@ public partial interface INeuron : IGrainWithStringKey
     Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence);
 
     [Alias(nameof(Watch))]
+    [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
     Task Watch(JournalKind kind, long afterSequence, IJournalObserver observer);
 
     [Alias(nameof(Unwatch))]
