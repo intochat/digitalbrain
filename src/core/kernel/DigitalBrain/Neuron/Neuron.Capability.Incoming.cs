@@ -13,9 +13,22 @@ public abstract partial class Neuron
 
         RequireAuthorizedCapabilityDelivery(delivery, source, delegatedSource);
 
-        await CommitIncomingCapabilityRequestAsync(delivery);
+        var incomingCheckpoint = _incoming.Checkpoint();
 
+        _incoming.Append(delivery);
         ProtectCommittedIncoming();
+
+        try
+        {
+            await CommitAsync(CancellationToken.None);
+        }
+        catch
+        {
+            _incoming.Restore(incomingCheckpoint);
+            ProtectCommittedIncoming();
+
+            throw;
+        }
 
         await NotifyWatchersAsync();
     }

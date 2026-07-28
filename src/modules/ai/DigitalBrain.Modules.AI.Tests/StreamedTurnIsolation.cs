@@ -93,6 +93,8 @@ public sealed class StreamedTurnTarget : Neuron, IStreamedTurnTarget, IHandle<Fa
 
     internal static Task TurnEntered => _turnEntered.Task;
 
+    internal static void ReleaseTurn() => _streamRecorded.TrySetResult();
+
     internal static void ArmFailures(int failures, bool failWhileWatchersAreNotified = false)
     {
         _streamRecorded = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -239,6 +241,34 @@ public sealed class StreamedTurnIsolation(ModuleFixture fixture)
         var received = await target.Incoming.ReadAsync<CapabilityRequested>(afterSequence: 0, cancellationToken: cancellationToken);
 
         Assert.Contains(received, fact => fact.Synapse.Method == nameof(IStreamedTurnTarget.StreamOnce));
+    }
+
+    [Fact(DisplayName = "a streamed capability whose commit fails leaves no fact a concurrent rollback can resurrect")]
+    public async Task FailedStreamedCommitLeavesNothingForARollbackToResurrect()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var target = test.Neuron<IStreamedTurnTarget>(TargetName);
+        var caller = test.Neuron<IStreamedTurnCaller>(CallerName);
+        var streamingCaller = test.Neuron<IStreamedTurnCaller>(StreamingCallerName);
+
+        StreamedTurnTarget.ArmFailures(0);
+
+        var rollback = caller.Reference.ProvokeStagedRollback(TargetName, WitnessName);
+        await StreamedTurnTarget.TurnEntered.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+
+        await using (target.FailNextJournalCommit("the streamed capability commit fails"))
+        {
+            await Assert.ThrowsAnyAsync<Exception>(
+                () => streamingCaller.Reference.DrainStreamedTurnTarget(TargetName));
+        }
+
+        StreamedTurnTarget.ReleaseTurn();
+        Assert.True(await rollback);
+
+        var received = await target.Incoming.ReadAsync<CapabilityRequested>(afterSequence: 0, cancellationToken: cancellationToken);
+
+        Assert.DoesNotContain(received, fact => fact.Synapse.Method == nameof(IStreamedTurnTarget.StreamOnce));
     }
 
     [Fact(DisplayName = "a rollback after a streamed commit leaves no orphaned deliverable outbox entry")]
