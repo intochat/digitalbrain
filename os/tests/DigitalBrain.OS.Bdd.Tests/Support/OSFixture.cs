@@ -16,6 +16,6 @@ public sealed class OSFixture : DigitalBrainFixture
         brain.AddModule<ChatModule>();
         brain.AddModule<AIModule>();
         brain.AddModule<OSBehaviorsModule>();
-        brain.ConfigureScriptedChat(typeof(Llama32));
+        brain.ConfigureScriptedChat(typeof(Gemma4));
     }
 }

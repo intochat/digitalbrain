@@ -1,22 +1,26 @@
 using System.Diagnostics;
 using System.Net;
 using System.Text;
+using ModelContextProtocol.Authentication;
 
 namespace DigitalBrain.Mcp;
 
-internal static class LocalLoopbackMcpAuthorizationRedirect
+internal static class LocalLoopbackMcpAuthorizationCallback
 {
-    internal static Task<string?> AuthorizeAsync(
-        Uri authorizationUri,
-        Uri redirectUri,
+    internal static Task<AuthorizationResult?> AuthorizeAsync(
+        AuthorizationCallbackContext context,
         CancellationToken cancellationToken)
-        => AuthorizeAsyncCore(
-            authorizationUri,
-            redirectUri,
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        return AuthorizeAsyncCore(
+            context.AuthorizationUri,
+            context.RedirectUri,
             static startInfo => { Process.Start(startInfo); },
             cancellationToken);
+    }
 
-    private static async Task<string?> AuthorizeAsyncCore(
+    private static async Task<AuthorizationResult?> AuthorizeAsyncCore(
         Uri authorizationUri,
         Uri redirectUri,
         Action<ProcessStartInfo> startBrowser,
@@ -44,11 +48,11 @@ internal static class LocalLoopbackMcpAuthorizationRedirect
         {
             var context = await listener.GetContextAsync().WaitAsync(cancellationToken);
             var callback = context.Request.Url;
-            string? code;
+            AuthorizationResult? authorization;
 
             try
             {
-                code = ValidateCallback(authorizationUri, redirectUri, callback);
+                authorization = ValidateCallback(authorizationUri, redirectUri, callback);
             }
             catch (InvalidOperationException)
             {
@@ -56,7 +60,7 @@ internal static class LocalLoopbackMcpAuthorizationRedirect
                 continue;
             }
 
-            if (code is null)
+            if (authorization is null)
             {
                 await RespondAsync(
                     context.Response,
@@ -71,11 +75,11 @@ internal static class LocalLoopbackMcpAuthorizationRedirect
                 HttpStatusCode.OK,
                 "DigitalBrain authorization completed. You can close this window.",
                 cancellationToken);
-            return code;
+            return authorization;
         }
     }
 
-    private static string? ValidateCallback(
+    private static AuthorizationResult? ValidateCallback(
         Uri authorizationUri,
         Uri redirectUri,
         Uri? callbackUri)
@@ -93,9 +97,10 @@ internal static class LocalLoopbackMcpAuthorizationRedirect
 
         var expectedState = QueryValue(authorizationUri, "state")
             ?? throw new InvalidOperationException("The OAuth authorization URI contains no state value.");
+        var callbackState = QueryValue(callbackUri, "state");
 
         if (!string.Equals(callbackUri.AbsolutePath, redirectUri.AbsolutePath, StringComparison.Ordinal)
-            || !string.Equals(QueryValue(callbackUri, "state"), expectedState, StringComparison.Ordinal))
+            || !string.Equals(callbackState, expectedState, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("The OAuth callback does not match the SDK redirect contract.");
         }
@@ -105,8 +110,12 @@ internal static class LocalLoopbackMcpAuthorizationRedirect
             return null;
         }
 
-        return QueryValue(callbackUri, "code")
-            ?? throw new InvalidOperationException("The OAuth callback contains no authorization code.");
+        return new AuthorizationResult
+        {
+            Code = QueryValue(callbackUri, "code")
+                ?? throw new InvalidOperationException("The OAuth callback contains no authorization code."),
+            Iss = QueryValue(callbackUri, "iss"),
+        };
     }
 
     private static string? QueryValue(Uri uri, string name)

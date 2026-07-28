@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using DigitalBrain.Mcp;
+using ModelContextProtocol.Authentication;
 using Xunit;
 
 namespace DigitalBrain.Integrations.Tests;
@@ -47,14 +48,38 @@ public sealed class McpOAuthCallbacks
         using var completed = await SendAsync(redirectUri, "?state=expected&code=accepted", cancellation.Token);
 
         Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
-        Assert.Equal("accepted", await authorization.WaitAsync(cancellation.Token));
+        Assert.Equal("accepted", (await authorization.WaitAsync(cancellation.Token))?.Code);
+        AssertPortReleased(redirectUri);
+    }
+
+    [Fact(DisplayName =
+        "the loopback callback surfaces the RFC 9207 issuer so the SDK can reject a mixed-up authorization response")]
+    public async Task CallbackSurfacesIssuerToTheSdk()
+    {
+        var redirectUri = RedirectUri();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var launch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var authorization = Authorize(redirectUri, () => launch.SetResult(), cancellation.Token);
+        await launch.Task.WaitAsync(cancellation.Token);
+
+        using var completed = await SendAsync(
+            redirectUri,
+            "?state=expected&code=accepted&iss=https%3A%2F%2Fprovider.example",
+            cancellation.Token);
+
+        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+
+        var result = await authorization.WaitAsync(cancellation.Token);
+
+        Assert.Equal("accepted", result?.Code);
+        Assert.Equal("https://provider.example", result?.Iss);
         AssertPortReleased(redirectUri);
     }
 
     [Fact]
     public void MissingCallbackUriIsRejected()
     {
-        var validate = typeof(LocalLoopbackMcpAuthorizationRedirect).GetMethod(
+        var validate = typeof(LocalLoopbackMcpAuthorizationCallback).GetMethod(
             "ValidateCallback",
             BindingFlags.NonPublic | BindingFlags.Static)!;
 
@@ -65,16 +90,16 @@ public sealed class McpOAuthCallbacks
         Assert.IsType<ArgumentNullException>(exception.InnerException);
     }
 
-    private static Task<string?> Authorize(
+    private static Task<AuthorizationResult?> Authorize(
         Uri redirectUri,
         Action launched,
         CancellationToken cancellationToken)
     {
-        var core = typeof(LocalLoopbackMcpAuthorizationRedirect).GetMethod(
+        var core = typeof(LocalLoopbackMcpAuthorizationCallback).GetMethod(
             "AuthorizeAsyncCore",
             BindingFlags.NonPublic | BindingFlags.Static)!;
         var start = (Action<ProcessStartInfo>)(_ => launched());
-        return (Task<string?>)core.Invoke(
+        return (Task<AuthorizationResult?>)core.Invoke(
             null,
             [new Uri("https://provider.example/authorize?state=expected"), redirectUri, start, cancellationToken])!;
     }

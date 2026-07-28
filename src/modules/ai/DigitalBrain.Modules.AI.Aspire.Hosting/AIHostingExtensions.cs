@@ -30,9 +30,19 @@ public static class AIHostingExtensions
 
     private sealed class AIHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
     {
+        private const string OllamaImageTag = "latest";
+
+        private static readonly Dictionary<Type, (string ResourceSuffix, string Tag)> OllamaModelCatalog = new()
+        {
+            [typeof(Llama32)] = ("llama32", "llama3.2"),
+            [typeof(Gemma4)] = ("gemma4", "gemma4:12b"),
+            [typeof(Qwen35)] = ("qwen35", "qwen3.5:9b"),
+            [typeof(Granite41)] = ("granite41", "granite4.1:8b"),
+        };
+
         private readonly HashSet<Type> _models = [];
+        private readonly Dictionary<Type, IResourceBuilder<OllamaModelResource>> _ollamaModels = [];
         private IResourceBuilder<OllamaResource>? _ollama;
-        private IResourceBuilder<OllamaModelResource>? _llama32;
         private IResourceBuilder<OpenAIResource>? _openAI;
         private IResourceBuilder<OpenAIModelResource>? _gpt56;
         private IResourceBuilder<ParameterResource>? _openAIKey;
@@ -48,9 +58,9 @@ public static class AIHostingExtensions
                     $"{model.FullName} is already configured on brain '{brain.Name}'. Add each model exactly once.");
             }
 
-            if (model == typeof(Llama32))
+            if (OllamaModelCatalog.TryGetValue(model, out var ollama))
             {
-                AddLlama32();
+                AddOllamaModel(model, ollama.ResourceSuffix, ollama.Tag);
                 return;
             }
 
@@ -68,19 +78,19 @@ public static class AIHostingExtensions
         {
             ArgumentNullException.ThrowIfNull(builder);
 
-            if (_llama32 is not null)
+            foreach (var (model, resource) in _ollamaModels)
             {
                 builder
                     .WithAnnotation(new WaitAnnotation(
-                        _llama32.Resource,
+                        resource.Resource,
                         WaitType.WaitUntilHealthy,
                         exitCode: 0))
                     .WithEnvironment(
                         "DigitalBrain__AI__Ollama__Endpoint",
-                        _llama32.Resource.Parent.UriExpression)
+                        resource.Resource.Parent.UriExpression)
                     .WithEnvironment(
-                        "DigitalBrain__AI__Ollama__Llama32__Model",
-                        _llama32.Resource.ModelName);
+                        $"DigitalBrain__AI__Ollama__{model.Name}__Model",
+                        resource.Resource.ModelName);
             }
 
             if (_gpt56 is not null)
@@ -98,17 +108,20 @@ public static class AIHostingExtensions
             }
         }
 
-        private void AddLlama32()
+        private void AddOllamaModel(Type model, string resourceSuffix, string tag)
         {
             var builder = brain.GetApplicationBuilder();
             _ollama ??= builder
                 .AddOllama($"{brain.Name}-ai-ollama")
+                .WithImageTag(OllamaImageTag)
                 .WithGPUSupport()
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent)
-                .WithOpenWebUI(uiContianer=>uiContianer.WithLifetime(ContainerLifetime.Persistent));
+                .WithOpenWebUI(uiContainer => uiContainer.WithLifetime(ContainerLifetime.Persistent));
 
-            _llama32 = _ollama.AddModel($"{brain.Name}-ai-llama32", "llama3.2");
+            _ollamaModels[model] = _ollama.AddModel(
+                $"{brain.Name}-ai-{resourceSuffix}",
+                tag);
         }
 
         private void AddGpt56()

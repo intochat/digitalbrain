@@ -15,15 +15,29 @@ internal static class AIClients
 
     internal static void Add(IServiceCollection services)
     {
-        services.AddKeyedSingleton<IChatClient>(
-            typeof(Llama32),
-            static (provider, _) => Ollama(provider.GetRequiredService<IConfiguration>()));
+        AddOllamaModel<Llama32>(services, "llama3.2");
+        AddOllamaModel<Gemma4>(services, "gemma4:12b");
+        AddOllamaModel<Qwen35>(services, "qwen3.5:9b");
+        AddOllamaModel<Granite41>(services, "granite4.1:8b");
+
         services.AddKeyedSingleton<IChatClient>(
             typeof(Gpt56),
             static (provider, _) => OpenAI(provider.GetRequiredService<IConfiguration>()));
     }
 
-    private static OllamaApiClient Ollama(IConfiguration configuration)
+    private static void AddOllamaModel<TModel>(IServiceCollection services, string defaultTag)
+        where TModel : LLM
+        => services.AddKeyedSingleton<IChatClient>(
+            typeof(TModel),
+            (provider, _) => Ollama(
+                provider.GetRequiredService<IConfiguration>(),
+                typeof(TModel).Name,
+                defaultTag));
+
+    private static OllamaApiClient Ollama(
+        IConfiguration configuration,
+        string modelName,
+        string defaultTag)
     {
         var endpoint = configuration[$"{ConfigurationRoot}:Ollama:Endpoint"];
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)
@@ -32,12 +46,12 @@ internal static class AIClients
                 && !string.Equals(endpointUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
         {
             throw new InvalidOperationException(
-                "Llama32 requires DigitalBrain:AI:Ollama:Endpoint to be an absolute HTTP(S) URI. Configure it through AIModule.WithLlm<Llama32>() in AppHost.");
+                $"{modelName} requires DigitalBrain:AI:Ollama:Endpoint to be an absolute HTTP(S) URI. Configure it through AIModule.WithLlm<{modelName}>() in AppHost.");
         }
 
-        var model = configuration[$"{ConfigurationRoot}:Ollama:Llama32:Model"] ?? "llama3.2";
+        var tag = configuration[$"{ConfigurationRoot}:Ollama:{modelName}:Model"] ?? defaultTag;
 
-        return new OllamaApiClient(endpointUri, model);
+        return new OllamaApiClient(endpointUri, tag);
     }
 
     private static IChatClient OpenAI(IConfiguration configuration)

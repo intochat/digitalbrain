@@ -3,9 +3,10 @@ using ModelContextProtocol.Authentication;
 
 namespace DigitalBrain.Mcp;
 
-internal static class McpAuthorizationRedirect
+internal static class McpAuthorizationCallback
 {
-    internal static AuthorizationRedirectDelegate Create(IConfiguration configuration)
+    internal static Func<AuthorizationCallbackContext, CancellationToken, Task<AuthorizationResult?>> Create(
+        IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
@@ -13,19 +14,17 @@ internal static class McpAuthorizationRedirect
             configuration[McpRuntimeHosting.AuthorizationModeKey],
             McpRuntimeHosting.LocalLoopbackDevelopmentMode,
             StringComparison.Ordinal)
-            ? LocalLoopbackMcpAuthorizationRedirect.AuthorizeAsync
+            ? LocalLoopbackMcpAuthorizationCallback.AuthorizeAsync
             : RejectAsync;
     }
 
-    private static Task<string?> RejectAsync(
-        Uri authorizationUri,
-        Uri redirectUri,
+    private static Task<AuthorizationResult?> RejectAsync(
+        AuthorizationCallbackContext context,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(authorizationUri);
-        ArgumentNullException.ThrowIfNull(redirectUri);
+        ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromException<string?>(new InvalidOperationException(
+        return Task.FromException<AuthorizationResult?>(new InvalidOperationException(
             "Interactive MCP authorization is disabled. "
             + "Use a durable pre-authorized token or explicitly enable the local loopback development adapter."));
     }

@@ -5,16 +5,16 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.Tasks.Contracts\DigitalBrain.Modules.Tasks.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Modules.Tasks\DigitalBrain.Modules.Tasks.csproj" />
     <ProjectReference Include="..\..\..\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
-    <ProjectReference Include="..\..\..\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false"
-                      PrivateAssets="all" />
+    <ProjectReference Include="..\..\..\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
 </Project>

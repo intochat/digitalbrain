@@ -23,7 +23,7 @@ internal static class McpOAuthOptions
             RedirectUri = RequiredUri(configuration, server, "RedirectUri"),
             Scopes = server.Scopes,
             TokenCache = tokenCache,
-            AuthorizationRedirectDelegate = McpAuthorizationRedirect.Create(configuration),
+            AuthorizationCallbackHandler = McpAuthorizationCallback.Create(configuration),
         };
     }
 

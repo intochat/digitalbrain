@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DigitalBrain.OS;
 
 internal sealed class Assistant(
-    [FromKeyedServices(typeof(Llama32))] IChatClient chatClient)
+    [FromKeyedServices(typeof(Gemma4))] IChatClient chatClient)
     : Agent(chatClient), IAssistant
 {
     public const string EnrichAccountFromEmail = "enrich_account_from_email";
