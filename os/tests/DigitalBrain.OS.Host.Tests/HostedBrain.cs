@@ -4,8 +4,10 @@ namespace DigitalBrain.HostTests;
 
 public sealed class HostedBrain(TestingAppHostFixture fixture)
 {
-    [Fact(DisplayName =
-        "TestingAppHost silo-only residual: silo Healthy and health path OK (not product OS surface)")]
+    [Fact(
+        Timeout = 120_000,
+        DisplayName =
+            "TestingAppHost silo-only residual: silo Healthy and health path OK (not product OS surface)")]
     public async Task TheSiloReachesHealthyOnTheRealHost()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
