@@ -14,6 +14,9 @@ public partial interface IStreamingRelayProbe : INeuron
 {
     [Alias(nameof(CollectStreamingUpdates))]
     Task<IReadOnlyList<ChatResponseUpdate>> CollectStreamingUpdates(string modelName, string prompt);
+
+    [Alias(nameof(RelayRespond))]
+    Task<ChatResponse> RelayRespond(string modelName, string prompt);
 }
 
 public sealed class StreamingRelayProbe : Neuron, IStreamingRelayProbe
@@ -32,6 +35,16 @@ public sealed class StreamingRelayProbe : Neuron, IStreamingRelayProbe
         }
 
         return updates;
+    }
+
+    public Task<ChatResponse> RelayRespond(string modelName, string prompt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(modelName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
+
+        var llm = GrainFactory.GetGrain<ILlama32>(NeuronId.For<ILlama32>(Id.Owner, modelName).ToGrainId());
+
+        return llm.Respond([new ChatMessage(ChatRole.User, prompt)]);
     }
 }
 
