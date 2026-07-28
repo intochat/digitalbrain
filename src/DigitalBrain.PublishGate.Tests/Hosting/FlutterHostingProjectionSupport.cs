@@ -118,7 +118,8 @@ internal static class FlutterHostingProjectionSupport
 
     public static void AssertClientSafeUIProductEnvironment(
         IReadOnlyDictionary<string, object> environment,
-        params string[] modules)
+        IReadOnlyList<string> modules,
+        IReadOnlyList<string> configuredFeatures)
     {
         var productKeys = environment.Keys
             .Where(static key =>
@@ -131,19 +132,32 @@ internal static class FlutterHostingProjectionSupport
         {
             FlutterHostingExtensions.OwnerEnvironmentVariable,
         };
-        for (var index = 0; index < modules.Length; index++)
+        for (var index = 0; index < modules.Count; index++)
         {
             expected.Add(
                 $"{DigitalBrainHostingExtensions.ModulesConfigurationKey.Replace(":", "__", StringComparison.Ordinal)}__{index}");
         }
+        for (var index = 0; index < configuredFeatures.Count; index++)
+        {
+            expected.Add(
+                $"{DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey.Replace(":", "__", StringComparison.Ordinal)}__{index}");
+        }
 
         Assert.Equal(expected, productKeys);
-        for (var index = 0; index < modules.Length; index++)
+        for (var index = 0; index < modules.Count; index++)
         {
             Assert.Equal(
                 modules[index],
                 environment[
                     $"{DigitalBrainHostingExtensions.ModulesConfigurationKey.Replace(":", "__", StringComparison.Ordinal)}__{index}"]
+                    ?.ToString());
+        }
+        for (var index = 0; index < configuredFeatures.Count; index++)
+        {
+            Assert.Equal(
+                configuredFeatures[index],
+                environment[
+                    $"{DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey.Replace(":", "__", StringComparison.Ordinal)}__{index}"]
                     ?.ToString());
         }
     }

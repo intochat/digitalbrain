@@ -9,6 +9,7 @@ public static class DigitalBrainHostingExtensions
     public const string JournalConnectionName = "journal";
     public const string StateProtectionKeyConfigurationKey = "DigitalBrain:Security:StateProtectionKey";
     public const string ModulesConfigurationKey = "DigitalBrain:Modules";
+    public const string ConfiguredFeaturesConfigurationKey = "DigitalBrain:ConfiguredFeatures";
 
     public static DigitalBrainBuilder AddDigitalBrain(
         this IDistributedApplicationBuilder builder,
@@ -98,6 +99,7 @@ public static class DigitalBrainHostingExtensions
 
         builder.WithReference(client.Brain.Orleans.AsClient());
         ProjectModuleManifest(builder, client.Brain);
+        ProjectConfiguredFeatureManifest(builder, client.Brain);
         return builder;
     }
 
@@ -112,6 +114,20 @@ public static class DigitalBrainHostingExtensions
                 context.EnvironmentVariables[
                     $"{ConfigurationEnvironment(ModulesConfigurationKey)}__{index}"] =
                     brain.Modules[index].Value;
+            }
+        });
+
+    private static void ProjectConfiguredFeatureManifest<TResource>(
+        IResourceBuilder<TResource> builder,
+        DigitalBrainBuilder brain)
+        where TResource : IResourceWithEnvironment
+        => builder.WithEnvironment(context =>
+        {
+            for (var index = 0; index < brain.ConfiguredFeatures.Count; index++)
+            {
+                context.EnvironmentVariables[
+                    $"{ConfigurationEnvironment(ConfiguredFeaturesConfigurationKey)}__{index}"] =
+                    brain.ConfiguredFeatures[index];
             }
         });
 

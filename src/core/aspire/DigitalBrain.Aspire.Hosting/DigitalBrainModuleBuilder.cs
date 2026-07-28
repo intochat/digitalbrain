@@ -12,6 +12,9 @@ public sealed class DigitalBrainModuleBuilder<TModule>
     internal void AddProjection(DigitalBrainModuleProjection projection)
         => Brain.AddProjection(projection);
 
+    internal void ConfigureFeature(string feature)
+        => Brain.ConfigureFeature(feature);
+
     internal void RequireStateProtection()
         => Brain.RequireStateProtection();
 }

@@ -1,6 +1,8 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.AI;
+using DigitalBrain.AI.Aspire.Hosting;
+using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
@@ -23,7 +25,7 @@ public sealed class FlutterHostingUIEdgeContracts
             options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath;
             options.Owner = "edge-owner";
         }));
-        brain.AddModule<AIModule>();
+        brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
 
         var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
@@ -40,8 +42,11 @@ public sealed class FlutterHostingUIEdgeContracts
         var environment = await FlutterHostingProjectionSupport.EnvironmentOf(ui).ConfigureAwait(true);
         FlutterHostingProjectionSupport.AssertClientSafeUIProductEnvironment(
             environment,
-            FlutterModule.Id.Value,
-            AIModule.Id.Value);
+            [FlutterModule.Id.Value, AIModule.Id.Value],
+            [AIHostingExtensions.LlmFeature]);
+        Assert.Equal(
+            AIHostingExtensions.LlmFeature,
+            environment["DigitalBrain__ConfiguredFeatures__0"]?.ToString());
         Assert.Equal(
             "edge-owner",
             environment[FlutterHostingExtensions.OwnerEnvironmentVariable]?.ToString());

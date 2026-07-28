@@ -9,6 +9,8 @@ namespace DigitalBrain.AI.Aspire.Hosting;
 
 public static class AIHostingExtensions
 {
+    public const string LlmFeature = "ai.llm";
+
     public static DigitalBrainModuleBuilder<AIModule> WithLlm<TModel>(
         this DigitalBrainModuleBuilder<AIModule> module)
         where TModel : class, ILLM
@@ -25,6 +27,7 @@ public static class AIHostingExtensions
         }
 
         state.Add<TModel>();
+        module.ConfigureFeature(LlmFeature);
         return module;
     }
 

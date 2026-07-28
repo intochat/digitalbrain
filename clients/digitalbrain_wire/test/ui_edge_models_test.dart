@@ -63,6 +63,9 @@ void main() {
       'modules': [
         {'id': 'DigitalBrain.Chat.ChatModule'},
       ],
+      'capabilities': [
+        {'id': 'assistant.general'},
+      ],
       'neurons': [
         {
           'id': 'chat:owner/main',
@@ -75,6 +78,7 @@ void main() {
     });
 
     expect(topology.modules.single.id, 'DigitalBrain.Chat.ChatModule');
+    expect(topology.capabilities.single.id, 'assistant.general');
     expect(topology.neurons.single.id, 'chat:owner/main');
     expect(topology.neurons.single.grainType, 'chat');
     expect(topology.neurons.single.placement, 'cluster-1');

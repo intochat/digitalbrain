@@ -52,9 +52,14 @@ public sealed class HostingProjectionContracts
             .EnvironmentOf(client.Resource)
             .ConfigureAwait(true);
         var clientEnvironmentKeys = clientEnvironment.Keys.ToHashSet(StringComparer.Ordinal);
+        var configuredFeaturePrefix = ConfigurationEnvironment(
+            DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey);
 
         Assert.All(SiloOnlyEnvironmentKeys, key => Assert.Contains(key, siloEnvironment));
         Assert.All(SiloOnlyEnvironmentKeys, key => Assert.DoesNotContain(key, clientEnvironmentKeys));
+        Assert.DoesNotContain(
+            siloEnvironment,
+            key => key.StartsWith(configuredFeaturePrefix, StringComparison.Ordinal));
         Assert.Equal(
             AIModule.Id.Value,
             clientEnvironment[
@@ -69,6 +74,21 @@ public sealed class HostingProjectionContracts
             SalesforceModule.Id.Value,
             clientEnvironment[
                 $"{ConfigurationEnvironment(DigitalBrainHostingExtensions.ModulesConfigurationKey)}__2"]
+                ?.ToString());
+        Assert.Equal(
+            AIHostingExtensions.LlmFeature,
+            clientEnvironment[
+                $"{ConfigurationEnvironment(DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey)}__0"]
+                ?.ToString());
+        Assert.Equal(
+            "google.gmail",
+            clientEnvironment[
+                $"{ConfigurationEnvironment(DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey)}__1"]
+                ?.ToString());
+        Assert.Equal(
+            "salesforce",
+            clientEnvironment[
+                $"{ConfigurationEnvironment(DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey)}__2"]
                 ?.ToString());
 
         Assert.Contains(

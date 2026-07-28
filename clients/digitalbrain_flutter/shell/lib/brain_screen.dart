@@ -23,11 +23,9 @@ final class BrainScreen extends StatefulWidget {
 }
 
 final class _BrainScreenState extends State<BrainScreen> {
-  static const _aiModule = 'DigitalBrain.AI.AIModule';
-  static const _chatModule = 'DigitalBrain.Chat.ChatModule';
-  static const _googleModule = 'DigitalBrain.Google.GoogleModule';
-  static const _osModule = 'DigitalBrain.OS.OSBehaviorsModule';
-  static const _salesforceModule = 'DigitalBrain.Salesforce.SalesforceModule';
+  static const _generalAssistant = 'assistant.general';
+  static const _accountEnrichment =
+      'account-enrichment.gmail-salesforce-description';
 
   BrainTopologySelection? _selection;
 
@@ -78,18 +76,12 @@ final class _BrainScreenState extends State<BrainScreen> {
   }
 
   ({bool generalAssistant, bool accountEnrichment}) _capabilities() {
-    final modules = widget.topology?.modules.map((module) => module.id).toSet();
-    final generalAssistant =
-        modules?.contains(_aiModule) == true &&
-        modules?.contains(_chatModule) == true;
-    final accountEnrichment =
-        generalAssistant &&
-        modules?.contains(_googleModule) == true &&
-        modules?.contains(_osModule) == true &&
-        modules?.contains(_salesforceModule) == true;
+    final capabilities = widget.topology?.capabilities
+        .map((capability) => capability.id)
+        .toSet();
     return (
-      generalAssistant: generalAssistant,
-      accountEnrichment: accountEnrichment,
+      generalAssistant: capabilities?.contains(_generalAssistant) == true,
+      accountEnrichment: capabilities?.contains(_accountEnrichment) == true,
     );
   }
 

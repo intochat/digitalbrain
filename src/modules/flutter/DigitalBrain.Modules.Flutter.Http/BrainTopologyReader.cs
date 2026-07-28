@@ -54,6 +54,7 @@ internal sealed class BrainTopologyReader(
 
         return new BrainTopologySnapshot(
             modules,
+            BrainCapabilityCatalog.Resolve(modules, configuration),
             neurons,
             TimeProvider.System.GetUtcNow());
     }

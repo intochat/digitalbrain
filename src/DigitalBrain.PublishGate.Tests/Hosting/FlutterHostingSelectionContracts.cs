@@ -46,6 +46,11 @@ public sealed class FlutterHostingSelectionContracts
                     entry.Value?.ToString(),
                     FlutterModule.Id.Value,
                     StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            siloEnvironment,
+            entry => entry.Key.StartsWith(
+                "DigitalBrain__ConfiguredFeatures__",
+                StringComparison.Ordinal));
 
         FlutterHostingProjectionSupport.AssertNoOSSurfaceResources(builder);
     }

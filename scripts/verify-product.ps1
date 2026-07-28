@@ -215,14 +215,19 @@ try {
         "DigitalBrain.Google.GoogleModule",
         "DigitalBrain.OS.OSBehaviorsModule",
         "DigitalBrain.Salesforce.SalesforceModule")
+    $expectedCapabilities = @(
+        "assistant.general",
+        "account-enrichment.gmail-salesforce-description")
     $expectedChatNeuron = "chat:dev/$ChatName"
     $topology = $null
     $moduleIds = @()
+    $capabilityIds = @()
     $activeChat = $null
     for ($attempt = 1; $attempt -le 30 -and $null -eq $activeChat; $attempt++) {
         try {
             $topology = Invoke-RestMethod -Uri "$uiUrl/brain/topology"
             $moduleIds = @($topology.modules | ForEach-Object id)
+            $capabilityIds = @($topology.capabilities | ForEach-Object id)
             $activeChat = @($topology.neurons) |
                 Where-Object id -eq $expectedChatNeuron |
                 Select-Object -First 1
@@ -244,6 +249,14 @@ try {
         Require `
             -Condition ($moduleIds -contains $module) `
             -Message "Live topology is missing configured module '$module'."
+    }
+    Require `
+        -Condition ($capabilityIds.Count -eq $expectedCapabilities.Count) `
+        -Message "Expected $($expectedCapabilities.Count) configured capabilities but found $($capabilityIds.Count)."
+    foreach ($capability in $expectedCapabilities) {
+        Require `
+            -Condition ($capabilityIds -contains $capability) `
+            -Message "Live topology is missing configured capability '$capability'."
     }
     Require `
         -Condition ($null -ne $activeChat) `
@@ -315,6 +328,7 @@ try {
         InputTokens = $genAi.attributes.'gen_ai.usage.input_tokens'
         OutputTokens = $genAi.attributes.'gen_ai.usage.output_tokens'
         TopologyModules = $moduleIds.Count
+        ConfiguredCapabilities = $capabilityIds.Count
         ActiveNeuron = $activeChat.id
     } | Format-List
 }
