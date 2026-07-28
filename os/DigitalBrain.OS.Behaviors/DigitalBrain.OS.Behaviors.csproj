@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <Description>Operating-system behaviour programs. Behaviour-shaped and composed at build time; the install rail does not exist yet.</Description>
+    <RootNamespace>DigitalBrain.OS</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812;CA2007</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\core\behaviors\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
+    <ProjectReference Include="..\..\src\core\kernel\DigitalBrain\DigitalBrain.csproj" />
+    <ProjectReference Include="..\..\src\modules\chat\DigitalBrain.Modules.Chat.Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\modules\ai\DigitalBrain.Modules.AI.Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\modules\ai\DigitalBrain.Modules.AI\DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="..\..\src\modules\google\DigitalBrain.Modules.Google.Contracts\DigitalBrain.Modules.Google.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\modules\salesforce\DigitalBrain.Modules.Salesforce.Contracts\DigitalBrain.Modules.Salesforce.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+  </ItemGroup>
+</Project>

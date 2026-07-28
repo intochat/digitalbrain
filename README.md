@@ -1,89 +1,78 @@
 # DigitalBrain
 
-DigitalBrain is an open-source .NET framework for durable agents on Orleans and Aspire. Its
-paradigm is **neurons, synapses, and simulations**: neurons are durable Orleans-journaled agents,
-synapses are typed messages with full lineage, and simulations fire synapses into a real in-process
-cluster and assert on the timeline.
-
-What it is being built toward:
+An open-source .NET framework for durable agents on Orleans and Aspire. Its paradigm is **neurons and
+synapses**: neurons are durable Orleans-journaled agents, synapses are typed facts with full lineage,
+and method-scoped `TestBrain` fixtures fire real multi-silo traffic and assert on committed journals.
 
 > **A brain you program by writing ordinary C#, and that can program itself.**
 
 ```csharp
-var brain = DigitalBrainClient.Connect(grains, "acme");
+// production: builder.AddDigitalBrainClient(owner); inject IDigitalBrain
 await brain.SendAsync<IAnalyst>(
     "incident-42",
     new SummaryRequested("Summarize the incident."));
 ```
 
-The owner-bound client enters through a session; neurons call typed capabilities such as `ILlama32`
-inside the brain. The same vocabulary will later support approved C# behaviors generated from
-natural language. See [docs/architecture.md](docs/architecture.md) for what is built versus
-designed.
+The owner-bound `IDigitalBrain` facade enters through a session; neurons call typed capabilities such
+as `ILlama32` inside the brain. The same vocabulary will later carry approved C# behaviors generated
+from natural language.
 
 ## The shape of it
 
 - **A synapse is a fact** — a thin record, broadcast, no reply. **An interface method is a request** —
   directed at a capability, and it replies. Both are journaled; neither is privileged.
-- **Modules own their domain** — contracts, neurons, dependencies, authentication, and Aspire
-  resources. Kernel stays domain-neutral.
-- **Namespaces and type names are architecture** — `DigitalBrain.AI.Ollama.ILlama32` is identity,
-  not a lookup result from a model descriptor.
-- **Behaviors own logic** — single-file C# scripts carried as durable state by one registered grain
-  type. Adding a verb needs only approval.
-- **Capability is the contracts package a script compiles against**, enforced where it resolves one.
+- **Modules own vocabulary** — synapse records and neuron interfaces, resolved at compile time.
+- **Namespaces and type names are architecture** — `DigitalBrain.AI.Ollama.ILlama32` is identity, not
+  a lookup result.
+- **Journals are the audit source**, recording causal facts only — never arguments, prompts or
+  secrets. Telemetry is a projection and never replaces them.
 - **Every install is a human-approved proposal**, journaled and reversible.
 
 ## Status
 
-See the module status lines in [docs/architecture.md](docs/architecture.md) for what is built versus
-designed.
+The plan of record. Nothing is shipped unless it says Built.
 
-[`docs/architecture.md`](docs/architecture.md) is the plan of record: ratified architecture, known
-limitations, and build order.
+| Area | State |
+|---|---|
+| Neuron/synapse foundation, owner-scoped client, module activation, AppHost composition, testing path | **Built** |
+| Typed AI, Tasks, Google, Salesforce, Chat, Flutter, Quickstart families | **Built** |
+| Flutter vertical — shell/scene vocabulary, UI HTTP/SSE edge, `WithUIEdge`/`WithFlutterHost`, headless Dart host, Windows chrome | **Built** |
+| Time — durable one-shot `ICountdown` and its recovery tests | **Built** |
+| Time — reminders, recurring interval/calendar scheduling, DST | Designed |
+| Product chrome polish, multi-principal IdP edge, journal observation on `IDigitalBrain` | Designed |
+| Behavior rail — proposal, approval, installation, execution, rollback | Designed |
+| Observability spine — host OpenTelemetry, instrumented chat clients, GenAI spans | **Not built — top open defect** |
+
+`DigitalBrain.Behaviors` is a packable SDK foundation (authoring interfaces, constrained context,
+manifests, artifact identities) and holds the canonical artifact codec. It is not a compiler, builder,
+broker or execution rail. Chat today is *behaviour-shaped, not behaviour-installed* — its program is a
+real `IIntentProgram` composed at build time.
+
+One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
 
 ## Repository shape
 
 ```text
-src/       domain-neutral framework packages
-modules/   independently shipped domains, beginning with AI
-hosts/     runnable silo, AppHost, and the test-only probe hosts
-samples/   package-only consumers proven against an empty package cache
-tests/     contract tests, simulations, hosted proof
-docs/      VitePress documentation and the published specification
+src/       published packages: core/ (framework) and modules/ (IModule domains),
+           plus the publish gate that polices them
+os/        the product: silo, MCP server, OS behaviours, AppHost
+clients/   Flutter shell and the Dart wire package
+tests/     fixtures/ — shared test subjects and their scaffolding AppHosts
 ```
 
-Earlier prototype generations were retired to git history rather than kept on disk. Recover any of
-them with `git log --diff-filter=D -- sources/` and `git show <sha>^:<path>`.
+Retired prototype generations live in git history — `git log --diff-filter=D --summary`, then
+`git show <sha>^:<path>`.
 
-## Gate
-
-The fast gate, run at every slice and before any completion claim:
+## Running and verifying
 
 ```powershell
-dotnet test --logger "console;verbosity=minimal"
+git clean -fdx
+aspire run
 ```
 
-The full gate, run before a release:
+[CLAUDE.md](CLAUDE.md) is the working discipline for every agent and contributor: the gates, the
+verification ladder, and the traps. A green test suite is necessary, not sufficient — it proves the
+code holds, not that a behaviour works.
 
-```powershell
-dotnet test .\DigitalBrain.slnx -c Release
-```
-
-Never `--filter`, on either. The website gate runs `node` directly rather than through npm:
-
-```powershell
-cd docs
-node tools/render-specification.mjs
-node --test tests/*.test.mjs
-```
-
-Every commit keeps the gate green.
-
-Published docs: **https://digitalbrain.tech** (GitHub Pages via `.github/workflows/docs-pages.yml`).
-Domain and DNS steps live in [docs/contributing.md](docs/contributing.md#documentation-site-on-github-pages).
-
-## Way of working
-
-[CLAUDE.md](CLAUDE.md) is the canonical working discipline for every agent and contributor, and
-`AGENTS.md` points there. The contributing guide is [docs/contributing.md](docs/contributing.md).
+The public site lives in [intochat/digitalbrain.docs](https://github.com/intochat/digitalbrain.docs)
+and publishes **https://digitalbrain.tech**.

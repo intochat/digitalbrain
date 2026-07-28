@@ -1,6 +1,8 @@
 bin/
+!clients/**/bin/
+!clients/**/bin/**
 obj/
-artifacts/
+/artifacts/
 TestResults/
 *.binlog
 *.user
@@ -8,18 +10,21 @@ TestResults/
 .vs/
 logs/
 .codegraph/
-.config/.codegraph-initialized
 .digitalbrain/
 .agents/
 .superpowers/
 .worktrees/
 sources/
 node_modules/
-docs/.vitepress/cache/
-docs/.vitepress/dist/
-docs/specification.md
-*.feature.cs
 
 # Local MCP tool installs (Codex absolute launch)
 .config/codegraph-tool/
 .config/context7-tool/
+
+# Dart / Flutter clients
+**/.dart_tool/
+**/packages/pubspec_overrides.yaml
+
+# Reqnroll code-behind: generated into obj/, never source
+*.feature.cs
+

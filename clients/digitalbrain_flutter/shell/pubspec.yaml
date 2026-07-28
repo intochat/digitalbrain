@@ -1,0 +1,23 @@
+name: digitalbrain_flutter_shell
+description: >
+  Windows Material chrome for DigitalBrain OS surface. Depends on pure-Dart
+  digitalbrain_flutter for edge/projection only. Pixels only — never Orleans/MCP.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  digitalbrain_flutter:
+    path: ../
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

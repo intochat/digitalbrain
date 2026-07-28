@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Flutter module: durable shell and scene neurons for OS surface vocabulary.</Description>
+    <RootNamespace>DigitalBrain.Flutter</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812;CA2007</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Modules.Flutter.Contracts\DigitalBrain.Modules.Flutter.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain\DigitalBrain.csproj" />
+    <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+  </ItemGroup>
+</Project>

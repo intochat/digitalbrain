@@ -115,10 +115,22 @@
     "hookify@claude-plugins-official": true,
     "security-guidance@claude-plugins-official": true,
     "csharp-lsp@claude-plugins-official": true,
-    "typescript-lsp@claude-plugins-official": true,
-    "mattpocock-skills@mattpocock": true
+    "mattpocock-skills@mattpocock": true,
+    "dotnet11@dotnet-agent-skills": true,
+    "dotnet-msbuild@dotnet-agent-skills": true,
+    "dotnet-nuget@dotnet-agent-skills": true,
+    "dotnet-test@dotnet-agent-skills": true,
+    "dotnet-diag@dotnet-agent-skills": true,
+    "dotnet-ai@dotnet-agent-skills": true,
+    "dotnet-aspnetcore@dotnet-agent-skills": true
   },
   "extraKnownMarketplaces": {
+    "dotnet-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "dotnet/skills"
+      }
+    },
     "claude-plugins-official": {
       "source": {
         "source": "github",

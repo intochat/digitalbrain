@@ -1,5 +1,5 @@
 {
   "appHost": {
-    "path": "hosts/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj"
+    "path": "os/DigitalBrain.OS.AppHost/DigitalBrain.OS.AppHost.csproj"
   }
 }

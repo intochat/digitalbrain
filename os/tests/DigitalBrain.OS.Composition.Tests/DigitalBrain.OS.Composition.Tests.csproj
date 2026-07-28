@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);CA2007;CA1515;CA1812</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\tests\fixtures\DigitalBrain.Compositions\DigitalBrain.Compositions.csproj" />
+    <ProjectReference Include="..\..\..\src\modules\flutter\DigitalBrain.Modules.Flutter\DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="..\..\..\src\modules\time\DigitalBrain.Modules.Time\DigitalBrain.Modules.Time.csproj" />
+    <ProjectReference Include="..\..\..\src\modules\ai\DigitalBrain.Modules.AI\DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="..\..\..\src\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+  </ItemGroup>
+</Project>

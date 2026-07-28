@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Purpose-bound authenticated encryption for durable DigitalBrain module payloads.</Description>
+  </PropertyGroup>
+</Project>

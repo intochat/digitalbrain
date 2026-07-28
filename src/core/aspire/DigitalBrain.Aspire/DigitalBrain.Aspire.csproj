@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>DigitalBrain client integration for IHostApplicationBuilder applications.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Client" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
+  </ItemGroup>
+</Project>

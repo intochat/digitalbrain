@@ -1,0 +1,11 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.5.0-preview.1.26376.5">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\DigitalBrain.Quickstart\DigitalBrain.Quickstart.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\..\..\src\core\aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\DigitalBrain.Quickstart.Host\DigitalBrain.Quickstart.Host.csproj" />
+  </ItemGroup>
+</Project>
