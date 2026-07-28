@@ -118,6 +118,25 @@ public sealed class LlmStreaming(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         test.Chat().Reply(ScriptedReply);
 
+        var updates = new List<ChatResponseUpdate>();
+
+        await foreach (var update in test.Client.Get<ILlama32>(ModelName)
+            .RespondStreaming([new ChatMessage(ChatRole.User, UserPrompt)], cancellationToken))
+        {
+            updates.Add(update);
+        }
+
+        Assert.NotEmpty(updates);
+        Assert.Equal(ScriptedReply, string.Concat(updates.Select(update => update.Text)));
+    }
+
+    [Fact(DisplayName = "a neuron relaying ILLM.RespondStreaming yields the same scripted reply")]
+    public async Task RelayedStreamingYieldsTheScriptedReply()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        test.Chat().Reply(ScriptedReply);
+
         var updates = await test.Client.Get<IStreamingRelayProbe>(RelayName)
             .CollectStreamingUpdates(ModelName, UserPrompt);
 

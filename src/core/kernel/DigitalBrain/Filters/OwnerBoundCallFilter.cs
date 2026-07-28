@@ -35,7 +35,7 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
                     $"The subscription registry of owner '{unattributedRegistry.Owner}' cannot be reached by an unattributed caller.");
             }
 
-            if (context.Grain is Neuron unattributedTarget && !IsClientEntryPoint(context.InterfaceMethod))
+            if (context.Grain is Neuron unattributedTarget && !AllowsUnattributedCaller(context, unattributedTarget))
             {
                 throw new NeuronAuthorizationException(
                     $"'{context.InterfaceMethod?.Name}' is not a client entry point, so an unattributed caller cannot be authorized to reach '{unattributedTarget.Id}'. Reach a neuron through a session of the owner you are acting as.");
@@ -86,6 +86,18 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
 
     private bool IsAdditionalTrustedSource(GrainId source)
         => additionalReminderSources.Any(allowlist => allowlist.Contains(source));
+
+    private static bool AllowsUnattributedCaller(IIncomingGrainCallContext context, Neuron target)
+        => IsClientEntryPoint(context.InterfaceMethod)
+            || CapabilityInvocation.IsEnumerationContinuation(context.InterfaceMethod)
+            || CapabilityInvocation.IsEnumerationDisposal(context.InterfaceMethod)
+            || IsClientEntryPoint(ContractMethodTheTargetImplements(context, target));
+
+    private static MethodInfo? ContractMethodTheTargetImplements(IIncomingGrainCallContext context, Neuron target)
+        => CapabilityInvocation.ContractMethod(context.InterfaceMethod, context.Request) is { } contract
+            && contract.DeclaringType!.IsInstanceOfType(target)
+                ? contract
+                : null;
 
     private static bool IsClientEntryPoint(MethodInfo? method)
         => method?.DeclaringType?.GetCustomAttribute<ClientEntryPointAttribute>() is not null;
