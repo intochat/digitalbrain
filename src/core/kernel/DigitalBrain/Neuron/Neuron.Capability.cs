@@ -146,8 +146,8 @@ public abstract partial class Neuron
         return delivery;
     }
 
-    internal void RegisterStreamedCapabilityRequest(Guid enumerationId, SynapseDelivery request)
-        => _streamedCapabilityRequests[enumerationId] = request;
+    internal bool TryRegisterStreamedCapabilityRequest(Guid enumerationId, SynapseDelivery request)
+        => _streamedCapabilityRequests.TryAdd(enumerationId, request);
 
     internal bool TryClaimStreamedCapabilityRequest(Guid enumerationId, out SynapseDelivery request)
         => _streamedCapabilityRequests.TryRemove(enumerationId, out request!);

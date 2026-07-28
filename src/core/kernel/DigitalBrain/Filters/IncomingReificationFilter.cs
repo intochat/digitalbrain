@@ -73,6 +73,14 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
             delegatedSource = null;
         }
 
+        if (CapabilityInvocation.IsEnumerationDispatch(context.InterfaceMethod))
+        {
+            await target.RecordStreamedCapabilityRequestAsync(delivery, context.SourceId, delegatedSource);
+            await context.Invoke();
+
+            return;
+        }
+
         var turn = await target.BeginIncomingCapabilityRequestAsync(delivery, context.SourceId, delegatedSource);
 
         try

@@ -4,6 +4,18 @@ namespace DigitalBrain.Kernel;
 
 public abstract partial class Neuron
 {
+    internal async Task RecordStreamedCapabilityRequestAsync(
+        SynapseDelivery delivery,
+        GrainId? source,
+        GrainId? delegatedSource = null)
+    {
+        ArgumentNullException.ThrowIfNull(delivery);
+
+        RequireAuthorizedCapabilityDelivery(delivery, source, delegatedSource);
+
+        await AppendIncomingCapabilityRequestAsync(delivery);
+    }
+
     internal async Task<CapabilityTurn> BeginIncomingCapabilityRequestAsync(
         SynapseDelivery delivery,
         GrainId? source,
@@ -17,6 +29,42 @@ public abstract partial class Neuron
                 $"Neuron '{Id}' cannot begin a capability request while it is already handling '{_handling.SynapseId}'.");
         }
 
+        RequireAuthorizedCapabilityDelivery(delivery, source, delegatedSource);
+
+        var turn = new CapabilityTurn(
+            _outbox.Count,
+            _outgoing.Checkpoint(),
+            [.. _turnRollbacks],
+            _handling,
+            _handlingDepth,
+            _turnCheckpoint);
+
+        await AppendIncomingCapabilityRequestAsync(delivery);
+
+        _handling = delivery;
+        _handlingDepth = DeliveryPolicy.InboundDepth();
+        _turnCheckpoint = new(_outbox.Count, _handled.Count, InboundCommitted: true, _incoming.Checkpoint(), _outgoing.Checkpoint());
+        _turnRollbacks.Clear();
+
+        return turn;
+    }
+
+    internal async Task CompleteIncomingCapabilityRequestAsync(CapabilityTurn turn)
+    {
+        FlushOutgoing();
+        await CommitAsync(CancellationToken.None);
+        AdvanceTurnCheckpoint();
+        await NotifyWatchersAsync();
+
+        Restore(turn);
+        ScheduleDrain();
+    }
+
+    private void RequireAuthorizedCapabilityDelivery(
+        SynapseDelivery delivery,
+        GrainId? source,
+        GrainId? delegatedSource)
+    {
         if (delivery.Synapse is not CapabilityRequested request || request.Target != Id)
         {
             throw new InvalidOperationException(
@@ -36,15 +84,10 @@ public abstract partial class Neuron
             throw new NeuronAuthorizationException(
                 $"The capability request caller '{delivery.Caller}' does not authorize its actual Orleans source.");
         }
+    }
 
-        var turn = new CapabilityTurn(
-            _outbox.Count,
-            _outgoing.Checkpoint(),
-            [.. _turnRollbacks],
-            _handling,
-            _handlingDepth,
-            _turnCheckpoint);
-
+    private async Task AppendIncomingCapabilityRequestAsync(SynapseDelivery delivery)
+    {
         var incomingCheckpoint = _incoming.Checkpoint();
 
         try
@@ -55,28 +98,11 @@ public abstract partial class Neuron
         catch
         {
             _incoming.Restore(incomingCheckpoint);
+
             throw;
         }
 
         await NotifyWatchersAsync();
-
-        _handling = delivery;
-        _handlingDepth = DeliveryPolicy.InboundDepth();
-        _turnCheckpoint = new(_outbox.Count, _handled.Count, InboundCommitted: true, _incoming.Checkpoint(), _outgoing.Checkpoint());
-        _turnRollbacks.Clear();
-
-        return turn;
-    }
-
-    internal async Task CompleteIncomingCapabilityRequestAsync(CapabilityTurn turn)
-    {
-        FlushOutgoing();
-        await CommitAsync(CancellationToken.None);
-        AdvanceTurnCheckpoint();
-        await NotifyWatchersAsync();
-
-        Restore(turn);
-        ScheduleDrain();
     }
 
     internal void FailIncomingCapabilityRequest(CapabilityTurn turn)

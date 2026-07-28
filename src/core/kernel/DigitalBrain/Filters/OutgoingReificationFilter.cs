@@ -94,7 +94,11 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
             contract.Name,
             target);
 
-        caller.RegisterStreamedCapabilityRequest(enumerationId, request);
+        if (!caller.TryRegisterStreamedCapabilityRequest(enumerationId, request))
+        {
+            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Abandoned);
+            caller.TryRegisterStreamedCapabilityRequest(enumerationId, request);
+        }
 
         try
         {
