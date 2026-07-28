@@ -79,10 +79,6 @@ public sealed class RunningAppHost : IAsyncDisposable
         var failures = new List<Exception>();
 
         await AttemptAsync(
-            () => StopRuntimeResourcesAsync(cleanup.Token),
-            failures,
-            cleanup.Token);
-        await AttemptAsync(
             () => _application.StopAsync(cleanup.Token),
             failures,
             cleanup.Token);
@@ -180,69 +176,6 @@ public sealed class RunningAppHost : IAsyncDisposable
         throw new AppHostTestFailureException(
             "AppHost graph cleanup failed.",
             primary);
-    }
-
-    private async Task StopRuntimeResourcesAsync(
-        CancellationToken cancellationToken)
-    {
-        var stoppable = _resourceNames
-            .Where(id => !IsTerminal(id) && AdvertisesStop(id))
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        await Task.WhenAll(
-            stoppable.Select(id => StopOneAsync(id, cancellationToken)));
-    }
-
-    private bool AdvertisesStop(string resourceId)
-        => _application.ResourceNotifications.TryGetCurrentState(
-                resourceId,
-                out var resourceEvent)
-            && resourceEvent is not null
-            && resourceEvent.Snapshot.Commands.Any(command =>
-                string.Equals(
-                    command.Name,
-                    KnownResourceCommands.StopCommand,
-                    StringComparison.Ordinal));
-
-    private bool IsTerminal(string resourceId)
-        => _application.ResourceNotifications.TryGetCurrentState(
-                resourceId,
-                out var resourceEvent)
-            && resourceEvent?.Snapshot.State?.Text is { } state
-            && KnownResourceStates.TerminalStates.Contains(
-                state,
-                StringComparer.Ordinal);
-
-    private async Task StopOneAsync(
-        string resourceId,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var result = await _application.ResourceCommands.ExecuteCommandAsync(
-                resourceId,
-                KnownResourceCommands.StopCommand,
-                cancellationToken);
-
-#pragma warning disable CS0618
-            var errorMessage = result.ErrorMessage;
-#pragma warning restore CS0618
-
-            if (!result.Success && !IsTerminal(resourceId))
-            {
-                throw new InvalidOperationException(
-                    $"Stop failed for '{resourceId}': {errorMessage ?? result.Message}");
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            if (!IsTerminal(resourceId))
-            {
-                throw new TimeoutException(
-                    $"Stop timed out for '{resourceId}' within the AppHost cleanup budget.");
-            }
-        }
     }
 
     private void ThrowIfDisposed()
