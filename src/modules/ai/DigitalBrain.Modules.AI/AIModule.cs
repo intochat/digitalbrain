@@ -11,7 +11,9 @@ public sealed partial class AIModule : IModule
         => services.AddSerializer(
             serializer => serializer.AddJsonSerializer(
                 static type => type == typeof(Microsoft.Extensions.AI.ChatMessage)
-                    || type == typeof(Microsoft.Extensions.AI.ChatResponse)));
+                    || type == typeof(Microsoft.Extensions.AI.ChatResponse)
+                    || type == typeof(Microsoft.Extensions.AI.ChatResponseUpdate)
+                    || typeof(Microsoft.Extensions.AI.AIContent).IsAssignableFrom(type)));
 
     static partial void ConfigureRuntime(ISiloBuilder builder)
     {
