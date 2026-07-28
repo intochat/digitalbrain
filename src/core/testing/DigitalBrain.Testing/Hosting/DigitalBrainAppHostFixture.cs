@@ -5,10 +5,9 @@ using Xunit;
 
 namespace DigitalBrain.Testing;
 
-public abstract class DigitalBrainAppHostFixture<TAppHost> : IAsyncLifetime
-    where TAppHost : class
+public abstract class DigitalBrainAppHostFixture : IAsyncLifetime
 {
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(2);
     private readonly object _sync = new();
     private RunningAppHost? _active;
     private bool _disposed;
@@ -28,22 +27,48 @@ public abstract class DigitalBrainAppHostFixture<TAppHost> : IAsyncLifetime
         return StartCoreAsync(cancellationToken);
     }
 
-    public ValueTask DisposeAsync()
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Fixture disposal must tear down any active graph even when stop fails; original cleanup failure is rethrown after best-effort dispose.")]
+    public async ValueTask DisposeAsync()
     {
+        RunningAppHost? active;
+        var pending = 0;
         lock (_sync)
         {
             _disposed = true;
-            if (_pendingStarts != 0 || _active is not null)
-            {
-                return ValueTask.FromException(
-                    new InvalidOperationException(
-                        "The AppHost fixture was disposed with a pending start or active graph handle."));
-            }
+            active = _active;
+            _active = null;
+            pending = _pendingStarts;
+            _pendingStarts = 0;
         }
 
         GC.SuppressFinalize(this);
-        return ValueTask.CompletedTask;
+
+        Exception? cleanupFailure = null;
+        if (active is not null)
+        {
+            try
+            {
+                await active.DisposeAsync();
+            }
+            catch (Exception failure)
+            {
+                cleanupFailure = failure;
+            }
+        }
+
+        if (pending != 0 || cleanupFailure is not null)
+        {
+            throw new InvalidOperationException(
+                "The AppHost fixture was disposed with a pending start or active graph handle.",
+                cleanupFailure);
+        }
     }
+
+    protected abstract Task<DistributedApplication> BuildApplicationAsync(
+        CancellationToken cancellationToken);
 
     [SuppressMessage(
         "Design",
@@ -62,18 +87,11 @@ public abstract class DigitalBrainAppHostFixture<TAppHost> : IAsyncLifetime
         try
         {
             lease = await AppHostExclusiveLease.AcquireAsync(cancellationToken);
-            var builder = await DistributedApplicationTestingBuilder
-                .CreateAsync<TAppHost>(
-                    args: [],
-                    configureBuilder: static (options, _) =>
-                        options.EnableResourceLogging = true,
-                    cancellationToken);
-
             using var startup = CancellationTokenSource
                 .CreateLinkedTokenSource(cancellationToken);
             startup.CancelAfter(StartupTimeout);
 
-            application = await builder.BuildAsync(startup.Token);
+            application = await BuildApplicationAsync(startup.Token);
             await application.StartAsync(startup.Token);
 
             var running = new RunningAppHost(
@@ -158,5 +176,31 @@ public abstract class DigitalBrainAppHostFixture<TAppHost> : IAsyncLifetime
                 _active = null;
             }
         }
+    }
+}
+
+public abstract class DigitalBrainAppHostFixture<TAppHost> : DigitalBrainAppHostFixture
+    where TAppHost : class
+{
+    private static readonly bool ResourceLoggingEnabled =
+        string.Equals(
+            Environment.GetEnvironmentVariable("DIGITALBRAIN_APPHOST_RESOURCE_LOGS"),
+            "1",
+            StringComparison.Ordinal)
+        || string.Equals(
+            Environment.GetEnvironmentVariable("DIGITALBRAIN_APPHOST_RESOURCE_LOGS"),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task<DistributedApplication> BuildApplicationAsync(
+        CancellationToken cancellationToken)
+    {
+        var builder = await DistributedApplicationTestingBuilder
+            .CreateAsync<TAppHost>(
+                args: [],
+                configureBuilder: static (options, _) =>
+                    options.EnableResourceLogging = ResourceLoggingEnabled,
+                cancellationToken);
+        return await builder.BuildAsync(cancellationToken);
     }
 }
