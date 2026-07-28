@@ -79,8 +79,9 @@ public abstract partial class Neuron
         {
             await CommitAsync(CancellationToken.None);
         }
-        catch
+        catch (Exception unretracted)
         {
+            SynapseTelemetry.RetractionUncommitted(Id, unretracted);
         }
     }
 

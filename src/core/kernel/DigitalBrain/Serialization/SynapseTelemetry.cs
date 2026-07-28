@@ -19,4 +19,13 @@ internal static class SynapseTelemetry
         dropped?.SetTag(ReceiverTag, watched.ToString());
         dropped?.SetTag("db.watcher-dropped", unreachable.GetType().Name);
     }
+
+    internal static void RetractionUncommitted(DigitalBrain.Abstractions.NeuronId neuron, Exception uncommitted)
+    {
+        using var retraction = Source.StartActivity("db.retraction-uncommitted");
+
+        retraction?.SetStatus(ActivityStatusCode.Error, uncommitted.Message);
+        retraction?.SetTag(ReceiverTag, neuron.ToString());
+        retraction?.SetTag("db.retraction-uncommitted", uncommitted.GetType().Name);
+    }
 }

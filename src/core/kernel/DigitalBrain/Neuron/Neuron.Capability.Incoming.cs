@@ -13,9 +13,11 @@ public abstract partial class Neuron
 
         RequireAuthorizedCapabilityDelivery(delivery, source, delegatedSource);
 
-        await AppendIncomingCapabilityRequestAsync(delivery);
+        await CommitIncomingCapabilityRequestAsync(delivery);
 
         ProtectCommittedIncoming();
+
+        await NotifyWatchersAsync();
     }
 
     internal async Task<CapabilityTurn> BeginIncomingCapabilityRequestAsync(
@@ -41,7 +43,8 @@ public abstract partial class Neuron
             _handlingDepth,
             _turnCheckpoint);
 
-        await AppendIncomingCapabilityRequestAsync(delivery);
+        await CommitIncomingCapabilityRequestAsync(delivery);
+        await NotifyWatchersAsync();
 
         _handling = delivery;
         _handlingDepth = DeliveryPolicy.InboundDepth();
@@ -88,7 +91,7 @@ public abstract partial class Neuron
         }
     }
 
-    private async Task AppendIncomingCapabilityRequestAsync(SynapseDelivery delivery)
+    private async Task CommitIncomingCapabilityRequestAsync(SynapseDelivery delivery)
     {
         var incomingCheckpoint = _incoming.Checkpoint();
 
@@ -103,8 +106,6 @@ public abstract partial class Neuron
 
             throw;
         }
-
-        await NotifyWatchersAsync();
     }
 
     internal async Task FailIncomingCapabilityRequestAsync(CapabilityTurn turn)
