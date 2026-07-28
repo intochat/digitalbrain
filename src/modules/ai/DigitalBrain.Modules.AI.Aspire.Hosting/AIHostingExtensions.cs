@@ -9,17 +9,35 @@ namespace DigitalBrain.AI.Aspire.Hosting;
 
 public static class AIHostingExtensions
 {
+    private const string EnableSensitiveDataEnvironmentKey =
+        "DigitalBrain__AI__Telemetry__EnableSensitiveData";
+
     public const string Llama32Feature = "ai.llm.llama32";
     public const string Gemma4Feature = "ai.llm.gemma4";
     public const string Qwen35Feature = "ai.llm.qwen35";
     public const string Granite41Feature = "ai.llm.granite41";
     public const string Gpt56Feature = "ai.llm.gpt56";
 
+    extension(DigitalBrainModuleBuilder<AIModule> module)
+    {
+        public bool EnableSensitiveData
+        {
+            get => State(module).EnableSensitiveData;
+            set => State(module).EnableSensitiveData = value;
+        }
+    }
+
     public static DigitalBrainModuleBuilder<AIModule> WithLlm<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
         where TModel : class, ILLM
     {
-        ArgumentNullException.ThrowIfNull(module);
+        var state = State(module);
+        module.ConfigureFeature(state.Add<TModel>());
+        return module;
+    }
 
+    private static AIHostingState State(DigitalBrainModuleBuilder<AIModule> module)
+    {
+        ArgumentNullException.ThrowIfNull(module);
         var state = module.Brain.GetOrAddState(static brain => new AIHostingState(brain), out var added);
         if (added)
         {
@@ -27,8 +45,7 @@ public static class AIHostingExtensions
             module.AddProjection(state);
         }
 
-        module.ConfigureFeature(state.Add<TModel>());
-        return module;
+        return state;
     }
 
     private sealed class AIHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
@@ -49,6 +66,8 @@ public static class AIHostingExtensions
         private IResourceBuilder<OpenAIResource>? _openAI;
         private IResourceBuilder<OpenAIModelResource>? _gpt56;
         private IResourceBuilder<ParameterResource>? _openAIKey;
+
+        internal bool EnableSensitiveData { get; set; }
 
         internal string Add<TModel>()
             where TModel : class, ILLM
@@ -80,6 +99,10 @@ public static class AIHostingExtensions
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
             ArgumentNullException.ThrowIfNull(builder);
+
+            builder.WithEnvironment(
+                EnableSensitiveDataEnvironmentKey,
+                EnableSensitiveData.ToString());
 
             foreach (var (model, resource) in _ollamaModels)
             {

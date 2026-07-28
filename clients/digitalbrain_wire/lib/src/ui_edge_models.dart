@@ -101,16 +101,6 @@ final class BrainModule {
   }
 }
 
-final class BrainCapability {
-  const BrainCapability({required this.id});
-
-  final String id;
-
-  factory BrainCapability.fromJson(Map<String, Object?> json) {
-    return BrainCapability(id: json['id'] as String);
-  }
-}
-
 final class BrainNeuron {
   const BrainNeuron({
     required this.id,
@@ -137,13 +127,11 @@ final class BrainNeuron {
 final class BrainTopologySnapshot {
   const BrainTopologySnapshot({
     required this.modules,
-    required this.capabilities,
     required this.neurons,
     required this.observedAt,
   });
 
   final List<BrainModule> modules;
-  final List<BrainCapability> capabilities;
   final List<BrainNeuron> neurons;
   final DateTime observedAt;
 
@@ -153,13 +141,6 @@ final class BrainTopologySnapshot {
           .map(
             (module) =>
                 BrainModule.fromJson(Map<String, Object?>.from(module! as Map)),
-          )
-          .toList(growable: false),
-      capabilities: (json['capabilities'] as List<Object?>)
-          .map(
-            (capability) => BrainCapability.fromJson(
-              Map<String, Object?>.from(capability! as Map),
-            ),
           )
           .toList(growable: false),
       neurons: (json['neurons'] as List<Object?>)

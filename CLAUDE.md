@@ -70,7 +70,8 @@ the live system. Tests are the regression net, not the proof.
 7. Only now claim, quoting what you saw.
 
 Journals are the audit source; telemetry is a projection and never replaces them. Journals hold
-causal facts only — never arguments, prompts or secrets. Telemetry tags follow the same rule.
+causal facts only — never arguments, prompts or secrets. Production telemetry follows the same rule;
+the product AppHost opts Development into prompt and response capture for local diagnosis.
 
 **What Aspire can actually tell you** (measured against a live AppHost after a real chat turn):
 
@@ -80,12 +81,12 @@ causal facts only — never arguments, prompts or secrets. Telemetry tags follow
 | `digitalbrain-mcp` journals | works, and is authoritative |
 | Structured logs | works — MCP invocation completion includes tool name and error state |
 | Application traces | works — ASP.NET, Orleans and kernel spans carry causal identifiers |
-| GenAI spans, metrics | works — provider, model, duration, token usage and finish reason; no prompt or response content |
+| GenAI spans, metrics | works — provider, model, duration, token usage and finish reason; prompt and response content only when the AI module explicitly enables it |
 
-`scripts/verify-product.ps1` is the one-command live oracle. It builds Release, waits for the product
-resources, checks the exact MCP catalog, drives a real Gemma4 turn, confirms the durable transcript
-and correlation, confirms the configured modules and active chat neuron through the UI topology,
-checks telemetry content hygiene, and stops the AppHost unless `-KeepRunning` is specified.
+`dotnet test os/tests/DigitalBrain.OS.Product.Tests -c Release -- -explicit only` is the live oracle.
+It starts and stops the product AppHost, drives a real Gemma4 turn and retry, confirms the durable
+transcript and correlation, checks owner-scoped active-neuron discovery, and verifies GenAI usage
+and Development message content in the exported span.
 
 ## Gates
 

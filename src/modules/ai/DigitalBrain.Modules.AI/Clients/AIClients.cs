@@ -13,7 +13,10 @@ namespace DigitalBrain.AI;
 internal static class AIClients
 {
     private const string ConfigurationRoot = "DigitalBrain:AI";
+    private const string EnableSensitiveDataKey =
+        $"{ConfigurationRoot}:Telemetry:EnableSensitiveData";
     private const string TelemetrySource = "DigitalBrain.AI";
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromMinutes(5);
 
     internal static void Add(IServiceCollection services)
     {
@@ -31,13 +34,19 @@ internal static class AIClients
         where TModel : LLM
         => services.AddKeyedSingleton<IChatClient>(
             typeof(TModel),
-            (provider, _) => Ollama(provider.GetRequiredService<IConfiguration>(), typeof(TModel).Name, defaultTag));
+            (provider, _) => Ollama(
+                provider.GetRequiredService<IConfiguration>(),
+                typeof(TModel).Name,
+                defaultTag));
 
     [SuppressMessage(
         "Reliability",
         "CA2000:Dispose objects before losing scope",
         Justification = "The telemetry middleware owns and disposes the inner Ollama client.")]
-    private static IChatClient Ollama(IConfiguration configuration, string modelName, string defaultTag)
+    private static IChatClient Ollama(
+        IConfiguration configuration,
+        string modelName,
+        string defaultTag)
     {
         var endpoint = configuration[$"{ConfigurationRoot}:Ollama:Endpoint"];
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)
@@ -50,9 +59,18 @@ internal static class AIClients
         }
 
         var tag = configuration[$"{ConfigurationRoot}:Ollama:{modelName}:Model"] ?? defaultTag;
+        var enableSensitiveData = configuration.GetValue<bool>(EnableSensitiveDataKey);
 
-        return new ChatClientBuilder(new OllamaApiClient(endpointUri, tag))
-            .UseOpenTelemetry(sourceName: $"{TelemetrySource}.{modelName}")
+        var http = new HttpClient
+        {
+            BaseAddress = endpointUri,
+            Timeout = RequestTimeout,
+        };
+
+        return new ChatClientBuilder(new OllamaApiClient(http, tag))
+            .UseOpenTelemetry(
+                sourceName: $"{TelemetrySource}.{modelName}",
+                configure: telemetry => telemetry.EnableSensitiveData = enableSensitiveData)
             .Build();
     }
 
@@ -62,6 +80,7 @@ internal static class AIClients
             ?? throw new InvalidOperationException(
                 "Gpt56 requires DigitalBrain:AI:OpenAI:ApiKey. Configure it through AIModule.WithLlm<Gpt56>() in AppHost.");
         var model = configuration[$"{ConfigurationRoot}:OpenAI:Gpt56:Model"] ?? "gpt-5.6";
+        var enableSensitiveData = configuration.GetValue<bool>(EnableSensitiveDataKey);
         var options = new OpenAIClientOptions();
 
         if (configuration[$"{ConfigurationRoot}:OpenAI:Endpoint"] is { } endpoint)
@@ -74,7 +93,10 @@ internal static class AIClients
             .AsIChatClient();
 
         return new ChatClientBuilder(client)
-            .UseOpenTelemetry(sourceName: $"{TelemetrySource}.{nameof(Gpt56)}")
+            .UseStreamingUsage()
+            .UseOpenTelemetry(
+                sourceName: $"{TelemetrySource}.{nameof(Gpt56)}",
+                configure: telemetry => telemetry.EnableSensitiveData = enableSensitiveData)
             .Build();
     }
 }

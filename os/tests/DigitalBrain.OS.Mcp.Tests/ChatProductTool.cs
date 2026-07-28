@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Testing;
 using Xunit;
@@ -15,14 +16,30 @@ public sealed class ChatProductTool(OSMcpFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         test.Chat().Reply("Hello from DigitalBrain.");
         var tools = new DigitalBrainMcpTools(test.Client, test.Cluster.Client);
+        var commandId = CommandId.New();
 
-        var result = await tools.SendChatMessageAsync("hi", "main", timeoutSeconds: 10, cancellationToken);
+        var result = await tools.SendChatMessageAsync(
+            "hi",
+            commandId.ToString(),
+            "main",
+            timeoutSeconds: 10,
+            cancellationToken: cancellationToken);
 
         Assert.Equal("main", result.Chat);
         Assert.Equal("Hello from DigitalBrain.", result.Response);
-        Assert.NotEqual(Guid.Empty.ToString("N"), result.CommandId);
+        Assert.Equal(commandId.ToString(), result.CommandId);
         Assert.NotEqual(Guid.Empty.ToString("N"), result.CorrelationId);
         Assert.True(result.Sequence > 0);
+
+        await test.Neuron<IChat>("main").RestartHostAsync(cancellationToken);
+        var retried = await tools.SendChatMessageAsync(
+            "hi",
+            commandId.ToString(),
+            "main",
+            timeoutSeconds: 10,
+            cancellationToken: cancellationToken);
+
+        Assert.Equal(result, retried);
 
         var transcript = await test.Client.Get<IChat>("main").Read();
         Assert.Collection(
@@ -37,5 +54,13 @@ public sealed class ChatProductTool(OSMcpFixture fixture)
                 Assert.False(assistant.FromUser);
                 Assert.Equal(result.Response, assistant.Text);
             });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => tools.SendChatMessageAsync(
+                "different text",
+                commandId.ToString(),
+                "main",
+                timeoutSeconds: 10,
+                cancellationToken: cancellationToken));
     }
 }

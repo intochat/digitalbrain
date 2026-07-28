@@ -31,10 +31,6 @@ BrainTopologySnapshot _topology() => BrainTopologySnapshot(
     BrainModule(id: 'DigitalBrain.OS.OSBehaviorsModule'),
     BrainModule(id: 'DigitalBrain.Salesforce.SalesforceModule'),
   ],
-  capabilities: const [
-    BrainCapability(id: 'assistant.general'),
-    BrainCapability(id: 'account-enrichment.gmail-salesforce-description'),
-  ],
   neurons: const [
     BrainNeuron(
       id: 'chat:owner/main',
@@ -48,7 +44,6 @@ BrainTopologySnapshot _topology() => BrainTopologySnapshot(
 
 BrainTopologySnapshot _topologyWithoutNeuron() => BrainTopologySnapshot(
   modules: _topology().modules,
-  capabilities: _topology().capabilities,
   neurons: const [],
   observedAt: DateTime.utc(2026, 7, 28, 8),
 );
@@ -78,77 +73,6 @@ void main() {
     await tester.tap(find.byKey(const Key('destination_brain')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('brain_screen')), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('General assistant'),
-      300,
-      scrollable: find.byType(Scrollable),
-    );
-    expect(find.text('General assistant'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Gmail message → Salesforce Account description'),
-      300,
-      scrollable: find.byType(Scrollable),
-    );
-    expect(
-      find.text('Gmail message → Salesforce Account description'),
-      findsOneWidget,
-    );
-    expect(find.text('Approval required'), findsOneWidget);
-  });
-
-  testWidgets('Brain claims only capabilities declared by the live manifest', (
-    tester,
-  ) async {
-    final topology = StreamController<BrainTopologySnapshot>();
-    addTearDown(topology.close);
-    final flutterOnly = BrainTopologySnapshot(
-      modules: const [BrainModule(id: 'DigitalBrain.Flutter.FlutterModule')],
-      capabilities: const [],
-      neurons: const [],
-      observedAt: DateTime.utc(2026, 7, 28, 8),
-    );
-
-    await tester.pumpWidget(
-      BrainChatApp(chatName: 'main', topology: topology.stream),
-    );
-    topology.add(flutterOnly);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('destination_brain')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('General assistant'), findsNothing);
-    expect(
-      find.text('Gmail message → Salesforce Account description'),
-      findsNothing,
-    );
-    expect(find.text('Approval required'), findsNothing);
-  });
-
-  testWidgets('Brain makes no claims for installed but unconfigured modules', (
-    tester,
-  ) async {
-    final topology = StreamController<BrainTopologySnapshot>();
-    addTearDown(topology.close);
-    final unconfigured = BrainTopologySnapshot(
-      modules: _topology().modules,
-      capabilities: const [],
-      neurons: const [],
-      observedAt: DateTime.utc(2026, 7, 28, 8),
-    );
-
-    await tester.pumpWidget(
-      BrainChatApp(chatName: 'main', topology: topology.stream),
-    );
-    topology.add(unconfigured);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('destination_brain')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('General assistant'), findsNothing);
-    expect(
-      find.text('Gmail message → Salesforce Account description'),
-      findsNothing,
-    );
   });
 
   testWidgets('activity shows journal facts without message content', (

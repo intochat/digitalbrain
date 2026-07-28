@@ -25,10 +25,11 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain, IGrain
         return
         [
             .. statistics
+                .Where(statistic => statistic.GrainId.Key.ToString()!
+                    .StartsWith($"{brain.Owner.Value}/", StringComparison.Ordinal))
                 .Select(statistic => new ActiveNeuron(
                     statistic.GrainId.Type.ToString()!,
-                    statistic.GrainId.Key.ToString()!,
-                    statistic.SiloAddress.ToString()))
+                    statistic.GrainId.Key.ToString()!))
                 .OrderBy(neuron => neuron.GrainType, StringComparer.Ordinal)
                 .ThenBy(neuron => neuron.Identity, StringComparer.Ordinal),
         ];

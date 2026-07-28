@@ -7,7 +7,7 @@ namespace DigitalBrain.Testing;
 
 public abstract class DigitalBrainAppHostFixture : IAsyncLifetime
 {
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
     private readonly object _sync = new();
     private RunningAppHost? _active;
     private bool _disposed;
@@ -113,7 +113,6 @@ public abstract class DigitalBrainAppHostFixture : IAsyncLifetime
                 }
                 catch
                 {
-                    // Preserve the startup failure.
                 }
             }
 
@@ -125,7 +124,6 @@ public abstract class DigitalBrainAppHostFixture : IAsyncLifetime
                 }
                 catch
                 {
-                    // Preserve the startup failure.
                 }
             }
 

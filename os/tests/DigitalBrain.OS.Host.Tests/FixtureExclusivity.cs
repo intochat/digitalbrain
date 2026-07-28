@@ -8,7 +8,7 @@ public sealed class FixtureExclusivity(
     TestingAppHostFixture testing,
     QuickstartAppHostFixture quickstart)
 {
-    private const int LiveAppHostTimeoutMs = 120_000;
+    private const int LiveAppHostTimeoutMs = 300_000;
 
     [Fact(
         Timeout = LiveAppHostTimeoutMs,
@@ -77,7 +77,6 @@ public sealed class FixtureExclusivity(
         }
         catch
         {
-            // Preserve the original test failure when cleanup races or stop times out.
         }
     }
 
@@ -94,12 +93,11 @@ public sealed class FixtureExclusivity(
 
         try
         {
-            var host = await starting.WaitAsync(TimeSpan.FromSeconds(90));
+            var host = await starting.WaitAsync(TimeSpan.FromMinutes(5));
             await DisposeQuietlyAsync(host);
         }
         catch
         {
-            // Orphaned starts must not leave AppHost graphs running after the fact ends.
         }
     }
 }

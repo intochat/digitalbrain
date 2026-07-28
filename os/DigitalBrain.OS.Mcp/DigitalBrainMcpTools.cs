@@ -15,8 +15,8 @@ namespace DigitalBrain.OS.Mcp;
 internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory grains)
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
-    private const int DefaultTimeoutSeconds = 120;
-    private const int MaximumTimeoutSeconds = 180;
+    private const int DefaultTimeoutSeconds = 300;
+    private const int MaximumTimeoutSeconds = 300;
 
     [McpServerTool(Name = McpHost.SendChatMessageToolName)]
     [Description(
@@ -24,29 +24,45 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
         + "correlated assistant response. This is the same durable chat path used by the product UI.")]
     public async Task<ChatMessageResult> SendChatMessageAsync(
         [Description("Message to send to DigitalBrain")] string text,
+        [Description("Caller-generated command id used to resume an interrupted call")]
+        string commandId,
         [Description("Conversation name, for example 'main'")] string chatName = "main",
-        [Description("Maximum wait in seconds, from 1 through 180")]
+        [Description("Maximum wait in seconds, from 1 through 300")]
         int timeoutSeconds = DefaultTimeoutSeconds,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        ArgumentException.ThrowIfNullOrWhiteSpace(commandId);
         ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
         ArgumentOutOfRangeException.ThrowIfLessThan(timeoutSeconds, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(timeoutSeconds, MaximumTimeoutSeconds);
 
+        if (!Guid.TryParse(commandId, out var commandIdentity)
+            || commandIdentity == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "The command id must be a non-empty GUID.",
+                nameof(commandId));
+        }
+
         var chatId = NeuronId.For<IChat>(brain.Owner, chatName);
         var session = grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(brain.Owner).ToGrainId());
-        var baseline = await session.ReadNeuronJournal(chatId, JournalKind.Outgoing, afterSequence: 0);
-        var commandId = CommandId.New();
+        var command = new CommandId(commandIdentity);
 
-        await brain.Get<IChat>(chatName).Send(new SendMessage(commandId, text));
+        await brain.Get<IChat>(chatName).Send(new SendMessage(command, text));
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
 
         try
         {
-            return await WaitForResponseAsync(session, chatId, chatName, commandId, baseline.ResumeSequence, timeout.Token);
+            return await WaitForResponseAsync(
+                session,
+                chatId,
+                chatName,
+                command,
+                afterSequence: 0,
+                cancellationToken: timeout.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {

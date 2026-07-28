@@ -151,7 +151,6 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         Assert.Contains(topology.Modules, module => module.Id == FlutterModule.Id.Value);
         Assert.Contains(topology.Modules, module => module.Id == ChatModule.Id.Value);
         Assert.Contains(topology.Neurons, neuron => neuron.Id == shell.Id.ToString());
-        Assert.Empty(topology.Capabilities);
         Assert.All(topology.Neurons, neuron => Assert.StartsWith("cluster-", neuron.Placement, StringComparison.Ordinal));
     }
 

@@ -14,15 +14,24 @@ internal sealed class ChatNeuron :
     IEmit<UserMessaged>,
     IEmit<AssistantResponded>
 {
+    private const string CommandOrderName = "chat.command-order";
+    private const string CommandsName = "chat.commands";
     private const string TranscriptName = "chat.transcript";
+    private const int RememberedCommands = 64;
     private const int RetainedTurns = 64;
 
+    private readonly IDurableList<Guid> _commandOrder;
+    private readonly IDurableDictionary<Guid, byte[]> _commands;
     private readonly IDurableList<byte[]> _transcript;
+    private readonly Serializer<string> _texts;
     private readonly Serializer<ChatTurn> _turns;
 
     public ChatNeuron()
     {
+        _commandOrder = ServiceProvider.GetRequiredKeyedService<IDurableList<Guid>>(CommandOrderName);
+        _commands = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(CommandsName);
         _transcript = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(TranscriptName);
+        _texts = ServiceProvider.GetRequiredService<Serializer<string>>();
         _turns = ServiceProvider.GetRequiredService<Serializer<ChatTurn>>();
     }
 
@@ -30,8 +39,29 @@ internal sealed class ChatNeuron :
     {
         ArgumentNullException.ThrowIfNull(message);
         ArgumentException.ThrowIfNullOrWhiteSpace(message.Text);
+        if (message.CommandId.Value == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "The command id cannot be empty.",
+                nameof(message));
+        }
 
-        await RememberAsync(new ChatTurn(FromUser: true, message.Text));
+        if (_commands.TryGetValue(message.CommandId.Value, out var serialized))
+        {
+            if (!string.Equals(
+                    _texts.Deserialize(serialized),
+                    message.Text,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "A chat command id cannot be reused with different text.");
+            }
+
+            return;
+        }
+
+        Remember(message.CommandId, message.Text);
+        Remember(new ChatTurn(FromUser: true, message.Text));
         await EmitAsync(new UserMessaged(message.CommandId, Id, message.Text, Turns()));
     }
 
@@ -45,7 +75,7 @@ internal sealed class ChatNeuron :
             return;
         }
 
-        await RememberAsync(new ChatTurn(FromUser: false, synapse.Text));
+        Remember(new ChatTurn(FromUser: false, synapse.Text));
         await EmitAsync(new AssistantResponded(synapse.CommandId, Id, synapse.Text));
     }
 
@@ -53,7 +83,19 @@ internal sealed class ChatNeuron :
 
     private IReadOnlyList<ChatTurn> Turns() => [.. _transcript.Select(_turns.Deserialize)];
 
-    private async Task RememberAsync(ChatTurn turn)
+    private void Remember(CommandId commandId, string text)
+    {
+        _commands[commandId.Value] = _texts.SerializeToArray(text);
+        _commandOrder.Add(commandId.Value);
+
+        while (_commandOrder.Count > RememberedCommands)
+        {
+            _commands.Remove(_commandOrder[0]);
+            _commandOrder.RemoveAt(0);
+        }
+    }
+
+    private void Remember(ChatTurn turn)
     {
         _transcript.Add(_turns.SerializeToArray(turn));
 
@@ -61,7 +103,5 @@ internal sealed class ChatNeuron :
         {
             _transcript.RemoveAt(0);
         }
-
-        await WriteStateAsync(CancellationToken.None);
     }
 }

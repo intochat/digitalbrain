@@ -72,12 +72,11 @@ git clean -fdx
 aspire run
 ```
 
-[scripts/verify-product.ps1](scripts/verify-product.ps1) performs the Release build and a live,
-self-cleaning Aspire proof across resource health, MCP discovery, Gemma4 chat, durable journals,
-live UI topology, and OpenTelemetry:
+The explicit product suite performs a self-cleaning live Aspire proof across resource health,
+Gemma4 chat, command retry, durable journals, owner-scoped introspection, and OpenTelemetry:
 
 ```powershell
-./scripts/verify-product.ps1
+dotnet test os/tests/DigitalBrain.OS.Product.Tests -c Release -- -explicit only
 ```
 
 [CLAUDE.md](CLAUDE.md) is the working discipline for every agent and contributor: the gates, the

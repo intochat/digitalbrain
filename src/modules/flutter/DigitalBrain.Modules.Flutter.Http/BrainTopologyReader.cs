@@ -46,7 +46,6 @@ internal sealed class BrainTopologyReader(IDigitalBrain brain, IGrainFactory gra
 
         return new BrainTopologySnapshot(
             modules,
-            BrainCapabilityCatalog.Resolve(modules, configuration),
             neurons,
             TimeProvider.System.GetUtcNow());
     }

@@ -1,7 +1,6 @@
 export 'package:digitalbrain_wire/digitalbrain_wire.dart'
     show
         ActivateControlRequest,
-        BrainCapability,
         BrainModule,
         BrainNeuron,
         BrainTopologySnapshot,

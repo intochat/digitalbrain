@@ -168,9 +168,6 @@ data: {"sequence":3,"sceneKey":"home","title":"Home refreshed","commandId":"c","
               'modules': [
                 {'id': 'DigitalBrain.Chat.ChatModule'},
               ],
-              'capabilities': [
-                {'id': 'assistant.general'},
-              ],
               'neurons': [
                 if (requestCount > 1)
                   {
@@ -195,7 +192,6 @@ data: {"sequence":3,"sceneKey":"home","title":"Home refreshed","commandId":"c","
 
       expect(snapshots.first.neurons, isEmpty);
       expect(snapshots.last.neurons.single.id, 'chat:owner/main');
-      expect(snapshots.last.capabilities.single.id, 'assistant.general');
     },
   );
 
@@ -215,7 +211,6 @@ data: {"sequence":3,"sceneKey":"home","title":"Home refreshed","commandId":"c","
               'modules': [
                 {'id': 'DigitalBrain.Chat.ChatModule'},
               ],
-              'capabilities': const [],
               'neurons': const [],
               'observedAt': '2026-07-28T08:00:00Z',
             }),
@@ -281,7 +276,6 @@ final class _AbortThenSucceedClient extends http.BaseClient {
             'modules': [
               {'id': 'DigitalBrain.Chat.ChatModule'},
             ],
-            'capabilities': const [],
             'neurons': const [],
             'observedAt': '2026-07-28T08:00:00Z',
           }),

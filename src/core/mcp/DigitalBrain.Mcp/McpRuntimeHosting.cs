@@ -15,7 +15,13 @@ internal static class McpRuntimeHosting
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.AddHttpClient();
+        var http = services
+            .AddHttpClient(
+                McpRuntime.HttpClientName,
+                static client => client.Timeout = TimeSpan.FromMinutes(5));
+#pragma warning disable EXTEXP0001
+        http.RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
         DurablePayloadProtectionHosting.Configure(services, configuration);
         services.TryAddSingleton<IMcpClientSessionFactory, HttpMcpClientSessionFactory>();
         services.TryAddSingleton<McpRuntime>();

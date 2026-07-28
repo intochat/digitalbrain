@@ -23,10 +23,6 @@ final class BrainScreen extends StatefulWidget {
 }
 
 final class _BrainScreenState extends State<BrainScreen> {
-  static const _generalAssistant = 'assistant.general';
-  static const _accountEnrichment =
-      'account-enrichment.gmail-salesforce-description';
-
   BrainTopologySelection? _selection;
 
   @override
@@ -73,52 +69,6 @@ final class _BrainScreenState extends State<BrainScreen> {
         null,
       final selection => selection,
     };
-  }
-
-  ({bool generalAssistant, bool accountEnrichment}) _capabilities() {
-    final capabilities = widget.topology?.capabilities
-        .map((capability) => capability.id)
-        .toSet();
-    return (
-      generalAssistant: capabilities?.contains(_generalAssistant) == true,
-      accountEnrichment: capabilities?.contains(_accountEnrichment) == true,
-    );
-  }
-
-  List<Widget> _capabilityPanels() {
-    final capabilities = _capabilities();
-    if (!capabilities.generalAssistant && !capabilities.accountEnrichment) {
-      return const [];
-    }
-
-    return [
-      const SizedBox(height: 30),
-      const _SectionLabel('CAPABILITIES'),
-      const SizedBox(height: 12),
-      if (capabilities.generalAssistant)
-        const _CapabilityCard(
-          icon: Icons.chat_bubble_outline_rounded,
-          title: 'General assistant',
-          body:
-              'Conversation, explanation, drafting, and reasoning in the current chat.',
-        ),
-      if (capabilities.generalAssistant && capabilities.accountEnrichment)
-        const SizedBox(height: 12),
-      if (capabilities.accountEnrichment)
-        const _CapabilityCard(
-          icon: Icons.compare_arrows_rounded,
-          title: 'Gmail message → Salesforce Account description',
-          body:
-              'Creates a reviewable enrichment proposal from an exact Gmail message ID and a Salesforce Account ID.',
-          badge: 'Approval required',
-        ),
-      if (capabilities.accountEnrichment) ...[
-        const SizedBox(height: 30),
-        const _SectionLabel('BOUNDARIES'),
-        const SizedBox(height: 12),
-        const _BoundaryCard(),
-      ],
-    ];
   }
 
   @override
@@ -177,7 +127,6 @@ final class _BrainScreenState extends State<BrainScreen> {
                 onSelected: (selection) =>
                     setState(() => _selection = selection),
               ),
-              ..._capabilityPanels(),
               if (!connected) ...[
                 const SizedBox(height: 20),
                 _ConnectionNotice(message: widget.statusMessage!),
@@ -454,132 +403,6 @@ final class _MetricCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-final class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Text(text, style: BrainType.meta);
-}
-
-final class _CapabilityCard extends StatelessWidget {
-  const _CapabilityCard({
-    required this.icon,
-    required this.title,
-    required this.body,
-    this.badge,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-  final String? badge;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: _panelDecoration(),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: BrainPalette.signal.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(icon, color: BrainPalette.signal, size: 19),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: Text(title, style: BrainType.cardTitle)),
-                    if (badge != null) _Badge(label: badge!),
-                  ],
-                ),
-                const SizedBox(height: 7),
-                Text(body, style: BrainType.bodyMuted),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-final class _Badge extends StatelessWidget {
-  const _Badge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: BrainPalette.owner.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: BrainPalette.owner.withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        label,
-        style: BrainType.metaStrong.copyWith(color: BrainPalette.owner),
-      ),
-    );
-  }
-}
-
-final class _BoundaryCard extends StatelessWidget {
-  const _BoundaryCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: _panelDecoration(color: BrainPalette.surfaceSunken),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _BoundaryLine('No Gmail search, listing, or sending'),
-          SizedBox(height: 11),
-          _BoundaryLine('No direct Salesforce writes'),
-          SizedBox(height: 11),
-          _BoundaryLine('No account, contact, or lead creation'),
-        ],
-      ),
-    );
-  }
-}
-
-final class _BoundaryLine extends StatelessWidget {
-  const _BoundaryLine(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Icon(
-          Icons.remove_circle_outline_rounded,
-          color: BrainPalette.textMuted,
-          size: 16,
-        ),
-        const SizedBox(width: 10),
-        Expanded(child: Text(text, style: BrainType.bodyMuted)),
-      ],
     );
   }
 }

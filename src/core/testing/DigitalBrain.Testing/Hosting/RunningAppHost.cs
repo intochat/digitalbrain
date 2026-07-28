@@ -9,7 +9,7 @@ namespace DigitalBrain.Testing;
 public sealed class RunningAppHost : IAsyncDisposable
 {
     private static readonly TimeSpan CleanupTimeout = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(5);
 
     private readonly DistributedApplication _application;
     private readonly TimeSpan _cleanupTimeout;

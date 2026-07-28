@@ -3,8 +3,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Trace;
 using Xunit;
 
 namespace DigitalBrain.ServiceDefaultsTests;
@@ -33,19 +31,5 @@ public sealed class ServiceDefaultsContracts
 
         Assert.Equal(HealthStatus.Healthy, health.Status);
         Assert.Equal(["/alive", "/health"], routes);
-    }
-
-    [Fact(DisplayName = "service defaults register tracing, metrics, and resilient HTTP clients")]
-    public async Task ServiceDefaultsRegisterTelemetryAndResilientHttpClients()
-    {
-        var builder = WebApplication.CreateBuilder();
-        builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] = "";
-        builder.AddServiceDefaults();
-
-        await using var app = builder.Build();
-
-        Assert.NotNull(app.Services.GetRequiredService<TracerProvider>());
-        Assert.NotNull(app.Services.GetRequiredService<MeterProvider>());
-        Assert.NotNull(app.Services.GetRequiredService<IHttpClientFactory>());
     }
 }

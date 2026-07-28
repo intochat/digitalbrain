@@ -31,7 +31,11 @@ public sealed class HostingProjectionContracts
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
-        brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
+        brain.AddModule<AIModule>(ai =>
+        {
+            ai.EnableSensitiveData = true;
+            ai.WithLlm<Llama32>();
+        });
         brain.AddModule<GoogleModule>(google => google.WithGmail());
         brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 
@@ -80,6 +84,14 @@ public sealed class HostingProjectionContracts
             clientEnvironment[
                 $"{ConfigurationEnvironment(DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey)}__0"]
                 ?.ToString());
+        Assert.Equal(
+            bool.TrueString,
+            (await FlutterHostingProjectionSupport.EnvironmentOf(silo.Resource).ConfigureAwait(true))[
+                "DigitalBrain__AI__Telemetry__EnableSensitiveData"]
+                ?.ToString());
+        Assert.DoesNotContain(
+            "DigitalBrain__AI__Telemetry__EnableSensitiveData",
+            clientEnvironmentKeys);
         Assert.Equal(
             "google.gmail",
             clientEnvironment[

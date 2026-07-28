@@ -9,7 +9,7 @@ internal sealed record NeuronJournalPage(
 
 internal sealed record JournaledSynapse(long Sequence, string Synapse, string Caller, string Correlation, DateTimeOffset Timestamp);
 
-internal sealed record ActiveNeuron(string GrainType, string Identity, string Silo);
+internal sealed record ActiveNeuron(string GrainType, string Identity);
 
 internal sealed record ChatTranscriptPage(string Chat, IReadOnlyList<ChatTranscriptTurn> Turns);
 

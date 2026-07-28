@@ -38,7 +38,9 @@ public abstract class Agent : Neuron, IAgent
             ? messages
             : [new ChatMessage(ChatRole.System, instructions), .. messages];
 
-        var response = await _toolCallingClient.GetResponseAsync(request, options);
+        var response = await _toolCallingClient
+            .GetStreamingResponseAsync(request, options)
+            .ToChatResponseAsync();
 
         foreach (var selected in SelectedCapabilities(response))
         {
