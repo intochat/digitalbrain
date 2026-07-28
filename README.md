@@ -37,10 +37,11 @@ The plan of record. Nothing is shipped unless it says Built.
 | Neuron/synapse foundation, owner-scoped client, module activation, AppHost composition, testing path | **Built** |
 | Typed AI, Tasks, Google, Salesforce, Chat, Flutter, Quickstart families | **Built** |
 | Flutter vertical — shell/scene vocabulary, UI HTTP/SSE edge, `WithUIEdge`/`WithFlutterHost`, headless Dart host, Windows chrome | **Built** |
+| Product shell — responsive Chat, content-safe Activity, capability-accurate Brain surfaces | **Built** |
 | Product MCP surface — durable chat send/read, neuron journal observation, active-neuron discovery | **Built** |
 | Time — durable one-shot `ICountdown` and its recovery tests | **Built** |
 | Time — reminders, recurring interval/calendar scheduling, DST | Designed |
-| Product chrome polish, multi-principal IdP edge, journal observation on `IDigitalBrain` | Designed |
+| Multi-principal IdP edge, journal observation on `IDigitalBrain` | Designed |
 | Behavior rail — proposal, approval, installation, execution, rollback | Designed |
 | Observability spine — host OpenTelemetry, structured logs, causal kernel spans, GenAI spans and metrics | **Built** |
 
