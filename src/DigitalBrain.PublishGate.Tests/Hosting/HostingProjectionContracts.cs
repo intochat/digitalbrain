@@ -76,7 +76,7 @@ public sealed class HostingProjectionContracts
                 $"{ConfigurationEnvironment(DigitalBrainHostingExtensions.ModulesConfigurationKey)}__2"]
                 ?.ToString());
         Assert.Equal(
-            AIHostingExtensions.LlmFeature,
+            AIHostingExtensions.Llama32Feature,
             clientEnvironment[
                 $"{ConfigurationEnvironment(DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey)}__0"]
                 ?.ToString());

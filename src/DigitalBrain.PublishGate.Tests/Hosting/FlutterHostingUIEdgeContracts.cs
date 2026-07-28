@@ -25,7 +25,7 @@ public sealed class FlutterHostingUIEdgeContracts
             options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath;
             options.Owner = "edge-owner";
         }));
-        brain.AddModule<AIModule>(ai => ai.WithLlm<Llama32>());
+        brain.AddModule<AIModule>(ai => ai.WithLlm<Gemma4>());
 
         var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
@@ -43,9 +43,9 @@ public sealed class FlutterHostingUIEdgeContracts
         FlutterHostingProjectionSupport.AssertClientSafeUIProductEnvironment(
             environment,
             [FlutterModule.Id.Value, AIModule.Id.Value],
-            [AIHostingExtensions.LlmFeature]);
+            [AIHostingExtensions.Gemma4Feature]);
         Assert.Equal(
-            AIHostingExtensions.LlmFeature,
+            AIHostingExtensions.Gemma4Feature,
             environment["DigitalBrain__ConfiguredFeatures__0"]?.ToString());
         Assert.Equal(
             "edge-owner",

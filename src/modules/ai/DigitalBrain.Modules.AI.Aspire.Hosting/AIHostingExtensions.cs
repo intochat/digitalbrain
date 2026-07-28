@@ -9,7 +9,11 @@ namespace DigitalBrain.AI.Aspire.Hosting;
 
 public static class AIHostingExtensions
 {
-    public const string LlmFeature = "ai.llm";
+    public const string Llama32Feature = "ai.llm.llama32";
+    public const string Gemma4Feature = "ai.llm.gemma4";
+    public const string Qwen35Feature = "ai.llm.qwen35";
+    public const string Granite41Feature = "ai.llm.granite41";
+    public const string Gpt56Feature = "ai.llm.gpt56";
 
     public static DigitalBrainModuleBuilder<AIModule> WithLlm<TModel>(
         this DigitalBrainModuleBuilder<AIModule> module)
@@ -26,8 +30,7 @@ public static class AIHostingExtensions
             module.AddProjection(state);
         }
 
-        state.Add<TModel>();
-        module.ConfigureFeature(LlmFeature);
+        module.ConfigureFeature(state.Add<TModel>());
         return module;
     }
 
@@ -35,12 +38,12 @@ public static class AIHostingExtensions
     {
         private const string OllamaImageTag = "latest";
 
-        private static readonly Dictionary<Type, (string ResourceSuffix, string Tag)> OllamaModelCatalog = new()
+        private static readonly Dictionary<Type, (string ResourceSuffix, string Tag, string Feature)> OllamaModelCatalog = new()
         {
-            [typeof(Llama32)] = ("llama32", "llama3.2"),
-            [typeof(Gemma4)] = ("gemma4", "gemma4:12b"),
-            [typeof(Qwen35)] = ("qwen35", "qwen3.5:9b"),
-            [typeof(Granite41)] = ("granite41", "granite4.1:8b"),
+            [typeof(Llama32)] = ("llama32", "llama3.2", Llama32Feature),
+            [typeof(Gemma4)] = ("gemma4", "gemma4:12b", Gemma4Feature),
+            [typeof(Qwen35)] = ("qwen35", "qwen3.5:9b", Qwen35Feature),
+            [typeof(Granite41)] = ("granite41", "granite4.1:8b", Granite41Feature),
         };
 
         private readonly HashSet<Type> _models = [];
@@ -50,7 +53,7 @@ public static class AIHostingExtensions
         private IResourceBuilder<OpenAIModelResource>? _gpt56;
         private IResourceBuilder<ParameterResource>? _openAIKey;
 
-        internal void Add<TModel>()
+        internal string Add<TModel>()
             where TModel : class, ILLM
         {
             var model = typeof(TModel);
@@ -64,13 +67,13 @@ public static class AIHostingExtensions
             if (OllamaModelCatalog.TryGetValue(model, out var ollama))
             {
                 AddOllamaModel(model, ollama.ResourceSuffix, ollama.Tag);
-                return;
+                return ollama.Feature;
             }
 
             if (model == typeof(Gpt56))
             {
                 AddGpt56();
-                return;
+                return Gpt56Feature;
             }
 
             throw new NotSupportedException(

@@ -11,7 +11,7 @@ internal static class BrainCapabilityCatalog
     private const string GoogleModule = "DigitalBrain.Google.GoogleModule";
     private const string OSModule = "DigitalBrain.OS.OSBehaviorsModule";
     private const string SalesforceModule = "DigitalBrain.Salesforce.SalesforceModule";
-    private const string LlmFeature = "ai.llm";
+    private const string Gemma4Feature = "ai.llm.gemma4";
     private const string GmailFeature = "google.gmail";
     private const string SalesforceFeature = "salesforce";
 
@@ -35,7 +35,7 @@ internal static class BrainCapabilityCatalog
             moduleIds.Contains(AIModule) &&
             moduleIds.Contains(ChatModule) &&
             moduleIds.Contains(OSModule) &&
-            features.Contains(LlmFeature);
+            features.Contains(Gemma4Feature);
         var accountEnrichment =
             generalAssistant &&
             moduleIds.Contains(GoogleModule) &&

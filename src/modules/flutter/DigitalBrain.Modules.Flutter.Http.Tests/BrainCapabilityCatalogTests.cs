@@ -36,18 +36,29 @@ public sealed class BrainCapabilityCatalogTests
 
         var capabilities = BrainCapabilityCatalog.Resolve(
             modules,
-            Configuration("ai.llm", "google.gmail", "salesforce"));
+            Configuration("ai.llm.gemma4", "google.gmail", "salesforce"));
 
         Assert.Empty(capabilities);
     }
 
     [Fact(DisplayName =
-        "complete configured product manifest claims general assistant and account enrichment")]
-    public void CompleteConfiguredProductManifestClaimsExactCapabilities()
+        "configured non-Gemma model claims no product capability")]
+    public void NonGemmaModelClaimsNothing()
     {
         var capabilities = BrainCapabilityCatalog.Resolve(
             ProductModules,
-            Configuration("ai.llm", "google.gmail", "salesforce"));
+            Configuration("ai.llm.llama32", "google.gmail", "salesforce"));
+
+        Assert.Empty(capabilities);
+    }
+
+    [Fact(DisplayName =
+        "configured Gemma product manifest claims general assistant and account enrichment")]
+    public void ConfiguredGemmaProductManifestClaimsExactCapabilities()
+    {
+        var capabilities = BrainCapabilityCatalog.Resolve(
+            ProductModules,
+            Configuration("ai.llm.gemma4", "google.gmail", "salesforce"));
 
         Assert.Equal(
             [
