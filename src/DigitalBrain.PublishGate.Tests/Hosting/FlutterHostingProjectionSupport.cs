@@ -116,7 +116,9 @@ internal static class FlutterHostingProjectionSupport
             environment);
     }
 
-    public static void AssertExclusiveUIProductEnvironment(IReadOnlyDictionary<string, object> environment)
+    public static void AssertClientSafeUIProductEnvironment(
+        IReadOnlyDictionary<string, object> environment,
+        params string[] modules)
     {
         var productKeys = environment.Keys
             .Where(static key =>
@@ -125,12 +127,25 @@ internal static class FlutterHostingProjectionSupport
                 || string.Equals(key, JournalConnectionEnvironmentKey, StringComparison.Ordinal))
             .ToHashSet(StringComparer.Ordinal);
 
-        Assert.Equal(
-            new HashSet<string>(StringComparer.Ordinal)
-            {
-                FlutterHostingExtensions.OwnerEnvironmentVariable,
-            },
-            productKeys);
+        var expected = new HashSet<string>(StringComparer.Ordinal)
+        {
+            FlutterHostingExtensions.OwnerEnvironmentVariable,
+        };
+        for (var index = 0; index < modules.Length; index++)
+        {
+            expected.Add(
+                $"{DigitalBrainHostingExtensions.ModulesConfigurationKey.Replace(":", "__", StringComparison.Ordinal)}__{index}");
+        }
+
+        Assert.Equal(expected, productKeys);
+        for (var index = 0; index < modules.Length; index++)
+        {
+            Assert.Equal(
+                modules[index],
+                environment[
+                    $"{DigitalBrainHostingExtensions.ModulesConfigurationKey.Replace(":", "__", StringComparison.Ordinal)}__{index}"]
+                    ?.ToString());
+        }
     }
 
     public static async Task<HashSet<string>> EnvironmentKeysOf(IResource resource)

@@ -93,6 +93,21 @@ try {
             "--non-interactive")
     }
 
+    $uiDescription = Invoke-AspireJson @(
+        "describe", "digitalbrain-ui",
+        "--apphost", $appHost,
+        "--format", "Json",
+        "--non-interactive")
+    $uiResource = @($uiDescription.resources) |
+        Where-Object displayName -eq "digitalbrain-ui" |
+        Select-Object -First 1
+    $uiUrl = @($uiResource.urls) |
+        Where-Object name -eq "http" |
+        Select-Object -ExpandProperty url -First 1
+    Require `
+        -Condition (-not [string]::IsNullOrWhiteSpace($uiUrl)) `
+        -Message "Aspire did not expose the digitalbrain-ui HTTP endpoint."
+
     $tools = @()
     for ($attempt = 1; $attempt -le 90 -and $tools.Count -eq 0; $attempt++) {
         $tools = @(
@@ -193,6 +208,47 @@ try {
             $journal.entries[1].correlation -eq $result.correlationId) `
         -Message "Chat journal entries do not share the MCP result correlation."
 
+    $expectedModules = @(
+        "DigitalBrain.AI.AIModule",
+        "DigitalBrain.Chat.ChatModule",
+        "DigitalBrain.Flutter.FlutterModule",
+        "DigitalBrain.Google.GoogleModule",
+        "DigitalBrain.OS.OSBehaviorsModule",
+        "DigitalBrain.Salesforce.SalesforceModule")
+    $expectedChatNeuron = "chat:dev/$ChatName"
+    $topology = $null
+    $moduleIds = @()
+    $activeChat = $null
+    for ($attempt = 1; $attempt -le 30 -and $null -eq $activeChat; $attempt++) {
+        try {
+            $topology = Invoke-RestMethod -Uri "$uiUrl/brain/topology"
+            $moduleIds = @($topology.modules | ForEach-Object id)
+            $activeChat = @($topology.neurons) |
+                Where-Object id -eq $expectedChatNeuron |
+                Select-Object -First 1
+        }
+        catch {
+            $topology = $null
+        }
+        if ($null -eq $activeChat) {
+            Start-Sleep -Seconds 1
+        }
+    }
+    Require `
+        -Condition ($null -ne $topology) `
+        -Message "The UI edge did not return a live brain topology."
+    Require `
+        -Condition ($moduleIds.Count -eq $expectedModules.Count) `
+        -Message "Expected $($expectedModules.Count) live modules but found $($moduleIds.Count)."
+    foreach ($module in $expectedModules) {
+        Require `
+            -Condition ($moduleIds -contains $module) `
+            -Message "Live topology is missing configured module '$module'."
+    }
+    Require `
+        -Condition ($null -ne $activeChat) `
+        -Message "Live topology never exposed active neuron '$expectedChatNeuron'."
+
     $genAi = $null
     for ($attempt = 1; $attempt -le 60 -and $null -eq $genAi; $attempt++) {
         $genAiSpans = @(
@@ -258,6 +314,8 @@ try {
         GenAiDurationMs = $genAi.durationMs
         InputTokens = $genAi.attributes.'gen_ai.usage.input_tokens'
         OutputTokens = $genAi.attributes.'gen_ai.usage.output_tokens'
+        TopologyModules = $moduleIds.Count
+        ActiveNeuron = $activeChat.id
     } | Format-List
 }
 finally {

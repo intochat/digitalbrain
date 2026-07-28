@@ -29,4 +29,6 @@ public static class UIEdgeContract
     public const string ChatEventsPath = "/chats/{chatName}/events";
 
     public const string ChatTurnEvent = "chat-turn";
+
+    public const string BrainTopologyPath = "/brain/topology";
 }

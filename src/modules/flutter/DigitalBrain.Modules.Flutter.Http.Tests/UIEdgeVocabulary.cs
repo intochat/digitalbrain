@@ -40,6 +40,7 @@ public sealed class UIEdgeVocabulary(UIFixture fixture)
         Assert.Equal("text/event-stream", UIEdgeContract.EventStreamContentType);
         Assert.Equal("no-cache", UIEdgeContract.CacheControlNoCache);
         Assert.Equal("scene-opened", UIEdgeContract.SceneOpenedEvent);
+        Assert.Equal("/brain/topology", UIEdgeContract.BrainTopologyPath);
     }
 
     [Fact(DisplayName =

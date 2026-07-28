@@ -13,6 +13,7 @@ internal static class UIEdgeServices
             OwnerSessionJournal.Open(
                 services.GetRequiredService<IGrainFactory>(),
                 services.GetRequiredService<IDigitalBrain>().Owner));
+        services.TryAddSingleton<BrainTopologyReader>();
 
         return services;
     }

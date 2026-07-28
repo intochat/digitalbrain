@@ -78,12 +78,7 @@ public static class DigitalBrainHostingExtensions
                 brain.StateProtectionKey);
         }
 
-        for (var index = 0; index < brain.Modules.Count; index++)
-        {
-            builder.WithEnvironment(
-                $"{ConfigurationEnvironment(ModulesConfigurationKey)}__{index}",
-                brain.Modules[index].Value);
-        }
+        ProjectModuleManifest(builder, brain);
 
         foreach (var projection in brain.Projections)
         {
@@ -101,8 +96,24 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(client);
 
-        return builder.WithReference(client.Brain.Orleans.AsClient());
+        builder.WithReference(client.Brain.Orleans.AsClient());
+        ProjectModuleManifest(builder, client.Brain);
+        return builder;
     }
+
+    private static void ProjectModuleManifest<TResource>(
+        IResourceBuilder<TResource> builder,
+        DigitalBrainBuilder brain)
+        where TResource : IResourceWithEnvironment
+        => builder.WithEnvironment(context =>
+        {
+            for (var index = 0; index < brain.Modules.Count; index++)
+            {
+                context.EnvironmentVariables[
+                    $"{ConfigurationEnvironment(ModulesConfigurationKey)}__{index}"] =
+                    brain.Modules[index].Value;
+            }
+        });
 
     private static string ConfigurationEnvironment(string configurationKey)
         => configurationKey.Replace(":", "__", StringComparison.Ordinal);

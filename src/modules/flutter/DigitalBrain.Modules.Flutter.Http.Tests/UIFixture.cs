@@ -1,3 +1,4 @@
+using DigitalBrain.Chat;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.ServiceDefaults;
@@ -33,6 +34,12 @@ public sealed class UIFixture : DigitalBrainFixture
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.AddServiceDefaults();
+        builder.Configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["DigitalBrain:Modules:0"] = FlutterModule.Id.Value,
+                ["DigitalBrain:Modules:1"] = ChatModule.Id.Value,
+            });
         builder.Services.AddSingleton(test.Client);
         builder.Services.AddSingleton<IGrainFactory>(test.Cluster.Client);
         builder.Services.AddUIEdgeServices();
@@ -50,5 +57,6 @@ public sealed class UIFixture : DigitalBrainFixture
     {
         ArgumentNullException.ThrowIfNull(brain);
         brain.AddModule<FlutterModule>();
+        brain.AddModule<ChatModule>();
     }
 }

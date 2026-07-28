@@ -84,8 +84,8 @@ causal facts only — never arguments, prompts or secrets. Telemetry tags follow
 
 `scripts/verify-product.ps1` is the one-command live oracle. It builds Release, waits for the product
 resources, checks the exact MCP catalog, drives a real Gemma4 turn, confirms the durable transcript
-and correlation, checks telemetry content hygiene, and stops the AppHost unless `-KeepRunning` is
-specified.
+and correlation, confirms the configured modules and active chat neuron through the UI topology,
+checks telemetry content hygiene, and stops the AppHost unless `-KeepRunning` is specified.
 
 ## Gates
 

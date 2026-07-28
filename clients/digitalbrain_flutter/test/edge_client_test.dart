@@ -16,11 +16,7 @@ void main() {
       }),
     );
 
-    await client.openScene(
-      shellName: 'desk',
-      sceneKey: 'home',
-      title: 'Home',
-    );
+    await client.openScene(shellName: 'desk', sceneKey: 'home', title: 'Home');
 
     expect(seen, isNotNull);
     expect(seen!.method, 'POST');
@@ -153,4 +149,86 @@ data: {"sequence":3,"sceneKey":"home","title":"Home refreshed","commandId":"c","
       throwsA(isA<StateError>()),
     );
   });
+
+  test(
+    'watchBrainTopology polls live modules and neurons without restart',
+    () async {
+      var requestCount = 0;
+      final client = DigitalBrainUiEdgeClient(
+        baseUri: Uri.parse('http://ui.example:5080'),
+        httpClient: MockClient((request) async {
+          expect(request.method, 'GET');
+          expect(
+            request.url.toString(),
+            'http://ui.example:5080/brain/topology',
+          );
+          requestCount++;
+          return http.Response(
+            jsonEncode({
+              'modules': [
+                {'id': 'DigitalBrain.Chat.ChatModule'},
+              ],
+              'neurons': [
+                if (requestCount > 1)
+                  {
+                    'id': 'chat:owner/main',
+                    'grainType': 'chat',
+                    'identity': 'owner/main',
+                    'silo': 'silo-1',
+                  },
+              ],
+              'observedAt': '2026-07-28T08:00:00Z',
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+
+      final snapshots = await client
+          .watchBrainTopology(pollInterval: Duration.zero)
+          .take(2)
+          .toList();
+
+      expect(snapshots.first.neurons, isEmpty);
+      expect(snapshots.last.neurons.single.id, 'chat:owner/main');
+    },
+  );
+
+  test(
+    'watchBrainTopology reports a transient failure and keeps polling',
+    () async {
+      var requestCount = 0;
+      final client = DigitalBrainUiEdgeClient(
+        baseUri: Uri.parse('http://ui.example:5080'),
+        httpClient: MockClient((request) async {
+          requestCount++;
+          if (requestCount == 1) {
+            return http.Response('temporarily unavailable', 503);
+          }
+          return http.Response(
+            jsonEncode({
+              'modules': [
+                {'id': 'DigitalBrain.Chat.ChatModule'},
+              ],
+              'neurons': const [],
+              'observedAt': '2026-07-28T08:00:00Z',
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      final errors = <Object>[];
+
+      final snapshot = await client
+          .watchBrainTopology(pollInterval: Duration.zero)
+          .handleError(errors.add)
+          .first;
+
+      expect(requestCount, 2);
+      expect(errors, hasLength(1));
+      expect(snapshot.modules.single.id, 'DigitalBrain.Chat.ChatModule');
+    },
+  );
 }

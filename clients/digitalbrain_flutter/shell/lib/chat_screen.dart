@@ -15,12 +15,14 @@ final class BrainChatApp extends StatelessWidget {
     super.key,
     required this.chatName,
     this.turns,
+    this.topology,
     this.onSend,
     this.statusMessage,
   });
 
   final String chatName;
   final Stream<ChatTurnEvent>? turns;
+  final Stream<BrainTopologySnapshot>? topology;
   final SendMessage? onSend;
   final String? statusMessage;
 
@@ -33,6 +35,7 @@ final class BrainChatApp extends StatelessWidget {
       home: _BrainWorkspace(
         chatName: chatName,
         turns: turns,
+        topology: topology,
         onSend: onSend,
         statusMessage: statusMessage,
       ),
@@ -44,12 +47,14 @@ final class _BrainWorkspace extends StatefulWidget {
   const _BrainWorkspace({
     required this.chatName,
     this.turns,
+    this.topology,
     this.onSend,
     this.statusMessage,
   });
 
   final String chatName;
   final Stream<ChatTurnEvent>? turns;
+  final Stream<BrainTopologySnapshot>? topology;
   final SendMessage? onSend;
   final String? statusMessage;
 
@@ -63,13 +68,17 @@ final class _BrainWorkspaceState extends State<_BrainWorkspace> {
   final _turns = <ChatTurnEvent>[];
   final _seen = <int>{};
   StreamSubscription<ChatTurnEvent>? _subscription;
+  StreamSubscription<BrainTopologySnapshot>? _topologySubscription;
+  BrainTopologySnapshot? _topology;
   int _destination = 0;
-  String? _streamFailure;
+  String? _turnFailure;
+  String? _topologyFailure;
 
   @override
   void initState() {
     super.initState();
     _listen(widget.turns);
+    _listenTopology(widget.topology);
   }
 
   @override
@@ -83,10 +92,32 @@ final class _BrainWorkspaceState extends State<_BrainWorkspace> {
       unawaited(_subscription?.cancel());
       _listen(widget.turns);
     }
+    if (!identical(oldWidget.topology, widget.topology)) {
+      unawaited(_topologySubscription?.cancel());
+      _listenTopology(widget.topology);
+    }
+  }
+
+  void _listenTopology(Stream<BrainTopologySnapshot>? topology) {
+    _topologySubscription = topology?.listen(
+      (snapshot) {
+        if (mounted) {
+          setState(() {
+            _topology = snapshot;
+            _topologyFailure = null;
+          });
+        }
+      },
+      onError: (Object error) {
+        if (mounted) {
+          setState(() => _topologyFailure = '$error');
+        }
+      },
+    );
   }
 
   void _listen(Stream<ChatTurnEvent>? turns) {
-    _streamFailure = null;
+    _turnFailure = null;
     _subscription = turns?.listen(
       (turn) {
         if (!mounted || !_seen.add(turn.sequence)) {
@@ -99,13 +130,14 @@ final class _BrainWorkspaceState extends State<_BrainWorkspace> {
       },
       onError: (Object error) {
         if (mounted) {
-          setState(() => _streamFailure = '$error');
+          setState(() => _turnFailure = '$error');
         }
       },
     );
   }
 
-  String? get _statusMessage => widget.statusMessage ?? _streamFailure;
+  String? get _statusMessage =>
+      widget.statusMessage ?? _turnFailure ?? _topologyFailure;
 
   void _selectDestination(int index) {
     if (_destination != index) {
@@ -116,6 +148,7 @@ final class _BrainWorkspaceState extends State<_BrainWorkspace> {
   @override
   void dispose() {
     unawaited(_subscription?.cancel());
+    unawaited(_topologySubscription?.cancel());
     super.dispose();
   }
 
@@ -132,6 +165,7 @@ final class _BrainWorkspaceState extends State<_BrainWorkspace> {
       BrainScreen(
         chatName: widget.chatName,
         turns: projectedTurns,
+        topology: _topology,
         statusMessage: _statusMessage,
       ),
     ];

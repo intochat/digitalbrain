@@ -64,7 +64,12 @@ internal static class ChatEventFeed
                         delivery.Sequence,
                         FromUser: true,
                         messaged.Text,
-                        messaged.CommandId.ToString());
+                        messaged.CommandId.ToString(),
+                        nameof(UserMessaged),
+                        messaged.Chat.ToString(),
+                        delivery.Caller.ToString(),
+                        delivery.CorrelationId.ToString(),
+                        delivery.Timestamp);
                     break;
 
                 case AssistantResponded responded:
@@ -72,7 +77,12 @@ internal static class ChatEventFeed
                         delivery.Sequence,
                         FromUser: false,
                         responded.Text,
-                        responded.CommandId.ToString());
+                        responded.CommandId.ToString(),
+                        nameof(AssistantResponded),
+                        responded.Chat.ToString(),
+                        delivery.Caller.ToString(),
+                        delivery.CorrelationId.ToString(),
+                        delivery.Timestamp);
                     break;
             }
         }

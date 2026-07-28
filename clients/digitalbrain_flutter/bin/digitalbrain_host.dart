@@ -6,7 +6,8 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 Future<void> main(List<String> args) async {
   final shell = _arg(args, '--shell') ?? DigitalBrainHostEnv.resolveShell();
   final open = _arg(args, '--open');
-  final reconnectSeconds = int.tryParse(_arg(args, '--reconnect-seconds') ?? '') ?? 2;
+  final reconnectSeconds =
+      int.tryParse(_arg(args, '--reconnect-seconds') ?? '') ?? 2;
 
   final client = DigitalBrainUiEdgeClient.fromEnvironment();
   final surface = ShellSurfaceController();

@@ -8,11 +8,9 @@ import 'sse_chat_frames.dart';
 import 'sse_frames.dart';
 
 final class DigitalBrainUiEdgeClient {
-  DigitalBrainUiEdgeClient({
-    required this.baseUri,
-    http.Client? httpClient,
-  })  : _http = httpClient ?? http.Client(),
-        _ownsClient = httpClient == null;
+  DigitalBrainUiEdgeClient({required this.baseUri, http.Client? httpClient})
+    : _http = httpClient ?? http.Client(),
+      _ownsClient = httpClient == null;
 
   factory DigitalBrainUiEdgeClient.fromEnvironment({
     http.Client? httpClient,
@@ -145,6 +143,36 @@ final class DigitalBrainUiEdgeClient {
     }
     for (final event in parser.flush()) {
       yield event;
+    }
+  }
+
+  Future<BrainTopologySnapshot> readBrainTopology() async {
+    final uri = baseUri.replace(path: '/brain/topology');
+    final response = await _http.get(uri);
+    if (response.statusCode != 200) {
+      throw StateError(
+        'brain-topology failed: ${response.statusCode} ${response.body}',
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw const FormatException('brain-topology response is not an object');
+    }
+
+    return BrainTopologySnapshot.fromJson(Map<String, Object?>.from(decoded));
+  }
+
+  Stream<BrainTopologySnapshot> watchBrainTopology({
+    Duration pollInterval = const Duration(seconds: 2),
+  }) async* {
+    while (true) {
+      try {
+        yield await readBrainTopology();
+      } on Object catch (error, stackTrace) {
+        yield* Stream<BrainTopologySnapshot>.error(error, stackTrace);
+      }
+      await Future<void>.delayed(pollInterval);
     }
   }
 

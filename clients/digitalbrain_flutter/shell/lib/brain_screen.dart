@@ -2,23 +2,57 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
 import 'brain_theme.dart';
+import 'brain_topology_canvas.dart';
 
-final class BrainScreen extends StatelessWidget {
+final class BrainScreen extends StatefulWidget {
   const BrainScreen({
     super.key,
     required this.chatName,
     required this.turns,
+    this.topology,
     this.statusMessage,
   });
 
   final String chatName;
   final List<ChatTurnEvent> turns;
+  final BrainTopologySnapshot? topology;
   final String? statusMessage;
 
   @override
+  State<BrainScreen> createState() => _BrainScreenState();
+}
+
+final class _BrainScreenState extends State<BrainScreen> {
+  BrainTopologySelection? _selection;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.turns.isNotEmpty) {
+      _selection = BrainPulseSelection(widget.turns.last);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant BrainScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.turns.isNotEmpty &&
+        (oldWidget.turns.isEmpty ||
+            widget.turns.last.sequence != oldWidget.turns.last.sequence ||
+            widget.turns.last.correlationId !=
+                oldWidget.turns.last.correlationId)) {
+      setState(() => _selection = BrainPulseSelection(widget.turns.last));
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final connected = statusMessage == null || statusMessage!.isEmpty;
-    final lastSequence = turns.isEmpty ? '—' : '${turns.last.sequence}';
+    final connected =
+        widget.statusMessage == null || widget.statusMessage!.isEmpty;
+    final lastSequence = widget.turns.isEmpty
+        ? '—'
+        : '${widget.turns.last.sequence}';
+    final pulse = widget.turns.lastOrNull;
 
     return ColoredBox(
       key: const Key('brain_screen'),
@@ -26,14 +60,14 @@ final class BrainScreen extends StatelessWidget {
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 980),
+          constraints: const BoxConstraints(maxWidth: 1120),
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
             children: [
               const Text('Brain', style: BrainType.heading),
               const SizedBox(height: 8),
               const Text(
-                'What this DigitalBrain can do, and what remains under your control.',
+                'Live modules, owner-scoped neurons, and durable causal pulses.',
                 style: BrainType.bodyMuted,
               ),
               const SizedBox(height: 26),
@@ -48,9 +82,24 @@ final class BrainScreen extends StatelessWidget {
                         ? BrainPalette.success
                         : BrainPalette.signal,
                   ),
-                  _MetricCard(label: 'Conversation', value: chatName),
+                  _MetricCard(
+                    label: 'Modules',
+                    value: '${widget.topology?.modules.length ?? 0}',
+                  ),
+                  _MetricCard(
+                    label: 'Active neurons',
+                    value: '${widget.topology?.neurons.length ?? 0}',
+                  ),
                   _MetricCard(label: 'Last sequence', value: lastSequence),
                 ],
+              ),
+              const SizedBox(height: 24),
+              _TopologyPanel(
+                topology: widget.topology,
+                pulse: pulse,
+                selection: _selection,
+                onSelected: (selection) =>
+                    setState(() => _selection = selection),
               ),
               const SizedBox(height: 30),
               const _SectionLabel('CAPABILITIES'),
@@ -75,11 +124,245 @@ final class BrainScreen extends StatelessWidget {
               const _BoundaryCard(),
               if (!connected) ...[
                 const SizedBox(height: 20),
-                _ConnectionNotice(message: statusMessage!),
+                _ConnectionNotice(message: widget.statusMessage!),
               ],
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+final class _TopologyPanel extends StatelessWidget {
+  const _TopologyPanel({
+    required this.topology,
+    required this.pulse,
+    required this.selection,
+    required this.onSelected,
+  });
+
+  final BrainTopologySnapshot? topology;
+  final ChatTurnEvent? pulse;
+  final BrainTopologySelection? selection;
+  final ValueChanged<BrainTopologySelection> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final snapshot = topology;
+    if (snapshot == null) {
+      return Container(
+        height: 260,
+        decoration: _panelDecoration(),
+        child: const Center(
+          child: Text('Waiting for live topology…', style: BrainType.bodyMuted),
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 860;
+        final canvas = Container(
+          height: 430,
+          decoration: _panelDecoration(),
+          clipBehavior: Clip.antiAlias,
+          child: BrainTopologyCanvas(
+            topology: snapshot,
+            pulse: pulse,
+            onSelected: onSelected,
+          ),
+        );
+        final explorer = _TopologyExplorer(
+          topology: snapshot,
+          selection: selection,
+          onSelected: onSelected,
+        );
+
+        if (wide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 3, child: canvas),
+              const SizedBox(width: 14),
+              SizedBox(width: 320, child: explorer),
+            ],
+          );
+        }
+
+        return Column(children: [canvas, const SizedBox(height: 14), explorer]);
+      },
+    );
+  }
+}
+
+final class _TopologyExplorer extends StatelessWidget {
+  const _TopologyExplorer({
+    required this.topology,
+    required this.selection,
+    required this.onSelected,
+  });
+
+  final BrainTopologySnapshot topology;
+  final BrainTopologySelection? selection;
+  final ValueChanged<BrainTopologySelection> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('brain_inspector'),
+      constraints: const BoxConstraints(minHeight: 430),
+      padding: const EdgeInsets.all(18),
+      decoration: _panelDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('INSPECTOR', style: BrainType.meta),
+          const SizedBox(height: 14),
+          _SelectionDetails(selection: selection),
+          const SizedBox(height: 20),
+          const Text('MODULES', style: BrainType.meta),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [
+              for (var index = 0; index < topology.modules.length; index++)
+                ActionChip(
+                  key: Key('topology_module_$index'),
+                  label: Text(_moduleLabel(topology.modules[index].id)),
+                  onPressed: () =>
+                      onSelected(BrainModuleSelection(topology.modules[index])),
+                ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          const Text('ACTIVE NEURONS', style: BrainType.meta),
+          const SizedBox(height: 8),
+          for (var index = 0; index < topology.neurons.length; index++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: TextButton(
+                key: Key('topology_neuron_$index'),
+                onPressed: () =>
+                    onSelected(BrainNeuronSelection(topology.neurons[index])),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    topology.neurons[index].id,
+                    overflow: TextOverflow.ellipsis,
+                    style: BrainType.meta,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+final class _SelectionDetails extends StatelessWidget {
+  const _SelectionDetails({required this.selection});
+
+  final BrainTopologySelection? selection;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (selection) {
+      BrainPulseSelection(:final turn) => _PulseDetails(turn: turn),
+      BrainNeuronSelection(:final neuron) => _NeuronDetails(neuron: neuron),
+      BrainModuleSelection(:final module) => _ModuleDetails(module: module),
+      null => const Text(
+        'Select a module or neuron. New chat turns open their causal pulse automatically.',
+        style: BrainType.bodyMuted,
+      ),
+    };
+  }
+}
+
+final class _PulseDetails extends StatelessWidget {
+  const _PulseDetails({required this.turn});
+
+  final ChatTurnEvent turn;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const Key('brain_pulse_details'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(turn.synapse, style: BrainType.cardTitle),
+        const SizedBox(height: 10),
+        _InspectorField(label: 'neuron', value: turn.neuronId),
+        _InspectorField(label: 'caller', value: turn.caller),
+        _InspectorField(label: 'correlation', value: turn.correlationId),
+        _InspectorField(label: 'command', value: turn.commandId),
+        _InspectorField(label: 'sequence', value: '${turn.sequence}'),
+        _InspectorField(
+          label: 'timestamp',
+          value: turn.timestamp.toIso8601String(),
+        ),
+      ],
+    );
+  }
+}
+
+final class _NeuronDetails extends StatelessWidget {
+  const _NeuronDetails({required this.neuron});
+
+  final BrainNeuron neuron;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(neuron.grainType, style: BrainType.cardTitle),
+        const SizedBox(height: 10),
+        _InspectorField(label: 'id', value: neuron.id),
+        _InspectorField(label: 'identity', value: neuron.identity),
+        _InspectorField(label: 'silo', value: neuron.silo),
+      ],
+    );
+  }
+}
+
+final class _ModuleDetails extends StatelessWidget {
+  const _ModuleDetails({required this.module});
+
+  final BrainModule module;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(_moduleLabel(module.id), style: BrainType.cardTitle),
+        const SizedBox(height: 10),
+        _InspectorField(label: 'module id', value: module.id),
+      ],
+    );
+  }
+}
+
+final class _InspectorField extends StatelessWidget {
+  const _InspectorField({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: BrainType.meta),
+          const SizedBox(height: 2),
+          SelectableText(value, style: BrainType.metaStrong),
+        ],
       ),
     );
   }
@@ -101,11 +384,7 @@ final class _MetricCard extends StatelessWidget {
     return Container(
       width: 190,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: BrainPalette.surfaceRaised,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: BrainPalette.line),
-      ),
+      decoration: _panelDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -129,9 +408,7 @@ final class _SectionLabel extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) {
-    return Text(text, style: BrainType.meta);
-  }
+  Widget build(BuildContext context) => Text(text, style: BrainType.meta);
 }
 
 final class _CapabilityCard extends StatelessWidget {
@@ -151,11 +428,7 @@ final class _CapabilityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: BrainPalette.surfaceRaised,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: BrainPalette.line),
-      ),
+      decoration: _panelDecoration(),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -219,11 +492,7 @@ final class _BoundaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: BrainPalette.surfaceSunken,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: BrainPalette.line),
-      ),
+      decoration: _panelDecoration(color: BrainPalette.surfaceSunken),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -276,4 +545,18 @@ final class _ConnectionNotice extends StatelessWidget {
       child: Text(message, style: BrainType.bodyMuted),
     );
   }
+}
+
+BoxDecoration _panelDecoration({Color color = BrainPalette.surfaceRaised}) =>
+    BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: BrainPalette.line),
+    );
+
+String _moduleLabel(String id) {
+  final type = id.split('.').last;
+  return type.endsWith('Module')
+      ? type.substring(0, type.length - 'Module'.length)
+      : type;
 }

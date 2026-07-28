@@ -8,6 +8,7 @@ internal static class UIHost
 
         app.MapUI();
         app.MapChat();
+        app.MapBrain();
         return app;
     }
 }
