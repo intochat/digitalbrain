@@ -243,8 +243,8 @@ public sealed class StreamedTurnIsolation(ModuleFixture fixture)
         Assert.Contains(received, fact => fact.Synapse.Method == nameof(IStreamedTurnTarget.StreamOnce));
     }
 
-    [Fact(DisplayName = "a streamed capability whose commit fails leaves no fact a concurrent rollback can resurrect")]
-    public async Task FailedStreamedCommitLeavesNothingForARollbackToResurrect()
+    [Fact(DisplayName = "a failed streamed commit leaves no fact for a failing delivered turn's rollback to resurrect")]
+    public async Task FailedStreamedCommitLeavesNothingForADeliveredRollbackToResurrect()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
@@ -252,9 +252,9 @@ public sealed class StreamedTurnIsolation(ModuleFixture fixture)
         var caller = test.Neuron<IStreamedTurnCaller>(CallerName);
         var streamingCaller = test.Neuron<IStreamedTurnCaller>(StreamingCallerName);
 
-        StreamedTurnTarget.ArmFailures(0);
+        StreamedTurnTarget.ArmFailures(1);
 
-        var rollback = caller.Reference.ProvokeStagedRollback(TargetName, WitnessName);
+        await caller.Reference.TriggerFailingDelivery(TargetName, WitnessName);
         await StreamedTurnTarget.TurnEntered.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
 
         await using (target.FailNextJournalCommit("the streamed capability commit fails"))
@@ -264,7 +264,8 @@ public sealed class StreamedTurnIsolation(ModuleFixture fixture)
         }
 
         StreamedTurnTarget.ReleaseTurn();
-        Assert.True(await rollback);
+
+        await target.Incoming.NextAsync<FailingTurnTrigger>(cancellationToken);
 
         var received = await target.Incoming.ReadAsync<CapabilityRequested>(afterSequence: 0, cancellationToken: cancellationToken);
 
