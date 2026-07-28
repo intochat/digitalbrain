@@ -103,7 +103,11 @@ public static class AIHostingExtensions
             var builder = brain.GetApplicationBuilder();
             _ollama ??= builder
                 .AddOllama($"{brain.Name}-ai-ollama")
-                .WithDataVolume();
+                .WithGPUSupport()
+                .WithDataVolume()
+                .WithLifetime(ContainerLifetime.Persistent)
+                .WithOpenWebUI(uiContianer=>uiContianer.WithLifetime(ContainerLifetime.Persistent));
+
             _llama32 = _ollama.AddModel($"{brain.Name}-ai-llama32", "llama3.2");
         }
 
