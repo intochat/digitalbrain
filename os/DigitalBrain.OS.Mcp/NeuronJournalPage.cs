@@ -21,3 +21,11 @@ internal sealed record ChatTranscriptPage(
     IReadOnlyList<ChatTranscriptTurn> Turns);
 
 internal sealed record ChatTranscriptTurn(string Speaker, string Text);
+
+internal sealed record ChatMessageResult(
+    string Chat,
+    string CommandId,
+    string CorrelationId,
+    string Response,
+    long Sequence,
+    DateTimeOffset Timestamp);

@@ -7,5 +7,6 @@ namespace DigitalBrain.AI;
 public partial interface IAgent : INeuron
 {
     [Alias(nameof(Respond))]
+    [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
     Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages);
 }

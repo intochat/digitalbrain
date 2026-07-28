@@ -3,8 +3,7 @@ namespace DigitalBrain.OS.Mcp;
 internal static class McpHost
 {
     public const string EndpointPath = "/mcp";
-    public const string AskLlama32ToolName = "ask_llama32";
-    public const string DefaultLlama32Key = "default";
+    public const string SendChatMessageToolName = "send_chat_message";
     public const string ListActiveNeuronsToolName = "list_active_neurons";
     public const string ReadNeuronJournalToolName = "read_neuron_journal";
     public const string ReadChatTranscriptToolName = "read_chat_transcript";

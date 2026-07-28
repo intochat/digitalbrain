@@ -28,6 +28,7 @@ brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 var silo = builder.AddProject<Projects.DigitalBrain_OS_Host>(ProductSurfaceResources.Silo)
     .WithReference(brain);
 
+#pragma warning disable ASPIREMCP001
 builder.AddProject<Projects.DigitalBrain_OS_Mcp>(ProductSurfaceResources.Mcp)
     .WithReference(brain.AsClient())
     .WaitFor(silo)
@@ -37,6 +38,10 @@ builder.AddProject<Projects.DigitalBrain_OS_Mcp>(ProductSurfaceResources.Mcp)
     .WithHttpEndpoint(
         port: ProductSurfaceResources.McpHttpPort,
         name: ProductSurfaceResources.McpHttpEndpointName,
-        isProxied: false);
+        isProxied: false)
+    .WithMcpServer(
+        ProductSurfaceResources.McpPath,
+        ProductSurfaceResources.McpHttpEndpointName);
+#pragma warning restore ASPIREMCP001
 
 builder.Build().Run();
