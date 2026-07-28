@@ -174,7 +174,7 @@ data: {"sequence":3,"sceneKey":"home","title":"Home refreshed","commandId":"c","
                     'id': 'chat:owner/main',
                     'grainType': 'chat',
                     'identity': 'owner/main',
-                    'silo': 'silo-1',
+                    'placement': 'cluster-1',
                   },
               ],
               'observedAt': '2026-07-28T08:00:00Z',
@@ -231,4 +231,58 @@ data: {"sequence":3,"sceneKey":"home","title":"Home refreshed","commandId":"c","
       expect(snapshot.modules.single.id, 'DigitalBrain.Chat.ChatModule');
     },
   );
+
+  test('watchBrainTopology aborts a hung request and keeps polling', () async {
+    final httpClient = _AbortThenSucceedClient();
+    final client = DigitalBrainUiEdgeClient(
+      baseUri: Uri.parse('http://ui.example:5080'),
+      httpClient: httpClient,
+    );
+    final errors = <Object>[];
+
+    final snapshot = await client
+        .watchBrainTopology(
+          pollInterval: Duration.zero,
+          requestTimeout: const Duration(milliseconds: 1),
+        )
+        .handleError(errors.add)
+        .first;
+
+    expect(httpClient.requests, 2);
+    expect(httpClient.sawAbortableRequest, isTrue);
+    expect(errors.single, isA<http.RequestAbortedException>());
+    expect(snapshot.modules.single.id, 'DigitalBrain.Chat.ChatModule');
+  });
+}
+
+final class _AbortThenSucceedClient extends http.BaseClient {
+  int requests = 0;
+  bool sawAbortableRequest = false;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    requests++;
+    if (requests == 1) {
+      sawAbortableRequest = request is http.AbortableRequest;
+      final abortable = request as http.AbortableRequest;
+      await abortable.abortTrigger;
+      throw http.RequestAbortedException(request.url);
+    }
+
+    return http.StreamedResponse(
+      Stream.value(
+        utf8.encode(
+          jsonEncode({
+            'modules': [
+              {'id': 'DigitalBrain.Chat.ChatModule'},
+            ],
+            'neurons': const [],
+            'observedAt': '2026-07-28T08:00:00Z',
+          }),
+        ),
+      ),
+      200,
+      headers: {'content-type': 'application/json'},
+    );
+  }
 }

@@ -68,7 +68,7 @@ void main() {
           'id': 'chat:owner/main',
           'grainType': 'chat',
           'identity': 'owner/main',
-          'silo': 'silo-1',
+          'placement': 'cluster-1',
         },
       ],
       'observedAt': '2026-07-28T08:00:00Z',
@@ -77,6 +77,7 @@ void main() {
     expect(topology.modules.single.id, 'DigitalBrain.Chat.ChatModule');
     expect(topology.neurons.single.id, 'chat:owner/main');
     expect(topology.neurons.single.grainType, 'chat');
+    expect(topology.neurons.single.placement, 'cluster-1');
     expect(topology.observedAt, DateTime.utc(2026, 7, 28, 8));
   });
 }

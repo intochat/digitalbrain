@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:digitalbrain_wire/digitalbrain_wire.dart';
@@ -146,9 +147,27 @@ final class DigitalBrainUiEdgeClient {
     }
   }
 
-  Future<BrainTopologySnapshot> readBrainTopology() async {
+  Future<BrainTopologySnapshot> readBrainTopology({
+    Duration requestTimeout = const Duration(seconds: 5),
+  }) async {
     final uri = baseUri.replace(path: '/brain/topology');
-    final response = await _http.get(uri);
+    final abort = Completer<void>();
+    final operation = () async {
+      final request = http.AbortableRequest(
+        'GET',
+        uri,
+        abortTrigger: abort.future,
+      );
+      final streamed = await _http.send(request);
+      return http.Response.fromStream(streamed);
+    }();
+    final response = await operation.timeout(
+      requestTimeout,
+      onTimeout: () {
+        abort.complete();
+        throw http.RequestAbortedException(uri);
+      },
+    );
     if (response.statusCode != 200) {
       throw StateError(
         'brain-topology failed: ${response.statusCode} ${response.body}',
@@ -165,10 +184,11 @@ final class DigitalBrainUiEdgeClient {
 
   Stream<BrainTopologySnapshot> watchBrainTopology({
     Duration pollInterval = const Duration(seconds: 2),
+    Duration requestTimeout = const Duration(seconds: 5),
   }) async* {
     while (true) {
       try {
-        yield await readBrainTopology();
+        yield await readBrainTopology(requestTimeout: requestTimeout);
       } on Object catch (error, stackTrace) {
         yield* Stream<BrainTopologySnapshot>.error(error, stackTrace);
       }

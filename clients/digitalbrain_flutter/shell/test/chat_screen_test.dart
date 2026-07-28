@@ -5,14 +5,19 @@ import 'package:digitalbrain_flutter_shell/chat_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-ChatTurnEvent _turn(int sequence, bool fromUser, String text) => ChatTurnEvent(
+ChatTurnEvent _turn(
+  int sequence,
+  bool fromUser,
+  String text, {
+  String? synapse,
+}) => ChatTurnEvent(
   sequence: sequence,
   fromUser: fromUser,
   text: text,
   commandId: 'c$sequence',
-  synapse: fromUser ? 'UserMessaged' : 'AssistantResponded',
+  synapse: synapse ?? (fromUser ? 'UserMessaged' : 'AssistantResponded'),
   neuronId: 'chat:owner/main',
-  caller: 'session:owner/session',
+  caller: 'chat:owner/main',
   correlationId: 'correlation-$sequence',
   timestamp: DateTime.utc(2026, 7, 28, 8, 0, sequence),
 );
@@ -21,13 +26,17 @@ BrainTopologySnapshot _topology() => BrainTopologySnapshot(
   modules: const [
     BrainModule(id: 'DigitalBrain.Chat.ChatModule'),
     BrainModule(id: 'DigitalBrain.AI.AIModule'),
+    BrainModule(id: 'DigitalBrain.Flutter.FlutterModule'),
+    BrainModule(id: 'DigitalBrain.Google.GoogleModule'),
+    BrainModule(id: 'DigitalBrain.OS.OSBehaviorsModule'),
+    BrainModule(id: 'DigitalBrain.Salesforce.SalesforceModule'),
   ],
   neurons: const [
     BrainNeuron(
       id: 'chat:owner/main',
       grainType: 'chat',
       identity: 'owner/main',
-      silo: 'silo-1',
+      placement: 'cluster-1',
     ),
   ],
   observedAt: DateTime.utc(2026, 7, 28, 8),
@@ -43,7 +52,13 @@ void main() {
   testWidgets('the workspace exposes Chat, Activity, and Brain destinations', (
     tester,
   ) async {
-    await tester.pumpWidget(const BrainChatApp(chatName: 'main'));
+    final topology = StreamController<BrainTopologySnapshot>();
+    addTearDown(topology.close);
+
+    await tester.pumpWidget(
+      BrainChatApp(chatName: 'main', topology: topology.stream),
+    );
+    topology.add(_topology());
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('destination_chat')), findsOneWidget);
@@ -64,11 +79,43 @@ void main() {
       scrollable: find.byType(Scrollable),
     );
     expect(find.text('General assistant'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Gmail message → Salesforce Account description'),
+      300,
+      scrollable: find.byType(Scrollable),
+    );
     expect(
       find.text('Gmail message → Salesforce Account description'),
       findsOneWidget,
     );
     expect(find.text('Approval required'), findsOneWidget);
+  });
+
+  testWidgets('Brain claims only capabilities declared by live modules', (
+    tester,
+  ) async {
+    final topology = StreamController<BrainTopologySnapshot>();
+    addTearDown(topology.close);
+    final flutterOnly = BrainTopologySnapshot(
+      modules: const [BrainModule(id: 'DigitalBrain.Flutter.FlutterModule')],
+      neurons: const [],
+      observedAt: DateTime.utc(2026, 7, 28, 8),
+    );
+
+    await tester.pumpWidget(
+      BrainChatApp(chatName: 'main', topology: topology.stream),
+    );
+    topology.add(flutterOnly);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('destination_brain')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('General assistant'), findsNothing);
+    expect(
+      find.text('Gmail message → Salesforce Account description'),
+      findsNothing,
+    );
+    expect(find.text('Approval required'), findsNothing);
   });
 
   testWidgets('activity shows journal facts without message content', (
@@ -90,6 +137,27 @@ void main() {
     expect(find.text('sequence 001'), findsOneWidget);
     expect(find.text('command c1'), findsOneWidget);
     expect(find.text('private customer message'), findsNothing);
+  });
+
+  testWidgets('activity renders the authoritative synapse name', (
+    tester,
+  ) async {
+    final turns = StreamController<ChatTurnEvent>();
+    addTearDown(turns.close);
+
+    await tester.pumpWidget(
+      BrainChatApp(chatName: 'main', turns: turns.stream, onSend: (_) async {}),
+    );
+    turns.add(
+      _turn(2, true, 'private payload', synapse: 'ObservedCustomSynapse'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('destination_activity')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('ObservedCustomSynapse'), findsOneWidget);
+    expect(find.text('UserMessaged'), findsNothing);
+    expect(find.text('private payload'), findsNothing);
   });
 
   testWidgets('the shared event projection survives destination changes', (
@@ -157,17 +225,26 @@ void main() {
     await tester.pumpWidget(
       BrainChatApp(chatName: 'main', topology: topology.stream),
     );
-    topology.addError(StateError('topology temporarily unavailable'));
+    topology.add(_topology());
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('destination_brain')));
     await tester.pumpAndSettle();
 
+    expect(find.text('Connected'), findsOneWidget);
+    expect(find.byKey(const Key('brain_topology_canvas')), findsOneWidget);
+
+    topology.addError(StateError('topology temporarily unavailable'));
+    await tester.pumpAndSettle();
+
     expect(find.text('Offline'), findsOneWidget);
+    expect(find.byKey(const Key('brain_topology_canvas')), findsNothing);
+    expect(find.text('Waiting for live topology…'), findsOneWidget);
 
     topology.add(_topology());
     await tester.pumpAndSettle();
 
     expect(find.text('Connected'), findsOneWidget);
+    expect(find.byKey(const Key('brain_topology_canvas')), findsOneWidget);
   });
 
   testWidgets('a chat turn pulses Brain and opens correlation inspector', (
@@ -192,6 +269,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('brain_pulse')), findsOneWidget);
+    expect(find.byKey(const Key('brain_local_pulse')), findsOneWidget);
+    expect(find.byKey(const Key('brain_edge_pulse')), findsNothing);
     expect(find.byKey(const Key('brain_inspector')), findsOneWidget);
     expect(find.text('correlation-9'), findsOneWidget);
     expect(find.text('chat:owner/main'), findsWidgets);
@@ -226,6 +305,75 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('brain_pulse')), findsOneWidget);
+  });
+
+  testWidgets('Brain clears a neuron selection when the neuron disappears', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final topology = StreamController<BrainTopologySnapshot>();
+    addTearDown(topology.close);
+
+    await tester.pumpWidget(
+      BrainChatApp(chatName: 'main', topology: topology.stream),
+    );
+    topology.add(_topology());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('destination_brain')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('topology_neuron_0')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('cluster-1'), findsOneWidget);
+
+    topology.add(_topologyWithoutNeuron());
+    await tester.pumpAndSettle();
+
+    expect(find.text('cluster-1'), findsNothing);
+    expect(
+      find.text(
+        'Select a module or neuron. New chat turns open their causal pulse automatically.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Brain clears causal selection when the chat changes', (
+    tester,
+  ) async {
+    final topology = StreamController<BrainTopologySnapshot>.broadcast();
+    final turns = StreamController<ChatTurnEvent>.broadcast();
+    addTearDown(topology.close);
+    addTearDown(turns.close);
+
+    await tester.pumpWidget(
+      BrainChatApp(
+        chatName: 'main',
+        topology: topology.stream,
+        turns: turns.stream,
+      ),
+    );
+    topology.add(_topology());
+    turns.add(_turn(14, false, 'private turn'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('destination_brain')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('correlation-14'), findsOneWidget);
+
+    await tester.pumpWidget(
+      BrainChatApp(
+        chatName: 'other',
+        topology: topology.stream,
+        turns: turns.stream,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('correlation-14'), findsNothing);
   });
 
   testWidgets('an empty conversation invites the owner to act', (tester) async {

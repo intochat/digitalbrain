@@ -91,7 +91,6 @@ final class _ActivityEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = turn.fromUser ? BrainPalette.owner : BrainPalette.signal;
-    final event = turn.fromUser ? 'UserMessaged' : 'AssistantResponded';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -123,7 +122,10 @@ final class _ActivityEntry extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(event, style: BrainType.metaStrong.copyWith(color: color)),
+                Text(
+                  turn.synapse,
+                  style: BrainType.metaStrong.copyWith(color: color),
+                ),
                 const SizedBox(height: 6),
                 Wrap(
                   spacing: 18,

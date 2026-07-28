@@ -106,20 +106,20 @@ final class BrainNeuron {
     required this.id,
     required this.grainType,
     required this.identity,
-    required this.silo,
+    required this.placement,
   });
 
   final String id;
   final String grainType;
   final String identity;
-  final String silo;
+  final String placement;
 
   factory BrainNeuron.fromJson(Map<String, Object?> json) {
     return BrainNeuron(
       id: json['id'] as String,
       grainType: json['grainType'] as String,
       identity: json['identity'] as String,
-      silo: json['silo'] as String,
+      placement: json['placement'] as String,
     );
   }
 }

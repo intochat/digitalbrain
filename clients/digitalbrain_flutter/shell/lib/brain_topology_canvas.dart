@@ -95,6 +95,12 @@ final class _BrainTopologyCanvasState extends State<BrainTopologyCanvas>
   Widget build(BuildContext context) {
     final disableAnimations = MediaQuery.disableAnimationsOf(context);
     final hasPulseTarget = _hasPulseTarget(widget.topology, widget.pulse);
+    final localPulse =
+        hasPulseTarget && widget.pulse!.caller == widget.pulse!.neuronId;
+    final edgePulse =
+        hasPulseTarget &&
+        !localPulse &&
+        _hasNode(widget.topology, widget.pulse!.caller);
 
     return Semantics(
       key: const Key('brain_topology_canvas'),
@@ -136,6 +142,10 @@ final class _BrainTopologyCanvasState extends State<BrainTopologyCanvas>
                     ),
                     if (hasPulseTarget)
                       const IgnorePointer(key: Key('brain_pulse')),
+                    if (localPulse)
+                      const IgnorePointer(key: Key('brain_local_pulse')),
+                    if (edgePulse)
+                      const IgnorePointer(key: Key('brain_edge_pulse')),
                   ],
                 ),
               );
@@ -150,6 +160,10 @@ final class _BrainTopologyCanvasState extends State<BrainTopologyCanvas>
 bool _hasPulseTarget(BrainTopologySnapshot topology, ChatTurnEvent? pulse) =>
     pulse != null &&
     topology.neurons.any((neuron) => neuron.id == pulse.neuronId);
+
+bool _hasNode(BrainTopologySnapshot topology, String id) =>
+    topology.neurons.any((neuron) => neuron.id == id) ||
+    topology.modules.any((module) => module.id == id);
 
 final class _GraphNode {
   const _GraphNode({
@@ -236,7 +250,7 @@ Iterable<_GraphNode> _placeModules(List<BrainModule> modules) sync* {
     final module = modules[index];
     yield _GraphNode(
       id: module.id,
-      label: _moduleLabel(module.id),
+      label: brainModuleLabel(module),
       module: true,
       selection: BrainModuleSelection(module),
       x: position.x,
@@ -290,8 +304,8 @@ _ProjectedNode? _hitTest(List<_ProjectedNode> nodes, Offset position) {
   return null;
 }
 
-String _moduleLabel(String id) {
-  final type = id.split('.').last;
+String brainModuleLabel(BrainModule module) {
+  final type = module.id.split('.').last;
   return type.endsWith('Module')
       ? type.substring(0, type.length - 'Module'.length)
       : type;
@@ -341,24 +355,23 @@ final class _TopologyPainter extends CustomPainter {
         : nodes.where((node) => node.node.id == pulse!.caller).firstOrNull;
     if (pulseTarget != null) {
       final wave = math.sin(pulseValue * math.pi).abs();
-      final path = Path()
-        ..moveTo(
-          (pulseSource?.center ?? center).dx,
-          (pulseSource?.center ?? center).dy,
-        )
-        ..quadraticBezierTo(
-          center.dx,
-          center.dy - radius * 0.45,
-          pulseTarget.center.dx,
-          pulseTarget.center.dy,
+      if (pulseSource != null && pulseSource.node.id != pulseTarget.node.id) {
+        final path = Path()
+          ..moveTo(pulseSource.center.dx, pulseSource.center.dy)
+          ..quadraticBezierTo(
+            center.dx,
+            center.dy - radius * 0.45,
+            pulseTarget.center.dx,
+            pulseTarget.center.dy,
+          );
+        canvas.drawPath(
+          path,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.4
+            ..color = BrainPalette.signal.withValues(alpha: 0.25 + wave * 0.7),
         );
-      canvas.drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4
-          ..color = BrainPalette.signal.withValues(alpha: 0.25 + wave * 0.7),
-      );
+      }
       canvas.drawCircle(
         pulseTarget.center,
         pulseTarget.radius + 8 + wave * 16,

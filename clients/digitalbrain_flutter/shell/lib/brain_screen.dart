@@ -23,6 +23,12 @@ final class BrainScreen extends StatefulWidget {
 }
 
 final class _BrainScreenState extends State<BrainScreen> {
+  static const _aiModule = 'DigitalBrain.AI.AIModule';
+  static const _chatModule = 'DigitalBrain.Chat.ChatModule';
+  static const _googleModule = 'DigitalBrain.Google.GoogleModule';
+  static const _osModule = 'DigitalBrain.OS.OSBehaviorsModule';
+  static const _salesforceModule = 'DigitalBrain.Salesforce.SalesforceModule';
+
   BrainTopologySelection? _selection;
 
   @override
@@ -36,13 +42,91 @@ final class _BrainScreenState extends State<BrainScreen> {
   @override
   void didUpdateWidget(covariant BrainScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.chatName != oldWidget.chatName) {
+      _selection = null;
+      return;
+    }
+
     if (widget.turns.isNotEmpty &&
         (oldWidget.turns.isEmpty ||
             widget.turns.last.sequence != oldWidget.turns.last.sequence ||
             widget.turns.last.correlationId !=
                 oldWidget.turns.last.correlationId)) {
-      setState(() => _selection = BrainPulseSelection(widget.turns.last));
+      _selection = BrainPulseSelection(widget.turns.last);
+      return;
     }
+
+    final topology = widget.topology;
+    _selection = switch (_selection) {
+      BrainPulseSelection(:final turn)
+          when !widget.turns.any(
+            (candidate) =>
+                candidate.sequence == turn.sequence &&
+                candidate.correlationId == turn.correlationId,
+          ) =>
+        null,
+      BrainNeuronSelection(:final neuron)
+          when topology == null ||
+              !topology.neurons.any((candidate) => candidate.id == neuron.id) =>
+        null,
+      BrainModuleSelection(:final module)
+          when topology == null ||
+              !topology.modules.any((candidate) => candidate.id == module.id) =>
+        null,
+      final selection => selection,
+    };
+  }
+
+  ({bool generalAssistant, bool accountEnrichment}) _capabilities() {
+    final modules = widget.topology?.modules.map((module) => module.id).toSet();
+    final generalAssistant =
+        modules?.contains(_aiModule) == true &&
+        modules?.contains(_chatModule) == true;
+    final accountEnrichment =
+        generalAssistant &&
+        modules?.contains(_googleModule) == true &&
+        modules?.contains(_osModule) == true &&
+        modules?.contains(_salesforceModule) == true;
+    return (
+      generalAssistant: generalAssistant,
+      accountEnrichment: accountEnrichment,
+    );
+  }
+
+  List<Widget> _capabilityPanels() {
+    final capabilities = _capabilities();
+    if (!capabilities.generalAssistant && !capabilities.accountEnrichment) {
+      return const [];
+    }
+
+    return [
+      const SizedBox(height: 30),
+      const _SectionLabel('CAPABILITIES'),
+      const SizedBox(height: 12),
+      if (capabilities.generalAssistant)
+        const _CapabilityCard(
+          icon: Icons.chat_bubble_outline_rounded,
+          title: 'General assistant',
+          body:
+              'Conversation, explanation, drafting, and reasoning in the current chat.',
+        ),
+      if (capabilities.generalAssistant && capabilities.accountEnrichment)
+        const SizedBox(height: 12),
+      if (capabilities.accountEnrichment)
+        const _CapabilityCard(
+          icon: Icons.compare_arrows_rounded,
+          title: 'Gmail message → Salesforce Account description',
+          body:
+              'Creates a reviewable enrichment proposal from an exact Gmail message ID and a Salesforce Account ID.',
+          badge: 'Approval required',
+        ),
+      if (capabilities.accountEnrichment) ...[
+        const SizedBox(height: 30),
+        const _SectionLabel('BOUNDARIES'),
+        const SizedBox(height: 12),
+        const _BoundaryCard(),
+      ],
+    ];
   }
 
   @override
@@ -101,27 +185,7 @@ final class _BrainScreenState extends State<BrainScreen> {
                 onSelected: (selection) =>
                     setState(() => _selection = selection),
               ),
-              const SizedBox(height: 30),
-              const _SectionLabel('CAPABILITIES'),
-              const SizedBox(height: 12),
-              const _CapabilityCard(
-                icon: Icons.chat_bubble_outline_rounded,
-                title: 'General assistant',
-                body:
-                    'Conversation, explanation, drafting, and reasoning in the current chat.',
-              ),
-              const SizedBox(height: 12),
-              const _CapabilityCard(
-                icon: Icons.compare_arrows_rounded,
-                title: 'Gmail message → Salesforce Account description',
-                body:
-                    'Creates a reviewable enrichment proposal from an exact Gmail message ID and a Salesforce Account ID.',
-                badge: 'Approval required',
-              ),
-              const SizedBox(height: 30),
-              const _SectionLabel('BOUNDARIES'),
-              const SizedBox(height: 12),
-              const _BoundaryCard(),
+              ..._capabilityPanels(),
               if (!connected) ...[
                 const SizedBox(height: 20),
                 _ConnectionNotice(message: widget.statusMessage!),
@@ -230,7 +294,7 @@ final class _TopologyExplorer extends StatelessWidget {
               for (var index = 0; index < topology.modules.length; index++)
                 ActionChip(
                   key: Key('topology_module_$index'),
-                  label: Text(_moduleLabel(topology.modules[index].id)),
+                  label: Text(brainModuleLabel(topology.modules[index])),
                   onPressed: () =>
                       onSelected(BrainModuleSelection(topology.modules[index])),
                 ),
@@ -322,7 +386,7 @@ final class _NeuronDetails extends StatelessWidget {
         const SizedBox(height: 10),
         _InspectorField(label: 'id', value: neuron.id),
         _InspectorField(label: 'identity', value: neuron.identity),
-        _InspectorField(label: 'silo', value: neuron.silo),
+        _InspectorField(label: 'placement', value: neuron.placement),
       ],
     );
   }
@@ -338,7 +402,7 @@ final class _ModuleDetails extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(_moduleLabel(module.id), style: BrainType.cardTitle),
+        Text(brainModuleLabel(module), style: BrainType.cardTitle),
         const SizedBox(height: 10),
         _InspectorField(label: 'module id', value: module.id),
       ],
@@ -553,10 +617,3 @@ BoxDecoration _panelDecoration({Color color = BrainPalette.surfaceRaised}) =>
       borderRadius: BorderRadius.circular(14),
       border: Border.all(color: BrainPalette.line),
     );
-
-String _moduleLabel(String id) {
-  final type = id.split('.').last;
-  return type.endsWith('Module')
-      ? type.substring(0, type.length - 'Module'.length)
-      : type;
-}

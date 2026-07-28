@@ -27,10 +27,18 @@ internal sealed class BrainTopologyReader(
         cancellationToken.ThrowIfCancellationRequested();
 
         var ownerPrefix = $"{brain.Owner.Value}/";
-        var neurons = statistics
+        var ownerStatistics = statistics
             .Where(statistic => statistic.GrainId.Key.ToString()!
                 .StartsWith(ownerPrefix, StringComparison.Ordinal))
-            .Select(static statistic =>
+            .ToArray();
+        var placements = ownerStatistics
+            .Select(static statistic => statistic.SiloAddress)
+            .Distinct()
+            .OrderBy(static address => address.ToString(), StringComparer.Ordinal)
+            .Select(static (address, index) => (Address: address, Label: $"cluster-{index + 1}"))
+            .ToDictionary(static placement => placement.Address, static placement => placement.Label);
+        var neurons = ownerStatistics
+            .Select(statistic =>
             {
                 var type = statistic.GrainId.Type.ToString()!;
                 var key = statistic.GrainId.Key.ToString()!;
@@ -38,7 +46,7 @@ internal sealed class BrainTopologyReader(
                     $"{type}:{key}",
                     type,
                     key,
-                    statistic.SiloAddress.ToString());
+                    placements[statistic.SiloAddress]);
             })
             .OrderBy(static neuron => neuron.GrainType, StringComparer.Ordinal)
             .ThenBy(static neuron => neuron.Identity, StringComparer.Ordinal)

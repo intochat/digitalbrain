@@ -11,4 +11,4 @@ internal sealed record BrainNeuron(
     string Id,
     string GrainType,
     string Identity,
-    string Silo);
+    string Placement);

@@ -159,6 +159,9 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         Assert.Contains(
             topology.Neurons,
             neuron => neuron.Id == shell.Id.ToString());
+        Assert.All(
+            topology.Neurons,
+            neuron => Assert.StartsWith("cluster-", neuron.Placement, StringComparison.Ordinal));
     }
 
     [Fact(DisplayName =
@@ -185,7 +188,7 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         Assert.True(projected.Sequence > 0);
         Assert.Equal(nameof(UserMessaged), projected.Synapse);
         Assert.Equal(chat.Id.ToString(), projected.NeuronId);
-        Assert.False(string.IsNullOrWhiteSpace(projected.Caller));
+        Assert.Equal(chat.Id.ToString(), projected.Caller);
         Assert.Equal(command.CommandId.ToString(), projected.CommandId);
         Assert.True(Guid.TryParse(projected.CorrelationId, out var correlation));
         Assert.NotEqual(Guid.Empty, correlation);

@@ -110,7 +110,10 @@ final class _BrainWorkspaceState extends State<_BrainWorkspace> {
       },
       onError: (Object error) {
         if (mounted) {
-          setState(() => _topologyFailure = '$error');
+          setState(() {
+            _topology = null;
+            _topologyFailure = '$error';
+          });
         }
       },
     );
