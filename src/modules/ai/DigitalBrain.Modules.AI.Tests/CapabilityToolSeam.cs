@@ -21,8 +21,7 @@ public sealed class CapabilityToolSeam(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         test.Chat().Reply(FinalReply);
 
-        await test.Client.Get<IToolAgentProbe>(AgentName).Respond(
-            [new(Microsoft.Extensions.AI.ChatRole.User, IdentityPrompt)]);
+        await test.Client.Get<IToolAgentProbe>(AgentName).Respond([new(Microsoft.Extensions.AI.ChatRole.User, IdentityPrompt)]);
 
         Assert.Collection(
             test.Chat().LastMessages,
@@ -95,12 +94,9 @@ public sealed class CapabilityToolSeam(ModuleFixture fixture)
         var agent = test.Neuron<IToolAgentProbe>(AgentName);
         test.Chat().Reply(FinalReply);
 
-        await test.Client.Get<IToolAgentProbe>(AgentName).Respond(
-            [new(Microsoft.Extensions.AI.ChatRole.User, "hello")]);
+        await test.Client.Get<IToolAgentProbe>(AgentName).Respond([new(Microsoft.Extensions.AI.ChatRole.User, "hello")]);
 
-        var selected = await agent.Outgoing.ReadAsync<CapabilityToolSelected>(
-            afterSequence: 0,
-            cancellationToken);
+        var selected = await agent.Outgoing.ReadAsync<CapabilityToolSelected>(afterSequence: 0, cancellationToken);
         Assert.Empty(selected);
     }
 }

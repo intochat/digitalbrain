@@ -15,15 +15,12 @@ public static class AIHostingExtensions
     public const string Granite41Feature = "ai.llm.granite41";
     public const string Gpt56Feature = "ai.llm.gpt56";
 
-    public static DigitalBrainModuleBuilder<AIModule> WithLlm<TModel>(
-        this DigitalBrainModuleBuilder<AIModule> module)
+    public static DigitalBrainModuleBuilder<AIModule> WithLlm<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
         where TModel : class, ILLM
     {
         ArgumentNullException.ThrowIfNull(module);
 
-        var state = module.Brain.GetOrAddState(
-            static brain => new AIHostingState(brain),
-            out var added);
+        var state = module.Brain.GetOrAddState(static brain => new AIHostingState(brain), out var added);
         if (added)
         {
             module.RequireStateProtection();
@@ -87,30 +84,17 @@ public static class AIHostingExtensions
             foreach (var (model, resource) in _ollamaModels)
             {
                 builder
-                    .WithAnnotation(new WaitAnnotation(
-                        resource.Resource,
-                        WaitType.WaitUntilHealthy,
-                        exitCode: 0))
-                    .WithEnvironment(
-                        "DigitalBrain__AI__Ollama__Endpoint",
-                        resource.Resource.Parent.UriExpression)
-                    .WithEnvironment(
-                        $"DigitalBrain__AI__Ollama__{model.Name}__Model",
-                        resource.Resource.ModelName);
+                    .WithAnnotation(new WaitAnnotation(resource.Resource, WaitType.WaitUntilHealthy, exitCode: 0))
+                    .WithEnvironment("DigitalBrain__AI__Ollama__Endpoint", resource.Resource.Parent.UriExpression)
+                    .WithEnvironment($"DigitalBrain__AI__Ollama__{model.Name}__Model", resource.Resource.ModelName);
             }
 
             if (_gpt56 is not null)
             {
                 builder
-                    .WithEnvironment(
-                        "DigitalBrain__AI__OpenAI__ApiKey",
-                        _openAIKey!)
-                    .WithEnvironment(
-                        "DigitalBrain__AI__OpenAI__Endpoint",
-                        _gpt56.Resource.Parent.UriExpression)
-                    .WithEnvironment(
-                        "DigitalBrain__AI__OpenAI__Gpt56__Model",
-                        _gpt56.Resource.Model);
+                    .WithEnvironment("DigitalBrain__AI__OpenAI__ApiKey", _openAIKey!)
+                    .WithEnvironment("DigitalBrain__AI__OpenAI__Endpoint", _gpt56.Resource.Parent.UriExpression)
+                    .WithEnvironment("DigitalBrain__AI__OpenAI__Gpt56__Model", _gpt56.Resource.Model);
             }
         }
 
@@ -125,9 +109,7 @@ public static class AIHostingExtensions
                 .WithLifetime(ContainerLifetime.Persistent)
                 .WithOpenWebUI(uiContainer => uiContainer.WithLifetime(ContainerLifetime.Persistent));
 
-            _ollamaModels[model] = _ollama.AddModel(
-                $"{brain.Name}-ai-{resourceSuffix}",
-                tag);
+            _ollamaModels[model] = _ollama.AddModel($"{brain.Name}-ai-{resourceSuffix}", tag);
         }
 
         private void AddGpt56()

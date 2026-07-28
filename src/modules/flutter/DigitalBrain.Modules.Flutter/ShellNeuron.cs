@@ -15,10 +15,6 @@ internal sealed class ShellNeuron :
         ArgumentException.ThrowIfNullOrWhiteSpace(command.SceneKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(command.Title);
 
-        return EmitAsync(new SceneOpened(
-            command.CommandId,
-            Id,
-            command.SceneKey,
-            command.Title));
+        return EmitAsync(new SceneOpened(command.CommandId, Id, command.SceneKey, command.Title));
     }
 }

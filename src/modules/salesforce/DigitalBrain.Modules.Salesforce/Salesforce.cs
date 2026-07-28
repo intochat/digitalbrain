@@ -29,8 +29,7 @@ internal sealed partial class Salesforce : Neuron, ISalesforce
     public Salesforce(McpRuntime runtime)
     {
         _runtime = runtime;
-        _mutations = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(
-            MutationsName);
+        _mutations = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(MutationsName);
         _states = ServiceProvider.GetRequiredService<Serializer<MutationData>>();
         _tokenState = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(TokensName);
         _durableIdentity = Id.ToString();

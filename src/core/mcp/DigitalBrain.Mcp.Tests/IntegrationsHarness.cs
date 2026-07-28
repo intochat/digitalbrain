@@ -9,10 +9,7 @@ namespace DigitalBrain.Integrations.Tests;
 public partial interface IIntegrationDriver : INeuron
 {
     [Alias(nameof(ReadGmailMessage))]
-    Task<GmailMessage> ReadGmailMessage(
-        string account,
-        string messageId,
-        CancellationToken cancellationToken);
+    Task<GmailMessage> ReadGmailMessage(string account, string messageId, CancellationToken cancellationToken);
 
     [Alias(nameof(ProposeSalesforceAccountDescription))]
     Task<SalesforceAccountDescriptionMutation> ProposeSalesforceAccountDescription(
@@ -38,19 +35,14 @@ internal sealed class IntegrationDriver :
     IIntegrationDriver,
     IHandle<SalesforceMutationApproval>
 {
-    public Task HandleAsync(
-        SalesforceMutationApproval synapse,
-        CancellationToken cancellationToken)
+    public Task HandleAsync(SalesforceMutationApproval synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
         return Task.CompletedTask;
     }
 
-    public Task<GmailMessage> ReadGmailMessage(
-        string account,
-        string messageId,
-        CancellationToken cancellationToken)
+    public Task<GmailMessage> ReadGmailMessage(string account, string messageId, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(account);
         ArgumentException.ThrowIfNullOrWhiteSpace(messageId);
@@ -65,12 +57,7 @@ internal sealed class IntegrationDriver :
         string accountId,
         string description,
         CancellationToken cancellationToken)
-        => Salesforce().ProposeAccountDescription(
-            commandId,
-            Id,
-            accountId,
-            description,
-            cancellationToken);
+        => Salesforce().ProposeAccountDescription(commandId, Id, accountId, description, cancellationToken);
 
     public async Task<SalesforceAccountDescriptionMutation> ApproveSalesforceWithStoredEvidence(
         SalesforceMutationApproval approval,
@@ -78,10 +65,7 @@ internal sealed class IntegrationDriver :
     {
         ArgumentNullException.ThrowIfNull(approval);
         var evidence = await ApprovalEvidenceAsync(approval);
-        return await Salesforce().ApproveAccountDescription(
-            approval,
-            evidence,
-            cancellationToken);
+        return await Salesforce().ApproveAccountDescription(approval, evidence, cancellationToken);
     }
 
     public async Task ApproveSalesforceWithMismatchedEvidence(
@@ -92,18 +76,14 @@ internal sealed class IntegrationDriver :
         ArgumentNullException.ThrowIfNull(approval);
         ArgumentNullException.ThrowIfNull(recordedEvidence);
         var evidence = await ApprovalEvidenceAsync(recordedEvidence);
-        _ = await Salesforce().ApproveAccountDescription(
-            approval,
-            evidence,
-            cancellationToken);
+        _ = await Salesforce().ApproveAccountDescription(approval, evidence, cancellationToken);
     }
 
     private ISalesforce Salesforce()
         => GrainFactory.GetGrain<ISalesforce>(
             NeuronId.For<ISalesforce>(Id.Owner, IntegrationsFixture.SalesforceServerKey).ToGrainId());
 
-    private async Task<SynapseDelivery> ApprovalEvidenceAsync(
-        SalesforceMutationApproval approval)
+    private async Task<SynapseDelivery> ApprovalEvidenceAsync(SalesforceMutationApproval approval)
     {
         var incoming = await ReadJournal(JournalKind.Incoming, afterSequence: 0);
         return incoming.Delta.FirstOrDefault(delivery =>

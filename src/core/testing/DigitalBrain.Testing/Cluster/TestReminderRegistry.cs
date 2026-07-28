@@ -2,18 +2,13 @@ using Orleans.Timers;
 
 namespace DigitalBrain.Testing;
 
-internal sealed class TestReminderRegistry(
-    VolatileReminderTable table,
-    ControllableTimeProvider clock) : IReminderRegistry
+internal sealed class TestReminderRegistry(VolatileReminderTable table, ControllableTimeProvider clock)
+    : IReminderRegistry
 {
-    private static readonly TimeSpan MinimumPeriod =
-        TimeSpan.FromMilliseconds(50);
+    private static readonly TimeSpan MinimumPeriod = TimeSpan.FromMilliseconds(50);
 
     public async Task<IGrainReminder> RegisterOrUpdateReminder(
-        GrainId callingGrainId,
-        string reminderName,
-        TimeSpan dueTime,
-        TimeSpan period)
+        GrainId callingGrainId, string reminderName, TimeSpan dueTime, TimeSpan period)
     {
         ValidateName(reminderName);
         ValidateDueTime(dueTime);
@@ -44,9 +39,7 @@ internal sealed class TestReminderRegistry(
         return new ReminderHandle(callingGrainId, reminderName, etag);
     }
 
-    public async Task UnregisterReminder(
-        GrainId callingGrainId,
-        IGrainReminder reminder)
+    public async Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)
     {
         ArgumentNullException.ThrowIfNull(reminder);
 
@@ -58,10 +51,7 @@ internal sealed class TestReminderRegistry(
                 nameof(reminder));
         }
 
-        var removal = table.RemoveRowWithStatus(
-            callingGrainId,
-            handle.ReminderName,
-            handle.ETag);
+        var removal = table.RemoveRowWithStatus(callingGrainId, handle.ReminderName, handle.ETag);
 
         if (removal == ReminderRemovalResult.ETagMismatch)
         {
@@ -72,32 +62,23 @@ internal sealed class TestReminderRegistry(
         await Task.CompletedTask;
     }
 
-    public async Task<IGrainReminder> GetReminder(
-        GrainId callingGrainId,
-        string reminderName)
+    public async Task<IGrainReminder> GetReminder(GrainId callingGrainId, string reminderName)
     {
         ValidateName(reminderName);
 
         var entry = await table.ReadRow(callingGrainId, reminderName);
         return entry is null
             ? null!
-            : new ReminderHandle(
-                entry.GrainId,
-                entry.ReminderName,
-                entry.ETag);
+            : new ReminderHandle(entry.GrainId, entry.ReminderName, entry.ETag);
     }
 
-    public async Task<List<IGrainReminder>> GetReminders(
-        GrainId callingGrainId)
+    public async Task<List<IGrainReminder>> GetReminders(GrainId callingGrainId)
     {
         var data = await table.ReadRows(callingGrainId);
         return
         [
             .. data.Reminders.Select(entry =>
-                (IGrainReminder)new ReminderHandle(
-                    entry.GrainId,
-                    entry.ReminderName,
-                    entry.ETag)),
+                (IGrainReminder)new ReminderHandle(entry.GrainId, entry.ReminderName, entry.ETag)),
         ];
     }
 
@@ -122,9 +103,7 @@ internal sealed class TestReminderRegistry(
         }
     }
 
-    private static void ValidatePeriod(
-        string reminderName,
-        TimeSpan period)
+    private static void ValidatePeriod(string reminderName, TimeSpan period)
     {
         if (period == Timeout.InfiniteTimeSpan || period < TimeSpan.Zero)
         {
@@ -142,8 +121,5 @@ internal sealed class TestReminderRegistry(
         }
     }
 
-    private sealed record ReminderHandle(
-        GrainId GrainId,
-        string ReminderName,
-        string ETag) : IGrainReminder;
+    private sealed record ReminderHandle(GrainId GrainId, string ReminderName, string ETag) : IGrainReminder;
 }

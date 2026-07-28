@@ -13,9 +13,7 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     public IJournalStorage CreateStorage(JournalId journalId)
         => new RecordingJournalStorage(this, journalId, inner.CreateStorage(journalId));
 
-    internal JournalFaultRegistration ArmFault(
-        NeuronId target,
-        string message)
+    internal JournalFaultRegistration ArmFault(NeuronId target, string message)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
 
@@ -81,17 +79,13 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     {
         public bool IsCompactionRequested => inner.IsCompactionRequested;
 
-        public async ValueTask AppendAsync(
-            ReadOnlySequence<byte> value,
-            CancellationToken cancellationToken)
+        public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             recorder.BeforeWrite(journalId);
             await inner.AppendAsync(value, cancellationToken);
         }
 
-        public async ValueTask ReplaceAsync(
-            ReadOnlySequence<byte> value,
-            CancellationToken cancellationToken)
+        public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             recorder.BeforeWrite(journalId);
             await inner.ReplaceAsync(value, cancellationToken);
@@ -108,9 +102,7 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
         public ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken)
             => inner.GetMetadataAsync(cancellationToken);
 
-        public ValueTask ReadAsync(
-            IJournalStorageConsumer consumer,
-            CancellationToken cancellationToken)
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
             => inner.ReadAsync(consumer, cancellationToken);
 
         public ValueTask<IJournalMetadata?> UpdateMetadataAsync(
@@ -122,8 +114,4 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     }
 }
 
-internal sealed record JournalFaultRegistration(
-    NeuronId Target,
-    string Message,
-    Task Consumed,
-    object Token);
+internal sealed record JournalFaultRegistration(NeuronId Target, string Message, Task Consumed, object Token);

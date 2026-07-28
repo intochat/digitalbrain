@@ -32,12 +32,7 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
         var workerId = test.Neuron<IGroupChatProbe>(SupervisedTeam).Id;
         var taskId = test.Neuron<ILlama32>("task-placeholder").Id;
         var attempt = new AttemptId(Guid.NewGuid());
-        var request = new AttemptRequest(
-            taskId,
-            workerId,
-            attempt,
-            Revision: 0,
-            new ProbeGoal("supervised"));
+        var request = new AttemptRequest(taskId, workerId, attempt, Revision: 0, new ProbeGoal("supervised"));
         var cursor = new AttemptCursor(taskId, workerId, attempt, Revision: 0);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => worker.InvokeAccept(request));
@@ -77,8 +72,7 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
 
         await orchestration.UseParticipants("left-alt", "right-alt");
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => orchestration.Respond([User()]));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => orchestration.Respond([User()]));
 
         Assert.Equal(Pair, test.Chat().CallCount);
     }

@@ -44,8 +44,7 @@ public static class ServiceDefaultsExtensions
         app.MapHealthChecks(HealthPath);
         app.MapHealthChecks(AlivePath, new HealthCheckOptions
         {
-            Predicate = static registration =>
-                registration.Tags.Contains("live"),
+            Predicate = static registration => registration.Tags.Contains("live"),
         });
 
         return app;
@@ -55,16 +54,12 @@ public static class ServiceDefaultsExtensions
         where TBuilder : IHostApplicationBuilder
         => builder.Services
             .AddHealthChecks()
-            .AddCheck(
-                "self",
-                static () => HealthCheckResult.Healthy(),
-                ["live"]);
+            .AddCheck("self", static () => HealthCheckResult.Healthy(), ["live"]);
 
     private static void AddOpenTelemetryExporters<TBuilder>(TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
-        if (!string.IsNullOrWhiteSpace(
-                builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+        if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
         {
             builder.Services.AddOpenTelemetry().UseOtlpExporter();
         }
@@ -73,8 +68,7 @@ public static class ServiceDefaultsExtensions
     private static void ConfigureOpenTelemetry<TBuilder>(TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
-        var configuredSampleRatio = builder.Configuration.GetValue<double?>(
-            "Telemetry:Tracing:SampleRatio");
+        var configuredSampleRatio = builder.Configuration.GetValue<double?>("Telemetry:Tracing:SampleRatio");
         var sampleRatio = Math.Clamp(configuredSampleRatio ?? 1d, 0d, 1d);
 
         builder.Logging.AddOpenTelemetry(logging =>
@@ -96,8 +90,7 @@ public static class ServiceDefaultsExtensions
                 .AddMeter("Experimental.Microsoft.Extensions.AI")
                 .AddMeter("Microsoft.Orleans"))
             .WithTracing(tracing => tracing
-                .SetSampler(new ParentBasedSampler(
-                    new TraceIdRatioBasedSampler(sampleRatio)))
+                .SetSampler(new ParentBasedSampler(new TraceIdRatioBasedSampler(sampleRatio)))
                 .AddSource(builder.Environment.ApplicationName)
                 .AddSource(TelemetryPrefix)
                 .AddSource($"{TelemetryPrefix}.*")
@@ -105,12 +98,8 @@ public static class ServiceDefaultsExtensions
                 .AddSource("Microsoft.Orleans.Application")
                 .AddAspNetCoreInstrumentation(options =>
                     options.Filter = context =>
-                        !context.Request.Path.StartsWithSegments(
-                            HealthPath,
-                            StringComparison.OrdinalIgnoreCase)
-                        && !context.Request.Path.StartsWithSegments(
-                            AlivePath,
-                            StringComparison.OrdinalIgnoreCase))
+                        !context.Request.Path.StartsWithSegments(HealthPath, StringComparison.OrdinalIgnoreCase)
+                        && !context.Request.Path.StartsWithSegments(AlivePath, StringComparison.OrdinalIgnoreCase))
                 .AddHttpClientInstrumentation());
 
         AddOpenTelemetryExporters(builder);

@@ -19,9 +19,7 @@ public sealed class BrainCapabilityCatalogTests
         "all modules without configured providers claims no product capability")]
     public void CompleteModuleSetWithoutConfiguredFeaturesClaimsNothing()
     {
-        var capabilities = BrainCapabilityCatalog.Resolve(
-            ProductModules,
-            Configuration());
+        var capabilities = BrainCapabilityCatalog.Resolve(ProductModules, Configuration());
 
         Assert.Empty(capabilities);
     }
@@ -34,9 +32,7 @@ public sealed class BrainCapabilityCatalogTests
             .Where(module => module.Id != "DigitalBrain.OS.OSBehaviorsModule")
             .ToArray();
 
-        var capabilities = BrainCapabilityCatalog.Resolve(
-            modules,
-            Configuration("ai.llm.gemma4", "google.gmail", "salesforce"));
+        var capabilities = BrainCapabilityCatalog.Resolve(modules, Configuration("ai.llm.gemma4", "google.gmail", "salesforce"));
 
         Assert.Empty(capabilities);
     }
@@ -45,9 +41,7 @@ public sealed class BrainCapabilityCatalogTests
         "configured non-Gemma model claims no product capability")]
     public void NonGemmaModelClaimsNothing()
     {
-        var capabilities = BrainCapabilityCatalog.Resolve(
-            ProductModules,
-            Configuration("ai.llm.llama32", "google.gmail", "salesforce"));
+        var capabilities = BrainCapabilityCatalog.Resolve(ProductModules, Configuration("ai.llm.llama32", "google.gmail", "salesforce"));
 
         Assert.Empty(capabilities);
     }
@@ -56,9 +50,7 @@ public sealed class BrainCapabilityCatalogTests
         "configured Gemma product manifest claims general assistant and account enrichment")]
     public void ConfiguredGemmaProductManifestClaimsExactCapabilities()
     {
-        var capabilities = BrainCapabilityCatalog.Resolve(
-            ProductModules,
-            Configuration("ai.llm.gemma4", "google.gmail", "salesforce"));
+        var capabilities = BrainCapabilityCatalog.Resolve(ProductModules, Configuration("ai.llm.gemma4", "google.gmail", "salesforce"));
 
         Assert.Equal(
             [
@@ -72,9 +64,7 @@ public sealed class BrainCapabilityCatalogTests
     {
         var values = features
             .Select((feature, index) =>
-                new KeyValuePair<string, string?>(
-                    $"DigitalBrain:ConfiguredFeatures:{index}",
-                    feature));
+                new KeyValuePair<string, string?>($"DigitalBrain:ConfiguredFeatures:{index}", feature));
         return new ConfigurationBuilder()
             .AddInMemoryCollection(values)
             .Build();

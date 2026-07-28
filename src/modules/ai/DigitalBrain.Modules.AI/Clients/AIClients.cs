@@ -31,19 +31,13 @@ internal static class AIClients
         where TModel : LLM
         => services.AddKeyedSingleton<IChatClient>(
             typeof(TModel),
-            (provider, _) => Ollama(
-                provider.GetRequiredService<IConfiguration>(),
-                typeof(TModel).Name,
-                defaultTag));
+            (provider, _) => Ollama(provider.GetRequiredService<IConfiguration>(), typeof(TModel).Name, defaultTag));
 
     [SuppressMessage(
         "Reliability",
         "CA2000:Dispose objects before losing scope",
         Justification = "The telemetry middleware owns and disposes the inner Ollama client.")]
-    private static IChatClient Ollama(
-        IConfiguration configuration,
-        string modelName,
-        string defaultTag)
+    private static IChatClient Ollama(IConfiguration configuration, string modelName, string defaultTag)
     {
         var endpoint = configuration[$"{ConfigurationRoot}:Ollama:Endpoint"];
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)

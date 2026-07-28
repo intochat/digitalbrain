@@ -10,10 +10,7 @@ public sealed partial class TaskLifecycle
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var brain = await fixture.CreateBrainAsync(cancellationToken);
-        var (worker, task, started) = await StartAsync(
-            brain,
-            "cancel",
-            new TestGoal("cancel-me"));
+        var (worker, task, started) = await StartAsync(brain, "cancel", new TestGoal("cancel-me"));
         var running = await AcceptThenRunningAsync(task, cancellationToken);
 
         var cancel = new CancelTask(CommandId.New(), running.Revision);
@@ -24,19 +21,10 @@ public sealed partial class TaskLifecycle
         Assert.Equal(running.ActiveAttempt, cancelling.ActiveAttempt);
         AssertReceipt(cancelling, await task.Reference.Cancel(cancel));
 
-        var cancelledFact = await task.Incoming.NextAsync<AttemptCancelled>(
-            cancellationToken);
-        AssertAttempt(
-            cancelledFact,
-            task.Id,
-            worker.Id,
-            running.ActiveAttempt,
-            running.Revision);
+        var cancelledFact = await task.Incoming.NextAsync<AttemptCancelled>(cancellationToken);
+        AssertAttempt(cancelledFact, task.Id, worker.Id, running.ActiveAttempt, running.Revision);
 
-        var cancelled = await WaitForStateAsync(
-            task,
-            TaskState.Cancelled,
-            cancellationToken);
+        var cancelled = await WaitForStateAsync(task, TaskState.Cancelled, cancellationToken);
 
         Assert.Null(cancelled.ActiveAttempt);
         Assert.Null(cancelled.Blocker);

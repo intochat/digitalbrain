@@ -26,9 +26,7 @@ internal sealed partial class CountdownNeuron
         var observedAt = TimeProvider.GetUtcNow();
         if (observedAt < data.DueAt)
         {
-            await RegisterReminderAsync(
-                reminderName,
-                data.DueAt - observedAt);
+            await RegisterReminderAsync(reminderName, data.DueAt - observedAt);
             return;
         }
 
@@ -72,13 +70,8 @@ internal sealed partial class CountdownNeuron
         await RetireReminderAsync(reminderName);
     }
 
-    private Task<Orleans.Runtime.IGrainReminder> RegisterReminderAsync(
-        string reminderName,
-        TimeSpan dueTime)
-        => this.RegisterOrUpdateReminder(
-            reminderName,
-            dueTime,
-            ReminderPeriod);
+    private Task<Orleans.Runtime.IGrainReminder> RegisterReminderAsync(string reminderName, TimeSpan dueTime)
+        => this.RegisterOrUpdateReminder(reminderName, dueTime, ReminderPeriod);
 
     private async Task RetireReminderAsync(string? reminderName)
     {
@@ -90,21 +83,14 @@ internal sealed partial class CountdownNeuron
     }
 
     private static string ReminderName(long generation, long revision)
-        => string.Create(
-            CultureInfo.InvariantCulture,
-            $"{ReminderPrefix}{generation}.{revision}");
+        => string.Create(CultureInfo.InvariantCulture, $"{ReminderPrefix}{generation}.{revision}");
 
-    private static bool TryParseReminderName(
-        string reminderName,
-        out long generation,
-        out long revision)
+    private static bool TryParseReminderName(string reminderName, out long generation, out long revision)
     {
         generation = 0;
         revision = 0;
 
-        if (!reminderName.StartsWith(
-            ReminderPrefix,
-            StringComparison.Ordinal))
+        if (!reminderName.StartsWith(ReminderPrefix, StringComparison.Ordinal))
         {
             return false;
         }
@@ -114,16 +100,8 @@ internal sealed partial class CountdownNeuron
 
         return separator > 0
             && separator == suffix.LastIndexOf('.', StringComparison.Ordinal)
-            && long.TryParse(
-                suffix.AsSpan(0, separator),
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out generation)
-            && long.TryParse(
-                suffix.AsSpan(separator + 1),
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out revision)
+            && long.TryParse(suffix.AsSpan(0, separator), NumberStyles.None, CultureInfo.InvariantCulture, out generation)
+            && long.TryParse(suffix.AsSpan(separator + 1), NumberStyles.None, CultureInfo.InvariantCulture, out revision)
             && generation > 0
             && revision > 0;
     }

@@ -70,8 +70,7 @@ public static class FlutterHostingExtensions
             $"Use {nameof(DesktopHost)} or {nameof(HeadlessHost)}.");
     }
 
-    private static FlutterHostingState GetOrCreateState(
-        DigitalBrainModuleBuilder<FlutterModule> module)
+    private static FlutterHostingState GetOrCreateState(DigitalBrainModuleBuilder<FlutterModule> module)
     {
         var state = module.Brain.GetOrAddState(
             static brain => new FlutterHostingState(brain),
@@ -135,9 +134,7 @@ public static class FlutterHostingExtensions
             }
 
             var appHost = brain.GetApplicationBuilder();
-            var packageRoot = ResolveFlutterWorkingDirectory(
-                appHost.AppHostDirectory,
-                options.WorkingDirectory);
+            var packageRoot = ResolveFlutterWorkingDirectory(appHost.AppHostDirectory, options.WorkingDirectory);
             if (!Directory.Exists(packageRoot)
                 || !File.Exists(Path.Combine(packageRoot, "pubspec.yaml")))
             {
@@ -146,11 +143,7 @@ public static class FlutterHostingExtensions
                     "Pass FlutterHostOptions.WorkingDirectory or place clients/digitalbrain_flutter in the repo.");
             }
 
-            var launch = FlutterHostLaunch.Resolve(
-                kind,
-                packageRoot,
-                options,
-                appHost.Configuration);
+            var launch = FlutterHostLaunch.Resolve(kind, packageRoot, options, appHost.Configuration);
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
                 ? DefaultFlutterResourceName
                 : options.ResourceName;
@@ -176,10 +169,7 @@ public static class FlutterHostingExtensions
 
             if (_ui is not null)
             {
-                _ui.WithAnnotation(new WaitAnnotation(
-                    builder.Resource,
-                    WaitType.WaitUntilHealthy,
-                    exitCode: 0));
+                _ui.WithAnnotation(new WaitAnnotation(builder.Resource, WaitType.WaitUntilHealthy, exitCode: 0));
             }
         }
 
@@ -210,9 +200,7 @@ public static class FlutterHostingExtensions
             return Path.GetFullPath(candidates[0]);
         }
 
-        private static string ResolveFlutterWorkingDirectory(
-            string appHostDirectory,
-            string? configured)
+        private static string ResolveFlutterWorkingDirectory(string appHostDirectory, string? configured)
         {
             if (!string.IsNullOrWhiteSpace(configured))
             {

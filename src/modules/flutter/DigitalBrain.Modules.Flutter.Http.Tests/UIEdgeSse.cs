@@ -105,15 +105,9 @@ internal static class UIEdgeSse
         StreamReader reader,
         CancellationToken cancellationToken)
     {
-        var payload = await ReadNextEventPayloadAsync(
-            reader,
-            UIEdgeContract.ChatTurnEvent,
-            cancellationToken);
-        return JsonSerializer.Deserialize<ChatTurnEvent>(
-            payload,
-            EventJsonOptions)
-            ?? throw new InvalidOperationException(
-                "SSE chat-turn payload did not deserialize.");
+        var payload = await ReadNextEventPayloadAsync(reader, UIEdgeContract.ChatTurnEvent, cancellationToken);
+        return JsonSerializer.Deserialize<ChatTurnEvent>(payload, EventJsonOptions)
+            ?? throw new InvalidOperationException("SSE chat-turn payload did not deserialize.");
     }
 
     private static async Task<string> ReadNextEventPayloadAsync(
@@ -121,8 +115,7 @@ internal static class UIEdgeSse
         string expectedEvent,
         CancellationToken cancellationToken)
     {
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
-            cancellationToken);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         linked.CancelAfter(TimeSpan.FromSeconds(15));
 
         string? dataLine = null;
@@ -160,7 +153,6 @@ internal static class UIEdgeSse
             }
         }
 
-        throw new TimeoutException(
-            $"SSE stream ended before a {expectedEvent} projection arrived.");
+        throw new TimeoutException($"SSE stream ended before a {expectedEvent} projection arrived.");
     }
 }

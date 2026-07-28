@@ -50,9 +50,7 @@ public sealed class DigitalBrainBuilder
 
     internal IDistributedApplicationBuilder GetApplicationBuilder() => _builder;
 
-    internal TState GetOrAddState<TState>(
-        Func<DigitalBrainBuilder, TState> create,
-        out bool added)
+    internal TState GetOrAddState<TState>(Func<DigitalBrainBuilder, TState> create, out bool added)
         where TState : class
     {
         ArgumentNullException.ThrowIfNull(create);
@@ -111,11 +109,7 @@ public sealed class DigitalBrainBuilder
 
         var name = $"{Name}-state-protection-key";
         _stateProtectionKey = (_builder.ExecutionContext.IsRunMode
-                ? _builder.AddParameter(
-                    name,
-                    new StateProtectionKeyParameterDefault(),
-                    secret: true,
-                    persist: true)
+                ? _builder.AddParameter(name, new StateProtectionKeyParameterDefault(), secret: true, persist: true)
                 : _builder.AddParameter(name, secret: true))
             .WithDescription(
                 "Base64-encoded 256-bit key shared by every silo that recovers encrypted durable module state.");
@@ -125,8 +119,7 @@ public sealed class DigitalBrainBuilder
     {
         if (_modules.Contains(module))
         {
-            throw new InvalidOperationException(
-                $"{module} is already configured on brain '{Name}'. Add each module exactly once.");
+            throw new InvalidOperationException($"{module} is already configured on brain '{Name}'. Add each module exactly once.");
         }
 
         _modules.Add(module);
@@ -137,12 +130,9 @@ public sealed class DigitalBrainBuilder
     private sealed class StateProtectionKeyParameterDefault : ParameterDefault
     {
         public override string GetDefaultValue()
-            => Convert.ToBase64String(
-                RandomNumberGenerator.GetBytes(32));
+            => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
-        public override void WriteToManifest(
-            ManifestPublishingContext context)
-            => throw new InvalidOperationException(
-                "Local state-protection defaults cannot be published.");
+        public override void WriteToManifest(ManifestPublishingContext context)
+            => throw new InvalidOperationException("Local state-protection defaults cannot be published.");
     }
 }

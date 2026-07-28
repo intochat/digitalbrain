@@ -51,16 +51,12 @@ public sealed class FlutterVocabulary
         Assert.All(shellMethods, method =>
         {
             Assert.DoesNotContain("Async", method.Name, StringComparison.Ordinal);
-            Assert.Equal(
-                method.Name,
-                method.GetCustomAttribute<AliasAttribute>()?.Alias);
+            Assert.Equal(method.Name, method.GetCustomAttribute<AliasAttribute>()?.Alias);
             Assert.Equal(typeof(Task), method.ReturnType);
         });
 
         var open = shellMethods.Single();
-        Assert.Equal(
-            [typeof(OpenScene)],
-            open.GetParameters().Select(parameter => parameter.ParameterType));
+        Assert.Equal([typeof(OpenScene)], open.GetParameters().Select(parameter => parameter.ParameterType));
 
         Assert.Contains(typeof(INeuron), typeof(IShell).GetInterfaces());
         Assert.Contains(typeof(INeuron), typeof(IScene).GetInterfaces());

@@ -2,8 +2,7 @@ using System.Collections.Frozen;
 
 namespace DigitalBrain.Kernel;
 
-internal sealed class ReminderSourceAllowlist(
-    IEnumerable<string> sourceTypes)
+internal sealed class ReminderSourceAllowlist(IEnumerable<string> sourceTypes)
 {
     private readonly FrozenSet<string> _sourceTypes =
         sourceTypes.ToFrozenSet(StringComparer.Ordinal);

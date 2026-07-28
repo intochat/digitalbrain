@@ -32,34 +32,21 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
         ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
         ArgumentOutOfRangeException.ThrowIfLessThan(timeoutSeconds, 1);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(
-            timeoutSeconds,
-            MaximumTimeoutSeconds);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(timeoutSeconds, MaximumTimeoutSeconds);
 
         var chatId = NeuronId.For<IChat>(brain.Owner, chatName);
-        var session = grains.GetGrain<ISessionNeuron>(
-            ISessionNeuron.ForOwner(brain.Owner).ToGrainId());
-        var baseline = await session.ReadNeuronJournal(
-            chatId,
-            JournalKind.Outgoing,
-            afterSequence: 0);
+        var session = grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(brain.Owner).ToGrainId());
+        var baseline = await session.ReadNeuronJournal(chatId, JournalKind.Outgoing, afterSequence: 0);
         var commandId = CommandId.New();
 
         await brain.Get<IChat>(chatName).Send(new SendMessage(commandId, text));
 
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(
-            cancellationToken);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
 
         try
         {
-            return await WaitForResponseAsync(
-                session,
-                chatId,
-                chatName,
-                commandId,
-                baseline.ResumeSequence,
-                timeout.Token);
+            return await WaitForResponseAsync(session, chatId, chatName, commandId, baseline.ResumeSequence, timeout.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -83,10 +70,7 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var page = await session.ReadNeuronJournal(
-                chatId,
-                JournalKind.Outgoing,
-                cursor);
+            var page = await session.ReadNeuronJournal(chatId, JournalKind.Outgoing, cursor);
 
             foreach (var delivery in page.Delta)
             {

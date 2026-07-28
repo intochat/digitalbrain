@@ -20,10 +20,5 @@ internal sealed class TestReminderDeliveryServiceClient(
         TimeSpan period,
         DateTime currentTickTime)
         => GetGrainService(CurrentGrainReference.GrainId)
-            .Deliver(
-                target,
-                reminderName,
-                firstTickTime,
-                period,
-                currentTickTime);
+            .Deliver(target, reminderName, firstTickTime, period, currentTickTime);
 }

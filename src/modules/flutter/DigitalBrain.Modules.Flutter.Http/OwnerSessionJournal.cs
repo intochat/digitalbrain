@@ -20,9 +20,7 @@ internal sealed class OwnerSessionJournal
     {
         ArgumentNullException.ThrowIfNull(grains);
 
-        return new OwnerSessionJournal(
-            grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(owner).ToGrainId()),
-            owner);
+        return new OwnerSessionJournal(grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(owner).ToGrainId()), owner);
     }
 
     public Task<JournalRead> ReadShellOutgoingAsync(string shellName, long afterSequence)
@@ -30,10 +28,7 @@ internal sealed class OwnerSessionJournal
         ArgumentException.ThrowIfNullOrWhiteSpace(shellName);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-        return _session.ReadNeuronJournal(
-            NeuronId.For<IShell>(_owner, shellName),
-            JournalKind.Outgoing,
-            afterSequence);
+        return _session.ReadNeuronJournal(NeuronId.For<IShell>(_owner, shellName), JournalKind.Outgoing, afterSequence);
     }
 
     public Task<JournalRead> ReadChatOutgoingAsync(string chatName, long afterSequence)
@@ -41,9 +36,6 @@ internal sealed class OwnerSessionJournal
         ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-        return _session.ReadNeuronJournal(
-            NeuronId.For<IChat>(_owner, chatName),
-            JournalKind.Outgoing,
-            afterSequence);
+        return _session.ReadNeuronJournal(NeuronId.For<IChat>(_owner, chatName), JournalKind.Outgoing, afterSequence);
     }
 }

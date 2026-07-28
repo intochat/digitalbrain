@@ -20,9 +20,7 @@ public sealed class GreetingBehavior(QuickstartFixture fixture)
 
         await greeter.RestartHostAsync(cancellationToken);
 
-        var committed = await greeter.Outgoing.ReadAsync<Greeted>(
-            afterSequence: 0,
-            cancellationToken);
+        var committed = await greeter.Outgoing.ReadAsync<Greeted>(afterSequence: 0, cancellationToken);
         Assert.Single(committed);
         Assert.Equal(first.SynapseId, committed[0].SynapseId);
     }

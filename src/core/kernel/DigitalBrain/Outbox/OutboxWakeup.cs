@@ -16,10 +16,7 @@ internal sealed class OutboxWakeup :
         TimeSpan.FromMinutes(1);
 
     public async Task Arm()
-        => _ = await this.RegisterOrUpdateReminder(
-            ReminderName,
-            RetryCadence,
-            RetryCadence);
+        => _ = await this.RegisterOrUpdateReminder(ReminderName, RetryCadence, RetryCadence);
 
     public async Task Disarm()
     {
@@ -29,14 +26,9 @@ internal sealed class OutboxWakeup :
         }
     }
 
-    async Task IRemindable.ReceiveReminder(
-        string reminderName,
-        TickStatus status)
+    async Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
     {
-        if (!string.Equals(
-                reminderName,
-                ReminderName,
-                StringComparison.Ordinal))
+        if (!string.Equals(reminderName, ReminderName, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Outbox wakeup '{this.GetPrimaryKeyString()}' does not own reminder '{reminderName}'.");
@@ -47,9 +39,7 @@ internal sealed class OutboxWakeup :
             .Drain();
     }
 
-    internal static bool TryParseTarget(
-        string encoded,
-        out NeuronId target)
+    internal static bool TryParseTarget(string encoded, out NeuronId target)
     {
         target = default;
 
@@ -66,9 +56,7 @@ internal sealed class OutboxWakeup :
 
         try
         {
-            target = NeuronId.FromGrainKey(
-                encoded[..separator],
-                encoded[(separator + 1)..]);
+            target = NeuronId.FromGrainKey(encoded[..separator], encoded[(separator + 1)..]);
             return true;
         }
         catch (ArgumentException)

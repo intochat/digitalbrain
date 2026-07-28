@@ -130,10 +130,7 @@ internal sealed partial class TaskNeuron
         {
             data.State = TaskState.Waiting;
             data.Blocker = new RetryScheduled(new BlockerId(Guid.NewGuid()));
-            await this.RegisterOrUpdateReminder(
-                RetryReminderName,
-                data.Policy.RetryDelay,
-                ReminderPeriod);
+            await this.RegisterOrUpdateReminder(RetryReminderName, data.Policy.RetryDelay, ReminderPeriod);
             Stage(data);
             return;
         }

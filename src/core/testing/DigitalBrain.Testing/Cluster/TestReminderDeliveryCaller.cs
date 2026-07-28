@@ -17,8 +17,7 @@ internal sealed class TestReminderDeliveryCaller :
 
     public TestReminderDeliveryCaller()
     {
-        _service = ServiceProvider
-            .GetRequiredService<ITestReminderDeliveryServiceClient>();
+        _service = ServiceProvider.GetRequiredService<ITestReminderDeliveryServiceClient>();
     }
 
     public Task Deliver(
@@ -27,10 +26,5 @@ internal sealed class TestReminderDeliveryCaller :
         DateTime firstTickTime,
         TimeSpan period,
         DateTime currentTickTime)
-        => _service.Deliver(
-            target,
-            reminderName,
-            firstTickTime,
-            period,
-            currentTickTime);
+        => _service.Deliver(target, reminderName, firstTickTime, period, currentTickTime);
 }

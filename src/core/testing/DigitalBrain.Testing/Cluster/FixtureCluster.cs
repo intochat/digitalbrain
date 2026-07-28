@@ -27,13 +27,10 @@ internal sealed class FixtureCluster : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(composition);
         _modules = composition.Modules.ToArray();
         _edges = composition.Edges;
-        _edges.AttachTimeProvider(
-            _clock,
-            _clock.Reset);
+        _edges.AttachTimeProvider(_clock, _clock.Reset);
     }
 
-    internal static async Task<FixtureCluster> StartAsync(
-        TestFixtureComposition composition)
+    internal static async Task<FixtureCluster> StartAsync(TestFixtureComposition composition)
     {
         var fixture = new FixtureCluster(composition);
 
@@ -67,28 +64,18 @@ internal sealed class FixtureCluster : IAsyncDisposable
 
     internal TestEdgeRegistry Edges => _edges;
 
-    internal JournalFaultRegistration ArmJournalFault(
-        NeuronId target,
-        string message)
+    internal JournalFaultRegistration ArmJournalFault(NeuronId target, string message)
         => _journalStorage.ArmFault(target, message);
 
-    internal bool DisarmJournalFault(
-        JournalFaultRegistration registration)
+    internal bool DisarmJournalFault(JournalFaultRegistration registration)
         => _journalStorage.DisarmFault(registration);
-    internal async Task<(TestClock Clock, long EdgeGeneration)> PrepareMethodAsync(
-        string scope,
-        BrainTestDiagnostics diagnostics)
+
+    internal async Task<(TestClock Clock, long EdgeGeneration)> PrepareMethodAsync(string scope, BrainTestDiagnostics diagnostics)
     {
         var edgeGeneration = _edges.ResetMethodScope();
         await _reminderTable.TestOnlyClearTable();
         return (
-            new TestClock(
-                _clock,
-                new TestReminderDriver(
-                    _reminderTable,
-                    Client,
-                    scope),
-                diagnostics),
+            new TestClock(_clock, new TestReminderDriver(_reminderTable, Client, scope), diagnostics),
             edgeGeneration);
     }
 
@@ -107,9 +94,7 @@ internal sealed class FixtureCluster : IAsyncDisposable
         };
     }
 
-    internal async Task RestartHostAsync(
-        NeuronId neuron,
-        CancellationToken cancellationToken)
+    internal async Task RestartHostAsync(NeuronId neuron, CancellationToken cancellationToken)
     {
         var cluster = _cluster
             ?? throw new InvalidOperationException(
@@ -119,13 +104,11 @@ internal sealed class FixtureCluster : IAsyncDisposable
             .GetDetailedGrainStatistics()
             .WaitAsync(cancellationToken);
         var hosting = statistics
-            .FirstOrDefault(statistic =>
-                statistic.GrainId == neuron.ToGrainId())
+            .FirstOrDefault(statistic => statistic.GrainId == neuron.ToGrainId())
             ?.SiloAddress
             ?? throw new InvalidOperationException(
                 $"{neuron} is not activated on any silo, so no host can be restarted.");
-        var host = cluster.Silos.Single(silo =>
-            silo.SiloAddress.Equals(hosting));
+        var host = cluster.Silos.Single(silo => silo.SiloAddress.Equals(hosting));
 
         // Restart mutates assembly-scoped topology. Cancellation may prevent it
         // from starting, but cannot detach this method from an in-flight restart
@@ -174,8 +157,7 @@ internal sealed class FixtureCluster : IAsyncDisposable
                 Convert.ToBase64String(new byte[32]);
 
             DigitalBrainRuntime.Add(silo, FixtureCluster.LabelOf(options.SiloName), _modules);
-            silo.Services.AddSingleton(new ReminderSourceAllowlist(
-                [TestReminderDeliveryService.SourceType]));
+            silo.Services.AddSingleton(new ReminderSourceAllowlist([TestReminderDeliveryService.SourceType]));
             silo.Services.AddGrainService<TestReminderDeliveryService>();
             silo.Services.AddSingleton<
                 ITestReminderDeliveryServiceClient,

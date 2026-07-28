@@ -19,14 +19,10 @@ internal static class CapabilityRequestContext
     internal static Task InvokeAsync(SynapseDelivery delivery, Func<Task> invoke)
         => InvokeWithAsync(delivery, invoke);
 
-    internal static Task<TResult> InvokeAsync<TResult>(
-        CapabilityDelegation delegation,
-        Func<Task<TResult>> invoke)
+    internal static Task<TResult> InvokeAsync<TResult>(CapabilityDelegation delegation, Func<Task<TResult>> invoke)
         => InvokeWithLocalDelegationAsync(delegation, invoke);
 
-    internal static Task InvokeRedeemedAsync(
-        CapabilityDelegation delegation,
-        Func<Task> invoke)
+    internal static Task InvokeRedeemedAsync(CapabilityDelegation delegation, Func<Task> invoke)
         => InvokeWithAsync(new RedeemedCapabilityDelegation(delegation), invoke);
 
     private static async Task<TResult> InvokeWithLocalDelegationAsync<TResult>(

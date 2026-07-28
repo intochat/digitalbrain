@@ -84,16 +84,12 @@ public sealed class McpOAuthCallbacks
             BindingFlags.NonPublic | BindingFlags.Static)!;
 
         var exception = Assert.Throws<TargetInvocationException>(() => validate.Invoke(
-            null,
-            [new Uri("https://provider.example/authorize?state=expected"), RedirectUri(), null]));
+            null, [new Uri("https://provider.example/authorize?state=expected"), RedirectUri(), null]));
 
         Assert.IsType<ArgumentNullException>(exception.InnerException);
     }
 
-    private static Task<AuthorizationResult?> Authorize(
-        Uri redirectUri,
-        Action launched,
-        CancellationToken cancellationToken)
+    private static Task<AuthorizationResult?> Authorize(Uri redirectUri, Action launched, CancellationToken cancellationToken)
     {
         var core = typeof(LocalLoopbackMcpAuthorizationCallback).GetMethod(
             "AuthorizeAsyncCore",
@@ -104,10 +100,7 @@ public sealed class McpOAuthCallbacks
             [new Uri("https://provider.example/authorize?state=expected"), redirectUri, start, cancellationToken])!;
     }
 
-    private static async Task<HttpResponseMessage> SendAsync(
-        Uri uri,
-        string query,
-        CancellationToken cancellationToken)
+    private static async Task<HttpResponseMessage> SendAsync(Uri uri, string query, CancellationToken cancellationToken)
     {
         using var client = new HttpClient();
         return await client.GetAsync(new Uri(uri + query), cancellationToken);

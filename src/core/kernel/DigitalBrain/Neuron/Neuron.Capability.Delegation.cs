@@ -88,12 +88,7 @@ public abstract partial class Neuron
             ? (Synapse)new CapabilityCompleted(delegation.Request.SynapseId)
             : new CapabilityFailed(delegation.Request.SynapseId);
         var sequence = _outgoing.NextSequence + _firedWhileHandling.Count;
-        var delivery = SynapseDelivery.Create(
-            fact,
-            Id,
-            sequence,
-            delegation.Request,
-            TimeProvider);
+        var delivery = SynapseDelivery.Create(fact, Id, sequence, delegation.Request, TimeProvider);
         var delegationCheckpoint = SnapshotDelegations();
         var outgoingCheckpoint = _outgoing.Checkpoint();
 
@@ -101,9 +96,7 @@ public abstract partial class Neuron
         {
             FlushOutgoing();
             _outgoing.Append(delivery);
-            _delegations[delegation.Identity] = _delegationStates.SerializeToArray(new(
-                state.Delegation,
-                terminal));
+            _delegations[delegation.Identity] = _delegationStates.SerializeToArray(new(state.Delegation, terminal));
             _delegationConsumed.RemoveAt(consumedIndex);
             _delegationTerminals.Add(delegation.Identity);
             await CommitAsync(CancellationToken.None);

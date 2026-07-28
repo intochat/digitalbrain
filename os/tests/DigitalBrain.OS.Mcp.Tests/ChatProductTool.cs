@@ -8,9 +8,7 @@ public sealed class ChatProductTool(OSMcpFixture fixture)
 {
     private const int TestTimeout = 60_000;
 
-    [Fact(
-        Timeout = TestTimeout,
-        DisplayName = "send_chat_message returns the correlated assistant response")]
+    [Fact(Timeout = TestTimeout, DisplayName = "send_chat_message returns the correlated assistant response")]
     public async Task SendChatMessageReturnsCorrelatedAssistantResponse()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -18,11 +16,7 @@ public sealed class ChatProductTool(OSMcpFixture fixture)
         test.Chat().Reply("Hello from DigitalBrain.");
         var tools = new DigitalBrainMcpTools(test.Client, test.Cluster.Client);
 
-        var result = await tools.SendChatMessageAsync(
-            "hi",
-            "main",
-            timeoutSeconds: 10,
-            cancellationToken);
+        var result = await tools.SendChatMessageAsync("hi", "main", timeoutSeconds: 10, cancellationToken);
 
         Assert.Equal("main", result.Chat);
         Assert.Equal("Hello from DigitalBrain.", result.Response);

@@ -33,9 +33,7 @@ public sealed class UIEdgeVocabulary(UIFixture fixture)
         Assert.Equal("/health", UIEdgeContract.HealthPath);
         Assert.Equal("/shells/{shellName}/scenes", UIEdgeContract.OpenScenePath);
         Assert.Equal("/shells/{shellName}/events", UIEdgeContract.ShellEventsPath);
-        Assert.Equal(
-            "/scenes/{sceneKey}/controls/{controlId}/activate",
-            UIEdgeContract.ActivateControlPath);
+        Assert.Equal("/scenes/{sceneKey}/controls/{controlId}/activate", UIEdgeContract.ActivateControlPath);
         Assert.Equal("afterSequence", UIEdgeContract.AfterSequenceQuery);
         Assert.Equal("text/event-stream", UIEdgeContract.EventStreamContentType);
         Assert.Equal("no-cache", UIEdgeContract.CacheControlNoCache);
@@ -98,9 +96,7 @@ public sealed class UIEdgeVocabulary(UIFixture fixture)
         await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
 
         using var http = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
-        using var health = await http.GetAsync(
-            new Uri(UIEdgeContract.HealthPath, UriKind.Relative),
-            cancellationToken);
+        using var health = await http.GetAsync(new Uri(UIEdgeContract.HealthPath, UriKind.Relative), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
     }

@@ -6,11 +6,7 @@ using DigitalBrain.Abstractions;
 [Alias("db.behavior-execution-metadata")]
 public sealed record BehaviorExecutionMetadata
 {
-    public BehaviorExecutionMetadata(
-        OwnerId Owner,
-        BehaviorId Behavior,
-        BehaviorRevisionId Revision,
-        BehaviorExecutionId Execution)
+    public BehaviorExecutionMetadata(OwnerId Owner, BehaviorId Behavior, BehaviorRevisionId Revision, BehaviorExecutionId Execution)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(Owner.Value);
         Behavior.EnsureValid();

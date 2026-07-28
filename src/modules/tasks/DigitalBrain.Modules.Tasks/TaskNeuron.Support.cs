@@ -74,16 +74,12 @@ internal sealed partial class TaskNeuron
 
         if (command.Policy.MaximumAttempts <= 0)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(command),
-                "A task policy must allow at least one attempt.");
+            throw new ArgumentOutOfRangeException(nameof(command), "A task policy must allow at least one attempt.");
         }
 
         if (command.Policy.RetryDelay < TimeSpan.Zero)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(command),
-                "A task retry delay cannot be negative.");
+            throw new ArgumentOutOfRangeException(nameof(command), "A task retry delay cannot be negative.");
         }
 
         if (command.Worker == default)

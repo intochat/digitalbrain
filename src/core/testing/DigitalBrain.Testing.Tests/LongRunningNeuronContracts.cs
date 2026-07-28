@@ -10,9 +10,7 @@ public sealed class LongRunningNeuronContracts
     [InlineData(typeof(INeuron), nameof(INeuron.Deliver))]
     [InlineData(typeof(INeuron), nameof(INeuron.ReadJournal))]
     [InlineData(typeof(ISessionNeuron), nameof(ISessionNeuron.ReadNeuronJournal))]
-    public void LongRunningNeuronCallsDeclareProductTimeout(
-        Type contract,
-        string methodName)
+    public void LongRunningNeuronCallsDeclareProductTimeout(Type contract, string methodName)
     {
         ArgumentNullException.ThrowIfNull(contract);
         var method = contract.GetMethod(methodName);

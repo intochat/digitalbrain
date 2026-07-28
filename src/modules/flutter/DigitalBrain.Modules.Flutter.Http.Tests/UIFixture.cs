@@ -25,9 +25,7 @@ public sealed class UIFixture : DigitalBrainFixture
         return new Uri(configured.TrimEnd('/') + "/");
     }
 
-    public static async Task<WebApplication> StartUIEdgeAsync(
-        TestBrain test,
-        CancellationToken cancellationToken)
+    public static async Task<WebApplication> StartUIEdgeAsync(TestBrain test, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(test);
 

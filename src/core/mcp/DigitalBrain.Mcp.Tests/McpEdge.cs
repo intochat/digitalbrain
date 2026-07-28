@@ -61,27 +61,17 @@ internal static class AdmittedMcpTools
         OpenWorldHint = false,
     };
 
-    internal static McpServerTool GmailGetMessage(
-        string id,
-        string subject,
-        string sender,
-        string plaintextBody)
-        => Fixed(
-            GmailGetMessageProtocolTool(ReadOnlyAdmitted),
-            _ => Structured(new { id, subject, sender, plaintextBody }));
+    internal static McpServerTool GmailGetMessage(string id, string subject, string sender, string plaintextBody)
+        => Fixed(GmailGetMessageProtocolTool(ReadOnlyAdmitted), _ => Structured(new { id, subject, sender, plaintextBody }));
 
     internal static McpServerTool GmailGetMessageWithPayload(object payload)
     {
         ArgumentNullException.ThrowIfNull(payload);
-        return Fixed(
-            GmailGetMessageProtocolTool(ReadOnlyAdmitted),
-            _ => Structured(payload));
+        return Fixed(GmailGetMessageProtocolTool(ReadOnlyAdmitted), _ => Structured(payload));
     }
 
     internal static McpServerTool GmailGetMessageWithToolError()
-        => Fixed(
-            GmailGetMessageProtocolTool(ReadOnlyAdmitted),
-            _ => new CallToolResult { IsError = true });
+        => Fixed(GmailGetMessageProtocolTool(ReadOnlyAdmitted), _ => new CallToolResult { IsError = true });
 
     internal static McpServerTool GmailGetMessageWithIncompatibleAnnotations()
         => Fixed(
@@ -142,23 +132,15 @@ internal static class AdmittedMcpTools
             Annotations = annotations,
         };
 
-    private static JsonElement ObjectSchema(
-        params (string Name, object Definition)[] properties)
-        => ObjectSchema(
-            required: properties.Select(property => property.Name).ToArray(),
-            properties);
+    private static JsonElement ObjectSchema(params (string Name, object Definition)[] properties)
+        => ObjectSchema(required: properties.Select(property => property.Name).ToArray(), properties);
 
-    private static JsonElement ObjectSchema(
-        string[]? required,
-        params (string Name, object Definition)[] properties)
+    private static JsonElement ObjectSchema(string[]? required, params (string Name, object Definition)[] properties)
     {
         var shape = new Dictionary<string, object?>
         {
             [Type] = Object,
-            [Properties] = properties.ToDictionary(
-                property => property.Name,
-                property => property.Definition,
-                StringComparer.Ordinal),
+            [Properties] = properties.ToDictionary(property => property.Name, property => property.Definition, StringComparer.Ordinal),
         };
         if (required is not null)
         {
@@ -174,9 +156,7 @@ internal static class AdmittedMcpTools
             StructuredContent = JsonSerializer.SerializeToElement(payload),
         };
 
-    private static FixedSchemaTool Fixed(
-        Tool protocolTool,
-        Func<RequestContext<CallToolRequestParams>, CallToolResult> invoke)
+    private static FixedSchemaTool Fixed(Tool protocolTool, Func<RequestContext<CallToolRequestParams>, CallToolResult> invoke)
         => new(protocolTool, invoke);
 
     private sealed class FixedSchemaTool(

@@ -196,14 +196,9 @@ internal sealed partial class CountdownNeuron :
         return snapshot;
     }
 
-    async Task IRemindable.ReceiveReminder(
-        string reminderName,
-        TickStatus status)
+    async Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
     {
-        if (!TryParseReminderName(
-            reminderName,
-            out var generation,
-            out var revision))
+        if (!TryParseReminderName(reminderName, out var generation, out var revision))
         {
             throw new InvalidOperationException(
                 $"Countdown neuron '{Id}' does not own reminder '{reminderName}'.");

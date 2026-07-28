@@ -44,9 +44,7 @@ public static class DigitalBrainClientHostingExtensions
         }
 
         builder.Services.AddSingleton<IDigitalBrain>(
-            services => DigitalBrainClient.Connect(
-                services.GetRequiredService<IGrainFactory>(),
-                owner));
+            services => DigitalBrainClient.Connect(services.GetRequiredService<IGrainFactory>(), owner));
         builder.Services.AddHostedService<DigitalBrainActivationHostedService>();
 
         return builder;

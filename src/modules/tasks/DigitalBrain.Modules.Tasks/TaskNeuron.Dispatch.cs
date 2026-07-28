@@ -4,10 +4,7 @@ namespace DigitalBrain.Tasks;
 internal sealed partial class TaskNeuron
 {
     private Task<Orleans.Runtime.IGrainReminder> RegisterDispatchReminderAsync()
-        => this.RegisterOrUpdateReminder(
-            DispatchReminderName,
-            TimeSpan.FromSeconds(1),
-            ReminderPeriod);
+        => this.RegisterOrUpdateReminder(DispatchReminderName, TimeSpan.FromSeconds(1), ReminderPeriod);
 
     private async Task UnregisterReminderAsync(string reminderName)
     {

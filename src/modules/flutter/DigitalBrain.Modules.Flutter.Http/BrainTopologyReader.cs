@@ -2,13 +2,9 @@ using DigitalBrain.Client;
 
 namespace DigitalBrain.UI;
 
-internal sealed class BrainTopologyReader(
-    IDigitalBrain brain,
-    IGrainFactory grains,
-    IConfiguration configuration)
+internal sealed class BrainTopologyReader(IDigitalBrain brain, IGrainFactory grains, IConfiguration configuration)
 {
-    public async Task<BrainTopologySnapshot> ReadAsync(
-        CancellationToken cancellationToken)
+    public async Task<BrainTopologySnapshot> ReadAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -42,11 +38,7 @@ internal sealed class BrainTopologyReader(
             {
                 var type = statistic.GrainId.Type.ToString()!;
                 var key = statistic.GrainId.Key.ToString()!;
-                return new BrainNeuron(
-                    $"{type}:{key}",
-                    type,
-                    key,
-                    placements[statistic.SiloAddress]);
+                return new BrainNeuron($"{type}:{key}", type, key, placements[statistic.SiloAddress]);
             })
             .OrderBy(static neuron => neuron.GrainType, StringComparer.Ordinal)
             .ThenBy(static neuron => neuron.Identity, StringComparer.Ordinal)

@@ -88,9 +88,7 @@ public sealed class ClockContracts(TestingFixture fixture)
         await probe.ScheduleAsync(1, 2, reentrantTimer: true, recurringTimer: false);
         await test.Clock.AdvanceAsync(TimeSpan.FromSeconds(2), cancellationToken);
 
-        Assert.Equal(
-            ["reminder", "timer", "reentrant-timer"],
-            await probe.EventsAsync());
+        Assert.Equal(["reminder", "timer", "reentrant-timer"], await probe.EventsAsync());
     }
 
     [Fact(DisplayName = "TestClock skips a cancelled timer while delivering a due reminder")]
@@ -119,21 +117,14 @@ public sealed class ClockContracts(TestingFixture fixture)
         var failure = await Assert.ThrowsAsync<BrainTestFailureException>(
             () => test.Clock.AdvanceAsync(TimeSpan.FromSeconds(1026), cancellationToken));
 
-        Assert.Contains(
-            "exceeded 1024 operations",
-            failure.InnerException!.Message,
-            StringComparison.Ordinal);
+        Assert.Contains("exceeded 1024 operations", failure.InnerException!.Message, StringComparison.Ordinal);
     }
 }
 
 [ClientEntryPoint]
 public partial interface IClockProbe : INeuron
 {
-    Task ScheduleAsync(
-        int reminderDueSeconds,
-        int timerDueSeconds,
-        bool reentrantTimer,
-        bool recurringTimer);
+    Task ScheduleAsync(int reminderDueSeconds, int timerDueSeconds, bool reentrantTimer, bool recurringTimer);
 
     Task CancelTimerAsync();
 
@@ -149,18 +140,12 @@ internal sealed class ClockProbe : Neuron, IClockProbe, IRemindable
     private ITimer? _timer;
     private bool _reentrantTimer;
 
-    public async Task ScheduleAsync(
-        int reminderDueSeconds,
-        int timerDueSeconds,
-        bool reentrantTimer,
-        bool recurringTimer)
+    public async Task ScheduleAsync(int reminderDueSeconds, int timerDueSeconds, bool reentrantTimer, bool recurringTimer)
     {
         _events.Clear();
         _reentrantTimer = reentrantTimer;
         _reminder = await this.RegisterOrUpdateReminder(
-            ReminderName,
-            TimeSpan.FromSeconds(reminderDueSeconds),
-            TimeSpan.FromDays(1));
+            ReminderName, TimeSpan.FromSeconds(reminderDueSeconds), TimeSpan.FromDays(1));
         _timer = TimeProvider.CreateTimer(
             static state => ((ClockProbe)state!).OnTimer(),
             this,

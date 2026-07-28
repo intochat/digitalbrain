@@ -11,11 +11,7 @@ public abstract class GroupChat : Neuron, IGroupChat
 
     protected GroupChat()
     {
-        _directSession = DirectAgentSession.Create(
-            ServiceProvider,
-            "ai.group-chat.session",
-            () => WriteStateAsync(),
-            Id);
+        _directSession = DirectAgentSession.Create(ServiceProvider, "ai.group-chat.session", () => WriteStateAsync(), Id);
     }
 
     protected abstract IReadOnlyList<Participant> Participants { get; }
@@ -32,11 +28,7 @@ public abstract class GroupChat : Neuron, IGroupChat
         var shape = DirectOrchestrationShape.CreateGroupChat(GetType(), snapshot);
         var agent = shape.CreateAgent(GrainFactory, TaskScheduler.Current);
 
-        return _directSession.RunAsync(
-            agent,
-            shape.Definition,
-            messages,
-            CancellationToken.None);
+        return _directSession.RunAsync(agent, shape.Definition, messages, CancellationToken.None);
     }
 
     public Task Accept(AttemptRequest request)

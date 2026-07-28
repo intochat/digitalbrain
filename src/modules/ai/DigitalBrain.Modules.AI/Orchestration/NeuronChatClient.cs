@@ -54,8 +54,7 @@ internal sealed class NeuronChatClient(INeuron participant, TaskScheduler turnSc
             TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
             TaskScheduler.Default);
 
-    private static Func<IReadOnlyList<ChatMessage>, Task<ChatResponse>> InvocationFor(
-        INeuron participant)
+    private static Func<IReadOnlyList<ChatMessage>, Task<ChatResponse>> InvocationFor(INeuron participant)
     {
         ArgumentNullException.ThrowIfNull(participant);
 
@@ -69,9 +68,7 @@ internal sealed class NeuronChatClient(INeuron participant, TaskScheduler turnSc
         };
     }
 
-    private static IReadOnlyList<ChatMessage> Request(
-        IEnumerable<ChatMessage> messages,
-        ChatOptions? options)
+    private static IReadOnlyList<ChatMessage> Request(IEnumerable<ChatMessage> messages, ChatOptions? options)
     {
         var request = messages as IReadOnlyList<ChatMessage> ?? messages.ToArray();
 

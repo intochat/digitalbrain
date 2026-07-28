@@ -9,10 +9,7 @@ public sealed class AccountEnrichmentSurface
     public const string SceneKey = "enrichment";
     public const string SceneTitle = "Account enrichment";
 
-    public async Task RunAsync(
-        IDigitalBrain brain,
-        string shellName,
-        CancellationToken cancellationToken)
+    public async Task RunAsync(IDigitalBrain brain, string shellName, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentException.ThrowIfNullOrWhiteSpace(shellName);

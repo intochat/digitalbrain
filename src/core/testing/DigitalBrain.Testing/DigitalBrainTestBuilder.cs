@@ -26,25 +26,15 @@ public sealed class DigitalBrainTestBuilder
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     public void ConfigureChatClient<TService, TScript>(
-        IReadOnlyCollection<Type> neuronAliases,
-        TService adapter,
-        TScript script,
-        Action<TScript> reset)
+        IReadOnlyCollection<Type> neuronAliases, TService adapter, TScript script, Action<TScript> reset)
         where TService : class
         where TScript : class
     {
         ThrowIfSealed();
-        _edges.ConfigureChatClient(
-            neuronAliases,
-            adapter,
-            script,
-            reset);
+        _edges.ConfigureChatClient(neuronAliases, adapter, script, reset);
     }
 
-    internal void ConfigureMcpSessionFactory<TScript>(
-        IMcpClientSessionFactory factory,
-        TScript script,
-        Action<TScript> reset)
+    internal void ConfigureMcpSessionFactory<TScript>(IMcpClientSessionFactory factory, TScript script, Action<TScript> reset)
         where TScript : class
     {
         ThrowIfSealed();
@@ -54,9 +44,7 @@ public sealed class DigitalBrainTestBuilder
     internal TestFixtureComposition Seal()
     {
         _sealed = true;
-        return new(
-            _modules.Values.ToArray(),
-            _edges);
+        return new(_modules.Values.ToArray(), _edges);
     }
 
     private void ThrowIfSealed()
@@ -69,6 +57,4 @@ public sealed class DigitalBrainTestBuilder
     }
 }
 
-internal sealed record TestFixtureComposition(
-    IReadOnlyCollection<ICompiledModule> Modules,
-    TestEdgeRegistry Edges);
+internal sealed record TestFixtureComposition(IReadOnlyCollection<ICompiledModule> Modules, TestEdgeRegistry Edges);

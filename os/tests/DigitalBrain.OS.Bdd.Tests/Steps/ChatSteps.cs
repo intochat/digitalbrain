@@ -54,9 +54,7 @@ public sealed class ChatSteps(BrainWorld world)
         var selected = await world
             .Neuron<IAssistant>(ChatResponder.AssistantName)
             .Outgoing
-            .ReadAsync<CapabilityToolSelected>(
-                afterSequence: 0,
-                world.CancellationToken);
+            .ReadAsync<CapabilityToolSelected>(afterSequence: 0, world.CancellationToken);
 
         Assert.Empty(selected);
     }

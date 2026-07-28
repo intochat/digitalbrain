@@ -18,8 +18,7 @@ public sealed class ChatResponder : IIntentProgram<UserMessaged, string>
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var answer = await context.Get<IAssistant>(AssistantName).Respond(
-            [.. request.Transcript.Select(AsChatMessage)]);
+        var answer = await context.Get<IAssistant>(AssistantName).Respond([.. request.Transcript.Select(AsChatMessage)]);
 
         return answer.Text;
     }

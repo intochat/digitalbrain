@@ -15,9 +15,7 @@ internal static class BrainCapabilityCatalog
     private const string GmailFeature = "google.gmail";
     private const string SalesforceFeature = "salesforce";
 
-    internal static IReadOnlyList<BrainCapability> Resolve(
-        IReadOnlyList<BrainModule> modules,
-        IConfiguration configuration)
+    internal static IReadOnlyList<BrainCapability> Resolve(IReadOnlyList<BrainModule> modules, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(modules);
         ArgumentNullException.ThrowIfNull(configuration);

@@ -69,9 +69,7 @@ internal sealed class CompositionChatScript : IChatClient
         }
     }
 
-    private ChatResponse NextResponse(
-        IEnumerable<ChatMessage> messages,
-        CancellationToken cancellationToken)
+    private ChatResponse NextResponse(IEnumerable<ChatMessage> messages, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(messages);
         cancellationToken.ThrowIfCancellationRequested();

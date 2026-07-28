@@ -18,17 +18,11 @@ internal static class FlutterHostingProjectionSupport
         "DigitalBrain.Modules.Flutter.Http",
         "DigitalBrain.Modules.Flutter.Http.csproj");
 
-    public static string FlutterClientDirectory => RepositoryAssets.Path(
-        "clients",
-        "digitalbrain_flutter");
+    public static string FlutterClientDirectory => RepositoryAssets.Path("clients", "digitalbrain_flutter");
 
-    public static string FlutterShellDirectory => Path.Combine(
-        FlutterClientDirectory,
-        "shell");
+    public static string FlutterShellDirectory => Path.Combine(FlutterClientDirectory, "shell");
 
-    public static async Task AssertShellDesktopLayoutAsync(
-        string shellDirectory,
-        CancellationToken cancellationToken = default)
+    public static async Task AssertShellDesktopLayoutAsync(string shellDirectory, CancellationToken cancellationToken = default)
     {
         Assert.True(
             File.Exists(Path.Combine(shellDirectory, "pubspec.yaml")),
@@ -50,9 +44,7 @@ internal static class FlutterHostingProjectionSupport
         Assert.Contains("sdk: flutter", pubspec, StringComparison.OrdinalIgnoreCase);
     }
 
-    public static async Task AssertPureDartClientLayoutAsync(
-        string clientDirectory,
-        CancellationToken cancellationToken = default)
+    public static async Task AssertPureDartClientLayoutAsync(string clientDirectory, CancellationToken cancellationToken = default)
     {
         Assert.True(
             File.Exists(Path.Combine(clientDirectory, "pubspec.yaml")),

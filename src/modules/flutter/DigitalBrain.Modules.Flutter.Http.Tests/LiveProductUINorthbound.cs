@@ -23,26 +23,17 @@ public sealed class LiveProductUINorthbound
             Timeout = TimeSpan.FromSeconds(30),
         };
 
-        using (var health = await http.GetAsync(
-                   new Uri(UIEdgeContract.HealthPath, UriKind.Relative),
-                   cancellationToken))
+        using (var health = await http.GetAsync(new Uri(UIEdgeContract.HealthPath, UriKind.Relative), cancellationToken))
         {
             Assert.True(
                 health.IsSuccessStatusCode,
                 $"Product {UIFixture.DefaultUIResourceName} {UIEdgeContract.HealthPath} not OK at {baseAddress}. Start: aspire start --project os/DigitalBrain.OS.AppHost. Status={(int)health.StatusCode}. Override with {UIFixture.UIBaseEnvironmentVariable}.");
         }
 
-        using var streamRequest = new HttpRequestMessage(
-            HttpMethod.Get,
-            UIEdgeSse.ShellEvents(shellName, afterSequence: 0));
-        using var streamResponse = await http.SendAsync(
-            streamRequest,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken);
+        using var streamRequest = new HttpRequestMessage(HttpMethod.Get, UIEdgeSse.ShellEvents(shellName, afterSequence: 0));
+        using var streamResponse = await http.SendAsync(streamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
-        Assert.Equal(
-            UIEdgeContract.EventStreamContentType,
-            streamResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(UIEdgeContract.EventStreamContentType, streamResponse.Content.Headers.ContentType?.MediaType);
 
         await using var body = await streamResponse.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(body);
@@ -53,10 +44,7 @@ public sealed class LiveProductUINorthbound
             cancellationToken);
         Assert.Equal(HttpStatusCode.Accepted, openResponse.StatusCode);
 
-        var projected = await UIEdgeSse.ReadNextSceneOpenedAsync(
-            reader,
-            cancellationToken,
-            timeout: TimeSpan.FromSeconds(20));
+        var projected = await UIEdgeSse.ReadNextSceneOpenedAsync(reader, cancellationToken, timeout: TimeSpan.FromSeconds(20));
 
         Assert.Equal(sceneKey, projected.SceneKey);
         Assert.Equal(title, projected.Title);

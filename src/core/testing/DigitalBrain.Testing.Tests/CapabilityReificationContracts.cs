@@ -14,9 +14,7 @@ public sealed class CapabilityReificationContracts(TestingFixture fixture)
         var caller = test.Neuron<ICapabilityCaller>(TestingScenario.CapabilityCaller);
         var target = test.Neuron<ICapabilityTarget>(TestingScenario.CapabilityTarget);
 
-        await test.Client.SendAsync<ICapabilityCaller>(
-            caller.Id.Name,
-            new CapabilityPing());
+        await test.Client.SendAsync<ICapabilityCaller>(caller.Id.Name, new CapabilityPing());
 
         var stimulus = await caller.Incoming.NextAsync<CapabilityPing>(cancellationToken);
         var requested = await caller.Outgoing.NextAsync<CapabilityRequested>(cancellationToken);
@@ -42,9 +40,7 @@ public sealed class CapabilityReificationContracts(TestingFixture fixture)
         Assert.Equal(requested.CorrelationId, completed.CorrelationId);
         Assert.Equal(caller.Id, completed.Caller);
         Assert.Equal(JournalKind.Outgoing, completed.Direction);
-        Assert.Empty(await caller.Outgoing.ReadAsync<CapabilityFailed>(
-            cancellationToken: cancellationToken));
-        Assert.Empty(await caller.Outgoing.ReadAsync<CapabilityRejected>(
-            cancellationToken: cancellationToken));
+        Assert.Empty(await caller.Outgoing.ReadAsync<CapabilityFailed>(cancellationToken: cancellationToken));
+        Assert.Empty(await caller.Outgoing.ReadAsync<CapabilityRejected>(cancellationToken: cancellationToken));
     }
 }

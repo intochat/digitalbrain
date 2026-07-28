@@ -32,17 +32,12 @@ internal sealed class DirectOrchestrationShape
         _participants = participants;
         _buildWorkflow = buildWorkflow;
         _executionEnvironment = executionEnvironment;
-        Definition = OrchestrationDefinition.Describe(
-            orchestrationType,
-            participants,
-            identity);
+        Definition = OrchestrationDefinition.Describe(orchestrationType, participants, identity);
     }
 
     internal OrchestrationDefinition Definition { get; }
 
-    internal static Participant[] Snapshot(
-        NeuronId orchestration,
-        IReadOnlyList<Participant>? participants)
+    internal static Participant[] Snapshot(NeuronId orchestration, IReadOnlyList<Participant>? participants)
     {
         if (participants is null)
         {
@@ -72,31 +67,19 @@ internal sealed class DirectOrchestrationShape
         return snapshot;
     }
 
-    internal static DirectOrchestrationShape CreateConcurrent(
-        Type orchestrationType,
-        IReadOnlyList<Participant> participants)
+    internal static DirectOrchestrationShape CreateConcurrent(Type orchestrationType, IReadOnlyList<Participant> participants)
         => new(
             orchestrationType,
             participants,
-            new(
-                "concurrent",
-                "in-process-concurrent",
-                "concurrent-default",
-                static _ => "none"),
+            new("concurrent", "in-process-concurrent", "concurrent-default", static _ => "none"),
             static agents => AgentWorkflowBuilder.BuildConcurrent(agents),
             InProcessExecution.Concurrent);
 
-    internal static DirectOrchestrationShape CreateGroupChat(
-        Type orchestrationType,
-        IReadOnlyList<Participant> participants)
+    internal static DirectOrchestrationShape CreateGroupChat(Type orchestrationType, IReadOnlyList<Participant> participants)
         => new(
             orchestrationType,
             participants,
-            new(
-                "group-chat",
-                "in-process-lockstep",
-                "none",
-                static count => $"round-robin:{count}"),
+            new("group-chat", "in-process-lockstep", "none", static count => $"round-robin:{count}"),
             static agents => AgentWorkflowBuilder
                 .CreateGroupChatBuilderWith(team => new RoundRobinGroupChatManager(team)
                 {
@@ -106,9 +89,7 @@ internal sealed class DirectOrchestrationShape
                 .Build(),
             InProcessExecution.Lockstep);
 
-    internal AIAgent CreateAgent(
-        IGrainFactory grains,
-        TaskScheduler turnScheduler)
+    internal AIAgent CreateAgent(IGrainFactory grains, TaskScheduler turnScheduler)
     {
         ArgumentNullException.ThrowIfNull(grains);
         ArgumentNullException.ThrowIfNull(turnScheduler);
@@ -118,8 +99,6 @@ internal sealed class DirectOrchestrationShape
             .. _participants.Select(participant => participant.CreateAgent(grains, turnScheduler)),
         ];
 
-        return _buildWorkflow(agents).AsAIAgent(
-            id: Definition.HostId,
-            executionEnvironment: _executionEnvironment);
+        return _buildWorkflow(agents).AsAIAgent(id: Definition.HostId, executionEnvironment: _executionEnvironment);
     }
 }

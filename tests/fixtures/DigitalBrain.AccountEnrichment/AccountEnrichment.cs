@@ -23,14 +23,11 @@ internal sealed class AccountEnrichment :
 
     public AccountEnrichment()
     {
-        _requests = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(
-            RequestsName);
+        _requests = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(RequestsName);
         _states = ServiceProvider.GetRequiredService<Serializer<Request>>();
     }
 
-    public async Task HandleAsync(
-        EnrichAccountFromEmail synapse,
-        CancellationToken cancellationToken)
+    public async Task HandleAsync(EnrichAccountFromEmail synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         Validate(synapse);
@@ -41,10 +38,8 @@ internal sealed class AccountEnrichment :
             return;
         }
 
-        var gmail = GrainFactory.GetGrain<IGmail>(
-            NeuronId.For<IGmail>(Id.Owner, synapse.GmailAccount).ToGrainId());
-        var salesforce = GrainFactory.GetGrain<ISalesforce>(
-            NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
+        var gmail = GrainFactory.GetGrain<IGmail>(NeuronId.For<IGmail>(Id.Owner, synapse.GmailAccount).ToGrainId());
+        var salesforce = GrainFactory.GetGrain<ISalesforce>(NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
 
         var message = await gmail.ReadMessage(synapse.MessageId, cancellationToken);
         var description =
@@ -74,25 +69,19 @@ internal sealed class AccountEnrichment :
             mutation.Fingerprint));
     }
 
-    public Task HandleAsync(
-        SalesforceMutationApproval synapse,
-        CancellationToken cancellationToken)
+    public Task HandleAsync(SalesforceMutationApproval synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
 
         var request = Load(synapse.CommandId)
-            ?? throw new InvalidOperationException(
-                $"Account enrichment '{synapse.CommandId}' has no durable request.");
+            ?? throw new InvalidOperationException($"Account enrichment '{synapse.CommandId}' has no durable request.");
         if (request.Completed)
         {
             return Task.CompletedTask;
         }
 
-        if (!string.Equals(
-                request.MutationFingerprint,
-                synapse.Fingerprint,
-                StringComparison.Ordinal))
+        if (!string.Equals(request.MutationFingerprint, synapse.Fingerprint, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Salesforce approval '{synapse.ApprovalId}' does not match the enrichment proposal.");
@@ -101,37 +90,27 @@ internal sealed class AccountEnrichment :
         return SendAsync(Id, new ExecuteApprovedAccountEnrichment(synapse));
     }
 
-    public async Task HandleAsync(
-        ExecuteApprovedAccountEnrichment synapse,
-        CancellationToken cancellationToken)
+    public async Task HandleAsync(ExecuteApprovedAccountEnrichment synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         var approval = synapse.Approval;
 
         var request = Load(approval.CommandId)
-            ?? throw new InvalidOperationException(
-                $"Account enrichment '{approval.CommandId}' has no durable request.");
+            ?? throw new InvalidOperationException($"Account enrichment '{approval.CommandId}' has no durable request.");
         if (request.Completed)
         {
             return;
         }
 
-        if (!string.Equals(
-                request.MutationFingerprint,
-                approval.Fingerprint,
-                StringComparison.Ordinal))
+        if (!string.Equals(request.MutationFingerprint, approval.Fingerprint, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Salesforce approval '{approval.ApprovalId}' does not match the enrichment proposal.");
         }
 
         var evidence = await ApprovalEvidenceAsync(approval);
-        var salesforce = GrainFactory.GetGrain<ISalesforce>(
-            NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
-        var mutation = await salesforce.ApproveAccountDescription(
-            approval,
-            evidence,
-            cancellationToken);
+        var salesforce = GrainFactory.GetGrain<ISalesforce>(NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
+        var mutation = await salesforce.ApproveAccountDescription(approval, evidence, cancellationToken);
 
         if (mutation.State is not SalesforceMutationState.Completed)
         {
@@ -139,9 +118,7 @@ internal sealed class AccountEnrichment :
                 $"Salesforce could not prove completion of Account '{mutation.AccountId}' enrichment.");
         }
 
-        Stage(
-            approval.CommandId,
-            request with { Completed = true });
+        Stage(approval.CommandId, request with { Completed = true });
         await EmitAsync(new AccountEnriched(
             mutation.CommandId,
             request.MessageId,
@@ -164,8 +141,7 @@ internal sealed class AccountEnrichment :
         return base.Deliver(delivery);
     }
 
-    private async Task<SynapseDelivery> ApprovalEvidenceAsync(
-        SalesforceMutationApproval approval)
+    private async Task<SynapseDelivery> ApprovalEvidenceAsync(SalesforceMutationApproval approval)
     {
         var incoming = await ReadJournal(JournalKind.Incoming, afterSequence: 0);
         return incoming.Delta.FirstOrDefault(delivery =>
@@ -214,9 +190,7 @@ internal sealed class AccountEnrichment :
     {
         if (request.CommandId.Value == Guid.Empty)
         {
-            throw new ArgumentException(
-                "An account-enrichment command id cannot be empty.",
-                nameof(request));
+            throw new ArgumentException("An account-enrichment command id cannot be empty.", nameof(request));
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(request.MessageId);

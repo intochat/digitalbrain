@@ -16,10 +16,7 @@ public sealed class TestClock
     private readonly TestReminderDriver _reminders;
     private bool _disposed;
 
-    internal TestClock(
-        ControllableTimeProvider provider,
-        TestReminderDriver reminders,
-        BrainTestDiagnostics diagnostics)
+    internal TestClock(ControllableTimeProvider provider, TestReminderDriver reminders, BrainTestDiagnostics diagnostics)
     {
         _provider = provider;
         _reminders = reminders;
@@ -30,36 +27,26 @@ public sealed class TestClock
     {
         get
         {
-            ObjectDisposedException.ThrowIf(
-                Volatile.Read(ref _disposed),
-                this);
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed), this);
             return _provider.GetUtcNow();
         }
     }
 
-    public async Task AdvanceAsync(
-        TimeSpan duration,
-        CancellationToken cancellationToken = default)
+    public async Task AdvanceAsync(TimeSpan duration, CancellationToken cancellationToken = default)
     {
         try
         {
-            ArgumentOutOfRangeException.ThrowIfLessThan(
-                duration,
-                TimeSpan.Zero);
+            ArgumentOutOfRangeException.ThrowIfLessThan(duration, TimeSpan.Zero);
             await AdvanceCoreAsync(duration, cancellationToken);
         }
         catch (Exception failure)
             when (failure is not BrainTestFailureException)
         {
-            throw _diagnostics.CaptureFailure(
-                "clock.advance",
-                failure);
+            throw _diagnostics.CaptureFailure("clock.advance", failure);
         }
     }
 
-    private async Task AdvanceCoreAsync(
-        TimeSpan duration,
-        CancellationToken cancellationToken)
+    private async Task AdvanceCoreAsync(TimeSpan duration, CancellationToken cancellationToken)
     {
         await _advanceGate.WaitAsync(cancellationToken);
         try
@@ -88,9 +75,7 @@ public sealed class TestClock
                             "A deterministic timer disappeared before it could be fired.");
                     }
                 }
-                else if (!await _reminders.TryDeliverNextDueAsync(
-                    target,
-                    cancellationToken))
+                else if (!await _reminders.TryDeliverNextDueAsync(target, cancellationToken))
                 {
                     throw new InvalidOperationException(
                         "A deterministic reminder disappeared before it could be delivered.");
@@ -124,9 +109,7 @@ public sealed class TestClock
         => new(
             $"Deterministic time drain exceeded {MaximumDrainOperations} operations while advancing to {target:O}.");
 
-    private bool TrySelectNextDue(
-        DateTimeOffset target,
-        out bool nextIsTimer)
+    private bool TrySelectNextDue(DateTimeOffset target, out bool nextIsTimer)
     {
         var timer = _provider.NextDueAtOrBefore(target);
         var reminder = _reminders.NextDueAtOrBefore(target);
@@ -143,9 +126,7 @@ public sealed class TestClock
         return true;
     }
 
-    private static DateTimeOffset Add(
-        DateTimeOffset value,
-        TimeSpan duration)
+    private static DateTimeOffset Add(DateTimeOffset value, TimeSpan duration)
     {
         try
         {

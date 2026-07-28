@@ -62,12 +62,7 @@ public abstract partial class Neuron
 
         _handling = delivery;
         _handlingDepth = DeliveryPolicy.InboundDepth();
-        _turnCheckpoint = new(
-            _outbox.Count,
-            _handled.Count,
-            InboundCommitted: true,
-            _incoming.Checkpoint(),
-            _outgoing.Checkpoint());
+        _turnCheckpoint = new(_outbox.Count, _handled.Count, InboundCommitted: true, _incoming.Checkpoint(), _outgoing.Checkpoint());
         _turnRollbacks.Clear();
 
         return turn;
@@ -86,9 +81,7 @@ public abstract partial class Neuron
 
     internal void FailIncomingCapabilityRequest(CapabilityTurn turn)
     {
-        Discard(
-            _outbox,
-            _turnCheckpoint?.CommittedOutbox ?? turn.CommittedOutbox);
+        Discard(_outbox, _turnCheckpoint?.CommittedOutbox ?? turn.CommittedOutbox);
         _outgoing.Restore(_turnCheckpoint?.Outgoing ?? turn.Outgoing);
         RollbackTurnState();
         _firedWhileHandling.Clear();

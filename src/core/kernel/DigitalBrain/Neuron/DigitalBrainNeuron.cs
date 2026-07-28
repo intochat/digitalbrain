@@ -13,8 +13,7 @@ internal sealed class DigitalBrainNeuron : Neuron, IDigitalBrainNeuron
 
     public DigitalBrainNeuron()
     {
-        _activationPublished = ServiceProvider.GetRequiredKeyedService<IDurableValue<bool>>(
-            ActivationPublishedName);
+        _activationPublished = ServiceProvider.GetRequiredKeyedService<IDurableValue<bool>>(ActivationPublishedName);
     }
 
     public async Task Activate()

@@ -2,8 +2,7 @@ namespace DigitalBrain.UI;
 
 internal static class BrainEndpoints
 {
-    public static IEndpointRouteBuilder MapBrain(
-        this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapBrain(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 

@@ -9,9 +9,7 @@ namespace DigitalBrain.ModuleTests;
 
 [GenerateSerializer]
 [Alias("moduletests.account-enriched-probe")]
-public sealed record ProbeAccountEnriched(
-    [property: Id(0)] string AccountId,
-    [property: Id(1)] string MessageId) : Synapse;
+public sealed record ProbeAccountEnriched([property: Id(0)] string AccountId, [property: Id(1)] string MessageId) : Synapse;
 
 [Alias("DigitalBrain.ModuleTests.IEnrichmentProbe")]
 [ClientEntryPoint]
@@ -35,8 +33,7 @@ public sealed class EnrichmentProbe : Neuron, IEnrichmentProbe, IEmit<ProbeAccou
     }
 }
 
-public sealed class ToolAgentProbe(
-    [FromKeyedServices(typeof(Llama32))] IChatClient chatClient)
+public sealed class ToolAgentProbe([FromKeyedServices(typeof(Llama32))] IChatClient chatClient)
     : Agent(chatClient), IToolAgentProbe
 {
     public const string EnrichTool = "enrich_account_from_email";
@@ -56,8 +53,7 @@ public sealed class ToolAgentProbe(
 
     private async Task<string> EnrichAsync(string accountId, string messageId)
     {
-        var enrichment = GrainFactory.GetGrain<IEnrichmentProbe>(
-            NeuronId.For<IEnrichmentProbe>(Id.Owner, ProbeName).ToGrainId());
+        var enrichment = GrainFactory.GetGrain<IEnrichmentProbe>(NeuronId.For<IEnrichmentProbe>(Id.Owner, ProbeName).ToGrainId());
 
         await enrichment.Enrich(accountId, messageId);
 

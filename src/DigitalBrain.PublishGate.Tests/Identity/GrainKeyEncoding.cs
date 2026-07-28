@@ -16,8 +16,7 @@ public sealed class GrainKeyEncoding
     [Theory]
     [MemberData(nameof(RejectedIdentityParts))]
     public void NeuronNameRejectsPartsThatWouldBreakGrainKeyEncoding(string name)
-        => Assert.Throws<ArgumentException>(
-            () => new NeuronId(nameof(NeuronId), new OwnerId(nameof(OwnerId)), name));
+        => Assert.Throws<ArgumentException>(() => new NeuronId(nameof(NeuronId), new OwnerId(nameof(OwnerId)), name));
 
     [Fact]
     public void OwnerIdRejectsNull()
@@ -26,10 +25,7 @@ public sealed class GrainKeyEncoding
     [Fact]
     public void GrainKeyRoundTripsThroughOwnerAndName()
     {
-        var original = new NeuronId(
-            nameof(NeuronId),
-            new OwnerId(nameof(OwnerId)),
-            nameof(NeuronId.Name));
+        var original = new NeuronId(nameof(NeuronId), new OwnerId(nameof(OwnerId)), nameof(NeuronId.Name));
 
         Assert.Equal(original, NeuronId.FromGrainKey(original.Type, original.GrainKey));
     }
@@ -48,6 +44,5 @@ public sealed class GrainKeyEncoding
     [InlineData("/x")]
     [InlineData("x/")]
     public void FromGrainKeyRejectsMalformedKeys(string grainKey)
-        => Assert.Throws<ArgumentException>(
-            () => NeuronId.FromGrainKey(nameof(NeuronId), grainKey));
+        => Assert.Throws<ArgumentException>(() => NeuronId.FromGrainKey(nameof(NeuronId), grainKey));
 }

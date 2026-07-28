@@ -23,19 +23,11 @@ internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
         ArgumentException.ThrowIfNullOrWhiteSpace(durableIdentity);
         ArgumentNullException.ThrowIfNull(callback);
 
-        await using var session = await sessions.OpenAsync(
-            server,
-            tokenState,
-            commit,
-            durableIdentity,
-            cancellationToken);
+        await using var session = await sessions.OpenAsync(server, tokenState, commit, durableIdentity, cancellationToken);
         return await callback(session.Client, cancellationToken);
     }
 
-    internal static JsonElement RequireStructuredContent(
-        CallToolResult result,
-        McpServerDefinition server,
-        string toolName)
+    internal static JsonElement RequireStructuredContent(CallToolResult result, McpServerDefinition server, string toolName)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(server);

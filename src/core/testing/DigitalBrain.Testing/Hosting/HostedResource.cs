@@ -11,8 +11,7 @@ public sealed class HostedResource
         _name = name;
     }
 
-    public Task WaitUntilHealthyAsync(
-        CancellationToken cancellationToken = default)
+    public Task WaitUntilHealthyAsync(CancellationToken cancellationToken = default)
         => _host.WaitUntilHealthyAsync(_name, cancellationToken);
 
     public HttpClient CreateHttpClient()

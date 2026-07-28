@@ -11,10 +11,7 @@ public sealed class ShellSceneRoundTrip(FlutterFixture fixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(FlutterFixture.ShellName);
-        var command = new OpenScene(
-            CommandId.New(),
-            FlutterFixture.HomeSceneKey,
-            FlutterFixture.HomeSceneTitle);
+        var command = new OpenScene(CommandId.New(), FlutterFixture.HomeSceneKey, FlutterFixture.HomeSceneTitle);
 
         await shell.Reference.Open(command);
 
@@ -61,18 +58,12 @@ public sealed class ShellSceneRoundTrip(FlutterFixture fixture)
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(FlutterFixture.HomeSceneKey, opened.Synapse.SceneKey);
 
-        Assert.Empty(await shell.Outgoing.ReadAsync<CapabilityRequested>(
-            cancellationToken: cancellationToken));
-        Assert.Empty(await shell.Outgoing.ReadAsync<CapabilityCompleted>(
-            cancellationToken: cancellationToken));
-        Assert.Empty(await shell.Outgoing.ReadAsync<CapabilityFailed>(
-            cancellationToken: cancellationToken));
-        Assert.Empty(await shell.Outgoing.ReadAsync<CapabilityRejected>(
-            cancellationToken: cancellationToken));
-        Assert.Empty(await shell.Incoming.ReadAsync<CapabilityRequested>(
-            cancellationToken: cancellationToken));
-        Assert.Empty(await shell.Incoming.ReadAsync<CapabilityCompleted>(
-            cancellationToken: cancellationToken));
+        Assert.Empty(await shell.Outgoing.ReadAsync<CapabilityRequested>(cancellationToken: cancellationToken));
+        Assert.Empty(await shell.Outgoing.ReadAsync<CapabilityCompleted>(cancellationToken: cancellationToken));
+        Assert.Empty(await shell.Outgoing.ReadAsync<CapabilityFailed>(cancellationToken: cancellationToken));
+        Assert.Empty(await shell.Outgoing.ReadAsync<CapabilityRejected>(cancellationToken: cancellationToken));
+        Assert.Empty(await shell.Incoming.ReadAsync<CapabilityRequested>(cancellationToken: cancellationToken));
+        Assert.Empty(await shell.Incoming.ReadAsync<CapabilityCompleted>(cancellationToken: cancellationToken));
     }
 
     [Fact(DisplayName =
@@ -85,27 +76,14 @@ public sealed class ShellSceneRoundTrip(FlutterFixture fixture)
         var commandId = CommandId.New();
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            shell.Reference.Open(new OpenScene(
-                commandId,
-                string.Empty,
-                FlutterFixture.HomeSceneTitle)));
+            shell.Reference.Open(new OpenScene(commandId, string.Empty, FlutterFixture.HomeSceneTitle)));
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            shell.Reference.Open(new OpenScene(
-                commandId,
-                "   ",
-                FlutterFixture.HomeSceneTitle)));
+            shell.Reference.Open(new OpenScene(commandId, "   ", FlutterFixture.HomeSceneTitle)));
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            shell.Reference.Open(new OpenScene(
-                commandId,
-                FlutterFixture.HomeSceneKey,
-                string.Empty)));
+            shell.Reference.Open(new OpenScene(commandId, FlutterFixture.HomeSceneKey, string.Empty)));
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            shell.Reference.Open(new OpenScene(
-                commandId,
-                FlutterFixture.HomeSceneKey,
-                "   ")));
+            shell.Reference.Open(new OpenScene(commandId, FlutterFixture.HomeSceneKey, "   ")));
 
-        Assert.Empty(await shell.Outgoing.ReadAsync<SceneOpened>(
-            cancellationToken: cancellationToken));
+        Assert.Empty(await shell.Outgoing.ReadAsync<SceneOpened>(cancellationToken: cancellationToken));
     }
 }

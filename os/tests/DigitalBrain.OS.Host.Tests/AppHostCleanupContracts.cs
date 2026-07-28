@@ -28,9 +28,7 @@ public sealed class AppHostCleanupContracts
         var applicationHost = new ControllableHost(hangDuringDispose: true);
         var running = await CreateRunningAppHost(applicationHost);
         var disposal = running.DisposeAsync().AsTask();
-        var bound = Task.Delay(
-            TimeSpan.FromSeconds(1),
-            TestContext.Current.CancellationToken);
+        var bound = Task.Delay(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
 
         Assert.Same(disposal, await Task.WhenAny(disposal, bound));
         var failure = await Record.ExceptionAsync(() => disposal);
@@ -53,17 +51,13 @@ public sealed class AppHostCleanupContracts
         var later = new IOException("dispose failed");
         var applicationHost = new ControllableHost(primary, later);
         var releases = 0;
-        var running = await CreateRunningAppHost(
-            applicationHost,
-            _ => Interlocked.Increment(ref releases));
+        var running = await CreateRunningAppHost(applicationHost, _ => Interlocked.Increment(ref releases));
 
-        var failure = await Record.ExceptionAsync(
-            () => running.DisposeAsync().AsTask());
+        var failure = await Record.ExceptionAsync(() => running.DisposeAsync().AsTask());
 
         Assert.NotNull(failure);
         Assert.Same(primary, failure.InnerException);
-        var secondary = Assert.IsType<AggregateException>(
-            primary.Data["AppHost cleanup secondary failures"]);
+        var secondary = Assert.IsType<AggregateException>(primary.Data["AppHost cleanup secondary failures"]);
         Assert.Same(later, Assert.Single(secondary.InnerExceptions));
         Assert.Equal(1, applicationHost.StopCalls);
         Assert.Equal(1, applicationHost.AsyncDisposeCalls);
@@ -80,9 +74,7 @@ public sealed class AppHostCleanupContracts
     {
         var applicationHost = new ControllableHost();
         var releases = 0;
-        var running = await CreateRunningAppHost(
-            applicationHost,
-            _ => Interlocked.Increment(ref releases));
+        var running = await CreateRunningAppHost(applicationHost, _ => Interlocked.Increment(ref releases));
 
         await running.DisposeAsync();
         await running.DisposeAsync();
@@ -103,16 +95,10 @@ public sealed class AppHostCleanupContracts
     {
         var application = new DistributedApplication(applicationHost);
         var lease = await AcquireLeaseAsync(CancellationToken.None);
-        var constructor = typeof(RunningAppHost).GetConstructors(
-                BindingFlags.NonPublic | BindingFlags.Instance)
+        var constructor = typeof(RunningAppHost)
+            .GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance)
             .Single();
-        return (RunningAppHost)constructor.Invoke(
-        [
-            application,
-            lease,
-            release ?? (_ => { }),
-            TestCleanupBudget,
-        ]);
+        return (RunningAppHost)constructor.Invoke([application, lease, release ?? (_ => { }), TestCleanupBudget]);
     }
 
     private static async Task AssertLeaseReleasedExactlyOnceAsync()
@@ -120,20 +106,14 @@ public sealed class AppHostCleanupContracts
         using var timeout = new CancellationTokenSource(TestCleanupBudget);
         var lease = await AcquireLeaseAsync(timeout.Token);
         using var contenderTimeout = new CancellationTokenSource(TestCleanupBudget);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => AcquireLeaseAsync(contenderTimeout.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => AcquireLeaseAsync(contenderTimeout.Token));
         await DisposeLeaseAsync(lease);
     }
 
-    private static async Task<object> AcquireLeaseAsync(
-        CancellationToken cancellationToken)
+    private static async Task<object> AcquireLeaseAsync(CancellationToken cancellationToken)
     {
-        var leaseType = typeof(RunningAppHost).Assembly.GetType(
-            "DigitalBrain.Testing.AppHostExclusiveLease",
-            throwOnError: true)!;
-        var acquire = leaseType.GetMethod(
-            "AcquireAsync",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
+        var leaseType = typeof(RunningAppHost).Assembly.GetType("DigitalBrain.Testing.AppHostExclusiveLease", throwOnError: true)!;
+        var acquire = leaseType.GetMethod("AcquireAsync", BindingFlags.NonPublic | BindingFlags.Static)!;
         var leaseTask = (Task)acquire.Invoke(null, [cancellationToken])!;
         await leaseTask;
         return leaseTask.GetType().GetProperty("Result")!.GetValue(leaseTask)!;
@@ -142,12 +122,9 @@ public sealed class AppHostCleanupContracts
     private static Task DisposeLeaseAsync(object lease)
     {
         var dispose = lease.GetType().GetMethod(
-            nameof(IAsyncDisposable.DisposeAsync),
-            BindingFlags.Public | BindingFlags.Instance)!;
+            nameof(IAsyncDisposable.DisposeAsync), BindingFlags.Public | BindingFlags.Instance)!;
         var valueTask = dispose.Invoke(lease, null)!;
-        return (Task)valueTask.GetType().GetMethod("AsTask")!.Invoke(
-            valueTask,
-            null)!;
+        return (Task)valueTask.GetType().GetMethod("AsTask")!.Invoke(valueTask, null)!;
     }
 
     private sealed class ControllableHost : IHost, IAsyncDisposable
@@ -212,8 +189,7 @@ public sealed class AppHostCleanupContracts
         private static ServiceProvider CreateServices()
         {
             var builder = Host.CreateApplicationBuilder();
-            builder.Services.AddSingleton(
-                new DistributedApplicationModel(Array.Empty<IResource>()));
+            builder.Services.AddSingleton(new DistributedApplicationModel(Array.Empty<IResource>()));
             builder.Services.AddSingleton<ResourceNotificationService>();
             builder.Services.AddSingleton<ResourceCommandService>();
             return builder.Services.BuildServiceProvider();

@@ -61,10 +61,7 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
 
         if (redeemed is not null)
         {
-            redeemed.Delegation.RequireMatches(
-                context.SourceId,
-                context.TargetId,
-                context.InterfaceMethod);
+            redeemed.Delegation.RequireMatches(context.SourceId, context.TargetId, context.InterfaceMethod);
             delivery = redeemed.Delegation.Request;
             delegatedSource = redeemed.Delegation.DelegateSource;
         }
@@ -74,10 +71,7 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
             delegatedSource = null;
         }
 
-        var turn = await target.BeginIncomingCapabilityRequestAsync(
-            delivery,
-            context.SourceId,
-            delegatedSource);
+        var turn = await target.BeginIncomingCapabilityRequestAsync(delivery, context.SourceId, delegatedSource);
 
         try
         {

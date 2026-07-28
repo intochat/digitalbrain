@@ -27,11 +27,7 @@ internal sealed class HttpMcpClientSessionFactory(
         ArgumentNullException.ThrowIfNull(commit);
         ArgumentException.ThrowIfNullOrWhiteSpace(durableIdentity);
 
-        var tokens = new DurableMcpTokenCache(
-            tokenState,
-            commit,
-            protector,
-            $"mcp/oauth/{server.Key}/{durableIdentity}");
+        var tokens = new DurableMcpTokenCache(tokenState, commit, protector, $"mcp/oauth/{server.Key}/{durableIdentity}");
         var authorization = McpOAuthOptions.Create(server, configuration, tokens);
         var httpClient = httpClients.CreateClient(McpRuntime.HttpClientName);
         var transport = new HttpClientTransport(
@@ -44,9 +40,7 @@ internal sealed class HttpMcpClientSessionFactory(
             httpClient,
             loggerFactory: null,
             ownsHttpClient: true);
-        var client = await McpClient.CreateAsync(
-            transport,
-            cancellationToken: cancellationToken);
+        var client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken);
         return new OwnedMcpClientSession(client);
     }
 

@@ -9,9 +9,7 @@ internal sealed class SceneNeuron :
     IScene,
     IHandle<ControlActivated>
 {
-    public Task HandleAsync(
-        ControlActivated synapse,
-        CancellationToken cancellationToken)
+    public Task HandleAsync(ControlActivated synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         ArgumentException.ThrowIfNullOrWhiteSpace(synapse.SceneKey);

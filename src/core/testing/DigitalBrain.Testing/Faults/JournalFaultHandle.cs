@@ -9,9 +9,7 @@ public sealed class JournalFaultHandle : IAsyncDisposable
     private readonly BrainTestDiagnostics _diagnostics;
 
     internal JournalFaultHandle(
-        JournalFaultRegistration registration,
-        Func<JournalFaultHandle, bool> disarm,
-        BrainTestDiagnostics diagnostics)
+        JournalFaultRegistration registration, Func<JournalFaultHandle, bool> disarm, BrainTestDiagnostics diagnostics)
     {
         Registration = registration;
         _disarm = disarm;
@@ -39,15 +37,10 @@ public sealed class JournalFaultHandle : IAsyncDisposable
         }
         catch (Exception failure)
         {
-            return ValueTask.FromException(
-                _diagnostics.CaptureFailure(
-                    "fault.dispose",
-                    failure));
+            return ValueTask.FromException(_diagnostics.CaptureFailure("fault.dispose", failure));
         }
     }
 
     internal bool Disarm()
-        => Interlocked.Exchange(ref _disarm, null)
-            ?.Invoke(this)
-            ?? false;
+        => Interlocked.Exchange(ref _disarm, null)?.Invoke(this) ?? false;
 }

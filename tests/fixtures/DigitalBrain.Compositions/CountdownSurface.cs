@@ -27,9 +27,6 @@ public sealed class CountdownSurface
 
         var countdown = brain.Get<ICountdown>(countdownName);
         var destination = NeuronId.For<IScene>(brain.Owner, SceneKey);
-        return await countdown.Start(new StartCountdown(
-            CommandId.New(),
-            duration,
-            destination));
+        return await countdown.Start(new StartCountdown(CommandId.New(), duration, destination));
     }
 }

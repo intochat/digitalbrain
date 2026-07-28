@@ -42,9 +42,7 @@ public sealed class BehaviorOSActivationBoot(CompositionsFixture fixture)
 
         await test.Client.ActivateAsync();
 
-        var activations = await brain.Outgoing.ReadAsync<DigitalBrainActivated>(
-            afterSequence: 0,
-            cancellationToken);
+        var activations = await brain.Outgoing.ReadAsync<DigitalBrainActivated>(afterSequence: 0, cancellationToken);
         Assert.Single(activations);
         Assert.Equal(first.SynapseId, activations[0].SynapseId);
     }

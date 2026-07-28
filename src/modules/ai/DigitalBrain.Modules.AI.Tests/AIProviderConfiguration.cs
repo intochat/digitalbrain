@@ -47,16 +47,12 @@ public sealed class AIProviderConfiguration
 
     [Theory(DisplayName = "every supported Ollama model resolves with its expected default tag")]
     [MemberData(nameof(SupportedOllamaModels))]
-    public void SupportedOllamaModelResolvesWithExpectedDefaultTag(
-        Type modelType,
-        string expectedTag,
-        string endpoint)
+    public void SupportedOllamaModelResolvesWithExpectedDefaultTag(Type modelType, string expectedTag, string endpoint)
     {
         using var provider = Compose(endpoint);
 
         var client = provider.GetRequiredKeyedService<IChatClient>(modelType);
-        var ollama = Assert.IsAssignableFrom<IOllamaApiClient>(
-            client.GetService(typeof(IOllamaApiClient)));
+        var ollama = Assert.IsAssignableFrom<IOllamaApiClient>(client.GetService(typeof(IOllamaApiClient)));
 
         Assert.NotSame(ollama, client);
         Assert.Equal(new Uri(endpoint), ollama.Uri);
@@ -93,9 +89,7 @@ public sealed class AIProviderConfiguration
         return services.BuildServiceProvider();
     }
 
-    private sealed class CompositionSiloBuilder(
-        IServiceCollection services,
-        IConfiguration configuration) : ISiloBuilder
+    private sealed class CompositionSiloBuilder(IServiceCollection services, IConfiguration configuration) : ISiloBuilder
     {
         public IServiceCollection Services => services;
 

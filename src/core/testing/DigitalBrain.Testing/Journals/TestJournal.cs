@@ -25,11 +25,7 @@ public sealed partial class TestJournal
     private IJournalObserver? _reference;
     private bool _watching;
 
-    internal TestJournal(
-        FixtureCluster cluster,
-        NeuronId subject,
-        JournalKind direction,
-        BrainTestDiagnostics diagnostics)
+    internal TestJournal(FixtureCluster cluster, NeuronId subject, JournalKind direction, BrainTestDiagnostics diagnostics)
     {
         _cluster = cluster;
         _subject = subject;
@@ -39,8 +35,7 @@ public sealed partial class TestJournal
             ISessionNeuron.ForOwner(subject.Owner).ToGrainId());
     }
 
-    public Task<ObservedSynapse<TSynapse>> NextAsync<TSynapse>(
-        CancellationToken cancellationToken = default)
+    public Task<ObservedSynapse<TSynapse>> NextAsync<TSynapse>(CancellationToken cancellationToken = default)
         where TSynapse : Synapse
     {
         lock (_nextTasksGate)
@@ -56,8 +51,7 @@ public sealed partial class TestJournal
             var task = NextWrappedAsync<TSynapse>(cancellationToken);
             _outstandingNextTasks.Add(task);
             _ = task.ContinueWith(
-                static (completed, state) =>
-                    ((TestJournal)state!).RetireNextTask(completed),
+                static (completed, state) => ((TestJournal)state!).RetireNextTask(completed),
                 this,
                 CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously,
@@ -67,8 +61,7 @@ public sealed partial class TestJournal
     }
 
     public async Task<IReadOnlyList<ObservedSynapse<TSynapse>>> ReadAsync<TSynapse>(
-        long afterSequence = 0,
-        CancellationToken cancellationToken = default)
+        long afterSequence = 0, CancellationToken cancellationToken = default)
         where TSynapse : Synapse
     {
         try
@@ -89,9 +82,7 @@ public sealed partial class TestJournal
             [
                 .. read.Delta
                     .Where(delivery => delivery.Synapse is TSynapse)
-                    .Select(delivery => Observe(
-                        (TSynapse)delivery.Synapse,
-                        delivery)),
+                    .Select(delivery => Observe((TSynapse)delivery.Synapse, delivery)),
             ];
         }
         catch (Exception failure) when (failure is not BrainTestFailureException)

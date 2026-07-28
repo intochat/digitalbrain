@@ -19,17 +19,9 @@ public sealed partial class TaskLifecycle
         Assert.NotNull(started.ActiveAttempt);
 
         var accepted = await task.Incoming.NextAsync<AttemptAccepted>(cancellationToken);
-        AssertAttempt(
-            accepted,
-            task.Id,
-            worker.Id,
-            started.ActiveAttempt,
-            started.Revision);
+        AssertAttempt(accepted, task.Id, worker.Id, started.ActiveAttempt, started.Revision);
 
-        var running = await WaitForStateAsync(
-            task,
-            TaskState.Running,
-            cancellationToken);
+        var running = await WaitForStateAsync(task, TaskState.Running, cancellationToken);
 
         Assert.Equal(started.ActiveAttempt, running.ActiveAttempt);
         Assert.Equal(started.Revision, running.Revision);
@@ -60,8 +52,6 @@ public sealed partial class TaskLifecycle
                 new TestGoal("second-start"),
                 worker.Id)));
 
-        Assert.Equal(
-            TaskState.Running,
-            (await task.Reference.Read()).State);
+        Assert.Equal(TaskState.Running, (await task.Reference.Read()).State);
     }
 }

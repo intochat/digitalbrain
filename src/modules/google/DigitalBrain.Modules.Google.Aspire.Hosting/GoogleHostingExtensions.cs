@@ -14,8 +14,7 @@ public static class GoogleHostingExtensions
         "OAuth client secret from [Google Auth Platform](https://console.cloud.google.com/auth/clients).",
         "OAuth callback URI registered on the Google client. Use an HTTP loopback callback only with the explicit local development authorization mode.");
 
-    public static DigitalBrainModuleBuilder<GoogleModule> WithGmail(
-        this DigitalBrainModuleBuilder<GoogleModule> module)
+    public static DigitalBrainModuleBuilder<GoogleModule> WithGmail(this DigitalBrainModuleBuilder<GoogleModule> module)
     {
         ArgumentNullException.ThrowIfNull(module);
 

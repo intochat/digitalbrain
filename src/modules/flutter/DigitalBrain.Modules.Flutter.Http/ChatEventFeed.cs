@@ -88,21 +88,14 @@ internal static class ChatEventFeed
         }
     }
 
-    private static Task WriteEventAsync(
-        Stream responseBody,
-        ChatTurnEvent turn,
-        CancellationToken cancellationToken)
+    private static Task WriteEventAsync(Stream responseBody, ChatTurnEvent turn, CancellationToken cancellationToken)
     {
         var payload = JsonSerializer.Serialize(turn, EventJson);
-        var frame = FormattableString.Invariant(
-            $"id: {turn.Sequence}\nevent: {UIEdgeContract.ChatTurnEvent}\ndata: {payload}\n\n");
+        var frame = FormattableString.Invariant($"id: {turn.Sequence}\nevent: {UIEdgeContract.ChatTurnEvent}\ndata: {payload}\n\n");
         return WriteAsync(responseBody, frame, cancellationToken);
     }
 
-    private static async Task WriteAsync(
-        Stream responseBody,
-        string text,
-        CancellationToken cancellationToken)
+    private static async Task WriteAsync(Stream responseBody, string text, CancellationToken cancellationToken)
     {
         var bytes = Utf8.GetBytes(text);
         await responseBody.WriteAsync(bytes, cancellationToken);

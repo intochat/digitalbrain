@@ -117,9 +117,7 @@ public sealed partial class DispatchManifestGenerator
         public string Name { get; } = name;
     }
 
-    private readonly struct CompositionModel(
-        ImmutableArray<ModuleModel> modules,
-        bool emit)
+    private readonly struct CompositionModel(ImmutableArray<ModuleModel> modules, bool emit)
     {
         public ImmutableArray<ModuleModel> Modules { get; } = modules;
 

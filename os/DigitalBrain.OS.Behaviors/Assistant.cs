@@ -9,8 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.OS;
 
-internal sealed class Assistant(
-    [FromKeyedServices(typeof(Gemma4))] IChatClient chatClient)
+internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient chatClient)
     : Agent(chatClient), IAssistant
 {
     public const string EnrichAccountFromEmail = "enrich_account_from_email";
@@ -71,17 +70,13 @@ internal sealed class Assistant(
             || accountId.Any(static character =>
                 !char.IsAsciiLetterOrDigit(character)))
         {
-            throw new ArgumentException(
-                "A Salesforce Account ID must be a 15- or 18-character alphanumeric value.",
-                nameof(accountId));
+            throw new ArgumentException("A Salesforce Account ID must be a 15- or 18-character alphanumeric value.", nameof(accountId));
         }
     }
 
     private IGmail Gmail()
-        => GrainFactory.GetGrain<IGmail>(
-            NeuronId.For<IGmail>(Id.Owner, DefaultGmailAccount).ToGrainId());
+        => GrainFactory.GetGrain<IGmail>(NeuronId.For<IGmail>(Id.Owner, DefaultGmailAccount).ToGrainId());
 
     private ISalesforce Salesforce()
-        => GrainFactory.GetGrain<ISalesforce>(
-            NeuronId.For<ISalesforce>(Id.Owner, DefaultSalesforceAccount).ToGrainId());
+        => GrainFactory.GetGrain<ISalesforce>(NeuronId.For<ISalesforce>(Id.Owner, DefaultSalesforceAccount).ToGrainId());
 }

@@ -40,9 +40,7 @@ public sealed class GmailReadMessage(IntegrationsFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Mcp().Catalog(
-            IntegrationsFixture.GmailServerKey,
-            AdmittedMcpTools.GmailGetMessageWithIncompatibleAnnotations());
+        test.Mcp().Catalog(IntegrationsFixture.GmailServerKey, AdmittedMcpTools.GmailGetMessageWithIncompatibleAnnotations());
 
         var driver = test.Neuron<IIntegrationDriver>("gmail-refuse");
         var failure = await Assert.ThrowsAnyAsync<Exception>(() =>
@@ -141,9 +139,7 @@ public sealed class GmailReadMessage(IntegrationsFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Mcp().Catalog(
-            IntegrationsFixture.GmailServerKey,
-            AdmittedMcpTools.GmailGetMessageWithToolError());
+        test.Mcp().Catalog(IntegrationsFixture.GmailServerKey, AdmittedMcpTools.GmailGetMessageWithToolError());
 
         var driver = test.Neuron<IIntegrationDriver>("gmail-tool-error");
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>

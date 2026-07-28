@@ -26,10 +26,7 @@ internal static class UIEndpoints
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var shell = brain.Get<IShell>(shellName);
-                await shell.Open(new OpenScene(
-                    CommandId.New(),
-                    request.SceneKey,
-                    request.Title));
+                await shell.Open(new OpenScene(CommandId.New(), request.SceneKey, request.Title));
 
                 return Results.Accepted();
             });
@@ -87,9 +84,7 @@ internal static class UIEndpoints
                     return Results.BadRequest();
                 }
 
-                await brain.SendAsync<IScene>(
-                    sceneKey,
-                    new ControlActivated(sceneKey, controlId, request.Intent));
+                await brain.SendAsync<IScene>(sceneKey, new ControlActivated(sceneKey, controlId, request.Intent));
 
                 return Results.Accepted();
             });

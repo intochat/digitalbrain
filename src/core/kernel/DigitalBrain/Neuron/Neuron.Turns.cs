@@ -133,16 +133,12 @@ public abstract partial class Neuron
     {
         while (_delegations.Count >= MaximumRememberedDelegations)
         {
-            if (TryEvictOldest(
-                _delegationTerminals,
-                ProtectedTerminalDelegations))
+            if (TryEvictOldest(_delegationTerminals, ProtectedTerminalDelegations))
             {
                 continue;
             }
 
-            if (TryEvictOldest(
-                _delegationConsumed,
-                ProtectedConsumedDelegations))
+            if (TryEvictOldest(_delegationConsumed, ProtectedConsumedDelegations))
             {
                 continue;
             }
@@ -157,9 +153,7 @@ public abstract partial class Neuron
         }
     }
 
-    private bool TryEvictOldest(
-        IDurableList<Guid> retentionOrder,
-        int protectedDelegations)
+    private bool TryEvictOldest(IDurableList<Guid> retentionOrder, int protectedDelegations)
     {
         if (retentionOrder.Count <= protectedDelegations)
         {

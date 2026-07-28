@@ -46,9 +46,7 @@ public sealed class AccountEnrichmentProcessSample(IntegrationsFixture fixture)
         Assert.DoesNotContain(expectedDescription, opened.Synapse.Title, StringComparison.Ordinal);
     }
 
-    private static async Task<AccountEnriched> RunEnrichmentToCompletionAsync(
-        TestBrain test,
-        CancellationToken cancellationToken)
+    private static async Task<AccountEnriched> RunEnrichmentToCompletionAsync(TestBrain test, CancellationToken cancellationToken)
     {
         var expectedDescription = IntegrationsFixture.SampleEnrichmentDescription;
         test.Mcp().Catalog(
@@ -61,14 +59,11 @@ public sealed class AccountEnrichmentProcessSample(IntegrationsFixture fixture)
         test.Mcp().Catalog(
             IntegrationsFixture.SalesforceServerKey,
             AdmittedMcpTools.SalesforceUpdateAccount(),
-            AdmittedMcpTools.SalesforceSoqlQuery(
-                IntegrationsFixture.SampleAccountId,
-                expectedDescription));
+            AdmittedMcpTools.SalesforceSoqlQuery(IntegrationsFixture.SampleAccountId, expectedDescription));
 
         var enrichment = test.Neuron<IAccountEnrichment>("enricher");
         var commandId = CommandId.New();
-        var proposedWait = enrichment.Outgoing.NextAsync<AccountEnrichmentProposed>(
-            cancellationToken);
+        var proposedWait = enrichment.Outgoing.NextAsync<AccountEnrichmentProposed>(cancellationToken);
 
         await test.Client.SendAsync<IAccountEnrichment>(
             "enricher",

@@ -79,10 +79,7 @@ internal static class LocalLoopbackMcpAuthorizationCallback
         }
     }
 
-    private static AuthorizationResult? ValidateCallback(
-        Uri authorizationUri,
-        Uri redirectUri,
-        Uri? callbackUri)
+    private static AuthorizationResult? ValidateCallback(Uri authorizationUri, Uri redirectUri, Uri? callbackUri)
     {
         ArgumentNullException.ThrowIfNull(authorizationUri);
         ArgumentNullException.ThrowIfNull(redirectUri);
