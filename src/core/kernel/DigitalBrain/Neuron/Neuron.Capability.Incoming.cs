@@ -14,6 +14,8 @@ public abstract partial class Neuron
         RequireAuthorizedCapabilityDelivery(delivery, source, delegatedSource);
 
         await AppendIncomingCapabilityRequestAsync(delivery);
+
+        ProtectCommittedIncoming();
     }
 
     internal async Task<CapabilityTurn> BeginIncomingCapabilityRequestAsync(
@@ -105,12 +107,15 @@ public abstract partial class Neuron
         await NotifyWatchersAsync();
     }
 
-    internal void FailIncomingCapabilityRequest(CapabilityTurn turn)
+    internal async Task FailIncomingCapabilityRequestAsync(CapabilityTurn turn)
     {
         Discard(_outbox, _turnCheckpoint?.CommittedOutbox ?? turn.CommittedOutbox);
         _outgoing.Restore(_turnCheckpoint?.Outgoing ?? turn.Outgoing);
         RollbackTurnState();
         _firedWhileHandling.Clear();
+
+        await CommitRetractionAsync();
+
         Restore(turn);
         ScheduleDrain();
     }

@@ -75,6 +75,8 @@ public abstract partial class Neuron
             _outgoing.Restore(checkpoint.Outgoing);
             RollbackTurnState();
 
+            await CommitRetractionAsync();
+
             RecallHandledDeliveries();
             ScheduleDrain();
 

@@ -90,7 +90,7 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
         }
         catch
         {
-            target.FailIncomingCapabilityRequest(turn);
+            await target.FailIncomingCapabilityRequestAsync(turn);
 
             throw;
         }

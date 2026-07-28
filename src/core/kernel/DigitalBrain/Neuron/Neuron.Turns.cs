@@ -69,6 +69,29 @@ public abstract partial class Neuron
         }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "A retraction commit failure must not replace the turn failure that caused it.")]
+    private async Task CommitRetractionAsync()
+    {
+        try
+        {
+            await CommitAsync(CancellationToken.None);
+        }
+        catch
+        {
+        }
+    }
+
+    private void ProtectCommittedIncoming()
+    {
+        if (_turnCheckpoint is { } checkpoint)
+        {
+            _turnCheckpoint = checkpoint with { Incoming = _incoming.Checkpoint() };
+        }
+    }
+
     private void RollbackTurnState()
     {
         for (var index = _turnRollbacks.Count - 1; index >= 0; index--)
