@@ -20,10 +20,7 @@ public static class ScriptedChatExtensions
 
         var script = new ScriptedChatClient();
         brain.ConfigureChatClient<IChatClient, ScriptedChatClient>(
-            models,
-            script,
-            script,
-            static scripted => scripted.Reset());
+            models, script, script, static scripted => scripted.Reset());
 
         return script;
     }

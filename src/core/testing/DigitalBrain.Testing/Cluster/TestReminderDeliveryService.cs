@@ -18,18 +18,12 @@ internal sealed class TestReminderDeliveryService :
     private readonly IGrainFactory _grains;
 
     public TestReminderDeliveryService(
-        GrainId id,
-        Silo silo,
-        ILoggerFactory loggerFactory,
-        IGrainFactory grains)
+        GrainId id, Silo silo, ILoggerFactory loggerFactory, IGrainFactory grains)
         : base(id, silo, loggerFactory)
     {
         _grains = grains;
 
-        if (!string.Equals(
-            id.Type.ToString(),
-            SourceType,
-            StringComparison.Ordinal))
+        if (!string.Equals(id.Type.ToString(), SourceType, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"The test reminder delivery service source changed from expected '{SourceType}' to '{id.Type}'. Update the exact fixture allowlist deliberately.");
@@ -44,7 +38,5 @@ internal sealed class TestReminderDeliveryService :
         DateTime currentTickTime)
         => _grains
             .GetGrain<IRemindable>(target.ToGrainId())
-            .ReceiveReminder(
-                reminderName,
-                new TickStatus(firstTickTime, period, currentTickTime));
+            .ReceiveReminder(reminderName, new TickStatus(firstTickTime, period, currentTickTime));
 }

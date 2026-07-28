@@ -18,6 +18,8 @@ public abstract class Agent : Neuron, IAgent
 
     protected abstract IReadOnlyList<CapabilityTool> Tools { get; }
 
+    protected virtual string? Instructions => null;
+
     protected static CapabilityTool Capability(string name, string description, Delegate invoke)
         => new(name, description, invoke);
 
@@ -31,8 +33,14 @@ public abstract class Agent : Neuron, IAgent
             Tools = [.. Tools.Select(tool => tool.BindTo(turnScheduler))],
             ToolMode = ChatToolMode.Auto,
         };
+        var instructions = Instructions;
+        IReadOnlyList<ChatMessage> request = string.IsNullOrWhiteSpace(instructions)
+            ? messages
+            : [new ChatMessage(ChatRole.System, instructions), .. messages];
 
-        var response = await _toolCallingClient.GetResponseAsync(messages, options);
+        var response = await _toolCallingClient
+            .GetStreamingResponseAsync(request, options)
+            .ToChatResponseAsync();
 
         foreach (var selected in SelectedCapabilities(response))
         {

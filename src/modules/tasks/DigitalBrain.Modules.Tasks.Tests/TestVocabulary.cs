@@ -36,15 +36,9 @@ public static class TaskFixtures
     public static readonly TestResult StaleSuccess = new("stale-success");
     public static readonly TestFailure Retryable = new("retryable");
 
-    public static readonly TaskPolicy SingleAttempt = new(
-        MaximumAttempts: 1,
-        RetryDelay: TimeSpan.FromSeconds(1),
-        Deadline: null);
+    public static readonly TaskPolicy SingleAttempt = new(MaximumAttempts: 1, RetryDelay: TimeSpan.FromSeconds(1), Deadline: null);
 
     public static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);
 
-    public static readonly TaskPolicy TwoAttempts = new(
-        MaximumAttempts: 2,
-        RetryDelay: RetryDelay,
-        Deadline: null);
+    public static readonly TaskPolicy TwoAttempts = new(MaximumAttempts: 2, RetryDelay: RetryDelay, Deadline: null);
 }

@@ -27,9 +27,7 @@ internal sealed partial class Gmail : Neuron, IGmail
         _durableIdentity = Id.ToString();
     }
 
-    public async Task<GmailMessage> ReadMessage(
-        string messageId,
-        CancellationToken cancellationToken)
+    public async Task<GmailMessage> ReadMessage(string messageId, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(messageId);
 

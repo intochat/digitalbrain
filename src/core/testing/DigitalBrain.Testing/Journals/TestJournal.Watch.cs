@@ -7,8 +7,7 @@ namespace DigitalBrain.Testing;
 
 public sealed partial class TestJournal
 {
-    private async Task<ObservedSynapse<TSynapse>> NextWrappedAsync<TSynapse>(
-        CancellationToken cancellationToken)
+    private async Task<ObservedSynapse<TSynapse>> NextWrappedAsync<TSynapse>(CancellationToken cancellationToken)
         where TSynapse : Synapse
     {
         try
@@ -21,8 +20,7 @@ public sealed partial class TestJournal
         }
     }
 
-    private async Task<ObservedSynapse<TSynapse>> NextCoreAsync<TSynapse>(
-        CancellationToken cancellationToken)
+    private async Task<ObservedSynapse<TSynapse>> NextCoreAsync<TSynapse>(CancellationToken cancellationToken)
         where TSynapse : Synapse
     {
         await _nextGate.WaitAsync(cancellationToken);
@@ -62,9 +60,7 @@ public sealed partial class TestJournal
         }
     }
 
-    private SynapseDelivery? Accept<TSynapse>(
-        TestJournalObserver observer,
-        JournalRead batch)
+    private SynapseDelivery? Accept<TSynapse>(TestJournalObserver observer, JournalRead batch)
         where TSynapse : Synapse
     {
         if (batch.ResetSnapshot is not null)
@@ -104,8 +100,7 @@ public sealed partial class TestJournal
         "Reliability",
         "CA2000:Dispose objects before losing scope",
         Justification = "Observer ownership transfers on success.")]
-    private async Task<TestJournalObserver> EnsureWatchingAsync(
-        CancellationToken cancellationToken)
+    private async Task<TestJournalObserver> EnsureWatchingAsync(CancellationToken cancellationToken)
     {
         await _setupGate.WaitAsync(cancellationToken);
         try
@@ -121,11 +116,7 @@ public sealed partial class TestJournal
             try
             {
                 reference = _cluster.Client.CreateObjectReference<IJournalObserver>(observer);
-                await _session.WatchNeuron(
-                    _subject,
-                    _direction,
-                    afterSequence: 0,
-                    reference);
+                await _session.WatchNeuron(_subject, _direction, afterSequence: 0, reference);
                 _observer = observer;
                 _reference = reference;
                 _watching = true;
@@ -178,9 +169,7 @@ public sealed partial class TestJournal
         }
     }
 
-    private ObservedSynapse<TSynapse> Observe<TSynapse>(
-        TSynapse synapse,
-        SynapseDelivery delivery)
+    private ObservedSynapse<TSynapse> Observe<TSynapse>(TSynapse synapse, SynapseDelivery delivery)
         where TSynapse : Synapse
         => new(
             synapse,
@@ -207,7 +196,5 @@ public sealed partial class TestJournal
     }
 
     private void ThrowIfDisposed()
-        => ObjectDisposedException.ThrowIf(
-            Volatile.Read(ref _disposed) != 0,
-            this);
+        => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 }

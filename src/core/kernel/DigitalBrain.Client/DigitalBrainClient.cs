@@ -43,9 +43,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
         RequireDomainNeuronContract(typeof(TNeuron));
         ArgumentNullException.ThrowIfNull(synapse);
 
-        await SendValidatedAsync(
-            new NeuronId(NeuronId.GrainTypeNameOf(typeof(TNeuron)), Owner, name),
-            synapse);
+        await SendValidatedAsync(new NeuronId(NeuronId.GrainTypeNameOf(typeof(TNeuron)), Owner, name), synapse);
     }
 
     public async Task SendAsync(NeuronId receiver, Synapse synapse)

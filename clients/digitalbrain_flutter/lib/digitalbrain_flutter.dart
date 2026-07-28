@@ -1,9 +1,13 @@
-export 'package:digitalbrain_wire/digitalbrain_wire.dart' show
-    ActivateControlRequest,
-    ChatTurnEvent,
-    OpenSceneRequest,
-    SceneOpenedEvent,
-    SendMessageRequest;
+export 'package:digitalbrain_wire/digitalbrain_wire.dart'
+    show
+        ActivateControlRequest,
+        BrainModule,
+        BrainNeuron,
+        BrainTopologySnapshot,
+        ChatTurnEvent,
+        OpenSceneRequest,
+        SceneOpenedEvent,
+        SendMessageRequest;
 
 export 'src/edge_client.dart';
 export 'src/host_environment.dart';

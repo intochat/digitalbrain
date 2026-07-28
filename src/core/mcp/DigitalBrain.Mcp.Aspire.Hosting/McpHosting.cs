@@ -17,9 +17,7 @@ internal sealed record McpProviderHostingDefinition(
 
 internal static class McpProviderHosting
 {
-    internal static void Register<TModule>(
-        DigitalBrainModuleBuilder<TModule> module,
-        McpProviderHostingDefinition definition)
+    internal static void Register<TModule>(DigitalBrainModuleBuilder<TModule> module, McpProviderHostingDefinition definition)
         where TModule : class, IModule, new()
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -36,10 +34,10 @@ internal static class McpProviderHosting
         }
 
         projection.Add(definition, application.Register(definition));
+        module.ConfigureFeature(definition.Key);
     }
 
-    private static McpApplicationParameters GetOrAddApplicationParameters(
-        IDistributedApplicationBuilder builder)
+    private static McpApplicationParameters GetOrAddApplicationParameters(IDistributedApplicationBuilder builder)
     {
         var existing = builder.Services
             .LastOrDefault(descriptor => descriptor.ServiceType == typeof(McpApplicationParameters))
@@ -137,17 +135,13 @@ internal static class McpProviderHosting
             new(StringComparer.Ordinal);
         private readonly IResourceBuilder<ParameterResource> _authorizationMode;
 
-        internal McpBrainProjection(
-            DigitalBrainBuilder brain,
-            IResourceBuilder<ParameterResource> authorizationMode)
+        internal McpBrainProjection(DigitalBrainBuilder brain, IResourceBuilder<ParameterResource> authorizationMode)
         {
             _brain = brain;
             _authorizationMode = authorizationMode;
         }
 
-        internal void Add(
-            McpProviderHostingDefinition definition,
-            McpProviderParameters parameters)
+        internal void Add(McpProviderHostingDefinition definition, McpProviderParameters parameters)
         {
             if (_providers.ContainsKey(definition.Key))
             {
@@ -162,16 +156,11 @@ internal static class McpProviderHosting
         {
             ArgumentNullException.ThrowIfNull(builder);
 
-            builder.WithEnvironment(
-                "DigitalBrain__Integrations__Mcp__AuthorizationMode",
-                _authorizationMode);
+            builder.WithEnvironment("DigitalBrain__Integrations__Mcp__AuthorizationMode", _authorizationMode);
 
             foreach (var provider in _providers.Values)
             {
-                var root = provider.Definition.ConfigurationRoot.Replace(
-                    ":",
-                    "__",
-                    StringComparison.Ordinal);
+                var root = provider.Definition.ConfigurationRoot.Replace(":", "__", StringComparison.Ordinal);
                 builder
                     .WithEnvironment($"{root}__ClientId", provider.ClientId)
                     .WithEnvironment($"{root}__RedirectUri", provider.RedirectUri);

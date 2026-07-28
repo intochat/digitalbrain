@@ -32,19 +32,11 @@ public sealed class IntegrationsFixture : DigitalBrainFixture
         return ISessionNeuron.ForOwner(test.Client.Owner);
     }
 
-    public static SalesforceMutationApproval Approval(
-        TestBrain test,
-        CommandId commandId,
-        string fingerprint)
+    public static SalesforceMutationApproval Approval(TestBrain test, CommandId commandId, string fingerprint)
     {
         ArgumentNullException.ThrowIfNull(test);
         ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
-        return new(
-            Guid.NewGuid(),
-            commandId,
-            fingerprint,
-            SessionOf(test),
-            test.Clock.UtcNow);
+        return new(Guid.NewGuid(), commandId, fingerprint, SessionOf(test), test.Clock.UtcNow);
     }
 
     protected override void Configure(DigitalBrainTestBuilder brain)

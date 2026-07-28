@@ -39,9 +39,7 @@ internal static class McpToolFingerprint
         {
             writer.WriteStartObject();
 
-            foreach (var property in element.EnumerateObject().OrderBy(
-                property => property.Name,
-                StringComparer.Ordinal))
+            foreach (var property in element.EnumerateObject().OrderBy(property => property.Name, StringComparer.Ordinal))
             {
                 writer.WritePropertyName(property.Name);
                 WriteCanonical(writer, property.Value);

@@ -91,9 +91,7 @@ internal sealed partial class Salesforce
         return Receipt(mutation);
     }
 
-    private static void EnsureSameApproval(
-        MutationData mutation,
-        SalesforceMutationApproval approval)
+    private static void EnsureSameApproval(MutationData mutation, SalesforceMutationApproval approval)
     {
         if (mutation.Approval != approval)
         {
@@ -118,22 +116,16 @@ internal sealed partial class Salesforce
         }
     }
 
-    private void ValidateApproval(
-        SalesforceMutationApproval approval,
-        SynapseDelivery approvalEvidence)
+    private void ValidateApproval(SalesforceMutationApproval approval, SynapseDelivery approvalEvidence)
     {
         if (approval.CommandId == default)
         {
-            throw new ArgumentException(
-                "A mutation command identity is required.",
-                nameof(approval));
+            throw new ArgumentException("A mutation command identity is required.", nameof(approval));
         }
 
         if (approval.ApprovalId == Guid.Empty || approvalEvidence.SynapseId == default)
         {
-            throw new ArgumentException(
-                "Durable approval identity and evidence are required.",
-                nameof(approval));
+            throw new ArgumentException("Durable approval identity and evidence are required.", nameof(approval));
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(approval.Fingerprint);

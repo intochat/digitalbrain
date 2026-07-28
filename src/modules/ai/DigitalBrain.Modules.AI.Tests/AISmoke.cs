@@ -18,8 +18,7 @@ public sealed class AISmoke(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         test.Chat().Reply(ScriptedReply);
 
-        var response = await test.Client.Get<ILlama32>(ModelName).Respond(
-            [new ChatMessage(ChatRole.User, UserPrompt)]);
+        var response = await test.Client.Get<ILlama32>(ModelName).Respond([new ChatMessage(ChatRole.User, UserPrompt)]);
 
         Assert.Equal(ScriptedReply, response.Text);
         Assert.Equal(1, test.Chat().CallCount);

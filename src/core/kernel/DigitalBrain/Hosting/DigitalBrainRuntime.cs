@@ -59,9 +59,7 @@ public static class DigitalBrainRuntime
         return selectedModules;
     }
 
-    private static HashSet<ModuleId> SelectModules(
-        ISiloBuilder builder,
-        IReadOnlyCollection<ICompiledModule> availableModules)
+    private static HashSet<ModuleId> SelectModules(ISiloBuilder builder, IReadOnlyCollection<ICompiledModule> availableModules)
     {
         var hostContext = builder.Services
             .LastOrDefault(descriptor => descriptor.ServiceType == typeof(HostBuilderContext))

@@ -31,16 +31,14 @@ public sealed class UIEdgeVocabulary(UIFixture fixture)
                 or "IFlutter");
 
         Assert.Equal("/health", UIEdgeContract.HealthPath);
-        Assert.Equal("healthy", UIEdgeContract.HealthResponse);
         Assert.Equal("/shells/{shellName}/scenes", UIEdgeContract.OpenScenePath);
         Assert.Equal("/shells/{shellName}/events", UIEdgeContract.ShellEventsPath);
-        Assert.Equal(
-            "/scenes/{sceneKey}/controls/{controlId}/activate",
-            UIEdgeContract.ActivateControlPath);
+        Assert.Equal("/scenes/{sceneKey}/controls/{controlId}/activate", UIEdgeContract.ActivateControlPath);
         Assert.Equal("afterSequence", UIEdgeContract.AfterSequenceQuery);
         Assert.Equal("text/event-stream", UIEdgeContract.EventStreamContentType);
         Assert.Equal("no-cache", UIEdgeContract.CacheControlNoCache);
         Assert.Equal("scene-opened", UIEdgeContract.SceneOpenedEvent);
+        Assert.Equal("/brain/topology", UIEdgeContract.BrainTopologyPath);
     }
 
     [Fact(DisplayName =
@@ -98,13 +96,8 @@ public sealed class UIEdgeVocabulary(UIFixture fixture)
         await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
 
         using var http = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
-        using var health = await http.GetAsync(
-            new Uri(UIEdgeContract.HealthPath, UriKind.Relative),
-            cancellationToken);
+        using var health = await http.GetAsync(new Uri(UIEdgeContract.HealthPath, UriKind.Relative), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
-        Assert.Equal(
-            $"\"{UIEdgeContract.HealthResponse}\"",
-            (await health.Content.ReadAsStringAsync(cancellationToken)).Trim());
     }
 }

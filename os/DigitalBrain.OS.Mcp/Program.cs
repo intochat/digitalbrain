@@ -1,16 +1,12 @@
 using DigitalBrain.Aspire;
 using DigitalBrain.OS.Mcp;
-using Microsoft.Extensions.AI;
-using Orleans.Serialization;
+using DigitalBrain.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.AddServiceDefaults();
 builder.AddKeyedAzureTableServiceClient("brain-clustering");
-builder.AddDigitalBrainClient(client =>
-{
-    client.Services.AddSerializer(serializer => serializer.AddJsonSerializer(
-        static type => type == typeof(ChatMessage) || type == typeof(ChatResponse)));
-});
+builder.AddDigitalBrainClient();
 
 builder.Services
     .AddMcpServer()
@@ -19,5 +15,6 @@ builder.Services
     .WithTools<DigitalBrainIntrospectionTools>();
 
 var app = builder.Build();
+app.MapDefaultEndpoints();
 app.MapMcpHost();
 app.Run();

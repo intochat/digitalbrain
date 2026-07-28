@@ -39,24 +39,18 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
         }
         catch (NeuronAuthorizationException) when (caller.Id.Owner != target.Owner)
         {
-            await caller.RecordCapabilityOutcomeAsync(
-                CapabilityOutcome.Rejected,
-                request);
+            await caller.RecordCapabilityOutcomeAsync(CapabilityOutcome.Rejected, request);
 
             throw;
         }
         catch
         {
-            await caller.RecordCapabilityOutcomeAsync(
-                CapabilityOutcome.Failed,
-                request);
+            await caller.RecordCapabilityOutcomeAsync(CapabilityOutcome.Failed, request);
 
             throw;
         }
 
-        await caller.RecordCapabilityOutcomeAsync(
-            CapabilityOutcome.Completed,
-            request);
+        await caller.RecordCapabilityOutcomeAsync(CapabilityOutcome.Completed, request);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -75,10 +69,7 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
                 "The delegated call's inherited Orleans source does not match its activation source.");
         }
 
-        delegation.RequireMatches(
-            context.SourceId,
-            context.TargetId,
-            context.InterfaceMethod);
+        delegation.RequireMatches(context.SourceId, context.TargetId, context.InterfaceMethod);
 
         var authority = context.SourceContext!.ActivationServices
             .GetRequiredService<IGrainFactory>()

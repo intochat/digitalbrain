@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Testing;
 using Reqnroll;
@@ -45,5 +46,16 @@ public sealed class ChatSteps(BrainWorld world)
         var transcript = await world.Brain.Client.Get<IChat>(conversation).Read();
 
         Assert.Equal(expected, transcript.Turns.Count);
+    }
+
+    [Then("the assistant selects no external capability")]
+    public async Task ThenTheAssistantSelectsNoExternalCapability()
+    {
+        var selected = await world
+            .Neuron<IAssistant>(ChatResponder.AssistantName)
+            .Outgoing
+            .ReadAsync<CapabilityToolSelected>(afterSequence: 0, world.CancellationToken);
+
+        Assert.Empty(selected);
     }
 }

@@ -55,9 +55,7 @@ final class SseSceneOpenedParser {
       if (decoded is! Map) {
         return null;
       }
-      return SceneOpenedEvent.fromJson(
-        Map<String, Object?>.from(decoded),
-      );
+      return SceneOpenedEvent.fromJson(Map<String, Object?>.from(decoded));
     } on FormatException {
       return null;
     } on TypeError {

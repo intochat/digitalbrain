@@ -39,26 +39,17 @@ internal sealed class ChatResponderNeuron :
 
         var context = new PreRailBehaviorContext(
             GrainFactory,
-            new BehaviorExecutionMetadata(
-                Id.Owner,
-                Identity,
-                Revision,
-                BehaviorExecutionId.New()),
+            new BehaviorExecutionMetadata(Id.Owner, Identity, Revision, BehaviorExecutionId.New()),
             TimeProvider,
             _state);
 
         var answer = await Program.ExecuteAsync(synapse, context, cancellationToken);
 
-        await SendAsync(
-            synapse.Chat,
-            new AssistantAnswered(
-                context.DeterministicCommandId(synapse.CommandId.ToString()),
-                answer));
+        await SendAsync(synapse.Chat, new AssistantAnswered(context.DeterministicCommandId(synapse.CommandId.ToString()), answer));
 
         await WriteStateAsync(CancellationToken.None);
     }
 
     private static BehaviorRevisionId RevisionOf(string seed)
-        => new(Convert.ToHexStringLower(
-            SHA256.HashData(Encoding.UTF8.GetBytes(seed))));
+        => new(Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(seed))));
 }

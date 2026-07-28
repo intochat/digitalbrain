@@ -23,9 +23,7 @@ public sealed partial class DispatchManifestGenerator
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
-    private static NeuronModel? NeuronOf(
-        GeneratorSyntaxContext syntax,
-        CancellationToken cancellationToken)
+    private static NeuronModel? NeuronOf(GeneratorSyntaxContext syntax, CancellationToken cancellationToken)
     {
         if (syntax.Node is not InterfaceDeclarationSyntax declaration
             || syntax.SemanticModel.GetDeclaredSymbol(declaration, cancellationToken) is not INamedTypeSymbol contract
@@ -65,19 +63,13 @@ public sealed partial class DispatchManifestGenerator
 
         if (!neuron.IsPartial)
         {
-            production.ReportDiagnostic(Diagnostic.Create(
-                NeuronMustBePartial,
-                neuron.Location,
-                neuron.FullName));
+            production.ReportDiagnostic(Diagnostic.Create(NeuronMustBePartial, neuron.Location, neuron.FullName));
             valid = false;
         }
 
         if (neuron.HasAlias)
         {
-            production.ReportDiagnostic(Diagnostic.Create(
-                NeuronAliasIsGenerated,
-                neuron.Location,
-                neuron.FullName));
+            production.ReportDiagnostic(Diagnostic.Create(NeuronAliasIsGenerated, neuron.Location, neuron.FullName));
             valid = false;
         }
 
@@ -86,9 +78,7 @@ public sealed partial class DispatchManifestGenerator
             return;
         }
 
-        production.AddSource(
-            $"{neuron.FullName}.NeuronIdentity.g.cs",
-            NeuronIdentity(neuron));
+        production.AddSource($"{neuron.FullName}.NeuronIdentity.g.cs", NeuronIdentity(neuron));
     }
 
     private static string NeuronIdentity(NeuronModel neuron)

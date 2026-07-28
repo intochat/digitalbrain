@@ -25,19 +25,13 @@ public sealed class JournalFaultContracts(TestingFixture fixture)
         await using (var fault = session.FailNextJournalCommit(SessionCommitFailure))
         {
             var failure = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => test.Client.SendAsync<IGreeter>(
-                    greeter.Id.Name,
-                    new SayHello(TestingScenario.Guest)));
+                () => test.Client.SendAsync<IGreeter>(greeter.Id.Name, new SayHello(TestingScenario.Guest)));
             Assert.Equal(SessionCommitFailure, failure.Message);
         }
 
-        await test.Client.SendAsync<IGreeter>(
-            greeter.Id.Name,
-            new SayHello(TestingScenario.Guest));
+        await test.Client.SendAsync<IGreeter>(greeter.Id.Name, new SayHello(TestingScenario.Guest));
         var greeted = await greeter.Outgoing.NextAsync<Greeted>(cancellationToken);
-        Assert.Equal(
-            TestingScenario.GreetedMessage(TestingScenario.Guest),
-            greeted.Synapse.Message);
+        Assert.Equal(TestingScenario.GreetedMessage(TestingScenario.Guest), greeted.Synapse.Message);
     }
 
     [Fact(DisplayName = "An unconsumed journal fault fails TestBrain dispose with brain.cleanup diagnostics")]
@@ -48,18 +42,11 @@ public sealed class JournalFaultContracts(TestingFixture fixture)
         var greeter = test.Neuron<IGreeter>(TestingScenario.WelcomeGreeter);
         _ = greeter.FailNextJournalCommit(NeverFiredFault);
 
-        var failure = await Assert.ThrowsAsync<BrainTestFailureException>(
-            async () => await test.DisposeAsync());
+        var failure = await Assert.ThrowsAsync<BrainTestFailureException>(async () => await test.DisposeAsync());
 
-        Assert.Contains(
-            BrainCleanupOperation,
-            failure.Message,
-            StringComparison.Ordinal);
+        Assert.Contains(BrainCleanupOperation, failure.Message, StringComparison.Ordinal);
         var leak = Assert.IsType<InvalidOperationException>(failure.InnerException);
-        Assert.Contains(
-            UnconsumedJournalFaultsRemain,
-            leak.Message,
-            StringComparison.Ordinal);
+        Assert.Contains(UnconsumedJournalFaultsRemain, leak.Message, StringComparison.Ordinal);
         Assert.Contains(NeverFiredFault, leak.Message, StringComparison.Ordinal);
         Assert.Contains(greeter.Id.ToString(), leak.Message, StringComparison.Ordinal);
     }
@@ -75,12 +62,8 @@ public sealed class JournalFaultContracts(TestingFixture fixture)
         {
         }
 
-        await test.Client.SendAsync<IGreeter>(
-            greeter.Id.Name,
-            new SayHello(TestingScenario.Guest));
+        await test.Client.SendAsync<IGreeter>(greeter.Id.Name, new SayHello(TestingScenario.Guest));
         var greeted = await greeter.Outgoing.NextAsync<Greeted>(cancellationToken);
-        Assert.Equal(
-            TestingScenario.GreetedMessage(TestingScenario.Guest),
-            greeted.Synapse.Message);
+        Assert.Equal(TestingScenario.GreetedMessage(TestingScenario.Guest), greeted.Synapse.Message);
     }
 }

@@ -16,11 +16,7 @@ void main() {
       }),
     );
 
-    await client.openScene(
-      shellName: 'desk',
-      sceneKey: 'home',
-      title: 'Home',
-    );
+    await client.openScene(shellName: 'desk', sceneKey: 'home', title: 'Home');
 
     expect(seen, isNotNull);
     expect(seen!.method, 'POST');
@@ -153,4 +149,140 @@ data: {"sequence":3,"sceneKey":"home","title":"Home refreshed","commandId":"c","
       throwsA(isA<StateError>()),
     );
   });
+
+  test(
+    'watchBrainTopology polls live modules and neurons without restart',
+    () async {
+      var requestCount = 0;
+      final client = DigitalBrainUiEdgeClient(
+        baseUri: Uri.parse('http://ui.example:5080'),
+        httpClient: MockClient((request) async {
+          expect(request.method, 'GET');
+          expect(
+            request.url.toString(),
+            'http://ui.example:5080/brain/topology',
+          );
+          requestCount++;
+          return http.Response(
+            jsonEncode({
+              'modules': [
+                {'id': 'DigitalBrain.Chat.ChatModule'},
+              ],
+              'neurons': [
+                if (requestCount > 1)
+                  {
+                    'id': 'chat:owner/main',
+                    'grainType': 'chat',
+                    'identity': 'owner/main',
+                    'placement': 'cluster-1',
+                  },
+              ],
+              'observedAt': '2026-07-28T08:00:00Z',
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+
+      final snapshots = await client
+          .watchBrainTopology(pollInterval: Duration.zero)
+          .take(2)
+          .toList();
+
+      expect(snapshots.first.neurons, isEmpty);
+      expect(snapshots.last.neurons.single.id, 'chat:owner/main');
+    },
+  );
+
+  test(
+    'watchBrainTopology reports a transient failure and keeps polling',
+    () async {
+      var requestCount = 0;
+      final client = DigitalBrainUiEdgeClient(
+        baseUri: Uri.parse('http://ui.example:5080'),
+        httpClient: MockClient((request) async {
+          requestCount++;
+          if (requestCount == 1) {
+            return http.Response('temporarily unavailable', 503);
+          }
+          return http.Response(
+            jsonEncode({
+              'modules': [
+                {'id': 'DigitalBrain.Chat.ChatModule'},
+              ],
+              'neurons': const [],
+              'observedAt': '2026-07-28T08:00:00Z',
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      final errors = <Object>[];
+
+      final snapshot = await client
+          .watchBrainTopology(pollInterval: Duration.zero)
+          .handleError(errors.add)
+          .first;
+
+      expect(requestCount, 2);
+      expect(errors, hasLength(1));
+      expect(snapshot.modules.single.id, 'DigitalBrain.Chat.ChatModule');
+    },
+  );
+
+  test('watchBrainTopology aborts a hung request and keeps polling', () async {
+    final httpClient = _AbortThenSucceedClient();
+    final client = DigitalBrainUiEdgeClient(
+      baseUri: Uri.parse('http://ui.example:5080'),
+      httpClient: httpClient,
+    );
+    final errors = <Object>[];
+
+    final snapshot = await client
+        .watchBrainTopology(
+          pollInterval: Duration.zero,
+          requestTimeout: const Duration(milliseconds: 1),
+        )
+        .handleError(errors.add)
+        .first;
+
+    expect(httpClient.requests, 2);
+    expect(httpClient.sawAbortableRequest, isTrue);
+    expect(errors.single, isA<http.RequestAbortedException>());
+    expect(snapshot.modules.single.id, 'DigitalBrain.Chat.ChatModule');
+  });
+}
+
+final class _AbortThenSucceedClient extends http.BaseClient {
+  int requests = 0;
+  bool sawAbortableRequest = false;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    requests++;
+    if (requests == 1) {
+      sawAbortableRequest = request is http.AbortableRequest;
+      final abortable = request as http.AbortableRequest;
+      await abortable.abortTrigger;
+      throw http.RequestAbortedException(request.url);
+    }
+
+    return http.StreamedResponse(
+      Stream.value(
+        utf8.encode(
+          jsonEncode({
+            'modules': [
+              {'id': 'DigitalBrain.Chat.ChatModule'},
+            ],
+            'neurons': const [],
+            'observedAt': '2026-07-28T08:00:00Z',
+          }),
+        ),
+      ),
+      200,
+      headers: {'content-type': 'application/json'},
+    );
+  }
 }

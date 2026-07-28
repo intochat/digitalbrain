@@ -12,6 +12,8 @@
     <Project Path="src/core/testing/DigitalBrain.Testing.Tests/DigitalBrain.Testing.Tests.csproj" />
     <Project Path="src/core/aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="src/core/aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+    <Project Path="src/core/aspire/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
+    <Project Path="src/core/aspire/DigitalBrain.ServiceDefaults.Tests/DigitalBrain.ServiceDefaults.Tests.csproj" />
     <Project Path="src/core/kernel/DigitalBrain.SourceGeneration/DigitalBrain.SourceGeneration.csproj" />
     <Project Path="src/core/security/DigitalBrain.Security/DigitalBrain.Security.csproj" />
     <Project Path="src/core/mcp/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
@@ -54,6 +56,8 @@
     <Project Path="os/tests/DigitalBrain.OS.Bdd.Tests/DigitalBrain.OS.Bdd.Tests.csproj" />
     <Project Path="os/tests/DigitalBrain.OS.Composition.Tests/DigitalBrain.OS.Composition.Tests.csproj" />
     <Project Path="os/tests/DigitalBrain.OS.Host.Tests/DigitalBrain.OS.Host.Tests.csproj" />
+    <Project Path="os/tests/DigitalBrain.OS.Mcp.Tests/DigitalBrain.OS.Mcp.Tests.csproj" />
+    <Project Path="os/tests/DigitalBrain.OS.Product.Tests/DigitalBrain.OS.Product.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/fixtures/DigitalBrain.Quickstart.Tests/DigitalBrain.Quickstart.Tests.csproj" />

@@ -22,9 +22,7 @@ public sealed class DurablePayloadProtectionStartup
 
     [Theory(DisplayName = "invalid durable protection keys fail during service composition")]
     [MemberData(nameof(InvalidKeys))]
-    public void InvalidKeysFailDuringServiceComposition(
-        string? encodedKey,
-        Type expectedExceptionType)
+    public void InvalidKeysFailDuringServiceComposition(string? encodedKey, Type expectedExceptionType)
     {
         var result = Compose(encodedKey, resolveProtector: false);
 
@@ -79,16 +77,12 @@ public sealed class DurablePayloadProtectionStartup
         return new(compositionException, resolutionException);
     }
 
-    private sealed class CompositionSiloBuilder(
-        IServiceCollection services,
-        IConfiguration configuration) : ISiloBuilder
+    private sealed class CompositionSiloBuilder(IServiceCollection services, IConfiguration configuration) : ISiloBuilder
     {
         public IServiceCollection Services => services;
 
         public IConfiguration Configuration => configuration;
     }
 
-    private sealed record CompositionResult(
-        Exception? CompositionException,
-        Exception? ResolutionException);
+    private sealed record CompositionResult(Exception? CompositionException, Exception? ResolutionException);
 }

@@ -24,10 +24,7 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
         Assert.Equal(0, empty.Revision);
         Assert.Null(empty.Destination);
 
-        var command = new StartCountdown(
-            CommandId.New(),
-            Hour,
-            destination.Id);
+        var command = new StartCountdown(CommandId.New(), Hour, destination.Id);
         var started = await countdown.Reference.Start(command);
         var repeated = await countdown.Reference.Start(command);
 
@@ -41,10 +38,7 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
         Assert.Equal(Hour, started.Duration);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => countdown.Reference.Start(new StartCountdown(
-                CommandId.New(),
-                Hour,
-                destination.Id)));
+            () => countdown.Reference.Start(new StartCountdown(CommandId.New(), Hour, destination.Id)));
     }
 
     [Fact(DisplayName =
@@ -77,12 +71,10 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
         Assert.Equal(test.Clock.UtcNow + Hour, rescheduled.DueAt);
 
         await test.Clock.AdvanceAsync(HalfHour, cancellationToken);
-        Assert.Empty(await destination.Incoming.ReadAsync<CountdownElapsed>(
-            cancellationToken: cancellationToken));
+        Assert.Empty(await destination.Incoming.ReadAsync<CountdownElapsed>(cancellationToken: cancellationToken));
 
         await test.Clock.AdvanceAsync(HalfHour, cancellationToken);
-        var elapsed = await destination.Incoming.NextAsync<CountdownElapsed>(
-            cancellationToken);
+        var elapsed = await destination.Incoming.NextAsync<CountdownElapsed>(cancellationToken);
 
         Assert.Equal(rescheduled.Generation, elapsed.Synapse.Generation);
         Assert.Equal(rescheduled.Revision, elapsed.Synapse.Revision);
@@ -97,13 +89,9 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
         var (countdown, destination, started) = await TimeFixture.Schedule(test, Hour);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => countdown.Reference.Cancel(new CancelCountdown(
-                CommandId.New(),
-                ExpectedRevision: started.Revision + 1)));
+            () => countdown.Reference.Cancel(new CancelCountdown(CommandId.New(), ExpectedRevision: started.Revision + 1)));
 
-        var command = new CancelCountdown(
-            CommandId.New(),
-            started.Revision);
+        var command = new CancelCountdown(CommandId.New(), started.Revision);
         var cancelled = await countdown.Reference.Cancel(command);
         var repeated = await countdown.Reference.Cancel(command);
 
@@ -113,23 +101,14 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
         Assert.Equal(started.Revision, cancelled.Revision);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => countdown.Reference.Cancel(new CancelCountdown(
-                CommandId.New(),
-                cancelled.Revision)));
+            () => countdown.Reference.Cancel(new CancelCountdown(CommandId.New(), cancelled.Revision)));
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => countdown.Reference.Reschedule(new RescheduleCountdown(
-                CommandId.New(),
-                cancelled.Revision,
-                Hour)));
+            () => countdown.Reference.Reschedule(new RescheduleCountdown(CommandId.New(), cancelled.Revision, Hour)));
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => countdown.Reference.Start(new StartCountdown(
-                CommandId.New(),
-                Hour,
-                destination.Id)));
+            () => countdown.Reference.Start(new StartCountdown(CommandId.New(), Hour, destination.Id)));
 
         await test.Clock.AdvanceAsync(TwoHours, cancellationToken);
-        Assert.Empty(await destination.Incoming.ReadAsync<CountdownElapsed>(
-            cancellationToken: cancellationToken));
+        Assert.Empty(await destination.Incoming.ReadAsync<CountdownElapsed>(cancellationToken: cancellationToken));
     }
 
     [Fact(DisplayName =
@@ -141,16 +120,10 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
         var (countdown, destination, started) = await TimeFixture.Schedule(test, Hour);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => countdown.Reference.Restart(new RestartCountdown(
-                CommandId.New(),
-                Hour)));
+            () => countdown.Reference.Restart(new RestartCountdown(CommandId.New(), Hour)));
 
-        var cancelled = await countdown.Reference.Cancel(
-            new CancelCountdown(CommandId.New(), started.Revision));
-        var restarted = await countdown.Reference.Restart(
-            new RestartCountdown(
-                CommandId.New(),
-                TwoHours));
+        var cancelled = await countdown.Reference.Cancel(new CancelCountdown(CommandId.New(), started.Revision));
+        var restarted = await countdown.Reference.Restart(new RestartCountdown(CommandId.New(), TwoHours));
 
         Assert.Equal(CountdownStatus.Scheduled, restarted.Status);
         Assert.Equal(cancelled.Generation + 1, restarted.Generation);
@@ -169,13 +142,9 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
         var (countdown, destination, started) = await TimeFixture.Schedule(test, Hour);
 
         await test.Clock.AdvanceAsync(Hour, cancellationToken);
-        _ = await destination.Incoming.NextAsync<CountdownElapsed>(
-            cancellationToken);
+        _ = await destination.Incoming.NextAsync<CountdownElapsed>(cancellationToken);
 
-        var restarted = await countdown.Reference.Restart(
-            new RestartCountdown(
-                CommandId.New(),
-                TwoHours));
+        var restarted = await countdown.Reference.Restart(new RestartCountdown(CommandId.New(), TwoHours));
 
         Assert.Equal(CountdownStatus.Scheduled, restarted.Status);
         Assert.Equal(started.Generation + 1, restarted.Generation);
@@ -190,15 +159,11 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var (countdown, destination, started) = await TimeFixture.Schedule(test, Hour);
 
-        await test.Clock.AdvanceAsync(
-            TimeSpan.FromMinutes(59),
-            cancellationToken);
-        Assert.Empty(await destination.Incoming.ReadAsync<CountdownElapsed>(
-            cancellationToken: cancellationToken));
+        await test.Clock.AdvanceAsync(TimeSpan.FromMinutes(59), cancellationToken);
+        Assert.Empty(await destination.Incoming.ReadAsync<CountdownElapsed>(cancellationToken: cancellationToken));
 
         await test.Clock.AdvanceAsync(OneMinute, cancellationToken);
-        var elapsed = await destination.Incoming.NextAsync<CountdownElapsed>(
-            cancellationToken);
+        var elapsed = await destination.Incoming.NextAsync<CountdownElapsed>(cancellationToken);
 
         Assert.Equal(countdown.Id, elapsed.Synapse.Countdown);
         Assert.Equal(started.Generation, elapsed.Synapse.Generation);
@@ -208,13 +173,10 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
         Assert.Equal(started.DueAt, elapsed.Synapse.DueAt);
         Assert.Equal(test.Clock.UtcNow, elapsed.Synapse.ObservedAt);
         Assert.Equal(CountdownResolution.OnTime, elapsed.Synapse.Resolution);
-        Assert.Equal(
-            CountdownStatus.Elapsed,
-            (await countdown.Reference.Read()).Status);
+        Assert.Equal(CountdownStatus.Elapsed, (await countdown.Reference.Read()).Status);
 
         await test.Clock.AdvanceAsync(OneMinute, cancellationToken);
-        Assert.Single(await destination.Incoming.ReadAsync<CountdownElapsed>(
-            cancellationToken: cancellationToken));
+        Assert.Single(await destination.Incoming.ReadAsync<CountdownElapsed>(cancellationToken: cancellationToken));
     }
 
     [Fact(DisplayName = "Read returns the committed snapshot after a hosting silo restart")]

@@ -16,11 +16,7 @@ internal sealed class ScriptedWorker : Neuron, IWorker
 
         await SendAsync(
             request.Task,
-            new AttemptAccepted(
-                request.Task,
-                request.Worker,
-                request.Attempt,
-                request.Revision));
+            new AttemptAccepted(request.Task, request.Worker, request.Attempt, request.Revision));
 
         switch (request.Goal)
         {
@@ -75,12 +71,6 @@ internal sealed class ScriptedWorker : Neuron, IWorker
     {
         ArgumentNullException.ThrowIfNull(cursor);
 
-        return SendAsync(
-            cursor.Task,
-            new AttemptCancelled(
-                cursor.Task,
-                cursor.Worker,
-                cursor.Attempt,
-                cursor.Revision));
+        return SendAsync(cursor.Task, new AttemptCancelled(cursor.Task, cursor.Worker, cursor.Attempt, cursor.Revision));
     }
 }

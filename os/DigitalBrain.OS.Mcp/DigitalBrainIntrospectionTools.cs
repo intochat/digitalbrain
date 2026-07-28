@@ -25,10 +25,11 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain, IGrain
         return
         [
             .. statistics
+                .Where(statistic => statistic.GrainId.Key.ToString()!
+                    .StartsWith($"{brain.Owner.Value}/", StringComparison.Ordinal))
                 .Select(statistic => new ActiveNeuron(
                     statistic.GrainId.Type.ToString()!,
-                    statistic.GrainId.Key.ToString()!,
-                    statistic.SiloAddress.ToString()))
+                    statistic.GrainId.Key.ToString()!))
                 .OrderBy(neuron => neuron.GrainType, StringComparer.Ordinal)
                 .ThenBy(neuron => neuron.Identity, StringComparer.Ordinal),
         ];
@@ -50,8 +51,7 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain, IGrain
 
         var direction = Enum.Parse<JournalKind>(kind, ignoreCase: true);
         var neuron = new NeuronId(grainType, brain.Owner, name);
-        var session = grains.GetGrain<ISessionNeuron>(
-            ISessionNeuron.ForOwner(brain.Owner).ToGrainId());
+        var session = grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(brain.Owner).ToGrainId());
 
         var read = await session.ReadNeuronJournal(neuron, direction, afterSequence);
 
@@ -82,9 +82,7 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain, IGrain
         return new ChatTranscriptPage(
             chatName,
             [
-                .. transcript.Turns.Select(turn => new ChatTranscriptTurn(
-                    turn.FromUser ? "you" : "brain",
-                    turn.Text)),
+                .. transcript.Turns.Select(turn => new ChatTranscriptTurn(turn.FromUser ? "you" : "brain", turn.Text)),
             ]);
     }
 }

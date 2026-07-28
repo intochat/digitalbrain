@@ -8,10 +8,7 @@ internal sealed class PinToSiloDirector(ISiloMetadataCache metadata) : IPlacemen
 {
     internal const string SiloLabelKey = "db.silo";
 
-    public IEnumerable<SiloAddress> Filter(
-        PlacementFilterStrategy strategy,
-        PlacementTarget target,
-        IEnumerable<SiloAddress> silos)
+    public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy strategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
     {
         ArgumentNullException.ThrowIfNull(strategy);
 

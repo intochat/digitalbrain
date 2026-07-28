@@ -11,6 +11,7 @@
     <ProjectReference Include="..\..\chat\DigitalBrain.Modules.Chat.Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Modules.Flutter.Contracts\DigitalBrain.Modules.Flutter.Contracts.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\aspire\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
+    <ProjectReference Include="..\..\..\..\src\core\aspire\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
   </ItemGroup>
   <ItemGroup>

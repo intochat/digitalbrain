@@ -16,8 +16,7 @@ public abstract class DigitalBrainFixture : IAsyncLifetime
         _cluster = await FixtureCluster.StartAsync(brain.Seal());
     }
 
-    public async Task<TestBrain> CreateBrainAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<TestBrain> CreateBrainAsync(CancellationToken cancellationToken = default)
     {
         await _methodLease.WaitAsync(cancellationToken);
         try
@@ -25,9 +24,7 @@ public abstract class DigitalBrainFixture : IAsyncLifetime
             var scope = $"test-{Guid.NewGuid():N}";
             var cluster = Cluster();
             var diagnostics = new BrainTestDiagnostics(scope);
-            var method = await cluster.PrepareMethodAsync(
-                scope,
-                diagnostics);
+            var method = await cluster.PrepareMethodAsync(scope, diagnostics);
             return new TestBrain(
                 cluster,
                 scope,
@@ -63,6 +60,5 @@ public abstract class DigitalBrainFixture : IAsyncLifetime
 
     private FixtureCluster Cluster()
         => _cluster
-            ?? throw new InvalidOperationException(
-                "The DigitalBrain fixture has not been initialized.");
+            ?? throw new InvalidOperationException("The DigitalBrain fixture has not been initialized.");
 }

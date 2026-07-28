@@ -17,9 +17,7 @@ internal sealed partial class CountdownNeuron
     private void Stage(CountdownState data)
         => _state.Value = _states.SerializeToArray(data);
 
-    private async Task SaveAsync(
-        CountdownState data,
-        byte[] rollbackState)
+    private async Task SaveAsync(CountdownState data, byte[] rollbackState)
     {
         Stage(data);
 
@@ -42,10 +40,7 @@ internal sealed partial class CountdownNeuron
     private void RestoreState(byte[] serialized)
         => _state.Value = serialized;
 
-    private static bool TryReceipt(
-        CountdownState? data,
-        CommandId commandId,
-        out CountdownSnapshot snapshot)
+    private static bool TryReceipt(CountdownState? data, CommandId commandId, out CountdownSnapshot snapshot)
     {
         if (data is not null
             && data.Receipts.TryGetValue(commandId, out var received))
@@ -58,10 +53,7 @@ internal sealed partial class CountdownNeuron
         return false;
     }
 
-    private static void Remember(
-        CountdownState data,
-        CommandId commandId,
-        CountdownSnapshot snapshot)
+    private static void Remember(CountdownState data, CommandId commandId, CountdownSnapshot snapshot)
     {
         while (data.Receipts.Count >= MaximumReceipts)
         {
@@ -116,15 +108,11 @@ internal sealed partial class CountdownNeuron
     {
         if (commandId.Value == Guid.Empty)
         {
-            throw new ArgumentException(
-                "A command id is required.",
-                nameof(commandId));
+            throw new ArgumentException("A command id is required.", nameof(commandId));
         }
     }
 
-    private static DateTimeOffset DueAt(
-        DateTimeOffset scheduledAt,
-        TimeSpan duration)
+    private static DateTimeOffset DueAt(DateTimeOffset scheduledAt, TimeSpan duration)
     {
         if (duration <= TimeSpan.Zero)
         {
@@ -155,9 +143,7 @@ internal sealed partial class CountdownNeuron
         }
     }
 
-    private void RequireRevision(
-        CountdownState data,
-        long expectedRevision)
+    private void RequireRevision(CountdownState data, long expectedRevision)
     {
         if (data.Revision != expectedRevision)
         {

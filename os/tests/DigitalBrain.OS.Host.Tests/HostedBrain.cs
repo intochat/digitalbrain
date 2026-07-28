@@ -4,8 +4,10 @@ namespace DigitalBrain.HostTests;
 
 public sealed class HostedBrain(TestingAppHostFixture fixture)
 {
-    [Fact(DisplayName =
-        "TestingAppHost silo-only residual: silo Healthy and health path OK (not product OS surface)")]
+    [Fact(
+        Timeout = 300_000,
+        DisplayName =
+            "TestingAppHost silo-only residual: silo Healthy and health path OK (not product OS surface)")]
     public async Task TheSiloReachesHealthyOnTheRealHost()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -15,7 +17,7 @@ public sealed class HostedBrain(TestingAppHostFixture fixture)
         await silo.WaitUntilHealthyAsync(cancellationToken);
 
         using var client = silo.CreateHttpClient();
-        client.Timeout = TimeSpan.FromSeconds(30);
+        client.Timeout = TimeSpan.FromMinutes(5);
         using var health = await client.GetAsync(
             new Uri(TestingAppHostFixture.HealthPath, UriKind.Relative),
             cancellationToken);

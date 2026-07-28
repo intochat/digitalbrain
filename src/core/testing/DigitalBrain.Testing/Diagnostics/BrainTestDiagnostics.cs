@@ -7,9 +7,7 @@ internal sealed class BrainTestDiagnostics
     internal BrainTestDiagnostics(string scopeId)
         => _scopeId = scopeId;
 
-    internal BrainTestFailureException CaptureFailure(
-        string operation,
-        Exception failure)
+    internal BrainTestFailureException CaptureFailure(string operation, Exception failure)
     {
         ArgumentNullException.ThrowIfNull(failure);
 

@@ -49,20 +49,12 @@ internal sealed class DirectAgentSession(
         var session = state.Value is { Length: > 0 } serialized
             ? await RestoreAsync(agent, serialized, definition, cancellationToken)
             : await agent.CreateSessionAsync(cancellationToken);
-        var response = await agent.RunAsync(
-            messages,
-            session,
-            cancellationToken: cancellationToken);
-        var serializedSession = await agent.SerializeSessionAsync(
-            session,
-            cancellationToken: cancellationToken);
+        var response = await agent.RunAsync(messages, session, cancellationToken: cancellationToken);
+        var serializedSession = await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken);
         var protectedSession = protector.Protect(
             Purpose(definition.Fingerprint),
             Encoding.UTF8.GetBytes(serializedSession.GetRawText()));
-        var envelope = new DirectAgentSessionEnvelope(
-            CurrentEnvelopeVersion,
-            definition,
-            protectedSession);
+        var envelope = new DirectAgentSessionEnvelope(CurrentEnvelopeVersion, definition, protectedSession);
         var previous = state.Value?.ToArray();
 
         state.Value = JsonSerializer.SerializeToUtf8Bytes(envelope);
@@ -105,10 +97,7 @@ internal sealed class DirectAgentSession(
             throw RecoveryRequired();
         }
 
-        if (!string.Equals(
-                stored.Definition.Fingerprint,
-                definition.Fingerprint,
-                StringComparison.Ordinal))
+        if (!string.Equals(stored.Definition.Fingerprint, definition.Fingerprint, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 "The durable direct-agent session is incompatible with the current orchestration definition; an explicit migration or reset is required.");
@@ -116,9 +105,7 @@ internal sealed class DirectAgentSession(
 
         try
         {
-            var sessionBytes = protector.Unprotect(
-                Purpose(definition.Fingerprint),
-                stored.ProtectedSession);
+            var sessionBytes = protector.Unprotect(Purpose(definition.Fingerprint), stored.ProtectedSession);
             using var sessionJson = JsonDocument.Parse(sessionBytes);
 
             return await agent.DeserializeSessionAsync(

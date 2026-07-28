@@ -26,8 +26,7 @@ public sealed class BrainWorld
     {
         await CloseAsync();
 
-        _deadline = CancellationTokenSource.CreateLinkedTokenSource(
-            TestContext.Current.CancellationToken);
+        _deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         _deadline.CancelAfter(ScenarioDeadline);
         _brain = await OSCluster.Fixture.CreateBrainAsync(_deadline.Token);
     }

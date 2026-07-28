@@ -11,9 +11,7 @@ internal sealed class TurnBoundFunction(AIFunction capability, TaskScheduler tur
 
     public override JsonElement JsonSchema => capability.JsonSchema;
 
-    protected override ValueTask<object?> InvokeCoreAsync(
-        AIFunctionArguments arguments,
-        CancellationToken cancellationToken)
+    protected override ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)
         => new(Task.Factory.StartNew(
             () => capability.InvokeAsync(arguments, cancellationToken).AsTask(),
             cancellationToken,

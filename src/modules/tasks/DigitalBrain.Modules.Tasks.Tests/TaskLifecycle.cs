@@ -6,15 +6,8 @@ namespace DigitalBrain.Tasks.Tests;
 
 public sealed partial class TaskLifecycle(TasksFixture fixture)
 {
-    private static StartTask StartCommand(
-        Goal goal,
-        NeuronId worker,
-        TaskPolicy? policy = null)
-        => new(
-            CommandId.New(),
-            goal,
-            worker,
-            policy ?? TaskFixtures.SingleAttempt);
+    private static StartTask StartCommand(Goal goal, NeuronId worker, TaskPolicy? policy = null)
+        => new(CommandId.New(), goal, worker, policy ?? TaskFixtures.SingleAttempt);
 
     private static async Task<(
         TestNeuron<IWorker> Worker,
@@ -27,8 +20,7 @@ public sealed partial class TaskLifecycle(TasksFixture fixture)
     {
         var worker = brain.Neuron<IWorker>($"{name}-worker");
         var task = brain.Neuron<ITask>($"{name}-task");
-        var started = await task.Reference.Start(
-            StartCommand(goal, worker.Id, policy));
+        var started = await task.Reference.Start(StartCommand(goal, worker.Id, policy));
         return (worker, task, started);
     }
 
@@ -56,9 +48,7 @@ public sealed partial class TaskLifecycle(TasksFixture fixture)
             $"Task '{task.Id}' stayed in {final.State} instead of becoming {expected}.");
     }
 
-    private static async Task<TaskSnapshot> AcceptThenRunningAsync(
-        TestNeuron<ITask> task,
-        CancellationToken cancellationToken)
+    private static async Task<TaskSnapshot> AcceptThenRunningAsync(TestNeuron<ITask> task, CancellationToken cancellationToken)
     {
         _ = await task.Incoming.NextAsync<AttemptAccepted>(cancellationToken);
         return await WaitForStateAsync(task, TaskState.Running, cancellationToken);

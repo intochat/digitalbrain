@@ -65,12 +65,13 @@ the live system. Tests are the regression net, not the proof.
 3. Drive the real scenario through the real edge — HTTP to `digitalbrain-ui`, or the Flutter shell.
 4. **Read the journal** via `digitalbrain-mcp`: `read_neuron_journal`, `read_chat_transcript`,
    `list_active_neurons`. Confirm the expected synapses fired, one correlation id, right order.
-5. Cross-check Aspire — but only for what the table below says works.
+5. Cross-check Aspire against structured logs and spans.
 6. Root gate for regression.
 7. Only now claim, quoting what you saw.
 
 Journals are the audit source; telemetry is a projection and never replaces them. Journals hold
-causal facts only — never arguments, prompts or secrets. Telemetry tags follow the same rule.
+causal facts only — never arguments, prompts or secrets. Production telemetry follows the same rule;
+the product AppHost opts Development into prompt and response capture for local diagnosis.
 
 **What Aspire can actually tell you** (measured against a live AppHost after a real chat turn):
 
@@ -78,20 +79,20 @@ causal facts only — never arguments, prompts or secrets. Telemetry tags follow
 |---|---|
 | `list_resources`, `list_console_logs` | works — console output is noisy with Azurite spam |
 | `digitalbrain-mcp` journals | works, and is authoritative |
-| `list_structured_logs` | **empty** |
-| `list_traces` | **no application spans** — `dotnet-cli` only |
-| GenAI spans, metrics | **do not exist** |
+| Structured logs | works — MCP invocation completion includes tool name and error state |
+| Application traces | works — ASP.NET, Orleans and kernel spans carry causal identifiers |
+| GenAI spans, metrics | works — provider, model, duration, token usage and finish reason; prompt and response content only when the AI module explicitly enables it |
 
-No host calls `ConfigureOpenTelemetry`, no chat client calls `UseOpenTelemetry`, and the kernel's
-`ActivitySource("DigitalBrain")` has no exporter. **This is the top open defect.** Until it lands,
-step 5 confirms health and console output only — say that, rather than implying traces were checked.
-Update this table when you fix it.
+`dotnet test os/tests/DigitalBrain.OS.Product.Tests -c Release -- -explicit only` is the live oracle.
+It starts and stops the product AppHost, drives a real Gemma4 turn and retry, confirms the durable
+transcript and correlation, checks owner-scoped active-neuron discovery, and verifies GenAI usage
+and Development message content in the exported span.
 
 ## Gates
 
 ```powershell
 dotnet build DigitalBrain.slnx -c Release
-dotnet test DigitalBrain.slnx -c Release --logger "console;verbosity=minimal"
+dotnet test DigitalBrain.slnx -c Release
 ```
 
 **Never `--filter` for the completion gate** — a project-scoped run has already missed a failing

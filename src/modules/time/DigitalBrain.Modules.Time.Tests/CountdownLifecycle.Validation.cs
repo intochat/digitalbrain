@@ -15,30 +15,19 @@ public sealed partial class CountdownLifecycle
         var empty = default(CommandId);
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => countdown.Reference.Start(new StartCountdown(
-                empty,
-                Hour,
-                destination.Id)));
+            () => countdown.Reference.Start(new StartCountdown(empty, Hour, destination.Id)));
 
         var started = await TimeFixture.Start(countdown, destination, Hour);
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => countdown.Reference.Reschedule(new RescheduleCountdown(
-                empty,
-                started.Revision,
-                Hour)));
+            () => countdown.Reference.Reschedule(new RescheduleCountdown(empty, started.Revision, Hour)));
         await Assert.ThrowsAsync<ArgumentException>(
-            () => countdown.Reference.Cancel(new CancelCountdown(
-                empty,
-                started.Revision)));
+            () => countdown.Reference.Cancel(new CancelCountdown(empty, started.Revision)));
 
-        var cancelled = await countdown.Reference.Cancel(
-            new CancelCountdown(CommandId.New(), started.Revision));
+        var cancelled = await countdown.Reference.Cancel(new CancelCountdown(CommandId.New(), started.Revision));
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => countdown.Reference.Restart(new RestartCountdown(
-                empty,
-                Hour)));
+            () => countdown.Reference.Restart(new RestartCountdown(empty, Hour)));
 
         Assert.Equal(cancelled, await countdown.Reference.Read());
     }
@@ -52,40 +41,23 @@ public sealed partial class CountdownLifecycle
         var (countdown, destination) = TimeFixture.Pair(test);
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => countdown.Reference.Start(new StartCountdown(
-                CommandId.New(),
-                TimeSpan.Zero,
-                destination.Id)));
+            () => countdown.Reference.Start(new StartCountdown(CommandId.New(), TimeSpan.Zero, destination.Id)));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => countdown.Reference.Start(new StartCountdown(
-                CommandId.New(),
-                TimeSpan.FromTicks(-1),
-                destination.Id)));
+            () => countdown.Reference.Start(new StartCountdown(CommandId.New(), TimeSpan.FromTicks(-1), destination.Id)));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => countdown.Reference.Start(new StartCountdown(
-                CommandId.New(),
-                TimeSpan.MaxValue,
-                destination.Id)));
+            () => countdown.Reference.Start(new StartCountdown(CommandId.New(), TimeSpan.MaxValue, destination.Id)));
 
         var started = await TimeFixture.Start(countdown, destination, Hour);
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => countdown.Reference.Reschedule(new RescheduleCountdown(
-                CommandId.New(),
-                started.Revision,
-                TimeSpan.Zero)));
+            () => countdown.Reference.Reschedule(new RescheduleCountdown(CommandId.New(), started.Revision, TimeSpan.Zero)));
 
-        var cancelled = await countdown.Reference.Cancel(
-            new CancelCountdown(CommandId.New(), started.Revision));
+        var cancelled = await countdown.Reference.Cancel(new CancelCountdown(CommandId.New(), started.Revision));
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => countdown.Reference.Restart(new RestartCountdown(
-                CommandId.New(),
-                TimeSpan.FromTicks(-1))));
+            () => countdown.Reference.Restart(new RestartCountdown(CommandId.New(), TimeSpan.FromTicks(-1))));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => countdown.Reference.Restart(new RestartCountdown(
-                CommandId.New(),
-                TimeSpan.MaxValue)));
+            () => countdown.Reference.Restart(new RestartCountdown(CommandId.New(), TimeSpan.MaxValue)));
 
         Assert.Equal(cancelled, await countdown.Reference.Read());
     }
@@ -100,13 +72,8 @@ public sealed partial class CountdownLifecycle
         var foreign = test.Owner("foreign").Neuron<ICountdown>(TimeFixture.Destination);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => countdown.Reference.Start(new StartCountdown(
-                CommandId.New(),
-                Hour,
-                foreign.Id)));
+            () => countdown.Reference.Start(new StartCountdown(CommandId.New(), Hour, foreign.Id)));
 
-        Assert.Equal(
-            CountdownStatus.Unscheduled,
-            (await countdown.Reference.Read()).Status);
+        Assert.Equal(CountdownStatus.Unscheduled, (await countdown.Reference.Read()).Status);
     }
 }

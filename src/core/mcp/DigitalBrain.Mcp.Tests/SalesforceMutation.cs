@@ -50,9 +50,7 @@ public sealed class SalesforceMutation(IntegrationsFixture fixture)
 
         Assert.Contains("fingerprint", failure.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, test.Mcp().SessionCount);
-        Assert.Equal(
-            proposed,
-            await ProposeAsync(driver, commandId, description, cancellationToken));
+        Assert.Equal(proposed, await ProposeAsync(driver, commandId, description, cancellationToken));
     }
 
     [Fact(DisplayName =
@@ -71,10 +69,7 @@ public sealed class SalesforceMutation(IntegrationsFixture fixture)
 
         var mismatched = recorded with { ApprovalId = Guid.NewGuid() };
         await Assert.ThrowsAsync<NeuronAuthorizationException>(() =>
-            driver.Reference.ApproveSalesforceWithMismatchedEvidence(
-                mismatched,
-                recorded,
-                cancellationToken));
+            driver.Reference.ApproveSalesforceWithMismatchedEvidence(mismatched, recorded, cancellationToken));
 
         Assert.Equal(0, test.Mcp().SessionCount);
         Assert.Equal(
@@ -93,16 +88,11 @@ public sealed class SalesforceMutation(IntegrationsFixture fixture)
         var description = IntegrationsFixture.SampleEnrichmentDescription;
         var proposed = await ProposeAsync(driver, commandId, description, cancellationToken);
 
-        var wrongFingerprint = IntegrationsFixture.Approval(
-            test,
-            commandId,
-            proposed.Fingerprint + "-tampered");
+        var wrongFingerprint = IntegrationsFixture.Approval(test, commandId, proposed.Fingerprint + "-tampered");
         await DeliverApprovalAsync(test, driver, wrongFingerprint, cancellationToken);
 
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            driver.Reference.ApproveSalesforceWithStoredEvidence(
-                wrongFingerprint,
-                cancellationToken));
+            driver.Reference.ApproveSalesforceWithStoredEvidence(wrongFingerprint, cancellationToken));
 
         Assert.Contains("fingerprint", failure.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, test.Mcp().SessionCount);
@@ -126,9 +116,7 @@ public sealed class SalesforceMutation(IntegrationsFixture fixture)
         var approval = IntegrationsFixture.Approval(test, commandId, proposed.Fingerprint);
         await DeliverApprovalAsync(test, driver, approval, cancellationToken);
 
-        var completed = await driver.Reference.ApproveSalesforceWithStoredEvidence(
-            approval,
-            cancellationToken);
+        var completed = await driver.Reference.ApproveSalesforceWithStoredEvidence(approval, cancellationToken);
 
         Assert.Equal(SalesforceMutationState.Completed, completed.State);
         Assert.Equal(commandId, completed.CommandId);
@@ -137,9 +125,7 @@ public sealed class SalesforceMutation(IntegrationsFixture fixture)
         Assert.Equal(proposed.Fingerprint, completed.Fingerprint);
         Assert.True(test.Mcp().SessionCount >= 1);
 
-        var again = await driver.Reference.ApproveSalesforceWithStoredEvidence(
-            approval,
-            cancellationToken);
+        var again = await driver.Reference.ApproveSalesforceWithStoredEvidence(approval, cancellationToken);
         Assert.Equal(completed, again);
     }
 
@@ -157,16 +143,12 @@ public sealed class SalesforceMutation(IntegrationsFixture fixture)
         test.Mcp().Catalog(
             IntegrationsFixture.SalesforceServerKey,
             AdmittedMcpTools.SalesforceUpdateAccount(success: false),
-            AdmittedMcpTools.SalesforceSoqlQuery(
-                IntegrationsFixture.SampleAccountId,
-                UnprovenProviderDescription));
+            AdmittedMcpTools.SalesforceSoqlQuery(IntegrationsFixture.SampleAccountId, UnprovenProviderDescription));
 
         var approval = IntegrationsFixture.Approval(test, commandId, proposed.Fingerprint);
         await DeliverApprovalAsync(test, driver, approval, cancellationToken);
 
-        var uncertain = await driver.Reference.ApproveSalesforceWithStoredEvidence(
-            approval,
-            cancellationToken);
+        var uncertain = await driver.Reference.ApproveSalesforceWithStoredEvidence(approval, cancellationToken);
 
         Assert.Equal(SalesforceMutationState.OutcomeUncertain, uncertain.State);
         Assert.Equal(commandId, uncertain.CommandId);
@@ -175,9 +157,7 @@ public sealed class SalesforceMutation(IntegrationsFixture fixture)
         Assert.Equal(proposed.Fingerprint, uncertain.Fingerprint);
         Assert.True(test.Mcp().SessionCount >= 1);
 
-        var again = await driver.Reference.ApproveSalesforceWithStoredEvidence(
-            approval,
-            cancellationToken);
+        var again = await driver.Reference.ApproveSalesforceWithStoredEvidence(approval, cancellationToken);
         Assert.Equal(SalesforceMutationState.OutcomeUncertain, again.State);
         Assert.Equal(uncertain, again);
     }

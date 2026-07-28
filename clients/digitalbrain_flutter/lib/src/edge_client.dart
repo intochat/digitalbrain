@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:digitalbrain_wire/digitalbrain_wire.dart';
@@ -8,11 +9,9 @@ import 'sse_chat_frames.dart';
 import 'sse_frames.dart';
 
 final class DigitalBrainUiEdgeClient {
-  DigitalBrainUiEdgeClient({
-    required this.baseUri,
-    http.Client? httpClient,
-  })  : _http = httpClient ?? http.Client(),
-        _ownsClient = httpClient == null;
+  DigitalBrainUiEdgeClient({required this.baseUri, http.Client? httpClient})
+    : _http = httpClient ?? http.Client(),
+      _ownsClient = httpClient == null;
 
   factory DigitalBrainUiEdgeClient.fromEnvironment({
     http.Client? httpClient,
@@ -145,6 +144,55 @@ final class DigitalBrainUiEdgeClient {
     }
     for (final event in parser.flush()) {
       yield event;
+    }
+  }
+
+  Future<BrainTopologySnapshot> readBrainTopology({
+    Duration requestTimeout = const Duration(seconds: 5),
+  }) async {
+    final uri = baseUri.replace(path: '/brain/topology');
+    final abort = Completer<void>();
+    final operation = () async {
+      final request = http.AbortableRequest(
+        'GET',
+        uri,
+        abortTrigger: abort.future,
+      );
+      final streamed = await _http.send(request);
+      return http.Response.fromStream(streamed);
+    }();
+    final response = await operation.timeout(
+      requestTimeout,
+      onTimeout: () {
+        abort.complete();
+        throw http.RequestAbortedException(uri);
+      },
+    );
+    if (response.statusCode != 200) {
+      throw StateError(
+        'brain-topology failed: ${response.statusCode} ${response.body}',
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw const FormatException('brain-topology response is not an object');
+    }
+
+    return BrainTopologySnapshot.fromJson(Map<String, Object?>.from(decoded));
+  }
+
+  Stream<BrainTopologySnapshot> watchBrainTopology({
+    Duration pollInterval = const Duration(seconds: 2),
+    Duration requestTimeout = const Duration(seconds: 5),
+  }) async* {
+    while (true) {
+      try {
+        yield await readBrainTopology(requestTimeout: requestTimeout);
+      } on Object catch (error, stackTrace) {
+        yield* Stream<BrainTopologySnapshot>.error(error, stackTrace);
+      }
+      await Future<void>.delayed(pollInterval);
     }
   }
 

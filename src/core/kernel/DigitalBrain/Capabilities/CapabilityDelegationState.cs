@@ -2,9 +2,7 @@ namespace DigitalBrain.Kernel;
 
 [GenerateSerializer]
 [Alias("db.kernel.capability-delegation-state")]
-internal sealed class CapabilityDelegationState(
-    CapabilityDelegation delegation,
-    CapabilityDelegationStatus status)
+internal sealed class CapabilityDelegationState(CapabilityDelegation delegation, CapabilityDelegationStatus status)
 {
     [Id(0)]
     internal CapabilityDelegation Delegation { get; } = delegation;

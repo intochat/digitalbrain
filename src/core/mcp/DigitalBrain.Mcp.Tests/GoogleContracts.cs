@@ -42,9 +42,7 @@ public sealed class GoogleContracts
         Assert.All(methods, method =>
         {
             Assert.DoesNotContain("Async", method.Name, StringComparison.Ordinal);
-            Assert.Equal(
-                method.Name,
-                method.GetCustomAttribute<AliasAttribute>()?.Alias);
+            Assert.Equal(method.Name, method.GetCustomAttribute<AliasAttribute>()?.Alias);
             Assert.Equal(typeof(Task<GmailMessage>), method.ReturnType);
         });
 

@@ -40,9 +40,7 @@ public sealed class TestOwner
         catch (Exception failure)
             when (failure is not BrainTestFailureException)
         {
-            throw _brain.CaptureFailure(
-                "neuron.open",
-                failure);
+            throw _brain.CaptureFailure("neuron.open", failure);
         }
     }
 }

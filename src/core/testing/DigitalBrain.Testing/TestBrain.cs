@@ -168,22 +168,15 @@ public sealed class TestBrain : IAsyncDisposable
         }
     }
 
-    internal JournalFaultHandle ArmJournalFault(
-        NeuronId target,
-        string message)
+    internal JournalFaultHandle ArmJournalFault(NeuronId target, string message)
     {
         lock (_faultGate)
         {
             try
             {
-                ObjectDisposedException.ThrowIf(
-                    Volatile.Read(ref _release) is null,
-                    this);
+                ObjectDisposedException.ThrowIf(Volatile.Read(ref _release) is null, this);
                 var registration = Cluster.ArmJournalFault(target, message);
-                var handle = new JournalFaultHandle(
-                    registration,
-                    RetireJournalFault,
-                    _diagnostics);
+                var handle = new JournalFaultHandle(registration, RetireJournalFault, _diagnostics);
                 _faults.Add(handle);
                 return handle;
             }
@@ -198,18 +191,12 @@ public sealed class TestBrain : IAsyncDisposable
     {
         lock (_journalGate)
         {
-            ObjectDisposedException.ThrowIf(
-                Volatile.Read(ref _release) is null,
-                this);
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _release) is null, this);
 
             var key = (subject, direction);
             if (!_journals.TryGetValue(key, out var journal))
             {
-                journal = new TestJournal(
-                    Cluster,
-                    subject,
-                    direction,
-                    _diagnostics);
+                journal = new TestJournal(Cluster, subject, direction, _diagnostics);
                 _journals.Add(key, journal);
             }
 
@@ -217,15 +204,11 @@ public sealed class TestBrain : IAsyncDisposable
         }
     }
 
-    internal async Task RestartHostAsync(
-        NeuronId target,
-        CancellationToken cancellationToken)
+    internal async Task RestartHostAsync(NeuronId target, CancellationToken cancellationToken)
     {
         try
         {
-            ObjectDisposedException.ThrowIf(
-                Volatile.Read(ref _release) is null,
-                this);
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _release) is null, this);
             await Cluster.RestartHostAsync(target, cancellationToken);
         }
         catch (Exception failure) when (failure is not BrainTestFailureException)
@@ -238,13 +221,9 @@ public sealed class TestBrain : IAsyncDisposable
         => new(this, new($"{_scope}-{label}"));
 
     private void ThrowIfDisposed()
-        => ObjectDisposedException.ThrowIf(
-            Volatile.Read(ref _release) is null,
-            this);
+        => ObjectDisposedException.ThrowIf(Volatile.Read(ref _release) is null, this);
 
-    internal BrainTestFailureException CaptureFailure(
-        string operation,
-        Exception failure)
+    internal BrainTestFailureException CaptureFailure(string operation, Exception failure)
         => _diagnostics.CaptureFailure(operation, failure);
 
     private bool RetireJournalFault(JournalFaultHandle fault)
@@ -278,8 +257,7 @@ public sealed class TestBrain : IAsyncDisposable
                 continue;
             }
 
-            (leaks ??= []).Add(
-                $"neuron='{fault.Target}', message='{fault.Message}'");
+            (leaks ??= []).Add($"neuron='{fault.Target}', message='{fault.Message}'");
         }
 
         return leaks is null
@@ -317,8 +295,7 @@ public sealed class TestBrain : IAsyncDisposable
         if (failures is not null)
         {
             throw new AggregateException(
-                "One or more DigitalBrain test journals failed to clean up.",
-                failures);
+                "One or more DigitalBrain test journals failed to clean up.", failures);
         }
     }
 }

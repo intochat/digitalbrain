@@ -63,10 +63,7 @@ internal static class FlutterHostLaunch
                 $"under '{packageRoot}' or '{packageRoot}/{ShellPackageDirectoryName}'. " +
                 "Use WithFlutterHost<HeadlessHost>() for the pure-Dart host.");
 
-        return new Result(
-            ResolveFlutterCommand(options, configuration),
-            workDir,
-            ["run", "-d", deviceTarget]);
+        return new Result(ResolveFlutterCommand(options, configuration), workDir, ["run", "-d", deviceTarget]);
     }
 
     private static Result ResolveHeadless(
@@ -74,9 +71,7 @@ internal static class FlutterHostLaunch
         FlutterHostOptions options,
         Microsoft.Extensions.Configuration.IConfiguration? configuration)
     {
-        var entry = Path.Combine(
-            packageRoot,
-            FlutterHostingExtensions.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar));
+        var entry = Path.Combine(packageRoot, FlutterHostingExtensions.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar));
         if (!File.Exists(entry))
         {
             throw new InvalidOperationException(
@@ -254,14 +249,12 @@ internal static class FlutterHostLaunch
         }
 
         // DCP / non-interactive hosts often lack a full interactive User PATH. Merge User+Machine.
-        foreach (var directory in SplitPath(
-                     Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User)))
+        foreach (var directory in SplitPath(Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User)))
         {
             yield return directory;
         }
 
-        foreach (var directory in SplitPath(
-                     Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine)))
+        foreach (var directory in SplitPath(Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine)))
         {
             yield return directory;
         }

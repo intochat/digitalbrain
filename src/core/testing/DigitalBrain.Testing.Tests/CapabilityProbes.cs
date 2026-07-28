@@ -20,9 +20,7 @@ internal sealed class CapabilityCaller :
     ICapabilityCaller,
     IHandle<CapabilityPing>
 {
-    public Task HandleAsync(
-        CapabilityPing synapse,
-        CancellationToken cancellationToken)
+    public Task HandleAsync(CapabilityPing synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();

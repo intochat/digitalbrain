@@ -99,12 +99,7 @@ public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
         var shell = test.Neuron<IShell>(ShellName);
         test.Chat().Reply(PaneReply);
 
-        var response = await new AiPaneSurface().RunAsync(
-            test.Client,
-            ShellName,
-            ModelName,
-            PanePrompt,
-            cancellationToken);
+        var response = await new AiPaneSurface().RunAsync(test.Client, ShellName, ModelName, PanePrompt, cancellationToken);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(AiPaneSurface.SceneKey, opened.Synapse.SceneKey);

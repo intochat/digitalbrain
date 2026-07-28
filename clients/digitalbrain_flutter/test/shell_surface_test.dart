@@ -2,59 +2,65 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('ShellSurfaceController projects SceneOpened without dropping prior scenes', () {
-    final surface = ShellSurfaceController();
+  test(
+    'ShellSurfaceController projects SceneOpened without dropping prior scenes',
+    () {
+      final surface = ShellSurfaceController();
 
-    surface.apply(
-      const SceneOpenedEvent(
-        sequence: 1,
-        sceneKey: 'home',
-        title: 'Home',
-        commandId: 'a',
-        shell: 'shell:dev/desk',
-      ),
-    );
-    surface.apply(
-      const SceneOpenedEvent(
-        sequence: 2,
-        sceneKey: 'countdown',
-        title: 'Countdown',
-        commandId: 'b',
-        shell: 'shell:dev/desk',
-      ),
-    );
+      surface.apply(
+        const SceneOpenedEvent(
+          sequence: 1,
+          sceneKey: 'home',
+          title: 'Home',
+          commandId: 'a',
+          shell: 'shell:dev/desk',
+        ),
+      );
+      surface.apply(
+        const SceneOpenedEvent(
+          sequence: 2,
+          sceneKey: 'countdown',
+          title: 'Countdown',
+          commandId: 'b',
+          shell: 'shell:dev/desk',
+        ),
+      );
 
-    expect(surface.scenes.map((s) => s.sceneKey), ['home', 'countdown']);
-    expect(surface.latest?.title, 'Countdown');
-    expect(surface.latest?.sequence, 2);
-  });
+      expect(surface.scenes.map((s) => s.sceneKey), ['home', 'countdown']);
+      expect(surface.latest?.title, 'Countdown');
+      expect(surface.latest?.sequence, 2);
+    },
+  );
 
-  test('ShellSurfaceController replaces same sceneKey with newer projection', () {
-    final surface = ShellSurfaceController();
+  test(
+    'ShellSurfaceController replaces same sceneKey with newer projection',
+    () {
+      final surface = ShellSurfaceController();
 
-    surface.apply(
-      const SceneOpenedEvent(
-        sequence: 1,
-        sceneKey: 'home',
-        title: 'Home',
-        commandId: 'a',
-        shell: 'shell:dev/desk',
-      ),
-    );
-    surface.apply(
-      const SceneOpenedEvent(
-        sequence: 4,
-        sceneKey: 'home',
-        title: 'Home again',
-        commandId: 'c',
-        shell: 'shell:dev/desk',
-      ),
-    );
+      surface.apply(
+        const SceneOpenedEvent(
+          sequence: 1,
+          sceneKey: 'home',
+          title: 'Home',
+          commandId: 'a',
+          shell: 'shell:dev/desk',
+        ),
+      );
+      surface.apply(
+        const SceneOpenedEvent(
+          sequence: 4,
+          sceneKey: 'home',
+          title: 'Home again',
+          commandId: 'c',
+          shell: 'shell:dev/desk',
+        ),
+      );
 
-    expect(surface.scenes, hasLength(1));
-    expect(surface.latest?.title, 'Home again');
-    expect(surface.latest?.sequence, 4);
-  });
+      expect(surface.scenes, hasLength(1));
+      expect(surface.latest?.title, 'Home again');
+      expect(surface.latest?.sequence, 4);
+    },
+  );
 
   test(
     'latest is most recently applied even when replace is not list-last',

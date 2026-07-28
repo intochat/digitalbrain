@@ -12,9 +12,7 @@ internal sealed class ShellBootNeuron :
     public const string HomeSceneKey = "home";
     public const string HomeSceneTitle = "Home";
 
-    public Task HandleAsync(
-        DigitalBrainActivated synapse,
-        CancellationToken cancellationToken)
+    public Task HandleAsync(DigitalBrainActivated synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
@@ -24,12 +22,8 @@ internal sealed class ShellBootNeuron :
             return Task.CompletedTask;
         }
 
-        var shell = GrainFactory.GetGrain<IShell>(
-            NeuronId.For<IShell>(Id.Owner, DefaultShellName).ToGrainId());
+        var shell = GrainFactory.GetGrain<IShell>(NeuronId.For<IShell>(Id.Owner, DefaultShellName).ToGrainId());
 
-        return shell.Open(new OpenScene(
-            CommandId.New(),
-            HomeSceneKey,
-            HomeSceneTitle));
+        return shell.Open(new OpenScene(CommandId.New(), HomeSceneKey, HomeSceneTitle));
     }
 }

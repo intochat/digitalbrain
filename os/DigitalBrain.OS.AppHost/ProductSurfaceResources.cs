@@ -4,5 +4,6 @@ internal static class ProductSurfaceResources
     public const string Silo = "silo";
     public const string Mcp = "digitalbrain-mcp";
     public const string McpHttpEndpointName = "http";
+    public const string McpPath = "/mcp";
     public const int McpHttpPort = 5000;
 }

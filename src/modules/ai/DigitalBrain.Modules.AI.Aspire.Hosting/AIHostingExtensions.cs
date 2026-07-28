@@ -9,35 +9,55 @@ namespace DigitalBrain.AI.Aspire.Hosting;
 
 public static class AIHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<AIModule> WithLlm<TModel>(
-        this DigitalBrainModuleBuilder<AIModule> module)
+    private const string EnableSensitiveDataEnvironmentKey =
+        "DigitalBrain__AI__Telemetry__EnableSensitiveData";
+
+    public const string Llama32Feature = "ai.llm.llama32";
+    public const string Gemma4Feature = "ai.llm.gemma4";
+    public const string Qwen35Feature = "ai.llm.qwen35";
+    public const string Granite41Feature = "ai.llm.granite41";
+    public const string Gpt56Feature = "ai.llm.gpt56";
+
+    extension(DigitalBrainModuleBuilder<AIModule> module)
+    {
+        public bool EnableSensitiveData
+        {
+            get => State(module).EnableSensitiveData;
+            set => State(module).EnableSensitiveData = value;
+        }
+    }
+
+    public static DigitalBrainModuleBuilder<AIModule> WithLlm<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
         where TModel : class, ILLM
     {
-        ArgumentNullException.ThrowIfNull(module);
+        var state = State(module);
+        module.ConfigureFeature(state.Add<TModel>());
+        return module;
+    }
 
-        var state = module.Brain.GetOrAddState(
-            static brain => new AIHostingState(brain),
-            out var added);
+    private static AIHostingState State(DigitalBrainModuleBuilder<AIModule> module)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        var state = module.Brain.GetOrAddState(static brain => new AIHostingState(brain), out var added);
         if (added)
         {
             module.RequireStateProtection();
             module.AddProjection(state);
         }
 
-        state.Add<TModel>();
-        return module;
+        return state;
     }
 
     private sealed class AIHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
     {
         private const string OllamaImageTag = "latest";
 
-        private static readonly Dictionary<Type, (string ResourceSuffix, string Tag)> OllamaModelCatalog = new()
+        private static readonly Dictionary<Type, (string ResourceSuffix, string Tag, string Feature)> OllamaModelCatalog = new()
         {
-            [typeof(Llama32)] = ("llama32", "llama3.2"),
-            [typeof(Gemma4)] = ("gemma4", "gemma4:12b"),
-            [typeof(Qwen35)] = ("qwen35", "qwen3.5:9b"),
-            [typeof(Granite41)] = ("granite41", "granite4.1:8b"),
+            [typeof(Llama32)] = ("llama32", "llama3.2", Llama32Feature),
+            [typeof(Gemma4)] = ("gemma4", "gemma4:12b", Gemma4Feature),
+            [typeof(Qwen35)] = ("qwen35", "qwen3.5:9b", Qwen35Feature),
+            [typeof(Granite41)] = ("granite41", "granite4.1:8b", Granite41Feature),
         };
 
         private readonly HashSet<Type> _models = [];
@@ -47,7 +67,9 @@ public static class AIHostingExtensions
         private IResourceBuilder<OpenAIModelResource>? _gpt56;
         private IResourceBuilder<ParameterResource>? _openAIKey;
 
-        internal void Add<TModel>()
+        internal bool EnableSensitiveData { get; set; }
+
+        internal string Add<TModel>()
             where TModel : class, ILLM
         {
             var model = typeof(TModel);
@@ -61,13 +83,13 @@ public static class AIHostingExtensions
             if (OllamaModelCatalog.TryGetValue(model, out var ollama))
             {
                 AddOllamaModel(model, ollama.ResourceSuffix, ollama.Tag);
-                return;
+                return ollama.Feature;
             }
 
             if (model == typeof(Gpt56))
             {
                 AddGpt56();
-                return;
+                return Gpt56Feature;
             }
 
             throw new NotSupportedException(
@@ -78,33 +100,24 @@ public static class AIHostingExtensions
         {
             ArgumentNullException.ThrowIfNull(builder);
 
+            builder.WithEnvironment(
+                EnableSensitiveDataEnvironmentKey,
+                EnableSensitiveData.ToString());
+
             foreach (var (model, resource) in _ollamaModels)
             {
                 builder
-                    .WithAnnotation(new WaitAnnotation(
-                        resource.Resource,
-                        WaitType.WaitUntilHealthy,
-                        exitCode: 0))
-                    .WithEnvironment(
-                        "DigitalBrain__AI__Ollama__Endpoint",
-                        resource.Resource.Parent.UriExpression)
-                    .WithEnvironment(
-                        $"DigitalBrain__AI__Ollama__{model.Name}__Model",
-                        resource.Resource.ModelName);
+                    .WithAnnotation(new WaitAnnotation(resource.Resource, WaitType.WaitUntilHealthy, exitCode: 0))
+                    .WithEnvironment("DigitalBrain__AI__Ollama__Endpoint", resource.Resource.Parent.UriExpression)
+                    .WithEnvironment($"DigitalBrain__AI__Ollama__{model.Name}__Model", resource.Resource.ModelName);
             }
 
             if (_gpt56 is not null)
             {
                 builder
-                    .WithEnvironment(
-                        "DigitalBrain__AI__OpenAI__ApiKey",
-                        _openAIKey!)
-                    .WithEnvironment(
-                        "DigitalBrain__AI__OpenAI__Endpoint",
-                        _gpt56.Resource.Parent.UriExpression)
-                    .WithEnvironment(
-                        "DigitalBrain__AI__OpenAI__Gpt56__Model",
-                        _gpt56.Resource.Model);
+                    .WithEnvironment("DigitalBrain__AI__OpenAI__ApiKey", _openAIKey!)
+                    .WithEnvironment("DigitalBrain__AI__OpenAI__Endpoint", _gpt56.Resource.Parent.UriExpression)
+                    .WithEnvironment("DigitalBrain__AI__OpenAI__Gpt56__Model", _gpt56.Resource.Model);
             }
         }
 
@@ -119,9 +132,7 @@ public static class AIHostingExtensions
                 .WithLifetime(ContainerLifetime.Persistent)
                 .WithOpenWebUI(uiContainer => uiContainer.WithLifetime(ContainerLifetime.Persistent));
 
-            _ollamaModels[model] = _ollama.AddModel(
-                $"{brain.Name}-ai-{resourceSuffix}",
-                tag);
+            _ollamaModels[model] = _ollama.AddModel($"{brain.Name}-ai-{resourceSuffix}", tag);
         }
 
         private void AddGpt56()

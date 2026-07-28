@@ -9,11 +9,7 @@ namespace DigitalBrain.Kernel;
 [Alias("db.capability-delegation")]
 public sealed class CapabilityDelegation
 {
-    internal CapabilityDelegation(
-        Guid identity,
-        SynapseDelivery request,
-        GrainId delegateSource,
-        OwnerId owner)
+    internal CapabilityDelegation(Guid identity, SynapseDelivery request, GrainId delegateSource, OwnerId owner)
     {
         Identity = identity;
         Request = request;
@@ -51,10 +47,7 @@ public sealed class CapabilityDelegation
             && expected == actual;
     }
 
-    internal void RequireMatches(
-        GrainId? actualSource,
-        GrainId actualTarget,
-        MethodInfo? actualMethod)
+    internal void RequireMatches(GrainId? actualSource, GrainId actualTarget, MethodInfo? actualMethod)
     {
         if (Request.Synapse is not CapabilityRequested requested
             || actualSource is null

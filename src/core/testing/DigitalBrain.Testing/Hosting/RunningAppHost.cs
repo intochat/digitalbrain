@@ -8,7 +8,7 @@ namespace DigitalBrain.Testing;
 
 public sealed class RunningAppHost : IAsyncDisposable
 {
-    private static readonly TimeSpan CleanupTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan CleanupTimeout = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(5);
 
     private readonly DistributedApplication _application;
@@ -78,10 +78,6 @@ public sealed class RunningAppHost : IAsyncDisposable
         using var cleanup = new CancellationTokenSource(_cleanupTimeout);
         var failures = new List<Exception>();
 
-        await AttemptAsync(
-            () => StopRuntimeResourcesAsync(cleanup.Token),
-            failures,
-            cleanup.Token);
         await AttemptAsync(
             () => _application.StopAsync(cleanup.Token),
             failures,
@@ -180,58 +176,6 @@ public sealed class RunningAppHost : IAsyncDisposable
         throw new AppHostTestFailureException(
             "AppHost graph cleanup failed.",
             primary);
-    }
-
-    private async Task StopRuntimeResourcesAsync(
-        CancellationToken cancellationToken)
-    {
-        var stoppable = _resourceNames
-            .Where(id => !IsTerminal(id) && AdvertisesStop(id))
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        await Task.WhenAll(
-            stoppable.Select(id => StopOneAsync(id, cancellationToken)));
-    }
-
-    private bool AdvertisesStop(string resourceId)
-        => _application.ResourceNotifications.TryGetCurrentState(
-                resourceId,
-                out var resourceEvent)
-            && resourceEvent is not null
-            && resourceEvent.Snapshot.Commands.Any(command =>
-                string.Equals(
-                    command.Name,
-                    KnownResourceCommands.StopCommand,
-                    StringComparison.Ordinal));
-
-    private bool IsTerminal(string resourceId)
-        => _application.ResourceNotifications.TryGetCurrentState(
-                resourceId,
-                out var resourceEvent)
-            && resourceEvent?.Snapshot.State?.Text is { } state
-            && KnownResourceStates.TerminalStates.Contains(
-                state,
-                StringComparer.Ordinal);
-
-    private async Task StopOneAsync(
-        string resourceId,
-        CancellationToken cancellationToken)
-    {
-        var result = await _application.ResourceCommands.ExecuteCommandAsync(
-            resourceId,
-            KnownResourceCommands.StopCommand,
-            cancellationToken);
-
-#pragma warning disable CS0618
-        var errorMessage = result.ErrorMessage;
-#pragma warning restore CS0618
-
-        if (!result.Success && !IsTerminal(resourceId))
-        {
-            throw new InvalidOperationException(
-                $"Stop failed for '{resourceId}': {errorMessage ?? result.Message}");
-        }
     }
 
     private void ThrowIfDisposed()

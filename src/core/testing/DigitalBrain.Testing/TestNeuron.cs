@@ -7,12 +7,7 @@ public sealed class TestNeuron<TNeuron>
 {
     private readonly TestBrain _brain;
 
-    internal TestNeuron(
-        TestBrain brain,
-        NeuronId id,
-        TNeuron reference,
-        TestJournal incoming,
-        TestJournal outgoing)
+    internal TestNeuron(TestBrain brain, NeuronId id, TNeuron reference, TestJournal incoming, TestJournal outgoing)
     {
         _brain = brain;
         Id = id;
@@ -32,7 +27,6 @@ public sealed class TestNeuron<TNeuron>
     public JournalFaultHandle FailNextJournalCommit(string message)
         => _brain.ArmJournalFault(Id, message);
 
-    public Task RestartHostAsync(
-        CancellationToken cancellationToken = default)
+    public Task RestartHostAsync(CancellationToken cancellationToken = default)
         => _brain.RestartHostAsync(Id, cancellationToken);
 }

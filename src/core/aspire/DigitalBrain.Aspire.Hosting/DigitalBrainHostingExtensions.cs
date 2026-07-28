@@ -9,10 +9,9 @@ public static class DigitalBrainHostingExtensions
     public const string JournalConnectionName = "journal";
     public const string StateProtectionKeyConfigurationKey = "DigitalBrain:Security:StateProtectionKey";
     public const string ModulesConfigurationKey = "DigitalBrain:Modules";
+    public const string ConfiguredFeaturesConfigurationKey = "DigitalBrain:ConfiguredFeatures";
 
-    public static DigitalBrainBuilder AddDigitalBrain(
-        this IDistributedApplicationBuilder builder,
-        string name)
+    public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -40,9 +39,7 @@ public static class DigitalBrainHostingExtensions
         where TModule : class, IModule, new()
         => brain.AddModule<TModule>(static _ => { });
 
-    public static DigitalBrainBuilder AddModule<TModule>(
-        this DigitalBrainBuilder brain,
-        Action<DigitalBrainModuleBuilder<TModule>> configure)
+    public static DigitalBrainBuilder AddModule<TModule>(this DigitalBrainBuilder brain, Action<DigitalBrainModuleBuilder<TModule>> configure)
         where TModule : class, IModule, new()
     {
         ArgumentNullException.ThrowIfNull(brain);
@@ -52,9 +49,7 @@ public static class DigitalBrainHostingExtensions
         return brain;
     }
 
-    public static IResourceBuilder<TResource> WithReference<TResource>(
-        this IResourceBuilder<TResource> builder,
-        DigitalBrainBuilder brain)
+    public static IResourceBuilder<TResource> WithReference<TResource>(this IResourceBuilder<TResource> builder, DigitalBrainBuilder brain)
         where TResource : IResourceWithEnvironment, IResourceWithEndpoints
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -65,25 +60,15 @@ public static class DigitalBrainHostingExtensions
 
         foreach (var dependency in brain.StartupDependencies)
         {
-            builder.WithAnnotation(new WaitAnnotation(
-                dependency,
-                WaitType.WaitUntilHealthy,
-                exitCode: 0));
+            builder.WithAnnotation(new WaitAnnotation(dependency, WaitType.WaitUntilHealthy, exitCode: 0));
         }
 
         if (brain.StateProtectionKey is not null)
         {
-            builder.WithEnvironment(
-                ConfigurationEnvironment(StateProtectionKeyConfigurationKey),
-                brain.StateProtectionKey);
+            builder.WithEnvironment(ConfigurationEnvironment(StateProtectionKeyConfigurationKey), brain.StateProtectionKey);
         }
 
-        for (var index = 0; index < brain.Modules.Count; index++)
-        {
-            builder.WithEnvironment(
-                $"{ConfigurationEnvironment(ModulesConfigurationKey)}__{index}",
-                brain.Modules[index].Value);
-        }
+        ProjectModuleManifest(builder, brain);
 
         foreach (var projection in brain.Projections)
         {
@@ -93,16 +78,41 @@ public static class DigitalBrainHostingExtensions
         return builder;
     }
 
-    public static IResourceBuilder<TResource> WithReference<TResource>(
-        this IResourceBuilder<TResource> builder,
-        ClientDigitalBrainReference client)
+    public static IResourceBuilder<TResource> WithReference<TResource>(this IResourceBuilder<TResource> builder, ClientDigitalBrainReference client)
         where TResource : IResourceWithEnvironment, IResourceWithEndpoints
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(client);
 
-        return builder.WithReference(client.Brain.Orleans.AsClient());
+        builder.WithReference(client.Brain.Orleans.AsClient());
+        ProjectModuleManifest(builder, client.Brain);
+        ProjectConfiguredFeatureManifest(builder, client.Brain);
+        return builder;
     }
+
+    private static void ProjectModuleManifest<TResource>(IResourceBuilder<TResource> builder, DigitalBrainBuilder brain)
+        where TResource : IResourceWithEnvironment
+        => builder.WithEnvironment(context =>
+        {
+            for (var index = 0; index < brain.Modules.Count; index++)
+            {
+                context.EnvironmentVariables[
+                    $"{ConfigurationEnvironment(ModulesConfigurationKey)}__{index}"] =
+                    brain.Modules[index].Value;
+            }
+        });
+
+    private static void ProjectConfiguredFeatureManifest<TResource>(IResourceBuilder<TResource> builder, DigitalBrainBuilder brain)
+        where TResource : IResourceWithEnvironment
+        => builder.WithEnvironment(context =>
+        {
+            for (var index = 0; index < brain.ConfiguredFeatures.Count; index++)
+            {
+                context.EnvironmentVariables[
+                    $"{ConfigurationEnvironment(ConfiguredFeaturesConfigurationKey)}__{index}"] =
+                    brain.ConfiguredFeatures[index];
+            }
+        });
 
     private static string ConfigurationEnvironment(string configurationKey)
         => configurationKey.Replace(":", "__", StringComparison.Ordinal);

@@ -20,11 +20,7 @@ public abstract partial class Neuron
         _turnRollbacks.Add(rollback);
     }
 
-    protected Task<CapabilityDelegation> DelegateCapabilityAsync(
-        GrainId delegateSource,
-        NeuronId target,
-        Type contract,
-        string method)
+    protected Task<CapabilityDelegation> DelegateCapabilityAsync(GrainId delegateSource, NeuronId target, Type contract, string method)
         => DelegateCapabilityAsync(_handling, delegateSource, target, contract, method);
 
     private async Task<CapabilityDelegation> DelegateCapabilityAsync(
@@ -67,11 +63,7 @@ public abstract partial class Neuron
             sequence,
             causation,
             TimeProvider);
-        var delegation = new CapabilityDelegation(
-            Guid.NewGuid(),
-            request,
-            delegateSource,
-            Id.Owner);
+        var delegation = new CapabilityDelegation(Guid.NewGuid(), request, delegateSource, Id.Owner);
         var delegationCheckpoint = SnapshotDelegations();
         var outgoingCheckpoint = _outgoing.Checkpoint();
 
@@ -81,11 +73,7 @@ public abstract partial class Neuron
             StageInboundCause();
             FlushOutgoing();
             _outgoing.Append(request);
-            _delegations.Add(
-                delegation.Identity,
-                _delegationStates.SerializeToArray(new(
-                    delegation,
-                    CapabilityDelegationStatus.Issued)));
+            _delegations.Add(delegation.Identity, _delegationStates.SerializeToArray(new(delegation, CapabilityDelegationStatus.Issued)));
             await CommitAsync(CancellationToken.None);
         }
         catch
@@ -134,10 +122,7 @@ public abstract partial class Neuron
         return delivery;
     }
 
-    internal async Task<SynapseDelivery> BeginCapabilityRequestAsync(
-        string contract,
-        string method,
-        NeuronId target)
+    internal async Task<SynapseDelivery> BeginCapabilityRequestAsync(string contract, string method, NeuronId target)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(contract);
         ArgumentException.ThrowIfNullOrWhiteSpace(method);
@@ -161,9 +146,7 @@ public abstract partial class Neuron
         return delivery;
     }
 
-    internal async Task RecordCapabilityOutcomeAsync(
-        CapabilityOutcome outcome,
-        SynapseDelivery request)
+    internal async Task RecordCapabilityOutcomeAsync(CapabilityOutcome outcome, SynapseDelivery request)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -172,17 +155,11 @@ public abstract partial class Neuron
             CapabilityOutcome.Completed => new CapabilityCompleted(request.SynapseId),
             CapabilityOutcome.Failed => new CapabilityFailed(request.SynapseId),
             CapabilityOutcome.Rejected => new CapabilityRejected(request.SynapseId),
-            _ => throw new ArgumentOutOfRangeException(
-                nameof(outcome)),
+            _ => throw new ArgumentOutOfRangeException(nameof(outcome)),
         };
 
         var sequence = _outgoing.NextSequence + _firedWhileHandling.Count;
-        var delivery = SynapseDelivery.Create(
-            fact,
-            Id,
-            sequence,
-            request,
-            TimeProvider);
+        var delivery = SynapseDelivery.Create(fact, Id, sequence, request, TimeProvider);
 
         FlushOutgoing();
         _outgoing.Append(delivery);

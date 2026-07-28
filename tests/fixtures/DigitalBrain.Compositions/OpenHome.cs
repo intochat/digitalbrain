@@ -9,10 +9,7 @@ public sealed class OpenHome
     public const string SceneKey = "home";
     public const string SceneTitle = "Home";
 
-    public async Task RunAsync(
-        IDigitalBrain brain,
-        string shellName,
-        CancellationToken cancellationToken)
+    public async Task RunAsync(IDigitalBrain brain, string shellName, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentException.ThrowIfNullOrWhiteSpace(shellName);

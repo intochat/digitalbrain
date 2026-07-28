@@ -26,9 +26,7 @@ internal sealed class DurableMcpTokenCache(
         return ValueTask.FromResult<TokenContainer?>(tokens);
     }
 
-    public async ValueTask StoreTokensAsync(
-        TokenContainer tokens,
-        CancellationToken cancellationToken)
+    public async ValueTask StoreTokensAsync(TokenContainer tokens, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(tokens);
         cancellationToken.ThrowIfCancellationRequested();

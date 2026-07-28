@@ -7,9 +7,7 @@ using Microsoft.Agents.AI.Workflows;
 
 namespace DigitalBrain.AI;
 
-internal sealed record OrchestrationParticipant(
-    string Contract,
-    NeuronId NeuronId);
+internal sealed record OrchestrationParticipant(string Contract, NeuronId NeuronId);
 
 internal sealed record OrchestrationDefinition(string Fingerprint)
 {
@@ -36,8 +34,7 @@ internal sealed record OrchestrationDefinition(string Fingerprint)
             identity.ManagerName(described.Length),
             identity.AggregatorName,
             described);
-        var fingerprint = Convert.ToHexStringLower(
-            SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(source)));
+        var fingerprint = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(source)));
 
         return new(fingerprint);
     }

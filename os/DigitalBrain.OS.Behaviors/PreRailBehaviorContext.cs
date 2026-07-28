@@ -21,8 +21,7 @@ internal sealed class PreRailBehaviorContext(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(purpose);
 
-        var seed = SHA256.HashData(
-            Encoding.UTF8.GetBytes($"{Execution.Behavior}/{Execution.Execution.Value}/{purpose}"));
+        var seed = SHA256.HashData(Encoding.UTF8.GetBytes($"{Execution.Behavior}/{Execution.Execution.Value}/{purpose}"));
 
         return new CommandId(new Guid(seed.AsSpan(0, 16)));
     }
@@ -32,8 +31,7 @@ internal sealed class PreRailBehaviorContext(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        return grains.GetGrain<TContract>(
-            NeuronId.For<TContract>(Execution.Owner, name).ToGrainId());
+        return grains.GetGrain<TContract>(NeuronId.For<TContract>(Execution.Owner, name).ToGrainId());
     }
 
     public ValueTask<T?> ReadStateAsync<T>(string key, CancellationToken cancellationToken = default)

@@ -35,10 +35,7 @@ public abstract partial class Neuron
         await FireAsync(synapse, [.. receivers], correlation);
     }
 
-    private Task<SynapseDelivery> FireAsync(
-        Synapse synapse,
-        NeuronId[] receivers,
-        CorrelationId? correlation = null)
+    private Task<SynapseDelivery> FireAsync(Synapse synapse, NeuronId[] receivers, CorrelationId? correlation = null)
         => FireAsync(synapse, receivers, _handling, correlation);
 
     private async Task<SynapseDelivery> FireAsync(
@@ -49,13 +46,7 @@ public abstract partial class Neuron
     {
         var sequence = _outgoing.NextSequence
             + (_handling is null ? 0 : _firedWhileHandling.Count);
-        var delivery = SynapseDelivery.Create(
-            Snapshot(synapse),
-            Id,
-            sequence,
-            causation,
-            TimeProvider,
-            correlation);
+        var delivery = SynapseDelivery.Create(Snapshot(synapse), Id, sequence, causation, TimeProvider, correlation);
 
         if (_handling is null)
         {
@@ -68,8 +59,7 @@ public abstract partial class Neuron
 
         if (receivers.Length > 0)
         {
-            _outbox.Add(_entries.SerializeToArray(
-                new OutboxEntry(delivery, receivers, _handlingDepth + 1, Attempts: 0)));
+            _outbox.Add(_entries.SerializeToArray(new OutboxEntry(delivery, receivers, _handlingDepth + 1, Attempts: 0)));
         }
 
         if (_handling is null)

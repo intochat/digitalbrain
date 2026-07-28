@@ -44,10 +44,7 @@ internal sealed class VolatileReminderTable : IReminderTable
         {
             return Task.FromResult(new ReminderTableData(
                 _entries.Values
-                    .Where(entry => InRange(
-                        entry.Entry.GrainId.GetUniformHashCode(),
-                        begin,
-                        end))
+                    .Where(entry => InRange(entry.Entry.GrainId.GetUniformHashCode(), begin, end))
                     .Select(entry => Copy(entry.Entry))));
         }
     }
@@ -61,23 +58,15 @@ internal sealed class VolatileReminderTable : IReminderTable
             var etag = Guid.NewGuid().ToString("N");
             var stored = Copy(entry);
             stored.ETag = etag;
-            _entries[(stored.GrainId, stored.ReminderName)] = new(
-                stored,
-                Utc(stored.StartAt),
-                _nextSequence++);
+            _entries[(stored.GrainId, stored.ReminderName)] = new(stored, Utc(stored.StartAt), _nextSequence++);
             return Task.FromResult(etag);
         }
     }
 
     public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
-        => Task.FromResult(
-            RemoveRowWithStatus(grainId, reminderName, eTag)
-                == ReminderRemovalResult.Removed);
+        => Task.FromResult(RemoveRowWithStatus(grainId, reminderName, eTag) == ReminderRemovalResult.Removed);
 
-    internal ReminderRemovalResult RemoveRowWithStatus(
-        GrainId grainId,
-        string reminderName,
-        string eTag)
+    internal ReminderRemovalResult RemoveRowWithStatus(GrainId grainId, string reminderName, string eTag)
     {
         lock (_gate)
         {
@@ -88,10 +77,7 @@ internal sealed class VolatileReminderTable : IReminderTable
                 return ReminderRemovalResult.Missing;
             }
 
-            if (!string.Equals(
-                    entry.Entry.ETag,
-                    eTag,
-                    StringComparison.Ordinal))
+            if (!string.Equals(entry.Entry.ETag, eTag, StringComparison.Ordinal))
             {
                 return ReminderRemovalResult.ETagMismatch;
             }
@@ -111,9 +97,7 @@ internal sealed class VolatileReminderTable : IReminderTable
         }
     }
 
-    internal DueReminder? NextDueAtOrBefore(
-        DateTimeOffset target,
-        string scope)
+    internal DueReminder? NextDueAtOrBefore(DateTimeOffset target, string scope)
     {
         lock (_gate)
         {
@@ -140,10 +124,7 @@ internal sealed class VolatileReminderTable : IReminderTable
         {
             var key = (delivered.GrainId, delivered.ReminderName);
             if (!_entries.TryGetValue(key, out var current)
-                || !string.Equals(
-                    current.Entry.ETag,
-                    delivered.ETag,
-                    StringComparison.Ordinal)
+                || !string.Equals(current.Entry.ETag, delivered.ETag, StringComparison.Ordinal)
                 || current.NextDue != delivered.Due)
             {
                 return;
@@ -160,28 +141,18 @@ internal sealed class VolatileReminderTable : IReminderTable
 
     private static bool BelongsToScope(GrainId grainId, string scope)
     {
-        if (string.Equals(
-                grainId.Type.ToString(),
-                OutboxWakeup.GrainTypeName,
-                StringComparison.Ordinal))
+        if (string.Equals(grainId.Type.ToString(), OutboxWakeup.GrainTypeName, StringComparison.Ordinal))
         {
-            return OutboxWakeup.TryParseTarget(
-                    grainId.Key.ToString(),
-                    out var target)
-                && target.Owner.Value.StartsWith(
-                    $"{scope}-",
-                    StringComparison.Ordinal);
+            return OutboxWakeup.TryParseTarget(grainId.Key.ToString(), out var target)
+                && target.Owner.Value.StartsWith($"{scope}-", StringComparison.Ordinal);
         }
 
         var id = NeuronId.FromGrainKey(
             grainId.Type.ToString()
-                ?? throw new InvalidOperationException(
-                    "A reminder grain has no grain type."),
+                ?? throw new InvalidOperationException("A reminder grain has no grain type."),
             grainId.Key.ToString());
 
-        return id.Owner.Value.StartsWith(
-            $"{scope}-",
-            StringComparison.Ordinal);
+        return id.Owner.Value.StartsWith($"{scope}-", StringComparison.Ordinal);
     }
 
     private static DateTimeOffset Utc(DateTime value)
@@ -196,10 +167,7 @@ internal sealed class VolatileReminderTable : IReminderTable
         ETag = entry.ETag,
     };
 
-    private sealed class StoredReminder(
-        ReminderEntry entry,
-        DateTimeOffset nextDue,
-        long sequence)
+    private sealed class StoredReminder(ReminderEntry entry, DateTimeOffset nextDue, long sequence)
     {
         internal ReminderEntry Entry { get; } = entry;
 

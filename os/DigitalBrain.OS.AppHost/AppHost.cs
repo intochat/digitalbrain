@@ -10,28 +10,27 @@ using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.OS;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
+using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
 var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
 
-brain.AddModule<AIModule>(ai => ai
-    .WithLlm<Gemma4>()
-    //.WithLlm<Qwen35>()
-    //.WithLlm<Granite41>()
-    //.WithLlm<Llama32>()
-    );
+brain.AddModule<AIModule>(ai =>
+{
+    ai.EnableSensitiveData = builder.Environment.IsDevelopment();
+    ai.WithLlm<Gemma4>();
+});
 brain.AddModule<ChatModule>();
 brain.AddModule<OSBehaviorsModule>();
-brain.AddModule<FlutterModule>(flutter => flutter
-    .WithUIEdge()
-    .WithFlutterHost());
+brain.AddModule<FlutterModule>(flutter => flutter.WithUIEdge().WithFlutterHost());
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 
 var silo = builder.AddProject<Projects.DigitalBrain_OS_Host>(ProductSurfaceResources.Silo)
     .WithReference(brain);
 
+#pragma warning disable ASPIREMCP001
 builder.AddProject<Projects.DigitalBrain_OS_Mcp>(ProductSurfaceResources.Mcp)
     .WithReference(brain.AsClient())
     .WaitFor(silo)
@@ -41,6 +40,10 @@ builder.AddProject<Projects.DigitalBrain_OS_Mcp>(ProductSurfaceResources.Mcp)
     .WithHttpEndpoint(
         port: ProductSurfaceResources.McpHttpPort,
         name: ProductSurfaceResources.McpHttpEndpointName,
-        isProxied: false);
+        isProxied: false)
+    .WithMcpServer(
+        ProductSurfaceResources.McpPath,
+        ProductSurfaceResources.McpHttpEndpointName);
+#pragma warning restore ASPIREMCP001
 
 builder.Build().Run();

@@ -25,11 +25,13 @@ public sealed class AIProviderConfiguration
         "file:///tmp/ollama",
     ];
 
-    public static TheoryData<string> ValidOllamaEndpoints =>
-    [
-        "http://ollama.example.test:11434",
-        "https://ollama.example.test:11435",
-    ];
+    public static TheoryData<Type, string, string> SupportedOllamaModels => new()
+    {
+        { typeof(Llama32), "llama3.2", "http://ollama.example.test:11434" },
+        { typeof(Gemma4), "gemma4:12b", "https://ollama.example.test:11435" },
+        { typeof(Qwen35), "qwen3.5:9b", "http://ollama.example.test:11436" },
+        { typeof(Granite41), "granite4.1:8b", "https://ollama.example.test:11437" },
+    };
 
     [Theory(DisplayName = "missing, blank, and malformed Ollama endpoints fail before client contact")]
     [MemberData(nameof(InvalidOllamaEndpoints))]
@@ -43,18 +45,19 @@ public sealed class AIProviderConfiguration
         Assert.Contains(OllamaEndpointKey, exception.Message, StringComparison.Ordinal);
     }
 
-    [Theory(DisplayName = "an explicit HTTP(S) Ollama endpoint resolves only the selected Llama32 client")]
-    [MemberData(nameof(ValidOllamaEndpoints))]
-    public void ExplicitOllamaEndpointResolvesSelectedClient(string endpoint)
+    [Theory(DisplayName = "every supported Ollama model resolves with its expected default tag")]
+    [MemberData(nameof(SupportedOllamaModels))]
+    public void SupportedOllamaModelResolvesWithExpectedDefaultTag(Type modelType, string expectedTag, string endpoint)
     {
         using var provider = Compose(endpoint);
 
-        var client = provider.GetRequiredKeyedService<IChatClient>(typeof(Llama32));
-        var ollama = Assert.IsAssignableFrom<IOllamaApiClient>(client);
+        var client = provider.GetRequiredKeyedService<IChatClient>(modelType);
+        var ollama = Assert.IsAssignableFrom<IOllamaApiClient>(client.GetService(typeof(IOllamaApiClient)));
 
+        Assert.NotSame(ollama, client);
         Assert.Equal(new Uri(endpoint), ollama.Uri);
         Assert.False(string.Equals("localhost", ollama.Uri.Host, StringComparison.OrdinalIgnoreCase));
-        Assert.Equal("llama3.2", ollama.SelectedModel);
+        Assert.Equal(expectedTag, ollama.SelectedModel);
     }
 
     private static ServiceProvider Compose(string? endpoint)
@@ -86,9 +89,7 @@ public sealed class AIProviderConfiguration
         return services.BuildServiceProvider();
     }
 
-    private sealed class CompositionSiloBuilder(
-        IServiceCollection services,
-        IConfiguration configuration) : ISiloBuilder
+    private sealed class CompositionSiloBuilder(IServiceCollection services, IConfiguration configuration) : ISiloBuilder
     {
         public IServiceCollection Services => services;
 

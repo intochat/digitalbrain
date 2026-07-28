@@ -30,11 +30,7 @@ internal sealed class ControllableTimeProvider : TimeProvider
         }
     }
 
-    public override ITimer CreateTimer(
-        TimerCallback callback,
-        object? state,
-        TimeSpan dueTime,
-        TimeSpan period)
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
         ArgumentNullException.ThrowIfNull(callback);
         ValidateTimerValue(dueTime, nameof(dueTime));
@@ -42,11 +38,7 @@ internal sealed class ControllableTimeProvider : TimeProvider
 
         lock (_gate)
         {
-            var registration = new Registration(
-                this,
-                callback,
-                state,
-                _nextSequence++);
+            var registration = new Registration(this, callback, state, _nextSequence++);
             registration.ChangeUnderLock(dueTime, period);
             _registrations.Add(registration);
             return registration;
@@ -136,10 +128,7 @@ internal sealed class ControllableTimeProvider : TimeProvider
         }
     }
 
-    private static DateTimeOffset Add(
-        DateTimeOffset value,
-        TimeSpan duration,
-        string parameterName)
+    private static DateTimeOffset Add(DateTimeOffset value, TimeSpan duration, string parameterName)
     {
         try
         {
@@ -154,9 +143,7 @@ internal sealed class ControllableTimeProvider : TimeProvider
         }
     }
 
-    private static void ValidateTimerValue(
-        TimeSpan value,
-        string parameterName)
+    private static void ValidateTimerValue(TimeSpan value, string parameterName)
     {
         if (value < TimeSpan.Zero && value != Timeout.InfiniteTimeSpan)
         {
@@ -167,11 +154,8 @@ internal sealed class ControllableTimeProvider : TimeProvider
         }
     }
 
-    private sealed class Registration(
-        ControllableTimeProvider owner,
-        TimerCallback callback,
-        object? state,
-        long sequence) : ITimer
+    private sealed class Registration(ControllableTimeProvider owner, TimerCallback callback, object? state, long sequence)
+        : ITimer
     {
         private bool _disposed;
 

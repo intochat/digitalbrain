@@ -26,7 +26,9 @@ final class ShellSurfaceController {
       title: event.title,
       sequence: event.sequence,
     );
-    final index = _scenes.indexWhere((scene) => scene.sceneKey == view.sceneKey);
+    final index = _scenes.indexWhere(
+      (scene) => scene.sceneKey == view.sceneKey,
+    );
     if (index >= 0) {
       _scenes[index] = view;
     } else {

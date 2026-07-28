@@ -13,10 +13,7 @@ internal static class McpEdgeExtensions
     internal static void ConfigureMcpEdge(this DigitalBrainTestBuilder builder)
     {
         var script = new McpEdgeScript();
-        builder.ConfigureMcpSessionFactory(
-            new ScriptedMcpSessionFactory(script),
-            script,
-            static edge => edge.Reset());
+        builder.ConfigureMcpSessionFactory(new ScriptedMcpSessionFactory(script), script, static edge => edge.Reset());
     }
 
     internal static McpEdgeScript Mcp(this TestBrain brain)
@@ -92,12 +89,8 @@ internal sealed class ScriptedMcpSessionFactory(McpEdgeScript script) : IMcpClie
         var tools = script.ToolsFor(server.Key);
         var clientToServer = new Pipe();
         var serverToClient = new Pipe();
-        var serverTransport = new StreamServerTransport(
-            clientToServer.Reader.AsStream(),
-            serverToClient.Writer.AsStream());
-        var clientTransport = new StreamClientTransport(
-            clientToServer.Writer.AsStream(),
-            serverToClient.Reader.AsStream());
+        var serverTransport = new StreamServerTransport(clientToServer.Reader.AsStream(), serverToClient.Writer.AsStream());
+        var clientTransport = new StreamClientTransport(clientToServer.Writer.AsStream(), serverToClient.Reader.AsStream());
 
         var mcpServer = McpServer.Create(
             serverTransport,
@@ -118,10 +111,7 @@ internal sealed class ScriptedMcpSessionFactory(McpEdgeScript script) : IMcpClie
 
     private const string ScriptedServerVersion = "test";
 
-    private sealed class ScriptedMcpSession(
-        McpClient client,
-        McpServer server,
-        Task run) : IMcpClientSession
+    private sealed class ScriptedMcpSession(McpClient client, McpServer server, Task run) : IMcpClientSession
     {
         public McpClient Client { get; } = client;
 

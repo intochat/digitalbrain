@@ -5,10 +5,7 @@ namespace DigitalBrain.Mcp;
 
 internal static class McpOAuthOptions
 {
-    internal static ClientOAuthOptions Create(
-        McpServerDefinition server,
-        IConfiguration configuration,
-        ITokenCache tokenCache)
+    internal static ClientOAuthOptions Create(McpServerDefinition server, IConfiguration configuration, ITokenCache tokenCache)
     {
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -27,19 +24,13 @@ internal static class McpOAuthOptions
         };
     }
 
-    private static string? Optional(
-        IConfiguration configuration,
-        McpServerDefinition server,
-        string name)
+    private static string? Optional(IConfiguration configuration, McpServerDefinition server, string name)
     {
         var value = configuration[$"{server.ConfigurationRoot}:{name}"];
         return !string.IsNullOrWhiteSpace(value) ? value : null;
     }
 
-    private static string Required(
-        IConfiguration configuration,
-        McpServerDefinition server,
-        string name)
+    private static string Required(IConfiguration configuration, McpServerDefinition server, string name)
     {
         var key = $"{server.ConfigurationRoot}:{name}";
         var value = configuration[key];
@@ -50,10 +41,7 @@ internal static class McpOAuthOptions
                 $"{server.DisplayName} requires projected configuration '{key}'.");
     }
 
-    private static Uri RequiredUri(
-        IConfiguration configuration,
-        McpServerDefinition server,
-        string name)
+    private static Uri RequiredUri(IConfiguration configuration, McpServerDefinition server, string name)
     {
         var value = Required(configuration, server, name);
 

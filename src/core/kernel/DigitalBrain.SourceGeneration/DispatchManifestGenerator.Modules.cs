@@ -39,9 +39,7 @@ public sealed partial class DispatchManifestGenerator
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
-    private static ModuleCapsuleModel? ModuleOf(
-        GeneratorSyntaxContext syntax,
-        CancellationToken cancellationToken)
+    private static ModuleCapsuleModel? ModuleOf(GeneratorSyntaxContext syntax, CancellationToken cancellationToken)
     {
         if (syntax.Node is not ClassDeclarationSyntax declaration
             || syntax.SemanticModel.GetDeclaredSymbol(declaration, cancellationToken) is not INamedTypeSymbol module
@@ -80,37 +78,25 @@ public sealed partial class DispatchManifestGenerator
 
         if (!module.IsPartial)
         {
-            production.ReportDiagnostic(Diagnostic.Create(
-                ModuleMustBePartial,
-                module.Location,
-                module.FullName));
+            production.ReportDiagnostic(Diagnostic.Create(ModuleMustBePartial, module.Location, module.FullName));
             valid = false;
         }
 
         if (module.IsNested)
         {
-            production.ReportDiagnostic(Diagnostic.Create(
-                ModuleMustBeTopLevel,
-                module.Location,
-                module.FullName));
+            production.ReportDiagnostic(Diagnostic.Create(ModuleMustBeTopLevel, module.Location, module.FullName));
             valid = false;
         }
 
         if (module.IsGeneric)
         {
-            production.ReportDiagnostic(Diagnostic.Create(
-                ModuleMustBeNonGeneric,
-                module.Location,
-                module.FullName));
+            production.ReportDiagnostic(Diagnostic.Create(ModuleMustBeNonGeneric, module.Location, module.FullName));
             valid = false;
         }
 
         if (!module.HasPublicParameterlessConstructor)
         {
-            production.ReportDiagnostic(Diagnostic.Create(
-                ModuleNeedsPublicConstructor,
-                module.Location,
-                module.FullName));
+            production.ReportDiagnostic(Diagnostic.Create(ModuleNeedsPublicConstructor, module.Location, module.FullName));
             valid = false;
         }
 
@@ -119,9 +105,7 @@ public sealed partial class DispatchManifestGenerator
             return;
         }
 
-        production.AddSource(
-            $"{module.FullName}.CompiledModule.g.cs",
-            CompiledModule(module));
+        production.AddSource($"{module.FullName}.CompiledModule.g.cs", CompiledModule(module));
     }
 
     private static string CompiledModule(ModuleCapsuleModel module)

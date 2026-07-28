@@ -3,8 +3,7 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Kernel;
 
-internal sealed class OwnerBoundCallFilter(
-    IEnumerable<ReminderSourceAllowlist> additionalReminderSources) :
+internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> additionalReminderSources) :
     IIncomingGrainCallFilter
 {
     public Task Invoke(IIncomingGrainCallContext context)
@@ -64,22 +63,15 @@ internal sealed class OwnerBoundCallFilter(
         => context.InterfaceMethod?.DeclaringType == typeof(IRemindable)
             && context.InterfaceMethod?.Name == nameof(IRemindable.ReceiveReminder);
 
-    private static bool IsOutboxDrainCall(
-        IIncomingGrainCallContext context)
+    private static bool IsOutboxDrainCall(IIncomingGrainCallContext context)
         => context.InterfaceMethod?.DeclaringType == typeof(IOutboxDrain)
             && context.InterfaceMethod?.Name == nameof(IOutboxDrain.Drain);
 
-    private static void RequireDedicatedWakeupForTarget(
-        IIncomingGrainCallContext context)
+    private static void RequireDedicatedWakeupForTarget(IIncomingGrainCallContext context)
     {
         if (context.SourceId is not { } source
-            || !string.Equals(
-                source.Type.ToString(),
-                OutboxWakeup.GrainTypeName,
-                StringComparison.Ordinal)
-            || !OutboxWakeup.TryParseTarget(
-                source.Key.ToString(),
-                out var encodedTarget)
+            || !string.Equals(source.Type.ToString(), OutboxWakeup.GrainTypeName, StringComparison.Ordinal)
+            || !OutboxWakeup.TryParseTarget(source.Key.ToString(), out var encodedTarget)
             || encodedTarget.ToGrainId() != context.TargetId)
         {
             throw new NeuronAuthorizationException(
@@ -89,10 +81,7 @@ internal sealed class OwnerBoundCallFilter(
 
     private bool IsTrustedReminderProvider(GrainId? source)
         => source is { } identified
-            && (string.Equals(
-                    identified.Type.ToString(),
-                    ReminderGrainServiceType,
-                    StringComparison.Ordinal)
+            && (string.Equals(identified.Type.ToString(), ReminderGrainServiceType, StringComparison.Ordinal)
                 || IsAdditionalTrustedSource(identified));
 
     private bool IsAdditionalTrustedSource(GrainId source)

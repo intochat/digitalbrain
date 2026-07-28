@@ -7,9 +7,7 @@ namespace DigitalBrain.Salesforce;
 
 internal sealed partial class Salesforce
 {
-    private async Task<MutationData> InvokeUpdateAsync(
-        MutationData mutation,
-        CancellationToken cancellationToken)
+    private async Task<MutationData> InvokeUpdateAsync(MutationData mutation, CancellationToken cancellationToken)
         => await _runtime.RunAsync(
             Server,
             _tokenState,
@@ -32,10 +30,7 @@ internal sealed partial class Salesforce
                 var result = await updateTool.Tool.CallAsync(
                     UpdateArguments(mutation),
                     cancellationToken: callbackCancellation);
-                var content = McpRuntime.RequireStructuredContent(
-                    result,
-                    Server,
-                    UpdateAccountName);
+                var content = McpRuntime.RequireStructuredContent(result, Server, UpdateAccountName);
 
                 return mutation with
                 {
@@ -72,9 +67,7 @@ internal sealed partial class Salesforce
         "Design",
         "CA1031:Do not catch general exception types",
         Justification = "Reconciliation is best effort; inability to prove the provider state must durably become OutcomeUncertain.")]
-    private async Task<MutationData> ReconcileAsync(
-        MutationData mutation,
-        CancellationToken cancellationToken)
+    private async Task<MutationData> ReconcileAsync(MutationData mutation, CancellationToken cancellationToken)
     {
         try
         {
@@ -196,10 +189,7 @@ internal sealed partial class Salesforce
                     idempotent: true,
                     openWorld: false));
 
-    private static SelectedTool SelectTool(
-        IList<McpClientTool> tools,
-        string name,
-        Func<McpClientTool, bool> compatible)
+    private static SelectedTool SelectTool(IList<McpClientTool> tools, string name, Func<McpClientTool, bool> compatible)
     {
         var matches = tools
             .Where(candidate => string.Equals(candidate.Name, name, StringComparison.Ordinal))
@@ -228,9 +218,7 @@ internal sealed partial class Salesforce
                 annotations?.OpenWorldHint));
     }
 
-    private static bool HasExactObjectSchema(
-        JsonElement? schema,
-        params (string Name, string Type)[] expected)
+    private static bool HasExactObjectSchema(JsonElement? schema, params (string Name, string Type)[] expected)
     {
         if (schema is not { ValueKind: JsonValueKind.Object } value
             || !value.TryGetProperty("type", out var schemaType)

@@ -11,6 +11,7 @@
     <ProjectReference Include="..\..\src\modules\flutter\DigitalBrain.Modules.Flutter\DigitalBrain.Modules.Flutter.csproj" />
     <ProjectReference Include="..\..\src\modules\google\DigitalBrain.Modules.Google\DigitalBrain.Modules.Google.csproj" />
     <ProjectReference Include="..\..\src\modules\salesforce\DigitalBrain.Modules.Salesforce\DigitalBrain.Modules.Salesforce.csproj" />
+    <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain\DigitalBrain.csproj" />
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>

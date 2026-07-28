@@ -27,10 +27,7 @@ public sealed class TimeFixture : DigitalBrainFixture
     {
         ArgumentNullException.ThrowIfNull(countdown);
         ArgumentNullException.ThrowIfNull(destination);
-        return countdown.Reference.Start(new StartCountdown(
-            CommandId.New(),
-            duration,
-            destination.Id));
+        return countdown.Reference.Start(new StartCountdown(CommandId.New(), duration, destination.Id));
     }
 
     public static async Task<(

@@ -15,10 +15,7 @@ internal sealed class TestEdgeRegistry
     private long _methodGeneration;
 
     internal void ConfigureChatClient<TService, TScript>(
-        IReadOnlyCollection<Type> neuronAliases,
-        TService adapter,
-        TScript script,
-        Action<TScript> reset)
+        IReadOnlyCollection<Type> neuronAliases, TService adapter, TScript script, Action<TScript> reset)
         where TService : class
         where TScript : class
     {
@@ -55,19 +52,11 @@ internal sealed class TestEdgeRegistry
                     "The chat-client test edge already has an assembly-configured adapter.");
             }
 
-            _chatClient = new(
-                serviceType,
-                aliases,
-                adapter,
-                script,
-                () => reset(script));
+            _chatClient = new(serviceType, aliases, adapter, script, () => reset(script));
         }
     }
 
-    internal void ConfigureMcpSessionFactory<TScript>(
-        IMcpClientSessionFactory factory,
-        TScript script,
-        Action<TScript> reset)
+    internal void ConfigureMcpSessionFactory<TScript>(IMcpClientSessionFactory factory, TScript script, Action<TScript> reset)
         where TScript : class
     {
         ArgumentNullException.ThrowIfNull(factory);
@@ -86,9 +75,7 @@ internal sealed class TestEdgeRegistry
         }
     }
 
-    internal void AttachTimeProvider(
-        TimeProvider provider,
-        Action reset)
+    internal void AttachTimeProvider(TimeProvider provider, Action reset)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentNullException.ThrowIfNull(reset);
@@ -127,10 +114,7 @@ internal sealed class TestEdgeRegistry
         {
             foreach (var serviceKey in chatClient.ServiceKeys)
             {
-                services.AddKeyedSingleton(
-                    chatClient.ServiceType,
-                    serviceKey,
-                    chatClient.Adapter);
+                services.AddKeyedSingleton(chatClient.ServiceType, serviceKey, chatClient.Adapter);
             }
         }
 
@@ -140,9 +124,7 @@ internal sealed class TestEdgeRegistry
             services.AddSingleton(mcp.Factory);
         }
 
-        services.AddKeyedSingleton<TimeProvider>(
-            NeuronTime.ServiceKey,
-            timeProvider);
+        services.AddKeyedSingleton<TimeProvider>(NeuronTime.ServiceKey, timeProvider);
     }
 
     internal long ResetMethodScope()
@@ -216,14 +198,7 @@ internal sealed class TestEdgeRegistry
     }
 
     private sealed record EdgeRegistration(
-        Type ServiceType,
-        IReadOnlyList<Type> ServiceKeys,
-        object Adapter,
-        object Script,
-        Action Reset);
+        Type ServiceType, IReadOnlyList<Type> ServiceKeys, object Adapter, object Script, Action Reset);
 
-    private sealed record McpEdgeRegistration(
-        IMcpClientSessionFactory Factory,
-        object Script,
-        Action Reset);
+    private sealed record McpEdgeRegistration(IMcpClientSessionFactory Factory, object Script, Action Reset);
 }

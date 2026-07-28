@@ -15,11 +15,7 @@ public abstract class Concurrent : Neuron, IAgent
 
     protected Concurrent()
     {
-        _directSession = DirectAgentSession.Create(
-            ServiceProvider,
-            "ai.concurrent.session",
-            () => WriteStateAsync(),
-            Id);
+        _directSession = DirectAgentSession.Create(ServiceProvider, "ai.concurrent.session", () => WriteStateAsync(), Id);
     }
 
     protected abstract IReadOnlyList<Participant> Participants { get; }
@@ -36,10 +32,6 @@ public abstract class Concurrent : Neuron, IAgent
         var shape = DirectOrchestrationShape.CreateConcurrent(GetType(), snapshot);
         var agent = shape.CreateAgent(GrainFactory, TaskScheduler.Current);
 
-        return _directSession.RunAsync(
-            agent,
-            shape.Definition,
-            messages,
-            CancellationToken.None);
+        return _directSession.RunAsync(agent, shape.Definition, messages, CancellationToken.None);
     }
 }

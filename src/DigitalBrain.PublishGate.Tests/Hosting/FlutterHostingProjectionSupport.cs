@@ -18,17 +18,11 @@ internal static class FlutterHostingProjectionSupport
         "DigitalBrain.Modules.Flutter.Http",
         "DigitalBrain.Modules.Flutter.Http.csproj");
 
-    public static string FlutterClientDirectory => RepositoryAssets.Path(
-        "clients",
-        "digitalbrain_flutter");
+    public static string FlutterClientDirectory => RepositoryAssets.Path("clients", "digitalbrain_flutter");
 
-    public static string FlutterShellDirectory => Path.Combine(
-        FlutterClientDirectory,
-        "shell");
+    public static string FlutterShellDirectory => Path.Combine(FlutterClientDirectory, "shell");
 
-    public static async Task AssertShellDesktopLayoutAsync(
-        string shellDirectory,
-        CancellationToken cancellationToken = default)
+    public static async Task AssertShellDesktopLayoutAsync(string shellDirectory, CancellationToken cancellationToken = default)
     {
         Assert.True(
             File.Exists(Path.Combine(shellDirectory, "pubspec.yaml")),
@@ -50,9 +44,7 @@ internal static class FlutterHostingProjectionSupport
         Assert.Contains("sdk: flutter", pubspec, StringComparison.OrdinalIgnoreCase);
     }
 
-    public static async Task AssertPureDartClientLayoutAsync(
-        string clientDirectory,
-        CancellationToken cancellationToken = default)
+    public static async Task AssertPureDartClientLayoutAsync(string clientDirectory, CancellationToken cancellationToken = default)
     {
         Assert.True(
             File.Exists(Path.Combine(clientDirectory, "pubspec.yaml")),
@@ -116,7 +108,10 @@ internal static class FlutterHostingProjectionSupport
             environment);
     }
 
-    public static void AssertExclusiveUIProductEnvironment(IReadOnlyDictionary<string, object> environment)
+    public static void AssertClientSafeUIProductEnvironment(
+        IReadOnlyDictionary<string, object> environment,
+        IReadOnlyList<string> modules,
+        IReadOnlyList<string> configuredFeatures)
     {
         var productKeys = environment.Keys
             .Where(static key =>
@@ -125,12 +120,38 @@ internal static class FlutterHostingProjectionSupport
                 || string.Equals(key, JournalConnectionEnvironmentKey, StringComparison.Ordinal))
             .ToHashSet(StringComparer.Ordinal);
 
-        Assert.Equal(
-            new HashSet<string>(StringComparer.Ordinal)
-            {
-                FlutterHostingExtensions.OwnerEnvironmentVariable,
-            },
-            productKeys);
+        var expected = new HashSet<string>(StringComparer.Ordinal)
+        {
+            FlutterHostingExtensions.OwnerEnvironmentVariable,
+        };
+        for (var index = 0; index < modules.Count; index++)
+        {
+            expected.Add(
+                $"{DigitalBrainHostingExtensions.ModulesConfigurationKey.Replace(":", "__", StringComparison.Ordinal)}__{index}");
+        }
+        for (var index = 0; index < configuredFeatures.Count; index++)
+        {
+            expected.Add(
+                $"{DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey.Replace(":", "__", StringComparison.Ordinal)}__{index}");
+        }
+
+        Assert.Equal(expected, productKeys);
+        for (var index = 0; index < modules.Count; index++)
+        {
+            Assert.Equal(
+                modules[index],
+                environment[
+                    $"{DigitalBrainHostingExtensions.ModulesConfigurationKey.Replace(":", "__", StringComparison.Ordinal)}__{index}"]
+                    ?.ToString());
+        }
+        for (var index = 0; index < configuredFeatures.Count; index++)
+        {
+            Assert.Equal(
+                configuredFeatures[index],
+                environment[
+                    $"{DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey.Replace(":", "__", StringComparison.Ordinal)}__{index}"]
+                    ?.ToString());
+        }
     }
 
     public static async Task<HashSet<string>> EnvironmentKeysOf(IResource resource)

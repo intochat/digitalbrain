@@ -1,5 +1,6 @@
 using System.Net;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Chat;
 using DigitalBrain.Flutter;
 using Xunit;
 
@@ -132,33 +133,81 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    private static async Task<ShellEventStream> OpenShellEventStreamAsync(
-        HttpClient http,
-        CancellationToken cancellationToken)
+    [Fact(DisplayName =
+        "HTTP brain topology projects configured modules and active owner neurons")]
+    public async Task HttpBrainTopologyProjectsRuntimeTruth()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var shell = test.Neuron<IShell>(UIFixture.DefaultShellName);
+        await test.Client.Get<IShell>(UIFixture.DefaultShellName).Open(
+            new OpenScene(CommandId.New(), HomeSceneKey, HomeTitle));
+
+        await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
+        using var http = CreateClient(app);
+        var topology = await http.GetFromJsonAsync<BrainTopologySnapshot>(UIEdgeContract.BrainTopologyPath, cancellationToken);
+
+        Assert.NotNull(topology);
+        Assert.Contains(topology.Modules, module => module.Id == FlutterModule.Id.Value);
+        Assert.Contains(topology.Modules, module => module.Id == ChatModule.Id.Value);
+        Assert.Contains(topology.Neurons, neuron => neuron.Id == shell.Id.ToString());
+        Assert.All(topology.Neurons, neuron => Assert.StartsWith("cluster-", neuron.Placement, StringComparison.Ordinal));
+    }
+
+    [Fact(DisplayName =
+        "SSE chat turn carries neuron, caller, command, correlation, and timestamp for live brain pulse")]
+    public async Task HttpChatTurnCarriesPulseIdentity()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var chat = test.Neuron<IChat>("pulse");
+
+        await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
+        using var http = CreateClient(app, streaming: true);
+        await using var events = await OpenChatEventStreamAsync(http, "pulse", cancellationToken);
+
+        var command = new SendMessage(CommandId.New(), "hello");
+        await test.Client.Get<IChat>("pulse").Send(command);
+        var projected = await UIEdgeSse.ReadNextChatTurnAsync(events.Reader, cancellationToken);
+
+        Assert.True(projected.Sequence > 0);
+        Assert.Equal(nameof(UserMessaged), projected.Synapse);
+        Assert.Equal(chat.Id.ToString(), projected.NeuronId);
+        Assert.Equal(chat.Id.ToString(), projected.Caller);
+        Assert.Equal(command.CommandId.ToString(), projected.CommandId);
+        Assert.True(Guid.TryParse(projected.CorrelationId, out var correlation));
+        Assert.NotEqual(Guid.Empty, correlation);
+        Assert.NotEqual(default, projected.Timestamp);
+    }
+
+    private static async Task<ShellEventStream> OpenShellEventStreamAsync(HttpClient http, CancellationToken cancellationToken)
     {
         using var streamRequest = new HttpRequestMessage(
             HttpMethod.Get,
             UIEdgeSse.ShellEvents(UIFixture.DefaultShellName, afterSequence: 0));
-        var streamResponse = await http.SendAsync(
-            streamRequest,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken);
+        var streamResponse = await http.SendAsync(streamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (streamResponse.StatusCode != HttpStatusCode.OK)
         {
             var errorBody = await streamResponse.Content.ReadAsStringAsync(cancellationToken);
             streamResponse.Dispose();
-            Assert.Fail(
-                $"SSE status {(int)streamResponse.StatusCode} {streamResponse.StatusCode}: {errorBody}");
+            Assert.Fail($"SSE status {(int)streamResponse.StatusCode} {streamResponse.StatusCode}: {errorBody}");
         }
 
-        Assert.Equal(
-            UIEdgeContract.EventStreamContentType,
-            streamResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(UIEdgeContract.EventStreamContentType, streamResponse.Content.Headers.ContentType?.MediaType);
         Assert.Contains(
             UIEdgeContract.CacheControlNoCache,
             streamResponse.Headers.CacheControl?.ToString() ?? string.Empty,
             StringComparison.OrdinalIgnoreCase);
 
+        var body = await streamResponse.Content.ReadAsStreamAsync(cancellationToken);
+        return new ShellEventStream(streamResponse, body);
+    }
+
+    private static async Task<ShellEventStream> OpenChatEventStreamAsync(HttpClient http, string chatName, CancellationToken cancellationToken)
+    {
+        using var streamRequest = new HttpRequestMessage(HttpMethod.Get, UIEdgeSse.ChatEvents(chatName, afterSequence: 0));
+        var streamResponse = await http.SendAsync(streamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
         var body = await streamResponse.Content.ReadAsStreamAsync(cancellationToken);
         return new ShellEventStream(streamResponse, body);
     }

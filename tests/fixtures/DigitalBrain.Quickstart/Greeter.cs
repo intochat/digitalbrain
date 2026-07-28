@@ -9,8 +9,6 @@ internal sealed class Greeter :
     IHandle<SayHello>,
     IEmit<Greeted>
 {
-    public Task HandleAsync(
-        SayHello request,
-        CancellationToken cancellationToken)
+    public Task HandleAsync(SayHello request, CancellationToken cancellationToken)
         => EmitAsync(new Greeted($"Hello, {request.Name}."));
 }
