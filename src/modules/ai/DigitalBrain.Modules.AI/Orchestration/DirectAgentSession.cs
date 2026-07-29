@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -36,11 +37,11 @@ internal sealed class DirectAgentSession(
             neuron);
     }
 
-    internal async Task<ChatResponse> RunAsync(
+    internal async IAsyncEnumerable<ChatResponseUpdate> RunStreamingAsync(
         AIAgent agent,
         OrchestrationDefinition definition,
         IReadOnlyList<ChatMessage> messages,
-        CancellationToken cancellationToken)
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(agent);
         ArgumentNullException.ThrowIfNull(definition);
@@ -49,7 +50,25 @@ internal sealed class DirectAgentSession(
         var session = state.Value is { Length: > 0 } serialized
             ? await RestoreAsync(agent, serialized, definition, cancellationToken)
             : await agent.CreateSessionAsync(cancellationToken);
-        var response = await agent.RunAsync(messages, session, cancellationToken: cancellationToken);
+
+        await foreach (var update in agent.RunStreamingAsync(messages, session, cancellationToken: cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            yield return update.AsChatResponseUpdate();
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await PersistSessionAsync(agent, session, definition, cancellationToken);
+    }
+
+    private async Task PersistSessionAsync(
+        AIAgent agent,
+        AgentSession session,
+        OrchestrationDefinition definition,
+        CancellationToken cancellationToken)
+    {
         var serializedSession = await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken);
         var protectedSession = protector.Protect(
             Purpose(definition.Fingerprint),
@@ -68,8 +87,6 @@ internal sealed class DirectAgentSession(
             state.Value = previous;
             throw;
         }
-
-        return response.AsChatResponse();
     }
 
     private async Task<AgentSession> RestoreAsync(

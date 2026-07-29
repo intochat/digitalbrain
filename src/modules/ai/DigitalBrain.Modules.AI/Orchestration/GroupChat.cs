@@ -25,19 +25,21 @@ public abstract class GroupChat : Neuron, IGroupChat
     {
         ArgumentNullException.ThrowIfNull(messages);
 
-        var snapshot = DirectOrchestrationShape.Snapshot(Id, Participants);
-        var shape = DirectOrchestrationShape.CreateGroupChat(GetType(), snapshot);
-        var agent = shape.CreateAgent(GrainFactory, TaskScheduler.Current);
-
-        return _directSession.RunAsync(agent, shape.Definition, messages, CancellationToken.None);
+        return RespondStreaming(messages).ToChatResponseAsync();
     }
 
     public async IAsyncEnumerable<ChatResponseUpdate> RespondStreaming(
         IReadOnlyList<ChatMessage> messages,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var response = await Respond(messages).WaitAsync(cancellationToken);
-        foreach (var update in response.ToChatResponseUpdates())
+        ArgumentNullException.ThrowIfNull(messages);
+
+        var snapshot = DirectOrchestrationShape.Snapshot(Id, Participants);
+        var shape = DirectOrchestrationShape.CreateGroupChat(GetType(), snapshot);
+        var agent = shape.CreateAgent(GrainFactory, TaskScheduler.Current);
+
+        await foreach (var update in _directSession
+            .RunStreamingAsync(agent, shape.Definition, messages, cancellationToken))
         {
             yield return update;
         }
