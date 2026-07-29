@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.AccountEnrichment;
+using DigitalBrain.Behaviors;
 using DigitalBrain.Flutter;
 using DigitalBrain.Google;
 using DigitalBrain.Salesforce;
@@ -42,6 +43,7 @@ public sealed class IntegrationsFixture : DigitalBrainFixture
     protected override void Configure(DigitalBrainTestBuilder brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
+        brain.AddModule<BehaviorsModule>();
         brain.AddModule<GoogleModule>();
         brain.AddModule<SalesforceModule>();
         brain.AddModule<EnrichmentModule>();

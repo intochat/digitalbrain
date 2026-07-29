@@ -12,7 +12,9 @@ builder.Services
     .AddMcpServer()
     .WithHttpTransport()
     .WithTools<DigitalBrainMcpTools>()
-    .WithTools<DigitalBrainIntrospectionTools>();
+    .WithTools<DigitalBrainIntrospectionTools>()
+    .WithTools<DigitalBrainBehaviorTools>();
+
 
 var app = builder.Build();
 app.MapDefaultEndpoints();
