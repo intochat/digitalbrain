@@ -31,6 +31,7 @@ public sealed class AssistantModelTeam(OSBehaviorsFixture fixture)
     private const string ReversedTeam = "team-Llama32-Gemma4";
     private const string SoloTeam = "team-Gemma4";
     private const string UnknownModel = "Gemini9";
+    private const string StorageOutage = "journal storage is offline for this test";
 
     [Fact(Timeout = FactTimeout, DisplayName =
         "the assistant asked to compare two models convenes their team and the team's answer reaches its reply")]
@@ -126,6 +127,26 @@ public sealed class AssistantModelTeam(OSBehaviorsFixture fixture)
         Assert.Contains("at least 2", correction, StringComparison.Ordinal);
         Assert.Equal(FirstReply, response.Text);
         await AssertTurnsTakenAsync(test.Neuron<IGemma4>(SoloTeam), 0, cancellationToken);
+    }
+
+    [Fact(Timeout = FactTimeout, DisplayName =
+        "a failure that is not the team refusing the request never reaches the model as prose")]
+    public async Task AFailureThatIsNotTheTeamRefusingNeverReachesTheModelAsProse()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        ScriptConvene(test, Gemma, Llama);
+        test.Chat().Reply(FirstReply);
+
+        await using var storageOutage = test.Neuron<ITeam>(PairedTeam)
+            .FailNextJournalCommit(StorageOutage);
+
+        var response = await Assistant(test).Respond([new ChatMessage(ChatRole.User, ComparePrompt)]);
+
+        var reported = Assert.Single(ToolResultsOfLastCall(test));
+        Assert.DoesNotContain(StorageOutage, reported, StringComparison.Ordinal);
+        Assert.Equal(FirstReply, response.Text);
+        await AssertTurnsTakenAsync(test.Neuron<IGemma4>(PairedTeam), 0, cancellationToken);
     }
 
     [Fact(Timeout = FactTimeout, DisplayName =

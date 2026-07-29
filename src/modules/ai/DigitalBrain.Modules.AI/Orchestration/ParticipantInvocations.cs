@@ -35,7 +35,7 @@ internal sealed class ParticipantInvocations(IReadOnlyList<NeuronId> participant
                 return;
             }
 
-            throw new InvalidOperationException(WhyNothingRan(orchestration), _firstFailure);
+            throw new OrchestrationRefusedException(WhyNothingRan(orchestration), _firstFailure);
         }
     }
 

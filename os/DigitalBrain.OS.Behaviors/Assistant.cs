@@ -56,7 +56,7 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
              [Description("Gmail message id to read")] string messageId)
                 => ProposeEnrichmentAsync(accountId, messageId));
 
-        if (ModelsNamedIn(LatestOwnerText(messages)) < SmallestTeam)
+        if (ModelMentions.NamedIn(LatestOwnerText(messages)).Count < SmallestTeam)
         {
             return [enrichment];
         }
@@ -89,47 +89,6 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         return string.Empty;
     }
 
-    private static int ModelsNamedIn(string text)
-        => TeamLineUp.KnownModels
-            .Select(ModelFamilyOf)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Count(family => IsNamedIn(text, family));
-
-    private static string ModelFamilyOf(string model)
-    {
-        var letters = 0;
-
-        while (letters < model.Length && char.IsAsciiLetter(model[letters]))
-        {
-            letters++;
-        }
-
-        return letters == 0 ? model : model[..letters];
-    }
-
-    private static bool IsNamedIn(string text, string family)
-    {
-        for (var start = text.IndexOf(family, StringComparison.OrdinalIgnoreCase);
-             start >= 0;
-             start = text.IndexOf(family, start + 1, StringComparison.OrdinalIgnoreCase))
-        {
-            var end = start + family.Length;
-
-            while (end < text.Length && char.IsAsciiDigit(text[end]))
-            {
-                end++;
-            }
-
-            if ((start == 0 || !char.IsLetterOrDigit(text[start - 1]))
-                && (end == text.Length || !char.IsLetterOrDigit(text[end])))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private async Task<string> ConveneAsync(string[] models, string question)
     {
         try
@@ -157,7 +116,7 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         {
             return Correctable(correctable);
         }
-        catch (InvalidOperationException correctable)
+        catch (OrchestrationRefusedException correctable)
         {
             return Correctable(correctable);
         }

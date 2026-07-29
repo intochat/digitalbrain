@@ -83,7 +83,7 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
 
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+        var failure = await Assert.ThrowsAsync<OrchestrationRefusedException>(
             () => test.Client.Get<IUnreachableGroupChatProbe>("unreachable-team").Respond([User()]));
 
         Assert.Contains($"Gpt56 '{ProbeParticipants.Left}'", failure.Message, StringComparison.Ordinal);

@@ -12,7 +12,7 @@ internal static class ModelContracts
 
         return ContractsByModelName.TryGetValue(model.Trim(), out var contract)
             ? contract
-            : throw new InvalidOperationException(
+            : throw new OrchestrationRefusedException(
                 $"Model '{model}' is not a model this build knows. Known models: {string.Join(", ", KnownModelNames())}. Knowing a model is not the same as it being provisioned here: a known model still fails on its first turn if this deployment has no endpoint or key configured for it.");
     }
 

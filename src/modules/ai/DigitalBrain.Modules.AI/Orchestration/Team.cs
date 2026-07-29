@@ -36,7 +36,7 @@ internal sealed class Team : GroupChat, ITeam
 
             if (HasDurableSession)
             {
-                throw new InvalidOperationException(
+                throw new OrchestrationRefusedException(
                     $"Team '{Id}' has already run {Names(formed)} and cannot be re-formed to run {Names(requested)}. Give each line-up its own team name.");
             }
         }

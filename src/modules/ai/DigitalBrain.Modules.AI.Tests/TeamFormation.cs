@@ -96,7 +96,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
         var team = test.Client.Get<ITeam>("unprovisioned-team");
         await team.Form(Formation(Gpt, Gemma));
 
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+        var failure = await Assert.ThrowsAsync<OrchestrationRefusedException>(
             () => StreamAsync(team, cancellationToken));
 
         Assert.Contains($"Failed to run: {Gpt} ", failure.Message, StringComparison.Ordinal);
@@ -115,7 +115,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
         var team = test.Client.Get<ITeam>("recovered-team");
         await team.Form(Formation(Gpt, Gemma));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => StreamAsync(team, cancellationToken));
+        await Assert.ThrowsAsync<OrchestrationRefusedException>(() => StreamAsync(team, cancellationToken));
 
         await team.Form(Formation(Gemma, Llama));
 
@@ -136,7 +136,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
         await team.Form(Formation(Gemma, Llama));
         await StreamAsync(team, cancellationToken);
 
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+        var failure = await Assert.ThrowsAsync<OrchestrationRefusedException>(
             () => team.Form(Formation(Qwen, Granite)));
 
         Assert.Contains(Gemma, failure.Message, StringComparison.Ordinal);
@@ -166,7 +166,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
 
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+        var failure = await Assert.ThrowsAsync<OrchestrationRefusedException>(
             () => test.Client.Get<ITeam>("unknown-model-team").Form(Formation(Gemma, "Gemini9")));
 
         Assert.Contains("Gemini9", failure.Message, StringComparison.Ordinal);
@@ -204,7 +204,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
 
         await team.RestartHostAsync(cancellationToken);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<OrchestrationRefusedException>(
             () => team.Reference.Form(Formation(Qwen, Granite)));
 
         var streamed = await StreamAsync(team.Reference, cancellationToken);
