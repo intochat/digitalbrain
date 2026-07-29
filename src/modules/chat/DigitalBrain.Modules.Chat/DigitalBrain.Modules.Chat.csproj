@@ -6,6 +6,9 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812;CA2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.Chat.Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
     <ProjectReference Include="..\..\ai\DigitalBrain.Modules.AI.Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain\DigitalBrain.csproj" />

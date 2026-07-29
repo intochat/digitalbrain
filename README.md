@@ -47,8 +47,8 @@ The plan of record. Nothing is shipped unless it says Built.
 
 `DigitalBrain.Behaviors` is a packable SDK foundation (authoring interfaces, constrained context,
 manifests, artifact identities) and holds the canonical artifact codec. It is not a compiler, builder,
-broker or execution rail. Chat today is *behaviour-shaped, not behaviour-installed* — its program is a
-real `IIntentProgram` composed at build time.
+broker or execution rail. Nothing in the product runs on it today: chat owns its whole turn in
+`ChatNeuron`, and no shipped neuron implements `IIntentProgram`.
 
 One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
 

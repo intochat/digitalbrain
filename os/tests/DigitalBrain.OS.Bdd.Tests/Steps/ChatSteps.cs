@@ -10,6 +10,8 @@ namespace DigitalBrain.OS.Bdd.Tests;
 [Binding]
 public sealed class ChatSteps(BrainWorld world)
 {
+    private const string AssistantName = "assistant";
+
     [Given("the conversation {string} is observed")]
     public void GivenTheConversationIsObserved(string conversation)
         => _ = world.Neuron<IChat>(conversation);
@@ -52,7 +54,7 @@ public sealed class ChatSteps(BrainWorld world)
     public async Task ThenTheAssistantSelectsNoExternalCapability()
     {
         var selected = await world
-            .Neuron<IAssistant>(ChatResponder.AssistantName)
+            .Neuron<IAssistant>(AssistantName)
             .Outgoing
             .ReadAsync<CapabilityToolSelected>(afterSequence: 0, world.CancellationToken);
 

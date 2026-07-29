@@ -1,7 +1,7 @@
-Feature: The operating system answers through a behaviour
+Feature: The conversation answers its own turn
 
-  A chat message is a journaled fact. An OS behaviour reacts to it, asks the assistant,
-  and posts the answer back into the same conversation. No host code is involved.
+  A chat message is a journaled fact. The conversation neuron asks the assistant and
+  journals the answer into the same conversation. No host code is involved.
 
   Scenario: the assistant answers a message
     Given a DigitalBrain for the default owner

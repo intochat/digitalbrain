@@ -14,7 +14,6 @@ namespace DigitalBrain.Chat;
 internal sealed class ChatNeuron :
     Neuron,
     IChat,
-    IHandle<AssistantAnswered>,
     IEmit<UserMessaged>,
     IEmit<AssistantResponded>
 {
@@ -42,12 +41,9 @@ internal sealed class ChatNeuron :
 
     public async Task Send(SendMessage message)
     {
-        if (!IsUnseenCommand(message))
+        await foreach (var _ in SendStreaming(message, CancellationToken.None))
         {
-            return;
         }
-
-        await RememberOwnerTurnAsync(message);
     }
 
     public async IAsyncEnumerable<ChatResponseUpdate> SendStreaming(
@@ -79,20 +75,6 @@ internal sealed class ChatNeuron :
 
         Remember(new ChatTurn(FromUser: false, answered));
         await EmitAsync(new AssistantResponded(message.CommandId, Id, answered));
-    }
-
-    public async Task HandleAsync(AssistantAnswered synapse, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(synapse);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (string.IsNullOrWhiteSpace(synapse.Text))
-        {
-            return;
-        }
-
-        Remember(new ChatTurn(FromUser: false, synapse.Text));
-        await EmitAsync(new AssistantResponded(synapse.CommandId, Id, synapse.Text));
     }
 
     public Task<ChatTranscript> Read() => Task.FromResult(new ChatTranscript(Turns()));

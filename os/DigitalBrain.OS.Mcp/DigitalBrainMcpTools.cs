@@ -81,7 +81,6 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
         CancellationToken cancellationToken)
     {
         var cursor = afterSequence;
-        CorrelationId? correlation = null;
 
         while (true)
         {
@@ -90,20 +89,13 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
 
             foreach (var delivery in page.Delta)
             {
-                if (delivery.Synapse is UserMessaged messaged
-                    && messaged.CommandId == commandId)
-                {
-                    correlation = delivery.CorrelationId;
-                }
-
                 if (delivery.Synapse is AssistantResponded response
-                    && correlation is { } expected
-                    && delivery.CorrelationId == expected)
+                    && response.CommandId == commandId)
                 {
                     return new ChatMessageResult(
                         chatName,
                         commandId.ToString(),
-                        expected.Value.ToString("N"),
+                        delivery.CorrelationId.Value.ToString("N"),
                         response.Text,
                         delivery.Sequence,
                         delivery.Timestamp);

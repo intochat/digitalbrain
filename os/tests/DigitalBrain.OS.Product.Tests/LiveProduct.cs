@@ -129,11 +129,7 @@ public sealed class LiveProduct
             var entries = RequiredArray(journal, "entries");
             Assert.Collection(
                 entries,
-                entry =>
-                {
-                    Assert.Equal("UserMessaged", RequiredString(entry, "synapse"));
-                    Assert.Equal(correlationId, RequiredString(entry, "correlation"));
-                },
+                entry => Assert.Equal("UserMessaged", RequiredString(entry, "synapse")),
                 entry =>
                 {
                     Assert.Equal("AssistantResponded", RequiredString(entry, "synapse"));
