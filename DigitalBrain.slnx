@@ -5,6 +5,7 @@
   <Folder Name="/src/core/">
     <Project Path="src/core/kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
     <Project Path="src/core/behaviors/DigitalBrain.Behaviors/DigitalBrain.Behaviors.csproj" />
+    <Project Path="src/core/behaviors/DigitalBrain.Behaviors.Runtime/DigitalBrain.Behaviors.Runtime.csproj" />
     <Project Path="src/core/behaviors/DigitalBrain.Behaviors.Tests/DigitalBrain.Behaviors.Tests.csproj" />
     <Project Path="src/core/kernel/DigitalBrain/DigitalBrain.csproj" />
     <Project Path="src/core/kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
