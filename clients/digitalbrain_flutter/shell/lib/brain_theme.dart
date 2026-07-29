@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_chat_core/flutter_chat_core.dart';
 
 abstract final class BrainPalette {
   static const navigation = Color(0xFF101219);
@@ -151,4 +152,27 @@ abstract final class BrainType {
     letterSpacing: -0.3,
     color: BrainPalette.textPrimary,
   );
+}
+
+abstract final class BrainChatTheme {
+  static ChatTheme dark() {
+    final base = ChatTypography.standard(fontFamily: BrainType.bodyFamily);
+    return ChatTheme(
+      colors: const ChatColors(
+        primary: BrainPalette.owner,
+        onPrimary: BrainPalette.surface,
+        surface: BrainPalette.surface,
+        onSurface: BrainPalette.textPrimary,
+        surfaceContainer: BrainPalette.surfaceRaised,
+        surfaceContainerLow: BrainPalette.surfaceSunken,
+        surfaceContainerHigh: BrainPalette.line,
+      ),
+      typography: base.copyWith(
+        bodyMedium: BrainType.body,
+        bodySmall: BrainType.bodyMuted,
+        labelSmall: BrainType.meta,
+      ),
+      shape: BorderRadius.circular(14),
+    );
+  }
 }

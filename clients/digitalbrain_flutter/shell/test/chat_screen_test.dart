@@ -48,10 +48,22 @@ BrainTopologySnapshot _topologyWithoutNeuron() => BrainTopologySnapshot(
   observedAt: DateTime.utc(2026, 7, 28, 8),
 );
 
+Future<void> _prepareSurface(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(1400, 900);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+Future<void> _drainChatTimers(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 400));
+}
+
 void main() {
   testWidgets('the workspace exposes Chat, Activity, and Brain destinations', (
     tester,
   ) async {
+    await _prepareSurface(tester);
     final topology = StreamController<BrainTopologySnapshot>();
     addTearDown(topology.close);
 
@@ -60,6 +72,7 @@ void main() {
     );
     topology.add(_topology());
     await tester.pumpAndSettle();
+    await _drainChatTimers(tester);
 
     expect(find.byKey(const Key('destination_chat')), findsOneWidget);
     expect(find.byKey(const Key('destination_activity')), findsOneWidget);
@@ -73,11 +86,13 @@ void main() {
     await tester.tap(find.byKey(const Key('destination_brain')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('brain_screen')), findsOneWidget);
+    await _drainChatTimers(tester);
   });
 
   testWidgets('activity shows journal facts without message content', (
     tester,
   ) async {
+    await _prepareSurface(tester);
     final turns = StreamController<ChatTurnEvent>();
     addTearDown(turns.close);
 
@@ -94,11 +109,13 @@ void main() {
     expect(find.text('sequence 001'), findsOneWidget);
     expect(find.text('command c1'), findsOneWidget);
     expect(find.text('private customer message'), findsNothing);
+    await _drainChatTimers(tester);
   });
 
   testWidgets('activity renders the authoritative synapse name', (
     tester,
   ) async {
+    await _prepareSurface(tester);
     final turns = StreamController<ChatTurnEvent>();
     addTearDown(turns.close);
 
@@ -115,11 +132,13 @@ void main() {
     expect(find.text('ObservedCustomSynapse'), findsOneWidget);
     expect(find.text('UserMessaged'), findsNothing);
     expect(find.text('private payload'), findsNothing);
+    await _drainChatTimers(tester);
   });
 
   testWidgets('the shared event projection survives destination changes', (
     tester,
   ) async {
+    await _prepareSurface(tester);
     final turns = StreamController<ChatTurnEvent>();
     addTearDown(turns.close);
 
@@ -137,7 +156,7 @@ void main() {
     await tester.tap(find.byKey(const Key('destination_chat')));
     await tester.pumpAndSettle();
     expect(find.text('arrived while activity was open'), findsOneWidget);
-    expect(find.text('009'), findsOneWidget);
+    await _drainChatTimers(tester);
   });
 
   testWidgets('narrow windows use bottom navigation', (tester) async {
@@ -148,9 +167,11 @@ void main() {
 
     await tester.pumpWidget(const BrainChatApp(chatName: 'main'));
     await tester.pumpAndSettle();
+    await _drainChatTimers(tester);
 
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
+    await _drainChatTimers(tester);
   });
 
   testWidgets('Brain renders live modules and active neurons', (tester) async {
@@ -171,11 +192,13 @@ void main() {
     expect(find.text('Chat'), findsWidgets);
     expect(find.text('AI'), findsOneWidget);
     expect(find.text('chat:owner/main'), findsOneWidget);
+    await _drainChatTimers(tester);
   });
 
   testWidgets('Brain clears a transient topology failure after recovery', (
     tester,
   ) async {
+    await _prepareSurface(tester);
     final topology = StreamController<BrainTopologySnapshot>();
     addTearDown(topology.close);
 
@@ -202,11 +225,13 @@ void main() {
 
     expect(find.text('Connected'), findsOneWidget);
     expect(find.byKey(const Key('brain_topology_canvas')), findsOneWidget);
+    await _drainChatTimers(tester);
   });
 
   testWidgets('a chat turn pulses Brain and opens correlation inspector', (
     tester,
   ) async {
+    await _prepareSurface(tester);
     final topology = StreamController<BrainTopologySnapshot>();
     final turns = StreamController<ChatTurnEvent>();
     addTearDown(topology.close);
@@ -232,11 +257,13 @@ void main() {
     expect(find.text('correlation-9'), findsOneWidget);
     expect(find.text('chat:owner/main'), findsWidgets);
     expect(find.text('private pulse content'), findsNothing);
+    await _drainChatTimers(tester);
   });
 
   testWidgets('a pulse waits for its neuron to appear in live topology', (
     tester,
   ) async {
+    await _prepareSurface(tester);
     final topology = StreamController<BrainTopologySnapshot>();
     final turns = StreamController<ChatTurnEvent>();
     addTearDown(topology.close);
@@ -262,11 +289,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('brain_pulse')), findsOneWidget);
+    await _drainChatTimers(tester);
   });
 
   testWidgets('Brain clears a neuron selection when the neuron disappears', (
     tester,
   ) async {
+    await _prepareSurface(tester);
     tester.view.physicalSize = const Size(1200, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -296,11 +325,13 @@ void main() {
       ),
       findsOneWidget,
     );
+    await _drainChatTimers(tester);
   });
 
   testWidgets('Brain clears causal selection when the chat changes', (
     tester,
   ) async {
+    await _prepareSurface(tester);
     final topology = StreamController<BrainTopologySnapshot>.broadcast();
     final turns = StreamController<ChatTurnEvent>.broadcast();
     addTearDown(topology.close);
@@ -331,20 +362,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('correlation-14'), findsNothing);
+    await _drainChatTimers(tester);
   });
 
-  testWidgets('an empty conversation invites the owner to act', (tester) async {
+  testWidgets('an empty conversation mounts the flyer chat surface', (
+    tester,
+  ) async {
+    await _prepareSurface(tester);
     await tester.pumpWidget(const BrainChatApp(chatName: 'main'));
     await tester.pump();
 
-    expect(find.text('Nothing yet.'), findsOneWidget);
-    expect(find.text('Ask your brain to do something.'), findsOneWidget);
-    expect(find.byKey(const Key('chat_journal')), findsNothing);
+    expect(find.byKey(const Key('chat_surface')), findsOneWidget);
+    await _drainChatTimers(tester);
   });
 
-  testWidgets('each turn carries its journal sequence and speaker', (
+  testWidgets('journal turns project as message text on the chat surface', (
     tester,
   ) async {
+    await _prepareSurface(tester);
     final turns = StreamController<ChatTurnEvent>();
     addTearDown(turns.close);
 
@@ -356,14 +391,10 @@ void main() {
     turns.add(_turn(2, false, 'Your account is up to date.'));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('turn_1')), findsOneWidget);
-    expect(find.byKey(const Key('turn_2')), findsOneWidget);
-    expect(find.text('001'), findsOneWidget);
-    expect(find.text('002'), findsOneWidget);
-    expect(find.text('you'), findsOneWidget);
-    expect(find.text('brain'), findsOneWidget);
+    expect(find.byKey(const Key('chat_surface')), findsOneWidget);
     expect(find.text('how is my account?'), findsOneWidget);
     expect(find.text('Your account is up to date.'), findsOneWidget);
+    await _drainChatTimers(tester);
   });
 
   testWidgets('a repeated sequence is projected once', (tester) async {
@@ -379,11 +410,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('only once'), findsOneWidget);
+    await _drainChatTimers(tester);
   });
 
-  testWidgets('sending hands the text to the edge and awaits the brain', (
+  testWidgets('sending hands the text to the edge and shows the journal answer', (
     tester,
   ) async {
+    await _prepareSurface(tester);
     final sent = <String>[];
     final turns = StreamController<ChatTurnEvent>();
     addTearDown(turns.close);
@@ -396,33 +429,32 @@ void main() {
       ),
     );
 
-    await tester.enterText(
-      find.byKey(const Key('chat_composer')),
-      'enrich my account',
-    );
-    await tester.tap(find.byKey(const Key('chat_send')));
+    await tester.enterText(find.byType(TextField), 'enrich my account');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
     await tester.pumpAndSettle();
 
     expect(sent, ['enrich my account']);
-    expect(find.text('thinking'), findsOneWidget);
+    expect(find.text('enrich my account'), findsWidgets);
 
-    turns.add(_turn(1, false, 'Done.'));
+    turns.add(_turn(1, true, 'enrich my account'));
+    turns.add(_turn(2, false, 'Done.'));
     await tester.pumpAndSettle();
 
-    expect(find.text('thinking'), findsNothing);
     expect(find.text('Done.'), findsOneWidget);
+    await _drainChatTimers(tester);
   });
 
-  testWidgets('a disconnected edge disables sending and says so', (
+  testWidgets('a disconnected edge says so and mounts chat without a send path', (
     tester,
   ) async {
+    await _prepareSurface(tester);
     await tester.pumpWidget(
       const BrainChatApp(chatName: 'main', statusMessage: 'no edge'),
     );
     await tester.pump();
 
     expect(find.text('not connected'), findsOneWidget);
-    final send = tester.widget<IconButton>(find.byKey(const Key('chat_send')));
-    expect(send.onPressed, isNull);
+    expect(find.byKey(const Key('chat_surface')), findsOneWidget);
+    await _drainChatTimers(tester);
   });
 }

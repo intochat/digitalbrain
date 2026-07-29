@@ -24,9 +24,9 @@ void main() {
       statusMessage: status,
       turns: edge?.watchChatTurns(chatName: chat),
       topology: edge?.watchBrainTopology(),
-      onSend: edge == null
+      onStream: edge == null
           ? null
-          : (text) => edge.sendMessage(chatName: chat, text: text),
+          : (text) => edge.streamMessage(chatName: chat, text: text),
     ),
   );
 }

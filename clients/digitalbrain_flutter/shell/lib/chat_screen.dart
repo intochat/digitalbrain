@@ -2,13 +2,22 @@ import 'dart:async';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_chat_core/flutter_chat_core.dart';
+import 'package:flutter_chat_ui/flutter_chat_ui.dart';
+import 'package:flyer_chat_text_message/flyer_chat_text_message.dart';
+import 'package:flyer_chat_text_stream_message/flyer_chat_text_stream_message.dart';
+import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 
 import 'activity_screen.dart';
 import 'brain_screen.dart';
 import 'brain_theme.dart';
 
 typedef SendMessage = Future<void> Function(String text);
+typedef StreamMessage = Stream<ChatDelta> Function(String text);
+
+const _ownerUserId = 'owner';
+const _assistantUserId = 'assistant';
 
 final class BrainChatApp extends StatelessWidget {
   const BrainChatApp({
@@ -17,6 +26,7 @@ final class BrainChatApp extends StatelessWidget {
     this.turns,
     this.topology,
     this.onSend,
+    this.onStream,
     this.statusMessage,
   });
 
@@ -24,6 +34,7 @@ final class BrainChatApp extends StatelessWidget {
   final Stream<ChatTurnEvent>? turns;
   final Stream<BrainTopologySnapshot>? topology;
   final SendMessage? onSend;
+  final StreamMessage? onStream;
   final String? statusMessage;
 
   @override
@@ -37,6 +48,7 @@ final class BrainChatApp extends StatelessWidget {
         turns: turns,
         topology: topology,
         onSend: onSend,
+        onStream: onStream,
         statusMessage: statusMessage,
       ),
     );
@@ -49,6 +61,7 @@ final class _BrainWorkspace extends StatefulWidget {
     this.turns,
     this.topology,
     this.onSend,
+    this.onStream,
     this.statusMessage,
   });
 
@@ -56,6 +69,7 @@ final class _BrainWorkspace extends StatefulWidget {
   final Stream<ChatTurnEvent>? turns;
   final Stream<BrainTopologySnapshot>? topology;
   final SendMessage? onSend;
+  final StreamMessage? onStream;
   final String? statusMessage;
 
   @override
@@ -163,6 +177,7 @@ final class _BrainWorkspaceState extends State<_BrainWorkspace> {
         chatName: widget.chatName,
         turns: projectedTurns,
         onSend: widget.onSend,
+        onStream: widget.onStream,
       ),
       ActivityScreen(turns: projectedTurns),
       BrainScreen(
@@ -380,266 +395,237 @@ final class BrainChatScreen extends StatefulWidget {
     required this.chatName,
     required this.turns,
     this.onSend,
+    this.onStream,
   });
 
   final String chatName;
   final List<ChatTurnEvent> turns;
   final SendMessage? onSend;
+  final StreamMessage? onStream;
 
   @override
   State<BrainChatScreen> createState() => _BrainChatScreenState();
 }
 
 final class _BrainChatScreenState extends State<BrainChatScreen> {
-  final _composer = TextEditingController();
-  final _composerFocus = FocusNode();
-  final _scroll = ScrollController();
+  static const _owner = User(id: _ownerUserId, name: 'you');
+  static const _assistant = User(id: _assistantUserId, name: 'brain');
+  static const _uuid = Uuid();
 
-  bool _awaitingBrain = false;
-  int _awaitingAfterSequence = 0;
+  final _controller = InMemoryChatController();
+  final _streamStates = _StreamStateStore();
+  final _seenSequences = <int>{};
+  String? _activeStreamId;
   String? _failure;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncJournal(widget.turns);
+  }
 
   @override
   void didUpdateWidget(covariant BrainChatScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.turns.length != oldWidget.turns.length) {
-      if (_awaitingBrain &&
-          widget.turns.any(
-            (turn) => !turn.fromUser && turn.sequence > _awaitingAfterSequence,
-          )) {
-        setState(() => _awaitingBrain = false);
-      }
-      _scrollToLatest();
+    if (!identical(oldWidget.turns, widget.turns) ||
+        oldWidget.turns.length != widget.turns.length) {
+      unawaited(_syncJournal(widget.turns));
     }
   }
 
-  void _scrollToLatest() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) {
-        return;
-      }
-      _scroll.animateTo(
-        _scroll.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
+  Future<void> _syncJournal(List<ChatTurnEvent> turns) async {
+    final messages = <Message>[];
+    for (final turn in turns) {
+      _seenSequences.add(turn.sequence);
+      messages.add(
+        TextMessage(
+          id: 'turn_${turn.sequence}',
+          authorId: turn.fromUser ? _ownerUserId : _assistantUserId,
+          createdAt: turn.timestamp.toUtc(),
+          text: turn.text,
+        ),
       );
-    });
+    }
+
+    if (_activeStreamId != null &&
+        turns.any((turn) => !turn.fromUser && turn.sequence > 0)) {
+      _streamStates.forget(_activeStreamId!);
+      _activeStreamId = null;
+    }
+
+    await _controller.setMessages(messages, animated: false);
+    if (mounted) {
+      setState(() {});
+    }
   }
 
-  Future<void> _send() async {
-    final text = _composer.text.trim();
-    final send = widget.onSend;
-    if (text.isEmpty || send == null) {
+  Future<void> _handleSend(String text) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
       return;
     }
 
-    _composer.clear();
-    setState(() {
-      _awaitingBrain = true;
-      _awaitingAfterSequence = widget.turns.isEmpty
-          ? 0
-          : widget.turns.last.sequence;
-      _failure = null;
-    });
+    setState(() => _failure = null);
+
+    final localId = _uuid.v4();
+    await _controller.insertMessage(
+      TextMessage(
+        id: localId,
+        authorId: _ownerUserId,
+        createdAt: DateTime.now().toUtc(),
+        text: trimmed,
+      ),
+    );
+
+    final stream = widget.onStream;
+    if (stream != null) {
+      await _drainStream(stream(trimmed));
+      return;
+    }
+
+    final send = widget.onSend;
+    if (send == null) {
+      return;
+    }
 
     try {
-      await send(text);
+      await send(trimmed);
     } on Object catch (error) {
       if (mounted) {
-        setState(() {
-          _awaitingBrain = false;
-          _failure = '$error';
-        });
+        setState(() => _failure = '$error');
       }
     }
-    _composerFocus.requestFocus();
+  }
+
+  Future<void> _drainStream(Stream<ChatDelta> deltas) async {
+    final streamId = _uuid.v4();
+    _activeStreamId = streamId;
+    final streamMessage = TextStreamMessage(
+      id: streamId,
+      authorId: _assistantUserId,
+      createdAt: DateTime.now().toUtc(),
+      streamId: streamId,
+    );
+    await _controller.insertMessage(streamMessage);
+    _streamStates.start(streamId);
+
+    final buffer = StringBuffer();
+    try {
+      await for (final delta in deltas) {
+        buffer.write(delta.text);
+        _streamStates.streaming(streamId, buffer.toString());
+      }
+      _streamStates.complete(streamId, buffer.toString());
+    } on Object catch (error) {
+      _streamStates.error(streamId, '$error');
+      if (mounted) {
+        setState(() => _failure = '$error');
+      }
+    }
   }
 
   @override
   void dispose() {
-    _composer.dispose();
-    _composerFocus.dispose();
-    _scroll.dispose();
+    _controller.dispose();
+    _streamStates.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final canSend = widget.onSend != null || widget.onStream != null;
+
     return ColoredBox(
       color: BrainPalette.surface,
       child: Column(
         children: [
           Expanded(
-            child: widget.turns.isEmpty && !_awaitingBrain
-                ? const _EmptyJournal()
-                : _Journal(
-                    turns: widget.turns,
-                    awaitingBrain: _awaitingBrain,
-                    controller: _scroll,
-                  ),
-          ),
-          if (_failure != null) _FailureNotice(message: _failure!),
-          _Composer(
-            controller: _composer,
-            focusNode: _composerFocus,
-            enabled: widget.onSend != null,
-            onSubmit: _send,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-final class _EmptyJournal extends StatelessWidget {
-  const _EmptyJournal();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: BrainPalette.surfaceRaised,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: BrainPalette.line),
-            ),
-            child: const Icon(
-              Icons.chat_bubble_outline_rounded,
-              color: BrainPalette.textMuted,
-            ),
-          ),
-          const SizedBox(height: 18),
-          const Text('Nothing yet.', style: BrainType.empty),
-          const SizedBox(height: 7),
-          Text(
-            'Ask your brain to do something.',
-            style: BrainType.body.copyWith(color: BrainPalette.textMuted),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-final class _Journal extends StatelessWidget {
-  const _Journal({
-    required this.turns,
-    required this.awaitingBrain,
-    required this.controller,
-  });
-
-  final List<ChatTurnEvent> turns;
-  final bool awaitingBrain;
-  final ScrollController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 820),
-        child: ListView.builder(
-          key: const Key('chat_journal'),
-          controller: controller,
-          padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 28),
-          itemCount: turns.length + (awaitingBrain ? 1 : 0),
-          itemBuilder: (context, index) {
-            if (index == turns.length) {
-              return const _AwaitingTurn();
-            }
-            return _JournalTurn(turn: turns[index]);
-          },
-        ),
-      ),
-    );
-  }
-}
-
-final class _JournalTurn extends StatelessWidget {
-  const _JournalTurn({required this.turn});
-
-  final ChatTurnEvent turn;
-
-  @override
-  Widget build(BuildContext context) {
-    final voice = turn.fromUser ? BrainPalette.owner : BrainPalette.signal;
-
-    return Padding(
-      key: Key('turn_${turn.sequence}'),
-      padding: const EdgeInsets.only(bottom: 28),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 48,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 3),
-              child: Text(
-                turn.sequence.toString().padLeft(3, '0'),
-                style: BrainType.meta,
+            child: ChangeNotifierProvider.value(
+              value: _streamStates,
+              child: Chat(
+                key: const Key('chat_surface'),
+                chatController: _controller,
+                currentUserId: _ownerUserId,
+                resolveUser: (id) async => switch (id) {
+                  _ownerUserId => _owner,
+                  _assistantUserId => _assistant,
+                  _ => null,
+                },
+                theme: BrainChatTheme.dark(),
+                onMessageSend: canSend ? _handleSend : null,
+                builders: Builders(
+                  textMessageBuilder:
+                      (
+                        context,
+                        message,
+                        index, {
+                        required bool isSentByMe,
+                        MessageGroupStatus? groupStatus,
+                      }) => FlyerChatTextMessage(
+                        message: message,
+                        index: index,
+                        showTime: false,
+                        showStatus: false,
+                      ),
+                  textStreamMessageBuilder:
+                      (
+                        context,
+                        message,
+                        index, {
+                        required bool isSentByMe,
+                        MessageGroupStatus? groupStatus,
+                      }) {
+                        final streamState = context
+                            .watch<_StreamStateStore>()
+                            .stateFor(message.streamId);
+                        return FlyerChatTextStreamMessage(
+                          message: message,
+                          index: index,
+                          streamState: streamState,
+                          showTime: false,
+                          showStatus: false,
+                        );
+                      },
+                ),
               ),
             ),
           ),
-          Container(
-            width: 3,
-            height: 22,
-            decoration: BoxDecoration(
-              color: voice,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  turn.fromUser ? 'you' : 'brain',
-                  style: BrainType.metaStrong.copyWith(color: voice),
-                ),
-                const SizedBox(height: 7),
-                SelectableText(turn.text, style: BrainType.body),
-              ],
-            ),
-          ),
+          if (_failure != null) _FailureNotice(message: _failure!),
         ],
       ),
     );
   }
 }
 
-final class _AwaitingTurn extends StatelessWidget {
-  const _AwaitingTurn();
+final class _StreamStateStore extends ChangeNotifier {
+  final _states = <String, StreamState>{};
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 28),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(width: 48),
-          Container(
-            width: 3,
-            height: 22,
-            decoration: BoxDecoration(
-              color: BrainPalette.signal,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 18),
-          Text(
-            'thinking',
-            style: BrainType.metaStrong.copyWith(color: BrainPalette.signal),
-          ),
-        ],
-      ),
-    );
+  StreamState stateFor(String streamId) =>
+      _states[streamId] ?? StreamStateLoading();
+
+  void start(String streamId) {
+    _states[streamId] = StreamStateLoading();
+    notifyListeners();
+  }
+
+  void streaming(String streamId, String text) {
+    _states[streamId] = StreamStateStreaming(text);
+    notifyListeners();
+  }
+
+  void complete(String streamId, String text) {
+    _states[streamId] = StreamStateCompleted(text);
+    notifyListeners();
+  }
+
+  void error(String streamId, String message) {
+    _states[streamId] = StreamStateError(message);
+    notifyListeners();
+  }
+
+  void forget(String streamId) {
+    _states.remove(streamId);
+    notifyListeners();
   }
 }
 
@@ -660,101 +646,4 @@ final class _FailureNotice extends StatelessWidget {
       ),
     );
   }
-}
-
-final class _Composer extends StatelessWidget {
-  const _Composer({
-    required this.controller,
-    required this.focusNode,
-    required this.enabled,
-    required this.onSubmit,
-  });
-
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final bool enabled;
-  final Future<void> Function() onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: BrainPalette.surfaceRaised,
-        border: Border(top: BorderSide(color: BrainPalette.line)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 820),
-          child: Container(
-            decoration: BoxDecoration(
-              color: BrainPalette.surfaceSunken,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: BrainPalette.lineStrong),
-            ),
-            padding: const EdgeInsets.only(left: 16, right: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Shortcuts(
-                    shortcuts: const {
-                      SingleActivator(LogicalKeyboardKey.enter):
-                          _SubmitIntent(),
-                    },
-                    child: Actions(
-                      actions: {
-                        _SubmitIntent: CallbackAction<_SubmitIntent>(
-                          onInvoke: (_) {
-                            unawaited(onSubmit());
-                            return null;
-                          },
-                        ),
-                      },
-                      child: TextField(
-                        key: const Key('chat_composer'),
-                        controller: controller,
-                        focusNode: focusNode,
-                        enabled: enabled,
-                        autofocus: true,
-                        maxLines: 4,
-                        minLines: 1,
-                        style: BrainType.body,
-                        cursorColor: BrainPalette.signal,
-                        decoration: InputDecoration(
-                          isDense: true,
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 13,
-                          ),
-                          hintText: 'Ask your brain…',
-                          hintStyle: BrainType.body.copyWith(
-                            color: BrainPalette.textMuted,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  key: const Key('chat_send'),
-                  onPressed: enabled ? () => unawaited(onSubmit()) : null,
-                  tooltip: 'Send',
-                  color: BrainPalette.signal,
-                  disabledColor: BrainPalette.textFaint,
-                  icon: const Icon(Icons.arrow_upward_rounded),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-final class _SubmitIntent extends Intent {
-  const _SubmitIntent();
 }
