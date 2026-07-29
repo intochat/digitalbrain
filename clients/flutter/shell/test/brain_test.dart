@@ -6,15 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/shell_test_support.dart';
+
 void main() {
   testWidgets('Brain renders live modules and active neurons', (tester) async {
-    final topology = StreamController<BrainTopologySnapshot>();
-    addTearDown(topology.close);
-
     await tester.pumpWidget(
-      BrainChatApp(chatName: 'main', topology: topology.stream),
+      BrainChatApp(
+        chatName: 'main',
+        onLoadTopology: () async => shellTopology(),
+      ),
     );
-    topology.add(shellTopology());
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('destination_brain')));
     await tester.pumpAndSettle();
@@ -32,13 +32,18 @@ void main() {
     tester,
   ) async {
     await prepareShellSurface(tester);
-    final topology = StreamController<BrainTopologySnapshot>();
-    addTearDown(topology.close);
-
+    var fail = false;
     await tester.pumpWidget(
-      BrainChatApp(chatName: 'main', topology: topology.stream),
+      BrainChatApp(
+        chatName: 'main',
+        onLoadTopology: () async {
+          if (fail) {
+            throw StateError('topology temporarily unavailable');
+          }
+          return shellTopology();
+        },
+      ),
     );
-    topology.add(shellTopology());
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('destination_brain')));
     await tester.pumpAndSettle();
@@ -46,14 +51,20 @@ void main() {
     expect(find.text('Connected'), findsOneWidget);
     expect(find.byKey(const Key('brain_topology_canvas')), findsOneWidget);
 
-    topology.addError(StateError('topology temporarily unavailable'));
+    fail = true;
+    await tester.tap(find.byKey(const Key('destination_chat')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('destination_brain')));
     await tester.pumpAndSettle();
 
     expect(find.text('Offline'), findsOneWidget);
     expect(find.byKey(const Key('brain_topology_canvas')), findsNothing);
     expect(find.text('Waiting for live topology…'), findsOneWidget);
 
-    topology.add(shellTopology());
+    fail = false;
+    await tester.tap(find.byKey(const Key('destination_chat')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('destination_brain')));
     await tester.pumpAndSettle();
 
     expect(find.text('Connected'), findsOneWidget);
@@ -65,19 +76,16 @@ void main() {
     tester,
   ) async {
     await prepareShellSurface(tester);
-    final topology = StreamController<BrainTopologySnapshot>();
     final turns = StreamController<ChatTurnEvent>();
-    addTearDown(topology.close);
     addTearDown(turns.close);
 
     await tester.pumpWidget(
       BrainChatApp(
         chatName: 'main',
-        topology: topology.stream,
+        onLoadTopology: () async => shellTopology(),
         turns: turns.stream,
       ),
     );
-    topology.add(shellTopology());
     turns.add(shellTurn(9, true, 'private pulse content'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('destination_brain')));
@@ -93,37 +101,29 @@ void main() {
     await drainShellTimers(tester);
   });
 
-  testWidgets('a pulse waits for its neuron to appear in live topology', (
-    tester,
-  ) async {
-    await prepareShellSurface(tester);
-    final topology = StreamController<BrainTopologySnapshot>();
-    final turns = StreamController<ChatTurnEvent>();
-    addTearDown(topology.close);
-    addTearDown(turns.close);
+  testWidgets(
+    'a pulse paints from the journal even before the neuron is in grain stats',
+    (tester) async {
+      await prepareShellSurface(tester);
+      final turns = StreamController<ChatTurnEvent>();
+      addTearDown(turns.close);
 
-    await tester.pumpWidget(
-      BrainChatApp(
-        chatName: 'main',
-        topology: topology.stream,
-        turns: turns.stream,
-      ),
-    );
-    topology.add(shellTopologyWithoutNeuron());
-    turns.add(shellTurn(12, false, 'not exposed by the topology view'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('destination_brain')));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        BrainChatApp(
+          chatName: 'main',
+          onLoadTopology: () async => shellTopologyWithoutNeuron(),
+          turns: turns.stream,
+        ),
+      );
+      turns.add(shellTurn(12, false, 'not exposed by the topology view'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('destination_brain')));
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('brain_pulse')), findsNothing);
-
-    await tester.pump(const Duration(milliseconds: 1200));
-    topology.add(shellTopology());
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('brain_pulse')), findsOneWidget);
-    await drainShellTimers(tester);
-  });
+      expect(find.byKey(const Key('brain_pulse')), findsOneWidget);
+      await drainShellTimers(tester);
+    },
+  );
 
   testWidgets('Brain clears a neuron selection when the neuron disappears', (
     tester,
@@ -133,13 +133,14 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final topology = StreamController<BrainTopologySnapshot>();
-    addTearDown(topology.close);
+    var topology = shellTopology();
 
     await tester.pumpWidget(
-      BrainChatApp(chatName: 'main', topology: topology.stream),
+      BrainChatApp(
+        chatName: 'main',
+        onLoadTopology: () async => topology,
+      ),
     );
-    topology.add(shellTopology());
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('destination_brain')));
     await tester.pumpAndSettle();
@@ -148,7 +149,10 @@ void main() {
 
     expect(find.text('cluster-1'), findsOneWidget);
 
-    topology.add(shellTopologyWithoutNeuron());
+    topology = shellTopologyWithoutNeuron();
+    await tester.tap(find.byKey(const Key('destination_chat')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('destination_brain')));
     await tester.pumpAndSettle();
 
     expect(find.text('cluster-1'), findsNothing);
@@ -165,19 +169,16 @@ void main() {
     tester,
   ) async {
     await prepareShellSurface(tester);
-    final topology = StreamController<BrainTopologySnapshot>.broadcast();
     final turns = StreamController<ChatTurnEvent>.broadcast();
-    addTearDown(topology.close);
     addTearDown(turns.close);
 
     await tester.pumpWidget(
       BrainChatApp(
         chatName: 'main',
-        topology: topology.stream,
+        onLoadTopology: () async => shellTopology(),
         turns: turns.stream,
       ),
     );
-    topology.add(shellTopology());
     turns.add(shellTurn(14, false, 'private turn'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('destination_brain')));
@@ -188,7 +189,7 @@ void main() {
     await tester.pumpWidget(
       BrainChatApp(
         chatName: 'other',
-        topology: topology.stream,
+        onLoadTopology: () async => shellTopology(),
         turns: turns.stream,
       ),
     );
@@ -197,5 +198,40 @@ void main() {
     expect(find.text('correlation-14'), findsNothing);
     await drainShellTimers(tester);
   });
-}
 
+  testWidgets('topology loads on start, Brain tab, and chat turn only', (
+    tester,
+  ) async {
+    await prepareShellSurface(tester);
+    var loads = 0;
+    final turns = StreamController<ChatTurnEvent>();
+    addTearDown(turns.close);
+
+    await tester.pumpWidget(
+      BrainChatApp(
+        chatName: 'main',
+        onLoadTopology: () async {
+          loads++;
+          return shellTopology();
+        },
+        turns: turns.stream,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(loads, 1);
+
+    await tester.tap(find.byKey(const Key('destination_activity')));
+    await tester.pumpAndSettle();
+    expect(loads, 1);
+
+    await tester.tap(find.byKey(const Key('destination_brain')));
+    await tester.pumpAndSettle();
+    expect(loads, 2);
+
+    turns.add(shellTurn(1, true, 'reload topology'));
+    await tester.pumpAndSettle();
+    expect(loads, 3);
+
+    await drainShellTimers(tester);
+  });
+}

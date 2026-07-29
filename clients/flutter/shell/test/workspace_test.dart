@@ -1,23 +1,21 @@
-import 'dart:async';
-
-import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/chat_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/shell_test_support.dart';
+
 void main() {
   testWidgets('the workspace exposes Chat, Activity, and Brain destinations', (
     tester,
   ) async {
     await prepareShellSurface(tester);
-    final topology = StreamController<BrainTopologySnapshot>();
-    addTearDown(topology.close);
 
     await tester.pumpWidget(
-      BrainChatApp(chatName: 'main', topology: topology.stream),
+      BrainChatApp(
+        chatName: 'main',
+        onLoadTopology: () async => shellTopology(),
+      ),
     );
-    topology.add(shellTopology());
     await tester.pumpAndSettle();
     await drainShellTimers(tester);
 

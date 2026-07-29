@@ -14,7 +14,7 @@ final class BrainWorkspace extends StatefulWidget {
     super.key,
     required this.chatName,
     this.turns,
-    this.topology,
+    this.onLoadTopology,
     this.onSend,
     this.onStream,
     this.statusMessage,
@@ -22,7 +22,7 @@ final class BrainWorkspace extends StatefulWidget {
 
   final String chatName;
   final Stream<ChatTurnEvent>? turns;
-  final Stream<BrainTopologySnapshot>? topology;
+  final LoadTopology? onLoadTopology;
   final SendMessage? onSend;
   final StreamMessage? onStream;
   final String? statusMessage;
@@ -38,9 +38,9 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
   final _seen = <int>{};
   List<ChatTurnEvent> _projectedTurns = const [];
   StreamSubscription<ChatTurnEvent>? _subscription;
-  StreamSubscription<BrainTopologySnapshot>? _topologySubscription;
   BrainTopologySnapshot? _topology;
   int _destination = 0;
+  int _topologyLoadEpoch = 0;
   String? _turnFailure;
   String? _topologyFailure;
 
@@ -48,7 +48,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
   void initState() {
     super.initState();
     _listen(widget.turns);
-    _listenTopology(widget.topology);
+    unawaited(_refreshTopology());
   }
 
   @override
@@ -58,36 +58,15 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
       _turns.clear();
       _seen.clear();
       _projectedTurns = const [];
+      unawaited(_refreshTopology());
     }
     if (!identical(oldWidget.turns, widget.turns)) {
       unawaited(_subscription?.cancel());
       _listen(widget.turns);
     }
-    if (!identical(oldWidget.topology, widget.topology)) {
-      unawaited(_topologySubscription?.cancel());
-      _listenTopology(widget.topology);
+    if (!identical(oldWidget.onLoadTopology, widget.onLoadTopology)) {
+      unawaited(_refreshTopology());
     }
-  }
-
-  void _listenTopology(Stream<BrainTopologySnapshot>? topology) {
-    _topologySubscription = topology?.listen(
-      (snapshot) {
-        if (mounted) {
-          setState(() {
-            _topology = snapshot;
-            _topologyFailure = null;
-          });
-        }
-      },
-      onError: (Object error) {
-        if (mounted) {
-          setState(() {
-            _topology = null;
-            _topologyFailure = '$error';
-          });
-        }
-      },
-    );
   }
 
   void _listen(Stream<ChatTurnEvent>? turns) {
@@ -102,6 +81,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
           _turns.sort((a, b) => a.sequence.compareTo(b.sequence));
           _projectedTurns = List<ChatTurnEvent>.unmodifiable(_turns);
         });
+        unawaited(_refreshTopology());
       },
       onError: (Object error) {
         if (mounted) {
@@ -111,6 +91,33 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
     );
   }
 
+  Future<void> _refreshTopology() async {
+    final load = widget.onLoadTopology;
+    if (load == null) {
+      return;
+    }
+
+    final epoch = ++_topologyLoadEpoch;
+    try {
+      final snapshot = await load();
+      if (!mounted || epoch != _topologyLoadEpoch) {
+        return;
+      }
+      setState(() {
+        _topology = snapshot;
+        _topologyFailure = null;
+      });
+    } on Object catch (error) {
+      if (!mounted || epoch != _topologyLoadEpoch) {
+        return;
+      }
+      setState(() {
+        _topology = null;
+        _topologyFailure = '$error';
+      });
+    }
+  }
+
   String? get _statusMessage =>
       widget.statusMessage ?? _turnFailure ?? _topologyFailure;
 
@@ -118,12 +125,14 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
     if (_destination != index) {
       setState(() => _destination = index);
     }
+    if (index == brainDestinationIndex) {
+      unawaited(_refreshTopology());
+    }
   }
 
   @override
   void dispose() {
     unawaited(_subscription?.cancel());
-    unawaited(_topologySubscription?.cancel());
     super.dispose();
   }
 

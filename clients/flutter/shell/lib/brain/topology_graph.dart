@@ -41,23 +41,58 @@ final class ProjectedNode {
   BrainTopologySelection get selection => node.selection;
 }
 
-bool hasPulseTarget(BrainTopologySnapshot topology, ChatTurnEvent? pulse) =>
-    pulse != null &&
-    topology.neurons.any((neuron) => neuron.id == pulse.neuronId);
+bool hasPulseTarget(ChatTurnEvent? pulse) => pulse != null;
 
-bool hasTopologyNode(BrainTopologySnapshot topology, String id) =>
-    topology.neurons.any((neuron) => neuron.id == id) ||
-    topology.modules.any((module) => module.id == id);
+List<BrainNeuron> neuronsWithPulse(
+  BrainTopologySnapshot topology,
+  ChatTurnEvent? pulse,
+) {
+  if (pulse == null) {
+    return topology.neurons;
+  }
+
+  final neurons = List<BrainNeuron>.of(topology.neurons);
+  void ensure(String id) {
+    if (id.isEmpty || neurons.any((neuron) => neuron.id == id)) {
+      return;
+    }
+    neurons.add(optimisticNeuron(id));
+  }
+
+  ensure(pulse.neuronId);
+  ensure(pulse.caller);
+  return neurons;
+}
+
+BrainNeuron optimisticNeuron(String id) {
+  final separator = id.indexOf(':');
+  if (separator <= 0 || separator == id.length - 1) {
+    return BrainNeuron(
+      id: id,
+      grainType: id,
+      identity: id,
+      placement: 'pending',
+    );
+  }
+
+  return BrainNeuron(
+    id: id,
+    grainType: id.substring(0, separator),
+    identity: id.substring(separator + 1),
+    placement: 'pending',
+  );
+}
 
 List<ProjectedNode> projectTopology(
   BrainTopologySnapshot topology,
   Size size,
   double rotationX,
-  double rotationY,
-) {
+  double rotationY, {
+  ChatTurnEvent? pulse,
+}) {
   final graph = <GraphNode>[
     ...placeModules(topology.modules),
-    ...placeNeurons(topology.neurons),
+    ...placeNeurons(neuronsWithPulse(topology, pulse)),
   ];
   final base = math.min(size.width, size.height) * 0.36;
   final center = Offset(size.width * 0.5, size.height * 0.51);

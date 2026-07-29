@@ -76,19 +76,17 @@ void main() {
   });
 
   testWidgets(
-    'topology ticks do not wipe an optimistic send before journal arrives',
+    'topology reloads do not wipe an optimistic send before journal arrives',
     (tester) async {
       await prepareShellSurface(tester);
       final turns = StreamController<ChatTurnEvent>();
-      final topology = StreamController<BrainTopologySnapshot>();
       addTearDown(turns.close);
-      addTearDown(topology.close);
 
       await tester.pumpWidget(
         BrainChatApp(
           chatName: 'main',
           turns: turns.stream,
-          topology: topology.stream,
+          onLoadTopology: () async => shellTopology(),
           onSend: (_) async {},
         ),
       );
@@ -99,9 +97,9 @@ void main() {
 
       expect(find.text('stay visible'), findsWidgets);
 
-      topology.add(shellTopology());
+      await tester.tap(find.byKey(const Key('destination_brain')));
       await tester.pumpAndSettle();
-      topology.add(shellTopologyWithoutNeuron());
+      await tester.tap(find.byKey(const Key('destination_chat')));
       await tester.pumpAndSettle();
 
       expect(find.text('stay visible'), findsWidgets);

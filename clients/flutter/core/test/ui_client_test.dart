@@ -195,108 +195,70 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
     );
   });
 
-  test(
-    'watchBrainTopology polls live modules and neurons without restart',
-    () async {
-      var requestCount = 0;
-      final client = DigitalBrainUiClient(
-        baseUri: Uri.parse('http://ui.example:5080'),
-        httpClient: MockClient((request) async {
-          expect(request.method, 'GET');
-          expect(
-            request.url.toString(),
-            'http://ui.example:5080/brain/topology',
-          );
-          requestCount++;
-          return http.Response(
-            jsonEncode({
-              'modules': [
-                {'id': 'DigitalBrain.Chat.ChatModule'},
-              ],
-              'neurons': [
-                if (requestCount > 1)
-                  {
-                    'id': 'chat:owner/main',
-                    'grainType': 'chat',
-                    'identity': 'owner/main',
-                    'placement': 'cluster-1',
-                  },
-              ],
-              'observedAt': '2026-07-28T08:00:00Z',
-            }),
-            200,
-            headers: {'content-type': 'application/json'},
-          );
-        }),
-      );
+  test('readBrainTopology loads modules and active neurons once', () async {
+    var requestCount = 0;
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://ui.example:5080'),
+      httpClient: MockClient((request) async {
+        expect(request.method, 'GET');
+        expect(request.url.toString(), 'http://ui.example:5080/brain/topology');
+        requestCount++;
+        return http.Response(
+          jsonEncode({
+            'modules': [
+              {'id': 'DigitalBrain.Chat.ChatModule'},
+            ],
+            'neurons': [
+              {
+                'id': 'chat:owner/main',
+                'grainType': 'chat',
+                'identity': 'owner/main',
+                'placement': 'cluster-1',
+              },
+            ],
+            'observedAt': '2026-07-28T08:00:00Z',
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
 
-      final snapshots = await client
-          .watchBrainTopology(pollInterval: Duration.zero)
-          .take(2)
-          .toList();
+    final snapshot = await client.readBrainTopology();
 
-      expect(snapshots.first.neurons, isEmpty);
-      expect(snapshots.last.neurons.single.id, 'chat:owner/main');
-    },
-  );
+    expect(requestCount, 1);
+    expect(snapshot.modules.single.id, 'DigitalBrain.Chat.ChatModule');
+    expect(snapshot.neurons.single.id, 'chat:owner/main');
+  });
 
-  test(
-    'watchBrainTopology reports a transient failure and keeps polling',
-    () async {
-      var requestCount = 0;
-      final client = DigitalBrainUiClient(
-        baseUri: Uri.parse('http://ui.example:5080'),
-        httpClient: MockClient((request) async {
-          requestCount++;
-          if (requestCount == 1) {
-            return http.Response('temporarily unavailable', 503);
-          }
-          return http.Response(
-            jsonEncode({
-              'modules': [
-                {'id': 'DigitalBrain.Chat.ChatModule'},
-              ],
-              'neurons': const [],
-              'observedAt': '2026-07-28T08:00:00Z',
-            }),
-            200,
-            headers: {'content-type': 'application/json'},
-          );
-        }),
-      );
-      final errors = <Object>[];
+  test('readBrainTopology surfaces a failed topology response', () async {
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://ui.example:5080'),
+      httpClient: MockClient(
+        (request) async => http.Response('temporarily unavailable', 503),
+      ),
+    );
 
-      final snapshot = await client
-          .watchBrainTopology(pollInterval: Duration.zero)
-          .handleError(errors.add)
-          .first;
+    await expectLater(
+      client.readBrainTopology(),
+      throwsA(isA<StateError>()),
+    );
+  });
 
-      expect(requestCount, 2);
-      expect(errors, hasLength(1));
-      expect(snapshot.modules.single.id, 'DigitalBrain.Chat.ChatModule');
-    },
-  );
-
-  test('watchBrainTopology aborts a hung request and keeps polling', () async {
+  test('readBrainTopology aborts a hung request', () async {
     final httpClient = _AbortThenSucceedClient();
     final client = DigitalBrainUiClient(
       baseUri: Uri.parse('http://ui.example:5080'),
       httpClient: httpClient,
     );
-    final errors = <Object>[];
 
-    final snapshot = await client
-        .watchBrainTopology(
-          pollInterval: Duration.zero,
-          requestTimeout: const Duration(milliseconds: 1),
-        )
-        .handleError(errors.add)
-        .first;
+    await expectLater(
+      client.readBrainTopology(requestTimeout: const Duration(milliseconds: 1)),
+      throwsA(isA<http.RequestAbortedException>()),
+    );
 
-    expect(httpClient.requests, 2);
+    expect(httpClient.requests, 1);
     expect(httpClient.sawAbortableRequest, isTrue);
-    expect(errors.single, isA<http.RequestAbortedException>());
-    expect(snapshot.modules.single.id, 'DigitalBrain.Chat.ChatModule');
   });
 }
 

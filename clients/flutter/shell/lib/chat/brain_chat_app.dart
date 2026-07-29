@@ -12,7 +12,7 @@ final class BrainChatApp extends StatelessWidget {
     super.key,
     required this.chatName,
     this.turns,
-    this.topology,
+    this.onLoadTopology,
     this.onSend,
     this.onStream,
     this.statusMessage,
@@ -20,7 +20,7 @@ final class BrainChatApp extends StatelessWidget {
 
   final String chatName;
   final Stream<ChatTurnEvent>? turns;
-  final Stream<BrainTopologySnapshot>? topology;
+  final LoadTopology? onLoadTopology;
   final SendMessage? onSend;
   final StreamMessage? onStream;
   final String? statusMessage;
@@ -34,7 +34,7 @@ final class BrainChatApp extends StatelessWidget {
       home: BrainWorkspace(
         chatName: chatName,
         turns: turns,
-        topology: topology,
+        onLoadTopology: onLoadTopology,
         onSend: onSend,
         onStream: onStream,
         statusMessage: statusMessage,

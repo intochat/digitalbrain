@@ -196,20 +196,6 @@ final class DigitalBrainUiClient {
     return BrainTopologySnapshot.fromJson(Map<String, Object?>.from(decoded));
   }
 
-  Stream<BrainTopologySnapshot> watchBrainTopology({
-    Duration pollInterval = const Duration(seconds: 2),
-    Duration requestTimeout = const Duration(seconds: 5),
-  }) async* {
-    while (true) {
-      try {
-        yield await readBrainTopology(requestTimeout: requestTimeout);
-      } on Object catch (error, stackTrace) {
-        yield* Stream<BrainTopologySnapshot>.error(error, stackTrace);
-      }
-      await Future<void>.delayed(pollInterval);
-    }
-  }
-
   void close() {
     if (_ownsClient) {
       _http.close();

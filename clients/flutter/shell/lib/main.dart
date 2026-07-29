@@ -23,7 +23,7 @@ void main() {
       chatName: chat,
       statusMessage: status,
       turns: edge?.watchChatTurns(chatName: chat),
-      topology: edge?.watchBrainTopology(),
+      onLoadTopology: edge?.readBrainTopology,
       onStream: edge == null
           ? null
           : (text) => edge.streamMessage(chatName: chat, text: text),

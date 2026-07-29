@@ -34,7 +34,7 @@ final class _BrainTopologyCanvasState extends State<BrainTopologyCanvas>
       vsync: this,
       duration: const Duration(milliseconds: 1100),
     );
-    if (hasPulseTarget(widget.topology, widget.pulse)) {
+    if (hasPulseTarget(widget.pulse)) {
       _pulse.forward();
     }
   }
@@ -45,8 +45,8 @@ final class _BrainTopologyCanvasState extends State<BrainTopologyCanvas>
     final pulseChanged =
         widget.pulse?.sequence != oldWidget.pulse?.sequence ||
         widget.pulse?.correlationId != oldWidget.pulse?.correlationId;
-    final hadTarget = hasPulseTarget(oldWidget.topology, oldWidget.pulse);
-    final hasTarget = hasPulseTarget(widget.topology, widget.pulse);
+    final hadTarget = hasPulseTarget(oldWidget.pulse);
+    final hasTarget = hasPulseTarget(widget.pulse);
     if (!hasTarget) {
       if (pulseChanged || hadTarget) {
         _pulse.reset();
@@ -72,13 +72,10 @@ final class _BrainTopologyCanvasState extends State<BrainTopologyCanvas>
   @override
   Widget build(BuildContext context) {
     final disableAnimations = MediaQuery.disableAnimationsOf(context);
-    final pulseReady = hasPulseTarget(widget.topology, widget.pulse);
+    final pulseReady = hasPulseTarget(widget.pulse);
     final localPulse =
         pulseReady && widget.pulse!.caller == widget.pulse!.neuronId;
-    final edgePulse =
-        pulseReady &&
-        !localPulse &&
-        hasTopologyNode(widget.topology, widget.pulse!.caller);
+    final edgePulse = pulseReady && !localPulse;
 
     return Semantics(
       key: const Key('brain_topology_canvas'),
@@ -96,6 +93,7 @@ final class _BrainTopologyCanvasState extends State<BrainTopologyCanvas>
                 size,
                 _rotationX,
                 _rotationY,
+                pulse: widget.pulse,
               );
               final pulseValue = disableAnimations ? 1.0 : _pulse.value;
 
