@@ -43,7 +43,7 @@ internal static class MafParticipantAdapter
         return $"dbp_{Convert.ToHexStringLower(SHA256.HashData(source))}";
     }
 
-    private static void Validate(Type contract)
+    internal static void Validate(Type contract)
     {
         if (!typeof(ILLM).IsAssignableFrom(contract) && !typeof(IAgent).IsAssignableFrom(contract))
         {

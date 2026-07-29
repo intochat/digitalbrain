@@ -9,6 +9,8 @@ public sealed class ModuleFixture : DigitalBrainFixture
     {
         ArgumentNullException.ThrowIfNull(brain);
         brain.AddModule<AIModule>();
-        brain.ConfigureScriptedChat(typeof(DigitalBrain.AI.Ollama.Llama32));
+        brain.ConfigureScriptedChat(
+            typeof(DigitalBrain.AI.Ollama.Llama32),
+            typeof(DigitalBrain.AI.Ollama.Gemma4));
     }
 }
