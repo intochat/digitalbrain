@@ -9,6 +9,7 @@ public sealed class ScriptedChatClient : IChatClient
     private readonly Queue<ChatMessage> _replies = [];
     private int _callCount;
     private ChatMessage[] _lastMessages = [];
+    private string[] _lastTools = [];
 
     public int CallCount
     {
@@ -28,6 +29,17 @@ public sealed class ScriptedChatClient : IChatClient
             lock (_gate)
             {
                 return [.. _lastMessages];
+            }
+        }
+    }
+
+    public IReadOnlyList<string> LastTools
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. _lastTools];
             }
         }
     }
@@ -54,6 +66,7 @@ public sealed class ScriptedChatClient : IChatClient
         {
             _callCount = 0;
             _lastMessages = [];
+            _lastTools = [];
             _replies.Clear();
         }
     }
@@ -62,7 +75,7 @@ public sealed class ScriptedChatClient : IChatClient
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
         CancellationToken cancellationToken = default)
-        => Task.FromResult(NextResponse(messages, cancellationToken));
+        => Task.FromResult(NextResponse(messages, options, cancellationToken));
 
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> messages,
@@ -97,6 +110,7 @@ public sealed class ScriptedChatClient : IChatClient
 
     private ChatResponse NextResponse(
         IEnumerable<ChatMessage> messages,
+        ChatOptions? options,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(messages);
@@ -104,10 +118,12 @@ public sealed class ScriptedChatClient : IChatClient
 
         ChatMessage reply;
         var request = messages.ToArray();
+        var offered = options?.Tools is { } tools ? tools.Select(tool => tool.Name).ToArray() : [];
         lock (_gate)
         {
             _callCount++;
             _lastMessages = request;
+            _lastTools = offered;
             reply = _replies.Count > 0
                 ? _replies.Dequeue()
                 : throw new InvalidOperationException(

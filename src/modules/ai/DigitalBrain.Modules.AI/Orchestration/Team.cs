@@ -74,30 +74,7 @@ internal sealed class Team : GroupChat, ITeam
             : null;
 
     private static TeamFormation CanonicalLineUp(TeamFormation formation)
-    {
-        if (formation.Models is not { Count: > 0 })
-        {
-            throw new ArgumentException("A team formation must name at least one model.", nameof(formation));
-        }
-
-        List<string> lineUp = [];
-
-        foreach (var requested in formation.Models)
-        {
-            var model = ModelContracts.ModelNameOf(ModelContracts.Resolve(requested));
-
-            if (lineUp.Contains(model, StringComparer.Ordinal))
-            {
-                throw new ArgumentException(
-                    $"Model '{model}' is named more than once; a team runs each of its models exactly once.",
-                    nameof(formation));
-            }
-
-            lineUp.Add(model);
-        }
-
-        return new TeamFormation(lineUp);
-    }
+        => new(TeamLineUp.Normalized(formation.Models));
 
     private static string Names(TeamFormation formation) => string.Join(", ", formation.Models);
 }

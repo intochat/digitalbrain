@@ -17,7 +17,7 @@ public abstract class Agent : Neuron, IAgent
             .Build();
     }
 
-    protected abstract IReadOnlyList<CapabilityTool> Tools { get; }
+    protected abstract IReadOnlyList<CapabilityTool> ToolsFor(IReadOnlyList<ChatMessage> messages);
 
     protected virtual string? Instructions => null;
 
@@ -33,7 +33,7 @@ public abstract class Agent : Neuron, IAgent
         var turnScheduler = TaskScheduler.Current;
         var options = new ChatOptions
         {
-            Tools = [.. Tools.Select(tool => tool.BindTo(turnScheduler))],
+            Tools = [.. ToolsFor(messages).Select(tool => tool.BindTo(turnScheduler))],
             ToolMode = ChatToolMode.Auto,
         };
         var instructions = Instructions;

@@ -43,7 +43,7 @@ public sealed class ToolAgentProbe([FromKeyedServices(typeof(Llama32))] IChatCli
 
     protected override string? Instructions => ProbeInstructions;
 
-    protected override IReadOnlyList<CapabilityTool> Tools =>
+    protected override IReadOnlyList<CapabilityTool> ToolsFor(IReadOnlyList<ChatMessage> messages) =>
     [
         Capability(
             EnrichTool,

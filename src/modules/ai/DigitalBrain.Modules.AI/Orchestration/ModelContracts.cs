@@ -28,8 +28,8 @@ internal static class ModelContracts
             ? $"{ModelNameOf(contract)} '{participant.Name}'"
             : $"{participant.Type} '{participant.Name}'";
 
-    private static IEnumerable<string> KnownModelNames()
-        => ContractsByModelName.Keys.Order(StringComparer.Ordinal);
+    internal static IReadOnlyList<string> KnownModelNames()
+        => [.. ContractsByModelName.Keys.Order(StringComparer.Ordinal)];
 
     private static Dictionary<string, Type> Discover()
     {
