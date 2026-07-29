@@ -1,5 +1,5 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Quickstart;
+using DigitalBrain.TestingTests.Harness;
 using DigitalBrain.Testing;
 using Xunit;
 

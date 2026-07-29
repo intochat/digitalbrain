@@ -54,13 +54,9 @@ internal static class ChatEndpoints
                     return;
                 }
 
-                http.Response.Headers.CacheControl = UiHttpContract.CacheControlNoCache;
-                http.Response.ContentType = UiHttpContract.EventStreamContentType;
-                await ChatDeltaFeed.WriteChatDeltaSseAsync(
-                    http.Response.Body,
-                    brain,
-                    chatName,
-                    request.Text,
+                await SseResponse.WriteAsync(
+                    http.Response,
+                    ChatDeltaFeed.StreamDeltasAsync(brain, chatName, request.Text, cancellationToken),
                     cancellationToken);
             });
 
@@ -85,13 +81,9 @@ internal static class ChatEndpoints
                     return;
                 }
 
-                http.Response.Headers.CacheControl = UiHttpContract.CacheControlNoCache;
-                http.Response.ContentType = UiHttpContract.EventStreamContentType;
-                await ChatEventFeed.WriteChatTurnSseAsync(
-                    http.Response.Body,
-                    sessionJournal,
-                    chatName,
-                    cursor,
+                await SseResponse.WriteAsync(
+                    http.Response,
+                    ChatEventFeed.WatchChatTurnsAsync(sessionJournal, chatName, cursor, cancellationToken),
                     cancellationToken);
             });
 

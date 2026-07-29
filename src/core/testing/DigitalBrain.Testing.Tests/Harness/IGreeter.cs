@@ -1,5 +1,5 @@
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Quickstart;
+namespace DigitalBrain.TestingTests.Harness;
 
 public partial interface IGreeter : INeuron;

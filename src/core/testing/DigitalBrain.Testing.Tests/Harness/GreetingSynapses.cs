@@ -1,11 +1,11 @@
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Quickstart;
+namespace DigitalBrain.TestingTests.Harness;
 
 [GenerateSerializer]
-[Alias("quickstart.say-hello")]
+[Alias("harness.say-hello")]
 public sealed record SayHello([property: Id(0)] string Name) : Synapse;
 
 [GenerateSerializer]
-[Alias("quickstart.greeted")]
+[Alias("harness.greeted")]
 public sealed record Greeted([property: Id(0)] string Message) : Synapse;

@@ -21,6 +21,5 @@
     <ProjectReference Include="..\modules\google\DigitalBrain.Modules.Google.Aspire.Hosting\DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />
     <ProjectReference Include="..\modules\salesforce\DigitalBrain.Modules.Salesforce.Aspire.Hosting\DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" />
     <ProjectReference Include="..\..\tests\fixtures\DigitalBrain.AccountEnrichment\DigitalBrain.AccountEnrichment.csproj" />
-    <ProjectReference Include="..\..\tests\fixtures\DigitalBrain.Quickstart\DigitalBrain.Quickstart.csproj" />
   </ItemGroup>
 </Project>

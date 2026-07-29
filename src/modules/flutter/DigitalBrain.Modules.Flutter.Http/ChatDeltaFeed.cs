@@ -1,5 +1,5 @@
-using System.Text;
-using System.Text.Json;
+using System.Net.ServerSentEvents;
+using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
@@ -12,20 +12,12 @@ internal static class ChatDeltaFeed
     internal static readonly TimeSpan TurnBudget =
         TimeSpan.Parse(NeuronCallTimeouts.LongRunning, System.Globalization.CultureInfo.InvariantCulture);
 
-    private static readonly JsonSerializerOptions AiJson = new(AIJsonUtilities.DefaultOptions)
-    {
-        WriteIndented = false,
-    };
-    private static readonly Encoding Utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
-
-    public static async Task WriteChatDeltaSseAsync(
-        Stream responseBody,
+    public static async IAsyncEnumerable<SseItem<ChatResponseUpdate>> StreamDeltasAsync(
         IDigitalBrain brain,
         string chatName,
         string text,
-        CancellationToken requestAborted)
+        [EnumeratorCancellation] CancellationToken requestAborted)
     {
-        ArgumentNullException.ThrowIfNull(responseBody);
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
@@ -38,20 +30,7 @@ internal static class ChatDeltaFeed
             .SendStreaming(new SendMessage(command, text), turn.Token))
         {
             turn.Token.ThrowIfCancellationRequested();
-            await WriteDeltaAsync(responseBody, chunk, turn.Token);
+            yield return new SseItem<ChatResponseUpdate>(chunk, UiHttpContract.ChatDeltaEvent);
         }
-    }
-
-    private static async Task WriteDeltaAsync(
-        Stream responseBody,
-        ChatResponseUpdate chunk,
-        CancellationToken cancellationToken)
-    {
-        var payload = JsonSerializer.Serialize(chunk, AiJson);
-        var frame = FormattableString.Invariant(
-            $"event: {UiHttpContract.ChatDeltaEvent}\ndata: {payload}\n\n");
-        var bytes = Utf8.GetBytes(frame);
-        await responseBody.WriteAsync(bytes, cancellationToken);
-        await responseBody.FlushAsync(cancellationToken);
     }
 }

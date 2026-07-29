@@ -44,15 +44,15 @@ public sealed class UiHttpVocabulary(UIFixture fixture)
     }
 
     [Fact(DisplayName =
-        "SSE shell feed uses host-private OwnerSessionJournal — not IDigitalBrain journal, not OpenTelemetry")]
+        "SSE shell feed uses host-private OwnerSessionJournal watch — not IDigitalBrain journal, not OpenTelemetry")]
     public void ShellSseProjectionIsEncapsulatedSessionJournalNotProductClientWatch()
     {
-        var write = typeof(ShellEventFeed).GetMethod(
-            nameof(ShellEventFeed.WriteSceneOpenedSseAsync),
+        var watch = typeof(ShellEventFeed).GetMethod(
+            nameof(ShellEventFeed.WatchSceneOpenedAsync),
             BindingFlags.Public | BindingFlags.Static);
-        Assert.NotNull(write);
+        Assert.NotNull(watch);
 
-        var parameters = write.GetParameters().Select(parameter => parameter.ParameterType).ToArray();
+        var parameters = watch.GetParameters().Select(parameter => parameter.ParameterType).ToArray();
         Assert.Contains(typeof(OwnerSessionJournal), parameters);
         Assert.Contains(typeof(string), parameters);
         Assert.Contains(typeof(long), parameters);
@@ -65,14 +65,16 @@ public sealed class UiHttpVocabulary(UIFixture fixture)
         Assert.DoesNotContain(typeof(System.Diagnostics.Activity), parameters);
         Assert.DoesNotContain(typeof(System.Diagnostics.ActivitySource), parameters);
 
-        var readShell = typeof(OwnerSessionJournal).GetMethod(
-            nameof(OwnerSessionJournal.ReadShellOutgoingAsync),
+        var watchShell = typeof(OwnerSessionJournal).GetMethod(
+            nameof(OwnerSessionJournal.WatchShellOutgoingAsync),
             BindingFlags.Public | BindingFlags.Instance);
-        Assert.NotNull(readShell);
-        Assert.Equal(typeof(Task<JournalRead>), readShell.ReturnType);
+        Assert.NotNull(watchShell);
         Assert.Contains(
             typeof(OwnerSessionJournal).GetFields(BindingFlags.NonPublic | BindingFlags.Instance),
             field => field.FieldType == typeof(ISessionNeuron));
+        Assert.Contains(
+            typeof(OwnerSessionJournal).GetFields(BindingFlags.NonPublic | BindingFlags.Instance),
+            field => field.FieldType == typeof(IClusterClient));
 
         Assert.Equal(
             [

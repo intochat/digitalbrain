@@ -2,7 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
-using DigitalBrain.Quickstart;
 using Xunit;
 
 namespace DigitalBrain.Tests.Client;
@@ -16,7 +15,7 @@ public sealed class SendOrdering
         var client = DigitalBrainClient.Connect(calls.Factory, "owner");
 
         await Assert.ThrowsAsync<ArgumentNullException>(
-            () => client.SendAsync<IGreeter>("greeter", null!));
+            () => client.SendAsync<ISendTarget>("target", null!));
 
         Assert.Empty(calls.Calls);
     }
@@ -27,7 +26,7 @@ public sealed class SendOrdering
         var calls = new GrainCallRecorder();
         var client = DigitalBrainClient.Connect(calls.Factory, "owner");
 
-        await client.SendAsync<IGreeter>("greeter", new TestSynapse());
+        await client.SendAsync<ISendTarget>("target", new TestSynapse());
 
         Assert.Equal(
             ["brain", "activate", "session", "fire"],
@@ -39,7 +38,7 @@ public sealed class SendOrdering
     {
         var calls = new GrainCallRecorder();
         var client = DigitalBrainClient.Connect(calls.Factory, "owner");
-        var receiver = NeuronId.For<IGreeter>(client.Owner, "greeter");
+        var receiver = NeuronId.For<ISendTarget>(client.Owner, "target");
 
         await client.SendAsync(receiver, new TestSynapse());
 
@@ -49,8 +48,9 @@ public sealed class SendOrdering
     }
 
     private sealed record TestSynapse : Synapse;
-
 }
+
+internal interface ISendTarget : INeuron;
 
 internal sealed class GrainCallRecorder
 {

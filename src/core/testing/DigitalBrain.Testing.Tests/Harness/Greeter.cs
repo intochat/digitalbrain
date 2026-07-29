@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 
-namespace DigitalBrain.Quickstart;
+namespace DigitalBrain.TestingTests.Harness;
 
 internal sealed class Greeter :
     Neuron,

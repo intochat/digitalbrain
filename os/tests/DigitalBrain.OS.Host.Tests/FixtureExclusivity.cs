@@ -4,9 +4,7 @@ using Xunit;
 
 namespace DigitalBrain.HostTests;
 
-public sealed class FixtureExclusivity(
-    TestingAppHostFixture testing,
-    QuickstartAppHostFixture quickstart)
+public sealed class FixtureExclusivity(TestingAppHostFixture testing)
 {
     private const int LiveAppHostTimeoutMs = 300_000;
 
@@ -15,41 +13,18 @@ public sealed class FixtureExclusivity(
         DisplayName = "a second graph waits for the first within the same AppHost fixture")]
     public async Task ASecondGraphWaitsForTheFirstWithinTheSameFixture()
     {
-        await AssertSecondGraphWaitsAsync(
-            testing,
-            testing,
-            TestContext.Current.CancellationToken);
-    }
-
-    [Fact(
-        Timeout = LiveAppHostTimeoutMs,
-        DisplayName =
-            "a second graph waits for the first across silo-only AppHost fixture types")]
-    public async Task ASecondGraphWaitsForTheFirstAcrossFixtureTypes()
-    {
-        await AssertSecondGraphWaitsAsync(
-            testing,
-            quickstart,
-            TestContext.Current.CancellationToken);
-    }
-
-    private static async Task AssertSecondGraphWaitsAsync(
-        DigitalBrainAppHostFixture firstFixture,
-        DigitalBrainAppHostFixture secondFixture,
-        CancellationToken cancellationToken)
-    {
         RunningAppHost? first = null;
         Task<RunningAppHost>? waiting = null;
         try
         {
-            first = await firstFixture.StartAsync(cancellationToken);
-            waiting = secondFixture.StartAsync(cancellationToken);
+            first = await testing.StartAsync(TestContext.Current.CancellationToken);
+            waiting = testing.StartAsync(TestContext.Current.CancellationToken);
             Assert.False(waiting.IsCompleted);
 
             await first.DisposeAsync();
             first = null;
 
-            await using var second = await waiting.WaitAsync(cancellationToken);
+            await using var second = await waiting.WaitAsync(TestContext.Current.CancellationToken);
             waiting = null;
             Assert.NotNull(second);
         }

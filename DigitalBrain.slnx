@@ -62,15 +62,10 @@
     <Project Path="os/tests/DigitalBrain.OS.Product.Tests/DigitalBrain.OS.Product.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/fixtures/DigitalBrain.Quickstart.Tests/DigitalBrain.Quickstart.Tests.csproj" />
     <Project Path="tests/fixtures/DigitalBrain.AccountEnrichment/DigitalBrain.AccountEnrichment.csproj" />
     <Project Path="tests/fixtures/DigitalBrain.Compositions/DigitalBrain.Compositions.csproj" />
-    <Project Path="tests/fixtures/DigitalBrain.Quickstart.Contracts/DigitalBrain.Quickstart.Contracts.csproj" />
-    <Project Path="tests/fixtures/DigitalBrain.Quickstart/DigitalBrain.Quickstart.csproj" />
   </Folder>
   <Folder Name="/tests/fixtures/apphosts/">
     <Project Path="tests/fixtures/apphosts/DigitalBrain.TestingAppHost/DigitalBrain.TestingAppHost.csproj" />
-    <Project Path="tests/fixtures/apphosts/DigitalBrain.Quickstart.Host/DigitalBrain.Quickstart.Host.csproj" />
-    <Project Path="tests/fixtures/apphosts/DigitalBrain.Quickstart.AppHost/DigitalBrain.Quickstart.AppHost.csproj" />
   </Folder>
 </Solution>

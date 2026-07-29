@@ -52,13 +52,9 @@ internal static class UIEndpoints
                     return;
                 }
 
-                http.Response.Headers.CacheControl = UiHttpContract.CacheControlNoCache;
-                http.Response.ContentType = UiHttpContract.EventStreamContentType;
-                await ShellEventFeed.WriteSceneOpenedSseAsync(
-                    http.Response.Body,
-                    sessionJournal,
-                    shellName,
-                    cursor,
+                await SseResponse.WriteAsync(
+                    http.Response,
+                    ShellEventFeed.WatchSceneOpenedAsync(sessionJournal, shellName, cursor, cancellationToken),
                     cancellationToken);
             });
 

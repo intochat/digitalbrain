@@ -1,5 +1,6 @@
-using System.Text;
-using System.Text.Json;
+using System.Globalization;
+using System.Net.ServerSentEvents;
+using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 
@@ -7,42 +8,25 @@ namespace DigitalBrain.UI;
 
 internal static class ChatEventFeed
 {
-    private const string SseConnectedComment = ": connected\n\n";
-    private static readonly JsonSerializerOptions EventJson = new(JsonSerializerDefaults.Web);
-    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
-    private static readonly Encoding Utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
-
-    public static async Task WriteChatTurnSseAsync(
-        Stream responseBody,
+    public static async IAsyncEnumerable<SseItem<ChatTurnEvent>> WatchChatTurnsAsync(
         OwnerSessionJournal sessionJournal,
         string chatName,
         long afterSequence,
-        CancellationToken cancellationToken)
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(responseBody);
         ArgumentNullException.ThrowIfNull(sessionJournal);
         ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-        await WriteAsync(responseBody, SseConnectedComment, cancellationToken);
-
-        var cursor = afterSequence;
-        while (!cancellationToken.IsCancellationRequested)
+        await foreach (var batch in sessionJournal.WatchChatOutgoingAsync(chatName, afterSequence, cancellationToken))
         {
-            var batch = await sessionJournal.ReadChatOutgoingAsync(chatName, cursor);
             foreach (var turn in ProjectTurns(batch))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                await WriteEventAsync(responseBody, turn, cancellationToken);
-                cursor = Math.Max(cursor, turn.Sequence);
+                yield return new SseItem<ChatTurnEvent>(turn, UiHttpContract.ChatTurnEvent)
+                {
+                    EventId = turn.Sequence.ToString(CultureInfo.InvariantCulture),
+                };
             }
-
-            if (batch.ResumeSequence > cursor)
-            {
-                cursor = batch.ResumeSequence;
-            }
-
-            await Task.Delay(PollInterval, cancellationToken);
         }
     }
 
@@ -86,19 +70,5 @@ internal static class ChatEventFeed
                     break;
             }
         }
-    }
-
-    private static Task WriteEventAsync(Stream responseBody, ChatTurnEvent turn, CancellationToken cancellationToken)
-    {
-        var payload = JsonSerializer.Serialize(turn, EventJson);
-        var frame = FormattableString.Invariant($"id: {turn.Sequence}\nevent: {UiHttpContract.ChatTurnEvent}\ndata: {payload}\n\n");
-        return WriteAsync(responseBody, frame, cancellationToken);
-    }
-
-    private static async Task WriteAsync(Stream responseBody, string text, CancellationToken cancellationToken)
-    {
-        var bytes = Utf8.GetBytes(text);
-        await responseBody.WriteAsync(bytes, cancellationToken);
-        await responseBody.FlushAsync(cancellationToken);
     }
 }
