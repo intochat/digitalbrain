@@ -11,6 +11,8 @@ public sealed class ModuleFixture : DigitalBrainFixture
         brain.AddModule<AIModule>();
         brain.ConfigureScriptedChat(
             typeof(DigitalBrain.AI.Ollama.Llama32),
-            typeof(DigitalBrain.AI.Ollama.Gemma4));
+            typeof(DigitalBrain.AI.Ollama.Gemma4),
+            typeof(DigitalBrain.AI.Ollama.Qwen35),
+            typeof(DigitalBrain.AI.Ollama.Granite41));
     }
 }

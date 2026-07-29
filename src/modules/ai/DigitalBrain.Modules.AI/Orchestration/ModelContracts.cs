@@ -11,7 +11,7 @@ internal static class ModelContracts
         return ContractsByModelName.TryGetValue(model.Trim(), out var contract)
             ? contract
             : throw new InvalidOperationException(
-                $"Model '{model}' is not one of this brain's models. The models it can run are {string.Join(", ", AvailableModelNames())}.");
+                $"Model '{model}' is not a model this build knows. Known models: {string.Join(", ", KnownModelNames())}. Knowing a model is not the same as it being provisioned here: a known model still fails on its first turn if this deployment has no endpoint or key configured for it.");
     }
 
     internal static string ModelNameOf(Type contract)
@@ -21,20 +21,31 @@ internal static class ModelContracts
         return contract.Name[1..];
     }
 
-    private static IEnumerable<string> AvailableModelNames()
+    private static IEnumerable<string> KnownModelNames()
         => ContractsByModelName.Keys.Order(StringComparer.Ordinal);
 
     private static Dictionary<string, Type> Discover()
     {
         var contracts = typeof(ILLM).Assembly.GetExportedTypes();
+        Dictionary<string, Type> byModelName = new(StringComparer.OrdinalIgnoreCase);
 
-        return typeof(LLM).Assembly
+        foreach (var model in typeof(LLM).Assembly
             .GetTypes()
-            .Where(model => model is { IsClass: true, IsAbstract: false } && model.IsSubclassOf(typeof(LLM)))
-            .ToDictionary(
-                model => model.Name,
-                model => ContractOf(model, contracts),
-                StringComparer.OrdinalIgnoreCase);
+            .Where(candidate => candidate is { IsClass: true, IsAbstract: false }
+                && candidate.IsSubclassOf(typeof(LLM))))
+        {
+            var contract = ContractOf(model, contracts);
+
+            if (byModelName.TryGetValue(model.Name, out var claimed))
+            {
+                throw new InvalidOperationException(
+                    $"Model name '{model.Name}' is claimed by both '{claimed.FullName}' and '{contract.FullName}'; a model name must select exactly one model.");
+            }
+
+            byModelName.Add(model.Name, contract);
+        }
+
+        return byModelName;
     }
 
     private static Type ContractOf(Type model, IReadOnlyList<Type> contracts)

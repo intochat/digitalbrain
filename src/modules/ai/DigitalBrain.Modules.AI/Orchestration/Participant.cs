@@ -14,9 +14,7 @@ public abstract record Participant(NeuronId Id)
         ArgumentNullException.ThrowIfNull(contract);
         MafParticipantAdapter.Validate(contract);
 
-        return Activator.CreateInstance(typeof(Participant<>).MakeGenericType(contract), id) as Participant
-            ?? throw new InvalidOperationException(
-                $"Participant contract '{contract.FullName}' could not be closed over {nameof(Participant)}<>.");
+        return (Participant)Activator.CreateInstance(typeof(Participant<>).MakeGenericType(contract), id)!;
     }
 }
 

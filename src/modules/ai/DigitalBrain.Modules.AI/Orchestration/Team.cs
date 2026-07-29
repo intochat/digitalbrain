@@ -29,16 +29,19 @@ internal sealed class Team : GroupChat, ITeam
 
         if (LineUpIfFormed() is { } formed)
         {
-            if (!formed.Models.SequenceEqual(requested.Models, StringComparer.Ordinal))
+            if (formed.Models.SequenceEqual(requested.Models, StringComparer.Ordinal))
             {
-                throw new InvalidOperationException(
-                    $"Team '{Id}' already runs {Names(formed)} and cannot be re-formed to run {Names(requested)}. Give each line-up its own team name.");
+                return;
             }
 
-            return;
+            if (HasDurableSession)
+            {
+                throw new InvalidOperationException(
+                    $"Team '{Id}' has already run {Names(formed)} and cannot be re-formed to run {Names(requested)}. Give each line-up its own team name.");
+            }
         }
 
-        var unformed = _lineUp.Value;
+        var previous = _lineUp.Value;
         _lineUp.Value = _formations.SerializeToArray(requested);
 
         try
@@ -47,7 +50,7 @@ internal sealed class Team : GroupChat, ITeam
         }
         catch
         {
-            _lineUp.Value = unformed;
+            _lineUp.Value = previous;
             throw;
         }
     }

@@ -45,6 +45,12 @@ internal static class MafParticipantAdapter
 
     internal static void Validate(Type contract)
     {
+        if (!contract.IsInterface)
+        {
+            throw new InvalidOperationException(
+                $"Participant contract '{contract.FullName}' must be a neuron contract interface, not a neuron implementation.");
+        }
+
         if (!typeof(ILLM).IsAssignableFrom(contract) && !typeof(IAgent).IsAssignableFrom(contract))
         {
             throw new InvalidOperationException(

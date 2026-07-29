@@ -17,6 +17,8 @@ public abstract class GroupChat : Neuron, IGroupChat
 
     protected abstract IReadOnlyList<Participant> Participants { get; }
 
+    protected bool HasDurableSession => _directSession.HasDurableSession;
+
     protected Participant<TNeuron> Participant<TNeuron>(string? name = null)
         where TNeuron : INeuron
         => new(NeuronId.For<TNeuron>(Id.Owner, name ?? Id.Name));

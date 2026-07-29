@@ -17,8 +17,11 @@ public sealed class TeamFormation(ModuleFixture fixture)
     private const string Gpt = "Gpt56";
     private const string GemmaReply = "gemma-reply";
     private const string LlamaReply = "llama-reply";
+    private const string QwenReply = "qwen-reply";
+    private const string GraniteReply = "granite-reply";
     private const string Prompt = "compare these two";
     private const string ComparisonTeam = "compare-team";
+    private const string CorrectedTeam = "corrected-team";
     private const int Pair = 2;
 
     [Fact(DisplayName = "a team formed with two model names streams back a reply from both models")]
@@ -36,8 +39,29 @@ public sealed class TeamFormation(ModuleFixture fixture)
         Assert.Contains(GemmaReply, streamed, StringComparison.Ordinal);
         Assert.Contains(LlamaReply, streamed, StringComparison.Ordinal);
         Assert.Equal(Pair, test.Chat().CallCount);
-        await AssertRespondedOnceAsync(test.Neuron<IGemma4>(ComparisonTeam), cancellationToken);
-        await AssertRespondedOnceAsync(test.Neuron<ILlama32>(ComparisonTeam), cancellationToken);
+        await AssertRespondedAsync(test.Neuron<IGemma4>(ComparisonTeam), 1, cancellationToken);
+        await AssertRespondedAsync(test.Neuron<ILlama32>(ComparisonTeam), 1, cancellationToken);
+    }
+
+    [Fact(DisplayName = "re-forming a team that has never responded replaces the line-up that then runs")]
+    public async Task ReFormingBeforeTheTeamRespondsReplacesTheLineUp()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        ScriptPair(test, QwenReply, GraniteReply);
+
+        var team = test.Client.Get<ITeam>(CorrectedTeam);
+        await team.Form(Formation(Gemma, Llama));
+        await team.Form(Formation(Qwen, Granite));
+
+        var streamed = await StreamAsync(team, cancellationToken);
+
+        Assert.Contains(QwenReply, streamed, StringComparison.Ordinal);
+        Assert.Contains(GraniteReply, streamed, StringComparison.Ordinal);
+        await AssertRespondedAsync(test.Neuron<IQwen35>(CorrectedTeam), 1, cancellationToken);
+        await AssertRespondedAsync(test.Neuron<IGranite41>(CorrectedTeam), 1, cancellationToken);
+        await AssertRespondedAsync(test.Neuron<IGemma4>(CorrectedTeam), 0, cancellationToken);
+        await AssertRespondedAsync(test.Neuron<ILlama32>(CorrectedTeam), 0, cancellationToken);
     }
 
     [Fact(DisplayName = "re-forming a responded team with the same models leaves the line-up and its durable session intact")]
@@ -61,6 +85,28 @@ public sealed class TeamFormation(ModuleFixture fixture)
         Assert.Contains(GemmaReply, second, StringComparison.Ordinal);
         Assert.Contains(LlamaReply, second, StringComparison.Ordinal);
         Assert.Equal(Pair * 2, test.Chat().CallCount);
+    }
+
+    [Fact(DisplayName =
+        "a line-up naming a model this deployment cannot run yields nothing, throws nothing, and still burns the team name — pinned limitation")]
+    public async Task AnUnrunnableLineUpSilentlyBurnsTheTeamName()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+
+        var team = test.Client.Get<ITeam>("unprovisioned-team");
+        await team.Form(Formation(Gpt, Gemma));
+
+        var streamed = await StreamAsync(team, cancellationToken);
+
+        Assert.Equal(string.Empty, streamed);
+        Assert.Equal(0, test.Chat().CallCount);
+        await AssertRespondedAsync(test.Neuron<IGemma4>("unprovisioned-team"), 0, cancellationToken);
+
+        var burned = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => team.Form(Formation(Gemma, Llama)));
+
+        Assert.Contains(Gpt, burned.Message, StringComparison.Ordinal);
     }
 
     [Fact(DisplayName = "forming a responded team with different models throws and names both line-ups")]
@@ -98,8 +144,8 @@ public sealed class TeamFormation(ModuleFixture fixture)
         Assert.Equal(0, test.Chat().CallCount);
     }
 
-    [Fact(DisplayName = "forming with an unknown model names it and lists every model that is available")]
-    public async Task FormingWithAnUnknownModelNamesItAndListsWhatIsAvailable()
+    [Fact(DisplayName = "an unknown model is named, the known models are listed, and provisioning is not promised")]
+    public async Task FormingWithAnUnknownModelNamesItAndListsTheKnownModelsWithoutPromisingThem()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
@@ -111,6 +157,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
         Assert.All(
             new[] { Gemma, Llama, Qwen, Granite, Gpt },
             model => Assert.Contains(model, failure.Message, StringComparison.Ordinal));
+        Assert.Contains("provisioned", failure.Message, StringComparison.Ordinal);
     }
 
     [Fact(DisplayName = "forming a team that names one model twice is rejected before any model runs")]
@@ -127,15 +174,17 @@ public sealed class TeamFormation(ModuleFixture fixture)
         Assert.Equal(0, test.Chat().CallCount);
     }
 
-    [Fact(DisplayName = "a formed line-up outlives a host restart and still refuses a different line-up")]
-    public async Task FormedLineUpOutlivesAHostRestart()
+    [Fact(DisplayName = "a line-up frozen by responding outlives a host restart and still refuses a different one")]
+    public async Task FrozenLineUpOutlivesAHostRestart()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         ScriptPair(test);
+        ScriptPair(test);
 
         var team = test.Neuron<ITeam>("restarted-team");
         await team.Reference.Form(Formation(Gemma, Llama));
+        await StreamAsync(team.Reference, cancellationToken);
 
         await team.RestartHostAsync(cancellationToken);
 
@@ -160,20 +209,24 @@ public sealed class TeamFormation(ModuleFixture fixture)
 
     private static DigitalBrain.AI.TeamFormation Formation(params string[] models) => new(models);
 
-    private static void ScriptPair(TestBrain test)
+    private static void ScriptPair(TestBrain test) => ScriptPair(test, GemmaReply, LlamaReply);
+
+    private static void ScriptPair(TestBrain test, string first, string second)
     {
-        test.Chat().Reply(GemmaReply);
-        test.Chat().Reply(LlamaReply);
+        test.Chat().Reply(first);
+        test.Chat().Reply(second);
     }
 
-    private static async Task AssertRespondedOnceAsync<TModel>(
+    private static async Task AssertRespondedAsync<TModel>(
         TestNeuron<TModel> model,
+        int expected,
         CancellationToken cancellationToken)
         where TModel : class, ILLM
-        => Assert.Single(
-            await model.Incoming.ReadAsync<CapabilityRequested>(
-                afterSequence: 0, cancellationToken: cancellationToken),
-            request => request.Synapse.Method == nameof(ILLM.RespondStreaming));
+        => Assert.Equal(
+            expected,
+            (await model.Incoming.ReadAsync<CapabilityRequested>(
+                afterSequence: 0, cancellationToken: cancellationToken))
+            .Count(request => request.Synapse.Method == nameof(ILLM.RespondStreaming)));
 
     private static async Task<string> StreamAsync(ITeam team, CancellationToken cancellationToken)
     {

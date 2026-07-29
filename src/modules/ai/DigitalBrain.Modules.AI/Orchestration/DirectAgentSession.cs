@@ -37,6 +37,8 @@ internal sealed class DirectAgentSession(
             neuron);
     }
 
+    internal bool HasDurableSession => state.Value is { Length: > 0 };
+
     internal async IAsyncEnumerable<ChatResponseUpdate> RunStreamingAsync(
         AIAgent agent,
         OrchestrationDefinition definition,
