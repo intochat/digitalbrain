@@ -1,5 +1,9 @@
+using System.Runtime.CompilerServices;
+using System.Text;
 using DigitalBrain.Abstractions;
+using DigitalBrain.AI;
 using DigitalBrain.Kernel;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
@@ -14,6 +18,7 @@ internal sealed class ChatNeuron :
     IEmit<UserMessaged>,
     IEmit<AssistantResponded>
 {
+    private const string AssistantName = "assistant";
     private const string CommandOrderName = "chat.command-order";
     private const string CommandsName = "chat.commands";
     private const string TranscriptName = "chat.transcript";
@@ -37,32 +42,43 @@ internal sealed class ChatNeuron :
 
     public async Task Send(SendMessage message)
     {
-        ArgumentNullException.ThrowIfNull(message);
-        ArgumentException.ThrowIfNullOrWhiteSpace(message.Text);
-        if (message.CommandId.Value == Guid.Empty)
+        if (!IsUnseenCommand(message))
         {
-            throw new ArgumentException(
-                "The command id cannot be empty.",
-                nameof(message));
-        }
-
-        if (_commands.TryGetValue(message.CommandId.Value, out var serialized))
-        {
-            if (!string.Equals(
-                    _texts.Deserialize(serialized),
-                    message.Text,
-                    StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "A chat command id cannot be reused with different text.");
-            }
-
             return;
         }
 
-        Remember(message.CommandId, message.Text);
-        Remember(new ChatTurn(FromUser: true, message.Text));
-        await EmitAsync(new UserMessaged(message.CommandId, Id, message.Text, Turns()));
+        await RememberOwnerTurnAsync(message);
+    }
+
+    public async IAsyncEnumerable<ChatResponseUpdate> SendStreaming(
+        SendMessage message,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        if (!IsUnseenCommand(message))
+        {
+            yield break;
+        }
+
+        await RememberOwnerTurnAsync(message);
+
+        var answer = new StringBuilder();
+
+        await foreach (var chunk in Assistant().RespondStreaming([.. Turns().Select(AsChatMessage)], cancellationToken))
+        {
+            answer.Append(chunk.Text);
+
+            yield return chunk;
+        }
+
+        var answered = answer.ToString();
+
+        if (string.IsNullOrWhiteSpace(answered))
+        {
+            yield break;
+        }
+
+        Remember(new ChatTurn(FromUser: false, answered));
+        await EmitAsync(new AssistantResponded(message.CommandId, Id, answered));
     }
 
     public async Task HandleAsync(AssistantAnswered synapse, CancellationToken cancellationToken)
@@ -82,6 +98,48 @@ internal sealed class ChatNeuron :
     public Task<ChatTranscript> Read() => Task.FromResult(new ChatTranscript(Turns()));
 
     private IReadOnlyList<ChatTurn> Turns() => [.. _transcript.Select(_turns.Deserialize)];
+
+    private IAssistant Assistant()
+        => GrainFactory.GetGrain<IAssistant>(NeuronId.For<IAssistant>(Id.Owner, AssistantName).ToGrainId());
+
+    private static ChatMessage AsChatMessage(ChatTurn turn)
+        => new(turn.FromUser ? ChatRole.User : ChatRole.Assistant, turn.Text);
+
+    private bool IsUnseenCommand(SendMessage message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        ArgumentException.ThrowIfNullOrWhiteSpace(message.Text);
+        if (message.CommandId.Value == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "The command id cannot be empty.",
+                nameof(message));
+        }
+
+        if (!_commands.TryGetValue(message.CommandId.Value, out var serialized))
+        {
+            return true;
+        }
+
+        if (!string.Equals(
+                _texts.Deserialize(serialized),
+                message.Text,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "A chat command id cannot be reused with different text.");
+        }
+
+        return false;
+    }
+
+    private Task RememberOwnerTurnAsync(SendMessage message)
+    {
+        Remember(message.CommandId, message.Text);
+        Remember(new ChatTurn(FromUser: true, message.Text));
+
+        return EmitAsync(new UserMessaged(message.CommandId, Id, message.Text, Turns()));
+    }
 
     private void Remember(CommandId commandId, string text)
     {

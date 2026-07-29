@@ -15,5 +15,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\core\kernel\DigitalBrain\DigitalBrain.csproj" />
+    <ProjectReference Include="..\..\..\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Modules.Chat\DigitalBrain.Modules.Chat.csproj" />
+    <ProjectReference Include="..\..\ai\DigitalBrain.Modules.AI\DigitalBrain.Modules.AI.csproj" />
   </ItemGroup>
 </Project>

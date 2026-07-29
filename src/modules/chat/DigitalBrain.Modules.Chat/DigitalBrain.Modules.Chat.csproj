@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.Chat.Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
+    <ProjectReference Include="..\..\ai\DigitalBrain.Modules.AI.Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain\DigitalBrain.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"
                       OutputItemType="Analyzer"

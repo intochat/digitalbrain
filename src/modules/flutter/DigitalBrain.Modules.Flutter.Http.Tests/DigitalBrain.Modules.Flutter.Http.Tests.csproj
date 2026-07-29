@@ -15,6 +15,7 @@
     <ProjectReference Include="..\DigitalBrain.Modules.Flutter.Http\DigitalBrain.Modules.Flutter.Http.csproj" />
     <ProjectReference Include="..\DigitalBrain.Modules.Flutter\DigitalBrain.Modules.Flutter.csproj" />
     <ProjectReference Include="..\..\chat\DigitalBrain.Modules.Chat\DigitalBrain.Modules.Chat.csproj" />
+    <ProjectReference Include="..\..\ai\DigitalBrain.Modules.AI\DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="..\..\..\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
     <ProjectReference Include="..\DigitalBrain.Modules.Flutter.Aspire.Hosting\DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
   </ItemGroup>

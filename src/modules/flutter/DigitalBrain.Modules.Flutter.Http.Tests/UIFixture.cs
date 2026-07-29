@@ -1,3 +1,4 @@
+using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
@@ -56,5 +57,6 @@ public sealed class UIFixture : DigitalBrainFixture
         ArgumentNullException.ThrowIfNull(brain);
         brain.AddModule<FlutterModule>();
         brain.AddModule<ChatModule>();
+        brain.AddModule<AIModule>();
     }
 }
