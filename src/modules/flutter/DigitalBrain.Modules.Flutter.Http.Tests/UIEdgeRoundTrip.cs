@@ -155,7 +155,7 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
     }
 
     [Fact(DisplayName =
-        "SSE chat turn carries neuron, caller, command, correlation, and timestamp for live brain pulse")]
+        "SSE chat turns carry the owner's message and the assistant's answer with pulse identity")]
     public async Task HttpChatTurnCarriesPulseIdentity()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -178,6 +178,14 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         Assert.True(Guid.TryParse(projected.CorrelationId, out var correlation));
         Assert.NotEqual(Guid.Empty, correlation);
         Assert.NotEqual(default, projected.Timestamp);
+
+        var answered = await UIEdgeSse.ReadNextChatTurnAsync(events.Reader, cancellationToken);
+
+        Assert.Equal(nameof(AssistantResponded), answered.Synapse);
+        Assert.False(answered.FromUser);
+        Assert.Equal(UIAssistantProbe.Answer, answered.Text);
+        Assert.Equal(command.CommandId.ToString(), answered.CommandId);
+        Assert.True(answered.Sequence > projected.Sequence);
     }
 
     private static async Task<ShellEventStream> OpenShellEventStreamAsync(HttpClient http, CancellationToken cancellationToken)

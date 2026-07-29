@@ -9,8 +9,8 @@ public sealed class ChatProductTool(OSMcpFixture fixture)
 {
     private const int TestTimeout = 60_000;
 
-    [Fact(Timeout = TestTimeout, DisplayName = "send_chat_message returns the correlated assistant response")]
-    public async Task SendChatMessageReturnsCorrelatedAssistantResponse()
+    [Fact(Timeout = TestTimeout, DisplayName = "send_chat_message returns the assistant response for its own command id")]
+    public async Task SendChatMessageReturnsTheResponseForItsOwnCommandId()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);

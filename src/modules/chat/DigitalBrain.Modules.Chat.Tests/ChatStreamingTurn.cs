@@ -63,12 +63,14 @@ public sealed class ChatStreamingTurn(ChatFixture fixture)
 {
     private const string ChatName = "streaming-turn";
     private const string AbandonedChatName = "abandoned-streaming-turn";
+    private const string SlowChatName = "slow-answering-turn";
     private const string Prompt = "how does streaming reach the transcript?";
     private const int StreamingTimeout = 180_000;
 
     private static readonly Assembly ChatVocabulary = typeof(UserMessaged).Assembly;
     private static readonly TimeSpan ProgressBudget = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan SettleStep = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan PastOrleansDefaultResponseTimeout = TimeSpan.FromSeconds(35);
 
     [Fact(Timeout = StreamingTimeout, DisplayName =
         "a drained IChat.SendStreaming yields many chunks and journals one AssistantResponded carrying all of them")]
@@ -174,6 +176,34 @@ public sealed class ChatStreamingTurn(ChatFixture fixture)
         var transcript = await chat.Read();
 
         Assert.Equal(2, transcript.Turns.Count);
+    }
+
+    [Fact(Timeout = StreamingTimeout, DisplayName =
+        "IChat.Send survives a model turn longer than Orleans' default response timeout")]
+    public async Task SendSurvivesAModelTurnLongerThanTheDefaultResponseTimeout()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        ChatStreamingAssistant.Arm();
+
+        var chat = test.Client.Get<IChat>(SlowChatName);
+        var sending = chat.Send(new SendMessage(CommandId.New(), Prompt));
+
+        await Task.Delay(PastOrleansDefaultResponseTimeout, cancellationToken);
+        ChatStreamingAssistant.Release();
+
+        await sending;
+
+        var transcript = await chat.Read();
+
+        Assert.Collection(
+            transcript.Turns,
+            turn => Assert.Equal(new ChatTurn(FromUser: true, Prompt), turn),
+            turn => Assert.Equal(
+                new ChatTurn(
+                    FromUser: false,
+                    ChatStreamingAssistant.Opening + Prompt + ChatStreamingAssistant.Closing),
+                turn));
     }
 
     private static async Task DrainAsync(IAsyncEnumerable<ChatResponseUpdate> stream)

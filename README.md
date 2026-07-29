@@ -57,7 +57,7 @@ One assumption is load-bearing and unmeasured: **that a model can reliably emit 
 ```text
 src/       published packages: core/ (framework) and modules/ (IModule domains),
            plus the publish gate that polices them
-os/        the product: silo, MCP server, OS behaviours, AppHost
+os/        the product: silo, MCP server, the assistant neuron, AppHost
 clients/   Flutter shell and the Dart wire package
 tests/     fixtures/ — shared test subjects and their scaffolding AppHosts
 ```

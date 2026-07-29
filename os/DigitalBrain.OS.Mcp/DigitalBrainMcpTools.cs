@@ -20,8 +20,8 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
 
     [McpServerTool(Name = McpHost.SendChatMessageToolName)]
     [Description(
-        "Send a message through the owner's DigitalBrain conversation and wait for the exact "
-        + "correlated assistant response. This is the same durable chat path used by the product UI.")]
+        "Send a message through the owner's DigitalBrain conversation and wait for the assistant "
+        + "response journaled under this command id. This is the same durable chat path used by the product UI.")]
     public async Task<ChatMessageResult> SendChatMessageAsync(
         [Description("Message to send to DigitalBrain")] string text,
         [Description("Caller-generated command id used to resume an interrupted call")]

@@ -7,6 +7,7 @@ namespace DigitalBrain.Chat;
 public partial interface IChat : INeuron
 {
     [Alias(nameof(Send))]
+    [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
     Task Send(SendMessage message);
 
     [Alias(nameof(SendStreaming))]

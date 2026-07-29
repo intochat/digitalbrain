@@ -11,6 +11,8 @@ public sealed class ChatTurnUnderBehaviors(OSBehaviorsFixture fixture)
     private const int FactTimeout = 120_000;
     private const string ChatName = "streaming-under-behaviors";
     private const string NonStreamedChatName = "sent-under-behaviors";
+    private const string SentCorrelationChatName = "sent-correlation";
+    private const string StreamedCorrelationChatName = "streamed-correlation";
     private const string Prompt = "who else is listening to this conversation?";
     private const string OwnedAnswer = "Only the conversation itself.";
     private const string CompetingAnswer = "A second answerer reached the same conversation.";
@@ -93,5 +95,53 @@ public sealed class ChatTurnUnderBehaviors(OSBehaviorsFixture fixture)
 
             await Task.Delay(SettleStep, cancellationToken);
         }
+    }
+
+    [Fact(Explicit = true, Timeout = FactTimeout, DisplayName =
+        "EXCLUDED until the kernel scopes a correlation across a client-entry-point call: IChat.Send journals one turn under one correlation id")]
+    public async Task SentTurnJournalsOneCorrelationId()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        test.Chat().Reply(OwnedAnswer);
+
+        var chat = test.Neuron<IChat>(SentCorrelationChatName);
+
+        await test.Client.Get<IChat>(SentCorrelationChatName).Send(new SendMessage(CommandId.New(), Prompt));
+
+        AssertOneCorrelation(await ChatFactsAsync(chat, cancellationToken));
+    }
+
+    [Fact(Explicit = true, Timeout = FactTimeout, DisplayName =
+        "EXCLUDED until the kernel scopes a correlation across enumeration dispatch: IChat.SendStreaming journals one turn under one correlation id")]
+    public async Task StreamedTurnJournalsOneCorrelationId()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        test.Chat().Reply(OwnedAnswer);
+
+        var chat = test.Neuron<IChat>(StreamedCorrelationChatName);
+
+        await foreach (var _ in chat.Reference
+            .SendStreaming(new SendMessage(CommandId.New(), Prompt), cancellationToken))
+        {
+        }
+
+        AssertOneCorrelation(await ChatFactsAsync(chat, cancellationToken));
+    }
+
+    private static async Task<ObservedSynapse<Synapse>[]> ChatFactsAsync(
+        TestNeuron<IChat> chat,
+        CancellationToken cancellationToken)
+        => [.. (await chat.Outgoing.ReadAsync<Synapse>(afterSequence: 0, cancellationToken: cancellationToken))
+            .Where(fact => fact.Synapse.GetType().Assembly == ChatVocabulary)];
+
+    private static void AssertOneCorrelation(ObservedSynapse<Synapse>[] facts)
+    {
+        Assert.Collection(
+            facts,
+            fact => Assert.IsType<UserMessaged>(fact.Synapse),
+            fact => Assert.IsType<AssistantResponded>(fact.Synapse));
+        Assert.Equal(facts[0].CorrelationId, facts[1].CorrelationId);
     }
 }
