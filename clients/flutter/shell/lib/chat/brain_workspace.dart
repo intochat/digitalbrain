@@ -36,6 +36,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
 
   final _turns = <ChatTurnEvent>[];
   final _seen = <int>{};
+  List<ChatTurnEvent> _projectedTurns = const [];
   StreamSubscription<ChatTurnEvent>? _subscription;
   StreamSubscription<BrainTopologySnapshot>? _topologySubscription;
   BrainTopologySnapshot? _topology;
@@ -56,6 +57,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
     if (oldWidget.chatName != widget.chatName) {
       _turns.clear();
       _seen.clear();
+      _projectedTurns = const [];
     }
     if (!identical(oldWidget.turns, widget.turns)) {
       unawaited(_subscription?.cancel());
@@ -98,6 +100,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
         setState(() {
           _turns.add(turn);
           _turns.sort((a, b) => a.sequence.compareTo(b.sequence));
+          _projectedTurns = List<ChatTurnEvent>.unmodifiable(_turns);
         });
       },
       onError: (Object error) {
@@ -126,18 +129,17 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
 
   @override
   Widget build(BuildContext context) {
-    final projectedTurns = List<ChatTurnEvent>.unmodifiable(_turns);
     final pages = [
       BrainChatScreen(
         chatName: widget.chatName,
-        turns: projectedTurns,
+        turns: _projectedTurns,
         onSend: widget.onSend,
         onStream: widget.onStream,
       ),
-      ActivityScreen(turns: projectedTurns),
+      ActivityScreen(turns: _projectedTurns),
       BrainScreen(
         chatName: widget.chatName,
-        turns: projectedTurns,
+        turns: _projectedTurns,
         topology: _topology,
         statusMessage: _statusMessage,
       ),

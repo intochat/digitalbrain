@@ -5,6 +5,7 @@ using DigitalBrain.AI.OpenAI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using OllamaSharp;
 using OpenAI;
 
@@ -12,7 +13,7 @@ namespace DigitalBrain.AI;
 
 internal static class AIClients
 {
-    private const string ConfigurationRoot = "DigitalBrain:AI";
+    internal const string ConfigurationRoot = "DigitalBrain:AI";
     private const string EnableSensitiveDataKey =
         $"{ConfigurationRoot}:Telemetry:EnableSensitiveData";
     private const string TelemetrySource = "DigitalBrain.AI";
@@ -28,6 +29,8 @@ internal static class AIClients
         services.AddKeyedSingleton<IChatClient>(
             typeof(Gpt56),
             static (provider, _) => OpenAI(provider.GetRequiredService<IConfiguration>()));
+
+        services.AddHostedService<LlmWarmupHostedService>();
     }
 
     private static void AddOllamaModel<TModel>(IServiceCollection services, string defaultTag)

@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration;
@@ -18,6 +20,7 @@ public static class ServiceDefaultsExtensions
     private const string AlivePath = "/alive";
     private const string HealthPath = "/health";
     private const string TelemetryPrefix = "DigitalBrain";
+    private const string AzuriteAccountPathSegment = "/devstoreaccount1/";
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
@@ -63,6 +66,7 @@ public static class ServiceDefaultsExtensions
     {
         var configuredSampleRatio = builder.Configuration.GetValue<double?>("Telemetry:Tracing:SampleRatio");
         var sampleRatio = Math.Clamp(configuredSampleRatio ?? 1d, 0d, 1d);
+        var rootSampler = new SuppressAzureStorageSampler(new TraceIdRatioBasedSampler(sampleRatio));
 
         builder.Logging.AddOpenTelemetry(logging =>
         {
@@ -83,7 +87,8 @@ public static class ServiceDefaultsExtensions
                 .AddMeter("Experimental.Microsoft.Extensions.AI")
                 .AddMeter("Microsoft.Orleans"))
             .WithTracing(tracing => tracing
-                .SetSampler(new ParentBasedSampler(new TraceIdRatioBasedSampler(sampleRatio)))
+                .SetSampler(new ParentBasedSampler(rootSampler))
+                .AddProcessor(new SuppressAzureStorageActivityProcessor())
                 .AddSource(builder.Environment.ApplicationName)
                 .AddSource(TelemetryPrefix)
                 .AddSource($"{TelemetryPrefix}.*")
@@ -93,8 +98,91 @@ public static class ServiceDefaultsExtensions
                     options.Filter = context =>
                         !context.Request.Path.StartsWithSegments(HealthPath, StringComparison.OrdinalIgnoreCase)
                         && !context.Request.Path.StartsWithSegments(AlivePath, StringComparison.OrdinalIgnoreCase))
-                .AddHttpClientInstrumentation());
+                .AddHttpClientInstrumentation(options =>
+                {
+                    options.FilterHttpRequestMessage = static request => !IsAzuriteRequest(request);
+                    options.EnrichWithHttpResponseMessage = static (activity, response) =>
+                        SoftenExpectedClientErrorStatus(activity, response.StatusCode);
+                }));
 
         AddOpenTelemetryExporters(builder);
+    }
+
+    private static bool IsAzuriteRequest(HttpRequestMessage request)
+    {
+        var path = request.RequestUri?.AbsolutePath;
+        return path is not null
+            && path.Contains(AzuriteAccountPathSegment, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void SoftenExpectedClientErrorStatus(Activity activity, HttpStatusCode statusCode)
+    {
+        if (statusCode is not (HttpStatusCode.NotFound or HttpStatusCode.Conflict))
+        {
+            return;
+        }
+
+        activity.SetStatus(ActivityStatusCode.Unset);
+        activity.SetTag("error.type", null);
+    }
+
+    private static bool IsAzureStorageNoiseName(string name)
+        => name.StartsWith("TableClient.", StringComparison.Ordinal)
+            || name.StartsWith("TableServiceClient.", StringComparison.Ordinal)
+            || name.StartsWith("BlobClient.", StringComparison.Ordinal)
+            || name.StartsWith("BlobBaseClient.", StringComparison.Ordinal)
+            || name.StartsWith("BlobContainerClient.", StringComparison.Ordinal)
+            || name.StartsWith("BlobServiceClient.", StringComparison.Ordinal)
+            || name.StartsWith("QueueClient.", StringComparison.Ordinal)
+            || name.StartsWith("QueueServiceClient.", StringComparison.Ordinal);
+
+    private static bool IsAzureStorageNoiseSource(string sourceName)
+        => sourceName.StartsWith("Azure.Data.Tables", StringComparison.Ordinal)
+            || sourceName.StartsWith("Azure.Storage", StringComparison.Ordinal)
+            || string.Equals(sourceName, "Azure.Core.Http", StringComparison.Ordinal);
+
+    private static bool IsAzureStorageNamespace(string? azNamespace)
+        => azNamespace is "Microsoft.Tables"
+            or "Microsoft.Storage"
+            or "Microsoft.Blobs"
+            or "Microsoft.Queue";
+
+    private static bool IsAzureStorageNoise(Activity activity)
+    {
+        if (IsAzureStorageNoiseName(activity.OperationName)
+            || IsAzureStorageNoiseSource(activity.Source.Name))
+        {
+            return true;
+        }
+
+        return activity.GetTagItem("az.namespace") is string azNamespace
+            && IsAzureStorageNamespace(azNamespace);
+    }
+
+    private sealed class SuppressAzureStorageSampler(Sampler inner) : Sampler
+    {
+        public override SamplingResult ShouldSample(in SamplingParameters samplingParameters)
+        {
+            if (IsAzureStorageNoiseName(samplingParameters.Name))
+            {
+                return new SamplingResult(SamplingDecision.Drop);
+            }
+
+            return inner.ShouldSample(in samplingParameters);
+        }
+    }
+
+    private sealed class SuppressAzureStorageActivityProcessor : BaseProcessor<Activity>
+    {
+        public override void OnEnd(Activity activity)
+        {
+            if (!IsAzureStorageNoise(activity))
+            {
+                return;
+            }
+
+            activity.ActivityTraceFlags &= ~ActivityTraceFlags.Recorded;
+            activity.IsAllDataRequested = false;
+        }
     }
 }

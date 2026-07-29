@@ -38,44 +38,87 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
 
   final _controller = InMemoryChatController();
   final _streamStates = StreamStateStore();
-  final _seenSequences = <int>{};
+  final _appliedSequences = <int>{};
+  String? _pendingUserMessageId;
+  String? _pendingUserText;
   String? _activeStreamId;
   String? _failure;
 
   @override
   void initState() {
     super.initState();
-    _syncJournal(widget.turns);
+    unawaited(_syncJournal(widget.turns));
   }
 
   @override
   void didUpdateWidget(covariant BrainChatScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.turns, widget.turns) ||
-        oldWidget.turns.length != widget.turns.length) {
+    if (!_sameJournal(oldWidget.turns, widget.turns)) {
       unawaited(_syncJournal(widget.turns));
     }
   }
 
   Future<void> _syncJournal(List<ChatTurnEvent> turns) async {
-    final messages = <Message>[];
-    for (final turn in turns) {
-      _seenSequences.add(turn.sequence);
-      messages.add(
+    final sequences = {for (final turn in turns) turn.sequence};
+    if (sequences.length == _appliedSequences.length &&
+        sequences.every(_appliedSequences.contains)) {
+      return;
+    }
+
+    // Empty journal snapshots must not clobber optimistic/stream bubbles.
+    // initState syncs [] and can finish after insertMessage without this guard.
+    if (sequences.isEmpty &&
+        (_pendingUserMessageId != null || _activeStreamId != null)) {
+      return;
+    }
+
+    if (_pendingUserText != null &&
+        turns.any((turn) => turn.fromUser && turn.text == _pendingUserText)) {
+      _pendingUserMessageId = null;
+      _pendingUserText = null;
+    }
+
+    final journalHasAssistant = turns.any((turn) => !turn.fromUser);
+    if (_activeStreamId != null && journalHasAssistant) {
+      _streamStates.forget(_activeStreamId!);
+      _activeStreamId = null;
+    }
+
+    final messages = <Message>[
+      for (final turn in turns)
         TextMessage(
           id: 'turn_${turn.sequence}',
           authorId: turn.fromUser ? ownerUserId : assistantUserId,
           createdAt: turn.timestamp.toUtc(),
           text: turn.text,
         ),
+    ];
+
+    if (_pendingUserMessageId != null && _pendingUserText != null) {
+      messages.add(
+        TextMessage(
+          id: _pendingUserMessageId!,
+          authorId: ownerUserId,
+          createdAt: DateTime.now().toUtc(),
+          text: _pendingUserText!,
+        ),
       );
     }
 
-    if (_activeStreamId != null &&
-        turns.any((turn) => !turn.fromUser && turn.sequence > 0)) {
-      _streamStates.forget(_activeStreamId!);
-      _activeStreamId = null;
+    if (_activeStreamId != null) {
+      messages.add(
+        TextStreamMessage(
+          id: _activeStreamId!,
+          authorId: assistantUserId,
+          createdAt: DateTime.now().toUtc(),
+          streamId: _activeStreamId!,
+        ),
+      );
     }
+
+    _appliedSequences
+      ..clear()
+      ..addAll(sequences);
 
     await _controller.setMessages(messages, animated: false);
     if (mounted) {
@@ -92,6 +135,8 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
     setState(() => _failure = null);
 
     final localId = _uuid.v4();
+    _pendingUserMessageId = localId;
+    _pendingUserText = trimmed;
     await _controller.insertMessage(
       TextMessage(
         id: localId,
@@ -218,6 +263,21 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
         ],
       ),
     );
+  }
+
+  static bool _sameJournal(List<ChatTurnEvent> left, List<ChatTurnEvent> right) {
+    if (identical(left, right)) {
+      return true;
+    }
+    if (left.length != right.length) {
+      return false;
+    }
+    for (var index = 0; index < left.length; index++) {
+      if (left[index].sequence != right[index].sequence) {
+        return false;
+      }
+    }
+    return true;
   }
 }
 

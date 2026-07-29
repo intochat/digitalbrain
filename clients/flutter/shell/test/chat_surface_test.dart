@@ -74,5 +74,89 @@ void main() {
     expect(find.text('Done.'), findsOneWidget);
     await drainShellTimers(tester);
   });
+
+  testWidgets(
+    'topology ticks do not wipe an optimistic send before journal arrives',
+    (tester) async {
+      await prepareShellSurface(tester);
+      final turns = StreamController<ChatTurnEvent>();
+      final topology = StreamController<BrainTopologySnapshot>();
+      addTearDown(turns.close);
+      addTearDown(topology.close);
+
+      await tester.pumpWidget(
+        BrainChatApp(
+          chatName: 'main',
+          turns: turns.stream,
+          topology: topology.stream,
+          onSend: (_) async {},
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField), 'stay visible');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(find.text('stay visible'), findsWidgets);
+
+      topology.add(shellTopology());
+      await tester.pumpAndSettle();
+      topology.add(shellTopologyWithoutNeuron());
+      await tester.pumpAndSettle();
+
+      expect(find.text('stay visible'), findsWidgets);
+
+      turns.add(shellTurn(1, true, 'stay visible'));
+      turns.add(shellTurn(2, false, 'still here'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('stay visible'), findsOneWidget);
+      expect(find.text('still here'), findsOneWidget);
+      await drainShellTimers(tester);
+    },
+  );
+
+  testWidgets(
+    'an in-flight stream bubble survives journal user-turn arrival',
+    (tester) async {
+      await prepareShellSurface(tester);
+      final turns = StreamController<ChatTurnEvent>();
+      addTearDown(turns.close);
+
+      // Completes after a short delay so the bubble exists while the user
+      // journal lands, without leaving an open stream that hangs the test.
+      await tester.pumpWidget(
+        BrainChatApp(
+          chatName: 'main',
+          turns: turns.stream,
+          onStream: (_) async* {
+            await Future<void>.delayed(const Duration(milliseconds: 80));
+          },
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField), 'stream me');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 20));
+
+      expect(find.text('stream me'), findsWidgets);
+
+      turns.add(shellTurn(1, true, 'stream me'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 20));
+
+      expect(find.text('stream me'), findsWidgets);
+
+      await tester.pump(const Duration(milliseconds: 100));
+      turns.add(shellTurn(2, false, 'stream done'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('stream me'), findsOneWidget);
+      expect(find.text('stream done'), findsOneWidget);
+      await drainShellTimers(tester);
+    },
+  );
 }
 

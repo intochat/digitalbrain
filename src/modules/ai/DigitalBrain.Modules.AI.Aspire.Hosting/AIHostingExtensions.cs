@@ -129,6 +129,7 @@ public static class AIHostingExtensions
                 .WithGPUSupport()
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent)
+                .WithEnvironment("OLLAMA_KEEP_ALIVE", "-1")
                 .WithOpenWebUI(uiContainer => uiContainer.WithLifetime(ContainerLifetime.Persistent));
 
             _ollamaModels[model] = _ollama.AddModel($"{brain.Name}-ai-{resourceSuffix}", tag);

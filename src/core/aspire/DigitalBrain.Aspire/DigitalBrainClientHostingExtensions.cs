@@ -34,14 +34,11 @@ public static class DigitalBrainClientHostingExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
 
-        if (configure is null)
+        builder.UseOrleansClient(client =>
         {
-            builder.UseOrleansClient();
-        }
-        else
-        {
-            builder.UseOrleansClient(configure);
-        }
+            client.Services.AddDigitalBrainClientWireSerializers();
+            configure?.Invoke(client);
+        });
 
         builder.Services.AddSingleton<IDigitalBrain>(
             services => DigitalBrainClient.Connect(services.GetRequiredService<IGrainFactory>(), owner));

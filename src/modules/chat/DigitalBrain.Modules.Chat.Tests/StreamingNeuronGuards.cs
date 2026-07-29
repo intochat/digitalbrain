@@ -24,13 +24,7 @@ public sealed class StreamingNeuronGuards
     [Fact(DisplayName = "ChatResponseUpdate round-trips the Orleans STJ codec with $type intact for text and data")]
     public void ChatResponseUpdateRoundTripsWithPolymorphicContent()
     {
-        var services = new ServiceCollection()
-            .AddSerializer(serializer => serializer.AddJsonSerializer(
-                static type => type == typeof(ChatResponseUpdate)
-                    || typeof(AIContent).IsAssignableFrom(type)))
-            .BuildServiceProvider();
-
-        var codec = services.GetRequiredService<Serializer<ChatResponseUpdate>>();
+        var codec = WireCodec();
         var original = new ChatResponseUpdate(ChatRole.Assistant, "hi")
         {
             Contents =
@@ -47,6 +41,34 @@ public sealed class StreamingNeuronGuards
             content => Assert.IsType<TextContent>(content),
             content => Assert.Equal("image/png", Assert.IsType<DataContent>(content).MediaType));
     }
+
+    [Fact(DisplayName = "ChatResponseUpdate round-trips reasoning content through the client wire serializers")]
+    public void ChatResponseUpdateRoundTripsReasoningContent()
+    {
+        var codec = WireCodec();
+        var original = new ChatResponseUpdate
+        {
+            Role = ChatRole.Assistant,
+            Contents = [new TextReasoningContent("thinking out loud"), new TextContent("hello")],
+        };
+
+        var revived = codec.Deserialize(codec.SerializeToArray(original));
+
+        Assert.Collection(
+            revived.Contents,
+            content => Assert.Equal("thinking out loud", Assert.IsType<TextReasoningContent>(content).Text),
+            content => Assert.Equal("hello", Assert.IsType<TextContent>(content).Text));
+    }
+
+    private static Serializer<ChatResponseUpdate> WireCodec()
+        => new ServiceCollection()
+            .AddSerializer(serializer => serializer.AddJsonSerializer(
+                static type => type == typeof(ChatMessage)
+                    || type == typeof(ChatResponse)
+                    || type == typeof(ChatResponseUpdate)
+                    || typeof(AIContent).IsAssignableFrom(type)))
+            .BuildServiceProvider()
+            .GetRequiredService<Serializer<ChatResponseUpdate>>();
 }
 
 internal sealed class ChatNeuronProbe : Neuron
