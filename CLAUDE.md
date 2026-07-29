@@ -182,3 +182,9 @@ Add only what you have reproduced.
   model-plus-capability chain.
 - **Windows file locks look like build breaks.** A running `digitalbrain_flutter.exe` fails the build
   with `LNK1168`; stale node processes block directory deletion. Find the holding process first.
+- **A sanitized shell environment un-Windows-es MSBuild.** A bridge shell that rebuilds its process
+  env from the registry (Windows-MCP does) can lack `OS=Windows_NT`. Aspire's
+  `SetOrchestrationDiscoveryAttributes` then bakes `dcpclipath` without `.exe` into the AppHost
+  assembly, and every L2 `DistributedApplication` start fails with "The Aspire orchestration
+  component is not installed at …\tools\dcp". Set `$env:OS='Windows_NT'` before any build from such
+  a shell; the bad path is baked at build time, so rebuild after fixing the env.
