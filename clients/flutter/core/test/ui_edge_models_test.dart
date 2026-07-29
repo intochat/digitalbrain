@@ -1,4 +1,4 @@
-import 'package:digitalbrain_wire/digitalbrain_wire.dart';
+import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:test/test.dart';
 
 void main() {

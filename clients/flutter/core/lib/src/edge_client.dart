@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:digitalbrain_wire/digitalbrain_wire.dart';
+import 'ui_edge_models.dart';
 import 'package:http/http.dart' as http;
 
 import 'host_environment.dart';

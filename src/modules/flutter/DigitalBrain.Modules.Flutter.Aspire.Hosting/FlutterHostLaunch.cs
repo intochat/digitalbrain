@@ -40,10 +40,18 @@ internal static class FlutterHostLaunch
             return packageRoot;
         }
 
-        var shellPackage = Path.Combine(packageRoot, ShellPackageDirectoryName);
-        if (HasDesktopMarkers(shellPackage, deviceTarget))
+        // Nested shell under the pure-Dart package (legacy clients/digitalbrain_flutter/shell).
+        var nestedShell = Path.Combine(packageRoot, ShellPackageDirectoryName);
+        if (HasDesktopMarkers(nestedShell, deviceTarget))
         {
-            return shellPackage;
+            return nestedShell;
+        }
+
+        // Sibling shell next to core (clients/flutter/shell beside clients/flutter/core).
+        var siblingShell = Path.GetFullPath(Path.Combine(packageRoot, "..", ShellPackageDirectoryName));
+        if (HasDesktopMarkers(siblingShell, deviceTarget))
+        {
+            return siblingShell;
         }
 
         return null;
@@ -60,7 +68,8 @@ internal static class FlutterHostLaunch
         var workDir = ResolveDesktopPackageDirectory(packageRoot, deviceTarget)
             ?? throw new InvalidOperationException(
                 $"Desktop Flutter host needs lib/main.dart and a '{deviceTarget}/' folder " +
-                $"under '{packageRoot}' or '{packageRoot}/{ShellPackageDirectoryName}'. " +
+                $"under '{packageRoot}', '{packageRoot}/{ShellPackageDirectoryName}', " +
+                $"or the sibling '../{ShellPackageDirectoryName}' (clients/flutter/shell). " +
                 "Use WithFlutterHost<HeadlessHost>() for the pure-Dart host.");
 
         return new Result(ResolveFlutterCommand(options, configuration), workDir, ["run", "-d", deviceTarget]);

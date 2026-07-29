@@ -140,7 +140,7 @@ public static class FlutterHostingExtensions
             {
                 throw new InvalidOperationException(
                     $"Flutter host package was not found at '{packageRoot}'. " +
-                    "Pass FlutterHostOptions.WorkingDirectory or place clients/digitalbrain_flutter in the repo.");
+                    "Pass FlutterHostOptions.WorkingDirectory or place clients/flutter/core in the repo.");
             }
 
             var launch = FlutterHostLaunch.Resolve(kind, packageRoot, options, appHost.Configuration);
@@ -211,8 +211,8 @@ public static class FlutterHostingExtensions
 
             var candidates = new[]
             {
-                Path.Combine(appHostDirectory, "..", "..", "clients", "digitalbrain_flutter"),
-                Path.Combine(appHostDirectory, "..", "clients", "digitalbrain_flutter"),
+                Path.Combine(appHostDirectory, "..", "..", "clients", "flutter", "core"),
+                Path.Combine(appHostDirectory, "..", "clients", "flutter", "core"),
             };
 
             foreach (var candidate in candidates)

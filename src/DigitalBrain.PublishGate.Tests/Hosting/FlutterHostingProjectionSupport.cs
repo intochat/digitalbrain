@@ -18,26 +18,26 @@ internal static class FlutterHostingProjectionSupport
         "DigitalBrain.Modules.Flutter.Http",
         "DigitalBrain.Modules.Flutter.Http.csproj");
 
-    public static string FlutterClientDirectory => RepositoryAssets.Path("clients", "digitalbrain_flutter");
+    public static string FlutterClientDirectory => RepositoryAssets.Path("clients", "flutter", "core");
 
-    public static string FlutterShellDirectory => Path.Combine(FlutterClientDirectory, "shell");
+    public static string FlutterShellDirectory => RepositoryAssets.Path("clients", "flutter", "shell");
 
     public static async Task AssertShellDesktopLayoutAsync(string shellDirectory, CancellationToken cancellationToken = default)
     {
         Assert.True(
             File.Exists(Path.Combine(shellDirectory, "pubspec.yaml")),
-            "clients/digitalbrain_flutter/shell must exist for desktop chrome.");
+            "clients/flutter/shell must exist for desktop chrome.");
         Assert.True(
             File.Exists(Path.Combine(shellDirectory, "lib", "main.dart")),
-            "shell Windows chrome requires lib/main.dart (Desktop host uses shell/ under pure-Dart root).");
+            "shell Windows chrome requires lib/main.dart (Desktop host uses clients/flutter/shell).");
         Assert.True(
             Directory.Exists(Path.Combine(shellDirectory, FlutterHostingExtensions.DefaultDeviceTarget)),
-            "shell Windows chrome requires windows/ (Desktop host uses shell/ under pure-Dart root).");
+            "shell Windows chrome requires windows/ (Desktop host uses clients/flutter/shell).");
         Assert.False(
             File.Exists(Path.Combine(
                 shellDirectory,
                 FlutterHostingExtensions.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar))),
-            "shell is desktop-only — headless entry stays on pure-Dart root.");
+            "shell is desktop-only — headless entry stays on pure-Dart core.");
         var pubspec = await File.ReadAllTextAsync(
             Path.Combine(shellDirectory, "pubspec.yaml"),
             cancellationToken).ConfigureAwait(true);
@@ -48,7 +48,7 @@ internal static class FlutterHostingProjectionSupport
     {
         Assert.True(
             File.Exists(Path.Combine(clientDirectory, "pubspec.yaml")),
-            "clients/digitalbrain_flutter must exist.");
+            "clients/flutter/core must exist.");
         Assert.True(
             File.Exists(Path.Combine(
                 clientDirectory,
@@ -56,10 +56,10 @@ internal static class FlutterHostingProjectionSupport
             $"pure-Dart package hosts {FlutterHostingExtensions.HeadlessHostEntry}.");
         Assert.False(
             File.Exists(Path.Combine(clientDirectory, "lib", "main.dart")),
-            "desktop entry moved to shell/ — root must not claim lib/main.dart.");
+            "desktop entry lives in clients/flutter/shell — core must not claim lib/main.dart.");
         Assert.False(
             Directory.Exists(Path.Combine(clientDirectory, FlutterHostingExtensions.DefaultDeviceTarget)),
-            "desktop runner moved to shell/ — root must not claim windows/.");
+            "desktop runner lives in clients/flutter/shell — core must not claim windows/.");
         var pubspec = await File.ReadAllTextAsync(
             Path.Combine(clientDirectory, "pubspec.yaml"),
             cancellationToken).ConfigureAwait(true);

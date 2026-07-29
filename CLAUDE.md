@@ -102,9 +102,8 @@ project; the root gate is what permits a completion claim.
 Touching `clients/` adds:
 
 ```powershell
-cd clients/digitalbrain_wire          ; dart test
-cd clients/digitalbrain_flutter       ; dart analyze ; dart test
-cd clients/digitalbrain_flutter/shell ; flutter analyze ; flutter test ; flutter build windows
+cd clients/flutter/core  ; dart analyze ; dart test
+cd clients/flutter/shell ; flutter analyze ; flutter test ; flutter build windows
 ```
 
 Dart never sole-owns shell or scene semantics; the root gate is domain truth. Adding an `[Alias]`

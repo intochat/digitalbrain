@@ -58,7 +58,7 @@ One assumption is load-bearing and unmeasured: **that a model can reliably emit 
 src/       published packages: core/ (framework) and modules/ (IModule domains),
            plus the publish gate that polices them
 os/        the product: silo, MCP server, the assistant neuron, AppHost
-clients/   Flutter shell and the Dart wire package
+clients/   flutter/core (pure Dart edge) and flutter/shell (Material chrome)
 tests/     fixtures/ — shared test subjects and their scaffolding AppHosts
 ```
 

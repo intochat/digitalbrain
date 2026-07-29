@@ -92,14 +92,7 @@ packages:
   digitalbrain_flutter:
     dependency: "direct main"
     description:
-      path: ".."
-      relative: true
-    source: path
-    version: "0.1.0"
-  digitalbrain_wire:
-    dependency: transitive
-    description:
-      path: "../../digitalbrain_wire"
+      path: "../core"
       relative: true
     source: path
     version: "0.1.0"

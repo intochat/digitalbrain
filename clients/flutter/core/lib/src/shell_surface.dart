@@ -1,4 +1,4 @@
-import 'package:digitalbrain_wire/digitalbrain_wire.dart';
+import 'ui_edge_models.dart';
 
 final class SceneViewModel {
   const SceneViewModel({

@@ -1,12 +1,12 @@
 import 'dart:convert';
 
-import 'package:digitalbrain_wire/digitalbrain_wire.dart';
+import 'ui_edge_models.dart';
 
-final class SseSceneOpenedParser {
+final class SseChatDeltaParser {
   String? _dataLine;
   String? _eventName;
 
-  Iterable<SceneOpenedEvent> addLine(String line) sync* {
+  Iterable<ChatDelta> addLine(String line) sync* {
     if (line.startsWith(':')) {
       return;
     }
@@ -26,11 +26,11 @@ final class SseSceneOpenedParser {
     }
   }
 
-  Iterable<SceneOpenedEvent> flush() sync* {
+  Iterable<ChatDelta> flush() sync* {
     yield* _emitBuffered();
   }
 
-  Iterable<SceneOpenedEvent> _emitBuffered() sync* {
+  Iterable<ChatDelta> _emitBuffered() sync* {
     final data = _dataLine;
     final name = _eventName;
     _dataLine = null;
@@ -39,7 +39,7 @@ final class SseSceneOpenedParser {
     if (data == null) {
       return;
     }
-    if (name != 'scene-opened') {
+    if (name != 'chat-delta') {
       return;
     }
 
@@ -49,13 +49,13 @@ final class SseSceneOpenedParser {
     }
   }
 
-  static SceneOpenedEvent? _decode(String payload) {
+  static ChatDelta? _decode(String payload) {
     try {
       final decoded = jsonDecode(payload);
       if (decoded is! Map) {
         return null;
       }
-      return SceneOpenedEvent.fromJson(Map<String, Object?>.from(decoded));
+      return ChatDelta.fromJson(Map<String, Object?>.from(decoded));
     } on FormatException {
       return null;
     } on TypeError {

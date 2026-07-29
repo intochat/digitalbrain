@@ -1,12 +1,12 @@
 import 'dart:convert';
 
-import 'package:digitalbrain_wire/digitalbrain_wire.dart';
+import 'ui_edge_models.dart';
 
-final class SseChatDeltaParser {
+final class SseChatTurnParser {
   String? _dataLine;
   String? _eventName;
 
-  Iterable<ChatDelta> addLine(String line) sync* {
+  Iterable<ChatTurnEvent> addLine(String line) sync* {
     if (line.startsWith(':')) {
       return;
     }
@@ -26,11 +26,11 @@ final class SseChatDeltaParser {
     }
   }
 
-  Iterable<ChatDelta> flush() sync* {
+  Iterable<ChatTurnEvent> flush() sync* {
     yield* _emitBuffered();
   }
 
-  Iterable<ChatDelta> _emitBuffered() sync* {
+  Iterable<ChatTurnEvent> _emitBuffered() sync* {
     final data = _dataLine;
     final name = _eventName;
     _dataLine = null;
@@ -39,7 +39,7 @@ final class SseChatDeltaParser {
     if (data == null) {
       return;
     }
-    if (name != 'chat-delta') {
+    if (name != 'chat-turn') {
       return;
     }
 
@@ -49,13 +49,13 @@ final class SseChatDeltaParser {
     }
   }
 
-  static ChatDelta? _decode(String payload) {
+  static ChatTurnEvent? _decode(String payload) {
     try {
       final decoded = jsonDecode(payload);
       if (decoded is! Map) {
         return null;
       }
-      return ChatDelta.fromJson(Map<String, Object?>.from(decoded));
+      return ChatTurnEvent.fromJson(Map<String, Object?>.from(decoded));
     } on FormatException {
       return null;
     } on TypeError {
