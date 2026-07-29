@@ -11,7 +11,6 @@ namespace DigitalBrain.Aspire.Hosting;
 public sealed class DigitalBrainBuilder
 {
     private readonly IDistributedApplicationBuilder _builder;
-    private readonly List<string> _configuredFeatures = [];
     private readonly List<ModuleId> _modules = [];
     private readonly List<DigitalBrainModuleProjection> _projections = [];
     private readonly List<IResource> _startupDependencies = [];
@@ -35,8 +34,6 @@ public sealed class DigitalBrainBuilder
     internal string Name { get; }
 
     internal IResourceBuilder<AzureBlobStorageResource> Journal { get; }
-
-    internal IReadOnlyList<string> ConfiguredFeatures => _configuredFeatures;
 
     internal IReadOnlyList<ModuleId> Modules => _modules;
 
@@ -78,16 +75,6 @@ public sealed class DigitalBrainBuilder
         }
 
         _projections.Add(projection);
-    }
-
-    internal void ConfigureFeature(string feature)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(feature);
-
-        if (!_configuredFeatures.Contains(feature, StringComparer.Ordinal))
-        {
-            _configuredFeatures.Add(feature);
-        }
     }
 
     internal void RequireHealthyBeforeStart(IResource dependency)

@@ -7,5 +7,4 @@ namespace DigitalBrain.Chat;
 public sealed record UserMessaged(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] NeuronId Chat,
-    [property: Id(2)] string Text,
-    [property: Id(3)] IReadOnlyList<ChatTurn> Transcript) : Synapse;
+    [property: Id(2)] string Text) : Synapse;

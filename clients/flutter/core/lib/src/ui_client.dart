@@ -102,23 +102,6 @@ final class DigitalBrainUiClient {
     }
   }
 
-  Future<void> sendMessage({
-    required String chatName,
-    required String text,
-  }) async {
-    final uri = baseUri.replace(path: '/chats/$chatName/messages');
-    final response = await _http.post(
-      uri,
-      headers: {'content-type': 'application/json'},
-      body: jsonEncode(SendMessageRequest(text: text).toJson()),
-    );
-    if (response.statusCode != 202) {
-      throw StateError(
-        'send-message failed: ${response.statusCode} ${response.body}',
-      );
-    }
-  }
-
   Stream<ChatDelta> streamMessage({
     required String chatName,
     required String text,

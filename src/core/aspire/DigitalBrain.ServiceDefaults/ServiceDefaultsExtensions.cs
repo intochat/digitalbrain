@@ -27,13 +27,6 @@ public static class ServiceDefaultsExtensions
         ConfigureOpenTelemetry(builder);
         AddDefaultHealthChecks(builder);
 
-        builder.Services.AddServiceDiscovery();
-        builder.Services.ConfigureHttpClientDefaults(http =>
-        {
-            http.AddStandardResilienceHandler();
-            http.AddServiceDiscovery();
-        });
-
         return builder;
     }
 

@@ -24,8 +24,6 @@ public static class UiHttpContract
 
     public const string SceneOpenedEvent = "scene-opened";
 
-    public const string SendMessagePath = "/chats/{chatName}/messages";
-
     public const string StreamMessagePath = "/chats/{chatName}/messages/stream";
 
     public const string ChatEventsPath = "/chats/{chatName}/events";

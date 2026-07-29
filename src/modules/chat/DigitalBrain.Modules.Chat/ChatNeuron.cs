@@ -120,7 +120,7 @@ internal sealed class ChatNeuron :
         Remember(message.CommandId, message.Text);
         Remember(new ChatTurn(FromUser: true, message.Text));
 
-        return EmitAsync(new UserMessaged(message.CommandId, Id, message.Text, Turns()));
+        return EmitAsync(new UserMessaged(message.CommandId, Id, message.Text));
     }
 
     private void Remember(CommandId commandId, string text)

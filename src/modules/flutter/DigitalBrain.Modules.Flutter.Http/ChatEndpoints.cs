@@ -11,29 +11,6 @@ internal static class ChatEndpoints
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints.MapPost(
-            UiHttpContract.SendMessagePath,
-            static async Task<IResult> (
-                string chatName,
-                SendMessageRequest request,
-                IDigitalBrain brain,
-                CancellationToken cancellationToken) =>
-            {
-                ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
-                ArgumentNullException.ThrowIfNull(request);
-                ArgumentNullException.ThrowIfNull(brain);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (string.IsNullOrWhiteSpace(request.Text))
-                {
-                    return Results.BadRequest();
-                }
-
-                await brain.Get<IChat>(chatName).Send(new SendMessage(CommandId.New(), request.Text));
-
-                return Results.Accepted();
-            });
-
-        endpoints.MapPost(
             UiHttpContract.StreamMessagePath,
             static async Task (
                 HttpContext http,

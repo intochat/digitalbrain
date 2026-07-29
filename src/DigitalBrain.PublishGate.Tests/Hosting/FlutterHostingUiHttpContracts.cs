@@ -42,11 +42,7 @@ public sealed class FlutterHostingUiHttpContracts
         var environment = await FlutterHostingProjectionSupport.EnvironmentOf(ui).ConfigureAwait(true);
         FlutterHostingProjectionSupport.AssertClientSafeUIProductEnvironment(
             environment,
-            [FlutterModule.Id.Value, AIModule.Id.Value],
-            [AIHostingExtensions.Gemma4Feature]);
-        Assert.Equal(
-            AIHostingExtensions.Gemma4Feature,
-            environment["DigitalBrain__ConfiguredFeatures__0"]?.ToString());
+            [FlutterModule.Id.Value, AIModule.Id.Value]);
         Assert.Equal(
             "ui-owner",
             environment[FlutterHostingExtensions.OwnerEnvironmentVariable]?.ToString());

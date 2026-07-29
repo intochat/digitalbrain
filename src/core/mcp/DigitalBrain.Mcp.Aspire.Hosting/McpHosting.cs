@@ -34,7 +34,6 @@ internal static class McpProviderHosting
         }
 
         projection.Add(definition, application.Register(definition));
-        module.ConfigureFeature(definition.Key);
     }
 
     private static McpApplicationParameters GetOrAddApplicationParameters(IDistributedApplicationBuilder builder)

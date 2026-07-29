@@ -85,7 +85,7 @@ public sealed class AIProviderConfiguration
         var builder = new CompositionSiloBuilder(services, configuration);
         var module = (ICompiledModule)new AIModule();
 
-        DigitalBrainRuntime.Add(builder, siloLabel: null, [module]);
+        DigitalBrainRuntime.Add(builder, [module]);
         return services.BuildServiceProvider();
     }
 

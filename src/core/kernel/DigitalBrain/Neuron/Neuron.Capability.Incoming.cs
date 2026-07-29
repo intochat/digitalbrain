@@ -6,12 +6,11 @@ public abstract partial class Neuron
 {
     internal async Task RecordStreamedCapabilityRequestAsync(
         SynapseDelivery delivery,
-        GrainId? source,
-        GrainId? delegatedSource = null)
+        GrainId? source)
     {
         ArgumentNullException.ThrowIfNull(delivery);
 
-        RequireAuthorizedCapabilityDelivery(delivery, source, delegatedSource);
+        RequireAuthorizedCapabilityDelivery(delivery, source);
 
         var incomingCheckpoint = _incoming.Checkpoint();
 
@@ -35,8 +34,7 @@ public abstract partial class Neuron
 
     internal async Task<CapabilityTurn> BeginIncomingCapabilityRequestAsync(
         SynapseDelivery delivery,
-        GrainId? source,
-        GrainId? delegatedSource = null)
+        GrainId? source)
     {
         ArgumentNullException.ThrowIfNull(delivery);
 
@@ -46,7 +44,7 @@ public abstract partial class Neuron
                 $"Neuron '{Id}' cannot begin a capability request while it is already handling '{_handling.SynapseId}'.");
         }
 
-        RequireAuthorizedCapabilityDelivery(delivery, source, delegatedSource);
+        RequireAuthorizedCapabilityDelivery(delivery, source);
 
         var turn = new CapabilityTurn(
             _outbox.Count,
@@ -80,8 +78,7 @@ public abstract partial class Neuron
 
     private void RequireAuthorizedCapabilityDelivery(
         SynapseDelivery delivery,
-        GrainId? source,
-        GrainId? delegatedSource)
+        GrainId? source)
     {
         if (delivery.Synapse is not CapabilityRequested request || request.Target != Id)
         {
@@ -89,13 +86,11 @@ public abstract partial class Neuron
                 $"The capability request delivery does not target neuron '{Id}'.");
         }
 
-        var sourceMatches = delegatedSource is { } expectedDelegate
-            ? source == expectedDelegate
-            : source is not null
-                && NeuronId.FromGrainKey(
-                    source.Value.Type.ToString()
-                        ?? throw new InvalidOperationException("The capability caller has no grain type."),
-                    source.Value.Key.ToString()) == delivery.Caller;
+        var sourceMatches = source is not null
+            && NeuronId.FromGrainKey(
+                source.Value.Type.ToString()
+                    ?? throw new InvalidOperationException("The capability caller has no grain type."),
+                source.Value.Key.ToString()) == delivery.Caller;
 
         if (!sourceMatches)
         {

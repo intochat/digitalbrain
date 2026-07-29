@@ -116,98 +116,8 @@ public abstract partial class Neuron
         _turnCheckpoint = checkpoint with { InboundCommitted = true };
     }
 
-    private DelegationCheckpoint SnapshotDelegations()
-        => new(
-            _delegations.ToDictionary(
-                entry => entry.Key,
-                entry => entry.Value.ToArray()),
-            [.. _delegationConsumed],
-            [.. _delegationTerminals]);
-
-    private void RestoreDelegations(DelegationCheckpoint checkpoint)
-    {
-        foreach (var key in _delegations.Select(entry => entry.Key).ToArray())
-        {
-            _delegations.Remove(key);
-        }
-
-        foreach (var entry in checkpoint.States)
-        {
-            _delegations[entry.Key] = entry.Value.ToArray();
-        }
-
-        Replace(_delegationConsumed, checkpoint.Consumed);
-        Replace(_delegationTerminals, checkpoint.Terminals);
-    }
-
-    private static void Replace(IDurableList<Guid> target, IReadOnlyList<Guid> values)
-    {
-        Discard(target, 0);
-
-        foreach (var value in values)
-        {
-            target.Add(value);
-        }
-    }
-
     private Synapse Snapshot(Synapse synapse)
         => _synapses.Deserialize(_synapses.SerializeToArray(synapse));
-
-    private void MakeRoomForDelegation()
-    {
-        while (_delegations.Count >= MaximumRememberedDelegations)
-        {
-            if (TryEvictOldest(_delegationTerminals, ProtectedTerminalDelegations))
-            {
-                continue;
-            }
-
-            if (TryEvictOldest(_delegationConsumed, ProtectedConsumedDelegations))
-            {
-                continue;
-            }
-
-            break;
-        }
-
-        if (_delegations.Count >= MaximumRememberedDelegations)
-        {
-            throw new InvalidOperationException(
-                $"Neuron '{Id}' has reached its limit of {MaximumRememberedDelegations} remembered capability delegations, with no safely evictable terminal or consumed history. Resolve an issued delegation or finish another consumed delegation before minting another.");
-        }
-    }
-
-    private bool TryEvictOldest(IDurableList<Guid> retentionOrder, int protectedDelegations)
-    {
-        if (retentionOrder.Count <= protectedDelegations)
-        {
-            return false;
-        }
-
-        var evicted = retentionOrder[0];
-        retentionOrder.RemoveAt(0);
-
-        if (!_delegations.Remove(evicted))
-        {
-            throw new InvalidOperationException(
-                "The durable capability delegation retention order references missing state.");
-        }
-
-        return true;
-    }
-
-    private static int IndexOf(IDurableList<Guid> retentionOrder, Guid identity)
-    {
-        for (var index = 0; index < retentionOrder.Count; index++)
-        {
-            if (retentionOrder[index] == identity)
-            {
-                return index;
-            }
-        }
-
-        return -1;
-    }
 
     internal readonly record struct CapabilityTurn(
         int CommittedOutbox,
@@ -216,11 +126,6 @@ public abstract partial class Neuron
         SynapseDelivery? PreviousHandling,
         int PreviousDepth,
         TurnCheckpoint? PreviousCheckpoint);
-
-    private readonly record struct DelegationCheckpoint(
-        IReadOnlyDictionary<Guid, byte[]> States,
-        IReadOnlyList<Guid> Consumed,
-        IReadOnlyList<Guid> Terminals);
 
     internal readonly record struct TurnCheckpoint(
         int CommittedOutbox,

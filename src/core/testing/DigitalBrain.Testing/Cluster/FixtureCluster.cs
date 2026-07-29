@@ -79,21 +79,6 @@ internal sealed class FixtureCluster : IAsyncDisposable
             edgeGeneration);
     }
 
-    internal static string LabelOf(string siloName)
-    {
-        var separator = siloName.LastIndexOf('_', StringComparison.Ordinal);
-        var instance = short.Parse(
-            siloName.AsSpan(separator + 1),
-            System.Globalization.CultureInfo.InvariantCulture);
-
-        return (instance % SiloCount) switch
-        {
-            0 => "alpha",
-            1 => "beta",
-            _ => "gamma",
-        };
-    }
-
     internal async Task RestartHostAsync(NeuronId neuron, CancellationToken cancellationToken)
     {
         var cluster = _cluster
@@ -156,7 +141,7 @@ internal sealed class FixtureCluster : IAsyncDisposable
             silo.Configuration["DigitalBrain:Security:StateProtectionKey"] =
                 Convert.ToBase64String(new byte[32]);
 
-            DigitalBrainRuntime.Add(silo, FixtureCluster.LabelOf(options.SiloName), _modules);
+            DigitalBrainRuntime.Add(silo, _modules);
             silo.Services.AddSingleton(new ReminderSourceAllowlist([TestReminderDeliveryService.SourceType]));
             silo.Services.AddGrainService<TestReminderDeliveryService>();
             silo.Services.AddSingleton<

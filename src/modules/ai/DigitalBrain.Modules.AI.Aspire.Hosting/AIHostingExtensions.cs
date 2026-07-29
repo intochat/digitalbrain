@@ -30,8 +30,7 @@ public static class AIHostingExtensions
     public static DigitalBrainModuleBuilder<AIModule> WithLlm<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
         where TModel : class, ILLM
     {
-        var state = State(module);
-        module.ConfigureFeature(state.Add<TModel>());
+        State(module).Add<TModel>();
         return module;
     }
 

@@ -56,14 +56,9 @@ public sealed class HostingProjectionContracts
             .EnvironmentOf(client.Resource)
             .ConfigureAwait(true);
         var clientEnvironmentKeys = clientEnvironment.Keys.ToHashSet(StringComparer.Ordinal);
-        var configuredFeaturePrefix = ConfigurationEnvironment(
-            DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey);
 
         Assert.All(SiloOnlyEnvironmentKeys, key => Assert.Contains(key, siloEnvironment));
         Assert.All(SiloOnlyEnvironmentKeys, key => Assert.DoesNotContain(key, clientEnvironmentKeys));
-        Assert.DoesNotContain(
-            siloEnvironment,
-            key => key.StartsWith(configuredFeaturePrefix, StringComparison.Ordinal));
         Assert.Equal(
             AIModule.Id.Value,
             clientEnvironment[
@@ -80,11 +75,6 @@ public sealed class HostingProjectionContracts
                 $"{ConfigurationEnvironment(DigitalBrainHostingExtensions.ModulesConfigurationKey)}__2"]
                 ?.ToString());
         Assert.Equal(
-            AIHostingExtensions.Llama32Feature,
-            clientEnvironment[
-                $"{ConfigurationEnvironment(DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey)}__0"]
-                ?.ToString());
-        Assert.Equal(
             bool.TrueString,
             (await FlutterHostingProjectionSupport.EnvironmentOf(silo.Resource).ConfigureAwait(true))[
                 "DigitalBrain__AI__Telemetry__EnableSensitiveData"]
@@ -92,16 +82,9 @@ public sealed class HostingProjectionContracts
         Assert.DoesNotContain(
             "DigitalBrain__AI__Telemetry__EnableSensitiveData",
             clientEnvironmentKeys);
-        Assert.Equal(
-            "google.gmail",
-            clientEnvironment[
-                $"{ConfigurationEnvironment(DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey)}__1"]
-                ?.ToString());
-        Assert.Equal(
-            "salesforce",
-            clientEnvironment[
-                $"{ConfigurationEnvironment(DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey)}__2"]
-                ?.ToString());
+        Assert.DoesNotContain(
+            clientEnvironmentKeys,
+            key => key.StartsWith("DigitalBrain__ConfiguredFeatures__", StringComparison.Ordinal));
 
         Assert.Contains(
             silo.Resource.Annotations.OfType<WaitAnnotation>(),

@@ -93,15 +93,9 @@ public sealed partial class DispatchManifestGenerator
         source.AppendLine("    {");
         source.AppendLine("        internal static global::Orleans.Hosting.ISiloBuilder AddDigitalBrain(");
         source.AppendLine("            this global::Orleans.Hosting.ISiloBuilder builder)");
-        source.AppendLine("            => AddDigitalBrain(builder, siloLabel: null);");
-        source.AppendLine();
-        source.AppendLine("        internal static global::Orleans.Hosting.ISiloBuilder AddDigitalBrain(");
-        source.AppendLine("            this global::Orleans.Hosting.ISiloBuilder builder,");
-        source.AppendLine("            string? siloLabel)");
         source.AppendLine("        {");
         source.AppendLine("            global::DigitalBrain.Kernel.DigitalBrainRuntime.Add(");
         source.AppendLine("                builder,");
-        source.AppendLine("                siloLabel,");
         source.AppendLine("                global::DigitalBrain.Generated.CompiledModuleCatalog.Modules);");
         source.AppendLine();
         source.AppendLine("            return builder;");

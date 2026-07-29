@@ -110,8 +110,7 @@ internal static class FlutterHostingProjectionSupport
 
     public static void AssertClientSafeUIProductEnvironment(
         IReadOnlyDictionary<string, object> environment,
-        IReadOnlyList<string> modules,
-        IReadOnlyList<string> configuredFeatures)
+        IReadOnlyList<string> modules)
     {
         var productKeys = environment.Keys
             .Where(static key =>
@@ -129,11 +128,6 @@ internal static class FlutterHostingProjectionSupport
             expected.Add(
                 $"{DigitalBrainHostingExtensions.ModulesConfigurationKey.Replace(":", "__", StringComparison.Ordinal)}__{index}");
         }
-        for (var index = 0; index < configuredFeatures.Count; index++)
-        {
-            expected.Add(
-                $"{DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey.Replace(":", "__", StringComparison.Ordinal)}__{index}");
-        }
 
         Assert.Equal(expected, productKeys);
         for (var index = 0; index < modules.Count; index++)
@@ -142,14 +136,6 @@ internal static class FlutterHostingProjectionSupport
                 modules[index],
                 environment[
                     $"{DigitalBrainHostingExtensions.ModulesConfigurationKey.Replace(":", "__", StringComparison.Ordinal)}__{index}"]
-                    ?.ToString());
-        }
-        for (var index = 0; index < configuredFeatures.Count; index++)
-        {
-            Assert.Equal(
-                configuredFeatures[index],
-                environment[
-                    $"{DigitalBrainHostingExtensions.ConfiguredFeaturesConfigurationKey.Replace(":", "__", StringComparison.Ordinal)}__{index}"]
                     ?.ToString());
         }
     }

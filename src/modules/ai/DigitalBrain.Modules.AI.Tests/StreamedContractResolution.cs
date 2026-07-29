@@ -41,14 +41,13 @@ public sealed class StreamedContractResolution
         Assert.True(CapabilityInvocation.IsRequest(Respond, dispatched));
     }
 
-    [Fact(DisplayName = "reminders, outbox drain and the delegation authority callback are not capability requests")]
+    [Fact(DisplayName = "reminders and outbox drain are not capability requests")]
     public void FrameworkCallsAreNotCapabilityRequests()
     {
         MethodInfo[] frameworkMethods =
         [
             typeof(IRemindable).GetMethod(nameof(IRemindable.ReceiveReminder))!,
             typeof(IOutboxDrain).GetMethod(nameof(IOutboxDrain.Drain))!,
-            typeof(ICapabilityDelegationAuthority).GetMethod(nameof(ICapabilityDelegationAuthority.RedeemAsync))!,
         ];
 
         foreach (var frameworkMethod in frameworkMethods)

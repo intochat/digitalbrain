@@ -62,7 +62,7 @@ public sealed class DurablePayloadProtectionStartup
         var builder = new CompositionSiloBuilder(services, configuration);
         var module = (ICompiledModule)new AIModule();
         var compositionException = Record.Exception(() =>
-            DigitalBrainRuntime.Add(builder, siloLabel: null, [module]));
+            DigitalBrainRuntime.Add(builder, [module]));
 
         if (!resolveProtector || compositionException is not null)
         {

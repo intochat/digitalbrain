@@ -1,4 +1,5 @@
 using DigitalBrain.Flutter;
+using DigitalBrain.Testing;
 using DigitalBrain.Time;
 using Xunit;
 
@@ -11,6 +12,8 @@ public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
     private const string ModelName = "assistant";
     private const string PaneReply = "hello from pane";
     private const string PanePrompt = "ping";
+    private const string SecondSceneKey = "settings";
+    private const string SecondSceneTitle = "Settings";
 
     private static readonly TimeSpan CountdownDuration = TimeSpan.FromMinutes(5);
 
@@ -40,14 +43,14 @@ public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
             ShellName,
             [
                 (OpenHome.SceneKey, OpenHome.SceneTitle),
-                (AccountEnrichmentSurface.SceneKey, AccountEnrichmentSurface.SceneTitle),
+                (SecondSceneKey, SecondSceneTitle),
             ],
             cancellationToken);
 
         var first = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         var second = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(OpenHome.SceneKey, first.Synapse.SceneKey);
-        Assert.Equal(AccountEnrichmentSurface.SceneKey, second.Synapse.SceneKey);
+        Assert.Equal(SecondSceneKey, second.Synapse.SceneKey);
         Assert.True(second.Sequence > first.Sequence);
     }
 
@@ -74,21 +77,6 @@ public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
         var reloaded = await countdown.Reference.Read();
         Assert.Equal(started.Generation, reloaded.Generation);
         Assert.Equal(started.Revision, reloaded.Revision);
-    }
-
-    [Fact(DisplayName =
-        "AccountEnrichmentSurface is OS-scene-only — opens enrichment scene; not multi-module process")]
-    public async Task AccountEnrichmentSurfaceOpensEnrichmentSceneOnly()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var shell = test.Neuron<IShell>(ShellName);
-
-        await new AccountEnrichmentSurface().RunAsync(test.Client, ShellName, cancellationToken);
-
-        var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
-        Assert.Equal(AccountEnrichmentSurface.SceneKey, opened.Synapse.SceneKey);
-        Assert.Equal(AccountEnrichmentSurface.SceneTitle, opened.Synapse.Title);
     }
 
     [Fact(DisplayName = "AiPaneSurface is multi-module — Flutter shell scene + typed ILlama32 respond")]
