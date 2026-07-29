@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -8,10 +7,6 @@ namespace DigitalBrain.ProductTests;
 
 public sealed class LiveProduct
 {
-    private static readonly TimeSpan CommandTimeout = TimeSpan.FromMinutes(5);
-    private const string AppHostPath = "os/DigitalBrain.OS.AppHost/DigitalBrain.OS.AppHost.csproj";
-    private const string McpResource = "digitalbrain-mcp";
-
     [Fact(
         Explicit = true,
         Timeout = 900_000,
@@ -20,47 +15,47 @@ public sealed class LiveProduct
     public async Task RealChatIsObservable()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var repository = FindRepositoryRoot();
+        var repository = LiveProductAspire.FindRepositoryRoot();
         var chatName = $"product-verification-{Guid.NewGuid():N}";
         var commandId = Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
         const string prompt = "Tell me your name in one short sentence.";
         var started = false;
 
-        await RunAspireAsync(
+        await LiveProductAspire.RunAsync(
             repository,
             allowFailure: true,
             CancellationToken.None,
             "stop",
             "--apphost",
-            AppHostPath,
+            LiveProductAspire.AppHostPath,
             "--non-interactive",
             "--nologo");
 
         try
         {
-            await RunAspireAsync(
+            await LiveProductAspire.RunAsync(
                 repository,
                 allowFailure: false,
                 cancellationToken,
                 "start",
                 "--apphost",
-                AppHostPath,
+                LiveProductAspire.AppHostPath,
                 "--format",
                 "Json",
                 "--non-interactive",
                 "--nologo");
             started = true;
 
-            foreach (var resource in new[] { "silo", McpResource, "brain-ai-gemma4" })
+            foreach (var resource in new[] { "silo", LiveProductAspire.McpResource, "brain-ai-gemma4" })
             {
-                await RunAspireAsync(
+                await LiveProductAspire.RunAsync(
                     repository,
                     allowFailure: false,
                     cancellationToken,
                     "wait",
                     resource,
                     "--apphost",
-                    AppHostPath,
+                    LiveProductAspire.AppHostPath,
                     "--timeout",
                     "300",
                     "--non-interactive",
@@ -80,11 +75,11 @@ public sealed class LiveProduct
                 "send_chat_message",
                 sendInput,
                 cancellationToken);
-            var response = RequiredString(result, "response");
-            var correlationId = RequiredString(result, "correlationId");
+            var response = LiveProductJson.RequiredString(result, "response");
+            var correlationId = LiveProductJson.RequiredString(result, "correlationId");
 
             Assert.False(string.IsNullOrWhiteSpace(response));
-            Assert.True(Guid.TryParse(RequiredString(result, "commandId"), out _));
+            Assert.True(Guid.TryParse(LiveProductJson.RequiredString(result, "commandId"), out _));
             Assert.True(Guid.TryParse(correlationId, out _));
 
             var retried = await CallToolAsync(
@@ -92,26 +87,26 @@ public sealed class LiveProduct
                 "send_chat_message",
                 sendInput,
                 cancellationToken);
-            Assert.Equal(response, RequiredString(retried, "response"));
-            Assert.Equal(correlationId, RequiredString(retried, "correlationId"));
+            Assert.Equal(response, LiveProductJson.RequiredString(retried, "response"));
+            Assert.Equal(correlationId, LiveProductJson.RequiredString(retried, "correlationId"));
 
             var transcript = await CallToolAsync(
                 repository,
                 "read_chat_transcript",
                 JsonSerializer.Serialize(new { chatName }),
                 cancellationToken);
-            var turns = RequiredArray(transcript, "turns");
+            var turns = LiveProductJson.RequiredArray(transcript, "turns");
             Assert.Collection(
                 turns,
                 turn =>
                 {
-                    Assert.Equal("you", RequiredString(turn, "speaker"));
-                    Assert.Equal(prompt, RequiredString(turn, "text"));
+                    Assert.Equal("you", LiveProductJson.RequiredString(turn, "speaker"));
+                    Assert.Equal(prompt, LiveProductJson.RequiredString(turn, "text"));
                 },
                 turn =>
                 {
-                    Assert.Equal("brain", RequiredString(turn, "speaker"));
-                    Assert.Equal(response, RequiredString(turn, "text"));
+                    Assert.Equal("brain", LiveProductJson.RequiredString(turn, "speaker"));
+                    Assert.Equal(response, LiveProductJson.RequiredString(turn, "text"));
                 });
 
             var journal = await CallToolAsync(
@@ -126,38 +121,38 @@ public sealed class LiveProduct
                         afterSequence = 0,
                     }),
                 cancellationToken);
-            var entries = RequiredArray(journal, "entries");
+            var entries = LiveProductJson.RequiredArray(journal, "entries");
             Assert.Contains(
                 entries,
                 entry => string.Equals(
-                    RequiredString(entry, "synapse"),
+                    LiveProductJson.RequiredString(entry, "synapse"),
                     "CapabilityRequested",
                     StringComparison.Ordinal));
             Assert.Contains(
                 entries,
                 entry => string.Equals(
-                    RequiredString(entry, "synapse"),
+                    LiveProductJson.RequiredString(entry, "synapse"),
                     "CapabilityCompleted",
                     StringComparison.Ordinal)
                     || string.Equals(
-                        RequiredString(entry, "synapse"),
+                        LiveProductJson.RequiredString(entry, "synapse"),
                         "CapabilityAbandoned",
                         StringComparison.Ordinal));
 
             var chatFacts = entries
-                .Where(entry => RequiredString(entry, "synapse") is "UserMessaged" or "AssistantResponded")
+                .Where(entry => LiveProductJson.RequiredString(entry, "synapse") is "UserMessaged" or "AssistantResponded")
                 .ToArray();
             Assert.Collection(
                 chatFacts,
                 entry =>
                 {
-                    Assert.Equal("UserMessaged", RequiredString(entry, "synapse"));
-                    Assert.Equal(correlationId, RequiredString(entry, "correlation"));
+                    Assert.Equal("UserMessaged", LiveProductJson.RequiredString(entry, "synapse"));
+                    Assert.Equal(correlationId, LiveProductJson.RequiredString(entry, "correlation"));
                 },
                 entry =>
                 {
-                    Assert.Equal("AssistantResponded", RequiredString(entry, "synapse"));
-                    Assert.Equal(correlationId, RequiredString(entry, "correlation"));
+                    Assert.Equal("AssistantResponded", LiveProductJson.RequiredString(entry, "synapse"));
+                    Assert.Equal(correlationId, LiveProductJson.RequiredString(entry, "correlation"));
                 });
 
             var activeNeurons = await CallToolAsync(
@@ -168,9 +163,9 @@ public sealed class LiveProduct
             var activeChat = activeNeurons
                 .AsArray()
                 .Single(neuron =>
-                    string.Equals(RequiredString(neuron, "grainType"), "chat", StringComparison.Ordinal)
+                    string.Equals(LiveProductJson.RequiredString(neuron, "grainType"), "chat", StringComparison.Ordinal)
                     && string.Equals(
-                        RequiredString(neuron, "identity"),
+                        LiveProductJson.RequiredString(neuron, "identity"),
                         $"dev/{chatName}",
                         StringComparison.Ordinal));
             Assert.NotNull(activeChat);
@@ -180,39 +175,39 @@ public sealed class LiveProduct
                 StringComparison.OrdinalIgnoreCase);
 
             var span = await WaitForGenAiSpanAsync(repository, prompt, cancellationToken);
-            var attributes = RequiredObject(span, "attributes");
+            var attributes = LiveProductJson.RequiredObject(span, "attributes");
 
-            Assert.Equal("chat", RequiredString(attributes, "gen_ai.operation.name"));
-            Assert.Equal("ollama", RequiredString(attributes, "gen_ai.provider.name"));
+            Assert.Equal("chat", LiveProductJson.RequiredString(attributes, "gen_ai.operation.name"));
+            Assert.Equal("ollama", LiveProductJson.RequiredString(attributes, "gen_ai.provider.name"));
             Assert.Contains(
                 "gemma4",
-                RequiredString(attributes, "gen_ai.request.model"),
+                LiveProductJson.RequiredString(attributes, "gen_ai.request.model"),
                 StringComparison.OrdinalIgnoreCase);
-            Assert.True(RequiredLong(attributes, "gen_ai.usage.input_tokens") > 0);
-            Assert.True(RequiredLong(attributes, "gen_ai.usage.output_tokens") > 0);
+            Assert.True(LiveProductJson.RequiredLong(attributes, "gen_ai.usage.input_tokens") > 0);
+            Assert.True(LiveProductJson.RequiredLong(attributes, "gen_ai.usage.output_tokens") > 0);
             Assert.False(
                 string.IsNullOrWhiteSpace(
-                    RequiredString(attributes, "gen_ai.response.finish_reasons")));
+                    LiveProductJson.RequiredString(attributes, "gen_ai.response.finish_reasons")));
             Assert.Contains(
                 prompt,
-                RequiredString(attributes, "gen_ai.input.messages"),
+                LiveProductJson.RequiredString(attributes, "gen_ai.input.messages"),
                 StringComparison.Ordinal);
             Assert.Contains(
                 response,
-                RequiredString(attributes, "gen_ai.output.messages"),
+                LiveProductJson.RequiredString(attributes, "gen_ai.output.messages"),
                 StringComparison.Ordinal);
         }
         finally
         {
             if (started)
             {
-                await RunAspireAsync(
+                await LiveProductAspire.RunAsync(
                     repository,
                     allowFailure: true,
                     CancellationToken.None,
                     "stop",
                     "--apphost",
-                    AppHostPath,
+                    LiveProductAspire.AppHostPath,
                     "--non-interactive",
                     "--nologo");
             }
@@ -225,21 +220,21 @@ public sealed class LiveProduct
         string input,
         CancellationToken cancellationToken)
     {
-        var result = await RunAspireAsync(
+        var result = await LiveProductAspire.RunAsync(
             repository,
             allowFailure: false,
             cancellationToken,
             "mcp",
             "call",
-            McpResource,
+            LiveProductAspire.McpResource,
             tool,
             "--input",
             input,
             "--apphost",
-            AppHostPath,
+            LiveProductAspire.AppHostPath,
             "--non-interactive",
             "--nologo");
-        return ParseJson(result.StandardOutput);
+        return LiveProductJson.Parse(result.StandardOutput);
     }
 
     private static async Task<JsonObject> WaitForGenAiSpanAsync(
@@ -249,14 +244,14 @@ public sealed class LiveProduct
     {
         for (var attempt = 0; attempt < 60; attempt++)
         {
-            var result = await RunAspireAsync(
+            var result = await LiveProductAspire.RunAsync(
                 repository,
                 allowFailure: false,
                 cancellationToken,
                 "otel",
                 "spans",
                 "--apphost",
-                AppHostPath,
+                LiveProductAspire.AppHostPath,
                 "--format",
                 "Json",
                 "--limit",
@@ -265,7 +260,7 @@ public sealed class LiveProduct
                 "gen_ai",
                 "--non-interactive",
                 "--nologo");
-            var spans = ParseJson(result.StandardOutput).AsArray();
+            var spans = LiveProductJson.Parse(result.StandardOutput).AsArray();
             var span = spans
                 .OfType<JsonObject>()
                 .FirstOrDefault(candidate =>
@@ -273,14 +268,14 @@ public sealed class LiveProduct
                     var attributes = candidate["attributes"] as JsonObject;
                     return attributes is not null
                         && string.Equals(
-                            OptionalString(attributes, "gen_ai.operation.name"),
+                            LiveProductJson.OptionalString(attributes, "gen_ai.operation.name"),
                             "chat",
                             StringComparison.Ordinal)
                         && string.Equals(
-                            OptionalString(attributes, "gen_ai.provider.name"),
+                            LiveProductJson.OptionalString(attributes, "gen_ai.provider.name"),
                             "ollama",
                             StringComparison.Ordinal)
-                        && OptionalString(attributes, "gen_ai.input.messages")
+                        && LiveProductJson.OptionalString(attributes, "gen_ai.input.messages")
                             ?.Contains(prompt, StringComparison.Ordinal) is true;
                 });
 
@@ -295,156 +290,4 @@ public sealed class LiveProduct
         throw new Xunit.Sdk.XunitException(
             "No content-rich Ollama GenAI chat span arrived within one minute.");
     }
-
-    private static async Task<CommandResult> RunAspireAsync(
-        string repository,
-        bool allowFailure,
-        CancellationToken cancellationToken,
-        params string[] arguments)
-    {
-        using var commandTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        commandTimeout.CancelAfter(CommandTimeout);
-
-        var start = new ProcessStartInfo("aspire")
-        {
-            WorkingDirectory = repository,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-        foreach (var argument in arguments)
-        {
-            start.ArgumentList.Add(argument);
-        }
-
-        using var process = new Process { StartInfo = start };
-        if (!process.Start())
-        {
-            throw new Xunit.Sdk.XunitException("The Aspire CLI process did not start.");
-        }
-
-        var standardOutput = process.StandardOutput.ReadToEndAsync(commandTimeout.Token);
-        var standardError = process.StandardError.ReadToEndAsync(commandTimeout.Token);
-
-        try
-        {
-            await process.WaitForExitAsync(commandTimeout.Token);
-        }
-        catch
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-            }
-
-            throw;
-        }
-
-        var result = new CommandResult(
-            process.ExitCode,
-            await standardOutput,
-            await standardError);
-
-        if (!allowFailure && result.ExitCode != 0)
-        {
-            throw new Xunit.Sdk.XunitException(
-                $"aspire {string.Join(' ', arguments)} exited with {result.ExitCode}.{Environment.NewLine}"
-                + result.StandardOutput
-                + Environment.NewLine
-                + result.StandardError);
-        }
-
-        return result;
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null
-               && !File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx")))
-        {
-            directory = directory.Parent;
-        }
-
-        return directory?.FullName
-            ?? throw new Xunit.Sdk.XunitException(
-                $"Could not find DigitalBrain.slnx above {AppContext.BaseDirectory}.");
-    }
-
-    private static JsonNode ParseJson(string output)
-    {
-        var lines = output.Split(
-            ["\r\n", "\n"],
-            StringSplitOptions.None);
-        var firstJsonLine = Array.FindIndex(
-            lines,
-            line =>
-            {
-                var trimmed = line.TrimStart();
-                return trimmed.StartsWith('{', StringComparison.Ordinal)
-                    || trimmed.StartsWith('[', StringComparison.Ordinal);
-            });
-
-        if (firstJsonLine < 0)
-        {
-            throw new Xunit.Sdk.XunitException(
-                $"The Aspire CLI did not return JSON.{Environment.NewLine}{output}");
-        }
-
-        return JsonNode.Parse(string.Join(Environment.NewLine, lines[firstJsonLine..]))
-            ?? throw new Xunit.Sdk.XunitException("The Aspire CLI returned JSON null.");
-    }
-
-    private static JsonArray RequiredArray(JsonNode? node, string property)
-        => node?[property] as JsonArray
-            ?? throw new Xunit.Sdk.XunitException(
-                $"Expected JSON array '{property}' in {node?.ToJsonString()}.");
-
-    private static JsonObject RequiredObject(JsonNode? node, string property)
-        => node?[property] as JsonObject
-            ?? throw new Xunit.Sdk.XunitException(
-                $"Expected JSON object '{property}' in {node?.ToJsonString()}.");
-
-    private static string RequiredString(JsonNode? node, string property)
-        => OptionalString(node, property)
-            ?? throw new Xunit.Sdk.XunitException(
-                $"Expected JSON string '{property}' in {node?.ToJsonString()}.");
-
-    private static string? OptionalString(JsonNode? node, string property)
-    {
-        var value = node?[property];
-        if (value is null)
-        {
-            return null;
-        }
-
-        return value is JsonValue jsonValue
-               && jsonValue.TryGetValue<string>(out var text)
-            ? text
-            : value.ToJsonString();
-    }
-
-    private static long RequiredLong(JsonNode? node, string property)
-    {
-        var value = node?[property];
-        if (value is JsonValue jsonValue
-            && jsonValue.TryGetValue<long>(out var number))
-        {
-            return number;
-        }
-
-        if (long.TryParse(OptionalString(node, property), CultureInfo.InvariantCulture, out number))
-        {
-            return number;
-        }
-
-        throw new Xunit.Sdk.XunitException(
-            $"Expected JSON integer '{property}' in {node?.ToJsonString()}.");
-    }
-
-    private sealed record CommandResult(
-        int ExitCode,
-        string StandardOutput,
-        string StandardError);
 }

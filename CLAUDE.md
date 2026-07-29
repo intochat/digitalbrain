@@ -170,7 +170,7 @@ Add only what you have reproduced.
 - **Reentrancy deadlock.** `DrainAsync` awaits `Deliver` inside the emitting neuron's turn and
   `NeuronConcurrency.RequireSerializedTurns` forbids reentrancy, so a handler calling back into the
   neuron that emitted its trigger **hangs**. Facts flow one way: `UserMessaged` carries the
-  transcript, the answer returns as a directed `AssistantAnswered`.
+  transcript, the answer returns as a directed `AssistantResponded`.
 - **No repository-root `Directory.Build.targets`.** Flutter's Windows native build walks into it and
   then needs empty stub props/targets under `clients/` to fence it off. Per-project targets only.
 - **`DOTNET_ROOT` breaks `aspire run` alone.** `dotnet build`/`test` resolve through the CLI, but the
