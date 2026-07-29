@@ -3,6 +3,7 @@ using DigitalBrain.AI;
 using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.AI;
+using Orleans.Runtime;
 using Xunit;
 
 namespace DigitalBrain.ModuleTests;
@@ -16,6 +17,9 @@ public partial interface ICountingStreamProbe : INeuron
 
     [Alias(nameof(DrainAnotherOwnersProbe))]
     Task DrainAnotherOwnersProbe(string foreignOwner, string probeName, int elements);
+
+    [Alias(nameof(BoundEnumerationIds))]
+    Task<Guid[]> BoundEnumerationIds();
 }
 
 public sealed class CountingStreamProbe : Neuron, ICountingStreamProbe
@@ -40,6 +44,9 @@ public sealed class CountingStreamProbe : Neuron, ICountingStreamProbe
         {
         }
     }
+
+    public Task<Guid[]> BoundEnumerationIds()
+        => Task.FromResult(BoundStreamedEnumerations.ToArray());
 }
 
 public sealed class StreamedClientAuthorization(ModuleFixture fixture)
@@ -116,4 +123,34 @@ public sealed class StreamedClientAuthorization(ModuleFixture fixture)
             () => test.Client.Get<ICountingStreamProbe>(CallerName)
                 .DrainAnotherOwnersProbe(foreignOwner.Id.Value, ProbeName, elements: 3));
     }
+
+    [Fact(DisplayName = "an unattributed caller is refused on MoveNext for an unbound enumeration id")]
+    public async Task UnattributedMoveNextOfAnUnboundEnumerationIsRefused()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        _ = test.Client.Get<ICountingStreamProbe>(ProbeName);
+
+        var extension = EnumerationExtension(test, ProbeName);
+
+        await Assert.ThrowsAsync<NeuronAuthorizationException>(async () =>
+            await extension.MoveNext<int>(Guid.NewGuid(), cancellationToken));
+    }
+
+    [Fact(DisplayName = "an unattributed caller is refused on DisposeAsync for an unbound enumeration id")]
+    public async Task UnattributedDisposeOfAnUnboundEnumerationIsRefused()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        _ = test.Client.Get<ICountingStreamProbe>(ProbeName);
+
+        var extension = EnumerationExtension(test, ProbeName);
+
+        await Assert.ThrowsAsync<NeuronAuthorizationException>(async () =>
+            await extension.DisposeAsync(Guid.NewGuid()));
+    }
+
+    private static IAsyncEnumerableGrainExtension EnumerationExtension(TestBrain test, string probeName)
+        => test.Cluster.Client.GetGrain<IAsyncEnumerableGrainExtension>(
+            NeuronId.For<ICountingStreamProbe>(test.Client.Owner, probeName).ToGrainId());
 }

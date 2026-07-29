@@ -127,9 +127,33 @@ public sealed class LiveProduct
                     }),
                 cancellationToken);
             var entries = RequiredArray(journal, "entries");
-            Assert.Collection(
+            Assert.Contains(
                 entries,
-                entry => Assert.Equal("UserMessaged", RequiredString(entry, "synapse")),
+                entry => string.Equals(
+                    RequiredString(entry, "synapse"),
+                    "CapabilityRequested",
+                    StringComparison.Ordinal));
+            Assert.Contains(
+                entries,
+                entry => string.Equals(
+                    RequiredString(entry, "synapse"),
+                    "CapabilityCompleted",
+                    StringComparison.Ordinal)
+                    || string.Equals(
+                        RequiredString(entry, "synapse"),
+                        "CapabilityAbandoned",
+                        StringComparison.Ordinal));
+
+            var chatFacts = entries
+                .Where(entry => RequiredString(entry, "synapse") is "UserMessaged" or "AssistantResponded")
+                .ToArray();
+            Assert.Collection(
+                chatFacts,
+                entry =>
+                {
+                    Assert.Equal("UserMessaged", RequiredString(entry, "synapse"));
+                    Assert.Equal(correlationId, RequiredString(entry, "correlation"));
+                },
                 entry =>
                 {
                     Assert.Equal("AssistantResponded", RequiredString(entry, "synapse"));

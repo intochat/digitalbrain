@@ -6,7 +6,7 @@ namespace DigitalBrain.Kernel;
 internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> additionalReminderSources) :
     IIncomingGrainCallFilter
 {
-    public Task Invoke(IIncomingGrainCallContext context)
+    public async Task Invoke(IIncomingGrainCallContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -14,7 +14,8 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
         {
             if (IsTrustedReminderProvider(context.SourceId))
             {
-                return context.Invoke();
+                await context.Invoke();
+                return;
             }
 
             throw new NeuronAuthorizationException(
@@ -24,7 +25,35 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
         if (IsOutboxDrainCall(context))
         {
             RequireDedicatedWakeupForTarget(context);
-            return context.Invoke();
+            await context.Invoke();
+            return;
+        }
+
+        if (context.Grain is Neuron enumerationTarget
+            && CapabilityInvocation.IsEnumerationDispatch(context.InterfaceMethod)
+            && CapabilityInvocation.EnumerationId(context.Request) is { } enumerationId
+            && (CapabilityInvocation.IsEnumerationContinuation(context.InterfaceMethod)
+                || CapabilityInvocation.IsEnumerationDisposal(context.InterfaceMethod)))
+        {
+            enumerationTarget.RequireStreamedEnumerationInitiator(enumerationId, context.SourceId);
+            RequireSameOwnerWhenAttributed(context, enumerationTarget);
+
+            if (CapabilityInvocation.IsEnumerationDisposal(context.InterfaceMethod))
+            {
+                try
+                {
+                    await context.Invoke();
+                }
+                finally
+                {
+                    enumerationTarget.ReleaseStreamedEnumeration(enumerationId);
+                }
+
+                return;
+            }
+
+            await context.Invoke();
+            return;
         }
 
         if (OwnerOf(context.SourceId) is not { } caller)
@@ -56,7 +85,25 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
             }
         }
 
-        return context.Invoke();
+        if (context.Grain is Neuron bindTarget
+            && CapabilityInvocation.IsEnumerationStart(context.InterfaceMethod)
+            && CapabilityInvocation.EnumerationId(context.Request) is { } startedEnumeration)
+        {
+            await context.Invoke();
+            bindTarget.BindStreamedEnumeration(startedEnumeration, context.SourceId);
+            return;
+        }
+
+        await context.Invoke();
+    }
+
+    private static void RequireSameOwnerWhenAttributed(IIncomingGrainCallContext context, Neuron target)
+    {
+        if (OwnerOf(context.SourceId) is { } caller && caller != target.Id.Owner)
+        {
+            throw new NeuronAuthorizationException(
+                $"Neuron '{target.Id}' belongs to owner '{target.Id.Owner}' and cannot be reached by owner '{caller}'.");
+        }
     }
 
     private static bool IsReminderCall(IIncomingGrainCallContext context)
@@ -89,8 +136,6 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
 
     private static bool AllowsUnattributedCaller(IIncomingGrainCallContext context, Neuron target)
         => IsClientEntryPoint(context.InterfaceMethod)
-            || CapabilityInvocation.IsEnumerationContinuation(context.InterfaceMethod)
-            || CapabilityInvocation.IsEnumerationDisposal(context.InterfaceMethod)
             || IsClientEntryPoint(ContractMethodTheTargetImplements(context, target));
 
     private static MethodInfo? ContractMethodTheTargetImplements(IIncomingGrainCallContext context, Neuron target)
