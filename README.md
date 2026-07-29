@@ -42,7 +42,7 @@ The plan of record. Nothing is shipped unless it says Built.
 | Time — durable one-shot `ICountdown` and its recovery tests | **Built** |
 | Time — reminders, recurring interval/calendar scheduling, DST | Designed |
 | Multi-principal IdP edge, journal observation on `IDigitalBrain` | Designed |
-| Behavior rail — proposal, compile, BDD gate, approval, activation, rollback, execution seam (L1; BehaviorHost silo is later) | **Built** |
+| Behavior rail — proposal, compile, BDD gate, approval, activation, rollback, signed BehaviorHost deploy/execute (L1/L2) | **Built** |
 | Observability spine — host OpenTelemetry, structured logs, causal kernel spans, GenAI spans and metrics | **Built** |
 
 `DigitalBrain.Behaviors` is a packable SDK foundation (authoring interfaces, constrained context,

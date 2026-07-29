@@ -188,5 +188,14 @@ internal sealed partial class BehaviorNeuron
 
         [Id(22)]
         public Dictionary<Guid, BehaviorSnapshot> Receipts { get; init; } = [];
+
+        [Id(23)]
+        public byte[]? ArtifactSignature { get; init; }
+
+        [Id(24)]
+        public byte[]? ActiveArtifactSignature { get; init; }
+
+        [Id(25)]
+        public byte[]? PriorArtifactSignature { get; init; }
     }
 }

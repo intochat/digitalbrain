@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <NoWarn>$(NoWarn);CA2007;CA1515;CA1812;NU1608</NoWarn>
+    <NoWarn>$(NoWarn);CA2007;CA1515;CA1812;NU1608;MSB3277</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
@@ -14,6 +14,8 @@
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
     <ProjectReference Include="..\DigitalBrain.Behaviors.Runtime\DigitalBrain.Behaviors.Runtime.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Behaviors.Host\DigitalBrain.Behaviors.Host.csproj" />
+    <ProjectReference Include="..\..\security\DigitalBrain.Security\DigitalBrain.Security.csproj" />
     <ProjectReference Include="..\..\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
   </ItemGroup>
 </Project>

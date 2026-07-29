@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <NoWarn>$(NoWarn);CA2007</NoWarn>
+    <NoWarn>$(NoWarn);CA2007;CA1812;MSB3277;NU1608</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Testing" />
@@ -15,5 +15,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\tests\fixtures\apphosts\DigitalBrain.TestingAppHost\DigitalBrain.TestingAppHost.csproj" />
     <ProjectReference Include="..\..\..\src\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="..\..\..\src\core\behaviors\DigitalBrain.Behaviors.Host\DigitalBrain.Behaviors.Host.csproj" />
+    <ProjectReference Include="..\..\..\src\core\behaviors\DigitalBrain.Behaviors.Runtime\DigitalBrain.Behaviors.Runtime.csproj" />
+    <ProjectReference Include="..\..\..\src\core\security\DigitalBrain.Security\DigitalBrain.Security.csproj" />
   </ItemGroup>
 </Project>

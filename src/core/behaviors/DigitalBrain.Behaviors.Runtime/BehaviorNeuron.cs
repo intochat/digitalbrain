@@ -21,6 +21,8 @@ internal sealed partial class BehaviorNeuron :
     private readonly IBehaviorCompiler _compiler;
     private readonly IBehaviorBddGate _bddGate;
     private readonly IBehaviorExecutor _executor;
+    private readonly IBehaviorArtifactTrust _artifactTrust;
+    private readonly IBehaviorHostGateway? _host;
 
     public BehaviorNeuron()
     {
@@ -29,6 +31,8 @@ internal sealed partial class BehaviorNeuron :
         _compiler = ServiceProvider.GetRequiredService<IBehaviorCompiler>();
         _bddGate = ServiceProvider.GetRequiredService<IBehaviorBddGate>();
         _executor = ServiceProvider.GetRequiredService<IBehaviorExecutor>();
+        _artifactTrust = ServiceProvider.GetRequiredService<IBehaviorArtifactTrust>();
+        _host = ServiceProvider.GetService<IBehaviorHostGateway>();
     }
 
     public Task<BehaviorSnapshot> Read() => Task.FromResult(Snapshot(LoadOrEmpty()));
@@ -231,12 +235,21 @@ internal sealed partial class BehaviorNeuron :
         var approvalEvidence = await ApprovalEvidenceAsync(approval);
         ValidateApprovalEvidence(approval, approvalEvidence);
 
+        if (data.ArtifactBytes is null)
+        {
+            throw new InvalidOperationException(
+                $"Behavior '{Id}' cannot be signed: proposed artifact bytes are missing.");
+        }
+
+        var signature = _artifactTrust.Sign(approval.Fingerprint);
+
         data = data with
         {
             Status = BehaviorRevisionStatus.Approved,
             IsApproved = true,
             Approval = approval,
             ApprovalEvidence = approvalEvidence.SynapseId,
+            ArtifactSignature = signature,
         };
         data = WithReceipt(data, approval.CommandId, Snapshot(data));
         await SaveAsync(data);
@@ -261,10 +274,45 @@ internal sealed partial class BehaviorNeuron :
         }
 
         if (!data.IsApproved
-            || !string.Equals(data.ProposedArtifactHash, command.ArtifactHash, StringComparison.Ordinal))
+            || !string.Equals(data.ProposedArtifactHash, command.ArtifactHash, StringComparison.Ordinal)
+            || data.ArtifactBytes is null
+            || data.AssemblyBytes is null
+            || data.ArtifactSignature is null)
         {
             throw new InvalidOperationException(
-                $"Behavior '{Id}' has no approved revision '{command.ArtifactHash}' to activate.");
+                $"Behavior '{Id}' has no signed approved revision '{command.ArtifactHash}' to activate.");
+        }
+
+        var behaviorId = BehaviorIdOfName();
+        if (_host is not null)
+        {
+            try
+            {
+                await _host.DeployAsync(
+                    new BehaviorHostDeployCommand(
+                        Id.Owner,
+                        behaviorId,
+                        command.ArtifactHash,
+                        data.ArtifactBytes,
+                        data.AssemblyBytes,
+                        data.ArtifactSignature),
+                    CancellationToken.None);
+                await _host.ActivateAsync(
+                    new BehaviorHostActivationCommand(Id.Owner, behaviorId, command.ArtifactHash),
+                    CancellationToken.None);
+            }
+            catch (BehaviorHostException exception)
+            {
+                await EmitAsync(new BehaviorRevisionDeployRefused(
+                    command.CommandId,
+                    behaviorId,
+                    command.ArtifactHash,
+                    exception.Reason));
+                throw new InvalidOperationException(
+                    $"Behavior host refused deploy of '{command.ArtifactHash}': {exception.Reason}.");
+            }
+
+            await EmitAsync(new BehaviorRevisionDeployed(command.CommandId, behaviorId, command.ArtifactHash));
         }
 
         var prior = data.ActiveArtifactHash;
@@ -275,16 +323,18 @@ internal sealed partial class BehaviorNeuron :
             ActiveArtifactHash = command.ArtifactHash,
             ActiveArtifactBytes = data.ArtifactBytes,
             ActiveAssemblyBytes = data.AssemblyBytes,
+            ActiveArtifactSignature = data.ArtifactSignature,
             ActiveProgramSource = data.ProgramSource,
             PriorArtifactBytes = data.ActiveArtifactBytes,
             PriorAssemblyBytes = data.ActiveAssemblyBytes,
+            PriorArtifactSignature = data.ActiveArtifactSignature,
             PriorProgramSource = data.ActiveProgramSource,
         };
         data = WithReceipt(data, command.CommandId, Snapshot(data));
         await SaveAsync(data);
         await EmitAsync(new BehaviorRevisionActivated(
             command.CommandId,
-            BehaviorIdOfName(),
+            behaviorId,
             command.ArtifactHash,
             prior));
         return Snapshot(data);
@@ -310,6 +360,17 @@ internal sealed partial class BehaviorNeuron :
 
         var demoted = data.ActiveArtifactHash;
         var restored = data.PriorArtifactHash;
+        var behaviorId = BehaviorIdOfName();
+        if (_host is not null)
+        {
+            await _host.DeactivateAsync(
+                new BehaviorHostDeactivationCommand(Id.Owner, behaviorId, demoted),
+                CancellationToken.None);
+            await _host.ActivateAsync(
+                new BehaviorHostActivationCommand(Id.Owner, behaviorId, restored),
+                CancellationToken.None);
+        }
+
         data = data with
         {
             Status = BehaviorRevisionStatus.Active,
@@ -317,16 +378,18 @@ internal sealed partial class BehaviorNeuron :
             PriorArtifactHash = demoted,
             ActiveArtifactBytes = data.PriorArtifactBytes,
             ActiveAssemblyBytes = data.PriorAssemblyBytes,
+            ActiveArtifactSignature = data.PriorArtifactSignature,
             ActiveProgramSource = data.PriorProgramSource,
             PriorArtifactBytes = data.ActiveArtifactBytes,
             PriorAssemblyBytes = data.ActiveAssemblyBytes,
+            PriorArtifactSignature = data.ActiveArtifactSignature,
             PriorProgramSource = data.ActiveProgramSource,
         };
         data = WithReceipt(data, command.CommandId, Snapshot(data));
         await SaveAsync(data);
         await EmitAsync(new BehaviorRevisionRolledBack(
             command.CommandId,
-            BehaviorIdOfName(),
+            behaviorId,
             restored,
             demoted));
         return Snapshot(data);

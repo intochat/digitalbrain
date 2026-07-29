@@ -15,5 +15,7 @@ public sealed class TestingAppHostFixture :
 {
     public const string SiloResourceName = "silo";
 
+    public const string BehaviorHostResourceName = "behavior-host";
+
     public const string HealthPath = "/health";
 }
