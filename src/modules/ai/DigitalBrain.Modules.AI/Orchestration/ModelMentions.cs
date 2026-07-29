@@ -3,10 +3,12 @@ namespace DigitalBrain.AI;
 public static class ModelMentions
 {
     public static IReadOnlyList<string> NamedIn(string text)
+        => NamedIn(text, ModelContracts.KnownModelNames());
+
+    internal static IReadOnlyList<string> NamedIn(string text, IReadOnlyList<string> known)
     {
         ArgumentNullException.ThrowIfNull(text);
-
-        var known = ModelContracts.KnownModelNames();
+        ArgumentNullException.ThrowIfNull(known);
 
         return [.. known.Where(model => IsNamedIn(text, model, known))];
     }

@@ -32,6 +32,7 @@ public sealed class AssistantModelTeam(OSBehaviorsFixture fixture)
     private const string SoloTeam = "team-Gemma4";
     private const string UnknownModel = "Gemini9";
     private const string StorageOutage = "journal storage is offline for this test";
+    private const string UndisclosedFailure = "Error: Function failed.";
 
     [Fact(Timeout = FactTimeout, DisplayName =
         "the assistant asked to compare two models convenes their team and the team's answer reaches its reply")]
@@ -144,7 +145,7 @@ public sealed class AssistantModelTeam(OSBehaviorsFixture fixture)
         var response = await Assistant(test).Respond([new ChatMessage(ChatRole.User, ComparePrompt)]);
 
         var reported = Assert.Single(ToolResultsOfLastCall(test));
-        Assert.DoesNotContain(StorageOutage, reported, StringComparison.Ordinal);
+        Assert.Equal(UndisclosedFailure, reported);
         Assert.Equal(FirstReply, response.Text);
         await AssertTurnsTakenAsync(test.Neuron<IGemma4>(PairedTeam), 0, cancellationToken);
     }

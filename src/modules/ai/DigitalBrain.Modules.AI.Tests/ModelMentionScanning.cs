@@ -1,7 +1,7 @@
 using DigitalBrain.AI;
 using Xunit;
 
-namespace DigitalBrain.OS.Behaviors.Tests;
+namespace DigitalBrain.ModuleTests;
 
 public sealed class ModelMentionScanning
 {
@@ -9,6 +9,7 @@ public sealed class ModelMentionScanning
     private const string Llama = "Llama32";
     private const string Granite = "Granite41";
     private const string Gpt = "Gpt56";
+    private const string SecondLlama = "Llama33";
 
     [Theory(DisplayName = "a model is named by its bare family, by its full name, and in any casing")]
     [InlineData("compare Gemma with something")]
@@ -56,4 +57,14 @@ public sealed class ModelMentionScanning
         => Assert.All(
             TeamLineUp.KnownModels,
             model => Assert.Equal([model], ModelMentions.NamedIn($"tell me about {model}")));
+
+    [Fact(DisplayName = "two models of one family named in full are two mentions, not one folded family")]
+    public void TwoModelsOfOneFamilyNamedInFullAreTwoMentions()
+        => Assert.Equal(
+            [Llama, SecondLlama],
+            ModelMentions.NamedIn($"compare {Llama} with {SecondLlama}", [Llama, SecondLlama]));
+
+    [Fact(DisplayName = "a bare family shared by two models identifies neither of them")]
+    public void ABareFamilySharedByTwoModelsIdentifiesNeither()
+        => Assert.Empty(ModelMentions.NamedIn("compare Llama with something", [Llama, SecondLlama]));
 }
