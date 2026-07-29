@@ -8,10 +8,10 @@ void main() {
 
   final chat = DigitalBrainHostEnv.resolveChat();
 
-  DigitalBrainUiEdgeClient? client;
+  DigitalBrainUiClient? client;
   String? status;
   try {
-    client = DigitalBrainUiEdgeClient.fromEnvironment();
+    client = DigitalBrainUiClient.fromEnvironment();
   } on Object catch (error) {
     status = error.toString();
   }

@@ -49,7 +49,7 @@ internal static class ChatDeltaFeed
     {
         var payload = JsonSerializer.Serialize(chunk, AiJson);
         var frame = FormattableString.Invariant(
-            $"event: {UIEdgeContract.ChatDeltaEvent}\ndata: {payload}\n\n");
+            $"event: {UiHttpContract.ChatDeltaEvent}\ndata: {payload}\n\n");
         var bytes = Utf8.GetBytes(frame);
         await responseBody.WriteAsync(bytes, cancellationToken);
         await responseBody.FlushAsync(cancellationToken);

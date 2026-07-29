@@ -11,7 +11,7 @@ internal static class ChatEndpoints
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints.MapPost(
-            UIEdgeContract.SendMessagePath,
+            UiHttpContract.SendMessagePath,
             static async Task<IResult> (
                 string chatName,
                 SendMessageRequest request,
@@ -34,7 +34,7 @@ internal static class ChatEndpoints
             });
 
         endpoints.MapPost(
-            UIEdgeContract.StreamMessagePath,
+            UiHttpContract.StreamMessagePath,
             static async Task (
                 HttpContext http,
                 string chatName,
@@ -54,8 +54,8 @@ internal static class ChatEndpoints
                     return;
                 }
 
-                http.Response.Headers.CacheControl = UIEdgeContract.CacheControlNoCache;
-                http.Response.ContentType = UIEdgeContract.EventStreamContentType;
+                http.Response.Headers.CacheControl = UiHttpContract.CacheControlNoCache;
+                http.Response.ContentType = UiHttpContract.EventStreamContentType;
                 await ChatDeltaFeed.WriteChatDeltaSseAsync(
                     http.Response.Body,
                     brain,
@@ -65,7 +65,7 @@ internal static class ChatEndpoints
             });
 
         endpoints.MapGet(
-            UIEdgeContract.ChatEventsPath,
+            UiHttpContract.ChatEventsPath,
             static async Task (
                 HttpContext http,
                 string chatName,
@@ -85,8 +85,8 @@ internal static class ChatEndpoints
                     return;
                 }
 
-                http.Response.Headers.CacheControl = UIEdgeContract.CacheControlNoCache;
-                http.Response.ContentType = UIEdgeContract.EventStreamContentType;
+                http.Response.Headers.CacheControl = UiHttpContract.CacheControlNoCache;
+                http.Response.ContentType = UiHttpContract.EventStreamContentType;
                 await ChatEventFeed.WriteChatTurnSseAsync(
                     http.Response.Body,
                     sessionJournal,

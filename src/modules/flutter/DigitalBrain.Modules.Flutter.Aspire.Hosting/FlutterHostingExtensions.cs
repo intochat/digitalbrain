@@ -22,15 +22,15 @@ public static class FlutterHostingExtensions
     public const string UIHttpEndpointName = "http";
     public const string UIHealthPath = "/health";
 
-    public static DigitalBrainModuleBuilder<FlutterModule> WithUIEdge(
+    public static DigitalBrainModuleBuilder<FlutterModule> WithUiHttp(
         this DigitalBrainModuleBuilder<FlutterModule> module,
-        Action<FlutterUIEdgeOptions>? configure = null)
+        Action<FlutterUiHttpOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(module);
 
-        var options = new FlutterUIEdgeOptions();
+        var options = new FlutterUiHttpOptions();
         configure?.Invoke(options);
-        GetOrCreateState(module).EnsureUIEdge(options);
+        GetOrCreateState(module).EnsureUiHttp(options);
         return module;
     }
 
@@ -88,21 +88,21 @@ public static class FlutterHostingExtensions
         private IResourceBuilder<ProjectResource>? _ui;
         private IResourceBuilder<ExecutableResource>? _flutterHost;
 
-        internal void EnsureUIEdge(FlutterUIEdgeOptions options)
+        internal void EnsureUiHttp(FlutterUiHttpOptions options)
         {
             if (_ui is not null)
             {
                 throw new InvalidOperationException(
-                    $"UI edge is already configured on brain '{brain.Name}'. Call WithUIEdge exactly once.");
+                    $"UI HTTP is already configured on brain '{brain.Name}'. Call {nameof(WithUiHttp)} exactly once.");
             }
 
             var appHost = brain.GetApplicationBuilder();
-            var projectPath = ResolveUIProjectPath(appHost.AppHostDirectory, options.ProjectPath);
+            var projectPath = ResolveUiHttpProjectPath(appHost.AppHostDirectory, options.ProjectPath);
             if (!File.Exists(projectPath))
             {
                 throw new InvalidOperationException(
-                    $"Flutter UI edge project was not found at '{projectPath}'. " +
-                    "Pass FlutterUIEdgeOptions.ProjectPath, or place DigitalBrain.Modules.Flutter.Http under src/modules/flutter/.");
+                    $"Flutter UI HTTP project was not found at '{projectPath}'. " +
+                    $"Pass {nameof(FlutterUiHttpOptions)}.{nameof(FlutterUiHttpOptions.ProjectPath)}, or place DigitalBrain.Modules.Flutter.Http under src/modules/flutter/.");
             }
 
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
@@ -130,7 +130,7 @@ public static class FlutterHostingExtensions
 
             if (_ui is null)
             {
-                EnsureUIEdge(new FlutterUIEdgeOptions());
+                EnsureUiHttp(new FlutterUiHttpOptions());
             }
 
             var appHost = brain.GetApplicationBuilder();
@@ -173,7 +173,7 @@ public static class FlutterHostingExtensions
             }
         }
 
-        private static string ResolveUIProjectPath(string appHostDirectory, string? configured)
+        private static string ResolveUiHttpProjectPath(string appHostDirectory, string? configured)
         {
             if (!string.IsNullOrWhiteSpace(configured))
             {

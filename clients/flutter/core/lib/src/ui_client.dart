@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'ui_edge_models.dart';
+import 'ui_models.dart';
 import 'package:http/http.dart' as http;
 
 import 'host_environment.dart';
@@ -9,16 +9,16 @@ import 'sse_chat_delta_frames.dart';
 import 'sse_chat_frames.dart';
 import 'sse_frames.dart';
 
-final class DigitalBrainUiEdgeClient {
-  DigitalBrainUiEdgeClient({required this.baseUri, http.Client? httpClient})
+final class DigitalBrainUiClient {
+  DigitalBrainUiClient({required this.baseUri, http.Client? httpClient})
     : _http = httpClient ?? http.Client(),
       _ownsClient = httpClient == null;
 
-  factory DigitalBrainUiEdgeClient.fromEnvironment({
+  factory DigitalBrainUiClient.fromEnvironment({
     http.Client? httpClient,
     Map<String, String>? processEnvironment,
   }) {
-    return DigitalBrainUiEdgeClient(
+    return DigitalBrainUiClient(
       baseUri: DigitalBrainHostEnv.requireUiBaseUri(
         processEnvironment: processEnvironment,
       ),

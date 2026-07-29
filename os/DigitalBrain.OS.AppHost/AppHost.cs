@@ -23,7 +23,7 @@ brain.AddModule<AIModule>(ai =>
 });
 brain.AddModule<ChatModule>();
 brain.AddModule<OSBehaviorsModule>();
-brain.AddModule<FlutterModule>(flutter => flutter.WithUIEdge().WithFlutterHost());
+brain.AddModule<FlutterModule>(flutter => flutter.WithUiHttp().WithFlutterHost());
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 

@@ -7,7 +7,7 @@ internal static class BrainEndpoints
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints.MapGet(
-            UIEdgeContract.BrainTopologyPath,
+            UiHttpContract.BrainTopologyPath,
             static async Task<IResult> (
                 BrainTopologyReader topology,
                 CancellationToken cancellationToken) =>

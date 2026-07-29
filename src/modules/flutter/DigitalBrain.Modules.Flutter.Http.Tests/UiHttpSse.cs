@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace DigitalBrain.UI.Tests;
 
-internal static class UIEdgeSse
+internal static class UiHttpSse
 {
     private static readonly JsonSerializerOptions EventJsonOptions = new()
     {
@@ -10,18 +10,18 @@ internal static class UIEdgeSse
     };
 
     public static string OpenScene(string shellName) =>
-        UIEdgeContract.OpenScenePath.Replace("{shellName}", shellName, StringComparison.Ordinal);
+        UiHttpContract.OpenScenePath.Replace("{shellName}", shellName, StringComparison.Ordinal);
 
     public static string ShellEvents(string shellName, long afterSequence = 0) =>
-        $"{UIEdgeContract.ShellEventsPath.Replace("{shellName}", shellName, StringComparison.Ordinal)}?{UIEdgeContract.AfterSequenceQuery}={afterSequence}";
+        $"{UiHttpContract.ShellEventsPath.Replace("{shellName}", shellName, StringComparison.Ordinal)}?{UiHttpContract.AfterSequenceQuery}={afterSequence}";
 
     public static string ActivateControl(string sceneKey, string controlId) =>
-        UIEdgeContract.ActivateControlPath
+        UiHttpContract.ActivateControlPath
             .Replace("{sceneKey}", sceneKey, StringComparison.Ordinal)
             .Replace("{controlId}", controlId, StringComparison.Ordinal);
 
     public static string ChatEvents(string chatName, long afterSequence = 0) =>
-        $"{UIEdgeContract.ChatEventsPath.Replace("{chatName}", chatName, StringComparison.Ordinal)}?{UIEdgeContract.AfterSequenceQuery}={afterSequence}";
+        $"{UiHttpContract.ChatEventsPath.Replace("{chatName}", chatName, StringComparison.Ordinal)}?{UiHttpContract.AfterSequenceQuery}={afterSequence}";
 
     public static async Task<SceneOpenedEvent> ReadNextSceneOpenedAsync(
         StreamReader reader,
@@ -84,7 +84,7 @@ internal static class UIEdgeSse
                 dataLine = null;
 
                 if (name is not null
-                    && !string.Equals(name, UIEdgeContract.SceneOpenedEvent, StringComparison.Ordinal))
+                    && !string.Equals(name, UiHttpContract.SceneOpenedEvent, StringComparison.Ordinal))
                 {
                     continue;
                 }
@@ -105,7 +105,7 @@ internal static class UIEdgeSse
         StreamReader reader,
         CancellationToken cancellationToken)
     {
-        var payload = await ReadNextEventPayloadAsync(reader, UIEdgeContract.ChatTurnEvent, cancellationToken);
+        var payload = await ReadNextEventPayloadAsync(reader, UiHttpContract.ChatTurnEvent, cancellationToken);
         return JsonSerializer.Deserialize<ChatTurnEvent>(payload, EventJsonOptions)
             ?? throw new InvalidOperationException("SSE chat-turn payload did not deserialize.");
     }

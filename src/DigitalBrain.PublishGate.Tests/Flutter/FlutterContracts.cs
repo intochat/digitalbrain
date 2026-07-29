@@ -119,7 +119,7 @@ public sealed class FlutterContracts
                 nameof(DesktopHost),
                 nameof(FlutterHostOptions),
                 nameof(FlutterHostingExtensions),
-                nameof(FlutterUIEdgeOptions),
+                nameof(FlutterUiHttpOptions),
                 nameof(HeadlessHost),
             ],
             exported);

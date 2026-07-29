@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'ui_edge_models.dart';
+import 'ui_models.dart';
 
 final class SseChatDeltaParser {
   String? _dataLine;

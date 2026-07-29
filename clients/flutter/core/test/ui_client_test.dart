@@ -6,9 +6,9 @@ import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('openScene POSTs OpenSceneRequest to Ui edge root path', () async {
+  test('openScene POSTs OpenSceneRequest to UI HTTP root path', () async {
     http.Request? seen;
-    final client = DigitalBrainUiEdgeClient(
+    final client = DigitalBrainUiClient(
       baseUri: Uri.parse('http://ui.example:5080'),
       httpClient: MockClient((request) async {
         seen = request;
@@ -44,7 +44,7 @@ data: {"sequence":5,"sceneKey":"countdown","title":"Countdown","commandId":"d","
 
 ''';
 
-      final client = DigitalBrainUiEdgeClient(
+      final client = DigitalBrainUiClient(
         baseUri: Uri.parse('http://ui.example:5080'),
         httpClient: MockClient((request) async {
           expect(request.method, 'GET');
@@ -92,7 +92,7 @@ data: {"sequence":3,"sceneKey":"home","title":"Home refreshed","commandId":"c","
 
 ''';
 
-      final client = DigitalBrainUiEdgeClient(
+      final client = DigitalBrainUiClient(
         baseUri: Uri.parse('http://ui.example:5080'),
         httpClient: MockClient((request) async {
           expect(
@@ -146,7 +146,7 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
 ''';
 
       http.BaseRequest? seen;
-      final client = DigitalBrainUiEdgeClient(
+      final client = DigitalBrainUiClient(
         baseUri: Uri.parse('http://ui.example:5080'),
         httpClient: MockClient((request) async {
           seen = request;
@@ -176,7 +176,7 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
   );
 
   test('openScene and activateControl reject non-202', () async {
-    final client = DigitalBrainUiEdgeClient(
+    final client = DigitalBrainUiClient(
       baseUri: Uri.parse('http://ui.example:5080'),
       httpClient: MockClient((request) async => http.Response('nope', 500)),
     );
@@ -199,7 +199,7 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
     'watchBrainTopology polls live modules and neurons without restart',
     () async {
       var requestCount = 0;
-      final client = DigitalBrainUiEdgeClient(
+      final client = DigitalBrainUiClient(
         baseUri: Uri.parse('http://ui.example:5080'),
         httpClient: MockClient((request) async {
           expect(request.method, 'GET');
@@ -244,7 +244,7 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
     'watchBrainTopology reports a transient failure and keeps polling',
     () async {
       var requestCount = 0;
-      final client = DigitalBrainUiEdgeClient(
+      final client = DigitalBrainUiClient(
         baseUri: Uri.parse('http://ui.example:5080'),
         httpClient: MockClient((request) async {
           requestCount++;
@@ -279,7 +279,7 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
 
   test('watchBrainTopology aborts a hung request and keeps polling', () async {
     final httpClient = _AbortThenSucceedClient();
-    final client = DigitalBrainUiEdgeClient(
+    final client = DigitalBrainUiClient(
       baseUri: Uri.parse('http://ui.example:5080'),
       httpClient: httpClient,
     );

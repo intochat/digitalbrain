@@ -3,9 +3,9 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.UI;
 
-internal static class UIEdgeServices
+internal static class UiHttpServices
 {
-    public static IServiceCollection AddUIEdgeServices(this IServiceCollection services)
+    public static IServiceCollection AddUiHttpServices(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 

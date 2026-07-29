@@ -97,9 +97,9 @@ void main() {
   });
 
   test(
-    'DigitalBrainUiEdgeClient.fromEnvironment reads injected process map',
+    'DigitalBrainUiClient.fromEnvironment reads injected process map',
     () {
-      final client = DigitalBrainUiEdgeClient.fromEnvironment(
+      final client = DigitalBrainUiClient.fromEnvironment(
         processEnvironment: {
           DigitalBrainHostEnv.uiBaseVariable: 'http://edge.test:7',
         },

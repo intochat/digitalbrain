@@ -10,20 +10,20 @@ using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
 
-public sealed class FlutterHostingUIEdgeContracts
+public sealed class FlutterHostingUiHttpContracts
 {
     [Fact(DisplayName =
-        "WithUIEdge projects " + FlutterHostingExtensions.DefaultUIResourceName
+        "WithUiHttp projects " + FlutterHostingExtensions.DefaultUIResourceName
         + " as a client with late-bound module topology and no silo secrets")]
-    public async Task WithUIEdgeProjectsLateBoundModuleTopologyWithoutSiloSecrets()
+    public async Task WithUiHttpProjectsLateBoundModuleTopologyWithoutSiloSecrets()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
 
-        brain.AddModule<FlutterModule>(flutter => flutter.WithUIEdge(options =>
+        brain.AddModule<FlutterModule>(flutter => flutter.WithUiHttp(options =>
         {
             options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath;
-            options.Owner = "edge-owner";
+            options.Owner = "ui-owner";
         }));
         brain.AddModule<AIModule>(ai => ai.WithLlm<Gemma4>());
 
@@ -48,7 +48,7 @@ public sealed class FlutterHostingUIEdgeContracts
             AIHostingExtensions.Gemma4Feature,
             environment["DigitalBrain__ConfiguredFeatures__0"]?.ToString());
         Assert.Equal(
-            "edge-owner",
+            "ui-owner",
             environment[FlutterHostingExtensions.OwnerEnvironmentVariable]?.ToString());
         Assert.DoesNotContain(
             FlutterHostingProjectionSupport.JournalConnectionEnvironmentKey,

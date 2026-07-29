@@ -5,8 +5,8 @@ namespace DigitalBrain.UI;
 [SuppressMessage(
     "Design",
     "CA1515:Consider making public types internal",
-    Justification = "Product UI edge route and SSE names are the single public constant source for host, tests, and peers.")]
-public static class UIEdgeContract
+    Justification = "UI HTTP route and SSE event names are the single public contract for host, tests, and clients.")]
+public static class UiHttpContract
 {
     public const string HealthPath = "/health";
 

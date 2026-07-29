@@ -26,7 +26,7 @@ public sealed class UIFixture : DigitalBrainFixture
         return new Uri(configured.TrimEnd('/') + "/");
     }
 
-    public static async Task<WebApplication> StartUIEdgeAsync(TestBrain test, CancellationToken cancellationToken)
+    public static async Task<WebApplication> StartUiHttpAsync(TestBrain test, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(test);
 
@@ -41,7 +41,7 @@ public sealed class UIFixture : DigitalBrainFixture
             });
         builder.Services.AddSingleton(test.Client);
         builder.Services.AddSingleton<IGrainFactory>(test.Cluster.Client);
-        builder.Services.AddUIEdgeServices();
+        builder.Services.AddUiHttpServices();
 
         var app = builder.Build();
         app.MapDefaultEndpoints();

@@ -49,7 +49,7 @@ internal static class ShellEventFeed
     private static Task WriteEventAsync(Stream responseBody, SceneOpenedEvent projected, CancellationToken cancellationToken)
     {
         var payload = JsonSerializer.Serialize(projected, EventJson);
-        var frame = FormattableString.Invariant($"id: {projected.Sequence}\nevent: {UIEdgeContract.SceneOpenedEvent}\ndata: {payload}\n\n");
+        var frame = FormattableString.Invariant($"id: {projected.Sequence}\nevent: {UiHttpContract.SceneOpenedEvent}\ndata: {payload}\n\n");
         return WriteAsync(responseBody, frame, cancellationToken);
     }
 

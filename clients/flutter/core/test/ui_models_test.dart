@@ -2,7 +2,7 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('SceneOpenedEvent reads JSON field names used by the UI edge', () {
+  test('SceneOpenedEvent reads JSON field names used by UI HTTP', () {
     final event = SceneOpenedEvent.fromJson({
       'sequence': 7,
       'sceneKey': 'home',
@@ -38,7 +38,7 @@ void main() {
     );
   });
 
-  test('ChatTurnEvent carries durable pulse identity from the UI edge', () {
+  test('ChatTurnEvent carries durable pulse identity from UI HTTP', () {
     final event = ChatTurnEvent.fromJson({
       'sequence': 9,
       'fromUser': true,
@@ -58,7 +58,7 @@ void main() {
     expect(event.timestamp, DateTime.utc(2026, 7, 28, 8));
   });
 
-  test('ChatDelta reads AIContent type-discriminator text frames from the stream edge', () {
+  test('ChatDelta reads AIContent type-discriminator text frames from the stream', () {
     final delta = ChatDelta.fromJson({
       'role': 'assistant',
       'contents': [

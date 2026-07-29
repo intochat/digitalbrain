@@ -1,4 +1,4 @@
-import 'ui_edge_models.dart';
+import 'ui_models.dart';
 
 final class SceneViewModel {
   const SceneViewModel({

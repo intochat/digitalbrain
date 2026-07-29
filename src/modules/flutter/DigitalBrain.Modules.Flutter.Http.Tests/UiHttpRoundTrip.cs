@@ -6,7 +6,7 @@ using Xunit;
 
 namespace DigitalBrain.UI.Tests;
 
-public sealed class UIEdgeRoundTrip(UIFixture fixture)
+public sealed class UiHttpRoundTrip(UIFixture fixture)
 {
     private const string HomeSceneKey = "home";
     private const string HomeTitle = "Home";
@@ -22,11 +22,11 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(UIFixture.DefaultShellName);
 
-        await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
+        await using var app = await UIFixture.StartUiHttpAsync(test, cancellationToken);
         using var http = CreateClient(app);
 
         using var response = await http.PostAsJsonAsync(
-            UIEdgeSse.OpenScene(UIFixture.DefaultShellName),
+            UiHttpSse.OpenScene(UIFixture.DefaultShellName),
             new OpenSceneRequest(HomeSceneKey, HomeTitle),
             cancellationToken);
 
@@ -45,11 +45,11 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var scene = test.Neuron<IScene>(HomeSceneKey);
 
-        await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
+        await using var app = await UIFixture.StartUiHttpAsync(test, cancellationToken);
         using var http = CreateClient(app);
 
         using var response = await http.PostAsJsonAsync(
-            UIEdgeSse.ActivateControl(HomeSceneKey, PrimaryControlId),
+            UiHttpSse.ActivateControl(HomeSceneKey, PrimaryControlId),
             new ActivateControlRequest(SubmitIntent),
             cancellationToken);
 
@@ -68,12 +68,12 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(UIFixture.DefaultShellName);
 
-        await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
+        await using var app = await UIFixture.StartUiHttpAsync(test, cancellationToken);
         using var http = CreateClient(app, streaming: true);
         await using var events = await OpenShellEventStreamAsync(http, cancellationToken);
 
         using var openResponse = await http.PostAsJsonAsync(
-            UIEdgeSse.OpenScene(UIFixture.DefaultShellName),
+            UiHttpSse.OpenScene(UIFixture.DefaultShellName),
             new OpenSceneRequest(HomeSceneKey, HomeTitle),
             cancellationToken);
         Assert.Equal(HttpStatusCode.Accepted, openResponse.StatusCode);
@@ -81,7 +81,7 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         var journaled = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(HomeSceneKey, journaled.Synapse.SceneKey);
 
-        var projected = await UIEdgeSse.ReadNextSceneOpenedAsync(events.Reader, cancellationToken);
+        var projected = await UiHttpSse.ReadNextSceneOpenedAsync(events.Reader, cancellationToken);
 
         Assert.Equal(HomeSceneKey, projected.SceneKey);
         Assert.Equal(HomeTitle, projected.Title);
@@ -96,7 +96,7 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         var shell = test.Neuron<IShell>(UIFixture.DefaultShellName);
         var command = new OpenScene(CommandId.New(), SettingsSceneKey, SettingsTitle);
 
-        await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
+        await using var app = await UIFixture.StartUiHttpAsync(test, cancellationToken);
         using var http = CreateClient(app, streaming: true);
         await using var events = await OpenShellEventStreamAsync(http, cancellationToken);
 
@@ -108,7 +108,7 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         Assert.Equal(SettingsTitle, journaled.Synapse.Title);
         Assert.Equal(shell.Id, journaled.Synapse.Shell);
 
-        var projected = await UIEdgeSse.ReadNextSceneOpenedAsync(events.Reader, cancellationToken);
+        var projected = await UiHttpSse.ReadNextSceneOpenedAsync(events.Reader, cancellationToken);
 
         Assert.Equal(journaled.Sequence, projected.Sequence);
         Assert.Equal(SettingsSceneKey, projected.SceneKey);
@@ -123,11 +123,11 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
 
-        await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
+        await using var app = await UIFixture.StartUiHttpAsync(test, cancellationToken);
         using var http = CreateClient(app);
 
         using var response = await http.GetAsync(
-            new Uri(UIEdgeSse.ShellEvents(UIFixture.DefaultShellName, afterSequence: -1), UriKind.Relative),
+            new Uri(UiHttpSse.ShellEvents(UIFixture.DefaultShellName, afterSequence: -1), UriKind.Relative),
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -143,9 +143,9 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         await test.Client.Get<IShell>(UIFixture.DefaultShellName).Open(
             new OpenScene(CommandId.New(), HomeSceneKey, HomeTitle));
 
-        await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
+        await using var app = await UIFixture.StartUiHttpAsync(test, cancellationToken);
         using var http = CreateClient(app);
-        var topology = await http.GetFromJsonAsync<BrainTopologySnapshot>(UIEdgeContract.BrainTopologyPath, cancellationToken);
+        var topology = await http.GetFromJsonAsync<BrainTopologySnapshot>(UiHttpContract.BrainTopologyPath, cancellationToken);
 
         Assert.NotNull(topology);
         Assert.Contains(topology.Modules, module => module.Id == FlutterModule.Id.Value);
@@ -162,13 +162,13 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var chat = test.Neuron<IChat>("pulse");
 
-        await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
+        await using var app = await UIFixture.StartUiHttpAsync(test, cancellationToken);
         using var http = CreateClient(app, streaming: true);
         await using var events = await OpenChatEventStreamAsync(http, "pulse", cancellationToken);
 
         var command = new SendMessage(CommandId.New(), "hello");
         await test.Client.Get<IChat>("pulse").Send(command);
-        var projected = await UIEdgeSse.ReadNextChatTurnAsync(events.Reader, cancellationToken);
+        var projected = await UiHttpSse.ReadNextChatTurnAsync(events.Reader, cancellationToken);
 
         Assert.True(projected.Sequence > 0);
         Assert.Equal(nameof(UserMessaged), projected.Synapse);
@@ -179,7 +179,7 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
         Assert.NotEqual(Guid.Empty, correlation);
         Assert.NotEqual(default, projected.Timestamp);
 
-        var answered = await UIEdgeSse.ReadNextChatTurnAsync(events.Reader, cancellationToken);
+        var answered = await UiHttpSse.ReadNextChatTurnAsync(events.Reader, cancellationToken);
 
         Assert.Equal(nameof(AssistantResponded), answered.Synapse);
         Assert.False(answered.FromUser);
@@ -192,7 +192,7 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
     {
         using var streamRequest = new HttpRequestMessage(
             HttpMethod.Get,
-            UIEdgeSse.ShellEvents(UIFixture.DefaultShellName, afterSequence: 0));
+            UiHttpSse.ShellEvents(UIFixture.DefaultShellName, afterSequence: 0));
         var streamResponse = await http.SendAsync(streamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (streamResponse.StatusCode != HttpStatusCode.OK)
         {
@@ -201,9 +201,9 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
             Assert.Fail($"SSE status {(int)streamResponse.StatusCode} {streamResponse.StatusCode}: {errorBody}");
         }
 
-        Assert.Equal(UIEdgeContract.EventStreamContentType, streamResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(UiHttpContract.EventStreamContentType, streamResponse.Content.Headers.ContentType?.MediaType);
         Assert.Contains(
-            UIEdgeContract.CacheControlNoCache,
+            UiHttpContract.CacheControlNoCache,
             streamResponse.Headers.CacheControl?.ToString() ?? string.Empty,
             StringComparison.OrdinalIgnoreCase);
 
@@ -213,7 +213,7 @@ public sealed class UIEdgeRoundTrip(UIFixture fixture)
 
     private static async Task<ShellEventStream> OpenChatEventStreamAsync(HttpClient http, string chatName, CancellationToken cancellationToken)
     {
-        using var streamRequest = new HttpRequestMessage(HttpMethod.Get, UIEdgeSse.ChatEvents(chatName, afterSequence: 0));
+        using var streamRequest = new HttpRequestMessage(HttpMethod.Get, UiHttpSse.ChatEvents(chatName, afterSequence: 0));
         var streamResponse = await http.SendAsync(streamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
         var body = await streamResponse.Content.ReadAsStreamAsync(cancellationToken);

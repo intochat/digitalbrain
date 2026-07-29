@@ -26,7 +26,7 @@ public sealed class ChatStreamEndpoint(UIFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var chat = test.Neuron<IChat>(ChatName);
 
-        await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
+        await using var app = await UIFixture.StartUiHttpAsync(test, cancellationToken);
         using var http = new HttpClient
         {
             BaseAddress = new Uri(app.Urls.Single()),
@@ -57,7 +57,7 @@ public sealed class ChatStreamEndpoint(UIFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var chat = test.Neuron<IChat>(FreshIdChatName);
 
-        await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
+        await using var app = await UIFixture.StartUiHttpAsync(test, cancellationToken);
         using var http = new HttpClient
         {
             BaseAddress = new Uri(app.Urls.Single()),
@@ -79,11 +79,11 @@ public sealed class ChatStreamEndpoint(UIFixture fixture)
     }
 
     [Fact(DisplayName =
-        "UIEdgeContract names the stream path and chat-delta event; vocabulary stays closed")]
+        "UiHttpContract names the stream path and chat-delta event; vocabulary stays closed")]
     public void StreamPathAndDeltaEventAreNamedOnTheContract()
     {
-        Assert.Equal("/chats/{chatName}/messages/stream", UIEdgeContract.StreamMessagePath);
-        Assert.Equal("chat-delta", UIEdgeContract.ChatDeltaEvent);
+        Assert.Equal("/chats/{chatName}/messages/stream", UiHttpContract.StreamMessagePath);
+        Assert.Equal("chat-delta", UiHttpContract.ChatDeltaEvent);
         Assert.Equal(
             TimeSpan.Parse(NeuronCallTimeouts.LongRunning, System.Globalization.CultureInfo.InvariantCulture),
             ChatDeltaFeed.TurnBudget);
@@ -97,7 +97,7 @@ public sealed class ChatStreamEndpoint(UIFixture fixture)
     {
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            UIEdgeContract.StreamMessagePath.Replace("{chatName}", chatName, StringComparison.Ordinal))
+            UiHttpContract.StreamMessagePath.Replace("{chatName}", chatName, StringComparison.Ordinal))
         {
             Content = JsonContent.Create(new SendMessageRequest(text)),
         };
@@ -109,7 +109,7 @@ public sealed class ChatStreamEndpoint(UIFixture fixture)
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(
-            UIEdgeContract.EventStreamContentType,
+            UiHttpContract.EventStreamContentType,
             response.Content.Headers.ContentType?.MediaType);
 
         await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -149,7 +149,7 @@ public sealed class ChatStreamEndpoint(UIFixture fixture)
 
             if (line.Length == 0 && dataLine is not null)
             {
-                if (string.Equals(eventName, UIEdgeContract.ChatDeltaEvent, StringComparison.Ordinal))
+                if (string.Equals(eventName, UiHttpContract.ChatDeltaEvent, StringComparison.Ordinal))
                 {
                     var frame = JsonSerializer.Deserialize<ChatResponseUpdate>(dataLine, AiJson)
                         ?? throw new InvalidOperationException("chat-delta payload did not deserialize.");

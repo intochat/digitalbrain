@@ -11,7 +11,7 @@ internal static class UIEndpoints
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints.MapPost(
-            UIEdgeContract.OpenScenePath,
+            UiHttpContract.OpenScenePath,
             static async Task<IResult> (
                 string shellName,
                 OpenSceneRequest request,
@@ -32,7 +32,7 @@ internal static class UIEndpoints
             });
 
         endpoints.MapGet(
-            UIEdgeContract.ShellEventsPath,
+            UiHttpContract.ShellEventsPath,
             static async Task (
                 HttpContext http,
                 string shellName,
@@ -52,8 +52,8 @@ internal static class UIEndpoints
                     return;
                 }
 
-                http.Response.Headers.CacheControl = UIEdgeContract.CacheControlNoCache;
-                http.Response.ContentType = UIEdgeContract.EventStreamContentType;
+                http.Response.Headers.CacheControl = UiHttpContract.CacheControlNoCache;
+                http.Response.ContentType = UiHttpContract.EventStreamContentType;
                 await ShellEventFeed.WriteSceneOpenedSseAsync(
                     http.Response.Body,
                     sessionJournal,
@@ -63,7 +63,7 @@ internal static class UIEndpoints
             });
 
         endpoints.MapPost(
-            UIEdgeContract.ActivateControlPath,
+            UiHttpContract.ActivateControlPath,
             static async Task<IResult> (
                 string sceneKey,
                 string controlId,

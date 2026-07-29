@@ -7,7 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddKeyedAzureTableServiceClient("brain-clustering");
 builder.AddDigitalBrainClient();
-builder.Services.AddUIEdgeServices();
+builder.Services.AddUiHttpServices();
 
 var app = builder.Build();
 app.MapDefaultEndpoints();

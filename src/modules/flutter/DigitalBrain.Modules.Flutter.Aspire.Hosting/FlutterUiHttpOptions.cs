@@ -1,6 +1,6 @@
 namespace DigitalBrain.Flutter.Aspire.Hosting;
 
-public sealed class FlutterUIEdgeOptions
+public sealed class FlutterUiHttpOptions
 {
     public string ResourceName { get; set; } = FlutterHostingExtensions.DefaultUIResourceName;
 

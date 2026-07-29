@@ -6,41 +6,41 @@ using Xunit;
 
 namespace DigitalBrain.UI.Tests;
 
-public sealed class UIEdgeVocabulary(UIFixture fixture)
+public sealed class UiHttpVocabulary(UIFixture fixture)
 {
     private const string OpenTelemetryMarker = "OpenTelemetry";
 
     [Fact(DisplayName =
-        "UI host public edge vocabulary is UIEdgeContract — health, shell/scene routes, scene-opened event")]
-    public void PublicEdgeVocabularyIsUIEdgeContract()
+        "UiHttpContract is the closed public vocabulary — health, shell/scene routes, scene-opened event")]
+    public void PublicVocabularyIsUiHttpContract()
     {
-        var vocabulary = typeof(UIEdgeContract).Assembly
+        var vocabulary = typeof(UiHttpContract).Assembly
             .GetExportedTypes()
-            .Where(type => type.Namespace == typeof(UIEdgeContract).Namespace)
+            .Where(type => type.Namespace == typeof(UiHttpContract).Namespace)
             .Select(type => type.Name)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal([nameof(UIEdgeContract)], vocabulary);
+        Assert.Equal([nameof(UiHttpContract)], vocabulary);
 
         Assert.DoesNotContain(
-            typeof(UIEdgeContract).Assembly.GetExportedTypes(),
+            typeof(UiHttpContract).Assembly.GetExportedTypes(),
             type => type.Name is "ShellEventFeed" or "UIHost" or "UIEndpoints"
-                or "OwnerSessionJournal" or "UIEdgeServices"
+                or "OwnerSessionJournal" or "UiHttpServices"
                 or "OpenSceneRequest" or "ActivateControlRequest" or "SceneOpenedEvent"
                 or "IFlutter");
 
-        Assert.Equal("/health", UIEdgeContract.HealthPath);
-        Assert.Equal("/shells/{shellName}/scenes", UIEdgeContract.OpenScenePath);
-        Assert.Equal("/shells/{shellName}/events", UIEdgeContract.ShellEventsPath);
-        Assert.Equal("/scenes/{sceneKey}/controls/{controlId}/activate", UIEdgeContract.ActivateControlPath);
-        Assert.Equal("afterSequence", UIEdgeContract.AfterSequenceQuery);
-        Assert.Equal("text/event-stream", UIEdgeContract.EventStreamContentType);
-        Assert.Equal("no-cache", UIEdgeContract.CacheControlNoCache);
-        Assert.Equal("scene-opened", UIEdgeContract.SceneOpenedEvent);
-        Assert.Equal("/brain/topology", UIEdgeContract.BrainTopologyPath);
-        Assert.Equal("/chats/{chatName}/messages/stream", UIEdgeContract.StreamMessagePath);
-        Assert.Equal("chat-delta", UIEdgeContract.ChatDeltaEvent);
+        Assert.Equal("/health", UiHttpContract.HealthPath);
+        Assert.Equal("/shells/{shellName}/scenes", UiHttpContract.OpenScenePath);
+        Assert.Equal("/shells/{shellName}/events", UiHttpContract.ShellEventsPath);
+        Assert.Equal("/scenes/{sceneKey}/controls/{controlId}/activate", UiHttpContract.ActivateControlPath);
+        Assert.Equal("afterSequence", UiHttpContract.AfterSequenceQuery);
+        Assert.Equal("text/event-stream", UiHttpContract.EventStreamContentType);
+        Assert.Equal("no-cache", UiHttpContract.CacheControlNoCache);
+        Assert.Equal("scene-opened", UiHttpContract.SceneOpenedEvent);
+        Assert.Equal("/brain/topology", UiHttpContract.BrainTopologyPath);
+        Assert.Equal("/chats/{chatName}/messages/stream", UiHttpContract.StreamMessagePath);
+        Assert.Equal("chat-delta", UiHttpContract.ChatDeltaEvent);
     }
 
     [Fact(DisplayName =
@@ -90,15 +90,15 @@ public sealed class UIEdgeVocabulary(UIFixture fixture)
                 .ToArray());
     }
 
-    [Fact(DisplayName = "MapUIHost serves UIEdgeContract health on the product edge composition path")]
+    [Fact(DisplayName = "MapUIHost serves UiHttpContract health on the product composition path")]
     public async Task MapUIHostServesHealth()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        await using var app = await UIFixture.StartUIEdgeAsync(test, cancellationToken);
+        await using var app = await UIFixture.StartUiHttpAsync(test, cancellationToken);
 
         using var http = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
-        using var health = await http.GetAsync(new Uri(UIEdgeContract.HealthPath, UriKind.Relative), cancellationToken);
+        using var health = await http.GetAsync(new Uri(UiHttpContract.HealthPath, UriKind.Relative), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
     }

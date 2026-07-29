@@ -9,7 +9,7 @@ Future<void> main(List<String> args) async {
   final reconnectSeconds =
       int.tryParse(_arg(args, '--reconnect-seconds') ?? '') ?? 2;
 
-  final client = DigitalBrainUiEdgeClient.fromEnvironment();
+  final client = DigitalBrainUiClient.fromEnvironment();
   final surface = ShellSurfaceController();
 
   stdout.writeln('digitalbrain_host shell=$shell base=${client.baseUri}');
