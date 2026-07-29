@@ -8,7 +8,9 @@ namespace DigitalBrain.UI.Tests;
 [GrainType("assistant")]
 public sealed class UIAssistantProbe : Neuron, IAssistant
 {
-    internal const string Answer = "the edge probe answered";
+    internal const string Opening = "the edge ";
+    internal const string Closing = "probe answered";
+    internal const string Answer = Opening + Closing;
 
     public async IAsyncEnumerable<ChatResponseUpdate> RespondStreaming(
         IReadOnlyList<ChatMessage> messages,
@@ -17,7 +19,8 @@ public sealed class UIAssistantProbe : Neuron, IAssistant
         ArgumentNullException.ThrowIfNull(messages);
         cancellationToken.ThrowIfCancellationRequested();
 
-        yield return new ChatResponseUpdate(ChatRole.Assistant, Answer);
+        yield return new ChatResponseUpdate(ChatRole.Assistant, Opening);
+        yield return new ChatResponseUpdate(ChatRole.Assistant, Closing);
 
         await Task.CompletedTask;
     }

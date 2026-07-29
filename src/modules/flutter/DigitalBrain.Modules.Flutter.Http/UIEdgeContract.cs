@@ -26,9 +26,13 @@ public static class UIEdgeContract
 
     public const string SendMessagePath = "/chats/{chatName}/messages";
 
+    public const string StreamMessagePath = "/chats/{chatName}/messages/stream";
+
     public const string ChatEventsPath = "/chats/{chatName}/events";
 
     public const string ChatTurnEvent = "chat-turn";
+
+    public const string ChatDeltaEvent = "chat-delta";
 
     public const string BrainTopologyPath = "/brain/topology";
 }

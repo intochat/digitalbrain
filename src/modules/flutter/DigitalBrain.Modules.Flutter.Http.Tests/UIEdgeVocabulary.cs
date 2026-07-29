@@ -39,6 +39,8 @@ public sealed class UIEdgeVocabulary(UIFixture fixture)
         Assert.Equal("no-cache", UIEdgeContract.CacheControlNoCache);
         Assert.Equal("scene-opened", UIEdgeContract.SceneOpenedEvent);
         Assert.Equal("/brain/topology", UIEdgeContract.BrainTopologyPath);
+        Assert.Equal("/chats/{chatName}/messages/stream", UIEdgeContract.StreamMessagePath);
+        Assert.Equal("chat-delta", UIEdgeContract.ChatDeltaEvent);
     }
 
     [Fact(DisplayName =

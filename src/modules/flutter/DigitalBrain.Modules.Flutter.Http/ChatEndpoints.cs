@@ -33,6 +33,37 @@ internal static class ChatEndpoints
                 return Results.Accepted();
             });
 
+        endpoints.MapPost(
+            UIEdgeContract.StreamMessagePath,
+            static async Task (
+                HttpContext http,
+                string chatName,
+                SendMessageRequest request,
+                IDigitalBrain brain,
+                CancellationToken cancellationToken) =>
+            {
+                ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
+                ArgumentNullException.ThrowIfNull(http);
+                ArgumentNullException.ThrowIfNull(request);
+                ArgumentNullException.ThrowIfNull(brain);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (string.IsNullOrWhiteSpace(request.Text))
+                {
+                    http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                    return;
+                }
+
+                http.Response.Headers.CacheControl = UIEdgeContract.CacheControlNoCache;
+                http.Response.ContentType = UIEdgeContract.EventStreamContentType;
+                await ChatDeltaFeed.WriteChatDeltaSseAsync(
+                    http.Response.Body,
+                    brain,
+                    chatName,
+                    request.Text,
+                    cancellationToken);
+            });
+
         endpoints.MapGet(
             UIEdgeContract.ChatEventsPath,
             static async Task (
