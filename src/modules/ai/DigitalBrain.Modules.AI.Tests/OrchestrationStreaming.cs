@@ -20,6 +20,57 @@ public partial interface IStreamingGroupChatProbe : IGroupChat;
 [Alias("DigitalBrain.ModuleTests.IHeldFirstGroupChatProbe")]
 public partial interface IHeldFirstGroupChatProbe : IGroupChat;
 
+[Alias("DigitalBrain.ModuleTests.IFragmentedParticipantProbe")]
+public partial interface IFragmentedParticipantProbe : IAgent;
+
+[Alias("DigitalBrain.ModuleTests.IFragmentedConcurrentProbe")]
+public partial interface IFragmentedConcurrentProbe : IAgent;
+
+public sealed class FragmentedParticipantProbe : Neuron, IFragmentedParticipantProbe
+{
+    internal const string ParticipantName = "fragmented-participant";
+    internal const string FirstFragment = "first-fragment";
+    internal const string SecondFragment = "second-fragment";
+
+    private static readonly TimeSpan HoldBudget = TimeSpan.FromSeconds(60);
+
+    private static TaskCompletionSource _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    internal static void Arm() => _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    internal static void Release() => _released.TrySetResult();
+
+    public async IAsyncEnumerable<ChatResponseUpdate> RespondStreaming(
+        IReadOnlyList<ChatMessage> messages,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+
+        var release = _released.Task;
+
+        yield return new ChatResponseUpdate(ChatRole.Assistant, FirstFragment);
+
+        await release.WaitAsync(HoldBudget, cancellationToken);
+
+        yield return new ChatResponseUpdate(ChatRole.Assistant, SecondFragment);
+    }
+
+    public Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+
+        return RespondStreaming(messages).ToChatResponseAsync();
+    }
+}
+
+public sealed class FragmentedConcurrentProbe : Concurrent, IFragmentedConcurrentProbe
+{
+    protected override IReadOnlyList<Participant> Participants =>
+    [
+        Participant<IFragmentedParticipantProbe>(FragmentedParticipantProbe.ParticipantName),
+    ];
+}
+
 public sealed class GatedParticipantProbe : Neuron, IGatedParticipantProbe
 {
     internal const string HeldName = "gated-held";
@@ -112,6 +163,8 @@ public sealed class OrchestrationStreaming(ModuleFixture fixture)
     private const string GroupChatTeam = "streaming-group-chat-team";
     private const string HeldFirstTeam = "held-first-group-chat-team";
     private const string SwapTeam = "streamed-fingerprint-team";
+    private const string AbandonTeam = "abandoned-stream-team";
+    private const string FragmentedTeam = "fragmented-concurrent-team";
     private const string Prompt = "prompt";
     private const string ScriptedLeft = "scripted-left-reply";
     private const string ScriptedRight = "scripted-right-reply";
@@ -153,6 +206,64 @@ public sealed class OrchestrationStreaming(ModuleFixture fixture)
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => orchestration.Respond([new ChatMessage(ChatRole.User, Prompt)]));
+    }
+
+    [Fact(Timeout = StreamingTimeout, DisplayName =
+        "Concurrent.RespondStreaming delivers a participant's first fragment before that participant finishes")]
+    public async Task ParticipantFragmentsReachTheCallerBeforeTheParticipantFinishes()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        FragmentedParticipantProbe.Arm();
+
+        var stream = test.Client.Get<IFragmentedConcurrentProbe>(FragmentedTeam)
+            .RespondStreaming([new ChatMessage(ChatRole.User, Prompt)], cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+        var text = new StringBuilder();
+
+        try
+        {
+            await ReadUntilAsync(stream, text, FragmentedParticipantProbe.FirstFragment, cancellationToken);
+
+            Assert.DoesNotContain(FragmentedParticipantProbe.SecondFragment, text.ToString(), StringComparison.Ordinal);
+
+            FragmentedParticipantProbe.Release();
+
+            await ReadUntilAsync(stream, text, FragmentedParticipantProbe.SecondFragment, cancellationToken);
+        }
+        finally
+        {
+            FragmentedParticipantProbe.Release();
+            await stream.DisposeAsync();
+        }
+    }
+
+    [Fact(Timeout = StreamingTimeout, DisplayName =
+        "an abandoned Concurrent.RespondStreaming deliberately leaves the durable session unwritten")]
+    public async Task AbandonedStreamDeliberatelyLeavesTheDurableSessionUnwritten()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        test.Chat().Reply(ScriptedLeft);
+        test.Chat().Reply(ScriptedRight);
+        test.Chat().Reply(ScriptedLeft);
+        test.Chat().Reply(ScriptedRight);
+
+        var orchestration = test.Client.Get<IParticipantSwapConcurrentProbe>(AbandonTeam);
+        var stream = orchestration
+            .RespondStreaming([new ChatMessage(ChatRole.User, Prompt)], cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+
+        Assert.True(
+            await stream.MoveNextAsync().AsTask().WaitAsync(ProgressBudget, cancellationToken),
+            "The stream ended before it could be abandoned mid-run.");
+
+        await stream.DisposeAsync();
+        await orchestration.UseParticipants("left-alt", "right-alt");
+
+        var afterSwap = await orchestration.Respond([new ChatMessage(ChatRole.User, Prompt)]);
+
+        Assert.False(string.IsNullOrWhiteSpace(afterSwap.Text));
     }
 
     [Fact(Timeout = StreamingTimeout, DisplayName =
@@ -198,6 +309,22 @@ public sealed class OrchestrationStreaming(ModuleFixture fixture)
         }
     }
 
+    private static async Task ReadUntilAsync(
+        IAsyncEnumerator<ChatResponseUpdate> stream,
+        StringBuilder text,
+        string marker,
+        CancellationToken cancellationToken)
+    {
+        while (!text.ToString().Contains(marker, StringComparison.Ordinal))
+        {
+            Assert.True(
+                await stream.MoveNextAsync().AsTask().WaitAsync(ProgressBudget, cancellationToken),
+                $"The stream ended before '{marker}' arrived; it carried '{text}'.");
+
+            text.Append(stream.Current.Text);
+        }
+    }
+
     private async Task YieldsBeforeCompletionAsync(
         Func<TestBrain, IAgent> resolve,
         CancellationToken cancellationToken)
@@ -209,31 +336,17 @@ public sealed class OrchestrationStreaming(ModuleFixture fixture)
             .RespondStreaming([new ChatMessage(ChatRole.User, Prompt)], cancellationToken)
             .GetAsyncEnumerator(cancellationToken);
 
+        var text = new StringBuilder();
+
         try
         {
-            Assert.True(
-                await stream.MoveNextAsync().AsTask().WaitAsync(ProgressBudget, cancellationToken),
-                "The stream completed without yielding a single update.");
-            Assert.False(
-                GatedParticipantProbe.Released,
-                "The held participant was released before the first update was observed.");
+            await ReadUntilAsync(stream, text, GatedParticipantProbe.ImmediateReply, cancellationToken);
 
-            var text = new StringBuilder(stream.Current.Text);
+            Assert.DoesNotContain(GatedParticipantProbe.HeldReply, text.ToString(), StringComparison.Ordinal);
 
             GatedParticipantProbe.Release();
 
-            var updatesAfterRelease = 0;
-
-            while (await stream.MoveNextAsync())
-            {
-                updatesAfterRelease++;
-                text.Append(stream.Current.Text);
-            }
-
-            Assert.True(
-                updatesAfterRelease > 0,
-                "No update arrived after the held participant was released.");
-            Assert.Contains(GatedParticipantProbe.HeldReply, text.ToString(), StringComparison.Ordinal);
+            await ReadUntilAsync(stream, text, GatedParticipantProbe.HeldReply, cancellationToken);
         }
         finally
         {

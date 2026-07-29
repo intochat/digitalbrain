@@ -6,37 +6,36 @@ namespace DigitalBrain.AI;
 
 internal sealed class NeuronChatClient(INeuron participant, TaskScheduler turnScheduler) : IChatClient
 {
-    private readonly Func<IReadOnlyList<ChatMessage>, Task<ChatResponse>> _invoke = InvocationFor(participant);
+    private readonly Func<IReadOnlyList<ChatMessage>, CancellationToken, IAsyncEnumerable<ChatResponseUpdate>> _stream =
+        StreamingInvocationFor(participant);
 
     public Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
         CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(messages);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var request = Request(messages, options);
-        var response = Task.Factory.StartNew(
-            () => _invoke(request),
-            cancellationToken,
-            TaskCreationOptions.DenyChildAttach,
-            turnScheduler).Unwrap();
-
-        ObserveFault(response);
-        return response.WaitAsync(cancellationToken);
-    }
+        => GetStreamingResponseAsync(messages, options, cancellationToken).ToChatResponseAsync(cancellationToken);
 
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var response = await GetResponseAsync(messages, options, cancellationToken);
+        ArgumentNullException.ThrowIfNull(messages);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        foreach (var update in response.ToChatResponseUpdates())
+        var updates = _stream(Request(messages, options), cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+
+        try
         {
-            yield return update;
+            while (await MoveNextOnTurnAsync(updates, cancellationToken))
+            {
+                yield return updates.Current;
+            }
+        }
+        finally
+        {
+            await DisposeOnTurnAsync(updates);
         }
     }
 
@@ -47,21 +46,31 @@ internal sealed class NeuronChatClient(INeuron participant, TaskScheduler turnSc
     {
     }
 
-    private static void ObserveFault(Task response)
-        => _ = response.ContinueWith(
-            static completed => _ = completed.Exception,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
-            TaskScheduler.Default);
+    private Task<bool> MoveNextOnTurnAsync(
+        IAsyncEnumerator<ChatResponseUpdate> updates,
+        CancellationToken cancellationToken)
+        => Task.Factory.StartNew(
+            () => updates.MoveNextAsync().AsTask(),
+            cancellationToken,
+            TaskCreationOptions.DenyChildAttach,
+            turnScheduler).Unwrap();
 
-    private static Func<IReadOnlyList<ChatMessage>, Task<ChatResponse>> InvocationFor(INeuron participant)
+    private Task DisposeOnTurnAsync(IAsyncEnumerator<ChatResponseUpdate> updates)
+        => Task.Factory.StartNew(
+            () => updates.DisposeAsync().AsTask(),
+            CancellationToken.None,
+            TaskCreationOptions.DenyChildAttach,
+            turnScheduler).Unwrap();
+
+    private static Func<IReadOnlyList<ChatMessage>, CancellationToken, IAsyncEnumerable<ChatResponseUpdate>>
+        StreamingInvocationFor(INeuron participant)
     {
         ArgumentNullException.ThrowIfNull(participant);
 
         return participant switch
         {
-            ILLM model => model.Respond,
-            IAgent agent => agent.Respond,
+            ILLM model => model.RespondStreaming,
+            IAgent agent => agent.RespondStreaming,
             _ => throw new ArgumentException(
                 $"AI participant '{participant.GetType().FullName}' must implement {nameof(ILLM)} or {nameof(IAgent)}.",
                 nameof(participant)),
