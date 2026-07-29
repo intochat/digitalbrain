@@ -1,13 +1,149 @@
 using System.Diagnostics;
+using System.Text.Json.Nodes;
 using Xunit;
 
 namespace DigitalBrain.ProductTests;
 
 internal static class LiveProductAspire
 {
-    internal static readonly TimeSpan CommandTimeout = TimeSpan.FromMinutes(5);
+    internal static readonly TimeSpan CommandTimeout = TimeSpan.FromMinutes(10);
     internal const string AppHostPath = "os/DigitalBrain.OS.AppHost/DigitalBrain.OS.AppHost.csproj";
     internal const string McpResource = "digitalbrain-mcp";
+    private const string ResourceWaitSeconds = "600";
+
+    internal static async Task RunScenarioAsync(
+        string repository,
+        IReadOnlyList<string> waitResources,
+        Func<Task> scenario,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(waitResources);
+        ArgumentNullException.ThrowIfNull(scenario);
+
+        var started = false;
+        await RunAsync(
+            repository,
+            allowFailure: true,
+            CancellationToken.None,
+            "stop",
+            "--apphost",
+            AppHostPath,
+            "--non-interactive",
+            "--nologo");
+
+        try
+        {
+            await RunAsync(
+                repository,
+                allowFailure: false,
+                cancellationToken,
+                "start",
+                "--apphost",
+                AppHostPath,
+                "--format",
+                "Json",
+                "--non-interactive",
+                "--nologo");
+            started = true;
+
+            foreach (var resource in waitResources)
+            {
+                await RunAsync(
+                    repository,
+                    allowFailure: false,
+                    cancellationToken,
+                    "wait",
+                    resource,
+                    "--apphost",
+                    AppHostPath,
+                    "--timeout",
+                    ResourceWaitSeconds,
+                    "--non-interactive",
+                    "--nologo");
+            }
+
+            await scenario();
+        }
+        finally
+        {
+            if (started)
+            {
+                await RunAsync(
+                    repository,
+                    allowFailure: true,
+                    CancellationToken.None,
+                    "stop",
+                    "--apphost",
+                    AppHostPath,
+                    "--non-interactive",
+                    "--nologo");
+            }
+        }
+    }
+
+    internal static async Task<JsonNode> CallToolAsync(
+        string repository,
+        string tool,
+        string input,
+        CancellationToken cancellationToken)
+    {
+        var result = await RunAsync(
+            repository,
+            allowFailure: false,
+            cancellationToken,
+            "mcp",
+            "call",
+            McpResource,
+            tool,
+            "--input",
+            input,
+            "--apphost",
+            AppHostPath,
+            "--non-interactive",
+            "--nologo");
+        return LiveProductJson.Parse(result.StandardOutput);
+    }
+
+    internal static async Task<JsonObject> WaitForGenAiSpanAsync(
+        string repository,
+        Func<JsonObject, bool> matches,
+        string description,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(matches);
+
+        for (var attempt = 0; attempt < 60; attempt++)
+        {
+            var result = await RunAsync(
+                repository,
+                allowFailure: false,
+                cancellationToken,
+                "otel",
+                "spans",
+                "--apphost",
+                AppHostPath,
+                "--format",
+                "Json",
+                "--limit",
+                "100",
+                "--search",
+                "gen_ai",
+                "--non-interactive",
+                "--nologo");
+            var spans = LiveProductJson.Parse(result.StandardOutput).AsArray();
+            var span = spans.OfType<JsonObject>().FirstOrDefault(matches);
+
+            if (span is not null)
+            {
+                return span;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        }
+
+        throw new Xunit.Sdk.XunitException(
+            $"No matching GenAI span arrived within one minute: {description}.");
+    }
 
     internal static async Task<CommandResult> RunAsync(
         string repository,

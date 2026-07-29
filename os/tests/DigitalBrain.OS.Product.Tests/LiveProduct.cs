@@ -5,6 +5,7 @@ using Xunit;
 
 namespace DigitalBrain.ProductTests;
 
+[Collection("live product")]
 public sealed class LiveProduct
 {
     [Fact(
@@ -19,275 +20,161 @@ public sealed class LiveProduct
         var chatName = $"product-verification-{Guid.NewGuid():N}";
         var commandId = Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
         const string prompt = "Tell me your name in one short sentence.";
-        var started = false;
 
-        await LiveProductAspire.RunAsync(
+        await LiveProductAspire.RunScenarioAsync(
             repository,
-            allowFailure: true,
-            CancellationToken.None,
-            "stop",
-            "--apphost",
-            LiveProductAspire.AppHostPath,
-            "--non-interactive",
-            "--nologo");
-
-        try
-        {
-            await LiveProductAspire.RunAsync(
-                repository,
-                allowFailure: false,
-                cancellationToken,
-                "start",
-                "--apphost",
-                LiveProductAspire.AppHostPath,
-                "--format",
-                "Json",
-                "--non-interactive",
-                "--nologo");
-            started = true;
-
-            foreach (var resource in new[] { "silo", LiveProductAspire.McpResource, "brain-ai-gemma4" })
+            ["silo", LiveProductAspire.McpResource, "brain-ai-gemma4"],
+            async () =>
             {
-                await LiveProductAspire.RunAsync(
-                    repository,
-                    allowFailure: false,
-                    cancellationToken,
-                    "wait",
-                    resource,
-                    "--apphost",
-                    LiveProductAspire.AppHostPath,
-                    "--timeout",
-                    "300",
-                    "--non-interactive",
-                    "--nologo");
-            }
-
-            var sendInput = JsonSerializer.Serialize(
-                new
-                {
-                    text = prompt,
-                    commandId,
-                    chatName,
-                    timeoutSeconds = 300,
-                });
-            var result = await CallToolAsync(
-                repository,
-                "send_chat_message",
-                sendInput,
-                cancellationToken);
-            var response = LiveProductJson.RequiredString(result, "response");
-            var correlationId = LiveProductJson.RequiredString(result, "correlationId");
-
-            Assert.False(string.IsNullOrWhiteSpace(response));
-            Assert.True(Guid.TryParse(LiveProductJson.RequiredString(result, "commandId"), out _));
-            Assert.True(Guid.TryParse(correlationId, out _));
-
-            var retried = await CallToolAsync(
-                repository,
-                "send_chat_message",
-                sendInput,
-                cancellationToken);
-            Assert.Equal(response, LiveProductJson.RequiredString(retried, "response"));
-            Assert.Equal(correlationId, LiveProductJson.RequiredString(retried, "correlationId"));
-
-            var transcript = await CallToolAsync(
-                repository,
-                "read_chat_transcript",
-                JsonSerializer.Serialize(new { chatName }),
-                cancellationToken);
-            var turns = LiveProductJson.RequiredArray(transcript, "turns");
-            Assert.Collection(
-                turns,
-                turn =>
-                {
-                    Assert.Equal("you", LiveProductJson.RequiredString(turn, "speaker"));
-                    Assert.Equal(prompt, LiveProductJson.RequiredString(turn, "text"));
-                },
-                turn =>
-                {
-                    Assert.Equal("brain", LiveProductJson.RequiredString(turn, "speaker"));
-                    Assert.Equal(response, LiveProductJson.RequiredString(turn, "text"));
-                });
-
-            var journal = await CallToolAsync(
-                repository,
-                "read_neuron_journal",
-                JsonSerializer.Serialize(
+                var sendInput = JsonSerializer.Serialize(
                     new
                     {
-                        grainType = "chat",
-                        name = chatName,
-                        kind = "outgoing",
-                        afterSequence = 0,
-                    }),
-                cancellationToken);
-            var entries = LiveProductJson.RequiredArray(journal, "entries");
-            Assert.Contains(
-                entries,
-                entry => string.Equals(
-                    LiveProductJson.RequiredString(entry, "synapse"),
-                    "CapabilityRequested",
-                    StringComparison.Ordinal));
-            Assert.Contains(
-                entries,
-                entry => string.Equals(
-                    LiveProductJson.RequiredString(entry, "synapse"),
-                    "CapabilityCompleted",
-                    StringComparison.Ordinal)
-                    || string.Equals(
-                        LiveProductJson.RequiredString(entry, "synapse"),
-                        "CapabilityAbandoned",
-                        StringComparison.Ordinal));
-
-            var chatFacts = entries
-                .Where(entry => LiveProductJson.RequiredString(entry, "synapse") is "UserMessaged" or "AssistantResponded")
-                .ToArray();
-            Assert.Collection(
-                chatFacts,
-                entry =>
-                {
-                    Assert.Equal("UserMessaged", LiveProductJson.RequiredString(entry, "synapse"));
-                    Assert.Equal(correlationId, LiveProductJson.RequiredString(entry, "correlation"));
-                },
-                entry =>
-                {
-                    Assert.Equal("AssistantResponded", LiveProductJson.RequiredString(entry, "synapse"));
-                    Assert.Equal(correlationId, LiveProductJson.RequiredString(entry, "correlation"));
-                });
-
-            var activeNeurons = await CallToolAsync(
-                repository,
-                "list_active_neurons",
-                "{}",
-                cancellationToken);
-            var activeChat = activeNeurons
-                .AsArray()
-                .Single(neuron =>
-                    string.Equals(LiveProductJson.RequiredString(neuron, "grainType"), "chat", StringComparison.Ordinal)
-                    && string.Equals(
-                        LiveProductJson.RequiredString(neuron, "identity"),
-                        $"dev/{chatName}",
-                        StringComparison.Ordinal));
-            Assert.NotNull(activeChat);
-            Assert.DoesNotContain(
-                "\"silo\"",
-                activeNeurons.ToJsonString(),
-                StringComparison.OrdinalIgnoreCase);
-
-            var span = await WaitForGenAiSpanAsync(repository, prompt, cancellationToken);
-            var attributes = LiveProductJson.RequiredObject(span, "attributes");
-
-            Assert.Equal("chat", LiveProductJson.RequiredString(attributes, "gen_ai.operation.name"));
-            Assert.Equal("ollama", LiveProductJson.RequiredString(attributes, "gen_ai.provider.name"));
-            Assert.Contains(
-                "gemma4",
-                LiveProductJson.RequiredString(attributes, "gen_ai.request.model"),
-                StringComparison.OrdinalIgnoreCase);
-            Assert.True(LiveProductJson.RequiredLong(attributes, "gen_ai.usage.input_tokens") > 0);
-            Assert.True(LiveProductJson.RequiredLong(attributes, "gen_ai.usage.output_tokens") > 0);
-            Assert.False(
-                string.IsNullOrWhiteSpace(
-                    LiveProductJson.RequiredString(attributes, "gen_ai.response.finish_reasons")));
-            Assert.Contains(
-                prompt,
-                LiveProductJson.RequiredString(attributes, "gen_ai.input.messages"),
-                StringComparison.Ordinal);
-            Assert.Contains(
-                response,
-                LiveProductJson.RequiredString(attributes, "gen_ai.output.messages"),
-                StringComparison.Ordinal);
-        }
-        finally
-        {
-            if (started)
-            {
-                await LiveProductAspire.RunAsync(
+                        text = prompt,
+                        commandId,
+                        chatName,
+                        timeoutSeconds = 300,
+                    });
+                var result = await LiveProductAspire.CallToolAsync(
                     repository,
-                    allowFailure: true,
-                    CancellationToken.None,
-                    "stop",
-                    "--apphost",
-                    LiveProductAspire.AppHostPath,
-                    "--non-interactive",
-                    "--nologo");
-            }
-        }
-    }
+                    "send_chat_message",
+                    sendInput,
+                    cancellationToken);
+                var response = LiveProductJson.RequiredString(result, "response");
+                var correlationId = LiveProductJson.RequiredString(result, "correlationId");
 
-    private static async Task<JsonNode> CallToolAsync(
-        string repository,
-        string tool,
-        string input,
-        CancellationToken cancellationToken)
-    {
-        var result = await LiveProductAspire.RunAsync(
-            repository,
-            allowFailure: false,
-            cancellationToken,
-            "mcp",
-            "call",
-            LiveProductAspire.McpResource,
-            tool,
-            "--input",
-            input,
-            "--apphost",
-            LiveProductAspire.AppHostPath,
-            "--non-interactive",
-            "--nologo");
-        return LiveProductJson.Parse(result.StandardOutput);
-    }
+                Assert.False(string.IsNullOrWhiteSpace(response));
+                Assert.True(Guid.TryParse(LiveProductJson.RequiredString(result, "commandId"), out _));
+                Assert.True(Guid.TryParse(correlationId, out _));
 
-    private static async Task<JsonObject> WaitForGenAiSpanAsync(
-        string repository,
-        string prompt,
-        CancellationToken cancellationToken)
-    {
-        for (var attempt = 0; attempt < 60; attempt++)
-        {
-            var result = await LiveProductAspire.RunAsync(
-                repository,
-                allowFailure: false,
-                cancellationToken,
-                "otel",
-                "spans",
-                "--apphost",
-                LiveProductAspire.AppHostPath,
-                "--format",
-                "Json",
-                "--limit",
-                "100",
-                "--search",
-                "gen_ai",
-                "--non-interactive",
-                "--nologo");
-            var spans = LiveProductJson.Parse(result.StandardOutput).AsArray();
-            var span = spans
-                .OfType<JsonObject>()
-                .FirstOrDefault(candidate =>
-                {
-                    var attributes = candidate["attributes"] as JsonObject;
-                    return attributes is not null
+                var retried = await LiveProductAspire.CallToolAsync(
+                    repository,
+                    "send_chat_message",
+                    sendInput,
+                    cancellationToken);
+                Assert.Equal(response, LiveProductJson.RequiredString(retried, "response"));
+                Assert.Equal(correlationId, LiveProductJson.RequiredString(retried, "correlationId"));
+
+                var transcript = await LiveProductAspire.CallToolAsync(
+                    repository,
+                    "read_chat_transcript",
+                    JsonSerializer.Serialize(new { chatName }),
+                    cancellationToken);
+                var turns = LiveProductJson.RequiredArray(transcript, "turns");
+                Assert.Collection(
+                    turns,
+                    turn =>
+                    {
+                        Assert.Equal("you", LiveProductJson.RequiredString(turn, "speaker"));
+                        Assert.Equal(prompt, LiveProductJson.RequiredString(turn, "text"));
+                    },
+                    turn =>
+                    {
+                        Assert.Equal("brain", LiveProductJson.RequiredString(turn, "speaker"));
+                        Assert.Equal(response, LiveProductJson.RequiredString(turn, "text"));
+                    });
+
+                var journal = await LiveProductAspire.CallToolAsync(
+                    repository,
+                    "read_neuron_journal",
+                    JsonSerializer.Serialize(
+                        new
+                        {
+                            grainType = "chat",
+                            name = chatName,
+                            kind = "outgoing",
+                            afterSequence = 0,
+                        }),
+                    cancellationToken);
+                var entries = LiveProductJson.RequiredArray(journal, "entries");
+                Assert.Contains(
+                    entries,
+                    entry => string.Equals(
+                        LiveProductJson.RequiredString(entry, "synapse"),
+                        "CapabilityRequested",
+                        StringComparison.Ordinal));
+                Assert.Contains(
+                    entries,
+                    entry => string.Equals(
+                        LiveProductJson.RequiredString(entry, "synapse"),
+                        "CapabilityCompleted",
+                        StringComparison.Ordinal)
+                        || string.Equals(
+                            LiveProductJson.RequiredString(entry, "synapse"),
+                            "CapabilityAbandoned",
+                            StringComparison.Ordinal));
+
+                var chatFacts = entries
+                    .Where(entry => LiveProductJson.RequiredString(entry, "synapse") is "UserMessaged" or "AssistantResponded")
+                    .ToArray();
+                Assert.Collection(
+                    chatFacts,
+                    entry =>
+                    {
+                        Assert.Equal("UserMessaged", LiveProductJson.RequiredString(entry, "synapse"));
+                        Assert.Equal(correlationId, LiveProductJson.RequiredString(entry, "correlation"));
+                    },
+                    entry =>
+                    {
+                        Assert.Equal("AssistantResponded", LiveProductJson.RequiredString(entry, "synapse"));
+                        Assert.Equal(correlationId, LiveProductJson.RequiredString(entry, "correlation"));
+                    });
+
+                var activeNeurons = await LiveProductAspire.CallToolAsync(
+                    repository,
+                    "list_active_neurons",
+                    "{}",
+                    cancellationToken);
+                var activeChat = activeNeurons
+                    .AsArray()
+                    .Single(neuron =>
+                        string.Equals(LiveProductJson.RequiredString(neuron, "grainType"), "chat", StringComparison.Ordinal)
                         && string.Equals(
-                            LiveProductJson.OptionalString(attributes, "gen_ai.operation.name"),
+                            LiveProductJson.RequiredString(neuron, "identity"),
+                            $"dev/{chatName}",
+                            StringComparison.Ordinal));
+                Assert.NotNull(activeChat);
+                Assert.DoesNotContain(
+                    "\"silo\"",
+                    activeNeurons.ToJsonString(),
+                    StringComparison.OrdinalIgnoreCase);
+
+                var span = await LiveProductAspire.WaitForGenAiSpanAsync(
+                    repository,
+                    candidate => candidate["attributes"] is JsonObject candidateAttributes
+                        && string.Equals(
+                            LiveProductJson.OptionalString(candidateAttributes, "gen_ai.operation.name"),
                             "chat",
                             StringComparison.Ordinal)
                         && string.Equals(
-                            LiveProductJson.OptionalString(attributes, "gen_ai.provider.name"),
+                            LiveProductJson.OptionalString(candidateAttributes, "gen_ai.provider.name"),
                             "ollama",
                             StringComparison.Ordinal)
-                        && LiveProductJson.OptionalString(attributes, "gen_ai.input.messages")
-                            ?.Contains(prompt, StringComparison.Ordinal) is true;
-                });
+                        && LiveProductJson.OptionalString(candidateAttributes, "gen_ai.input.messages")
+                            ?.Contains(prompt, StringComparison.Ordinal) is true,
+                    "content-rich Ollama chat span carrying the prompt",
+                    cancellationToken);
+                var attributes = LiveProductJson.RequiredObject(span, "attributes");
 
-            if (span is not null)
-            {
-                return span;
-            }
-
-            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
-        }
-
-        throw new Xunit.Sdk.XunitException(
-            "No content-rich Ollama GenAI chat span arrived within one minute.");
+                Assert.Equal("chat", LiveProductJson.RequiredString(attributes, "gen_ai.operation.name"));
+                Assert.Equal("ollama", LiveProductJson.RequiredString(attributes, "gen_ai.provider.name"));
+                Assert.Contains(
+                    "gemma4",
+                    LiveProductJson.RequiredString(attributes, "gen_ai.request.model"),
+                    StringComparison.OrdinalIgnoreCase);
+                Assert.True(LiveProductJson.RequiredLong(attributes, "gen_ai.usage.input_tokens") > 0);
+                Assert.True(LiveProductJson.RequiredLong(attributes, "gen_ai.usage.output_tokens") > 0);
+                Assert.False(
+                    string.IsNullOrWhiteSpace(
+                        LiveProductJson.RequiredString(attributes, "gen_ai.response.finish_reasons")));
+                Assert.Contains(
+                    prompt,
+                    LiveProductJson.RequiredString(attributes, "gen_ai.input.messages"),
+                    StringComparison.Ordinal);
+                Assert.Contains(
+                    response,
+                    LiveProductJson.RequiredString(attributes, "gen_ai.output.messages"),
+                    StringComparison.Ordinal);
+            },
+            cancellationToken);
     }
 }
