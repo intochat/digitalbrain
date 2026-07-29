@@ -130,6 +130,51 @@ data: {"sequence":3,"sceneKey":"home","title":"Home refreshed","commandId":"c","
     },
   );
 
+  test(
+    'streamMessage POSTs to /messages/stream and yields chat-delta frames',
+    () async {
+      const body = '''
+event: chat-delta
+data: {"role":"assistant","contents":[{"\$type":"text","text":"the edge "}]}
+
+event: chat-delta
+data: {"role":"assistant","contents":[{"\$type":"text","text":"probe answered"}]}
+
+event: noise
+data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
+
+''';
+
+      http.BaseRequest? seen;
+      final client = DigitalBrainUiEdgeClient(
+        baseUri: Uri.parse('http://ui.example:5080'),
+        httpClient: MockClient((request) async {
+          seen = request;
+          expect(request.method, 'POST');
+          expect(
+            request.url.toString(),
+            'http://ui.example:5080/chats/pulse/messages/stream',
+          );
+          expect(jsonDecode(request.body), {'text': 'hello'});
+          return http.Response(
+            body,
+            200,
+            headers: {'content-type': 'text/event-stream'},
+          );
+        }),
+      );
+
+      final frames = await client
+          .streamMessage(chatName: 'pulse', text: 'hello')
+          .toList();
+
+      expect(seen, isNotNull);
+      expect(frames, hasLength(2));
+      expect(frames.map((frame) => frame.text).join(), 'the edge probe answered');
+      expect(frames.every((frame) => frame.role == 'assistant'), isTrue);
+    },
+  );
+
   test('openScene and activateControl reject non-202', () async {
     final client = DigitalBrainUiEdgeClient(
       baseUri: Uri.parse('http://ui.example:5080'),

@@ -53,6 +53,63 @@ final class SendMessageRequest {
   Map<String, Object?> toJson() => {'text': text};
 }
 
+/// One [ChatResponseUpdate] frame from POST /chats/{name}/messages/stream.
+///
+/// Unknown content `$type` values are retained as [ChatDeltaPart] with raw
+/// fields so older clients do not crash when the edge starts emitting data/uri.
+final class ChatDelta {
+  const ChatDelta({required this.role, required this.contents});
+
+  final String? role;
+  final List<ChatDeltaPart> contents;
+
+  String get text => contents
+      .map((part) => part.text ?? '')
+      .where((value) => value.isNotEmpty)
+      .join();
+
+  factory ChatDelta.fromJson(Map<String, Object?> json) {
+    final rawContents = json['contents'];
+    final contents = rawContents is List
+        ? rawContents
+              .whereType<Map>()
+              .map(
+                (part) =>
+                    ChatDeltaPart.fromJson(Map<String, Object?>.from(part)),
+              )
+              .toList(growable: false)
+        : const <ChatDeltaPart>[];
+
+    return ChatDelta(
+      role: json['role'] as String?,
+      contents: contents,
+    );
+  }
+}
+
+final class ChatDeltaPart {
+  const ChatDeltaPart({
+    required this.type,
+    this.text,
+    required this.raw,
+  });
+
+  final String type;
+  final String? text;
+  final Map<String, Object?> raw;
+
+  bool get isText => type == 'text';
+
+  factory ChatDeltaPart.fromJson(Map<String, Object?> json) {
+    final type = json[r'$type'] as String? ?? 'unknown';
+    return ChatDeltaPart(
+      type: type,
+      text: json['text'] as String?,
+      raw: Map<String, Object?>.from(json),
+    );
+  }
+}
+
 final class ChatTurnEvent {
   const ChatTurnEvent({
     required this.sequence,

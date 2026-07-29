@@ -58,6 +58,42 @@ void main() {
     expect(event.timestamp, DateTime.utc(2026, 7, 28, 8));
   });
 
+  test('ChatDelta reads AIContent type-discriminator text frames from the stream edge', () {
+    final delta = ChatDelta.fromJson({
+      'role': 'assistant',
+      'contents': [
+        {r'$type': 'text', 'text': 'Hel'},
+        {r'$type': 'text', 'text': 'lo'},
+      ],
+    });
+
+    expect(delta.role, 'assistant');
+    expect(delta.contents, hasLength(2));
+    expect(delta.contents.every((part) => part.isText), isTrue);
+    expect(delta.text, 'Hello');
+  });
+
+  test('ChatDeltaPart keeps unknown \$type as opaque raw fields', () {
+    final delta = ChatDelta.fromJson({
+      'role': 'assistant',
+      'contents': [
+        {r'$type': 'text', 'text': 'hi'},
+        {
+          r'$type': 'data',
+          'mediaType': 'image/png',
+          'uri': 'data:image/png;base64,abc',
+        },
+      ],
+    });
+
+    expect(delta.contents, hasLength(2));
+    expect(delta.contents[0].isText, isTrue);
+    expect(delta.contents[1].type, 'data');
+    expect(delta.contents[1].isText, isFalse);
+    expect(delta.contents[1].raw['mediaType'], 'image/png');
+    expect(delta.text, 'hi');
+  });
+
   test('BrainTopologySnapshot carries configured modules and live neurons', () {
     final topology = BrainTopologySnapshot.fromJson({
       'modules': [

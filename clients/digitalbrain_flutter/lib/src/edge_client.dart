@@ -5,6 +5,7 @@ import 'package:digitalbrain_wire/digitalbrain_wire.dart';
 import 'package:http/http.dart' as http;
 
 import 'host_environment.dart';
+import 'sse_chat_delta_frames.dart';
 import 'sse_chat_frames.dart';
 import 'sse_frames.dart';
 
@@ -115,6 +116,36 @@ final class DigitalBrainUiEdgeClient {
       throw StateError(
         'send-message failed: ${response.statusCode} ${response.body}',
       );
+    }
+  }
+
+  Stream<ChatDelta> streamMessage({
+    required String chatName,
+    required String text,
+  }) async* {
+    final uri = baseUri.replace(path: '/chats/$chatName/messages/stream');
+    final request = http.Request('POST', uri)
+      ..headers['content-type'] = 'application/json'
+      ..body = jsonEncode(SendMessageRequest(text: text).toJson());
+    final response = await _http.send(request);
+    if (response.statusCode != 200) {
+      throw StateError(
+        'stream-message failed: ${response.statusCode}',
+      );
+    }
+
+    final lines = response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+
+    final parser = SseChatDeltaParser();
+    await for (final line in lines) {
+      for (final delta in parser.addLine(line)) {
+        yield delta;
+      }
+    }
+    for (final delta in parser.flush()) {
+      yield delta;
     }
   }
 

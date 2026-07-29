@@ -4,6 +4,8 @@ export 'package:digitalbrain_wire/digitalbrain_wire.dart'
         BrainModule,
         BrainNeuron,
         BrainTopologySnapshot,
+        ChatDelta,
+        ChatDeltaPart,
         ChatTurnEvent,
         OpenSceneRequest,
         SceneOpenedEvent,
@@ -12,5 +14,6 @@ export 'package:digitalbrain_wire/digitalbrain_wire.dart'
 export 'src/edge_client.dart';
 export 'src/host_environment.dart';
 export 'src/shell_surface.dart';
+export 'src/sse_chat_delta_frames.dart';
 export 'src/sse_chat_frames.dart';
 export 'src/sse_frames.dart';
