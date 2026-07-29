@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Journaling;
 using Orleans.TestingHost;
 
@@ -18,6 +19,7 @@ internal sealed class FixtureCluster : IAsyncDisposable
     private readonly VolatileReminderTable _reminderTable = new();
     private readonly ControllableTimeProvider _clock = new(FixedEpoch);
     private readonly TestEdgeRegistry _edges;
+    private readonly TimeSpan? _responseTimeout;
 #pragma warning disable CA2213 // The cluster is disposed asynchronously in DisposeAsync.
     private InProcessTestCluster? _cluster;
 #pragma warning restore CA2213
@@ -27,6 +29,7 @@ internal sealed class FixtureCluster : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(composition);
         _modules = composition.Modules.ToArray();
         _edges = composition.Edges;
+        _responseTimeout = composition.ResponseTimeout;
         _edges.AttachTimeProvider(_clock, _clock.Reset);
     }
 
@@ -151,12 +154,24 @@ internal sealed class FixtureCluster : IAsyncDisposable
                 new TestReminderRegistry(_reminderTable, _clock));
             silo.Services.AddSingleton<IJournalStorageProvider>(_journalStorage);
             _edges.ConfigureServices(silo.Services);
+
+            if (_responseTimeout is { } siloResponseTimeout)
+            {
+                silo.Services.Configure<SiloMessagingOptions>(
+                    messaging => messaging.ResponseTimeout = siloResponseTimeout);
+            }
         });
         builder.ConfigureClient(client =>
         {
             foreach (var module in _modules)
             {
                 module.PrepareSerialization(client.Services);
+            }
+
+            if (_responseTimeout is { } clientResponseTimeout)
+            {
+                client.Services.Configure<ClientMessagingOptions>(
+                    messaging => messaging.ResponseTimeout = clientResponseTimeout);
             }
         });
 

@@ -70,7 +70,7 @@ public sealed class ChatStreamingTurn(ChatFixture fixture)
     private static readonly Assembly ChatVocabulary = typeof(UserMessaged).Assembly;
     private static readonly TimeSpan ProgressBudget = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan SettleStep = TimeSpan.FromMilliseconds(100);
-    private static readonly TimeSpan PastOrleansDefaultResponseTimeout = TimeSpan.FromSeconds(35);
+    private static readonly TimeSpan PastResponseTimeout = ChatFixture.ResponseTimeout + TimeSpan.FromSeconds(2);
 
     [Fact(Timeout = StreamingTimeout, DisplayName =
         "a drained IChat.SendStreaming yields many chunks and journals one AssistantResponded carrying all of them")]
@@ -179,8 +179,8 @@ public sealed class ChatStreamingTurn(ChatFixture fixture)
     }
 
     [Fact(Timeout = StreamingTimeout, DisplayName =
-        "IChat.Send survives a model turn longer than Orleans' default response timeout")]
-    public async Task SendSurvivesAModelTurnLongerThanTheDefaultResponseTimeout()
+        "IChat.Send survives a model turn longer than the response timeout")]
+    public async Task SendSurvivesAModelTurnLongerThanTheResponseTimeout()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
@@ -189,7 +189,7 @@ public sealed class ChatStreamingTurn(ChatFixture fixture)
         var chat = test.Client.Get<IChat>(SlowChatName);
         var sending = chat.Send(new SendMessage(CommandId.New(), Prompt));
 
-        await Task.Delay(PastOrleansDefaultResponseTimeout, cancellationToken);
+        await Task.Delay(PastResponseTimeout, cancellationToken);
         ChatStreamingAssistant.Release();
 
         await sending;

@@ -9,6 +9,7 @@ public sealed class DigitalBrainTestBuilder
 {
     private readonly TestEdgeRegistry _edges = new();
     private readonly Dictionary<ModuleId, ICompiledModule> _modules = [];
+    private TimeSpan? _responseTimeout;
     private bool _sealed;
 
     public void AddModule<TModule>()
@@ -41,10 +42,17 @@ public sealed class DigitalBrainTestBuilder
         _edges.ConfigureMcpSessionFactory(factory, script, reset);
     }
 
+    public void WithResponseTimeout(TimeSpan timeout)
+    {
+        ThrowIfSealed();
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(timeout, TimeSpan.Zero);
+        _responseTimeout = timeout;
+    }
+
     internal TestFixtureComposition Seal()
     {
         _sealed = true;
-        return new(_modules.Values.ToArray(), _edges);
+        return new(_modules.Values.ToArray(), _edges, _responseTimeout);
     }
 
     private void ThrowIfSealed()
@@ -57,4 +65,7 @@ public sealed class DigitalBrainTestBuilder
     }
 }
 
-internal sealed record TestFixtureComposition(IReadOnlyCollection<ICompiledModule> Modules, TestEdgeRegistry Edges);
+internal sealed record TestFixtureComposition(
+    IReadOnlyCollection<ICompiledModule> Modules,
+    TestEdgeRegistry Edges,
+    TimeSpan? ResponseTimeout);
