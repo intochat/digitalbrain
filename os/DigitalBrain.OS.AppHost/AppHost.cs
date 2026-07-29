@@ -20,6 +20,7 @@ brain.AddModule<AIModule>(ai =>
 {
     ai.EnableSensitiveData = builder.Environment.IsDevelopment();
     ai.WithLlm<Gemma4>();
+    ai.WithLlm<Llama32>();
 });
 brain.AddModule<ChatModule>();
 brain.AddModule<OSBehaviorsModule>();
