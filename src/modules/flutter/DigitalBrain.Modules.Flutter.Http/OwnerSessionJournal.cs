@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Flutter;
+using DigitalBrain.Mcp;
 
 namespace DigitalBrain.UI;
 
@@ -77,6 +78,18 @@ internal sealed class OwnerSessionJournal
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
         return WatchOutgoingAsync(NeuronId.For<IChat>(_owner, chatName), afterSequence, cancellationToken);
+    }
+
+    public IAsyncEnumerable<JournalRead> WatchAuthorizationOutgoingAsync(
+        long afterSequence,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
+
+        return WatchOutgoingAsync(
+            NeuronId.For<IMcpAuthorization>(_owner, McpAuthorizationNeuron.InstanceName),
+            afterSequence,
+            cancellationToken);
     }
 
     [SuppressMessage(

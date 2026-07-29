@@ -35,4 +35,24 @@ public static class UiHttpContract
     public const string BrainTopologyPath = "/brain/topology";
 
     public const string McpOAuthCallbackPath = "/oauth/mcp/callback";
+
+    public const string AuthorizationEventsPath = "/authorizations/events";
+
+    public const string AuthorizationEvent = "authorization";
+
+    public const string BehaviorPath = "/behaviors/{behaviorId}";
+
+    public const string BehaviorProposePath = "/behaviors/{behaviorId}/propose";
+
+    public const string BehaviorTestsPath = "/behaviors/{behaviorId}/tests";
+
+    public const string BehaviorApprovePath = "/behaviors/{behaviorId}/approve";
+
+    public const string BehaviorEditorSurfacePath = "/surfaces/behavior-editor";
+
+    public const string BehaviorEditorSceneKey = "behavior-editor";
+
+    public const string BehaviorEditorSceneTitle = "Behavior editor";
+
+    public const string AccountEnrichmentBehaviorId = "com.digitalbrain.account-enrichment";
 }

@@ -8,6 +8,9 @@ internal static class UIHost
 
         app.MapUI();
         app.MapChat();
+        app.MapAuthorizations();
+        app.MapBehaviors();
+        app.MapBehaviorEditorSurface();
         app.MapBrain();
         app.MapMcpOAuthCallback();
         return app;

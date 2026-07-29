@@ -12,17 +12,21 @@ final class BrainChatApp extends StatelessWidget {
     super.key,
     required this.chatName,
     this.turns,
+    this.authorizations,
     this.onLoadTopology,
     this.onSend,
     this.onStream,
+    this.onOpenSignIn,
     this.statusMessage,
   });
 
   final String chatName;
   final Stream<ChatTurnEvent>? turns;
+  final Stream<AuthorizationEvent>? authorizations;
   final LoadTopology? onLoadTopology;
   final SendMessage? onSend;
   final StreamMessage? onStream;
+  final OpenUrl? onOpenSignIn;
   final String? statusMessage;
 
   @override
@@ -34,9 +38,11 @@ final class BrainChatApp extends StatelessWidget {
       home: BrainWorkspace(
         chatName: chatName,
         turns: turns,
+        authorizations: authorizations,
         onLoadTopology: onLoadTopology,
         onSend: onSend,
         onStream: onStream,
+        onOpenSignIn: onOpenSignIn,
         statusMessage: statusMessage,
       ),
     );

@@ -1,4 +1,5 @@
 using DigitalBrain.AI;
+using DigitalBrain.Behaviors;
 using DigitalBrain.Chat;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
@@ -38,12 +39,15 @@ public sealed class UIFixture : DigitalBrainFixture
             {
                 ["DigitalBrain:Modules:0"] = FlutterModule.Id.Value,
                 ["DigitalBrain:Modules:1"] = ChatModule.Id.Value,
+                ["DigitalBrain:Modules:2"] = BehaviorsModule.Id.Value,
             });
         builder.Services.AddSingleton(test.Client);
         builder.Services.AddSingleton<IGrainFactory>(test.Cluster.Client);
         builder.Services.AddUiHttpServices();
 
         var app = builder.Build();
+        app.UseDefaultFiles();
+        app.UseStaticFiles();
         app.MapDefaultEndpoints();
         app.MapUIHost();
         await app.StartAsync(cancellationToken);
@@ -58,5 +62,6 @@ public sealed class UIFixture : DigitalBrainFixture
         brain.AddModule<FlutterModule>();
         brain.AddModule<ChatModule>();
         brain.AddModule<AIModule>();
+        brain.AddModule<BehaviorsModule>();
     }
 }

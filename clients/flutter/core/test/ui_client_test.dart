@@ -72,6 +72,48 @@ data: {"sequence":5,"sceneKey":"countdown","title":"Countdown","commandId":"d","
     },
   );
 
+  test('watchAuthorizations streams authorization journal SSE', () async {
+    const body = '''
+: connected
+
+id: 1
+event: authorization
+data: {"sequence":1,"kind":"AuthorizationRequired","commandId":"c1","serverKey":"google.gmail","serverDisplayName":"DigitalBrain Gmail","signInUrl":"https://ui.test/oauth?state=s1","state":"s1","timestamp":"2026-07-28T08:00:00Z"}
+
+id: 2
+event: noise
+data: {"sequence":2,"kind":"AuthorizationRequired","commandId":"c2","serverKey":"x","state":"x","timestamp":"2026-07-28T08:00:01Z"}
+
+id: 3
+event: authorization
+data: {"sequence":3,"kind":"AuthorizationCompleted","commandId":"c1","serverKey":"google.gmail","state":"s1","timestamp":"2026-07-28T08:00:02Z"}
+
+''';
+
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://ui.example:5080'),
+      httpClient: MockClient((request) async {
+        expect(request.method, 'GET');
+        expect(
+          request.url.toString(),
+          'http://ui.example:5080/authorizations/events?afterSequence=0',
+        );
+        return http.Response(
+          body,
+          200,
+          headers: {'content-type': 'text/event-stream'},
+        );
+      }),
+    );
+
+    final events = await client.watchAuthorizations().toList();
+    expect(events, hasLength(2));
+    expect(events[0].isRequired, isTrue);
+    expect(events[0].serverDisplayName, 'DigitalBrain Gmail');
+    expect(events[1].isCompleted, isTrue);
+    expect(SignInCardProjection.project(events), isEmpty);
+  });
+
   test(
     'watchShellEvents multi-event SSE projects into one ShellSurfaceController without restart',
     () async {

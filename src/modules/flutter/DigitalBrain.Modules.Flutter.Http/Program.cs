@@ -10,6 +10,8 @@ builder.AddDigitalBrainClient();
 builder.Services.AddUiHttpServices();
 
 var app = builder.Build();
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.MapDefaultEndpoints();
 app.MapUIHost();
 app.Run();

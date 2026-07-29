@@ -42,6 +42,13 @@ public sealed class UiHttpVocabulary(UIFixture fixture)
         Assert.Equal("/chats/{chatName}/messages/stream", UiHttpContract.StreamMessagePath);
         Assert.Equal("chat-delta", UiHttpContract.ChatDeltaEvent);
         Assert.Equal("/oauth/mcp/callback", UiHttpContract.McpOAuthCallbackPath);
+        Assert.Equal("/authorizations/events", UiHttpContract.AuthorizationEventsPath);
+        Assert.Equal("authorization", UiHttpContract.AuthorizationEvent);
+        Assert.Equal("/behaviors/{behaviorId}", UiHttpContract.BehaviorPath);
+        Assert.Equal("/behaviors/{behaviorId}/propose", UiHttpContract.BehaviorProposePath);
+        Assert.Equal("/behaviors/{behaviorId}/tests", UiHttpContract.BehaviorTestsPath);
+        Assert.Equal("/behaviors/{behaviorId}/approve", UiHttpContract.BehaviorApprovePath);
+        Assert.Equal("/surfaces/behavior-editor", UiHttpContract.BehaviorEditorSurfacePath);
     }
 
     [Fact(DisplayName =

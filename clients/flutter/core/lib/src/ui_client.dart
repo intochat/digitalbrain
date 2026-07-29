@@ -5,6 +5,7 @@ import 'ui_models.dart';
 import 'package:http/http.dart' as http;
 
 import 'host_environment.dart';
+import 'sse_authorization_frames.dart';
 import 'sse_chat_delta_frames.dart';
 import 'sse_chat_frames.dart';
 import 'sse_frames.dart';
@@ -151,6 +152,34 @@ final class DigitalBrainUiClient {
         .transform(const LineSplitter());
 
     final parser = SseChatTurnParser();
+    await for (final line in lines) {
+      for (final event in parser.addLine(line)) {
+        yield event;
+      }
+    }
+    for (final event in parser.flush()) {
+      yield event;
+    }
+  }
+
+  Stream<AuthorizationEvent> watchAuthorizations({
+    int afterSequence = 0,
+  }) async* {
+    final uri = baseUri.replace(
+      path: '/authorizations/events',
+      queryParameters: {'afterSequence': '$afterSequence'},
+    );
+    final request = http.Request('GET', uri);
+    final response = await _http.send(request);
+    if (response.statusCode != 200) {
+      throw StateError('authorization events failed: ${response.statusCode}');
+    }
+
+    final lines = response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+
+    final parser = SseAuthorizationParser();
     await for (final line in lines) {
       for (final event in parser.addLine(line)) {
         yield event;

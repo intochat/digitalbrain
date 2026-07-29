@@ -1,0 +1,14 @@
+/* First-cut Monaco shell styles. Replace with full monaco-editor CSS when vendored. */
+html, body { height: 100%; }
+.monaco-editor-fallback {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  resize: none;
+  padding: 12px;
+  background: #11141b;
+  color: #e9ebf2;
+  font: 13px/1.45 Consolas, "Cascadia Mono", monospace;
+  outline: none;
+}

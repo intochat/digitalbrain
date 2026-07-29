@@ -14,17 +14,21 @@ final class BrainWorkspace extends StatefulWidget {
     super.key,
     required this.chatName,
     this.turns,
+    this.authorizations,
     this.onLoadTopology,
     this.onSend,
     this.onStream,
+    this.onOpenSignIn,
     this.statusMessage,
   });
 
   final String chatName;
   final Stream<ChatTurnEvent>? turns;
+  final Stream<AuthorizationEvent>? authorizations;
   final LoadTopology? onLoadTopology;
   final SendMessage? onSend;
   final StreamMessage? onStream;
+  final OpenUrl? onOpenSignIn;
   final String? statusMessage;
 
   @override
@@ -36,8 +40,12 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
 
   final _turns = <ChatTurnEvent>[];
   final _seen = <int>{};
+  final _authorizationEvents = <AuthorizationEvent>[];
+  final _seenAuthorizations = <int>{};
   List<ChatTurnEvent> _projectedTurns = const [];
+  List<SignInCardProjection> _signInCards = const [];
   StreamSubscription<ChatTurnEvent>? _subscription;
+  StreamSubscription<AuthorizationEvent>? _authorizationSubscription;
   BrainTopologySnapshot? _topology;
   int _destination = 0;
   int _topologyLoadEpoch = 0;
@@ -48,6 +56,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
   void initState() {
     super.initState();
     _listen(widget.turns);
+    _listenAuthorizations(widget.authorizations);
     unawaited(_refreshTopology());
   }
 
@@ -63,6 +72,10 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
     if (!identical(oldWidget.turns, widget.turns)) {
       unawaited(_subscription?.cancel());
       _listen(widget.turns);
+    }
+    if (!identical(oldWidget.authorizations, widget.authorizations)) {
+      unawaited(_authorizationSubscription?.cancel());
+      _listenAuthorizations(widget.authorizations);
     }
     if (!identical(oldWidget.onLoadTopology, widget.onLoadTopology)) {
       unawaited(_refreshTopology());
@@ -82,6 +95,25 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
           _projectedTurns = List<ChatTurnEvent>.unmodifiable(_turns);
         });
         unawaited(_refreshTopology());
+      },
+      onError: (Object error) {
+        if (mounted) {
+          setState(() => _turnFailure = '$error');
+        }
+      },
+    );
+  }
+
+  void _listenAuthorizations(Stream<AuthorizationEvent>? authorizations) {
+    _authorizationSubscription = authorizations?.listen(
+      (event) {
+        if (!mounted || !_seenAuthorizations.add(event.sequence)) {
+          return;
+        }
+        setState(() {
+          _authorizationEvents.add(event);
+          _signInCards = SignInCardProjection.project(_authorizationEvents);
+        });
       },
       onError: (Object error) {
         if (mounted) {
@@ -133,6 +165,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
   @override
   void dispose() {
     unawaited(_subscription?.cancel());
+    unawaited(_authorizationSubscription?.cancel());
     super.dispose();
   }
 
@@ -142,8 +175,10 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
       BrainChatScreen(
         chatName: widget.chatName,
         turns: _projectedTurns,
+        signInCards: _signInCards,
         onSend: widget.onSend,
         onStream: widget.onStream,
+        onOpenSignIn: widget.onOpenSignIn,
       ),
       ActivityScreen(turns: _projectedTurns),
       BrainScreen(

@@ -44,6 +44,63 @@ void main() {
     await drainShellTimers(tester);
   });
 
+  testWidgets(
+    'authorization required projects a sign-in card and completed resolves it',
+    (tester) async {
+      await prepareShellSurface(tester);
+      final turns = StreamController<ChatTurnEvent>();
+      final authorizations = StreamController<AuthorizationEvent>();
+      final opened = <Uri>[];
+      addTearDown(turns.close);
+      addTearDown(authorizations.close);
+
+      await tester.pumpWidget(
+        BrainChatApp(
+          chatName: 'main',
+          turns: turns.stream,
+          authorizations: authorizations.stream,
+          onOpenSignIn: (url) async => opened.add(url),
+        ),
+      );
+
+      authorizations.add(
+        AuthorizationEvent(
+          sequence: 1,
+          kind: 'AuthorizationRequired',
+          commandId: 'cmd-1',
+          serverKey: 'google.gmail',
+          serverDisplayName: 'DigitalBrain Gmail',
+          signInUrl: 'https://ui.test/oauth?state=s1',
+          state: 's1',
+          timestamp: DateTime.utc(2026, 7, 28, 8),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('sign_in_card_rail')), findsOneWidget);
+      expect(find.text('DigitalBrain Gmail'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('sign_in_open_s1')));
+      await tester.pumpAndSettle();
+      expect(opened, [Uri.parse('https://ui.test/oauth?state=s1')]);
+
+      authorizations.add(
+        AuthorizationEvent(
+          sequence: 2,
+          kind: 'AuthorizationCompleted',
+          commandId: 'cmd-1',
+          serverKey: 'google.gmail',
+          state: 's1',
+          timestamp: DateTime.utc(2026, 7, 28, 8, 1),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('sign_in_card_rail')), findsNothing);
+      expect(find.text('DigitalBrain Gmail'), findsNothing);
+      await drainShellTimers(tester);
+    },
+  );
+
   testWidgets('sending hands the text to the edge and shows the journal answer', (
     tester,
   ) async {

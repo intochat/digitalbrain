@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
@@ -23,10 +25,26 @@ void main() {
       chatName: chat,
       statusMessage: status,
       turns: edge?.watchChatTurns(chatName: chat),
+      authorizations: edge?.watchAuthorizations(),
       onLoadTopology: edge?.readBrainTopology,
       onStream: edge == null
           ? null
           : (text) => edge.streamMessage(chatName: chat, text: text),
+      onOpenSignIn: openSystemBrowser,
     ),
   );
+}
+
+Future<void> openSystemBrowser(Uri url) async {
+  if (Platform.isWindows) {
+    await Process.start('cmd', ['/c', 'start', '', url.toString()]);
+    return;
+  }
+
+  if (Platform.isMacOS) {
+    await Process.start('open', [url.toString()]);
+    return;
+  }
+
+  await Process.start('xdg-open', [url.toString()]);
 }

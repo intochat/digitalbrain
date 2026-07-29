@@ -18,14 +18,18 @@ final class BrainChatScreen extends StatefulWidget {
     super.key,
     required this.chatName,
     required this.turns,
+    this.signInCards = const [],
     this.onSend,
     this.onStream,
+    this.onOpenSignIn,
   });
 
   final String chatName;
   final List<ChatTurnEvent> turns;
+  final List<SignInCardProjection> signInCards;
   final SendMessage? onSend;
   final StreamMessage? onStream;
+  final OpenUrl? onOpenSignIn;
 
   @override
   State<BrainChatScreen> createState() => _BrainChatScreenState();
@@ -208,6 +212,11 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
       color: BrainPalette.surface,
       child: Column(
         children: [
+          if (widget.signInCards.isNotEmpty)
+            SignInCardRail(
+              cards: widget.signInCards,
+              onOpenSignIn: widget.onOpenSignIn,
+            ),
           Expanded(
             child: ChangeNotifierProvider.value(
               value: _streamStates,
@@ -295,6 +304,97 @@ final class FailureNotice extends StatelessWidget {
       child: Text(
         message,
         style: BrainType.meta.copyWith(color: BrainPalette.signal),
+      ),
+    );
+  }
+}
+
+final class SignInCardRail extends StatelessWidget {
+  const SignInCardRail({
+    super.key,
+    required this.cards,
+    this.onOpenSignIn,
+  });
+
+  final List<SignInCardProjection> cards;
+  final OpenUrl? onOpenSignIn;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const Key('sign_in_card_rail'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final card in cards)
+          SignInCard(
+            key: Key('sign_in_card_${card.state}'),
+            card: card,
+            onOpenSignIn: onOpenSignIn,
+          ),
+      ],
+    );
+  }
+}
+
+final class SignInCard extends StatelessWidget {
+  const SignInCard({
+    super.key,
+    required this.card,
+    this.onOpenSignIn,
+  });
+
+  final SignInCardProjection card;
+  final OpenUrl? onOpenSignIn;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: BrainPalette.surfaceRaised,
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          border: Border.all(color: BrainPalette.line),
+          borderRadius: BorderRadius.circular(10),
+          color: BrainPalette.surfaceSunken,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    card.serverDisplayName,
+                    style: BrainType.metaStrong.copyWith(
+                      color: BrainPalette.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Sign in to continue this chat turn.',
+                    style: BrainType.meta.copyWith(
+                      color: BrainPalette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            FilledButton(
+              key: Key('sign_in_open_${card.state}'),
+              onPressed: onOpenSignIn == null
+                  ? null
+                  : () => unawaited(onOpenSignIn!(card.signInUrl)),
+              style: FilledButton.styleFrom(
+                backgroundColor: BrainPalette.signal.withValues(alpha: 0.16),
+                foregroundColor: BrainPalette.signal,
+              ),
+              child: const Text('Sign in'),
+            ),
+          ],
+        ),
       ),
     );
   }
