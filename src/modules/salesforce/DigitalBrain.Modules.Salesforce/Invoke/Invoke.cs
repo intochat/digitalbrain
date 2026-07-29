@@ -8,7 +8,20 @@ namespace DigitalBrain.Salesforce;
 internal sealed partial class Salesforce
 {
     private async Task<MutationData> InvokeUpdateAsync(MutationData mutation, CancellationToken cancellationToken)
-        => await _runtime.RunAsync(
+    {
+        await McpAuthorizationRail.EnsureAuthorizedAsync(
+            GrainFactory,
+            Id.Owner,
+            ServiceProvider,
+            TimeProvider,
+            mutation.CommandId,
+            Server,
+            _tokenState,
+            () => WriteStateAsync(),
+            _durableIdentity,
+            cancellationToken);
+
+        return await _runtime.RunAsync(
             Server,
             _tokenState,
             () => WriteStateAsync(),
@@ -40,6 +53,7 @@ internal sealed partial class Salesforce
                 };
             },
             cancellationToken);
+    }
 
     private static Dictionary<string, object?> UpdateArguments(MutationData mutation)
         => new Dictionary<string, object?>(StringComparer.Ordinal)
@@ -71,6 +85,18 @@ internal sealed partial class Salesforce
     {
         try
         {
+            await McpAuthorizationRail.EnsureAuthorizedAsync(
+                GrainFactory,
+                Id.Owner,
+                ServiceProvider,
+                TimeProvider,
+                mutation.CommandId,
+                Server,
+                _tokenState,
+                () => WriteStateAsync(),
+                _durableIdentity,
+                cancellationToken);
+
             var content = await _runtime.RunAsync(
                 Server,
                 _tokenState,

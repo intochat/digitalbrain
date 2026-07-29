@@ -9,7 +9,11 @@ namespace DigitalBrain.Integrations.Tests;
 public partial interface IIntegrationDriver : INeuron
 {
     [Alias(nameof(ReadGmailMessage))]
-    Task<GmailMessage> ReadGmailMessage(string account, string messageId, CancellationToken cancellationToken);
+    Task<GmailMessage> ReadGmailMessage(
+        CommandId commandId,
+        string account,
+        string messageId,
+        CancellationToken cancellationToken);
 
     [Alias(nameof(ProposeSalesforceAccountDescription))]
     Task<SalesforceAccountDescriptionMutation> ProposeSalesforceAccountDescription(
@@ -42,14 +46,18 @@ internal sealed class IntegrationDriver :
         return Task.CompletedTask;
     }
 
-    public Task<GmailMessage> ReadGmailMessage(string account, string messageId, CancellationToken cancellationToken)
+    public Task<GmailMessage> ReadGmailMessage(
+        CommandId commandId,
+        string account,
+        string messageId,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(account);
         ArgumentException.ThrowIfNullOrWhiteSpace(messageId);
 
         return GrainFactory
             .GetGrain<IGmail>(NeuronId.For<IGmail>(Id.Owner, account).ToGrainId())
-            .ReadMessage(messageId, cancellationToken);
+            .ReadMessage(commandId, messageId, cancellationToken);
     }
 
     public Task<SalesforceAccountDescriptionMutation> ProposeSalesforceAccountDescription(

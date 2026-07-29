@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
+using DigitalBrain.Mcp;
 using ModelContextProtocol.Server;
 
 namespace DigitalBrain.OS.Mcp;
@@ -45,6 +46,7 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
         }
 
         var chatId = NeuronId.For<IChat>(brain.Owner, chatName);
+        var authorizationId = NeuronId.For<IMcpAuthorization>(brain.Owner, McpAuthorizationNeuron.InstanceName);
         var session = grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(brain.Owner).ToGrainId());
         var command = new CommandId(commandIdentity);
 
@@ -59,6 +61,7 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
                 grains,
                 session,
                 chatId,
+                authorizationId,
                 chatName,
                 command,
                 afterSequence: 0,
@@ -80,6 +83,7 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
         IGrainFactory grains,
         ISessionNeuron session,
         NeuronId chatId,
+        NeuronId authorizationId,
         string chatName,
         CommandId commandId,
         long afterSequence,
@@ -87,12 +91,23 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
     {
         var observer = new ChannelJournalObserver(JournalKind.Outgoing);
         var reference = grains.CreateObjectReference<IJournalObserver>(observer);
+        long authorizationCursor = 0;
         try
         {
             await session.WatchNeuron(chatId, JournalKind.Outgoing, afterSequence, reference);
 
             await foreach (var page in observer.Reads.ReadAllAsync(cancellationToken))
             {
+                var authorizationPage = await session.ReadNeuronJournal(
+                    authorizationId,
+                    JournalKind.Outgoing,
+                    authorizationCursor);
+                ThrowIfAuthorizationRequired(authorizationPage);
+                if (authorizationPage.Delta.Count > 0)
+                {
+                    authorizationCursor = authorizationPage.Delta[^1].Sequence;
+                }
+
                 foreach (var delivery in page.Delta)
                 {
                     if (delivery.Synapse is AssistantResponded response
@@ -131,6 +146,19 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
             }
 
             observer.Complete();
+        }
+    }
+
+    private static void ThrowIfAuthorizationRequired(JournalRead page)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+
+        foreach (var delivery in page.Delta)
+        {
+            if (delivery.Synapse is AuthorizationRequired required)
+            {
+                throw McpAuthorizationElicitation.For(required);
+            }
         }
     }
 }

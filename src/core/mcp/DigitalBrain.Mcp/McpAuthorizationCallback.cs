@@ -10,12 +10,18 @@ internal static class McpAuthorizationCallback
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        return string.Equals(
-            configuration[McpRuntimeHosting.AuthorizationModeKey],
-            McpRuntimeHosting.LocalLoopbackDevelopmentMode,
-            StringComparison.Ordinal)
-            ? LocalLoopbackMcpAuthorizationCallback.AuthorizeAsync
-            : RejectAsync;
+        var mode = configuration[McpRuntimeHosting.AuthorizationModeKey];
+        if (string.Equals(mode, McpRuntimeHosting.LocalLoopbackDevelopmentMode, StringComparison.Ordinal))
+        {
+            return LocalLoopbackMcpAuthorizationCallback.AuthorizeAsync;
+        }
+
+        if (string.Equals(mode, McpRuntimeHosting.EdgeMode, StringComparison.Ordinal))
+        {
+            return EdgeMcpAuthorizationCallback.AuthorizeAsync;
+        }
+
+        return RejectAsync;
     }
 
     private static Task<AuthorizationResult?> RejectAsync(
@@ -26,6 +32,7 @@ internal static class McpAuthorizationCallback
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromException<AuthorizationResult?>(new InvalidOperationException(
             "Interactive MCP authorization is disabled. "
-            + "Use a durable pre-authorized token or explicitly enable the local loopback development adapter."));
+            + "Use a durable pre-authorized token, enable Edge authorization, "
+            + "or explicitly enable the local loopback development adapter."));
     }
 }

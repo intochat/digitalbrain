@@ -33,4 +33,6 @@ public static class UiHttpContract
     public const string ChatDeltaEvent = "chat-delta";
 
     public const string BrainTopologyPath = "/brain/topology";
+
+    public const string McpOAuthCallbackPath = "/oauth/mcp/callback";
 }

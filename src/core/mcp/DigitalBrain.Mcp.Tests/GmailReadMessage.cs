@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.Google;
 using Xunit;
 
@@ -21,6 +22,7 @@ public sealed class GmailReadMessage(IntegrationsFixture fixture)
 
         var driver = test.Neuron<IIntegrationDriver>("gmail-driver");
         var message = await driver.Reference.ReadGmailMessage(
+            CommandId.New(),
             IntegrationsFixture.SampleGmailAccount,
             IntegrationsFixture.SampleMessageId,
             cancellationToken);
@@ -45,6 +47,7 @@ public sealed class GmailReadMessage(IntegrationsFixture fixture)
         var driver = test.Neuron<IIntegrationDriver>("gmail-refuse");
         var failure = await Assert.ThrowsAnyAsync<Exception>(() =>
             driver.Reference.ReadGmailMessage(
+                CommandId.New(),
                 IntegrationsFixture.SampleGmailAccount,
                 IntegrationsFixture.SampleMessageId,
                 cancellationToken));
@@ -70,6 +73,7 @@ public sealed class GmailReadMessage(IntegrationsFixture fixture)
         var driver = test.Neuron<IIntegrationDriver>("gmail-mismatch");
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             driver.Reference.ReadGmailMessage(
+                CommandId.New(),
                 IntegrationsFixture.SampleGmailAccount,
                 IntegrationsFixture.SampleMessageId,
                 cancellationToken));
@@ -97,6 +101,7 @@ public sealed class GmailReadMessage(IntegrationsFixture fixture)
         var driver = test.Neuron<IIntegrationDriver>("gmail-missing-id");
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             driver.Reference.ReadGmailMessage(
+                CommandId.New(),
                 IntegrationsFixture.SampleGmailAccount,
                 IntegrationsFixture.SampleMessageId,
                 cancellationToken));
@@ -120,6 +125,7 @@ public sealed class GmailReadMessage(IntegrationsFixture fixture)
 
         var driver = test.Neuron<IIntegrationDriver>("gmail-empty-content");
         var message = await driver.Reference.ReadGmailMessage(
+            CommandId.New(),
             IntegrationsFixture.SampleGmailAccount,
             IntegrationsFixture.SampleMessageId,
             cancellationToken);
@@ -144,6 +150,7 @@ public sealed class GmailReadMessage(IntegrationsFixture fixture)
         var driver = test.Neuron<IIntegrationDriver>("gmail-tool-error");
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             driver.Reference.ReadGmailMessage(
+                CommandId.New(),
                 IntegrationsFixture.SampleGmailAccount,
                 IntegrationsFixture.SampleMessageId,
                 cancellationToken));

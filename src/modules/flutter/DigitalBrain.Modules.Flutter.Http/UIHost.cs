@@ -9,6 +9,7 @@ internal static class UIHost
         app.MapUI();
         app.MapChat();
         app.MapBrain();
+        app.MapMcpOAuthCallback();
         return app;
     }
 }
