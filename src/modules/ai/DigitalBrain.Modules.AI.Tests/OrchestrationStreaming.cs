@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
@@ -88,8 +89,6 @@ public sealed class GatedParticipantProbe : Neuron, IGatedParticipantProbe
 
     internal static int ImmediateParticipantCalls => Volatile.Read(ref _immediateParticipantCalls);
 
-    internal static bool Released => _released.Task.IsCompleted;
-
     internal static void Arm()
     {
         _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -165,6 +164,7 @@ public sealed class OrchestrationStreaming(ModuleFixture fixture)
     private const string SwapTeam = "streamed-fingerprint-team";
     private const string AbandonTeam = "abandoned-stream-team";
     private const string FragmentedTeam = "fragmented-concurrent-team";
+    private const string AttributionTeam = "attributed-concurrent-team";
     private const string Prompt = "prompt";
     private const string ScriptedLeft = "scripted-left-reply";
     private const string ScriptedRight = "scripted-right-reply";
@@ -236,6 +236,45 @@ public sealed class OrchestrationStreaming(ModuleFixture fixture)
             FragmentedParticipantProbe.Release();
             await stream.DisposeAsync();
         }
+    }
+
+    [Fact(Timeout = StreamingTimeout, DisplayName =
+        "a Concurrent participant call is journaled as a capability request attributed to the orchestration")]
+    public async Task ParticipantCallIsJournaledAsACapabilityRequestAttributedToTheOrchestration()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        FragmentedParticipantProbe.Arm();
+        FragmentedParticipantProbe.Release();
+
+        var orchestration = test.Neuron<IFragmentedConcurrentProbe>(AttributionTeam);
+        var participant = test.Neuron<IFragmentedParticipantProbe>(FragmentedParticipantProbe.ParticipantName);
+
+        await foreach (var _ in orchestration.Reference
+            .RespondStreaming([new ChatMessage(ChatRole.User, Prompt)], cancellationToken))
+        {
+        }
+
+        var received = await participant.Incoming.ReadAsync<CapabilityRequested>(
+            afterSequence: 0, cancellationToken: cancellationToken);
+        var participantCall = Assert.Single(
+            received,
+            fact => fact.Synapse.Method == nameof(IAgent.RespondStreaming));
+
+        Assert.Equal(orchestration.Id, participantCall.Caller);
+
+        var emitted = await orchestration.Outgoing.ReadAsync<CapabilityRequested>(
+            afterSequence: 0, cancellationToken: cancellationToken);
+        var attributed = Assert.Single(emitted, fact => fact.Synapse.Target == participant.Id);
+
+        Assert.Equal(nameof(IAgent.RespondStreaming), attributed.Synapse.Method);
+
+        var completed = await orchestration.Outgoing.ReadAsync<CapabilityCompleted>(
+            afterSequence: 0, cancellationToken: cancellationToken);
+
+        Assert.Single(completed, fact => fact.Synapse.Request == attributed.SynapseId);
+        Assert.Empty(await orchestration.Outgoing.ReadAsync<CapabilityFailed>(
+            afterSequence: 0, cancellationToken: cancellationToken));
     }
 
     [Fact(Timeout = StreamingTimeout, DisplayName =
