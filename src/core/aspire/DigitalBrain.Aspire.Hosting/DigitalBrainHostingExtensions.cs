@@ -88,6 +88,25 @@ public static class DigitalBrainHostingExtensions
         return builder;
     }
 
+    public static IResourceBuilder<TResource> WithStateProtectionKey<TResource>(
+        this IResourceBuilder<TResource> builder,
+        DigitalBrainBuilder brain)
+        where TResource : IResourceWithEnvironment
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(brain);
+
+        brain.RequireStateProtection();
+        if (brain.StateProtectionKey is not null)
+        {
+            builder.WithEnvironment(
+                ConfigurationEnvironment(StateProtectionKeyConfigurationKey),
+                brain.StateProtectionKey);
+        }
+
+        return builder;
+    }
+
     private static void ProjectModuleManifest<TResource>(IResourceBuilder<TResource> builder, DigitalBrainBuilder brain)
         where TResource : IResourceWithEnvironment
         => builder.WithEnvironment(context =>

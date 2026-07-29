@@ -78,3 +78,26 @@ public sealed record BehaviorExecuted(
     [property: Id(1)] BehaviorId Behavior,
     [property: Id(2)] string ArtifactHash,
     [property: Id(3)] string Outcome) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.behavior.revision-deployed")]
+public sealed record BehaviorRevisionDeployed(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] BehaviorId Behavior,
+    [property: Id(2)] string ArtifactHash) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.behavior.revision-deploy-refused")]
+public sealed record BehaviorRevisionDeployRefused(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] BehaviorId Behavior,
+    [property: Id(2)] string ArtifactHash,
+    [property: Id(3)] string Reason) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.behavior.host-load-refused")]
+public sealed record BehaviorHostLoadRefused(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] BehaviorId Behavior,
+    [property: Id(2)] string ArtifactHash,
+    [property: Id(3)] string Reason) : Synapse;
