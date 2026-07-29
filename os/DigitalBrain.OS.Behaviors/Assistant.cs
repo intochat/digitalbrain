@@ -132,7 +132,7 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         ValidateAccountId(accountId);
         ArgumentException.ThrowIfNullOrWhiteSpace(messageId);
 
-        var message = await Gmail().ReadMessage(messageId, CancellationToken.None);
+        var message = await Gmail().ReadMessage(CommandId.New(), messageId, CancellationToken.None);
         var mutation = await Salesforce().ProposeAccountDescription(
             CommandId.New(),
             Id,

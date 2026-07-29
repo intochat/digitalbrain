@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Mcp;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,9 +28,24 @@ internal sealed partial class Gmail : Neuron, IGmail
         _durableIdentity = Id.ToString();
     }
 
-    public async Task<GmailMessage> ReadMessage(string messageId, CancellationToken cancellationToken)
+    public async Task<GmailMessage> ReadMessage(
+        CommandId commandId,
+        string messageId,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(messageId);
+
+        await McpAuthorizationRail.EnsureAuthorizedAsync(
+            GrainFactory,
+            Id.Owner,
+            ServiceProvider,
+            TimeProvider,
+            commandId,
+            Server,
+            _tokenState,
+            () => WriteStateAsync(),
+            _durableIdentity,
+            cancellationToken);
 
         return await _runtime.RunAsync(
             Server,

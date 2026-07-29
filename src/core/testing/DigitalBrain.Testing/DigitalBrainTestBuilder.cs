@@ -9,6 +9,7 @@ public sealed class DigitalBrainTestBuilder
 {
     private readonly TestEdgeRegistry _edges = new();
     private readonly Dictionary<ModuleId, ICompiledModule> _modules = [];
+    private readonly Dictionary<string, string?> _configuration = new(StringComparer.Ordinal);
     private TimeSpan? _responseTimeout;
     private bool _sealed;
 
@@ -23,6 +24,13 @@ public sealed class DigitalBrainTestBuilder
             throw new InvalidOperationException(
                 $"Module '{compiled.Id}' is already configured for this fixture.");
         }
+    }
+
+    public void Configure(string key, string? value)
+    {
+        ThrowIfSealed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        _configuration[key] = value;
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
@@ -52,7 +60,7 @@ public sealed class DigitalBrainTestBuilder
     internal TestFixtureComposition Seal()
     {
         _sealed = true;
-        return new(_modules.Values.ToArray(), _edges, _responseTimeout);
+        return new(_modules.Values.ToArray(), _edges, _responseTimeout, _configuration);
     }
 
     private void ThrowIfSealed()
@@ -68,4 +76,5 @@ public sealed class DigitalBrainTestBuilder
 internal sealed record TestFixtureComposition(
     IReadOnlyCollection<ICompiledModule> Modules,
     TestEdgeRegistry Edges,
-    TimeSpan? ResponseTimeout);
+    TimeSpan? ResponseTimeout,
+    IReadOnlyDictionary<string, string?> Configuration);

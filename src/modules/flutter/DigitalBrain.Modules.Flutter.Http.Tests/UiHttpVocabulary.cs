@@ -41,6 +41,7 @@ public sealed class UiHttpVocabulary(UIFixture fixture)
         Assert.Equal("/brain/topology", UiHttpContract.BrainTopologyPath);
         Assert.Equal("/chats/{chatName}/messages/stream", UiHttpContract.StreamMessagePath);
         Assert.Equal("chat-delta", UiHttpContract.ChatDeltaEvent);
+        Assert.Equal("/oauth/mcp/callback", UiHttpContract.McpOAuthCallbackPath);
     }
 
     [Fact(DisplayName =

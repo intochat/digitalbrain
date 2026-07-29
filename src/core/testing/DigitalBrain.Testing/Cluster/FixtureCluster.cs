@@ -16,6 +16,7 @@ internal sealed class FixtureCluster : IAsyncDisposable
     private readonly RecordingJournalStorageProvider _journalStorage =
         new(new VolatileJournalStorageProvider());
     private readonly IReadOnlyCollection<ICompiledModule> _modules;
+    private readonly IReadOnlyDictionary<string, string?> _configuration;
     private readonly VolatileReminderTable _reminderTable = new();
     private readonly ControllableTimeProvider _clock = new(FixedEpoch);
     private readonly TestEdgeRegistry _edges;
@@ -28,6 +29,7 @@ internal sealed class FixtureCluster : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(composition);
         _modules = composition.Modules.ToArray();
+        _configuration = composition.Configuration;
         _edges = composition.Edges;
         _responseTimeout = composition.ResponseTimeout;
         _edges.AttachTimeProvider(_clock, _clock.Reset);
@@ -143,6 +145,11 @@ internal sealed class FixtureCluster : IAsyncDisposable
 
             silo.Configuration["DigitalBrain:Security:StateProtectionKey"] =
                 Convert.ToBase64String(new byte[32]);
+
+            foreach (var entry in _configuration)
+            {
+                silo.Configuration[entry.Key] = entry.Value;
+            }
 
             DigitalBrainRuntime.Add(silo, _modules);
             silo.Services.AddSingleton(new ReminderSourceAllowlist([TestReminderDeliveryService.SourceType]));

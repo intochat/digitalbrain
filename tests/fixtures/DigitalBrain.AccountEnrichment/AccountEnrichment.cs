@@ -41,7 +41,7 @@ internal sealed class AccountEnrichment :
         var gmail = GrainFactory.GetGrain<IGmail>(NeuronId.For<IGmail>(Id.Owner, synapse.GmailAccount).ToGrainId());
         var salesforce = GrainFactory.GetGrain<ISalesforce>(NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
 
-        var message = await gmail.ReadMessage(synapse.MessageId, cancellationToken);
+        var message = await gmail.ReadMessage(synapse.CommandId, synapse.MessageId, cancellationToken);
         var description =
             $"Email from {message.Sender}: {message.Subject}\n{message.PlaintextBody}";
         var mutation = await salesforce.ProposeAccountDescription(

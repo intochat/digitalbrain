@@ -27,7 +27,11 @@ internal sealed class HttpMcpClientSessionFactory(
         ArgumentNullException.ThrowIfNull(commit);
         ArgumentException.ThrowIfNullOrWhiteSpace(durableIdentity);
 
-        var tokens = new DurableMcpTokenCache(tokenState, commit, protector, $"mcp/oauth/{server.Key}/{durableIdentity}");
+        var tokens = new DurableMcpTokenCache(
+            tokenState,
+            commit,
+            protector,
+            McpTokenPresence.Purpose(server.Key, durableIdentity));
         var authorization = McpOAuthOptions.Create(server, configuration, tokens);
         var httpClient = httpClients.CreateClient(McpRuntime.HttpClientName);
         var transport = new HttpClientTransport(
