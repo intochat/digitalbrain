@@ -31,8 +31,13 @@ public interface IUnreachableGroupChatProbe : IGroupChat;
 [Alias("DigitalBrain.ModuleTests.ISilentParticipantProbe")]
 public interface ISilentParticipantProbe : IAgent;
 
-[Alias("DigitalBrain.ModuleTests.ISilentConcurrentProbe")]
-public interface ISilentConcurrentProbe : IAgent;
+[Alias("DigitalBrain.ModuleTests.ISilentSwapConcurrentProbe")]
+[ClientEntryPoint]
+public interface ISilentSwapConcurrentProbe : IAgent
+{
+    [Alias(nameof(UseParticipant))]
+    Task UseParticipant(string name);
+}
 
 [Alias("DigitalBrain.ModuleTests.IGroupChatProbe")]
 [ClientEntryPoint]
@@ -124,12 +129,21 @@ public sealed class SilentParticipantProbe : Neuron, ISilentParticipantProbe
     }
 }
 
-public sealed class SilentConcurrentProbe : Concurrent, ISilentConcurrentProbe
+public sealed class SilentSwapConcurrentProbe : Concurrent, ISilentSwapConcurrentProbe
 {
+    private string _participant = SilentParticipantProbe.ParticipantName;
+
     protected override IReadOnlyList<Participant> Participants =>
     [
-        Participant<ISilentParticipantProbe>(SilentParticipantProbe.ParticipantName),
+        Participant<ISilentParticipantProbe>(_participant),
     ];
+
+    public Task UseParticipant(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        _participant = name;
+        return Task.CompletedTask;
+    }
 }
 
 [GenerateSerializer]

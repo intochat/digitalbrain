@@ -6,6 +6,7 @@ namespace DigitalBrain.AI;
 
 internal sealed class NeuronChatClient(
     INeuron participant,
+    NeuronId id,
     TaskScheduler turnScheduler,
     ParticipantInvocations invocations) : IChatClient
 {
@@ -31,7 +32,17 @@ internal sealed class NeuronChatClient(
 
         try
         {
-            var carrying = await MoveNextOnTurnAsync(updates, cancellationToken);
+            bool carrying;
+
+            try
+            {
+                carrying = await MoveNextOnTurnAsync(updates, cancellationToken);
+            }
+            catch (Exception failure)
+            {
+                invocations.RecordFailure(id, failure);
+                throw;
+            }
 
             invocations.RecordInvocation();
 

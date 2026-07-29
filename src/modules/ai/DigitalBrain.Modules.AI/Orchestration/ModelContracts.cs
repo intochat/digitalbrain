@@ -1,3 +1,5 @@
+using DigitalBrain.Abstractions;
+
 namespace DigitalBrain.AI;
 
 internal static class ModelContracts
@@ -20,6 +22,11 @@ internal static class ModelContracts
 
         return contract.Name[1..];
     }
+
+    internal static string LabelFor(NeuronId participant)
+        => ContractsByModelName.TryGetValue(participant.Type, out var contract)
+            ? $"{ModelNameOf(contract)} '{participant.Name}'"
+            : $"{participant.Type} '{participant.Name}'";
 
     private static IEnumerable<string> KnownModelNames()
         => ContractsByModelName.Keys.Order(StringComparer.Ordinal);

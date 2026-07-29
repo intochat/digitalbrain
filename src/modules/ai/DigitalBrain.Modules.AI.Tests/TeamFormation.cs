@@ -99,7 +99,9 @@ public sealed class TeamFormation(ModuleFixture fixture)
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(
             () => StreamAsync(team, cancellationToken));
 
-        Assert.Contains(Gpt, failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"Failed to run: {Gpt} ", failure.Message, StringComparison.Ordinal);
+        Assert.Contains($"Never given a turn: {Gemma} ", failure.Message, StringComparison.Ordinal);
+        Assert.NotNull(failure.InnerException);
         Assert.Equal(0, test.Chat().CallCount);
     }
 

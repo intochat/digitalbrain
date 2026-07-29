@@ -35,7 +35,7 @@ internal static class MafParticipantAdapter
         Validate(typeof(TNeuron));
 
         return new ChatClientAgent(
-            new NeuronChatClient(grains.GetGrain<TNeuron>(id.ToGrainId()), turnScheduler, invocations),
+            new NeuronChatClient(grains.GetGrain<TNeuron>(id.ToGrainId()), id, turnScheduler, invocations),
             new ChatClientAgentOptions
             {
                 Id = AgentId(typeof(TNeuron), id),

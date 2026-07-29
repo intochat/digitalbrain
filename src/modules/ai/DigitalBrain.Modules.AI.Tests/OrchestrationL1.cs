@@ -77,7 +77,7 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
         Assert.Equal(Pair, test.Chat().CallCount);
     }
 
-    [Fact(DisplayName = "a compile-time GroupChat that reaches none of its participants throws rather than answering nothing")]
+    [Fact(DisplayName = "a compile-time GroupChat that reaches none of its participants throws, naming them and carrying the cause")]
     public async Task CompileTimeGroupChatReachingNobodyThrows()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -86,22 +86,24 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(
             () => test.Client.Get<IUnreachableGroupChatProbe>("unreachable-team").Respond([User()]));
 
-        Assert.Contains("gpt56", failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"Gpt56 '{ProbeParticipants.Left}'", failure.Message, StringComparison.Ordinal);
+        Assert.NotNull(failure.InnerException);
     }
 
-    [Fact(DisplayName = "a participant that answers with no content at all is a real answer and still persists the session")]
-    public async Task ParticipantAnsweringWithNoContentStillSucceeds()
+    [Fact(DisplayName = "a participant that answers with no content at all is a real answer whose session is persisted")]
+    public async Task ParticipantAnsweringWithNoContentPersistsItsSession()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var orchestration = test.Client.Get<ISilentConcurrentProbe>("silent-team");
+        var orchestration = test.Client.Get<ISilentSwapConcurrentProbe>("silent-team");
 
-        var first = await orchestration.Respond([User()]);
-        var second = await orchestration.Respond([User()]);
+        var answer = await orchestration.Respond([User()]);
 
-        Assert.Equal(string.Empty, first.Text);
-        Assert.Equal(string.Empty, second.Text);
-        Assert.Equal(0, test.Chat().CallCount);
+        Assert.Equal(string.Empty, answer.Text);
+
+        await orchestration.UseParticipant("silent-alt");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => orchestration.Respond([User()]));
     }
 
     private async Task FanOutAsync(Func<TestBrain, IAgent> resolve)
