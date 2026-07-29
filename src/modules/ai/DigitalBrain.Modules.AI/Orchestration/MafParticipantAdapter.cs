@@ -23,14 +23,19 @@ internal static class MafParticipantAdapter
         "Reliability",
         "CA2000:Dispose objects before losing scope",
         Justification = "NeuronChatClient has empty disposal and is owned by the ChatClientAgent for the agent lifetime.")]
-    internal static AIAgent Create<TNeuron>(IGrainFactory grains, NeuronId id, TaskScheduler turnScheduler)
+    internal static AIAgent Create<TNeuron>(
+        IGrainFactory grains,
+        NeuronId id,
+        TaskScheduler turnScheduler,
+        ParticipantInvocations invocations)
         where TNeuron : INeuron
     {
         ArgumentNullException.ThrowIfNull(turnScheduler);
+        ArgumentNullException.ThrowIfNull(invocations);
         Validate(typeof(TNeuron));
 
         return new ChatClientAgent(
-            new NeuronChatClient(grains.GetGrain<TNeuron>(id.ToGrainId()), turnScheduler),
+            new NeuronChatClient(grains.GetGrain<TNeuron>(id.ToGrainId()), turnScheduler, invocations),
             new ChatClientAgentOptions
             {
                 Id = AgentId(typeof(TNeuron), id),

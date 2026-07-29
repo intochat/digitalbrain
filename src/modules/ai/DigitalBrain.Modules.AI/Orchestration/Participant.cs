@@ -7,7 +7,10 @@ public abstract record Participant(NeuronId Id)
 {
     internal abstract Type Contract { get; }
 
-    internal abstract AIAgent CreateAgent(IGrainFactory grains, TaskScheduler turnScheduler);
+    internal abstract AIAgent CreateAgent(
+        IGrainFactory grains,
+        TaskScheduler turnScheduler,
+        ParticipantInvocations invocations);
 
     internal static Participant Of(Type contract, NeuronId id)
     {
@@ -23,6 +26,9 @@ public sealed record Participant<TNeuron>(NeuronId Id) : Participant(Id)
 {
     internal override Type Contract => typeof(TNeuron);
 
-    internal override AIAgent CreateAgent(IGrainFactory grains, TaskScheduler turnScheduler)
-        => MafParticipantAdapter.Create<TNeuron>(grains, Id, turnScheduler);
+    internal override AIAgent CreateAgent(
+        IGrainFactory grains,
+        TaskScheduler turnScheduler,
+        ParticipantInvocations invocations)
+        => MafParticipantAdapter.Create<TNeuron>(grains, Id, turnScheduler, invocations);
 }

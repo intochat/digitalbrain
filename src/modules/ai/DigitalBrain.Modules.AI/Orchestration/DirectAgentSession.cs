@@ -42,11 +42,13 @@ internal sealed class DirectAgentSession(
     internal async IAsyncEnumerable<ChatResponseUpdate> RunStreamingAsync(
         AIAgent agent,
         OrchestrationDefinition definition,
+        ParticipantInvocations invocations,
         IReadOnlyList<ChatMessage> messages,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(agent);
         ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(invocations);
         ArgumentNullException.ThrowIfNull(messages);
 
         var session = state.Value is { Length: > 0 } serialized
@@ -61,6 +63,8 @@ internal sealed class DirectAgentSession(
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+
+        invocations.RequireAnyInvoked(neuron);
 
         await PersistSessionAsync(agent, session, definition, cancellationToken);
     }

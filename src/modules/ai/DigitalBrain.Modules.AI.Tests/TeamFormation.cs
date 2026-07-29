@@ -87,9 +87,8 @@ public sealed class TeamFormation(ModuleFixture fixture)
         Assert.Equal(Pair * 2, test.Chat().CallCount);
     }
 
-    [Fact(DisplayName =
-        "a line-up naming a model this deployment cannot run yields nothing, throws nothing, and still burns the team name — pinned limitation")]
-    public async Task AnUnrunnableLineUpSilentlyBurnsTheTeamName()
+    [Fact(DisplayName = "a line-up naming a model this deployment cannot run throws instead of answering nothing")]
+    public async Task AnUnreachableLineUpThrowsNamingTheParticipantsItCouldNotReach()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
@@ -97,16 +96,31 @@ public sealed class TeamFormation(ModuleFixture fixture)
         var team = test.Client.Get<ITeam>("unprovisioned-team");
         await team.Form(Formation(Gpt, Gemma));
 
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => StreamAsync(team, cancellationToken));
+
+        Assert.Contains(Gpt, failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, test.Chat().CallCount);
+    }
+
+    [Fact(DisplayName = "a respond that reached nobody does not freeze the line-up, so the team is still correctable")]
+    public async Task AFailedRespondLeavesTheLineUpCorrectable()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        ScriptPair(test);
+
+        var team = test.Client.Get<ITeam>("recovered-team");
+        await team.Form(Formation(Gpt, Gemma));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => StreamAsync(team, cancellationToken));
+
+        await team.Form(Formation(Gemma, Llama));
+
         var streamed = await StreamAsync(team, cancellationToken);
 
-        Assert.Equal(string.Empty, streamed);
-        Assert.Equal(0, test.Chat().CallCount);
-        await AssertRespondedAsync(test.Neuron<IGemma4>("unprovisioned-team"), 0, cancellationToken);
-
-        var burned = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => team.Form(Formation(Gemma, Llama)));
-
-        Assert.Contains(Gpt, burned.Message, StringComparison.Ordinal);
+        Assert.Contains(GemmaReply, streamed, StringComparison.Ordinal);
+        Assert.Contains(LlamaReply, streamed, StringComparison.Ordinal);
     }
 
     [Fact(DisplayName = "forming a responded team with different models throws and names both line-ups")]

@@ -4,7 +4,10 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI;
 
-internal sealed class NeuronChatClient(INeuron participant, TaskScheduler turnScheduler) : IChatClient
+internal sealed class NeuronChatClient(
+    INeuron participant,
+    TaskScheduler turnScheduler,
+    ParticipantInvocations invocations) : IChatClient
 {
     private readonly Func<IReadOnlyList<ChatMessage>, CancellationToken, IAsyncEnumerable<ChatResponseUpdate>> _stream =
         StreamingInvocationFor(participant);
@@ -28,9 +31,15 @@ internal sealed class NeuronChatClient(INeuron participant, TaskScheduler turnSc
 
         try
         {
-            while (await MoveNextOnTurnAsync(updates, cancellationToken))
+            var carrying = await MoveNextOnTurnAsync(updates, cancellationToken);
+
+            invocations.RecordInvocation();
+
+            while (carrying)
             {
                 yield return updates.Current;
+
+                carrying = await MoveNextOnTurnAsync(updates, cancellationToken);
             }
         }
         finally

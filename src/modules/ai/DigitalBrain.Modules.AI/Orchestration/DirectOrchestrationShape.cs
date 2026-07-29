@@ -32,10 +32,13 @@ internal sealed class DirectOrchestrationShape
         _participants = participants;
         _buildWorkflow = buildWorkflow;
         _executionEnvironment = executionEnvironment;
+        Invocations = new([.. participants.Select(participant => participant.Id)]);
         Definition = OrchestrationDefinition.Describe(orchestrationType, participants, identity);
     }
 
     internal OrchestrationDefinition Definition { get; }
+
+    internal ParticipantInvocations Invocations { get; }
 
     internal static Participant[] Snapshot(NeuronId orchestration, IReadOnlyList<Participant>? participants)
     {
@@ -96,7 +99,7 @@ internal sealed class DirectOrchestrationShape
 
         AIAgent[] agents =
         [
-            .. _participants.Select(participant => participant.CreateAgent(grains, turnScheduler)),
+            .. _participants.Select(participant => participant.CreateAgent(grains, turnScheduler, Invocations)),
         ];
 
         return _buildWorkflow(agents).AsAIAgent(id: Definition.HostId, executionEnvironment: _executionEnvironment);

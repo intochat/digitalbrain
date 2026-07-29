@@ -1,7 +1,10 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
+using DigitalBrain.AI.OpenAI;
+using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
+using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.ModuleTests;
 
@@ -21,6 +24,15 @@ public interface IParticipantSwapConcurrentProbe : IAgent
     [Alias(nameof(UseParticipants))]
     Task UseParticipants(string left, string right);
 }
+
+[Alias("DigitalBrain.ModuleTests.IUnreachableGroupChatProbe")]
+public interface IUnreachableGroupChatProbe : IGroupChat;
+
+[Alias("DigitalBrain.ModuleTests.ISilentParticipantProbe")]
+public interface ISilentParticipantProbe : IAgent;
+
+[Alias("DigitalBrain.ModuleTests.ISilentConcurrentProbe")]
+public interface ISilentConcurrentProbe : IAgent;
 
 [Alias("DigitalBrain.ModuleTests.IGroupChatProbe")]
 [ClientEntryPoint]
@@ -79,6 +91,45 @@ public sealed class GroupChatProbe : GroupChat, IGroupChatProbe
     public Task InvokeContinue(AttemptCursor cursor) => Continue(cursor);
 
     public Task InvokeCancel(AttemptCursor cursor) => Cancel(cursor);
+}
+
+public sealed class UnreachableGroupChatProbe : GroupChat, IUnreachableGroupChatProbe
+{
+    protected override IReadOnlyList<Participant> Participants =>
+    [
+        Participant<IGpt56>(ProbeParticipants.Left),
+        Participant<IGpt56>(ProbeParticipants.Right),
+    ];
+}
+
+public sealed class SilentParticipantProbe : Neuron, ISilentParticipantProbe
+{
+    internal const string ParticipantName = "silent-participant";
+
+    public IAsyncEnumerable<ChatResponseUpdate> RespondStreaming(
+        IReadOnlyList<ChatMessage> messages,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return AsyncEnumerable.Empty<ChatResponseUpdate>();
+    }
+
+    public Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+
+        return RespondStreaming(messages).ToChatResponseAsync();
+    }
+}
+
+public sealed class SilentConcurrentProbe : Concurrent, ISilentConcurrentProbe
+{
+    protected override IReadOnlyList<Participant> Participants =>
+    [
+        Participant<ISilentParticipantProbe>(SilentParticipantProbe.ParticipantName),
+    ];
 }
 
 [GenerateSerializer]

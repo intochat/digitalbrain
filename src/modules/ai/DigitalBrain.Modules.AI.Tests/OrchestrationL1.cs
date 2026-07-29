@@ -77,6 +77,33 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
         Assert.Equal(Pair, test.Chat().CallCount);
     }
 
+    [Fact(DisplayName = "a compile-time GroupChat that reaches none of its participants throws rather than answering nothing")]
+    public async Task CompileTimeGroupChatReachingNobodyThrows()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => test.Client.Get<IUnreachableGroupChatProbe>("unreachable-team").Respond([User()]));
+
+        Assert.Contains("gpt56", failure.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact(DisplayName = "a participant that answers with no content at all is a real answer and still persists the session")]
+    public async Task ParticipantAnsweringWithNoContentStillSucceeds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var orchestration = test.Client.Get<ISilentConcurrentProbe>("silent-team");
+
+        var first = await orchestration.Respond([User()]);
+        var second = await orchestration.Respond([User()]);
+
+        Assert.Equal(string.Empty, first.Text);
+        Assert.Equal(string.Empty, second.Text);
+        Assert.Equal(0, test.Chat().CallCount);
+    }
+
     private async Task FanOutAsync(Func<TestBrain, IAgent> resolve)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
