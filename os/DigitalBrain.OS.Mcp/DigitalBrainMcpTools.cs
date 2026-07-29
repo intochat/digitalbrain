@@ -14,7 +14,6 @@ namespace DigitalBrain.OS.Mcp;
     Justification = "Constructed by the MCP server DI container via WithTools<DigitalBrainMcpTools>().")]
 internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory grains)
 {
-    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
     private const int DefaultTimeoutSeconds = 300;
     private const int MaximumTimeoutSeconds = 300;
 
@@ -57,6 +56,7 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
         try
         {
             return await WaitForResponseAsync(
+                grains,
                 session,
                 chatId,
                 chatName,
@@ -72,7 +72,12 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
         }
     }
 
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Watch teardown must not mask the awaited response or its failure.")]
     private static async Task<ChatMessageResult> WaitForResponseAsync(
+        IGrainFactory grains,
         ISessionNeuron session,
         NeuronId chatId,
         string chatName,
@@ -80,30 +85,52 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
         long afterSequence,
         CancellationToken cancellationToken)
     {
-        var cursor = afterSequence;
-
-        while (true)
+        var observer = new ChannelJournalObserver(JournalKind.Outgoing);
+        var reference = grains.CreateObjectReference<IJournalObserver>(observer);
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var page = await session.ReadNeuronJournal(chatId, JournalKind.Outgoing, cursor);
+            await session.WatchNeuron(chatId, JournalKind.Outgoing, afterSequence, reference);
 
-            foreach (var delivery in page.Delta)
+            await foreach (var page in observer.Reads.ReadAllAsync(cancellationToken))
             {
-                if (delivery.Synapse is AssistantResponded response
-                    && response.CommandId == commandId)
+                foreach (var delivery in page.Delta)
                 {
-                    return new ChatMessageResult(
-                        chatName,
-                        commandId.ToString(),
-                        delivery.CorrelationId.Value.ToString("N"),
-                        response.Text,
-                        delivery.Sequence,
-                        delivery.Timestamp);
+                    if (delivery.Synapse is AssistantResponded response
+                        && response.CommandId == commandId)
+                    {
+                        return new ChatMessageResult(
+                            chatName,
+                            commandId.ToString(),
+                            delivery.CorrelationId.Value.ToString("N"),
+                            response.Text,
+                            delivery.Sequence,
+                            delivery.Timestamp);
+                    }
                 }
             }
 
-            cursor = page.ResumeSequence;
-            await Task.Delay(PollInterval, cancellationToken);
+            throw new InvalidOperationException(
+                "The journal watch ended before the assistant responded.");
+        }
+        finally
+        {
+            try
+            {
+                await session.UnwatchNeuron(chatId, reference);
+            }
+            catch (Exception)
+            {
+            }
+
+            try
+            {
+                grains.DeleteObjectReference<IJournalObserver>(reference);
+            }
+            catch (Exception)
+            {
+            }
+
+            observer.Complete();
         }
     }
 }
