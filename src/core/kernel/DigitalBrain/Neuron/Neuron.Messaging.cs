@@ -17,7 +17,9 @@ public abstract partial class Neuron
         ArgumentNullException.ThrowIfNull(synapse);
 
         var synapseType = synapse.GetType().FullName!;
-        var correlation = _handling?.CorrelationId ?? CorrelationId.New();
+        var correlation = _handling?.CorrelationId
+            ?? _clientEntryCorrelation
+            ?? CorrelationId.New();
         var catalog = ServiceProvider.GetRequiredService<BroadcastCatalog>();
 
         var receivers = catalog.HandlerGrainTypes(synapseType)

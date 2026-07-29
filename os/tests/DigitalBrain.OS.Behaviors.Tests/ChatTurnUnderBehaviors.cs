@@ -97,8 +97,8 @@ public sealed class ChatTurnUnderBehaviors(OSBehaviorsFixture fixture)
         }
     }
 
-    [Fact(Explicit = true, Timeout = FactTimeout, DisplayName =
-        "EXCLUDED until the kernel scopes a correlation across a client-entry-point call: IChat.Send journals one turn under one correlation id")]
+    [Fact(Timeout = FactTimeout, DisplayName =
+        "IChat.Send journals one turn under one correlation id")]
     public async Task SentTurnJournalsOneCorrelationId()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -112,8 +112,8 @@ public sealed class ChatTurnUnderBehaviors(OSBehaviorsFixture fixture)
         AssertOneCorrelation(await ChatFactsAsync(chat, cancellationToken));
     }
 
-    [Fact(Explicit = true, Timeout = FactTimeout, DisplayName =
-        "EXCLUDED until the kernel scopes a correlation across enumeration dispatch: IChat.SendStreaming journals one turn under one correlation id")]
+    [Fact(Timeout = FactTimeout, DisplayName =
+        "IChat.SendStreaming journals one turn under one correlation id")]
     public async Task StreamedTurnJournalsOneCorrelationId()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

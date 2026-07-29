@@ -26,6 +26,31 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
             return;
         }
 
+        if (context.Grain is Neuron streamTarget
+            && CapabilityInvocation.IsEnumerationDispatch(context.InterfaceMethod)
+            && CapabilityInvocation.EnumerationId(context.Request) is { } streamEnumeration
+            && streamTarget.TryGetClientStreamCorrelation(streamEnumeration, out var streamCorrelation)
+            && CapabilityInvocation.ContractMethod(context.InterfaceMethod, context.Request) is null)
+        {
+            using (streamTarget.EnterClientEntryCorrelation(streamCorrelation))
+            {
+                try
+                {
+                    await context.Invoke();
+                }
+                finally
+                {
+                    if (CapabilityInvocation.IsEnumerationDisposal(context.InterfaceMethod)
+                        || CapabilityInvocation.EnumerationTerminus(context.Result) is not null)
+                    {
+                        streamTarget.ForgetClientStreamCorrelation(streamEnumeration);
+                    }
+                }
+            }
+
+            return;
+        }
+
         if (CapabilityInvocation.ContractMethod(context.InterfaceMethod, context.Request) is not { } contract
             || context.Grain is not Neuron target
             || (CapabilityInvocation.IsEnumerationDispatch(context.InterfaceMethod)
@@ -45,8 +70,7 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
             {
                 if (IsClientEntryPoint(contract))
                 {
-                    await context.Invoke();
-
+                    await InvokeClientEntryAsync(context, target);
                     return;
                 }
 
@@ -93,6 +117,43 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
             await target.FailIncomingCapabilityRequestAsync(turn);
 
             throw;
+        }
+    }
+
+    private static async Task InvokeClientEntryAsync(IIncomingGrainCallContext context, Neuron target)
+    {
+        var correlation = CorrelationId.New();
+
+        if (CapabilityInvocation.IsEnumerationStart(context.InterfaceMethod)
+            && CapabilityInvocation.EnumerationId(context.Request) is { } enumerationId)
+        {
+            target.RegisterClientStreamCorrelation(enumerationId, correlation);
+            using (target.EnterClientEntryCorrelation(correlation))
+            {
+                try
+                {
+                    await context.Invoke();
+                }
+                catch
+                {
+                    target.ForgetClientStreamCorrelation(enumerationId);
+                    throw;
+                }
+                finally
+                {
+                    if (CapabilityInvocation.EnumerationTerminus(context.Result) is not null)
+                    {
+                        target.ForgetClientStreamCorrelation(enumerationId);
+                    }
+                }
+            }
+
+            return;
+        }
+
+        using (target.EnterClientEntryCorrelation(correlation))
+        {
+            await context.Invoke();
         }
     }
 
