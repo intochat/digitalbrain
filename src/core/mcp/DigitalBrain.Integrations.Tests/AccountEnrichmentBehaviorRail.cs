@@ -48,7 +48,7 @@ public sealed class AccountEnrichmentBehaviorRail(IntegrationsFixture fixture)
             IntegrationsFixture.SessionOf(test),
             test.Clock.UtcNow);
         var delivered = rail.Incoming.NextAsync<BehaviorRevisionApproval>(cancellationToken);
-        await test.Client.SendAsync(rail.Id, approval);
+        await test.Client.SendAsync(rail.Id, approval, cancellationToken);
         _ = await delivered;
         await rail.Reference.Approve(approval);
         await rail.Reference.Activate(new ActivateBehaviorRevision(CommandId.New(), proposed.ProposedArtifactHash!));
@@ -62,12 +62,13 @@ public sealed class AccountEnrichmentBehaviorRail(IntegrationsFixture fixture)
                 commandId,
                 IntegrationsFixture.SampleMessageId,
                 IntegrationsFixture.SampleAccountId,
-                IntegrationsFixture.SampleGmailAccount));
+                IntegrationsFixture.SampleGmailAccount),
+            cancellationToken);
         var enrichmentProposed = (await proposedWait).Synapse;
 
         var sfApproval = IntegrationsFixture.Approval(test, commandId, enrichmentProposed.Fingerprint);
         var completedWait = enrichment.Outgoing.NextAsync<AccountEnriched>(cancellationToken);
-        await test.Client.SendAsync(enrichment.Id, sfApproval);
+        await test.Client.SendAsync(enrichment.Id, sfApproval, cancellationToken);
         var completed = (await completedWait).Synapse;
         Assert.Equal(IntegrationsFixture.SampleAccountId, completed.AccountId);
 

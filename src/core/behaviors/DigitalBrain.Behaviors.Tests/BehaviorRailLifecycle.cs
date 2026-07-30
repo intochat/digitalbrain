@@ -197,7 +197,7 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
         CancellationToken cancellationToken)
     {
         var wait = behavior.Incoming.NextAsync<BehaviorRevisionApproval>(cancellationToken);
-        await test.Client.SendAsync(behavior.Id, approval);
+        await test.Client.SendAsync(behavior.Id, approval, cancellationToken);
         _ = await wait;
     }
 }

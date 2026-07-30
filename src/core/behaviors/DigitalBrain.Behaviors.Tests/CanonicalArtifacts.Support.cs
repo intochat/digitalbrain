@@ -17,9 +17,47 @@ public sealed partial class CanonicalArtifacts
         string requestSchema = "{\"type\":\"object\",\"properties\":{\"scene\":{\"type\":\"string\"}}}",
         string resultSchema = "{\"type\":\"object\",\"properties\":{\"opened\":{\"type\":\"boolean\"}}}")
     {
-        IReadOnlyDictionary<string, string> features = reverseOrder
-            ? new Dictionary<string, string>(StringComparer.Ordinal) { ["zulu"] = "Feature: zulu\n", ["alpha"] = "Feature: alpha\n" }
-            : new Dictionary<string, string>(StringComparer.Ordinal) { ["alpha"] = "Feature: alpha\n", ["zulu"] = "Feature: zulu\n" };
+        var normalizedRequest = requestSchema == "{\"type\":\"object\",\"properties\":{\"scene\":{\"type\":\"string\"}}}"
+            ? "{\"properties\":{\"scene\":{\"type\":\"string\"}},\"type\":\"object\"}"
+            : requestSchema;
+        var normalizedResult = resultSchema == "{\"type\":\"object\",\"properties\":{\"opened\":{\"type\":\"boolean\"}}}"
+            ? "{\"properties\":{\"opened\":{\"type\":\"boolean\"}},\"type\":\"object\"}"
+            : resultSchema;
+
+        var oneOf = reverseOrder
+            ? "{\"oneOf\":[{\"properties\":{\"caseId\":{\"const\":\"case.scene\"},\"payload\":" + normalizedRequest + "},\"type\":\"object\"}]}"
+            : "{\"oneOf\":[{\"properties\":{\"caseId\":{\"const\":\"case.scene\"},\"payload\":" + requestSchema + "},\"type\":\"object\"}]}";
+
+        if (reverseOrder && requestSchema == "{\"type\":\"object\",\"properties\":{\"scene\":{\"type\":\"string\"}}}")
+        {
+            oneOf = "{\"oneOf\":[{\"properties\":{\"caseId\":{\"const\":\"case.scene\"},\"payload\":" + normalizedRequest + "},\"type\":\"object\"}]}";
+        }
+
+        var contract = reverseOrder
+            ? new BehaviorContractManifest(
+                "com.digitalbrain.start-ui",
+                1,
+                oneOf,
+                [new BehaviorContractCaseManifest("case.scene", 1, "scene", normalizedRequest)],
+                normalizedResult)
+            : new BehaviorContractManifest(
+                "com.digitalbrain.start-ui",
+                1,
+                oneOf,
+                [new BehaviorContractCaseManifest("case.scene", 1, "scene", requestSchema)],
+                resultSchema);
+
+        IReadOnlyList<BehaviorScenarioManifest> scenarios = reverseOrder
+            ?
+            [
+                new BehaviorScenarioManifest("scenario.zulu", "Zulu path", "bind.zulu"),
+                new BehaviorScenarioManifest("scenario.alpha", "Alpha path", "bind.alpha"),
+            ]
+            :
+            [
+                new BehaviorScenarioManifest("scenario.alpha", "Alpha path", "bind.alpha"),
+                new BehaviorScenarioManifest("scenario.zulu", "Zulu path", "bind.zulu"),
+            ];
 
         return new BehaviorArtifactEnvelope(
             new BehaviorDefinitionManifest(
@@ -27,32 +65,27 @@ public sealed partial class CanonicalArtifacts
                 "Start UI",
                 "Open the first scene.",
                 reverseOrder
-                    ? new BehaviorEntryPoints(
-                        ["db.ready", "db.activated"],
-                        [new BehaviorIntentSchema(
-                            "com.digitalbrain.start-ui",
-                            1,
-                            requestSchema == "{\"type\":\"object\",\"properties\":{\"scene\":{\"type\":\"string\"}}}"
-                                ? "{\"properties\":{\"scene\":{\"type\":\"string\"}},\"type\":\"object\"}"
-                                : requestSchema,
-                            resultSchema == "{\"type\":\"object\",\"properties\":{\"opened\":{\"type\":\"boolean\"}}}"
-                                ? "{\"properties\":{\"opened\":{\"type\":\"boolean\"}},\"type\":\"object\"}"
-                                : resultSchema)])
-                    : new BehaviorEntryPoints(
-                        ["db.activated", "db.ready"],
-                        [new BehaviorIntentSchema("com.digitalbrain.start-ui", 1, requestSchema, resultSchema)]),
+                    ? new BehaviorEntryPoints(["db.ready", "db.activated"], contract)
+                    : new BehaviorEntryPoints(["db.activated", "db.ready"], contract),
+                scenarios,
+                "Start UI opens the first scene for alpha and zulu paths.",
+                reverseOrder
+                    ? new BehaviorCompilerPolicy("11.0.100-preview.6", "5.6.0", "Preview", "contract-only-v1")
+                    : new BehaviorCompilerPolicy("11.0.100-preview.6", "5.6.0", "Preview", "contract-only-v1"),
                 reverseOrder
                     ? [new BehaviorCapabilityGrant("db.time", "schedule", "clock"), new BehaviorCapabilityGrant("db.shell", "open", "desk")]
                     : [new BehaviorCapabilityGrant("db.shell", "open", "desk"), new BehaviorCapabilityGrant("db.time", "schedule", "clock")],
                 new BehaviorResourceLimits(1_000, 64 * 1024 * 1024, 30_000)),
             "public sealed class StartUi { }\n",
+            "Feature: start-ui\n  Scenario: alpha path\n    Then alpha succeeds\n  Scenario: zulu path\n    Then zulu succeeds\n",
             reverseOrder ? "{\"version\":1,\"libraries\":{}}" : "{\"libraries\":{},\"version\":1}",
             new byte[] { 0, 1, 2, 3 },
             "{\"runtimeTarget\":{\"name\":\"net10.0\"}}",
-            features,
-            reverseOrder ? "{\"sdk\":\"10.0.302\",\"diagnostics\":[]}" : "{\"diagnostics\":[],\"sdk\":\"10.0.302\"}",
-            "{\"result\":\"accepted\",\"policy\":\"v1\"}",
-            "{\"scenarios\":1,\"passed\":true}");
+            reverseOrder
+                ? "{\"diagnostics\":[],\"languageVersion\":\"Preview\",\"policy\":\"contract-only-v1\",\"roslyn\":\"5.6.0\",\"sdk\":\"11.0.100-preview.6\",\"succeeded\":true}"
+                : "{\"diagnostics\":[],\"languageVersion\":\"Preview\",\"policy\":\"contract-only-v1\",\"roslyn\":\"5.6.0\",\"sdk\":\"11.0.100-preview.6\",\"succeeded\":true}",
+            "{\"policy\":\"v1\",\"result\":\"accepted\"}",
+            "{\"passed\":true,\"scenarios\":2}");
     }
 
     private static void ReadWithExtraEntry(string name)

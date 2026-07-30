@@ -11,6 +11,13 @@ public sealed class InProcessBehaviorHostGatewayModule : IModule, ICompiledModul
 
     ModuleId ICompiledModule.Id => Id;
 
+    CapabilityManifest ICompiledModule.Capabilities { get; } = new(
+        new ModuleId("digitalbrain.behaviors.host.inprocess"),
+        "1.0.0",
+        "In-process behavior host gateway",
+        [],
+        []);
+
     public void PrepareSerialization(IServiceCollection services)
     {
     }

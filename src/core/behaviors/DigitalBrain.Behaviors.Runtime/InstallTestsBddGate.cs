@@ -24,16 +24,13 @@ internal sealed class InstallTestsBddGate : IBehaviorBddGate
         ArgumentNullException.ThrowIfNull(capabilities);
         ArgumentNullException.ThrowIfNull(time);
 
-        if (envelope.Features.Count == 0
-            || envelope.Features.Values.All(string.IsNullOrWhiteSpace)
-            || !envelope.Features.Values.Any(feature => feature.Contains("Scenario:", StringComparison.Ordinal)))
+        var binding = BehaviorScenarioBinder.Bind(
+            envelope.FeatureSource,
+            envelope.Manifest.Scenarios);
+        if (!binding.Passed)
         {
-            return BehaviorInstallTestReport.Fail("A behavior proposal must include at least one Gherkin Scenario.");
+            return BehaviorInstallTestReport.Fail(binding.Detail, binding.ScenarioCount);
         }
-
-        var scenarioCount = envelope.Features.Values
-            .SelectMany(feature => feature.Split('\n'))
-            .Count(line => line.TrimStart().StartsWith("Scenario:", StringComparison.Ordinal));
 
         var loadContext = new AssemblyLoadContext($"behavior-bdd-{Guid.NewGuid():N}", isCollectible: true);
         loadContext.Resolving += static (_, name) =>
@@ -58,7 +55,7 @@ internal sealed class InstallTestsBddGate : IBehaviorBddGate
             {
                 return BehaviorInstallTestReport.Fail(
                     "Compiled artifact must export a public parameterless IBehaviorInstallTests implementation.",
-                    scenarioCount);
+                    binding.ScenarioCount);
             }
 
             var tests = (IBehaviorInstallTests)Activator.CreateInstance(installTestsType)!;
@@ -71,14 +68,46 @@ internal sealed class InstallTestsBddGate : IBehaviorBddGate
                 capabilities,
                 time);
 
-            return tests.RunAsync(context, envelope.Features, CancellationToken.None)
+            IReadOnlyDictionary<string, string> featureBindings =
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["Behavior"] = envelope.FeatureSource,
+                };
+
+            var report = tests.RunAsync(context, featureBindings, CancellationToken.None)
                 .AsTask()
                 .GetAwaiter()
                 .GetResult();
+
+            if (report.Results.Count > 0)
+            {
+                var withResults = BehaviorScenarioBinder.Bind(
+                    envelope.FeatureSource,
+                    binding.Scenarios,
+                    report.Results);
+                if (!withResults.Passed)
+                {
+                    return BehaviorInstallTestReport.Fail(withResults.Detail, withResults.ScenarioCount);
+                }
+            }
+            else if (!report.Passed)
+            {
+                return BehaviorInstallTestReport.Fail(report.Detail, binding.ScenarioCount);
+            }
+            else if (report.ScenarioCount != binding.ScenarioCount)
+            {
+                return BehaviorInstallTestReport.Fail(
+                    $"Install tests reported {report.ScenarioCount} scenarios but the feature declares {binding.ScenarioCount}.",
+                    binding.ScenarioCount);
+            }
+
+            return report.Passed
+                ? BehaviorInstallTestReport.Pass(binding.ScenarioCount, report.Detail)
+                : BehaviorInstallTestReport.Fail(report.Detail, binding.ScenarioCount);
         }
         catch (Exception exception)
         {
-            return BehaviorInstallTestReport.Fail(exception.Message, scenarioCount);
+            return BehaviorInstallTestReport.Fail(exception.Message, binding.ScenarioCount);
         }
         finally
         {

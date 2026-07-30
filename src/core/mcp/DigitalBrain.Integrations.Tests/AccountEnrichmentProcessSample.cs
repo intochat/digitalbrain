@@ -72,7 +72,8 @@ public sealed class AccountEnrichmentProcessSample(IntegrationsFixture fixture)
                 commandId,
                 IntegrationsFixture.SampleMessageId,
                 IntegrationsFixture.SampleAccountId,
-                IntegrationsFixture.SampleGmailAccount));
+                IntegrationsFixture.SampleGmailAccount),
+            cancellationToken);
 
         var proposed = (await proposedWait).Synapse;
         Assert.Equal(commandId, proposed.CommandId);
@@ -81,7 +82,7 @@ public sealed class AccountEnrichmentProcessSample(IntegrationsFixture fixture)
         var approval = IntegrationsFixture.Approval(test, commandId, proposed.Fingerprint);
         var completedWait = enrichment.Outgoing.NextAsync<AccountEnriched>(cancellationToken);
 
-        await test.Client.SendAsync(enrichment.Id, approval);
+        await test.Client.SendAsync(enrichment.Id, approval, cancellationToken);
         return (await completedWait).Synapse;
     }
 }

@@ -7,5 +7,8 @@ public sealed record BehaviorDefinitionManifest(
     string DisplayName,
     string Description,
     BehaviorEntryPoints EntryPoints,
+    IReadOnlyList<BehaviorScenarioManifest> Scenarios,
+    string Overview,
+    BehaviorCompilerPolicy CompilerPolicy,
     IReadOnlyList<BehaviorCapabilityGrant> CapabilityGrants,
     BehaviorResourceLimits ResourceLimits);

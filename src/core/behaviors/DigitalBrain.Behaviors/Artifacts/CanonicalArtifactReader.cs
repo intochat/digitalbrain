@@ -12,7 +12,8 @@ internal static class CanonicalArtifactReader
     private static readonly string[] RequiredEntries =
     [
         "manifest.json",
-        "program.cs",
+        CanonicalArtifactWriter.ProgramEntryName,
+        CanonicalArtifactWriter.FeatureEntryName,
         "dependencies/packages.lock.json",
         "artifact/Behavior.dll",
         "artifact/Behavior.deps.json",
@@ -30,20 +31,14 @@ internal static class CanonicalArtifactReader
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
             var entries = ValidateEntries(archive, layout);
             var manifest = ReadManifest(entries["manifest.json"].Entry, entries["manifest.json"].Layout);
-            var features = entries
-                .Where(entry => entry.Key.StartsWith("features/", StringComparison.Ordinal))
-                .ToDictionary(
-                    entry => entry.Key["features/".Length..^".feature".Length],
-                    entry => ReadText(entry.Value.Entry, entry.Value.Layout),
-                    StringComparer.Ordinal);
 
             var envelope = new BehaviorArtifactEnvelope(
                 manifest,
-                ReadText(entries["program.cs"].Entry, entries["program.cs"].Layout),
+                ReadText(entries[CanonicalArtifactWriter.ProgramEntryName].Entry, entries[CanonicalArtifactWriter.ProgramEntryName].Layout),
+                ReadText(entries[CanonicalArtifactWriter.FeatureEntryName].Entry, entries[CanonicalArtifactWriter.FeatureEntryName].Layout),
                 ReadCanonicalJson(entries["dependencies/packages.lock.json"].Entry, entries["dependencies/packages.lock.json"].Layout),
                 ReadBytes(entries["artifact/Behavior.dll"].Entry, entries["artifact/Behavior.dll"].Layout),
                 ReadCanonicalJson(entries["artifact/Behavior.deps.json"].Entry, entries["artifact/Behavior.deps.json"].Layout),
-                features,
                 ReadCanonicalJson(entries["evidence/compiler.json"].Entry, entries["evidence/compiler.json"].Layout),
                 ReadCanonicalJson(entries["evidence/admission.json"].Entry, entries["evidence/admission.json"].Layout),
                 ReadCanonicalJson(entries["evidence/bdd.json"].Entry, entries["evidence/bdd.json"].Layout));
@@ -171,10 +166,7 @@ internal static class CanonicalArtifactReader
     }
 
     private static bool IsExpectedName(string name)
-        => RequiredEntries.Contains(name, StringComparer.Ordinal)
-            || (name.StartsWith("features/", StringComparison.Ordinal)
-                && name.EndsWith(".feature", StringComparison.Ordinal)
-                && CanonicalArtifactWriter.IsFeatureName(name["features/".Length..^".feature".Length]));
+        => RequiredEntries.Contains(name, StringComparer.Ordinal);
 
     private static BehaviorDefinitionManifest ReadManifest(ZipArchiveEntry entry, CanonicalZip.Entry layout)
     {

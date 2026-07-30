@@ -44,7 +44,7 @@ public sealed class AccountEnrichmentOnRail(BehaviorsFixture fixture)
             ISessionNeuron.ForOwner(test.Client.Owner),
             test.Clock.UtcNow);
         var delivered = rail.Incoming.NextAsync<BehaviorRevisionApproval>(cancellationToken);
-        await test.Client.SendAsync(rail.Id, approval);
+        await test.Client.SendAsync(rail.Id, approval, cancellationToken);
         _ = await delivered;
         var approvedWait = rail.Outgoing.NextAsync<BehaviorRevisionApproved>(cancellationToken);
         var approved = await rail.Reference.Approve(approval);

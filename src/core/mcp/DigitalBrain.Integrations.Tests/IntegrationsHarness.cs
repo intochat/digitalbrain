@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
@@ -6,6 +7,8 @@ using DigitalBrain.Salesforce;
 namespace DigitalBrain.Integrations.Tests;
 
 [ClientEntryPoint]
+[Alias("integrations.driver")]
+[Description("Integration harness driver neuron")]
 public partial interface IIntegrationDriver : INeuron
 {
     [Alias(nameof(ReadGmailMessage))]

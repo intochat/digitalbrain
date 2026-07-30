@@ -68,7 +68,7 @@ public sealed partial class CanonicalArtifacts
             Assert.Throws<BehaviorArtifactException>(() => CanonicalArtifactReader.Read(bytes));
         }
 
-        var malformedText = MutateStoredEntryBytes(artifact, "program.cs", bytes => bytes[0] = 0xFF);
+        var malformedText = MutateStoredEntryBytes(artifact, "Behavior.cs", bytes => bytes[0] = 0xFF);
         Assert.Throws<BehaviorArtifactException>(() => CanonicalArtifactReader.Read(malformedText));
     }
 

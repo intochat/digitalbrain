@@ -2,6 +2,7 @@ namespace DigitalBrain.Behaviors.Runtime.Artifacts;
 
 using System.IO.Compression;
 using System.Text;
+using System.Text.RegularExpressions;
 using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
 
@@ -12,8 +13,14 @@ internal static class CanonicalArtifactWriter
     internal const int MaximumExpandedBytes = 64 * 1024 * 1024;
     internal const int MaximumSerializedBytes = MaximumExpandedBytes + (MaximumEntries * 1024 * 1024);
 
+    internal const string ProgramEntryName = "Behavior.cs";
+    internal const string FeatureEntryName = "Behavior.feature";
+
     private static readonly DateTimeOffset CanonicalTimestamp = new(1980, 1, 1, 0, 0, 0, TimeSpan.Zero);
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
+    private static readonly Regex SecretLikeContent = new(
+        """(?i)(password\s*[:=]|api[_-]?key\s*[:=]|secret\s*[:=]|begin\s+(rsa\s+)?private\s+key|begin\s+openssh\s+private\s+key|\bbearer\s+[a-z0-9\-._~+/]+=*)""",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     public static (BehaviorArtifactDigest Digest, byte[] Bytes) Write(BehaviorArtifactEnvelope envelope)
     {
@@ -44,31 +51,39 @@ internal static class CanonicalArtifactWriter
     private static List<ArtifactEntry> CreateEntries(BehaviorArtifactEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(envelope.Manifest);
-        ArgumentNullException.ThrowIfNull(envelope.Features);
+        ArgumentNullException.ThrowIfNull(envelope.ProgramSource);
+        ArgumentNullException.ThrowIfNull(envelope.FeatureSource);
 
-        var entries = new List<ArtifactEntry>
-        {
+        RejectSecretLikeGeneratedContent(envelope);
+
+        return
+        [
             new("manifest.json", CanonicalJson.Serialize(CanonicalizeManifest(envelope.Manifest))),
-            new("program.cs", Encode(envelope.ProgramSource, nameof(envelope.ProgramSource))),
+            new(ProgramEntryName, Encode(envelope.ProgramSource, nameof(envelope.ProgramSource))),
+            new(FeatureEntryName, Encode(envelope.FeatureSource, nameof(envelope.FeatureSource))),
             new("dependencies/packages.lock.json", CanonicalJson.Normalize(envelope.PackageLockJson, nameof(envelope.PackageLockJson))),
             new("artifact/Behavior.dll", envelope.BehaviorAssembly),
             new("artifact/Behavior.deps.json", CanonicalJson.Normalize(envelope.BehaviorDependenciesJson, nameof(envelope.BehaviorDependenciesJson))),
             new("evidence/compiler.json", CanonicalJson.Normalize(envelope.CompilerEvidenceJson, nameof(envelope.CompilerEvidenceJson))),
             new("evidence/admission.json", CanonicalJson.Normalize(envelope.AdmissionEvidenceJson, nameof(envelope.AdmissionEvidenceJson))),
             new("evidence/bdd.json", CanonicalJson.Normalize(envelope.BddEvidenceJson, nameof(envelope.BddEvidenceJson))),
-        };
+        ];
+    }
 
-        foreach (var feature in envelope.Features)
+    private static void RejectSecretLikeGeneratedContent(BehaviorArtifactEnvelope envelope)
+    {
+        Scan("overview", envelope.Manifest.Overview);
+        Scan("compiler evidence", envelope.CompilerEvidenceJson);
+        Scan("admission evidence", envelope.AdmissionEvidenceJson);
+        Scan("bdd evidence", envelope.BddEvidenceJson);
+    }
+
+    private static void Scan(string name, string value)
+    {
+        if (value is not null && SecretLikeContent.IsMatch(value))
         {
-            if (!IsFeatureName(feature.Key))
-            {
-                throw new BehaviorArtifactException("Feature names must be non-empty ordinal file names without path separators.");
-            }
-
-            entries.Add(new($"features/{feature.Key}.feature", Encode(feature.Value, $"features[{feature.Key}]")));
+            throw new BehaviorArtifactException($"Generated {name} cannot contain secret-like content.");
         }
-
-        return entries;
     }
 
     private static ReadOnlyMemory<byte> Encode(string value, string parameterName)
@@ -84,49 +99,24 @@ internal static class CanonicalArtifactWriter
         }
     }
 
-    internal static bool IsFeatureName(string value)
-    {
-        if (string.IsNullOrEmpty(value) || value.Length > 128 || !IsAsciiAlphaNumeric(value[0]) || !IsAsciiAlphaNumeric(value[^1]))
-        {
-            return false;
-        }
-
-        foreach (var character in value)
-        {
-            if (!IsAsciiAlphaNumeric(character) && character is not '-' and not '_' and not '.')
-            {
-                return false;
-            }
-        }
-
-        var baseNameLength = value.IndexOf('.', StringComparison.Ordinal);
-        var baseName = baseNameLength < 0 ? value : value[..baseNameLength];
-        return !IsWindowsDeviceName(baseName);
-    }
-
-    private static bool IsAsciiAlphaNumeric(char value)
-        => value is >= 'a' and <= 'z' or >= '0' and <= '9';
-
-    private static bool IsWindowsDeviceName(string value)
-        => value is "con" or "prn" or "aux" or "nul"
-            || (value.Length == 4 && value.StartsWith("com", StringComparison.Ordinal) && value[3] is >= '1' and <= '9')
-            || (value.Length == 4 && value.StartsWith("lpt", StringComparison.Ordinal) && value[3] is >= '1' and <= '9');
-
     internal static BehaviorDefinitionManifest CanonicalizeManifest(BehaviorDefinitionManifest manifest)
     {
         ValidateManifest(manifest);
 
+        var contract = CanonicalizeContract(manifest.EntryPoints.Contract);
         return manifest with
         {
             EntryPoints = manifest.EntryPoints with
             {
                 EventAliases = manifest.EntryPoints.EventAliases.Order(StringComparer.Ordinal).ToArray(),
-                IntentSchemas = manifest.EntryPoints.IntentSchemas
-                    .Select(schema => CanonicalizeSchema(schema))
-                    .OrderBy(schema => schema.SchemaId, StringComparer.Ordinal)
-                    .ThenBy(schema => schema.SchemaVersion)
-                    .ToArray(),
+                Contract = contract,
             },
+            Scenarios = manifest.Scenarios
+                .Select(CanonicalizeScenario)
+                .OrderBy(scenario => scenario.ScenarioId, StringComparer.Ordinal)
+                .ToArray(),
+            Overview = manifest.Overview,
+            CompilerPolicy = CanonicalizeCompilerPolicy(manifest.CompilerPolicy),
             CapabilityGrants = manifest.CapabilityGrants
                 .OrderBy(grant => grant.ContractAlias, StringComparer.Ordinal)
                 .ThenBy(grant => grant.MethodAlias, StringComparer.Ordinal)
@@ -135,34 +125,104 @@ internal static class CanonicalArtifactWriter
         };
     }
 
-    private static BehaviorIntentSchema CanonicalizeSchema(BehaviorIntentSchema schema)
+    private static BehaviorContractManifest CanonicalizeContract(BehaviorContractManifest contract)
     {
-        if (schema is null || string.IsNullOrWhiteSpace(schema.SchemaId)
-            || schema.RequestSchemaJson is null || schema.ResultSchemaJson is null)
+        if (contract is null
+            || string.IsNullOrWhiteSpace(contract.BehaviorContractId)
+            || contract.OneOfSchemaJson is null
+            || contract.ResultSchemaJson is null
+            || contract.Cases is null)
         {
-            throw new BehaviorArtifactException("Intent schemas must have an identifier and request/result contracts.");
+            throw new BehaviorArtifactException("A behavior contract must have an identity, cases, and request/result schemas.");
         }
 
-        if (schema.SchemaVersion < 1)
+        if (contract.ContractMajorVersion < 1)
         {
-            throw new BehaviorArtifactException("Intent schema versions must be positive.");
+            throw new BehaviorArtifactException("Contract major versions must be positive.");
         }
 
-        return schema with
+        var cases = contract.Cases
+            .Select(CanonicalizeCase)
+            .OrderBy(item => item.CaseId, StringComparer.Ordinal)
+            .ThenBy(item => item.CaseSchemaVersion)
+            .ToArray();
+
+        if (cases.Select(item => item.CaseId).Distinct(StringComparer.Ordinal).Count() != cases.Length)
         {
-            RequestSchemaJson = CanonicalJson.NormalizeToString(schema.RequestSchemaJson, nameof(schema.RequestSchemaJson)),
-            ResultSchemaJson = CanonicalJson.NormalizeToString(schema.ResultSchemaJson, nameof(schema.ResultSchemaJson)),
+            throw new BehaviorArtifactException("Behavior contract case IDs must be unique.");
+        }
+
+        return contract with
+        {
+            OneOfSchemaJson = CanonicalJson.NormalizeToString(contract.OneOfSchemaJson, nameof(contract.OneOfSchemaJson)),
+            ResultSchemaJson = CanonicalJson.NormalizeToString(contract.ResultSchemaJson, nameof(contract.ResultSchemaJson)),
+            Cases = cases,
         };
+    }
+
+    private static BehaviorContractCaseManifest CanonicalizeCase(BehaviorContractCaseManifest contractCase)
+    {
+        if (contractCase is null
+            || string.IsNullOrWhiteSpace(contractCase.CaseId)
+            || string.IsNullOrWhiteSpace(contractCase.CaseName)
+            || contractCase.PayloadSchemaJson is null)
+        {
+            throw new BehaviorArtifactException("Contract cases must have an identifier, name, and payload schema.");
+        }
+
+        if (contractCase.CaseSchemaVersion < 1)
+        {
+            throw new BehaviorArtifactException("Case schema versions must be positive.");
+        }
+
+        return contractCase with
+        {
+            PayloadSchemaJson = CanonicalJson.NormalizeToString(contractCase.PayloadSchemaJson, nameof(contractCase.PayloadSchemaJson)),
+        };
+    }
+
+    private static BehaviorScenarioManifest CanonicalizeScenario(BehaviorScenarioManifest scenario)
+    {
+        if (scenario is null
+            || string.IsNullOrWhiteSpace(scenario.ScenarioId)
+            || string.IsNullOrWhiteSpace(scenario.Title)
+            || string.IsNullOrWhiteSpace(scenario.BindingKey))
+        {
+            throw new BehaviorArtifactException("Scenarios must have a stable identifier, title, and binding key.");
+        }
+
+        return scenario;
+    }
+
+    private static BehaviorCompilerPolicy CanonicalizeCompilerPolicy(BehaviorCompilerPolicy policy)
+    {
+        if (policy is null
+            || string.IsNullOrWhiteSpace(policy.SdkVersion)
+            || string.IsNullOrWhiteSpace(policy.RoslynVersion)
+            || string.IsNullOrWhiteSpace(policy.LanguageVersion)
+            || string.IsNullOrWhiteSpace(policy.PolicyId))
+        {
+            throw new BehaviorArtifactException("Compiler policy must record SDK, Roslyn, language version, and policy id.");
+        }
+
+        return policy;
     }
 
     private static void ValidateManifest(BehaviorDefinitionManifest manifest)
     {
         try
         {
-            if (manifest is null || manifest.EntryPoints is null
-                || manifest.EntryPoints.EventAliases is null || manifest.EntryPoints.IntentSchemas is null
-                || manifest.CapabilityGrants is null || manifest.ResourceLimits is null
-                || manifest.DisplayName is null || manifest.Description is null)
+            if (manifest is null
+                || manifest.EntryPoints is null
+                || manifest.EntryPoints.EventAliases is null
+                || manifest.EntryPoints.Contract is null
+                || manifest.Scenarios is null
+                || manifest.Overview is null
+                || manifest.CompilerPolicy is null
+                || manifest.CapabilityGrants is null
+                || manifest.ResourceLimits is null
+                || manifest.DisplayName is null
+                || manifest.Description is null)
             {
                 throw new BehaviorArtifactException("The behavior manifest has missing required members.");
             }
@@ -170,8 +230,7 @@ internal static class CanonicalArtifactWriter
             manifest.Behavior.EnsureValid();
             if (manifest.EntryPoints.EventAliases.Any(string.IsNullOrWhiteSpace)
                 || manifest.EntryPoints.EventAliases.Distinct(StringComparer.Ordinal).Count() != manifest.EntryPoints.EventAliases.Count
-                || manifest.EntryPoints.IntentSchemas.Any(schema => schema is null)
-                || manifest.EntryPoints.IntentSchemas.Select(schema => (schema.SchemaId, schema.SchemaVersion)).Distinct().Count() != manifest.EntryPoints.IntentSchemas.Count
+                || manifest.Scenarios.Select(scenario => scenario.ScenarioId).Distinct(StringComparer.Ordinal).Count() != manifest.Scenarios.Count
                 || manifest.CapabilityGrants.Any(grant => grant is null || string.IsNullOrWhiteSpace(grant.ContractAlias) || string.IsNullOrWhiteSpace(grant.MethodAlias) || string.IsNullOrWhiteSpace(grant.Target))
                 || manifest.ResourceLimits.CpuMilliseconds <= 0 || manifest.ResourceLimits.MemoryBytes <= 0 || manifest.ResourceLimits.WallClockMilliseconds <= 0)
             {

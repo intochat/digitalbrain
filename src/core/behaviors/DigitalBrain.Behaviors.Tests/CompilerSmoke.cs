@@ -12,5 +12,9 @@ public sealed class CompilerSmoke
         var compiler = new ContractOnlyBehaviorCompiler();
         var result = compiler.Compile(RailPrograms.GreenProgram(), new BehaviorId("com.digitalbrain.sample"));
         Assert.True(result.Succeeded, result.Diagnostics);
+        Assert.Equal("contract-only-v1", result.Policy.PolicyId);
+        Assert.Equal("Preview", result.Policy.LanguageVersion);
+        Assert.Contains("\"policy\":\"contract-only-v1\"", result.CompilerEvidenceJson, StringComparison.Ordinal);
+        Assert.Contains("\"languageVersion\":\"Preview\"", result.CompilerEvidenceJson, StringComparison.Ordinal);
     }
 }

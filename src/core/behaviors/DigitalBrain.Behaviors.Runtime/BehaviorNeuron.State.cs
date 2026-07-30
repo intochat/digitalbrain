@@ -1,4 +1,6 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors.Artifacts;
+using DigitalBrain.Behaviors.Manifest;
 
 namespace DigitalBrain.Behaviors;
 
@@ -39,6 +41,55 @@ internal sealed partial class BehaviorNeuron
             data.LastExecutionOutcome);
 
     private BehaviorId BehaviorIdOfName() => new(Id.Name);
+
+    private static string FeatureSourceOf(IReadOnlyDictionary<string, string> features)
+        => string.Join(
+            "\n",
+            features
+                .OrderBy(static pair => pair.Key, StringComparer.Ordinal)
+                .Select(static pair => pair.Value));
+
+    private static BehaviorArtifactEnvelope CreateProposalEnvelope(
+        BehaviorId behaviorId,
+        string displayName,
+        string description,
+        string programSource,
+        string featureSource,
+        ReadOnlyMemory<byte> assemblyBytes,
+        string compilerEvidenceJson,
+        BehaviorContractManifest? contract = null)
+    {
+        var scenarios = BehaviorScenarioBinder.DeriveScenarios(featureSource);
+        var overview = BehaviorScenarioBinder.ProjectOverview(displayName, scenarios);
+        var resolvedContract = contract ?? new BehaviorContractManifest(
+            behaviorId.Value,
+            1,
+            """{"oneOf":[]}""",
+            [],
+            """{"type":"object"}""");
+
+        return new(
+            new BehaviorDefinitionManifest(
+                behaviorId,
+                displayName,
+                description,
+                new BehaviorEntryPoints(
+                    [],
+                    resolvedContract),
+                scenarios,
+                overview,
+                BehaviorInputContractCompiler.DefaultPolicy,
+                [],
+                new BehaviorResourceLimits(1_000, 64 * 1024 * 1024, 30_000)),
+            programSource,
+            featureSource,
+            """{"libraries":{},"version":1}""",
+            assemblyBytes,
+            """{"runtimeTarget":{"name":"net11.0"}}""",
+            compilerEvidenceJson,
+            """{"policy":"v1","result":"pending"}""",
+            BehaviorScenarioBinder.EvidenceJson(false, scenarios.Count, "pending", scenarios));
+    }
 
     private static void ValidateCommand(CommandId commandId)
     {

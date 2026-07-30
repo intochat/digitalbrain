@@ -78,22 +78,15 @@ internal sealed partial class BehaviorNeuron :
             return Snapshot(data);
         }
 
-        var envelope = new BehaviorArtifactEnvelope(
-            new BehaviorDefinitionManifest(
-                behaviorId,
-                command.DisplayName,
-                command.Description,
-                new BehaviorEntryPoints([], []),
-                [],
-                new BehaviorResourceLimits(1_000, 64 * 1024 * 1024, 30_000)),
+        var envelope = CreateProposalEnvelope(
+            behaviorId,
+            command.DisplayName,
+            command.Description,
             command.ProgramSource,
-            """{"version":1,"libraries":{}}""",
+            FeatureSourceOf(command.Features),
             compile.AssemblyBytes,
-            """{"runtimeTarget":{"name":"net11.0"}}""",
-            command.Features.ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal),
             compile.CompilerEvidenceJson,
-            """{"result":"pending","policy":"v1"}""",
-            """{"scenarios":0,"passed":false}""");
+            compile.Contract);
 
         var written = CanonicalArtifactWriter.Write(envelope);
         var hash = written.Digest.Value;
@@ -146,22 +139,14 @@ internal sealed partial class BehaviorNeuron :
         }
 
         var behaviorId = BehaviorIdOfName();
-        var envelope = new BehaviorArtifactEnvelope(
-            new BehaviorDefinitionManifest(
-                behaviorId,
-                data.DisplayName ?? behaviorId.Value,
-                data.Description ?? behaviorId.Value,
-                new BehaviorEntryPoints([], []),
-                [],
-                new BehaviorResourceLimits(1_000, 64 * 1024 * 1024, 30_000)),
+        var envelope = CreateProposalEnvelope(
+            behaviorId,
+            data.DisplayName ?? behaviorId.Value,
+            data.Description ?? behaviorId.Value,
             data.ProgramSource,
-            """{"version":1,"libraries":{}}""",
+            FeatureSourceOf(data.Features),
             data.AssemblyBytes,
-            """{"runtimeTarget":{"name":"net11.0"}}""",
-            data.Features,
-            """{"diagnostics":[],"sdk":"rail"}""",
-            """{"result":"pending","policy":"v1"}""",
-            """{"scenarios":0,"passed":false}""");
+            """{"diagnostics":[],"languageVersion":"Preview","policy":"contract-only-v1","roslyn":"5.6.0","sdk":"rail","succeeded":true}""");
 
         var report = _bddGate.Evaluate(
             envelope,

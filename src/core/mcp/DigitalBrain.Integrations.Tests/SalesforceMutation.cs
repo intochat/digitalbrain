@@ -181,7 +181,7 @@ public sealed class SalesforceMutation(IntegrationsFixture fixture)
         CancellationToken cancellationToken)
     {
         var delivered = driver.Incoming.NextAsync<SalesforceMutationApproval>(cancellationToken);
-        await test.Client.SendAsync(driver.Id, approval);
+        await test.Client.SendAsync(driver.Id, approval, cancellationToken);
         Assert.Equal(approval, (await delivered).Synapse);
     }
 
