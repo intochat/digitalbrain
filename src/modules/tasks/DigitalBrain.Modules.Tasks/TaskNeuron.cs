@@ -10,6 +10,7 @@ namespace DigitalBrain.Tasks;
 internal sealed partial class TaskNeuron :
     Neuron,
     ITask,
+    IHandle<StartTask>,
     IHandle<AttemptAccepted>,
     IHandle<AttemptProgressed>,
     IHandle<AttemptWaiting>,
@@ -17,6 +18,7 @@ internal sealed partial class TaskNeuron :
     IHandle<AttemptFailed>,
     IHandle<AttemptCancelled>,
     IHandle<AttemptOutcomeUncertain>,
+    IEmit<TaskSnapshot>,
     IRemindable
 {
     private const string StateName = "tasks.task";
@@ -33,25 +35,16 @@ internal sealed partial class TaskNeuron :
         _states = ServiceProvider.GetRequiredService<Serializer<TaskData>>();
     }
 
-    public Task<TaskSnapshot> Read()
+    public Task<TaskSnapshot> Read() => Task.FromResult(Snapshot(Load()));
+
+    public async Task HandleAsync(StartTask synapse, CancellationToken cancellationToken)
     {
-        var data = LoadIfStarted();
-        return Task.FromResult(data is null
-            ? new TaskSnapshot(
-                default!,
-                default,
-                default!,
-                TaskState.Pending,
-                Revision: 0,
-                ActiveAttempt: null,
-                Blocker: null,
-                Result: null,
-                Failure: null,
-                Evidence: [],
-                RetryOf: null,
-                AttemptCount: 0,
-                Activation: null)
-            : Snapshot(data));
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var snapshot = await Start(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+        await ReplyAsync(snapshot, cancellationToken);
     }
 
     Task INeuron.Deliver(SynapseDelivery delivery)

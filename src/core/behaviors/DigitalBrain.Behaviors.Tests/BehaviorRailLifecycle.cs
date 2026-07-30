@@ -204,6 +204,50 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
         Assert.Equal(TaskState.Pending, (await task.Reference.Read()).State);
     }
 
+    [Fact(DisplayName = "binding rejects foreign owners and wrong task/worker neuron types before task start")]
+    public async Task BindingRejectsForeignOwnersAndWrongNeuronTypesBeforeTaskStart()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var behavior = test.Neuron<IBehaviorNeuron>(BehaviorsFixture.SampleBehavior);
+        var task = test.Neuron<ITask>("binding-isolation-task");
+        var worker = test.Neuron<IWorker>("binding-isolation-worker");
+        var foreign = test.Owner("foreign-binding-owner");
+        var foreignTask = foreign.Neuron<ITask>("foreign-binding-task");
+        var foreignWorker = foreign.Neuron<IWorker>("foreign-binding-worker");
+
+        var active = await InstallAsync(test, behavior, RailPrograms.GreenProgram("isolation"), "isolation");
+        var binding = BehaviorActivationBindings.ForExistingTask(
+            task.Id,
+            worker.Id,
+            new BehaviorId(BehaviorsFixture.SampleBehavior),
+            new BehaviorRevisionId(active.ActiveArtifactHash!),
+            contractVersion: "1",
+            caseId: "install",
+            protectedPayload: new ProtectedPayloadReference(
+                Guid.Parse("55555555-5555-5555-5555-555555555555")));
+        var invalidBindings = new[]
+        {
+            binding with { TaskId = foreignTask.Id },
+            binding with { WorkerId = foreignWorker.Id },
+            binding with { TaskId = worker.Id },
+            binding with { WorkerId = task.Id },
+        };
+
+        foreach (var invalidBinding in invalidBindings)
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => behavior.Reference.ActivateBound(
+                    new ActivateBoundBehavior(
+                        CommandId.New(),
+                        active.ActiveArtifactHash!,
+                        invalidBinding)));
+        }
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => task.Reference.Read());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => foreignTask.Reference.Read());
+    }
+
     [Fact(DisplayName = "union membership alone creates no subscription or task; only explicit binding activates")]
     public async Task UnionMembershipAloneCreatesNoSubscriptionOrTask()
     {
@@ -215,11 +259,7 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
         var active = await InstallAsync(test, behavior, RailPrograms.GreenProgram("union"), "union");
         Assert.Equal(BehaviorRevisionStatus.Active, active.Status);
 
-        var unread = await task.Reference.Read();
-        Assert.Equal(TaskState.Pending, unread.State);
-        Assert.Null(unread.ActiveAttempt);
-        Assert.Null(unread.Activation);
-        Assert.Equal(0, unread.Revision);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => task.Reference.Read());
     }
 
     [Fact(DisplayName = "duplicate binding delivery/recovery cannot create a second task")]
@@ -246,6 +286,13 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
             new ActivateBoundBehavior(commandId, active.ActiveArtifactHash!, binding));
         var second = await behavior.Reference.ActivateBound(
             new ActivateBoundBehavior(commandId, active.ActiveArtifactHash!, binding));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => behavior.Reference.ActivateBound(
+                new ActivateBoundBehavior(
+                    commandId,
+                    active.ActiveArtifactHash!,
+                    binding with { CaseId = "conflict" })));
 
         Assert.Equal(first.TaskId, second.TaskId);
         Assert.Equal(first.ActiveAttempt, second.ActiveAttempt);

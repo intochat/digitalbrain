@@ -68,7 +68,8 @@ public sealed partial class TaskLifecycle
             new BehaviorRevisionId("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
             contractVersion: "1",
             caseId: "install",
-            protectedPayload: new ProtectedPayloadReference(Guid.Parse("11111111-1111-1111-1111-111111111111")));
+            protectedPayload: new ProtectedPayloadReference(
+                Guid.Parse("11111111-1111-1111-1111-111111111111")));
 
         var started = await task.Reference.Start(new StartTask(
             CommandId.New(),
@@ -98,17 +99,32 @@ public sealed partial class TaskLifecycle
         await using var brain = await fixture.CreateBrainAsync(cancellationToken);
         var worker = brain.Neuron<IWorker>("directed-worker");
         var task = brain.Neuron<ITask>("directed-task");
+        var directed = brain.Client.Get<ITask>(task.Id.Name);
         var command = StartCommand(new TestGoal("directed"), worker.Id);
 
-        var first = await task.Reference.Start(command);
-        var recovered = await task.Reference.Start(command);
+        var first = await directed.SendAsync(command, cancellationToken);
+        var recovered = await directed.SendAsync(command, cancellationToken);
 
         AssertReceipt(first, recovered);
         Assert.Equal(first.ActiveAttempt, recovered.ActiveAttempt);
         Assert.Equal(1, recovered.AttemptCount);
 
+        var conflicting = command with
+        {
+            Activation = new BehaviorTaskActivation(
+                new BehaviorId("sample"),
+                new BehaviorRevisionId("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+                contractVersion: "1",
+                caseId: "conflict",
+                protectedPayload: new ProtectedPayloadReference(
+                    Guid.Parse("44444444-4444-4444-4444-444444444444"))),
+        };
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => task.Reference.Start(conflicting));
+
         var secondCommand = StartCommand(new TestGoal("directed-again"), worker.Id);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => task.Reference.Start(secondCommand));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => task.Reference.Start(secondCommand));
 
         var read = await task.Reference.Read();
         Assert.Equal(first.ActiveAttempt, read.ActiveAttempt);

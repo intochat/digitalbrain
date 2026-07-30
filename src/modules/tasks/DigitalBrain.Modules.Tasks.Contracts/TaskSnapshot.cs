@@ -1,9 +1,11 @@
+using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Tasks;
 
 [GenerateSerializer]
 [Alias("tasks.snapshot")]
+[Description("Durable task start result and lifecycle snapshot")]
 public sealed record TaskSnapshot(
     [property: Id(0)] Goal Goal,
     [property: Id(1)] NeuronId Worker,

@@ -15,6 +15,16 @@ internal sealed partial class TaskNeuron
 
             if (existing.Receipts.TryGetValue(command.CommandId, out var received))
             {
+                if (!Equals(existing.Goal, command.Goal)
+                    || existing.Worker != command.Worker
+                    || existing.Policy != command.Policy
+                    || existing.RetryOf != command.RetryOf
+                    || existing.Activation != command.Activation)
+                {
+                    throw new InvalidOperationException(
+                        $"Task '{Id}' received CommandId '{command.CommandId}' with a different Start payload.");
+                }
+
                 return received;
             }
 
