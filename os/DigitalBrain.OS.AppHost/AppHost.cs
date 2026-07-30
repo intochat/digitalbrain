@@ -27,8 +27,9 @@ brain.AddModule<ChatModule>();
 brain.AddModule<OSBehaviorsModule>();
 brain.AddModule<FlutterModule>(flutter => flutter
     .WithUiEdge()
-    // .WithHeadlessHost() // pure-Dart host; swap with window for headless-only dev
-    .WithWindowHost());
+     .WithHeadlessHost() // pure-Dart host; swap with window for headless-only dev
+                         //.WithWindowHost()
+    );
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 brain.AddModule<BehaviorsModule>();
