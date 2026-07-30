@@ -1,8 +1,11 @@
 using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Testing;
 using Xunit;
+using Xunit.Sdk;
+using Xunit.v3;
 
 [assembly: AssemblyFixture(typeof(DigitalBrain.HostTests.TestingAppHostFixture))]
+[assembly: Parallelization(Mode = ParallelMode.None)]
 
 namespace DigitalBrain.HostTests;
 
