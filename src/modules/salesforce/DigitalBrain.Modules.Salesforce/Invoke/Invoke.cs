@@ -26,6 +26,9 @@ internal sealed partial class Salesforce
             _tokenState,
             () => WriteStateAsync(),
             _durableIdentity,
+            mutation.CommandId,
+            Id.Owner,
+            GrainFactory,
             async (client, callbackCancellation) =>
             {
                 var tools = await client.ListToolsAsync(cancellationToken: callbackCancellation);
@@ -102,6 +105,9 @@ internal sealed partial class Salesforce
                 _tokenState,
                 () => WriteStateAsync(),
                 _durableIdentity,
+                mutation.CommandId,
+                Id.Owner,
+                GrainFactory,
                 async (client, callbackCancellation) =>
                 {
                     var tools = await client.ListToolsAsync(cancellationToken: callbackCancellation);

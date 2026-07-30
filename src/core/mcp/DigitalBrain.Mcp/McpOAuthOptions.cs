@@ -5,7 +5,11 @@ namespace DigitalBrain.Mcp;
 
 internal static class McpOAuthOptions
 {
-    internal static ClientOAuthOptions Create(McpServerDefinition server, IConfiguration configuration, ITokenCache tokenCache)
+    internal static ClientOAuthOptions Create(
+        McpServerDefinition server,
+        IConfiguration configuration,
+        ITokenCache tokenCache,
+        McpAuthorizationAmbientState? ambient = null)
     {
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -20,7 +24,7 @@ internal static class McpOAuthOptions
             RedirectUri = RequiredUri(configuration, server, "RedirectUri"),
             Scopes = server.Scopes,
             TokenCache = tokenCache,
-            AuthorizationCallbackHandler = McpAuthorizationCallback.Create(configuration),
+            AuthorizationCallbackHandler = McpAuthorizationCallback.Create(configuration, ambient),
         };
     }
 

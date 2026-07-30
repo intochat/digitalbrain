@@ -11,6 +11,8 @@ internal static class McpRuntimeHosting
     internal const string LocalLoopbackDevelopmentMode = "LocalLoopbackDevelopment";
     internal const string EdgeMode = "Edge";
     internal const string PublicSignInBaseKey = "DigitalBrain:Integrations:Mcp:PublicSignInBase";
+    internal const string AuthorizationPreflightKey = "DigitalBrain:Integrations:Mcp:AuthorizationPreflight";
+    internal const string EndpointConfigurationSuffix = "Endpoint";
 
     internal static void Configure(IServiceCollection services, IConfiguration configuration)
     {

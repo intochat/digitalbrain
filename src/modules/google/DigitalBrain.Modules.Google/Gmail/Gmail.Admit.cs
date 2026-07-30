@@ -84,5 +84,5 @@ internal sealed partial class Gmail
             : [];
 
     private static InvalidOperationException Incompatible(string tool) =>
-        new($"{Server.DisplayName} MCP tool '{tool}' is incompatible with the admitted '{GetMessageName}' contract.");
+        new($"{DefaultServer.DisplayName} MCP tool '{tool}' is incompatible with the admitted '{GetMessageName}' contract.");
 }

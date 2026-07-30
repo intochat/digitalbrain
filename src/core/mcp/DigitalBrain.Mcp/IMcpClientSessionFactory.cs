@@ -15,5 +15,6 @@ internal interface IMcpClientSessionFactory
         IDurableValue<byte[]> tokenState,
         Func<ValueTask> commit,
         string durableIdentity,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        McpAuthorizationAmbientState? ambient = null);
 }

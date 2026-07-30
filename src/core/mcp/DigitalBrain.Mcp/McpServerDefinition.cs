@@ -16,9 +16,24 @@ internal sealed class McpServerDefinition
         ArgumentException.ThrowIfNullOrWhiteSpace(configurationRoot);
         ArgumentNullException.ThrowIfNull(scopes);
 
-        if (!endpoint.IsAbsoluteUri || endpoint.Scheme != Uri.UriSchemeHttps)
+        if (!endpoint.IsAbsoluteUri)
         {
-            throw new ArgumentException("An MCP server endpoint must be an absolute HTTPS URI.", nameof(endpoint));
+            throw new ArgumentException("An MCP server endpoint must be an absolute URI.", nameof(endpoint));
+        }
+
+        if (endpoint.Scheme == Uri.UriSchemeHttps)
+        {
+            // Production endpoints are HTTPS.
+        }
+        else if (endpoint.Scheme == Uri.UriSchemeHttp && endpoint.IsLoopback)
+        {
+            // Loopback HTTP is reserved for test-owned fake providers.
+        }
+        else
+        {
+            throw new ArgumentException(
+                "An MCP server endpoint must be HTTPS, or HTTP on a loopback address for test hosts.",
+                nameof(endpoint));
         }
 
         if (scopes.Count == 0 || scopes.Any(string.IsNullOrWhiteSpace))
@@ -45,4 +60,7 @@ internal sealed class McpServerDefinition
     internal IReadOnlyList<string> Scopes { get; }
 
     internal bool RequiresClientSecret { get; }
+
+    internal McpServerDefinition WithEndpoint(Uri endpoint)
+        => new(Key, DisplayName, endpoint, ConfigurationRoot, Scopes, RequiresClientSecret);
 }

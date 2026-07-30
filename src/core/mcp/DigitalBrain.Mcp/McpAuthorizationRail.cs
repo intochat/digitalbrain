@@ -46,18 +46,65 @@ internal static class McpAuthorizationRail
         var purpose = McpTokenPresence.Purpose(server.Key, durableIdentity);
         var authorization = grains.GetGrain<IMcpAuthorization>(
             NeuronId.For<IMcpAuthorization>(owner, McpAuthorizationNeuron.InstanceName).ToGrainId());
+        var missingOrExpired = McpTokenPresence.IsMissingOrExpired(tokenState, protector, purpose, time);
+        var hadProtectedToken = tokenState.Value is { Length: > 0 };
 
-        if (!McpTokenPresence.IsMissingOrExpired(tokenState, protector, purpose, time))
-        {
-            return;
-        }
-
-        McpAuthorizationClaim claim;
+        McpAuthorizationClaim? claim = null;
         try
         {
             claim = await authorization.Claim(commandId, cancellationToken);
         }
         catch (InvalidOperationException)
+        {
+        }
+
+        if (claim is not null)
+        {
+            switch (claim.Kind)
+            {
+                case McpAuthorizationClaimKind.Required:
+                    throw new McpAuthorizationRequiredException(
+                        claim.Required
+                        ?? throw new InvalidOperationException("Authorization claim is missing the required fact."));
+                case McpAuthorizationClaimKind.Denied:
+                    throw new McpAuthorizationDeniedException(
+                        claim.Denied
+                        ?? throw new InvalidOperationException("Authorization claim is missing the denied fact."));
+                case McpAuthorizationClaimKind.Completed:
+                    if (!missingOrExpired)
+                    {
+                        return;
+                    }
+
+                    await McpTokenPresence.StoreAsync(
+                        tokenState,
+                        commit,
+                        protector,
+                        purpose,
+                        new TokenContainer
+                        {
+                            TokenType = "Bearer",
+                            AccessToken = $"authorized:{commandId}:{server.Key}",
+                            ObtainedAt = time.GetUtcNow(),
+                            ExpiresIn = 3600,
+                        },
+                        cancellationToken);
+                    return;
+                default:
+                    throw new InvalidOperationException($"Authorization claim kind '{claim.Kind}' is unsupported.");
+            }
+        }
+
+        if (!missingOrExpired)
+        {
+            return;
+        }
+
+        // Expired durable tokens always re-park so callers resume with a fresh command claim.
+        // Pure missing tokens may skip preflight when hold-open OAuth is configured for real
+        // HttpMcpClientSessionFactory proofs (AuthorizationPreflight=false).
+        var preflight = PreflightEnabled(configuration);
+        if (hadProtectedToken || preflight)
         {
             var required = await BeginNewAsync(
                 authorization,
@@ -67,35 +114,17 @@ internal static class McpAuthorizationRail
                 cancellationToken);
             throw new McpAuthorizationRequiredException(required);
         }
+    }
 
-        switch (claim.Kind)
+    private static bool PreflightEnabled(IConfiguration configuration)
+    {
+        var configured = configuration[McpRuntimeHosting.AuthorizationPreflightKey];
+        if (string.IsNullOrWhiteSpace(configured))
         {
-            case McpAuthorizationClaimKind.Required:
-                throw new McpAuthorizationRequiredException(
-                    claim.Required
-                    ?? throw new InvalidOperationException("Authorization claim is missing the required fact."));
-            case McpAuthorizationClaimKind.Denied:
-                throw new McpAuthorizationDeniedException(
-                    claim.Denied
-                    ?? throw new InvalidOperationException("Authorization claim is missing the denied fact."));
-            case McpAuthorizationClaimKind.Completed:
-                await McpTokenPresence.StoreAsync(
-                    tokenState,
-                    commit,
-                    protector,
-                    purpose,
-                    new TokenContainer
-                    {
-                        TokenType = "Bearer",
-                        AccessToken = $"authorized:{commandId}:{server.Key}",
-                        ObtainedAt = time.GetUtcNow(),
-                        ExpiresIn = 3600,
-                    },
-                    cancellationToken);
-                return;
-            default:
-                throw new InvalidOperationException($"Authorization claim kind '{claim.Kind}' is unsupported.");
+            return true;
         }
+
+        return !string.Equals(configured, "false", StringComparison.OrdinalIgnoreCase);
     }
 
     private static Task<AuthorizationRequired> BeginNewAsync(

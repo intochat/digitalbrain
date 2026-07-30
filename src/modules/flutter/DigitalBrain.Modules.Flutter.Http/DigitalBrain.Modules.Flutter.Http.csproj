@@ -19,5 +19,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Flutter.Http.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Mcp.Tests" />
   </ItemGroup>
 </Project>

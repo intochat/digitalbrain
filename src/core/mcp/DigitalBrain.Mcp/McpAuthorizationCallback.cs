@@ -6,7 +6,8 @@ namespace DigitalBrain.Mcp;
 internal static class McpAuthorizationCallback
 {
     internal static Func<AuthorizationCallbackContext, CancellationToken, Task<AuthorizationResult?>> Create(
-        IConfiguration configuration)
+        IConfiguration configuration,
+        McpAuthorizationAmbientState? ambient = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
@@ -18,7 +19,9 @@ internal static class McpAuthorizationCallback
 
         if (string.Equals(mode, McpRuntimeHosting.EdgeMode, StringComparison.Ordinal))
         {
-            return EdgeMcpAuthorizationCallback.AuthorizeAsync;
+            // Capture ambient at OpenAsync time — AsyncLocal does not survive Orleans/HTTP continuations.
+            return (context, cancellationToken) =>
+                EdgeMcpAuthorizationCallback.AuthorizeAsync(context, ambient, cancellationToken);
         }
 
         return RejectAsync;

@@ -52,8 +52,15 @@ internal sealed class McpAuthorizationNeuron :
 
             if (recorded.Outcome is PendingAuthorizationOutcome.Completed)
             {
-                throw new InvalidOperationException(
-                    $"Authorization command '{request.CommandId}' already completed for '{recorded.ServerKey}'.");
+                // Idempotent resume: the edge callback completed while the emitting grain was
+                // still wiring OAuth. Returning the original required fact is enough for journal
+                // observers; the durable token cache already holds the exchanged token.
+                return new AuthorizationRequired(
+                    recorded.CommandId,
+                    recorded.ServerKey,
+                    recorded.ServerDisplayName,
+                    recorded.SignInUrl,
+                    recorded.State);
             }
 
             return new AuthorizationRequired(
@@ -129,6 +136,18 @@ internal sealed class McpAuthorizationNeuron :
         var pending = _serializer.Deserialize(serialized);
         if (pending.Outcome is not PendingAuthorizationOutcome.Open)
         {
+            if (pending.Outcome is PendingAuthorizationOutcome.Completed
+                && !string.IsNullOrWhiteSpace(pending.Code))
+            {
+                McpAuthorizationCodeHub.Complete(
+                    delivery.State,
+                    new McpAuthorizationCodeResult(pending.Code, pending.Iss));
+            }
+            else if (pending.Outcome is PendingAuthorizationOutcome.Denied)
+            {
+                McpAuthorizationCodeHub.Complete(delivery.State, result: null);
+            }
+
             return new McpAuthorizationCallbackDelivery(
                 Accepted: true,
                 Completed: pending.Outcome is PendingAuthorizationOutcome.Completed,
@@ -188,6 +207,34 @@ internal sealed class McpAuthorizationNeuron :
                 new AuthorizationDenied(recorded.CommandId, recorded.ServerKey, recorded.State)),
             _ => throw new InvalidOperationException($"Authorization command '{commandId}' has an unknown outcome."),
         });
+    }
+
+    public Task<McpAuthorizationCodeResult?> TakeCompletedCode(
+        string state,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(state);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!_pending.TryGetValue(state, out var serialized))
+        {
+            return Task.FromResult<McpAuthorizationCodeResult?>(null);
+        }
+
+        var pending = _serializer.Deserialize(serialized);
+        if (pending.Outcome is PendingAuthorizationOutcome.Denied)
+        {
+            return Task.FromResult<McpAuthorizationCodeResult?>(null);
+        }
+
+        if (pending.Outcome is not PendingAuthorizationOutcome.Completed
+            || string.IsNullOrWhiteSpace(pending.Code))
+        {
+            return Task.FromResult<McpAuthorizationCodeResult?>(null);
+        }
+
+        return Task.FromResult<McpAuthorizationCodeResult?>(
+            new McpAuthorizationCodeResult(pending.Code, pending.Iss));
     }
 
     private async Task PersistOutcomeAsync(

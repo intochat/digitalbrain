@@ -78,13 +78,15 @@ internal sealed class ScriptedMcpSessionFactory(McpEdgeScript script) : IMcpClie
         IDurableValue<byte[]> tokenState,
         Func<ValueTask> commit,
         string durableIdentity,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        McpAuthorizationAmbientState? ambient = null)
     {
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(tokenState);
         ArgumentNullException.ThrowIfNull(commit);
         ArgumentException.ThrowIfNullOrWhiteSpace(durableIdentity);
         cancellationToken.ThrowIfCancellationRequested();
+        _ = ambient;
 
         var tools = script.ToolsFor(server.Key);
         var clientToServer = new Pipe();

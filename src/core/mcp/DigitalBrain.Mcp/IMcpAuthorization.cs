@@ -15,4 +15,7 @@ public partial interface IMcpAuthorization : INeuron
 
     [Alias(nameof(Claim))]
     Task<McpAuthorizationClaim> Claim(CommandId commandId, CancellationToken cancellationToken = default);
+
+    [Alias(nameof(TakeCompletedCode))]
+    Task<McpAuthorizationCodeResult?> TakeCompletedCode(string state, CancellationToken cancellationToken = default);
 }

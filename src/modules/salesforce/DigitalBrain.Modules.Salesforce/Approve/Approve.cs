@@ -55,6 +55,9 @@ internal sealed partial class Salesforce
             _tokenState,
             () => WriteStateAsync(),
             _durableIdentity,
+            approval.CommandId,
+            Id.Owner,
+            GrainFactory,
             async (client, callbackCancellation) =>
             {
                 var tools = await client.ListToolsAsync(cancellationToken: callbackCancellation);
