@@ -182,4 +182,30 @@ internal static class RailPrograms
             When the enrichment behavior runs
             Then the account description is proposed for approval
         """;
+
+    public static string SingleFileSdkProgram()
+        => """
+            using System.Threading.Tasks;
+            using DigitalBrain.Abstractions;
+            using DigitalBrain.Client;
+            using DigitalBrain.Behaviors;
+
+            public sealed record ResearchCompanyRequest(string Prompt) : Synapse;
+            public sealed record GmailResponse(string Status) : Synapse;
+            public sealed record GmailRequest(string Prompt) : RequestSynapse<GmailResponse>;
+            public interface IGmail : INeuron;
+
+            public static class BehaviorEntry
+            {
+                public static async Task RunAsync()
+                {
+                    await using var brain =
+                        await DigitalBrainClient.ConnectAsync<ResearchCompanyRequest>();
+
+                    var request = brain.Trigger;
+                    var gmail = brain.Get<IGmail>();
+                    var result = await gmail.SendAsync(new GmailRequest(request.Prompt));
+                }
+            }
+            """;
 }

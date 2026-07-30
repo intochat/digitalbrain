@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors;
 
 namespace DigitalBrain.Client;
 
@@ -23,6 +24,19 @@ public sealed class DigitalBrainClient : IDigitalBrain
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
 
         return new DigitalBrainClient(grains, new OwnerId(owner));
+    }
+
+    public static Task<BehaviorBrain<TTrigger>> ConnectAsync<TTrigger>(
+        CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.CanBeCanceled)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        return Task.FromException<BehaviorBrain<TTrigger>>(
+            new InvalidOperationException(
+                "DigitalBrainClient.ConnectAsync is supplied by the isolated behavior worker."));
     }
 
     public Task ActivateAsync(CancellationToken cancellationToken = default)

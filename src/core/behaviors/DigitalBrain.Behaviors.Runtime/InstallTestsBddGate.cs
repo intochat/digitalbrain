@@ -59,6 +59,7 @@ internal sealed class InstallTestsBddGate : IBehaviorBddGate
             }
 
             var tests = (IBehaviorInstallTests)Activator.CreateInstance(installTestsType)!;
+            using var attempt = new CancellationTokenSource();
             var context = new ExecutorBehaviorContext(
                 new BehaviorExecutionMetadata(
                     Owner: new OwnerId("bdd-gate"),
@@ -66,7 +67,8 @@ internal sealed class InstallTestsBddGate : IBehaviorBddGate
                     Revision: new BehaviorRevisionId(artifactHash),
                     Execution: BehaviorExecutionId.New()),
                 capabilities,
-                time);
+                time,
+                attempt.Token);
 
             IReadOnlyDictionary<string, string> featureBindings =
                 new Dictionary<string, string>(StringComparer.Ordinal)
@@ -74,7 +76,7 @@ internal sealed class InstallTestsBddGate : IBehaviorBddGate
                     ["Behavior"] = envelope.FeatureSource,
                 };
 
-            var report = tests.RunAsync(context, featureBindings, CancellationToken.None)
+            var report = tests.RunAsync(context, featureBindings, attempt.Token)
                 .AsTask()
                 .GetAwaiter()
                 .GetResult();

@@ -6,13 +6,16 @@ namespace DigitalBrain.Behaviors;
 internal sealed class HostBehaviorContext(
     BehaviorExecutionMetadata execution,
     IBehaviorCapabilityResolver capabilities,
-    TimeProvider time) : IBehaviorContext
+    TimeProvider time,
+    CancellationToken attemptCancellation) : IBehaviorContext
 {
     private readonly ConcurrentDictionary<string, object?> _state = new(StringComparer.Ordinal);
 
     public BehaviorExecutionMetadata Execution { get; } = execution;
 
     public DateTimeOffset UtcNow => time.GetUtcNow();
+
+    public CancellationToken AttemptCancellation { get; } = RequireAttempt(attemptCancellation);
 
     public string? LastOutcome { get; private set; }
 
@@ -25,7 +28,7 @@ internal sealed class HostBehaviorContext(
         return new CommandId(new Guid(hash.AsSpan(0, 16)));
     }
 
-    public TContract Get<TContract>(string name)
+    public TContract Get<TContract>(string name = "default")
         where TContract : class, INeuron
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -34,7 +37,8 @@ internal sealed class HostBehaviorContext(
 
     public ValueTask<T?> ReadStateAsync<T>(string key, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        using var linked = BehaviorOperationCancellation.Link(AttemptCancellation, cancellationToken);
+        linked.Token.ThrowIfCancellationRequested();
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         if (_state.TryGetValue(key, out var value) && value is T typed)
         {
@@ -52,5 +56,17 @@ internal sealed class HostBehaviorContext(
         {
             LastOutcome = value?.ToString();
         }
+    }
+
+    private static CancellationToken RequireAttempt(CancellationToken attemptCancellation)
+    {
+        if (!attemptCancellation.CanBeCanceled)
+        {
+            throw new ArgumentException(
+                "Worker attempt cancellation is required for every behavior operation.",
+                nameof(attemptCancellation));
+        }
+
+        return attemptCancellation;
     }
 }

@@ -63,10 +63,17 @@ internal sealed class InProcessBehaviorExecutor : IBehaviorExecutor
                 ?? throw new InvalidOperationException($"Trigger JSON could not deserialize to '{triggerType.FullName}'.");
 
             var program = Activator.CreateInstance(programType)!;
-            var context = new ExecutorBehaviorContext(request.Metadata, request.Capabilities, request.Time);
+            using var attempt = cancellationToken.CanBeCanceled
+                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+                : new CancellationTokenSource();
+            var context = new ExecutorBehaviorContext(
+                request.Metadata,
+                request.Capabilities,
+                request.Time,
+                attempt.Token);
             var execute = programInterface.GetMethod(nameof(IBehaviorProgram<Synapse>.ExecuteAsync))
                 ?? throw new InvalidOperationException("IBehaviorProgram.ExecuteAsync was not found.");
-            var task = (ValueTask)execute.Invoke(program, [trigger, context, cancellationToken])!;
+            var task = (ValueTask)execute.Invoke(program, [trigger, context, attempt.Token])!;
             await task.ConfigureAwait(false);
 
             var outcome = context.LastOutcome ?? "executed";

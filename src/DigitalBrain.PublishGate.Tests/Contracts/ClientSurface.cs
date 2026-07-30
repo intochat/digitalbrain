@@ -101,6 +101,7 @@ public sealed class ClientSurface
             [
                 nameof(DigitalBrainClient.ActivateAsync),
                 nameof(DigitalBrainClient.Connect),
+                nameof(DigitalBrainClient.ConnectAsync),
                 nameof(DigitalBrainClient.EmitAsync),
                 nameof(DigitalBrainClient.Get),
                 nameof(DigitalBrainClient.GetGrainProxy),

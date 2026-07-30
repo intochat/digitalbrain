@@ -8,6 +8,9 @@ namespace DigitalBrain.Tests.Client;
 
 public sealed class SendOrdering
 {
+    // Connect is Orleans grain-factory wiring; ConnectAsync is the unrelated single-file behavior SDK entry.
+#pragma warning disable CA1849
+
     [Fact(DisplayName = "neuron reference one-way Send rejects a null synapse before any grain call")]
     public async Task ReferenceSendRejectsNullSynapseBeforeAnyGrainCall()
     {
@@ -83,6 +86,8 @@ public sealed class SendOrdering
         Assert.Contains("unwatch", calls.Calls);
         Assert.Contains("fire", calls.Calls);
     }
+
+#pragma warning restore CA1849
 
     private sealed record TestSynapse : Synapse;
 

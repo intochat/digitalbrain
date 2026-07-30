@@ -1,11 +1,32 @@
 namespace DigitalBrain.Behaviors.Tests;
 
+using System.Collections.Immutable;
 using System.Reflection;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Client;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 public sealed class ProgramSurface
 {
+    [Fact(DisplayName = "Single-file behavior SDK compiles ConnectAsync Trigger Get SendAsync surface")]
+    public void SingleFileSdkSurfaceCompiles()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        var compilation = CSharpCompilation.Create(
+            "BehaviorSdkSurface",
+            [CSharpSyntaxTree.ParseText(RailPrograms.SingleFileSdkProgram(), cancellationToken: cancellation)],
+            SdkReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        using var stream = new MemoryStream();
+        var emit = compilation.Emit(stream, cancellationToken: cancellation);
+        Assert.True(
+            emit.Success,
+            string.Join(Environment.NewLine, emit.Diagnostics.Select(diagnostic => diagnostic.ToString())));
+    }
+
     [Fact(DisplayName = "Behavior context exposes only deterministic behavior authority")]
     public void ContextExposesNoInfrastructureAuthority()
     {
@@ -23,7 +44,11 @@ public sealed class ProgramSurface
                 .Select(method => method.Name)
                 .Order(StringComparer.Ordinal));
         Assert.Equal(
-            [("Execution", typeof(BehaviorExecutionMetadata)), ("UtcNow", typeof(DateTimeOffset))],
+            [
+                ("AttemptCancellation", typeof(CancellationToken)),
+                ("Execution", typeof(BehaviorExecutionMetadata)),
+                ("UtcNow", typeof(DateTimeOffset)),
+            ],
             typeof(IBehaviorContext).GetProperties()
                 .OrderBy(property => property.Name, StringComparer.Ordinal)
                 .Select(property => (property.Name, property.PropertyType)));
@@ -70,8 +95,48 @@ public sealed class ProgramSurface
 
         Assert.Equal(GenericParameterAttributes.ReferenceTypeConstraint, contract.GenericParameterAttributes & GenericParameterAttributes.SpecialConstraintMask);
         Assert.Equal([typeof(INeuron)], contract.GetGenericParameterConstraints());
-        Assert.Equal(typeof(string), Assert.Single(get.GetParameters()).ParameterType);
+        var name = Assert.Single(get.GetParameters());
+        Assert.Equal(typeof(string), name.ParameterType);
+        Assert.True(name.HasDefaultValue);
+        Assert.Equal("default", name.DefaultValue);
         Assert.Equal(contract, get.ReturnType);
+    }
+
+    [Fact(DisplayName = "Omitted SendAsync token links to the worker attempt cancellation")]
+    public async Task OmittedSendTokenLinksToAttemptCancellation()
+    {
+        using var attempt = new CancellationTokenSource();
+        await attempt.CancelAsync();
+        await using var brain = new BehaviorBrain<SdkResearchCompanyRequest>(
+            new BehaviorTrigger<SdkResearchCompanyRequest>(new SdkResearchCompanyRequest("q"), attempt.Token));
+
+        var gmail = brain.Get<ISdkGmail>();
+        var request = new SdkGmailRequest("q");
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(SendOmittingToken);
+
+        Task SendOmittingToken() => gmail.SendAsync(request);
+    }
+
+    [Fact(DisplayName = "Caller token is linked with the worker attempt cancellation")]
+    public async Task CallerTokenIsLinkedWithAttemptCancellation()
+    {
+        using var attempt = new CancellationTokenSource();
+        using var caller = new CancellationTokenSource();
+        await caller.CancelAsync();
+        await using var brain = new BehaviorBrain<SdkResearchCompanyRequest>(
+            new BehaviorTrigger<SdkResearchCompanyRequest>(new SdkResearchCompanyRequest("q"), attempt.Token));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => brain.Get<ISdkGmail>().SendAsync(new SdkGmailRequest("q"), caller.Token));
+    }
+
+    [Fact(DisplayName = "Behavior trigger rejects a non-cancellable attempt token")]
+    public void BehaviorTriggerRejectsNonCancellableAttemptToken()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new BehaviorTrigger<SdkResearchCompanyRequest>(
+                new SdkResearchCompanyRequest("q"),
+                default));
     }
 
     [Fact(DisplayName = "Execution metadata carries the immutable owner, behavior, revision, and execution identities")]
@@ -122,7 +187,44 @@ public sealed class ProgramSurface
         Assert.Equal("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", metadata.Revision.Value);
         Assert.Equal(new Guid("4b050fe8-45d0-4a16-b6a5-1b4b6683880a"), metadata.Execution.Value);
     }
+
+    private static ImmutableArray<MetadataReference> SdkReferences()
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var references = new List<MetadataReference>();
+
+        void Add(Assembly assembly)
+        {
+            if (string.IsNullOrWhiteSpace(assembly.Location) || !set.Add(assembly.Location))
+            {
+                return;
+            }
+
+            references.Add(MetadataReference.CreateFromFile(assembly.Location));
+        }
+
+        Add(typeof(object).Assembly);
+        Add(typeof(Enumerable).Assembly);
+        Add(typeof(INeuron).Assembly);
+        Add(typeof(IBehaviorProgram<>).Assembly);
+        Add(typeof(DigitalBrainClient).Assembly);
+        Add(typeof(BehaviorBrain<>).Assembly);
+        Add(typeof(Orleans.IGrain).Assembly);
+        Add(Assembly.Load("System.Runtime"));
+        Add(Assembly.Load("System.Collections"));
+        Add(Assembly.Load("System.Linq"));
+        Add(Assembly.Load("System.Private.CoreLib"));
+        Add(Assembly.Load("netstandard"));
+        Add(Assembly.Load("System.Threading"));
+        Add(Assembly.Load("System.Threading.Tasks"));
+        return [.. references];
+    }
 }
+
+internal sealed record SdkResearchCompanyRequest(string Prompt) : Synapse;
+internal sealed record SdkGmailResponse(string Status) : Synapse;
+internal sealed record SdkGmailRequest(string Prompt) : RequestSynapse<SdkGmailResponse>;
+internal interface ISdkGmail : INeuron;
 
 internal static class MemberSignature
 {
