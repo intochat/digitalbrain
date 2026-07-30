@@ -49,6 +49,7 @@ public sealed class IntegrationsFixture : DigitalBrainFixture
         brain.AddModule<EnrichmentModule>();
         brain.AddModule<FlutterModule>();
         brain.AddModule<IntegrationsHarnessModule>();
+        brain.WithResponseTimeout(TimeSpan.FromSeconds(90));
         brain.ConfigureMcpEdge();
     }
 }
