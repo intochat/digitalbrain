@@ -82,7 +82,7 @@ public sealed class UiHttpVocabulary(FlutterHttpFixture fixture)
             field => field.FieldType == typeof(ISessionNeuron));
         Assert.Contains(
             typeof(OwnerSessionJournal).GetFields(BindingFlags.NonPublic | BindingFlags.Instance),
-            field => field.FieldType == typeof(IClusterClient));
+            field => field.FieldType == typeof(IGrainFactory));
 
         Assert.Equal(
             [

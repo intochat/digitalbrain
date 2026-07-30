@@ -103,7 +103,7 @@ public sealed class FlutterContracts
     }
 
     [Fact(DisplayName =
-        "Flutter.Aspire.Hosting public surface is projection API only — Desktop/Headless, no Auto")]
+        "Flutter.Aspire.Hosting public surface is projection API only — WithHeadlessHost/WithWindowHost, no marker types")]
     public void HostingPublicSurfaceIsProjectionApiOnly()
     {
         var hostingNamespace = typeof(FlutterHostingExtensions).Namespace;
@@ -116,17 +116,16 @@ public sealed class FlutterContracts
 
         Assert.Equal(
             [
-                nameof(DesktopHost),
                 nameof(FlutterHostOptions),
                 nameof(FlutterHostingExtensions),
                 nameof(FlutterUiEdgeOptions),
-                nameof(HeadlessHost),
             ],
             exported);
 
         Assert.DoesNotContain(
             typeof(FlutterHostingExtensions).Assembly.GetExportedTypes(),
-            type => type.Name is "AutoHost" or "FlutterHostLaunch" or "FlutterHostKind" or "IFlutter");
+            type => type.Name is "AutoHost" or "DesktopHost" or "HeadlessHost"
+                or "FlutterHostLaunch" or "FlutterHostKind" or "IFlutter");
     }
 
     private static JsonObject ExtractWireManifest(Assembly assembly)

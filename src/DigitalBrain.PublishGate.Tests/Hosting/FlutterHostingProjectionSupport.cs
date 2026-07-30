@@ -24,18 +24,18 @@ internal static class FlutterHostingProjectionSupport
     {
         Assert.True(
             File.Exists(Path.Combine(shellDirectory, "pubspec.yaml")),
-            "clients/flutter/shell must exist for desktop chrome.");
+            "clients/flutter/shell must exist for window chrome.");
         Assert.True(
             File.Exists(Path.Combine(shellDirectory, "lib", "main.dart")),
-            "shell Windows chrome requires lib/main.dart (Desktop host uses clients/flutter/shell).");
+            "shell Windows chrome requires lib/main.dart (WithWindowHost uses clients/flutter/shell).");
         Assert.True(
             Directory.Exists(Path.Combine(shellDirectory, FlutterHostingExtensions.DefaultDeviceTarget)),
-            "shell Windows chrome requires windows/ (Desktop host uses clients/flutter/shell).");
+            "shell Windows chrome requires windows/ (WithWindowHost uses clients/flutter/shell).");
         Assert.False(
             File.Exists(Path.Combine(
                 shellDirectory,
                 FlutterHostingExtensions.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar))),
-            "shell is desktop-only — headless entry stays on pure-Dart core.");
+            "shell is window-only — headless entry stays on pure-Dart core.");
         var pubspec = await File.ReadAllTextAsync(
             Path.Combine(shellDirectory, "pubspec.yaml"),
             cancellationToken).ConfigureAwait(true);

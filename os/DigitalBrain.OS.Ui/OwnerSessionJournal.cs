@@ -10,13 +10,13 @@ namespace DigitalBrain.Flutter.Http;
 
 internal sealed class OwnerSessionJournal
 {
-    private readonly IClusterClient _client;
+    private readonly IGrainFactory _grains;
     private readonly ISessionNeuron _session;
     private readonly OwnerId _owner;
 
-    private OwnerSessionJournal(IClusterClient client, ISessionNeuron session, OwnerId owner)
+    private OwnerSessionJournal(IGrainFactory grains, ISessionNeuron session, OwnerId owner)
     {
-        _client = client;
+        _grains = grains;
         _session = session;
         _owner = owner;
     }
@@ -25,15 +25,9 @@ internal sealed class OwnerSessionJournal
     {
         ArgumentNullException.ThrowIfNull(grains);
 
-        if (grains is not IClusterClient client)
-        {
-            throw new InvalidOperationException(
-                "OwnerSessionJournal requires an Orleans cluster client so SSE can register journal observers.");
-        }
-
         return new OwnerSessionJournal(
-            client,
-            client.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(owner).ToGrainId()),
+            grains,
+            grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(owner).ToGrainId()),
             owner);
     }
 
@@ -103,7 +97,7 @@ internal sealed class OwnerSessionJournal
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var observer = new ChannelJournalObserver(JournalKind.Outgoing);
-        var reference = _client.CreateObjectReference<IJournalObserver>(observer);
+        var reference = _grains.CreateObjectReference<IJournalObserver>(observer);
         try
         {
             await _session.WatchNeuron(subject, JournalKind.Outgoing, afterSequence, reference);
@@ -124,7 +118,7 @@ internal sealed class OwnerSessionJournal
 
             try
             {
-                _client.DeleteObjectReference<IJournalObserver>(reference);
+                _grains.DeleteObjectReference<IJournalObserver>(reference);
             }
             catch (Exception)
             {

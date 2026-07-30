@@ -36,7 +36,7 @@ The plan of record. Nothing is shipped unless it says Built.
 |---|---|
 | Neuron/synapse foundation, owner-scoped client, module activation, AppHost composition, testing path | **Built** |
 | Typed AI, Tasks, Google, Salesforce, Chat, Flutter, Quickstart families | **Built** |
-| Flutter vertical — shell/scene vocabulary, UI HTTP/SSE edge (`WithUiEdge`/`WithFlutterHost`), headless Dart host, Windows chrome | **Built** |
+| Flutter vertical — shell/scene vocabulary, UI HTTP/SSE edge (`WithUiEdge`/`WithHeadlessHost`/`WithWindowHost`), headless Dart host, Windows chrome | **Built** |
 | Product shell — responsive Chat, content-safe Activity, live 3D-projected Brain topology, pulses and inspector | **Built** |
 | Product MCP surface — durable chat send/read, neuron journal observation, active-neuron discovery | **Built** |
 | Time — durable one-shot `ICountdown` and its recovery tests | **Built** |

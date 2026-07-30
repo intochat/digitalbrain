@@ -34,40 +34,27 @@ public static class FlutterHostingExtensions
         return module;
     }
 
-    public static DigitalBrainModuleBuilder<FlutterModule> WithFlutterHost(
+    public static DigitalBrainModuleBuilder<FlutterModule> WithHeadlessHost(
         this DigitalBrainModuleBuilder<FlutterModule> module,
         Action<FlutterHostOptions>? configure = null)
-        => WithFlutterHost<DesktopHost>(module, configure);
+        => ConfigureFlutterHost(module, FlutterHostKind.Headless, configure);
 
-    public static DigitalBrainModuleBuilder<FlutterModule> WithFlutterHost<THost>(
+    public static DigitalBrainModuleBuilder<FlutterModule> WithWindowHost(
         this DigitalBrainModuleBuilder<FlutterModule> module,
         Action<FlutterHostOptions>? configure = null)
-        where THost : class
+        => ConfigureFlutterHost(module, FlutterHostKind.Window, configure);
+
+    private static DigitalBrainModuleBuilder<FlutterModule> ConfigureFlutterHost(
+        DigitalBrainModuleBuilder<FlutterModule> module,
+        FlutterHostKind kind,
+        Action<FlutterHostOptions>? configure)
     {
         ArgumentNullException.ThrowIfNull(module);
 
         var options = new FlutterHostOptions();
         configure?.Invoke(options);
-        GetOrCreateState(module).EnsureFlutterHost(HostKindOf<THost>(), options);
+        GetOrCreateState(module).EnsureFlutterHost(kind, options);
         return module;
-    }
-
-    private static FlutterHostKind HostKindOf<THost>()
-        where THost : class
-    {
-        if (typeof(THost) == typeof(DesktopHost))
-        {
-            return FlutterHostKind.Desktop;
-        }
-
-        if (typeof(THost) == typeof(HeadlessHost))
-        {
-            return FlutterHostKind.Headless;
-        }
-
-        throw new NotSupportedException(
-            $"{typeof(THost).FullName} is not a Flutter host kind. " +
-            $"Use {nameof(DesktopHost)} or {nameof(HeadlessHost)}.");
     }
 
     private static FlutterHostingState GetOrCreateState(DigitalBrainModuleBuilder<FlutterModule> module)
@@ -125,7 +112,7 @@ public static class FlutterHostingExtensions
             if (_flutterHost is not null)
             {
                 throw new InvalidOperationException(
-                    $"Flutter host is already configured on brain '{brain.Name}'. Call WithFlutterHost exactly once.");
+                    $"Flutter host is already configured on brain '{brain.Name}'. Call {nameof(WithHeadlessHost)} or {nameof(WithWindowHost)} exactly once.");
             }
 
             if (_ui is null)

@@ -2,7 +2,7 @@ namespace DigitalBrain.Flutter.Aspire.Hosting;
 
 internal enum FlutterHostKind
 {
-    Desktop = 0,
+    Window = 0,
     Headless = 1,
 }
 
@@ -27,29 +27,29 @@ internal static class FlutterHostLaunch
 
         return kind switch
         {
-            FlutterHostKind.Desktop => ResolveDesktop(packageRoot, options, configuration),
+            FlutterHostKind.Window => ResolveWindow(packageRoot, options, configuration),
             FlutterHostKind.Headless => ResolveHeadless(packageRoot, options, configuration),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }
 
-    private static string? ResolveDesktopPackageDirectory(string packageRoot, string deviceTarget)
+    private static string? ResolveWindowPackageDirectory(string packageRoot, string deviceTarget)
     {
-        if (HasDesktopMarkers(packageRoot, deviceTarget))
+        if (HasWindowMarkers(packageRoot, deviceTarget))
         {
             return packageRoot;
         }
 
         // Nested shell under the pure-Dart package (legacy clients/digitalbrain_flutter/shell).
         var nestedShell = Path.Combine(packageRoot, ShellPackageDirectoryName);
-        if (HasDesktopMarkers(nestedShell, deviceTarget))
+        if (HasWindowMarkers(nestedShell, deviceTarget))
         {
             return nestedShell;
         }
 
         // Sibling shell next to core (clients/flutter/shell beside clients/flutter/core).
         var siblingShell = Path.GetFullPath(Path.Combine(packageRoot, "..", ShellPackageDirectoryName));
-        if (HasDesktopMarkers(siblingShell, deviceTarget))
+        if (HasWindowMarkers(siblingShell, deviceTarget))
         {
             return siblingShell;
         }
@@ -57,7 +57,7 @@ internal static class FlutterHostLaunch
         return null;
     }
 
-    private static Result ResolveDesktop(
+    private static Result ResolveWindow(
         string packageRoot,
         FlutterHostOptions options,
         Microsoft.Extensions.Configuration.IConfiguration? configuration)
@@ -65,12 +65,12 @@ internal static class FlutterHostLaunch
         var deviceTarget = string.IsNullOrWhiteSpace(options.DeviceTarget)
             ? FlutterHostingExtensions.DefaultDeviceTarget
             : options.DeviceTarget;
-        var workDir = ResolveDesktopPackageDirectory(packageRoot, deviceTarget)
+        var workDir = ResolveWindowPackageDirectory(packageRoot, deviceTarget)
             ?? throw new InvalidOperationException(
-                $"Desktop Flutter host needs lib/main.dart and a '{deviceTarget}/' folder " +
+                $"Window Flutter host needs lib/main.dart and a '{deviceTarget}/' folder " +
                 $"under '{packageRoot}', '{packageRoot}/{ShellPackageDirectoryName}', " +
                 $"or the sibling '../{ShellPackageDirectoryName}' (clients/flutter/shell). " +
-                "Use WithFlutterHost<HeadlessHost>() for the pure-Dart host.");
+                $"Use {nameof(FlutterHostingExtensions.WithHeadlessHost)}() for the pure-Dart host.");
 
         return new Result(ResolveFlutterCommand(options, configuration), workDir, ["run", "-d", deviceTarget]);
     }
@@ -85,7 +85,7 @@ internal static class FlutterHostLaunch
         {
             throw new InvalidOperationException(
                 $"Headless Flutter host needs '{FlutterHostingExtensions.HeadlessHostEntry}' under '{packageRoot}'. " +
-                "Use WithFlutterHost() / WithFlutterHost<DesktopHost>() for Windows chrome under shell/.");
+                $"Use {nameof(FlutterHostingExtensions.WithWindowHost)}() for Windows chrome under shell/.");
         }
 
         return new Result(
@@ -94,7 +94,7 @@ internal static class FlutterHostLaunch
             ["run", FlutterHostingExtensions.HeadlessHostEntry]);
     }
 
-    private static bool HasDesktopMarkers(string workingDirectory, string deviceTarget)
+    private static bool HasWindowMarkers(string workingDirectory, string deviceTarget)
     {
         var mainDart = Path.Combine(workingDirectory, "lib", "main.dart");
         if (!File.Exists(mainDart))

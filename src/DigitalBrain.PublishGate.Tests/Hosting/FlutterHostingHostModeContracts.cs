@@ -10,8 +10,8 @@ namespace DigitalBrain.Tests.Hosting;
 public sealed class FlutterHostingHostModeContracts
 {
     [Fact(DisplayName =
-        "WithFlutterHost defaults to Desktop — flutter run under shell/ with exclusive edge env")]
-    public async Task WithFlutterHostDefaultsToDesktopShell()
+        "WithWindowHost projects flutter run under shell/ with exclusive edge env")]
+    public async Task WithWindowHostProjectsFlutterRunUnderShell()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
@@ -22,7 +22,7 @@ public sealed class FlutterHostingHostModeContracts
         const string pinnedFlutterCommand = "flutter";
         brain.AddModule<FlutterModule>(flutter => flutter
             .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
-            .WithFlutterHost(options =>
+            .WithWindowHost(options =>
             {
                 options.WorkingDirectory = FlutterHostingProjectionSupport.FlutterClientDirectory;
                 options.FlutterCommand = pinnedFlutterCommand;
@@ -63,41 +63,8 @@ public sealed class FlutterHostingHostModeContracts
     }
 
     [Fact(DisplayName =
-        "WithFlutterHost<DesktopHost> is the same product sentence as WithFlutterHost()")]
-    public async Task WithFlutterHostDesktopHostMatchesDefault()
-    {
-        var builder = DistributedApplication.CreateBuilder();
-        var brain = builder.AddDigitalBrain("brain");
-
-        const string pinnedFlutterCommand = "dotnet";
-        brain.AddModule<FlutterModule>(flutter => flutter
-            .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
-            .WithFlutterHost<DesktopHost>(options =>
-            {
-                options.WorkingDirectory = FlutterHostingProjectionSupport.FlutterClientDirectory;
-                options.FlutterCommand = pinnedFlutterCommand;
-            }));
-
-        _ = builder
-            .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
-            .WithReference(brain);
-
-        var host = Assert.Single(
-            builder.Resources.OfType<ExecutableResource>(),
-            resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
-        Assert.Equal(pinnedFlutterCommand, host.Command, StringComparer.Ordinal);
-        Assert.Equal(
-            Path.GetFullPath(FlutterHostingProjectionSupport.FlutterShellDirectory),
-            Path.GetFullPath(host.WorkingDirectory),
-            StringComparer.OrdinalIgnoreCase);
-        var args = await FlutterHostingProjectionSupport.ResolvedArgsOf(host).ConfigureAwait(true);
-        Assert.Equal(["run", "-d", FlutterHostingExtensions.DefaultDeviceTarget], args);
-    }
-
-    [Fact(DisplayName =
-        "WithFlutterHost<HeadlessHost> projects dart run bin/digitalbrain_host.dart with exclusive edge env")]
-    public async Task WithFlutterHostHeadlessHostProjectsDartRun()
+        "WithHeadlessHost projects dart run bin/digitalbrain_host.dart with exclusive edge env")]
+    public async Task WithHeadlessHostProjectsDartRun()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
@@ -108,7 +75,7 @@ public sealed class FlutterHostingHostModeContracts
         const string pinnedDartCommand = "dart";
         brain.AddModule<FlutterModule>(flutter => flutter
             .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
-            .WithFlutterHost<HeadlessHost>(options =>
+            .WithHeadlessHost(options =>
             {
                 options.WorkingDirectory = FlutterHostingProjectionSupport.FlutterClientDirectory;
                 options.DartCommand = pinnedDartCommand;
@@ -143,8 +110,8 @@ public sealed class FlutterHostingHostModeContracts
     }
 
     [Fact(DisplayName =
-        "WithFlutterHost Desktop without desktop markers throws — no silent headless fallback")]
-    public void WithFlutterHostDesktopWithoutMarkersThrows()
+        "WithWindowHost without window markers throws — no silent headless fallback")]
+    public void WithWindowHostWithoutMarkersThrows()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
@@ -163,9 +130,9 @@ public sealed class FlutterHostingHostModeContracts
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 brain.AddModule<FlutterModule>(flutter => flutter
                     .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
-                    .WithFlutterHost(options => options.WorkingDirectory = headlessOnly.FullName)));
+                    .WithWindowHost(options => options.WorkingDirectory = headlessOnly.FullName)));
 
-            Assert.Contains(nameof(HeadlessHost), exception.Message, StringComparison.Ordinal);
+            Assert.Contains(nameof(FlutterHostingExtensions.WithHeadlessHost), exception.Message, StringComparison.Ordinal);
             FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);
         }
         finally
@@ -175,8 +142,8 @@ public sealed class FlutterHostingHostModeContracts
     }
 
     [Fact(DisplayName =
-        "WithFlutterHost Headless without bin host entry throws — no silent omit")]
-    public void WithFlutterHostHeadlessWithoutEntryThrows()
+        "WithHeadlessHost without bin host entry throws — no silent omit")]
+    public void WithHeadlessHostWithoutEntryThrows()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
@@ -190,7 +157,7 @@ public sealed class FlutterHostingHostModeContracts
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 brain.AddModule<FlutterModule>(flutter => flutter
                     .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
-                    .WithFlutterHost<HeadlessHost>(options =>
+                    .WithHeadlessHost(options =>
                         options.WorkingDirectory = emptyPackage.FullName)));
 
             Assert.Contains(
@@ -206,8 +173,8 @@ public sealed class FlutterHostingHostModeContracts
     }
 
     [Fact(DisplayName =
-        "WithFlutterHost missing package throws — no silent omit")]
-    public void WithFlutterHostMissingPackageThrows()
+        "WithWindowHost missing package throws — no silent omit")]
+    public void WithWindowHostMissingPackageThrows()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
@@ -218,7 +185,7 @@ public sealed class FlutterHostingHostModeContracts
         _ = Assert.Throws<InvalidOperationException>(() =>
             brain.AddModule<FlutterModule>(flutter => flutter
                 .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
-                .WithFlutterHost(options => options.WorkingDirectory = missing)));
+                .WithWindowHost(options => options.WorkingDirectory = missing)));
 
         FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);
     }
