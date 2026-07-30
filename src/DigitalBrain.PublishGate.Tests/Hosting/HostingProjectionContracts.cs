@@ -41,12 +41,12 @@ public sealed class HostingProjectionContracts
 
         var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UIHttpEndpointName)
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         var client = builder
             .AddContainer("client", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UIHttpEndpointName)
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain.AsClient());
 
         var siloEnvironment = await FlutterHostingProjectionSupport

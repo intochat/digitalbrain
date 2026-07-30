@@ -19,18 +19,18 @@ public static class FlutterHostingExtensions
     public const string DefaultChatName = "main";
     public const string DefaultOwner = "dev";
     public const string DefaultDeviceTarget = "windows";
-    public const string UIHttpEndpointName = "http";
-    public const string UIHealthPath = "/health";
+    public const string UiEdgeEndpointName = "http";
+    public const string UiEdgeHealthPath = "/health";
 
-    public static DigitalBrainModuleBuilder<FlutterModule> WithUiHttp(
+    public static DigitalBrainModuleBuilder<FlutterModule> WithUiEdge(
         this DigitalBrainModuleBuilder<FlutterModule> module,
-        Action<FlutterUiHttpOptions>? configure = null)
+        Action<FlutterUiEdgeOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(module);
 
-        var options = new FlutterUiHttpOptions();
+        var options = new FlutterUiEdgeOptions();
         configure?.Invoke(options);
-        GetOrCreateState(module).EnsureUiHttp(options);
+        GetOrCreateState(module).EnsureUiEdge(options);
         return module;
     }
 
@@ -88,21 +88,21 @@ public static class FlutterHostingExtensions
         private IResourceBuilder<ProjectResource>? _ui;
         private IResourceBuilder<ExecutableResource>? _flutterHost;
 
-        internal void EnsureUiHttp(FlutterUiHttpOptions options)
+        internal void EnsureUiEdge(FlutterUiEdgeOptions options)
         {
             if (_ui is not null)
             {
                 throw new InvalidOperationException(
-                    $"UI HTTP is already configured on brain '{brain.Name}'. Call {nameof(WithUiHttp)} exactly once.");
+                    $"UI HTTP is already configured on brain '{brain.Name}'. Call {nameof(WithUiEdge)} exactly once.");
             }
 
             var appHost = brain.GetApplicationBuilder();
-            var projectPath = ResolveUiHttpProjectPath(appHost.AppHostDirectory, options.ProjectPath);
+            var projectPath = ResolveUiEdgeProjectPath(appHost.AppHostDirectory, options.ProjectPath);
             if (!File.Exists(projectPath))
             {
                 throw new InvalidOperationException(
                     $"Flutter UI HTTP project was not found at '{projectPath}'. " +
-                    $"Pass {nameof(FlutterUiHttpOptions)}.{nameof(FlutterUiHttpOptions.ProjectPath)}, or place DigitalBrain.Modules.Flutter.Http under src/modules/flutter/.");
+                    $"Pass {nameof(FlutterUiEdgeOptions)}.{nameof(FlutterUiEdgeOptions.ProjectPath)}, or place DigitalBrain.OS.Ui under os/.");
             }
 
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
@@ -115,8 +115,8 @@ public static class FlutterHostingExtensions
             _ui = appHost
                 .AddProject(resourceName, projectPath)
                 .WithReference(brain.AsClient())
-                .WithHttpEndpoint(name: UIHttpEndpointName)
-                .WithHttpHealthCheck(UIHealthPath)
+                .WithHttpEndpoint(name: UiEdgeEndpointName)
+                .WithHttpHealthCheck(UiEdgeHealthPath)
                 .WithEnvironment(OwnerEnvironmentVariable, owner);
         }
 
@@ -130,7 +130,7 @@ public static class FlutterHostingExtensions
 
             if (_ui is null)
             {
-                EnsureUiHttp(new FlutterUiHttpOptions());
+                EnsureUiEdge(new FlutterUiEdgeOptions());
             }
 
             var appHost = brain.GetApplicationBuilder();
@@ -157,7 +157,7 @@ public static class FlutterHostingExtensions
 
             _flutterHost = appHost
                 .AddExecutable(resourceName, launch.Command, launch.WorkingDirectory, launch.Args)
-                .WithEnvironment(UIBaseEnvironmentVariable, ui.GetEndpoint(UIHttpEndpointName))
+                .WithEnvironment(UIBaseEnvironmentVariable, ui.GetEndpoint(UiEdgeEndpointName))
                 .WithEnvironment(ShellEnvironmentVariable, shell)
                 .WithEnvironment(ChatEnvironmentVariable, chat)
                 .WaitFor(ui);
@@ -173,7 +173,7 @@ public static class FlutterHostingExtensions
             }
         }
 
-        private static string ResolveUiHttpProjectPath(string appHostDirectory, string? configured)
+        private static string ResolveUiEdgeProjectPath(string appHostDirectory, string? configured)
         {
             if (!string.IsNullOrWhiteSpace(configured))
             {
@@ -184,8 +184,8 @@ public static class FlutterHostingExtensions
 
             string[] candidates =
             [
-                Path.Combine(appHostDirectory, "..", "DigitalBrain.Modules.Flutter.Http", "DigitalBrain.Modules.Flutter.Http.csproj"),
-                Path.Combine(appHostDirectory, "..", "..", "src", "modules", "flutter", "DigitalBrain.Modules.Flutter.Http", "DigitalBrain.Modules.Flutter.Http.csproj"),
+                Path.Combine(appHostDirectory, "..", "DigitalBrain.OS.Ui", "DigitalBrain.OS.Ui.csproj"),
+                Path.Combine(appHostDirectory, "..", "..", "os", "DigitalBrain.OS.Ui", "DigitalBrain.OS.Ui.csproj"),
             ];
 
             foreach (var candidate in candidates)

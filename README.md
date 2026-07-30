@@ -36,7 +36,7 @@ The plan of record. Nothing is shipped unless it says Built.
 |---|---|
 | Neuron/synapse foundation, owner-scoped client, module activation, AppHost composition, testing path | **Built** |
 | Typed AI, Tasks, Google, Salesforce, Chat, Flutter, Quickstart families | **Built** |
-| Flutter vertical — shell/scene vocabulary, UI HTTP/SSE (`WithUiHttp`/`WithFlutterHost`), headless Dart host, Windows chrome | **Built** |
+| Flutter vertical — shell/scene vocabulary, UI HTTP/SSE edge (`WithUiEdge`/`WithFlutterHost`), headless Dart host, Windows chrome | **Built** |
 | Product shell — responsive Chat, content-safe Activity, live 3D-projected Brain topology, pulses and inspector | **Built** |
 | Product MCP surface — durable chat send/read, neuron journal observation, active-neuron discovery | **Built** |
 | Time — durable one-shot `ICountdown` and its recovery tests | **Built** |
@@ -57,10 +57,16 @@ One assumption is load-bearing and unmeasured: **that a model can reliably emit 
 ```text
 src/       published packages: core/ (framework) and modules/ (IModule domains),
            plus the publish gate that polices them
-os/        the product: silo, MCP server, the assistant neuron, AppHost
+os/        the product: silo, northbound MCP host (OS.McpHost), Flutter UI edge
+           (OS.Ui), assistant neuron, AppHost
 clients/   flutter/core (pure Dart edge) and flutter/shell (Material chrome)
-tests/     fixtures/ — shared test subjects and their scaffolding AppHosts
+samples/   product-shaped compositions and process neurons (not packable product)
+tests/     fixtures/apphosts — shared L2 AppHost scaffolding
 ```
+
+Southbound MCP transport lives in package `DigitalBrain.Mcp` (integrations mechanics shared by
+Google/Salesforce). Northbound agent tools live in `DigitalBrain.OS.McpHost`. Older docs that say
+`DigitalBrain.Integrations.Mcp` mean the southbound package.
 
 Retired prototype generations live in git history — `git log --diff-filter=D --summary`, then
 `git show <sha>^:<path>`.

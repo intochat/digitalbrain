@@ -36,7 +36,7 @@ public sealed class FlutterContracts
             ],
             vocabulary);
 
-        Assert.Null(contracts.GetType($"DigitalBrain.UI.{nameof(IShell)}"));
+        Assert.Null(contracts.GetType($"DigitalBrain.Flutter.Http.{nameof(IShell)}"));
         Assert.Null(contracts.GetType($"{FlutterNamespace}.IFlutter"));
         Assert.DoesNotContain(
             contracts.GetExportedTypes().Concat(typeof(FlutterModule).Assembly.GetExportedTypes()),
@@ -119,7 +119,7 @@ public sealed class FlutterContracts
                 nameof(DesktopHost),
                 nameof(FlutterHostOptions),
                 nameof(FlutterHostingExtensions),
-                nameof(FlutterUiHttpOptions),
+                nameof(FlutterUiEdgeOptions),
                 nameof(HeadlessHost),
             ],
             exported);

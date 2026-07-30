@@ -15,7 +15,7 @@ internal sealed class HttpMcpClientSessionFactory(
         "Reliability",
         "CA2000:Dispose objects before losing scope",
         Justification = "The official MCP client takes ownership of its transport and disposes it with the session.")]
-    public async ValueTask<IMcpClientSession> OpenAsync(
+    public async ValueTask<McpClient> OpenAsync(
         McpServerDefinition server,
         IDurableValue<byte[]> tokenState,
         Func<ValueTask> commit,
@@ -49,14 +49,6 @@ internal sealed class HttpMcpClientSessionFactory(
             httpClient,
             loggerFactory: null,
             ownsHttpClient: true);
-        var client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken);
-        return new OwnedMcpClientSession(client);
-    }
-
-    private sealed class OwnedMcpClientSession(McpClient client) : IMcpClientSession
-    {
-        public McpClient Client { get; } = client;
-
-        public ValueTask DisposeAsync() => Client.DisposeAsync();
+        return await McpClient.CreateAsync(transport, cancellationToken: cancellationToken);
     }
 }

@@ -1,4 +1,4 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("DigitalBrain.OS.Mcp")]
-[assembly: InternalsVisibleTo("DigitalBrain.Modules.Flutter.Http")]
+[assembly: InternalsVisibleTo("DigitalBrain.OS.McpHost")]
+[assembly: InternalsVisibleTo("DigitalBrain.OS.Ui")]
