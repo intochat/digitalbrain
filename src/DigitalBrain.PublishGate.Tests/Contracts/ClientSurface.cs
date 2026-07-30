@@ -50,6 +50,11 @@ public sealed class ClientSurface
             ],
             methods);
 
+        Assert.Equal(
+            2,
+            typeof(IDigitalBrain).GetMethods()
+                .Count(method => method.Name == nameof(IDigitalBrain.SendAsync)));
+
         var properties = typeof(IDigitalBrain)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Select(property => property.Name)

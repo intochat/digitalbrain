@@ -21,6 +21,9 @@ public interface IDigitalBrain
     TNeuron GetGrainProxy<TNeuron>(string name = "default")
         where TNeuron : class, INeuron;
 
+    Task SendAsync<TNeuron>(string name, Synapse synapse, CancellationToken cancellationToken = default)
+        where TNeuron : INeuron;
+
     Task SendAsync(NeuronId receiver, Synapse synapse, CancellationToken cancellationToken = default);
 
     Task EmitAsync(Synapse synapse, CancellationToken cancellationToken = default);

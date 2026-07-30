@@ -49,6 +49,16 @@ public sealed class DigitalBrainClient : IDigitalBrain
         return _grains.GetGrain<TNeuron>(NeuronId.For<TNeuron>(Owner, name).ToGrainId());
     }
 
+    public Task SendAsync<TNeuron>(string name, Synapse synapse, CancellationToken cancellationToken = default)
+        where TNeuron : INeuron
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        RequireDomainNeuronContract(typeof(TNeuron));
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Get<TNeuron>(name).SendAsync(synapse, cancellationToken);
+    }
+
     public async Task SendAsync(NeuronId receiver, Synapse synapse, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(synapse);

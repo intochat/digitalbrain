@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -58,6 +59,8 @@ public sealed partial class DispatchManifestGenerator
             constructor.Parameters.Length == 0
             && constructor.DeclaredAccessibility == Accessibility.Public);
 
+        var neurons = CapabilitiesOf(syntax.SemanticModel.Compilation, module, cancellationToken);
+
         return new ModuleCapsuleModel(
             module.ToDisplayString(FullName),
             module.ContainingNamespace.IsGlobalNamespace
@@ -69,7 +72,8 @@ public sealed partial class DispatchManifestGenerator
             module.ContainingType is not null,
             module.TypeParameters.Length > 0,
             hasPublicParameterlessConstructor,
-            module.IsSealed);
+            module.IsSealed,
+            neurons);
     }
 
     private static void EmitModule(SourceProductionContext production, ModuleCapsuleModel module)
@@ -100,6 +104,8 @@ public sealed partial class DispatchManifestGenerator
             valid = false;
         }
 
+        ReportCapabilityDiagnostics(production, module.Neurons, requireDescriptions: false);
+
         if (!valid)
         {
             return;
@@ -128,6 +134,7 @@ public sealed partial class DispatchManifestGenerator
         source.AppendLine();
         source.AppendLine("    global::DigitalBrain.Abstractions.ModuleId");
         source.AppendLine("        global::DigitalBrain.Kernel.ICompiledModule.Id => Id;");
+        AppendCapabilities(source, module);
         source.AppendLine();
         source.AppendLine("    void global::DigitalBrain.Kernel.ICompiledModule.PrepareSerialization(");
         source.AppendLine("        global::Microsoft.Extensions.DependencyInjection.IServiceCollection services)");
@@ -159,7 +166,8 @@ public sealed partial class DispatchManifestGenerator
         bool isNested,
         bool isGeneric,
         bool hasPublicParameterlessConstructor,
-        bool isSealed)
+        bool isSealed,
+        ImmutableArray<NeuronCapabilityModel> neurons)
     {
         public string FullName { get; } = fullName;
 
@@ -178,5 +186,7 @@ public sealed partial class DispatchManifestGenerator
         public bool HasPublicParameterlessConstructor { get; } = hasPublicParameterlessConstructor;
 
         public bool IsSealed { get; } = isSealed;
+
+        public ImmutableArray<NeuronCapabilityModel> Neurons { get; } = neurons;
     }
 }
