@@ -1,9 +1,111 @@
 using DigitalBrain.Behaviors.Manifest;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Behaviors;
 
 internal static class BehaviorContractCompatibility
 {
+    public static BehaviorGrantAdmissionResult AdmitCapabilityGrants(
+        IReadOnlyList<BehaviorCapabilityGrant> grants,
+        ActiveCapabilityCatalog catalog)
+    {
+        ArgumentNullException.ThrowIfNull(grants);
+        ArgumentNullException.ThrowIfNull(catalog);
+
+        var admitted = new List<BehaviorCapabilityGrant>(grants.Count);
+        foreach (var grant in grants.OrderBy(static item => item.TargetNeuronContractId, StringComparer.Ordinal)
+                     .ThenBy(static item => item.AcceptedRequestSynapseId, StringComparer.Ordinal)
+                     .ThenBy(static item => item.AcceptedRequestSchemaVersion)
+                     .ThenBy(static item => item.EmittedResultSynapseId ?? string.Empty, StringComparer.Ordinal)
+                     .ThenBy(static item => item.EmittedResultSchemaVersion ?? 0)
+                     .ThenBy(static item => item.TargetInstancePolicy, StringComparer.Ordinal)
+                     .ThenBy(static item => item.TargetInstanceName, StringComparer.Ordinal))
+        {
+            var shapeFailure = ValidateDirectedGrantShape(grant);
+            if (shapeFailure is not null)
+            {
+                return BehaviorGrantAdmissionResult.Reject(shapeFailure);
+            }
+
+            if (!catalog.TryGetNeuron(grant.TargetNeuronContractId, out var neuron) || neuron is null)
+            {
+                return BehaviorGrantAdmissionResult.Reject(
+                    $"Directed capability edge targets undeclared or inactive neuron '{grant.TargetNeuronContractId}'.");
+            }
+
+            var accepted = neuron.Accepted.FirstOrDefault(item =>
+                string.Equals(item.ContractId, grant.AcceptedRequestSynapseId, StringComparison.Ordinal)
+                && item.SchemaVersion == grant.AcceptedRequestSchemaVersion);
+            if (accepted is null)
+            {
+                var versionMismatch = neuron.Accepted.Any(item =>
+                    string.Equals(item.ContractId, grant.AcceptedRequestSynapseId, StringComparison.Ordinal));
+                return BehaviorGrantAdmissionResult.Reject(
+                    versionMismatch
+                        ? $"Incompatible request synapse version for '{grant.AcceptedRequestSynapseId}' v{grant.AcceptedRequestSchemaVersion}."
+                        : $"Undeclared request synapse '{grant.AcceptedRequestSynapseId}' on neuron '{grant.TargetNeuronContractId}'.");
+            }
+
+            if (grant.EmittedResultSynapseId is null)
+            {
+                admitted.Add(grant);
+                continue;
+            }
+
+            var emitted = neuron.Emitted.FirstOrDefault(item =>
+                string.Equals(item.ContractId, grant.EmittedResultSynapseId, StringComparison.Ordinal)
+                && item.SchemaVersion == grant.EmittedResultSchemaVersion);
+            if (emitted is null)
+            {
+                return BehaviorGrantAdmissionResult.Reject(
+                    $"Incompatible result synapse '{grant.EmittedResultSynapseId}' for neuron '{grant.TargetNeuronContractId}'.");
+            }
+
+            admitted.Add(grant);
+        }
+
+        return BehaviorGrantAdmissionResult.Admit(admitted);
+    }
+
+    private static string? ValidateDirectedGrantShape(BehaviorCapabilityGrant grant)
+    {
+        if (grant is null)
+        {
+            return "Capability grant is missing.";
+        }
+
+        if (string.Equals(grant.TargetInstancePolicy, "method-alias", StringComparison.Ordinal)
+            || string.Equals(grant.AcceptedRequestSynapseId, "ReadMessage", StringComparison.Ordinal)
+            || grant.AcceptedRequestSynapseId.Contains("Method", StringComparison.OrdinalIgnoreCase)
+            || grant.TargetInstancePolicy.Contains("method", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Legacy method-alias capability grants are rejected; directed neuron/synapse edges are required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(grant.TargetNeuronContractId)
+            || string.IsNullOrWhiteSpace(grant.AcceptedRequestSynapseId)
+            || grant.AcceptedRequestSchemaVersion < 1
+            || string.IsNullOrWhiteSpace(grant.TargetInstancePolicy)
+            || string.IsNullOrWhiteSpace(grant.TargetInstanceName))
+        {
+            return "Directed capability grants require target neuron, request synapse identity/version, and target instance policy/name.";
+        }
+
+        var hasResultId = !string.IsNullOrWhiteSpace(grant.EmittedResultSynapseId);
+        var hasResultVersion = grant.EmittedResultSchemaVersion is not null;
+        if (hasResultId != hasResultVersion)
+        {
+            return "Result synapse id and version must both be present or both absent for one-way edges.";
+        }
+
+        if (hasResultVersion && grant.EmittedResultSchemaVersion < 1)
+        {
+            return "Result synapse version must be positive.";
+        }
+
+        return null;
+    }
+
     public static BehaviorContractCompatibilityResult Assess(
         BehaviorContractManifest prior,
         BehaviorContractManifest next,
@@ -135,4 +237,16 @@ internal sealed record BehaviorContractCompatibilityResult(
 
     public static BehaviorContractCompatibilityResult MappingRequired(string detail)
         => new(false, false, true, detail);
+}
+
+internal sealed record BehaviorGrantAdmissionResult(
+    bool IsAdmitted,
+    string Detail,
+    IReadOnlyList<BehaviorCapabilityGrant> Grants)
+{
+    public static BehaviorGrantAdmissionResult Admit(IReadOnlyList<BehaviorCapabilityGrant> grants)
+        => new(true, "Directed capability grants admitted against the active catalog.", grants);
+
+    public static BehaviorGrantAdmissionResult Reject(string detail)
+        => new(false, detail, Array.Empty<BehaviorCapabilityGrant>());
 }

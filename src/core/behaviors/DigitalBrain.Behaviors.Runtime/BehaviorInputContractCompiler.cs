@@ -6,6 +6,7 @@ using DigitalBrain.Behaviors.Manifest;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace DigitalBrain.Behaviors;
 
@@ -15,12 +16,535 @@ internal static class BehaviorInputContractCompiler
     internal const string SdkVersion = "11.0.100-preview.6";
     internal const string RoslynVersion = "5.6.0";
     internal const string LanguageVersionName = "Preview";
+    private const string BehaviorBrainMetadataName = "DigitalBrain.Behaviors.BehaviorBrain`1";
+    private const string BehaviorNeuronReferenceMetadataName = "DigitalBrain.Behaviors.BehaviorNeuronReference`1";
+    private const string RequestSynapseMetadataName = "DigitalBrain.Abstractions.RequestSynapse`1";
+    private const string AliasAttributeMetadataName = "Orleans.AliasAttribute";
+    private const string DefaultInstanceName = "default";
+    private const string DefaultInstancePolicy = "default";
+    private const string NamedInstancePolicy = "named";
 
     internal static BehaviorCompilerPolicy DefaultPolicy { get; } = new(
         SdkVersion,
         RoslynVersion,
         LanguageVersionName,
         PolicyId);
+
+    public static CapabilityGrantDerivationResult DeriveCapabilityGrants(
+        string programSource,
+        ImmutableArray<MetadataReference> references)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(programSource);
+
+        var tree = CSharpSyntaxTree.ParseText(
+            programSource,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            path: "Behavior.cs",
+            encoding: Encoding.UTF8);
+
+        var compilation = CSharpCompilation.Create(
+            assemblyName: "Behavior.CapabilityGrants",
+            syntaxTrees: [tree],
+            references: references,
+            options: new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary,
+                    optimizationLevel: OptimizationLevel.Release,
+                    deterministic: true,
+                    nullableContextOptions: NullableContextOptions.Enable)
+                .WithMetadataImportOptions(MetadataImportOptions.All));
+
+        var model = compilation.GetSemanticModel(tree);
+        var root = tree.GetCompilationUnitRoot();
+        var brainDefinition = compilation.GetTypeByMetadataName(BehaviorBrainMetadataName);
+        var neuronReferenceDefinition = compilation.GetTypeByMetadataName(BehaviorNeuronReferenceMetadataName);
+        var requestSynapseDefinition = compilation.GetTypeByMetadataName(RequestSynapseMetadataName);
+        if (brainDefinition is null || neuronReferenceDefinition is null || requestSynapseDefinition is null)
+        {
+            return CapabilityGrantDerivationResult.Fail(
+                "BehaviorBrain capability grant derivation requires BehaviorBrain and RequestSynapse metadata.");
+        }
+
+        var grants = new List<BehaviorCapabilityGrant>();
+        var errors = new List<string>();
+
+        foreach (var node in root.DescendantNodes())
+        {
+            if (model.GetOperation(node) is not IInvocationOperation invocation)
+            {
+                continue;
+            }
+
+            if (!IsBehaviorNeuronSendAsync(invocation.TargetMethod, neuronReferenceDefinition))
+            {
+                if (LooksLikeCapabilitySendLookalike(invocation, brainDefinition, neuronReferenceDefinition))
+                {
+                    errors.Add(
+                        "Directed capability edges must be derived from BehaviorBrain.Get and BehaviorNeuronReference.SendAsync; non-BehaviorBrain lookalikes are rejected.");
+                }
+
+                continue;
+            }
+
+            if (!TryResolveGetPairing(
+                    invocation,
+                    model,
+                    brainDefinition,
+                    neuronReferenceDefinition,
+                    out var neuronType,
+                    out var instanceName,
+                    out var pairingError))
+            {
+                errors.Add(pairingError ?? "Unresolvable BehaviorBrain.Get / SendAsync pairing.");
+                continue;
+            }
+
+            if (!TryBuildGrant(
+                    invocation,
+                    neuronType,
+                    instanceName,
+                    requestSynapseDefinition,
+                    out var grant,
+                    out var grantError))
+            {
+                errors.Add(grantError ?? "Unable to derive directed capability grant.");
+                continue;
+            }
+
+            grants.Add(grant);
+        }
+
+        if (errors.Count > 0)
+        {
+            return CapabilityGrantDerivationResult.Fail(string.Join(Environment.NewLine, errors.Distinct(StringComparer.Ordinal)));
+        }
+
+        var ordered = grants
+            .Distinct()
+            .OrderBy(static grant => grant.TargetNeuronContractId, StringComparer.Ordinal)
+            .ThenBy(static grant => grant.AcceptedRequestSynapseId, StringComparer.Ordinal)
+            .ThenBy(static grant => grant.AcceptedRequestSchemaVersion)
+            .ThenBy(static grant => grant.EmittedResultSynapseId ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(static grant => grant.EmittedResultSchemaVersion ?? 0)
+            .ThenBy(static grant => grant.TargetInstancePolicy, StringComparer.Ordinal)
+            .ThenBy(static grant => grant.TargetInstanceName, StringComparer.Ordinal)
+            .ToArray();
+
+        return CapabilityGrantDerivationResult.Ok(ordered);
+    }
+
+    private static bool IsBehaviorNeuronSendAsync(IMethodSymbol? method, INamedTypeSymbol neuronReferenceDefinition)
+    {
+        if (method is null
+            || !string.Equals(method.Name, "SendAsync", StringComparison.Ordinal)
+            || method.ContainingType is not INamedTypeSymbol containing
+            || !containing.IsGenericType)
+        {
+            return false;
+        }
+
+        return SymbolEqualityComparer.Default.Equals(containing.OriginalDefinition, neuronReferenceDefinition);
+    }
+
+    private static bool LooksLikeCapabilitySendLookalike(
+        IInvocationOperation invocation,
+        INamedTypeSymbol brainDefinition,
+        INamedTypeSymbol neuronReferenceDefinition)
+    {
+        var method = invocation.TargetMethod;
+        if (method is null || !string.Equals(method.Name, "SendAsync", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (IsBehaviorNeuronSendAsync(method, neuronReferenceDefinition))
+        {
+            return false;
+        }
+
+        // A Get-like call whose containing type is not BehaviorBrain is a lookalike edge attempt.
+        if (invocation.Instance is ILocalReferenceOperation local
+            && TryFindAssignedGet(local.Local, local.SemanticModel ?? invocation.SemanticModel, brainDefinition, out _, out _, out _))
+        {
+            return true;
+        }
+
+        if (invocation.Instance is IInvocationOperation receiverInvocation
+            && string.Equals(receiverInvocation.TargetMethod?.Name, "Get", StringComparison.Ordinal)
+            && receiverInvocation.TargetMethod?.ContainingType is INamedTypeSymbol containing
+            && !(containing.IsGenericType
+                && SymbolEqualityComparer.Default.Equals(containing.OriginalDefinition, brainDefinition)))
+        {
+            return true;
+        }
+
+        if (invocation.Instance is ILocalReferenceOperation
+            || (invocation.Instance is IInvocationOperation chained
+                && string.Equals(chained.TargetMethod?.Name, "Get", StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryResolveGetPairing(
+        IInvocationOperation sendInvocation,
+        SemanticModel model,
+        INamedTypeSymbol brainDefinition,
+        INamedTypeSymbol neuronReferenceDefinition,
+        out INamedTypeSymbol neuronType,
+        out string instanceName,
+        out string? error)
+    {
+        neuronType = null!;
+        instanceName = DefaultInstanceName;
+        error = null;
+
+        var receiver = UnwrapConversion(sendInvocation.Instance);
+        if (receiver is IInvocationOperation getInvocation)
+        {
+            return TryReadGetInvocation(getInvocation, brainDefinition, neuronReferenceDefinition, out neuronType, out instanceName, out error);
+        }
+
+        if (receiver is ILocalReferenceOperation localReference)
+        {
+            if (!TryFindAssignedGet(
+                    localReference.Local,
+                    localReference.SemanticModel ?? model,
+                    brainDefinition,
+                    out neuronType,
+                    out instanceName,
+                    out error))
+            {
+                return false;
+            }
+
+            if (sendInvocation.TargetMethod?.ContainingType is INamedTypeSymbol referenceType
+                && referenceType.IsGenericType
+                && referenceType.TypeArguments[0] is INamedTypeSymbol sendNeuron
+                && !SymbolEqualityComparer.Default.Equals(sendNeuron.OriginalDefinition, neuronType.OriginalDefinition))
+            {
+                error = "SendAsync target neuron type does not match the BehaviorBrain.Get pairing.";
+                return false;
+            }
+
+            return true;
+        }
+
+        error = "SendAsync must be paired with a resolvable BehaviorBrain.Get receiver.";
+        return false;
+    }
+
+    private static bool TryFindAssignedGet(
+        ILocalSymbol local,
+        SemanticModel? model,
+        INamedTypeSymbol brainDefinition,
+        out INamedTypeSymbol neuronType,
+        out string instanceName,
+        out string? error)
+    {
+        neuronType = null!;
+        instanceName = DefaultInstanceName;
+        error = null;
+        if (model is null)
+        {
+            error = "Semantic model is required to resolve BehaviorBrain.Get pairings.";
+            return false;
+        }
+
+        var assignments = new List<IInvocationOperation>();
+        foreach (var node in model.SyntaxTree.GetRoot().DescendantNodes())
+        {
+            var operation = model.GetOperation(node);
+            switch (operation)
+            {
+                case IVariableDeclaratorOperation declarator
+                    when SymbolEqualityComparer.Default.Equals(declarator.Symbol, local)
+                         && UnwrapConversion(declarator.Initializer?.Value) is IInvocationOperation get:
+                    assignments.Add(get);
+                    break;
+                case ISimpleAssignmentOperation assignment
+                    when assignment.Target is ILocalReferenceOperation target
+                         && SymbolEqualityComparer.Default.Equals(target.Local, local)
+                         && UnwrapConversion(assignment.Value) is IInvocationOperation get:
+                    assignments.Add(get);
+                    break;
+            }
+        }
+
+        if (assignments.Count == 0)
+        {
+            error = $"Local '{local.Name}' is not assigned from BehaviorBrain.Get.";
+            return false;
+        }
+
+        if (assignments.Count > 1)
+        {
+            error = $"Local '{local.Name}' has ambiguous BehaviorBrain.Get assignments.";
+            return false;
+        }
+
+        return TryReadGetInvocation(
+            assignments[0],
+            brainDefinition,
+            neuronReferenceDefinition: null,
+            out neuronType,
+            out instanceName,
+            out error);
+    }
+
+    private static bool TryReadGetInvocation(
+        IInvocationOperation getInvocation,
+        INamedTypeSymbol brainDefinition,
+        INamedTypeSymbol? neuronReferenceDefinition,
+        out INamedTypeSymbol neuronType,
+        out string instanceName,
+        out string? error)
+    {
+        neuronType = null!;
+        instanceName = DefaultInstanceName;
+        error = null;
+
+        var method = getInvocation.TargetMethod;
+        if (method is null
+            || !string.Equals(method.Name, "Get", StringComparison.Ordinal)
+            || method.ContainingType is not INamedTypeSymbol containing
+            || !containing.IsGenericType
+            || !SymbolEqualityComparer.Default.Equals(containing.OriginalDefinition, brainDefinition))
+        {
+            error = "Directed capability edges must use BehaviorBrain.Get; non-BehaviorBrain lookalikes are rejected.";
+            return false;
+        }
+
+        if (method.TypeArguments.Length != 1 || method.TypeArguments[0] is not INamedTypeSymbol resolvedNeuron)
+        {
+            error = "BehaviorBrain.Get requires a concrete neuron contract type argument.";
+            return false;
+        }
+
+        neuronType = resolvedNeuron.OriginalDefinition;
+        if (getInvocation.Arguments.Length == 0)
+        {
+            instanceName = DefaultInstanceName;
+            return true;
+        }
+
+        var nameArgument = getInvocation.Arguments[0].Value;
+        if (!TryReadConstantString(nameArgument, out instanceName) || string.IsNullOrWhiteSpace(instanceName))
+        {
+            error = "BehaviorBrain.Get instance name must be a constant non-empty string.";
+            return false;
+        }
+
+        _ = neuronReferenceDefinition;
+        return true;
+    }
+
+    private static bool TryBuildGrant(
+        IInvocationOperation sendInvocation,
+        INamedTypeSymbol neuronType,
+        string instanceName,
+        INamedTypeSymbol requestSynapseDefinition,
+        out BehaviorCapabilityGrant grant,
+        out string? error)
+    {
+        grant = null!;
+        error = null;
+
+        if (!TryContractId(neuronType, out var neuronContractId))
+        {
+            error = $"Neuron contract '{neuronType.Name}' requires a stable Orleans Alias for capability grants.";
+            return false;
+        }
+
+        var method = sendInvocation.TargetMethod!;
+        INamedTypeSymbol? requestType = null;
+        INamedTypeSymbol? resultType = null;
+
+        if (method.TypeParameters.Length == 1 && method.TypeArguments.Length == 1)
+        {
+            // Task<TResponse> SendAsync<TResponse>(RequestSynapse<TResponse> request, ...)
+            if (sendInvocation.Arguments.Length < 1
+                || !TryResolveRequestArgument(sendInvocation.Arguments[0].Value, requestSynapseDefinition, out requestType, out resultType)
+                || resultType is null)
+            {
+                // Prefer the method type argument when the argument conversion is opaque.
+                if (method.TypeArguments[0] is INamedTypeSymbol typedResult
+                    && sendInvocation.Arguments.Length >= 1
+                    && TryResolveNamedType(sendInvocation.Arguments[0].Value, out requestType)
+                    && requestType is not null)
+                {
+                    resultType = typedResult.OriginalDefinition;
+                }
+                else
+                {
+                    error = "Typed SendAsync requires a resolvable RequestSynapse request and result type.";
+                    return false;
+                }
+            }
+        }
+        else
+        {
+            // Task SendAsync(Synapse synapse, ...)
+            if (sendInvocation.Arguments.Length < 1
+                || !TryResolveNamedType(sendInvocation.Arguments[0].Value, out requestType)
+                || requestType is null)
+            {
+                error = "One-way SendAsync requires a resolvable synapse request type.";
+                return false;
+            }
+
+            resultType = null;
+        }
+
+        if (!TryContractId(requestType, out var requestContractId))
+        {
+            error = $"Request synapse '{requestType.Name}' requires a stable Orleans Alias for capability grants.";
+            return false;
+        }
+
+        string? resultContractId = null;
+        int? resultVersion = null;
+        if (resultType is not null)
+        {
+            if (!TryContractId(resultType, out resultContractId))
+            {
+                error = $"Result synapse '{resultType.Name}' requires a stable Orleans Alias for capability grants.";
+                return false;
+            }
+
+            resultVersion = 1;
+        }
+
+        var policy = string.Equals(instanceName, DefaultInstanceName, StringComparison.Ordinal)
+            ? DefaultInstancePolicy
+            : NamedInstancePolicy;
+
+        grant = new BehaviorCapabilityGrant(
+            neuronContractId,
+            requestContractId,
+            1,
+            resultContractId,
+            resultVersion,
+            policy,
+            instanceName);
+        return true;
+    }
+
+    private static bool TryResolveRequestArgument(
+        IOperation? argument,
+        INamedTypeSymbol requestSynapseDefinition,
+        out INamedTypeSymbol requestType,
+        out INamedTypeSymbol? resultType)
+    {
+        requestType = null!;
+        resultType = null;
+        argument = UnwrapConversion(argument);
+        if (!TryResolveNamedType(argument, out requestType) || requestType is null)
+        {
+            return false;
+        }
+
+        for (var current = requestType; current is not null; current = current.BaseType)
+        {
+            if (current.IsGenericType
+                && SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, requestSynapseDefinition)
+                && current.TypeArguments[0] is INamedTypeSymbol response)
+            {
+                resultType = response.OriginalDefinition;
+                requestType = requestType.OriginalDefinition;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryResolveNamedType(IOperation? operation, out INamedTypeSymbol type)
+    {
+        type = null!;
+        operation = UnwrapConversion(operation);
+        var candidate = operation?.Type as INamedTypeSymbol
+            ?? (operation as IObjectCreationOperation)?.Type as INamedTypeSymbol
+            ?? (operation as IConversionOperation)?.Type as INamedTypeSymbol
+            ?? (operation as IInvocationOperation)?.Type as INamedTypeSymbol;
+        if (candidate is null)
+        {
+            return false;
+        }
+
+        type = candidate.OriginalDefinition;
+        return true;
+    }
+
+    private static bool TryReadConstantString(IOperation? operation, out string value)
+    {
+        value = DefaultInstanceName;
+        operation = UnwrapConversion(operation);
+        if (operation is null)
+        {
+            return true;
+        }
+
+        if (operation.ConstantValue is { HasValue: true, Value: string constant })
+        {
+            value = constant;
+            return true;
+        }
+
+        if (operation is ILiteralOperation { ConstantValue.HasValue: true, ConstantValue.Value: string literal })
+        {
+            value = literal;
+            return true;
+        }
+
+        if (operation is IDefaultValueOperation)
+        {
+            value = DefaultInstanceName;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static IOperation? UnwrapConversion(IOperation? operation)
+    {
+        while (operation is IConversionOperation conversion)
+        {
+            operation = conversion.Operand;
+        }
+
+        return operation;
+    }
+
+    private static bool TryContractId(INamedTypeSymbol type, out string contractId)
+    {
+        foreach (var attribute in type.GetAttributes())
+        {
+            if (attribute.AttributeClass is null)
+            {
+                continue;
+            }
+
+            var attributeName = attribute.AttributeClass.ToDisplayString();
+            if (!string.Equals(attributeName, AliasAttributeMetadataName, StringComparison.Ordinal)
+                && !string.Equals(attribute.AttributeClass.Name, "AliasAttribute", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (attribute.ConstructorArguments.Length > 0
+                && attribute.ConstructorArguments[0].Value is string alias
+                && alias.Length > 0)
+            {
+                contractId = alias;
+                return true;
+            }
+        }
+
+        contractId = string.Empty;
+        return false;
+    }
 
     public static InputContractLoweringResult Lower(
         string programSource,
@@ -673,6 +1197,18 @@ internal static class BehaviorInputContractCompiler
         string Name,
         IReadOnlyList<TypeSyntax> Cases,
         bool HasDefaultOrNullCase);
+}
+
+internal sealed record CapabilityGrantDerivationResult(
+    bool Succeeded,
+    string Diagnostics,
+    IReadOnlyList<BehaviorCapabilityGrant> Grants)
+{
+    public static CapabilityGrantDerivationResult Ok(IReadOnlyList<BehaviorCapabilityGrant> grants)
+        => new(true, string.Empty, grants);
+
+    public static CapabilityGrantDerivationResult Fail(string diagnostics)
+        => new(false, diagnostics, Array.Empty<BehaviorCapabilityGrant>());
 }
 
 internal sealed record InputContractLoweringResult(

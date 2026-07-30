@@ -73,8 +73,14 @@ public sealed partial class CanonicalArtifacts
                     ? new BehaviorCompilerPolicy("11.0.100-preview.6", "5.6.0", "Preview", "contract-only-v1")
                     : new BehaviorCompilerPolicy("11.0.100-preview.6", "5.6.0", "Preview", "contract-only-v1"),
                 reverseOrder
-                    ? [new BehaviorCapabilityGrant("db.time", "schedule", "clock"), new BehaviorCapabilityGrant("db.shell", "open", "desk")]
-                    : [new BehaviorCapabilityGrant("db.shell", "open", "desk"), new BehaviorCapabilityGrant("db.time", "schedule", "clock")],
+                    ? [
+                        new BehaviorCapabilityGrant("db.time", "time.schedule-request", 1, "time.schedule-result", 1, "named", "clock"),
+                        new BehaviorCapabilityGrant("db.shell", "shell.open-request", 1, "shell.open-result", 1, "named", "desk"),
+                    ]
+                    : [
+                        new BehaviorCapabilityGrant("db.shell", "shell.open-request", 1, "shell.open-result", 1, "named", "desk"),
+                        new BehaviorCapabilityGrant("db.time", "time.schedule-request", 1, "time.schedule-result", 1, "named", "clock"),
+                    ],
                 new BehaviorResourceLimits(1_000, 64 * 1024 * 1024, 30_000)),
             "public sealed class StartUi { }\n",
             "Feature: start-ui\n  Scenario: alpha path\n    Then alpha succeeds\n  Scenario: zulu path\n    Then zulu succeeds\n",

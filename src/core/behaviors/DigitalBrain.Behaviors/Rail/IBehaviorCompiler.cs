@@ -14,4 +14,5 @@ public sealed record BehaviorCompileResult(
     string Diagnostics,
     string CompilerEvidenceJson,
     BehaviorContractManifest? Contract,
-    BehaviorCompilerPolicy Policy);
+    BehaviorCompilerPolicy Policy,
+    IReadOnlyList<BehaviorCapabilityGrant> CapabilityGrants);

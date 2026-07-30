@@ -74,7 +74,13 @@ internal sealed class ContractOnlyBehaviorCompiler : IBehaviorCompiler
             return Fail(diagnostics, contract: null, lowering);
         }
 
-        return Succeed(assemblyBytes, lowering.Contract, lowering);
+        var grants = BehaviorInputContractCompiler.DeriveCapabilityGrants(programSource, _references);
+        if (!grants.Succeeded)
+        {
+            return Fail(grants.Diagnostics, lowering.Contract, lowering);
+        }
+
+        return Succeed(assemblyBytes, lowering.Contract, lowering, grants.Grants);
     }
 
     private static string? FindForbiddenUsage(CSharpCompilation compilation)
@@ -104,14 +110,16 @@ internal sealed class ContractOnlyBehaviorCompiler : IBehaviorCompiler
     private static BehaviorCompileResult Succeed(
         byte[] assemblyBytes,
         BehaviorContractManifest contract,
-        InputContractLoweringResult lowering)
+        InputContractLoweringResult lowering,
+        IReadOnlyList<BehaviorCapabilityGrant> grants)
         => new(
             true,
             assemblyBytes,
             string.Empty,
-            Evidence(true, "ok", contract, lowering),
+            Evidence(true, "ok", contract, lowering, grants),
             contract,
-            BehaviorInputContractCompiler.DefaultPolicy);
+            BehaviorInputContractCompiler.DefaultPolicy,
+            grants);
 
     private static BehaviorCompileResult Fail(
         string diagnostics,
@@ -121,15 +129,17 @@ internal sealed class ContractOnlyBehaviorCompiler : IBehaviorCompiler
             false,
             ReadOnlyMemory<byte>.Empty,
             diagnostics,
-            Evidence(false, diagnostics, contract, lowering),
+            Evidence(false, diagnostics, contract, lowering, grants: null),
             contract,
-            BehaviorInputContractCompiler.DefaultPolicy);
+            BehaviorInputContractCompiler.DefaultPolicy,
+            Array.Empty<BehaviorCapabilityGrant>());
 
     private static string Evidence(
         bool succeeded,
         string detail,
         BehaviorContractManifest? contract,
-        InputContractLoweringResult? lowering)
+        InputContractLoweringResult? lowering,
+        IReadOnlyList<BehaviorCapabilityGrant>? grants)
     {
         var policy = BehaviorInputContractCompiler.DefaultPolicy;
         return JsonSerializer.Serialize(new
@@ -159,6 +169,18 @@ internal sealed class ContractOnlyBehaviorCompiler : IBehaviorCompiler
                     caseIds = lowering.CaseIds,
                     detail = lowering.Diagnostics,
                 },
+            capabilityGrants = grants is null
+                ? Array.Empty<object>()
+                : grants.Select(static grant => new
+                {
+                    targetNeuronContractId = grant.TargetNeuronContractId,
+                    acceptedRequestSynapseId = grant.AcceptedRequestSynapseId,
+                    acceptedRequestSchemaVersion = grant.AcceptedRequestSchemaVersion,
+                    emittedResultSynapseId = grant.EmittedResultSynapseId,
+                    emittedResultSchemaVersion = grant.EmittedResultSchemaVersion,
+                    targetInstancePolicy = grant.TargetInstancePolicy,
+                    targetInstanceName = grant.TargetInstanceName,
+                }).ToArray(),
         });
     }
 
@@ -181,6 +203,10 @@ internal sealed class ContractOnlyBehaviorCompiler : IBehaviorCompiler
         Add(typeof(Enumerable).Assembly);
         Add(typeof(INeuron).Assembly);
         Add(typeof(IBehaviorProgram<>).Assembly);
+        Add(typeof(BehaviorBrain<>).Assembly);
+        Add(typeof(Orleans.AliasAttribute).Assembly);
+        Add(typeof(Orleans.IGrain).Assembly);
+        Add(typeof(System.ComponentModel.DescriptionAttribute).Assembly);
         Add(Assembly.Load("System.Runtime"));
         Add(Assembly.Load("System.Collections"));
         Add(Assembly.Load("System.Linq"));
@@ -190,6 +216,7 @@ internal sealed class ContractOnlyBehaviorCompiler : IBehaviorCompiler
         Add(Assembly.Load("System.Threading"));
         Add(Assembly.Load("System.Threading.Tasks"));
         Add(Assembly.Load("System.Text.Json"));
+        Add(Assembly.Load("System.ComponentModel.Primitives"));
 
         return [.. references];
     }

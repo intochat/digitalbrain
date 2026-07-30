@@ -118,9 +118,13 @@ internal static class CanonicalArtifactWriter
             Overview = manifest.Overview,
             CompilerPolicy = CanonicalizeCompilerPolicy(manifest.CompilerPolicy),
             CapabilityGrants = manifest.CapabilityGrants
-                .OrderBy(grant => grant.ContractAlias, StringComparer.Ordinal)
-                .ThenBy(grant => grant.MethodAlias, StringComparer.Ordinal)
-                .ThenBy(grant => grant.Target, StringComparer.Ordinal)
+                .OrderBy(grant => grant.TargetNeuronContractId, StringComparer.Ordinal)
+                .ThenBy(grant => grant.AcceptedRequestSynapseId, StringComparer.Ordinal)
+                .ThenBy(grant => grant.AcceptedRequestSchemaVersion)
+                .ThenBy(grant => grant.EmittedResultSynapseId ?? string.Empty, StringComparer.Ordinal)
+                .ThenBy(grant => grant.EmittedResultSchemaVersion ?? 0)
+                .ThenBy(grant => grant.TargetInstancePolicy, StringComparer.Ordinal)
+                .ThenBy(grant => grant.TargetInstanceName, StringComparer.Ordinal)
                 .ToArray(),
         };
     }
@@ -231,7 +235,7 @@ internal static class CanonicalArtifactWriter
             if (manifest.EntryPoints.EventAliases.Any(string.IsNullOrWhiteSpace)
                 || manifest.EntryPoints.EventAliases.Distinct(StringComparer.Ordinal).Count() != manifest.EntryPoints.EventAliases.Count
                 || manifest.Scenarios.Select(scenario => scenario.ScenarioId).Distinct(StringComparer.Ordinal).Count() != manifest.Scenarios.Count
-                || manifest.CapabilityGrants.Any(grant => grant is null || string.IsNullOrWhiteSpace(grant.ContractAlias) || string.IsNullOrWhiteSpace(grant.MethodAlias) || string.IsNullOrWhiteSpace(grant.Target))
+                || manifest.CapabilityGrants.Any(grant => !IsDirectedCapabilityGrant(grant))
                 || manifest.ResourceLimits.CpuMilliseconds <= 0 || manifest.ResourceLimits.MemoryBytes <= 0 || manifest.ResourceLimits.WallClockMilliseconds <= 0)
             {
                 throw new BehaviorArtifactException("The behavior manifest contains invalid entry points, grants, or resource limits.");
@@ -253,6 +257,40 @@ internal static class CanonicalArtifactWriter
         {
             throw new BehaviorArtifactException("The behavior manifest contains invalid values.", exception);
         }
+    }
+
+    private static bool IsDirectedCapabilityGrant(BehaviorCapabilityGrant? grant)
+    {
+        if (grant is null
+            || string.IsNullOrWhiteSpace(grant.TargetNeuronContractId)
+            || string.IsNullOrWhiteSpace(grant.AcceptedRequestSynapseId)
+            || grant.AcceptedRequestSchemaVersion < 1
+            || string.IsNullOrWhiteSpace(grant.TargetInstancePolicy)
+            || string.IsNullOrWhiteSpace(grant.TargetInstanceName))
+        {
+            return false;
+        }
+
+        if (string.Equals(grant.TargetInstancePolicy, "method-alias", StringComparison.Ordinal)
+            || string.Equals(grant.AcceptedRequestSynapseId, "ReadMessage", StringComparison.Ordinal)
+            || grant.AcceptedRequestSynapseId.Contains("Method", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var hasResultId = !string.IsNullOrWhiteSpace(grant.EmittedResultSynapseId);
+        var hasResultVersion = grant.EmittedResultSchemaVersion is not null;
+        if (hasResultId != hasResultVersion)
+        {
+            return false;
+        }
+
+        if (hasResultVersion && grant.EmittedResultSchemaVersion < 1)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     internal static void ValidateEntries(IReadOnlyList<ArtifactEntry> entries)
