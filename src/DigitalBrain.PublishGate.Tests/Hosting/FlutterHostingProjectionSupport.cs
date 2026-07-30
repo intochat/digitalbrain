@@ -12,11 +12,9 @@ internal static class FlutterHostingProjectionSupport
         "ConnectionStrings__" + DigitalBrainHostingExtensions.JournalConnectionName;
 
     public static string UIProjectPath => RepositoryAssets.Path(
-        "src",
-        "modules",
-        "flutter",
-        "DigitalBrain.Modules.Flutter.Http",
-        "DigitalBrain.Modules.Flutter.Http.csproj");
+        "os",
+        "DigitalBrain.OS.Ui",
+        "DigitalBrain.OS.Ui.csproj");
 
     public static string FlutterClientDirectory => RepositoryAssets.Path("clients", "flutter", "core");
 
@@ -91,9 +89,9 @@ internal static class FlutterHostingProjectionSupport
             ui.Annotations.OfType<EndpointAnnotation>(),
             endpoint => string.Equals(
                 endpoint.Name,
-                FlutterHostingExtensions.UIHttpEndpointName,
+                FlutterHostingExtensions.UiEdgeEndpointName,
                 StringComparison.Ordinal));
-        Assert.Equal(FlutterHostingExtensions.UIHttpEndpointName, http.UriScheme, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(FlutterHostingExtensions.UiEdgeEndpointName, http.UriScheme, StringComparer.OrdinalIgnoreCase);
     }
 
     public static void AssertExclusiveFlutterHostEnvironment(HashSet<string> environment)

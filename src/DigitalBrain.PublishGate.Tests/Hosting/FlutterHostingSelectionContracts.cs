@@ -17,7 +17,7 @@ public sealed class FlutterHostingSelectionContracts
 
         _ = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UIHttpEndpointName)
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         FlutterHostingProjectionSupport.AssertNoOSSurfaceResources(builder);
@@ -33,7 +33,7 @@ public sealed class FlutterHostingSelectionContracts
 
         var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UIHttpEndpointName)
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         var siloEnvironment = await FlutterHostingProjectionSupport

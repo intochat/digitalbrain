@@ -13,14 +13,14 @@ namespace DigitalBrain.Tests.Hosting;
 public sealed class FlutterHostingUiHttpContracts
 {
     [Fact(DisplayName =
-        "WithUiHttp projects " + FlutterHostingExtensions.DefaultUIResourceName
+        "WithUiEdge projects " + FlutterHostingExtensions.DefaultUIResourceName
         + " as a client with late-bound module topology and no silo secrets")]
-    public async Task WithUiHttpProjectsLateBoundModuleTopologyWithoutSiloSecrets()
+    public async Task WithUiEdgeProjectsLateBoundModuleTopologyWithoutSiloSecrets()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
 
-        brain.AddModule<FlutterModule>(flutter => flutter.WithUiHttp(options =>
+        brain.AddModule<FlutterModule>(flutter => flutter.WithUiEdge(options =>
         {
             options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath;
             options.Owner = "ui-owner";
@@ -29,7 +29,7 @@ public sealed class FlutterHostingUiHttpContracts
 
         var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UIHttpEndpointName)
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         var ui = Assert.Single(

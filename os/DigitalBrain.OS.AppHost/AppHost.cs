@@ -25,7 +25,7 @@ brain.AddModule<AIModule>(ai =>
 });
 brain.AddModule<ChatModule>();
 brain.AddModule<OSBehaviorsModule>();
-brain.AddModule<FlutterModule>(flutter => flutter.WithUiHttp().WithFlutterHost<HeadlessHost>());
+brain.AddModule<FlutterModule>(flutter => flutter.WithUiEdge().WithFlutterHost<HeadlessHost>());
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 brain.AddModule<BehaviorsModule>();
@@ -51,7 +51,7 @@ silo.WithReference(behaviorHost)
         behaviorHost.GetEndpoint("http"));
 
 #pragma warning disable ASPIREMCP001
-builder.AddProject<Projects.DigitalBrain_OS_Mcp>(ProductSurfaceResources.Mcp)
+builder.AddProject<Projects.DigitalBrain_OS_McpHost>(ProductSurfaceResources.Mcp)
     .WithReference(brain.AsClient())
     .WaitFor(silo)
     .WithEnvironment(

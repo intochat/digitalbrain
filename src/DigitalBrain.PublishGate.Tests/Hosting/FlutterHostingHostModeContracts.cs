@@ -21,7 +21,7 @@ public sealed class FlutterHostingHostModeContracts
 
         const string pinnedFlutterCommand = "flutter";
         brain.AddModule<FlutterModule>(flutter => flutter
-            .WithUiHttp(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+            .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
             .WithFlutterHost(options =>
             {
                 options.WorkingDirectory = FlutterHostingProjectionSupport.FlutterClientDirectory;
@@ -30,7 +30,7 @@ public sealed class FlutterHostingHostModeContracts
 
         _ = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UIHttpEndpointName)
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         var host = Assert.Single(
@@ -71,7 +71,7 @@ public sealed class FlutterHostingHostModeContracts
 
         const string pinnedFlutterCommand = "dotnet";
         brain.AddModule<FlutterModule>(flutter => flutter
-            .WithUiHttp(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+            .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
             .WithFlutterHost<DesktopHost>(options =>
             {
                 options.WorkingDirectory = FlutterHostingProjectionSupport.FlutterClientDirectory;
@@ -80,7 +80,7 @@ public sealed class FlutterHostingHostModeContracts
 
         _ = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UIHttpEndpointName)
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         var host = Assert.Single(
@@ -107,7 +107,7 @@ public sealed class FlutterHostingHostModeContracts
 
         const string pinnedDartCommand = "dart";
         brain.AddModule<FlutterModule>(flutter => flutter
-            .WithUiHttp(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+            .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
             .WithFlutterHost<HeadlessHost>(options =>
             {
                 options.WorkingDirectory = FlutterHostingProjectionSupport.FlutterClientDirectory;
@@ -116,7 +116,7 @@ public sealed class FlutterHostingHostModeContracts
 
         _ = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UIHttpEndpointName)
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         var host = Assert.Single(
@@ -162,7 +162,7 @@ public sealed class FlutterHostingHostModeContracts
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 brain.AddModule<FlutterModule>(flutter => flutter
-                    .WithUiHttp(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+                    .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
                     .WithFlutterHost(options => options.WorkingDirectory = headlessOnly.FullName)));
 
             Assert.Contains(nameof(HeadlessHost), exception.Message, StringComparison.Ordinal);
@@ -189,7 +189,7 @@ public sealed class FlutterHostingHostModeContracts
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 brain.AddModule<FlutterModule>(flutter => flutter
-                    .WithUiHttp(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+                    .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
                     .WithFlutterHost<HeadlessHost>(options =>
                         options.WorkingDirectory = emptyPackage.FullName)));
 
@@ -217,7 +217,7 @@ public sealed class FlutterHostingHostModeContracts
 
         _ = Assert.Throws<InvalidOperationException>(() =>
             brain.AddModule<FlutterModule>(flutter => flutter
-                .WithUiHttp(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+                .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
                 .WithFlutterHost(options => options.WorkingDirectory = missing)));
 
         FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);

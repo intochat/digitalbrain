@@ -14,7 +14,7 @@
     <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\DigitalBrain.OS.Host\DigitalBrain.OS.Host.csproj" />
     <ProjectReference Include="..\DigitalBrain.OS.BehaviorHost\DigitalBrain.OS.BehaviorHost.csproj" />
-    <ProjectReference Include="..\DigitalBrain.OS.Mcp\DigitalBrain.OS.Mcp.csproj" />
+    <ProjectReference Include="..\DigitalBrain.OS.McpHost\DigitalBrain.OS.McpHost.csproj" />
     <ProjectReference Include="..\..\src\core\behaviors\DigitalBrain.Behaviors.Runtime\DigitalBrain.Behaviors.Runtime.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
   <PropertyGroup>

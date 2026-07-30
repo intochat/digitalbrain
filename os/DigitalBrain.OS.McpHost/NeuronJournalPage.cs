@@ -1,0 +1,24 @@
+namespace DigitalBrain.OS.McpHost;
+
+internal sealed record NeuronJournalPage(
+    string Neuron,
+    string Kind,
+    long ResumeSequence,
+    bool Compacted,
+    IReadOnlyList<JournaledSynapse> Entries);
+
+internal sealed record JournaledSynapse(long Sequence, string Synapse, string Caller, string Correlation, DateTimeOffset Timestamp);
+
+internal sealed record ActiveNeuron(string GrainType, string Identity);
+
+internal sealed record ChatTranscriptPage(string Chat, IReadOnlyList<ChatTranscriptTurn> Turns);
+
+internal sealed record ChatTranscriptTurn(string Speaker, string Text);
+
+internal sealed record ChatMessageResult(
+    string Chat,
+    string CommandId,
+    string CorrelationId,
+    string Response,
+    long Sequence,
+    DateTimeOffset Timestamp);
