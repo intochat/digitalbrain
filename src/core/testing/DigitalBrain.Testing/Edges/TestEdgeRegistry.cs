@@ -1,7 +1,5 @@
-using DigitalBrain.Mcp;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.Testing;
 
@@ -9,7 +7,7 @@ internal sealed class TestEdgeRegistry
 {
     private readonly Lock _gate = new();
     private EdgeRegistration? _chatClient;
-    private McpEdgeRegistration? _mcp;
+    private ServiceEdgeRegistration? _serviceEdge;
     private TimeProvider? _timeProvider;
     private Action? _timeReset;
     private long _methodGeneration;
@@ -56,22 +54,23 @@ internal sealed class TestEdgeRegistry
         }
     }
 
-    internal void ConfigureMcpSessionFactory<TScript>(IMcpClientSessionFactory factory, TScript script, Action<TScript> reset)
+    internal void ConfigureServiceEdge<TScript>(
+        Action<IServiceCollection> configure, TScript script, Action<TScript> reset)
         where TScript : class
     {
-        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(configure);
         ArgumentNullException.ThrowIfNull(script);
         ArgumentNullException.ThrowIfNull(reset);
 
         lock (_gate)
         {
-            if (_mcp is not null)
+            if (_serviceEdge is not null)
             {
                 throw new InvalidOperationException(
-                    "The southbound MCP test edge already has an assembly-configured session factory.");
+                    "A service test edge is already configured for this fixture.");
             }
 
-            _mcp = new(factory, script, () => reset(script));
+            _serviceEdge = new(configure, script, () => reset(script));
         }
     }
 
@@ -98,13 +97,13 @@ internal sealed class TestEdgeRegistry
         ArgumentNullException.ThrowIfNull(services);
 
         EdgeRegistration? chatClient;
-        McpEdgeRegistration? mcp;
+        ServiceEdgeRegistration? serviceEdge;
         TimeProvider timeProvider;
 
         lock (_gate)
         {
             chatClient = _chatClient;
-            mcp = _mcp;
+            serviceEdge = _serviceEdge;
             timeProvider = _timeProvider
                 ?? throw new InvalidOperationException(
                     "The framework-owned TimeProvider test edge has not been attached.");
@@ -118,11 +117,7 @@ internal sealed class TestEdgeRegistry
             }
         }
 
-        if (mcp is not null)
-        {
-            services.RemoveAll<IMcpClientSessionFactory>();
-            services.AddSingleton(mcp.Factory);
-        }
+        serviceEdge?.Configure(services);
 
         services.AddKeyedSingleton<TimeProvider>(NeuronTime.ServiceKey, timeProvider);
     }
@@ -130,7 +125,7 @@ internal sealed class TestEdgeRegistry
     internal long ResetMethodScope()
     {
         Action? chatReset;
-        Action? mcpReset;
+        Action? serviceReset;
         Action timeReset;
         long generation;
 
@@ -138,14 +133,14 @@ internal sealed class TestEdgeRegistry
         {
             generation = checked(++_methodGeneration);
             chatReset = _chatClient?.Reset;
-            mcpReset = _mcp?.Reset;
+            serviceReset = _serviceEdge?.Reset;
             timeReset = _timeReset
                 ?? throw new InvalidOperationException(
                     "The framework-owned TimeProvider test edge has not been attached.");
         }
 
         chatReset?.Invoke();
-        mcpReset?.Invoke();
+        serviceReset?.Invoke();
         timeReset();
         return generation;
     }
@@ -169,22 +164,22 @@ internal sealed class TestEdgeRegistry
         }
     }
 
-    internal TScript McpSessionScript<TScript>(long generation)
+    internal TScript ServiceEdgeScript<TScript>(long generation)
         where TScript : class
     {
         lock (_gate)
         {
             EnsureCurrentGeneration(generation);
 
-            if (_mcp is null)
+            if (_serviceEdge is null)
             {
                 throw new InvalidOperationException(
-                    "The southbound MCP test edge has no assembly-configured session factory.");
+                    "No service test edge is configured for this fixture.");
             }
 
-            return _mcp.Script as TScript
+            return _serviceEdge.Script as TScript
                 ?? throw new InvalidOperationException(
-                    $"The southbound MCP test edge script is '{_mcp.Script.GetType().FullName}', not '{typeof(TScript).FullName}'.");
+                    $"The service test edge script is '{_serviceEdge.Script.GetType().FullName}', not '{typeof(TScript).FullName}'.");
         }
     }
 
@@ -200,5 +195,6 @@ internal sealed class TestEdgeRegistry
     private sealed record EdgeRegistration(
         Type ServiceType, IReadOnlyList<Type> ServiceKeys, object Adapter, object Script, Action Reset);
 
-    private sealed record McpEdgeRegistration(IMcpClientSessionFactory Factory, object Script, Action Reset);
+    private sealed record ServiceEdgeRegistration(
+        Action<IServiceCollection> Configure, object Script, Action Reset);
 }

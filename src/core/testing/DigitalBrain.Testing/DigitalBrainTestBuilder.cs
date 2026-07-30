@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Mcp;
 using DigitalBrain.Kernel;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Testing;
 
@@ -43,11 +43,13 @@ public sealed class DigitalBrainTestBuilder
         _edges.ConfigureChatClient(neuronAliases, adapter, script, reset);
     }
 
-    internal void ConfigureMcpSessionFactory<TScript>(IMcpClientSessionFactory factory, TScript script, Action<TScript> reset)
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public void ConfigureServiceEdge<TScript>(
+        Action<IServiceCollection> configure, TScript script, Action<TScript> reset)
         where TScript : class
     {
         ThrowIfSealed();
-        _edges.ConfigureMcpSessionFactory(factory, script, reset);
+        _edges.ConfigureServiceEdge(configure, script, reset);
     }
 
     public void WithResponseTimeout(TimeSpan timeout)

@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Salesforce;
+using DigitalBrain.Mcp.Testing;
 using DigitalBrain.Testing;
 using Xunit;
 

@@ -63,6 +63,5 @@ public sealed class UIFixture : DigitalBrainFixture
         brain.AddModule<ChatModule>();
         brain.AddModule<AIModule>();
         brain.AddModule<BehaviorsModule>();
-        brain.WithResponseTimeout(TimeSpan.FromSeconds(90));
     }
 }

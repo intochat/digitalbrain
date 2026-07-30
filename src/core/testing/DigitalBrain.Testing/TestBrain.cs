@@ -64,11 +64,11 @@ public sealed class TestBrain : IAsyncDisposable
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public TScript McpSessionScript<TScript>()
+    public TScript ServiceEdgeScript<TScript>()
         where TScript : class
     {
         ThrowIfDisposed();
-        return _edges.McpSessionScript<TScript>(_edgeGeneration);
+        return _edges.ServiceEdgeScript<TScript>(_edgeGeneration);
     }
 
     public TestNeuron<TNeuron> Neuron<TNeuron>(string name = "default")

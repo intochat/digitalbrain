@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.AccountEnrichment;
 using DigitalBrain.Behaviors;
+using DigitalBrain.Mcp.Testing;
 using DigitalBrain.Testing;
 using Xunit;
 

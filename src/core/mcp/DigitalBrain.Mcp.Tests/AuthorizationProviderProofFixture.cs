@@ -6,6 +6,7 @@ using DigitalBrain.Google;
 using DigitalBrain.Mcp;
 using DigitalBrain.Salesforce;
 using DigitalBrain.ServiceDefaults;
+using DigitalBrain.Mcp.Testing;
 using DigitalBrain.Testing;
 using DigitalBrain.UI;
 using Microsoft.AspNetCore.Builder;

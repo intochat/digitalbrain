@@ -79,14 +79,14 @@ internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
         Func<McpClient, CancellationToken, ValueTask<T>> callback,
         CancellationToken cancellationToken)
     {
-        await using var session = await sessions.OpenAsync(
+        await using var client = await sessions.OpenAsync(
             server,
             tokenState,
             commit,
             durableIdentity,
             cancellationToken,
             ambient);
-        return await callback(session.Client, cancellationToken);
+        return await callback(client, cancellationToken);
     }
 
     internal static JsonElement RequireStructuredContent(CallToolResult result, McpServerDefinition server, string toolName)

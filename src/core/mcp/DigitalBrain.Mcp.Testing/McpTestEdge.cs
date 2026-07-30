@@ -1,33 +1,45 @@
 using System.IO.Pipelines;
-using DigitalBrain.Mcp;
 using DigitalBrain.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Integrations.Tests;
+namespace DigitalBrain.Mcp.Testing;
 
-internal static class McpEdgeExtensions
+public static class McpTestEdge
 {
-    internal static void ConfigureMcpEdge(this DigitalBrainTestBuilder builder)
+    public static void ConfigureMcpEdge(this DigitalBrainTestBuilder builder)
     {
+        ArgumentNullException.ThrowIfNull(builder);
         var script = new McpEdgeScript();
-        builder.ConfigureMcpSessionFactory(new ScriptedMcpSessionFactory(script), script, static edge => edge.Reset());
+        builder.ConfigureServiceEdge(
+            services =>
+            {
+                services.RemoveAll<IMcpClientSessionFactory>();
+                services.AddSingleton<IMcpClientSessionFactory>(new ScriptedMcpSessionFactory(script));
+            },
+            script,
+            static edge => edge.Reset());
     }
 
-    internal static McpEdgeScript Mcp(this TestBrain brain)
-        => brain.McpSessionScript<McpEdgeScript>();
+    public static McpEdgeScript Mcp(this TestBrain brain)
+    {
+        ArgumentNullException.ThrowIfNull(brain);
+        return brain.ServiceEdgeScript<McpEdgeScript>();
+    }
 }
 
-internal sealed class McpEdgeScript
+public sealed class McpEdgeScript
 {
     private readonly Lock _gate = new();
     private readonly Dictionary<string, IReadOnlyList<McpServerTool>> _catalogs =
         new(StringComparer.Ordinal);
     private int _sessionCount;
 
-    internal int SessionCount
+    public int SessionCount
     {
         get
         {
@@ -38,7 +50,7 @@ internal sealed class McpEdgeScript
         }
     }
 
-    internal void Catalog(string serverKey, params McpServerTool[] tools)
+    public void Catalog(string serverKey, params McpServerTool[] tools)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serverKey);
         ArgumentNullException.ThrowIfNull(tools);
@@ -49,7 +61,7 @@ internal sealed class McpEdgeScript
         }
     }
 
-    internal void Reset()
+    public void Reset()
     {
         lock (_gate)
         {
@@ -72,8 +84,8 @@ internal sealed class McpEdgeScript
 
 internal sealed class ScriptedMcpSessionFactory(McpEdgeScript script) : IMcpClientSessionFactory
 {
-#pragma warning disable CA2000 // Stream transports are owned by the MCP client/server session.
-    public async ValueTask<IMcpClientSession> OpenAsync(
+#pragma warning disable CA2000 // Stream transports are owned by the MCP client session.
+    public async ValueTask<McpClient> OpenAsync(
         McpServerDefinition server,
         IDurableValue<byte[]> tokenState,
         Func<ValueTask> commit,
@@ -107,27 +119,27 @@ internal sealed class ScriptedMcpSessionFactory(McpEdgeScript script) : IMcpClie
             });
         var run = mcpServer.RunAsync(CancellationToken.None);
         var client = await McpClient.CreateAsync(clientTransport, cancellationToken: cancellationToken);
-        return new ScriptedMcpSession(client, mcpServer, run);
+
+        // Client dispose closes the duplex stream; complete server cleanup off the caller's dispose path.
+        _ = CompleteServerAsync(mcpServer, run);
+        return client;
     }
 #pragma warning restore CA2000
 
     private const string ScriptedServerVersion = "test";
 
-    private sealed class ScriptedMcpSession(McpClient client, McpServer server, Task run) : IMcpClientSession
+    private static async Task CompleteServerAsync(McpServer server, Task run)
     {
-        public McpClient Client { get; } = client;
-
-        public async ValueTask DisposeAsync()
+        try
         {
-            await Client.DisposeAsync();
-            await server.DisposeAsync();
-            try
-            {
-                await run;
-            }
-            catch (OperationCanceledException)
-            {
-            }
+            await run.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            await server.DisposeAsync().ConfigureAwait(false);
         }
     }
 }

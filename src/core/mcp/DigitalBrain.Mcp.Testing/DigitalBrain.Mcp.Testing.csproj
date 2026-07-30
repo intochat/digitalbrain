@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DigitalBrain.Mcp.Testing</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <Description>Development-only southbound MCP test edges for DigitalBrain.Testing fixtures.</Description>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.Core" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
+    <ProjectReference Include="..\..\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+  </ItemGroup>
+</Project>

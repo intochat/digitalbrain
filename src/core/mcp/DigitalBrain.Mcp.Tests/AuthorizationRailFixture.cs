@@ -3,6 +3,7 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Google;
 using DigitalBrain.Mcp;
 using DigitalBrain.Salesforce;
+using DigitalBrain.Mcp.Testing;
 using DigitalBrain.Testing;
 
 namespace DigitalBrain.Integrations.Tests;
@@ -19,7 +20,6 @@ public sealed class AuthorizationRailFixture : DigitalBrainFixture
         brain.AddModule<EnrichmentModule>();
         brain.AddModule<FlutterModule>();
         brain.AddModule<IntegrationsHarnessModule>();
-        brain.WithResponseTimeout(TimeSpan.FromSeconds(90));
         brain.ConfigureMcpEdge();
         brain.Configure(McpRuntimeHosting.AuthorizationModeKey, McpRuntimeHosting.EdgeMode);
         brain.Configure(McpRuntimeHosting.PublicSignInBaseKey, PublicSignInBase);

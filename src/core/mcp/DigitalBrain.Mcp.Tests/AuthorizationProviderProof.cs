@@ -3,6 +3,7 @@ using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Google;
 using DigitalBrain.Mcp;
+using DigitalBrain.Mcp.Testing;
 using DigitalBrain.Testing;
 using DigitalBrain.UI;
 using Xunit;
