@@ -44,6 +44,7 @@ public sealed class VectorMemoryNeuron :
         }
 
         var embedding = await EmbedAsync(synapse.Text, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         var metadata = synapse.Metadata is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             : new Dictionary<string, string>(synapse.Metadata, StringComparer.Ordinal);
@@ -73,6 +74,7 @@ public sealed class VectorMemoryNeuron :
         ValidateSearch(synapse);
 
         var queryEmbedding = await EmbedAsync(synapse.Query, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         var matches = _store.Search(
             Id.Owner.Value,
             synapse.Namespace.Value,

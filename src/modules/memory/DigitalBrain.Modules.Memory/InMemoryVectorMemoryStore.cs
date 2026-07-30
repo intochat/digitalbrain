@@ -10,7 +10,10 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
         ArgumentNullException.ThrowIfNull(entry);
         lock (_gate)
         {
-            _entries[(entry.Owner, entry.Namespace, entry.Key)] = entry;
+            _entries[(entry.Owner, entry.Namespace, entry.Key)] = entry with
+            {
+                Metadata = SnapshotMetadata(entry.Metadata),
+            };
         }
     }
 
@@ -57,7 +60,7 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
                 .Select(static s => new VectorMemoryMatch(
                     s.Entry.Key,
                     s.Entry.Text,
-                    s.Entry.Metadata,
+                    SnapshotMetadata(s.Entry.Metadata),
                     s.Entry.Payload))
                 .ToArray();
         }
@@ -74,6 +77,9 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
             return _entries.Remove((owner, @namespace, key));
         }
     }
+
+    private static Dictionary<string, string> SnapshotMetadata(IReadOnlyDictionary<string, string> metadata)
+        => new(metadata, StringComparer.Ordinal);
 
     private static bool MatchesMetadata(
         IReadOnlyDictionary<string, string> metadata,

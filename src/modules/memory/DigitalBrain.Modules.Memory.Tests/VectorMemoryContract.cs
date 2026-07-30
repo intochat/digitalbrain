@@ -172,6 +172,44 @@ public sealed class VectorMemoryContract(MemoryFixture fixture)
                 cts.Token));
     }
 
+    [Fact(DisplayName = "Mutating search-result metadata does not alter stored entry or filtering")]
+    public async Task Search_result_metadata_is_isolated_from_store()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var memory = test.Client.Get<IVectorMemory>(MemoryFixture.Memory);
+        var notes = new VectorMemoryNamespace("notes");
+        var inputMetadata = new Dictionary<string, string> { ["tag"] = "keep" };
+
+        await memory.SendAsync(
+            new StoreVectorMemory(notes, "k1", "shared text", inputMetadata, null),
+            cancellationToken);
+
+        inputMetadata["tag"] = "caller-mutated-input";
+
+        var firstSearch = await memory.SendAsync(
+            new SearchVectorMemory(notes, "shared text", Limit: 5, Metadata: null),
+            cancellationToken);
+        var firstMatch = Assert.Single(firstSearch.Matches);
+        Assert.Equal("keep", firstMatch.Metadata["tag"]);
+
+        var returnedMetadata = Assert.IsAssignableFrom<IDictionary<string, string>>(firstMatch.Metadata);
+        returnedMetadata["tag"] = "mutated-via-search-result";
+
+        var filtered = await memory.SendAsync(
+            new SearchVectorMemory(notes, "shared text", Limit: 5, new Dictionary<string, string> { ["tag"] = "keep" }),
+            cancellationToken);
+        var filteredMatch = Assert.Single(filtered.Matches);
+        Assert.Equal("k1", filteredMatch.Key);
+        Assert.Equal("keep", filteredMatch.Metadata["tag"]);
+
+        var secondSearch = await memory.SendAsync(
+            new SearchVectorMemory(notes, "shared text", Limit: 5, Metadata: null),
+            cancellationToken);
+        var secondMatch = Assert.Single(secondSearch.Matches);
+        Assert.Equal("keep", secondMatch.Metadata["tag"]);
+    }
+
     [Fact(DisplayName = "Reserved capability and behavior namespaces reject store")]
     public async Task Reserved_namespaces_reject_store()
     {
