@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
+using DigitalBrain.Client;
 using DigitalBrain.Flutter;
 using DigitalBrain.Mcp;
 

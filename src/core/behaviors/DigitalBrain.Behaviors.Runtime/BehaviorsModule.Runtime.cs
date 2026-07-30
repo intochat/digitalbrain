@@ -18,19 +18,13 @@ public sealed partial class BehaviorsModule
         builder.Services.AddSingleton<IBehaviorCompiler, ContractOnlyBehaviorCompiler>();
         builder.Services.AddSingleton<IBehaviorBddGate, InstallTestsBddGate>();
         builder.Services.TryAddSingleton<IBehaviorArtifactTrust>(static provider =>
-            new BehaviorArtifactTrust(provider.GetRequiredService<IDurablePayloadProtector>()));
+            new SiloBehaviorArtifactTrust(provider.GetRequiredService<IDurablePayloadProtector>()));
 
         var executor = builder.Configuration[ExecutorConfigurationKey];
         if (string.Equals(executor, HostExecutorName, StringComparison.OrdinalIgnoreCase))
         {
             var baseAddress = builder.Configuration[HostBaseAddressConfigurationKey];
-            if (string.IsNullOrWhiteSpace(baseAddress))
-            {
-                builder.Services.AddSingleton<BehaviorHostEngine>();
-                builder.Services.AddSingleton<IBehaviorHostGateway>(static provider =>
-                    provider.GetRequiredService<BehaviorHostEngine>());
-            }
-            else
+            if (!string.IsNullOrWhiteSpace(baseAddress))
             {
                 builder.Services.AddHttpClient<IBehaviorHostGateway, HttpBehaviorHostClient>(client =>
                 {

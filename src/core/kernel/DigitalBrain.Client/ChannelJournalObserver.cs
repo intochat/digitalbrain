@@ -1,7 +1,7 @@
 using System.Threading.Channels;
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.OS.Mcp;
+namespace DigitalBrain.Client;
 
 internal sealed class ChannelJournalObserver : IJournalObserver
 {
