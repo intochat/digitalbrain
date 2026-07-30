@@ -11,7 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Behaviors.Host\DigitalBrain.Behaviors.Host.csproj" />
     <ProjectReference Include="..\..\kernel\DigitalBrain\DigitalBrain.csproj" />
     <ProjectReference Include="..\..\security\DigitalBrain.Security\DigitalBrain.Security.csproj" />
     <ProjectReference Include="..\..\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"

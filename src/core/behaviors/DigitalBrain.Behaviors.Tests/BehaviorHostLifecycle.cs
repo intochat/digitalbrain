@@ -183,6 +183,7 @@ public sealed class HostBehaviorsFixture : DigitalBrainFixture
         ArgumentNullException.ThrowIfNull(brain);
         BehaviorHostTestFaults.Reset();
         brain.AddModule<BehaviorsModule>();
+        brain.AddModule<InProcessBehaviorHostGatewayModule>();
         brain.Configure(BehaviorsModule.ExecutorConfigurationKey, BehaviorsModule.HostExecutorName);
     }
 }
