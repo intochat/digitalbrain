@@ -5,3 +5,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("DigitalBrain.Modules.Flutter.Http.Tests")]
 [assembly: InternalsVisibleTo("DigitalBrain.OS.Mcp.Tests")]
 [assembly: InternalsVisibleTo("DigitalBrain.Behaviors.Tests")]
+[assembly: InternalsVisibleTo("DigitalBrain.Testing.Tests")]
