@@ -17,7 +17,7 @@ public sealed class TestOwnerContracts(TestingFixture fixture)
         Assert.Equal(other.Id, other.Client.Owner);
 
         var greeter = other.Neuron<IGreeter>(TestingScenario.WelcomeGreeter);
-        await other.Client.SendAsync<IGreeter>(greeter.Id.Name, new SayHello(TestingScenario.Guest));
+        await other.Client.SendAsync<IGreeter>(greeter.Id.Name, new SayHello(TestingScenario.Guest), cancellationToken);
 
         var greeted = await greeter.Outgoing.NextAsync<Greeted>(cancellationToken);
         Assert.Equal(TestingScenario.GreetedMessage(TestingScenario.Guest), greeted.Synapse.Message);

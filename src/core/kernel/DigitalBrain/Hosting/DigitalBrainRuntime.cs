@@ -18,12 +18,18 @@ public static class DigitalBrainRuntime
         ArgumentNullException.ThrowIfNull(availableModules);
 
         var selectedModules = SelectModules(builder, availableModules);
+        var selected = availableModules
+            .Where(module => selectedModules.Contains(module.Id))
+            .OrderBy(module => module.Id.Value, StringComparer.Ordinal)
+            .ToArray();
+        var capabilities = ActiveCapabilityCatalog.Create(selected);
 
         builder.AddJournalStorage();
         builder.UseJsonJournalFormat(JournalJsonContext.Default);
         builder.AddIncomingGrainCallFilter<IncomingReificationFilter>();
         builder.AddIncomingGrainCallFilter<OwnerBoundCallFilter>();
         builder.AddOutgoingGrainCallFilter<OutgoingReificationFilter>();
+        builder.Services.AddSingleton(capabilities);
         builder.Services.AddSingleton(services =>
         {
             var catalog = new BroadcastCatalog();
@@ -41,7 +47,7 @@ public static class DigitalBrainRuntime
             module.PrepareSerialization(builder.Services);
         }
 
-        foreach (var module in availableModules.Where(module => selectedModules.Contains(module.Id)))
+        foreach (var module in selected)
         {
             module.Activate(builder);
         }

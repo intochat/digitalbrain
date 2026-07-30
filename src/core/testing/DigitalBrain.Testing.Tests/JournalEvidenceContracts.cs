@@ -13,7 +13,7 @@ public sealed class JournalEvidenceContracts(TestingFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var greeter = test.Neuron<IGreeter>(TestingScenario.WelcomeGreeter);
 
-        await test.Client.SendAsync<IGreeter>(greeter.Id.Name, new SayHello(TestingScenario.Guest));
+        await test.Client.SendAsync<IGreeter>(greeter.Id.Name, new SayHello(TestingScenario.Guest), cancellationToken);
 
         var observed = await greeter.Outgoing.NextAsync<Greeted>(cancellationToken);
 

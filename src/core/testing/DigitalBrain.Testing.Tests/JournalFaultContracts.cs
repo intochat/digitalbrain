@@ -25,11 +25,11 @@ public sealed class JournalFaultContracts(TestingFixture fixture)
         await using (var fault = session.FailNextJournalCommit(SessionCommitFailure))
         {
             var failure = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => test.Client.SendAsync<IGreeter>(greeter.Id.Name, new SayHello(TestingScenario.Guest)));
+                () => test.Client.SendAsync<IGreeter>(greeter.Id.Name, new SayHello(TestingScenario.Guest), cancellationToken));
             Assert.Equal(SessionCommitFailure, failure.Message);
         }
 
-        await test.Client.SendAsync<IGreeter>(greeter.Id.Name, new SayHello(TestingScenario.Guest));
+        await test.Client.SendAsync<IGreeter>(greeter.Id.Name, new SayHello(TestingScenario.Guest), cancellationToken);
         var greeted = await greeter.Outgoing.NextAsync<Greeted>(cancellationToken);
         Assert.Equal(TestingScenario.GreetedMessage(TestingScenario.Guest), greeted.Synapse.Message);
     }
@@ -62,7 +62,7 @@ public sealed class JournalFaultContracts(TestingFixture fixture)
         {
         }
 
-        await test.Client.SendAsync<IGreeter>(greeter.Id.Name, new SayHello(TestingScenario.Guest));
+        await test.Client.SendAsync<IGreeter>(greeter.Id.Name, new SayHello(TestingScenario.Guest), cancellationToken);
         var greeted = await greeter.Outgoing.NextAsync<Greeted>(cancellationToken);
         Assert.Equal(TestingScenario.GreetedMessage(TestingScenario.Guest), greeted.Synapse.Message);
     }
