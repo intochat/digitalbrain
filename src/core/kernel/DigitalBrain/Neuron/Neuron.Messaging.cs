@@ -5,7 +5,7 @@ namespace DigitalBrain.Kernel;
 
 public abstract partial class Neuron
 {
-    protected Task SendAsync(NeuronId receiver, Synapse synapse)
+    protected Task<SynapseDelivery> SendAsync(NeuronId receiver, Synapse synapse)
     {
         ArgumentNullException.ThrowIfNull(synapse);
 

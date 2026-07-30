@@ -4,7 +4,7 @@ namespace DigitalBrain.Kernel;
 
 internal sealed class SessionNeuron : Neuron, ISessionNeuron
 {
-    public Task Fire(NeuronId receiver, Synapse synapse)
+    public Task<SynapseDelivery> Fire(NeuronId receiver, Synapse synapse)
     {
         if (receiver.Owner != Id.Owner)
         {

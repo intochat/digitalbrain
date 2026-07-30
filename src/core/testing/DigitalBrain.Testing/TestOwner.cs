@@ -29,7 +29,7 @@ public sealed class TestOwner
             var reference = typeof(ISessionNeuron).IsAssignableFrom(typeof(TNeuron))
                 || typeof(IDigitalBrainNeuron).IsAssignableFrom(typeof(TNeuron))
                 ? _brain.Cluster.Client.GetGrain<TNeuron>(id.ToGrainId())
-                : Client.Get<TNeuron>(name);
+                : Client.GetGrainProxy<TNeuron>(name);
             return new TestNeuron<TNeuron>(
                 _brain,
                 id,

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Client;
@@ -24,31 +25,34 @@ public sealed class DigitalBrainClient : IDigitalBrain
         return new DigitalBrainClient(grains, new OwnerId(owner));
     }
 
-    public Task ActivateAsync()
-        => Brain().Activate();
-
-    public T Get<T>(string name)
-        where T : class, INeuron
+    public Task ActivateAsync(CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        RequireDomainNeuronContract(typeof(T));
-
-        return _grains.GetGrain<T>(NeuronId.For<T>(Owner, name).ToGrainId());
+        cancellationToken.ThrowIfCancellationRequested();
+        return Brain().Activate();
     }
 
-    public async Task SendAsync<TNeuron>(string name, Synapse synapse)
+    public NeuronReference<TNeuron> Get<TNeuron>(string name = "default")
         where TNeuron : INeuron
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         RequireDomainNeuronContract(typeof(TNeuron));
-        ArgumentNullException.ThrowIfNull(synapse);
-
-        await SendValidatedAsync(new NeuronId(NeuronId.GrainTypeNameOf(typeof(TNeuron)), Owner, name), synapse);
+        return new NeuronReference<TNeuron>(this, name);
     }
 
-    public async Task SendAsync(NeuronId receiver, Synapse synapse)
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public TNeuron GetGrainProxy<TNeuron>(string name = "default")
+        where TNeuron : class, INeuron
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        RequireDomainNeuronContract(typeof(TNeuron));
+
+        return _grains.GetGrain<TNeuron>(NeuronId.For<TNeuron>(Owner, name).ToGrainId());
+    }
+
+    public async Task SendAsync(NeuronId receiver, Synapse synapse, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (receiver.Owner != Owner)
         {
@@ -63,15 +67,47 @@ public sealed class DigitalBrainClient : IDigitalBrain
                 "The owner DigitalBrain and session are not Send targets. Use ActivateAsync, domain Get, SendAsync to domain neurons, and EmitAsync to broadcast.");
         }
 
-        await SendValidatedAsync(receiver, synapse);
+        await SendToAsync(receiver, synapse, cancellationToken);
     }
 
-    public async Task EmitAsync(Synapse synapse)
+    public async Task EmitAsync(Synapse synapse, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        await ActivateAsync();
+        await ActivateAsync(cancellationToken);
         await Session().Emit(synapse);
+    }
+
+    internal Task SendToAsync(NeuronId receiver, Synapse synapse, CancellationToken cancellationToken)
+        => SendValidatedAsync(receiver, synapse, cancellationToken);
+
+    internal async Task<TResponse> SendRequestAsync<TResponse>(
+        NeuronId receiver,
+        Synapse request,
+        CancellationToken cancellationToken)
+        where TResponse : Synapse
+    {
+        var sessionId = ISessionNeuron.ForOwner(Owner);
+        var session = Session();
+        var cursor = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, afterSequence: 0);
+        var observer = new ChannelJournalObserver(JournalKind.Incoming);
+        var reference = _grains.CreateObjectReference<IJournalObserver>(observer);
+
+        try
+        {
+            await session.WatchNeuron(sessionId, JournalKind.Incoming, cursor.ResumeSequence, reference);
+
+            var delivery = await SendValidatedAsync(receiver, request, cancellationToken);
+            return await WaitForResponseAsync<TResponse>(
+                observer,
+                delivery.CorrelationId,
+                cancellationToken);
+        }
+        finally
+        {
+            await TeardownWatchAsync(session, sessionId, reference, observer);
+        }
     }
 
     private IDigitalBrainNeuron Brain()
@@ -80,10 +116,64 @@ public sealed class DigitalBrainClient : IDigitalBrain
     private ISessionNeuron Session()
         => _grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(Owner).ToGrainId());
 
-    private async Task SendValidatedAsync(NeuronId receiver, Synapse synapse)
+    private async Task<SynapseDelivery> SendValidatedAsync(
+        NeuronId receiver,
+        Synapse synapse,
+        CancellationToken cancellationToken)
     {
-        await ActivateAsync();
-        await Session().Fire(receiver, synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+        await ActivateAsync(cancellationToken);
+        return await Session().Fire(receiver, synapse);
+    }
+
+    private static async Task<TResponse> WaitForResponseAsync<TResponse>(
+        ChannelJournalObserver observer,
+        CorrelationId correlation,
+        CancellationToken cancellationToken)
+        where TResponse : Synapse
+    {
+        await foreach (var page in observer.Reads.ReadAllAsync(cancellationToken))
+        {
+            foreach (var delivery in page.Delta)
+            {
+                if (delivery.CorrelationId == correlation
+                    && delivery.Synapse is TResponse response)
+                {
+                    return response;
+                }
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"The session journal watch ended before a '{typeof(TResponse).Name}' response arrived for correlation '{correlation}'.");
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Watch teardown must not mask the awaited response or its failure.")]
+    private static async Task TeardownWatchAsync(
+        ISessionNeuron session,
+        NeuronId sessionId,
+        IJournalObserver reference,
+        ChannelJournalObserver observer)
+    {
+        try
+        {
+            await session.UnwatchNeuron(sessionId, reference);
+        }
+        catch (Exception)
+        {
+        }
+
+        try
+        {
+            // Orleans object references are released by the factory when the client drops them.
+        }
+        finally
+        {
+            observer.Complete();
+        }
     }
 
     private static void RequireDomainNeuronContract(Type neuronType)

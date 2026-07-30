@@ -14,7 +14,7 @@ public partial interface ISessionNeuron : INeuron
         "Design",
         "CA1030:Use events where appropriate",
         Justification = "Fire is the contract's ratified verb for sending a synapse into the brain; it raises no event.")]
-    Task Fire(NeuronId receiver, Synapse synapse);
+    Task<SynapseDelivery> Fire(NeuronId receiver, Synapse synapse);
 
     [Alias(nameof(Emit))]
     Task Emit(Synapse synapse);
