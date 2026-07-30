@@ -1,6 +1,9 @@
+using DigitalBrain.Abstractions;
+
 namespace DigitalBrain.Behaviors;
 
 public sealed class BehaviorTrigger<TTrigger>
+    where TTrigger : Synapse
 {
     public BehaviorTrigger(TTrigger value, CancellationToken attemptCancellation)
     {

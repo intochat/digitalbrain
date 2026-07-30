@@ -28,6 +28,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
 
     public static Task<BehaviorBrain<TTrigger>> ConnectAsync<TTrigger>(
         CancellationToken cancellationToken = default)
+        where TTrigger : Synapse
     {
         if (cancellationToken.CanBeCanceled)
         {

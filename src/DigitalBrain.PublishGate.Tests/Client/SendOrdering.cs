@@ -8,14 +8,13 @@ namespace DigitalBrain.Tests.Client;
 
 public sealed class SendOrdering
 {
-    // Connect is Orleans grain-factory wiring; ConnectAsync is the unrelated single-file behavior SDK entry.
-#pragma warning disable CA1849
-
     [Fact(DisplayName = "neuron reference one-way Send rejects a null synapse before any grain call")]
     public async Task ReferenceSendRejectsNullSynapseBeforeAnyGrainCall()
     {
         var calls = new GrainCallRecorder();
+#pragma warning disable CA1849 // Connect is grain-factory wiring; ConnectAsync is the unrelated SDK entry.
         var client = DigitalBrainClient.Connect(calls.Factory, "owner");
+#pragma warning restore CA1849
 
         await Assert.ThrowsAsync<ArgumentNullException>(
             () => client.Get<ISendTarget>("target").SendAsync(null!, TestContext.Current.CancellationToken));
@@ -27,7 +26,9 @@ public sealed class SendOrdering
     public async Task ReferenceSendActivatesOnceBeforeFiringOnce()
     {
         var calls = new GrainCallRecorder();
+#pragma warning disable CA1849 // Connect is grain-factory wiring; ConnectAsync is the unrelated SDK entry.
         var client = DigitalBrainClient.Connect(calls.Factory, "owner");
+#pragma warning restore CA1849
 
         await client.Get<ISendTarget>("target").SendAsync(new TestSynapse(), TestContext.Current.CancellationToken);
 
@@ -40,7 +41,9 @@ public sealed class SendOrdering
     public async Task RawSendActivatesOnceBeforeFiringOnce()
     {
         var calls = new GrainCallRecorder();
+#pragma warning disable CA1849 // Connect is grain-factory wiring; ConnectAsync is the unrelated SDK entry.
         var client = DigitalBrainClient.Connect(calls.Factory, "owner");
+#pragma warning restore CA1849
         var receiver = NeuronId.For<ISendTarget>(client.Owner, "target");
 
         await client.SendAsync(receiver, new TestSynapse(), TestContext.Current.CancellationToken);
@@ -54,7 +57,9 @@ public sealed class SendOrdering
     public async Task TypedRequestSendWatchesSessionJournalForCorrelatedResponse()
     {
         var calls = new GrainCallRecorder();
+#pragma warning disable CA1849 // Connect is grain-factory wiring; ConnectAsync is the unrelated SDK entry.
         var client = DigitalBrainClient.Connect(calls.Factory, "owner");
+#pragma warning restore CA1849
         var response = new TestResponse("ok");
         calls.Response = response;
 
@@ -73,7 +78,9 @@ public sealed class SendOrdering
     public async Task TypedRequestSendCancellationTearsDownWatch()
     {
         var calls = new GrainCallRecorder();
+#pragma warning disable CA1849 // Connect is grain-factory wiring; ConnectAsync is the unrelated SDK entry.
         var client = DigitalBrainClient.Connect(calls.Factory, "owner");
+#pragma warning restore CA1849
         calls.HoldWatch = true;
 
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -86,8 +93,6 @@ public sealed class SendOrdering
         Assert.Contains("unwatch", calls.Calls);
         Assert.Contains("fire", calls.Calls);
     }
-
-#pragma warning restore CA1849
 
     private sealed record TestSynapse : Synapse;
 

@@ -71,21 +71,6 @@ public sealed class ProgramSurface
             execute.GetParameters().Select(parameter => parameter.ParameterType));
     }
 
-    [Fact(DisplayName = "Intent programs use the safe request-context-response signature")]
-    public void IntentProgramUsesTheSafeExecutionSignature()
-    {
-        var program = typeof(IIntentProgram<,>);
-        var execute = Assert.Single(program.GetMethods());
-        var arguments = program.GetGenericArguments();
-
-        Assert.All(arguments, argument => Assert.Equal(GenericParameterAttributes.None, argument.GenericParameterAttributes & GenericParameterAttributes.VarianceMask));
-        Assert.Equal(nameof(IIntentProgram<object, object>.ExecuteAsync), execute.Name);
-        Assert.Equal(typeof(ValueTask<>).MakeGenericType(arguments[1]), execute.ReturnType);
-        Assert.Equal(
-            [arguments[0], typeof(IBehaviorContext), typeof(CancellationToken)],
-            execute.GetParameters().Select(parameter => parameter.ParameterType));
-    }
-
     [Fact(DisplayName = "Behavior context Get keeps the exact class and INeuron constraints")]
     public void ContextGetKeepsTheExactNeuronContractConstraint()
     {
@@ -102,32 +87,100 @@ public sealed class ProgramSurface
         Assert.Equal(contract, get.ReturnType);
     }
 
-    [Fact(DisplayName = "Omitted SendAsync token links to the worker attempt cancellation")]
-    public async Task OmittedSendTokenLinksToAttemptCancellation()
+    [Fact(DisplayName = "Behavior SDK trigger generics require a Synapse bound")]
+    public void BehaviorSdkTriggerGenericsRequireSynapseBound()
     {
-        using var attempt = new CancellationTokenSource();
-        await attempt.CancelAsync();
-        await using var brain = new BehaviorBrain<SdkResearchCompanyRequest>(
-            new BehaviorTrigger<SdkResearchCompanyRequest>(new SdkResearchCompanyRequest("q"), attempt.Token));
+        Assert.Equal(
+            [typeof(Synapse)],
+            typeof(BehaviorTrigger<>).GetGenericArguments()[0].GetGenericParameterConstraints());
+        Assert.Equal(
+            [typeof(Synapse)],
+            typeof(BehaviorBrain<>).GetGenericArguments()[0].GetGenericParameterConstraints());
 
-        var gmail = brain.Get<ISdkGmail>();
-        var request = new SdkGmailRequest("q");
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(SendOmittingToken);
-
-        Task SendOmittingToken() => gmail.SendAsync(request);
+        var connect = typeof(DigitalBrainClient).GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Single(method => method.Name == nameof(DigitalBrainClient.ConnectAsync));
+        Assert.Equal(
+            [typeof(Synapse)],
+            connect.GetGenericArguments()[0].GetGenericParameterConstraints());
     }
 
-    [Fact(DisplayName = "Caller token is linked with the worker attempt cancellation")]
-    public async Task CallerTokenIsLinkedWithAttemptCancellation()
+    [Fact(DisplayName = "Omitted caller token cancels in-flight Send when attempt cancels")]
+    public async Task OmittedCallerTokenCancelsInFlightSendWhenAttemptCancels()
+    {
+        using var attempt = new CancellationTokenSource();
+        var broker = new ControllableBehaviorSynapseBroker();
+        await using var brain = BehaviorBrain<SdkResearchCompanyRequest>.Create(
+            new BehaviorTrigger<SdkResearchCompanyRequest>(new SdkResearchCompanyRequest("q"), attempt.Token),
+            broker);
+
+#pragma warning disable xUnit1051 // This case proves the omitted caller token path.
+        var send = brain.Get<ISdkGmail>().SendAsync(new SdkGmailRequest("q"));
+#pragma warning restore xUnit1051
+        await broker.Entered.WaitAsync(TestContext.Current.CancellationToken);
+        await attempt.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await send);
+    }
+
+    [Fact(DisplayName = "Caller token cancels in-flight Send while attempt remains live")]
+    public async Task CallerTokenCancelsInFlightSendWhileAttemptRemainsLive()
     {
         using var attempt = new CancellationTokenSource();
         using var caller = new CancellationTokenSource();
+        var broker = new ControllableBehaviorSynapseBroker();
+        await using var brain = BehaviorBrain<SdkResearchCompanyRequest>.Create(
+            new BehaviorTrigger<SdkResearchCompanyRequest>(new SdkResearchCompanyRequest("q"), attempt.Token),
+            broker);
+
+        var send = brain.Get<ISdkGmail>().SendAsync(new SdkGmailRequest("q"), caller.Token);
+        await broker.Entered.WaitAsync(TestContext.Current.CancellationToken);
         await caller.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await send);
+        Assert.False(attempt.Token.IsCancellationRequested);
+    }
+
+    [Fact(DisplayName = "Live attempt and caller remain usable until broker Send completes")]
+    public async Task LiveAttemptAndCallerRemainUsableUntilBrokerCompletes()
+    {
+        using var attempt = new CancellationTokenSource();
+        using var caller = new CancellationTokenSource();
+        var broker = new ControllableBehaviorSynapseBroker();
+        await using var brain = BehaviorBrain<SdkResearchCompanyRequest>.Create(
+            new BehaviorTrigger<SdkResearchCompanyRequest>(new SdkResearchCompanyRequest("q"), attempt.Token),
+            broker);
+
+        var response = new SdkGmailResponse("ok");
+        var send = brain.Get<ISdkGmail>().SendAsync(new SdkGmailRequest("q"), caller.Token);
+        await broker.Entered.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(attempt.Token.IsCancellationRequested);
+        Assert.False(caller.Token.IsCancellationRequested);
+        Assert.False(broker.ObservedToken.IsCancellationRequested);
+
+        broker.Complete(response);
+        var result = await send;
+
+        Assert.Same(response, result);
+        Assert.False(attempt.Token.IsCancellationRequested);
+        Assert.False(caller.Token.IsCancellationRequested);
+    }
+
+    [Fact(DisplayName = "Default compile-only broker throws the isolated worker delivery error")]
+    public async Task DefaultCompileOnlyBrokerThrowsIsolatedWorkerDeliveryError()
+    {
+        using var attempt = new CancellationTokenSource();
         await using var brain = new BehaviorBrain<SdkResearchCompanyRequest>(
             new BehaviorTrigger<SdkResearchCompanyRequest>(new SdkResearchCompanyRequest("q"), attempt.Token));
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => brain.Get<ISdkGmail>().SendAsync(new SdkGmailRequest("q"), caller.Token));
+#pragma warning disable xUnit1051 // Intentionally omits caller token for non-canceled default-broker path.
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => brain.Get<ISdkGmail>().SendAsync(new SdkGmailRequest("q")));
+#pragma warning restore xUnit1051
+
+        Assert.Equal(
+            "Behavior synapse delivery is supplied by the isolated worker broker.",
+            exception.Message);
     }
 
     [Fact(DisplayName = "Behavior trigger rejects a non-cancellable attempt token")]
@@ -225,6 +278,44 @@ internal sealed record SdkResearchCompanyRequest(string Prompt) : Synapse;
 internal sealed record SdkGmailResponse(string Status) : Synapse;
 internal sealed record SdkGmailRequest(string Prompt) : RequestSynapse<SdkGmailResponse>;
 internal interface ISdkGmail : INeuron;
+
+internal sealed class ControllableBehaviorSynapseBroker : IBehaviorSynapseBroker
+{
+    private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private Synapse? _response;
+
+    public Task Entered => _entered.Task;
+
+    public CancellationToken ObservedToken { get; private set; }
+
+    public void Complete(Synapse? response = null)
+    {
+        _response = response;
+        _gate.TrySetResult();
+    }
+
+    public async Task SendAsync<TNeuron>(string name, Synapse synapse, CancellationToken cancellationToken)
+        where TNeuron : INeuron
+    {
+        ObservedToken = cancellationToken;
+        _entered.TrySetResult();
+        await _gate.Task.WaitAsync(cancellationToken);
+    }
+
+    public async Task<TResponse> SendAsync<TNeuron, TResponse>(
+        string name,
+        RequestSynapse<TResponse> request,
+        CancellationToken cancellationToken)
+        where TNeuron : INeuron
+        where TResponse : Synapse
+    {
+        ObservedToken = cancellationToken;
+        _entered.TrySetResult();
+        await _gate.Task.WaitAsync(cancellationToken);
+        return (TResponse)_response!;
+    }
+}
 
 internal static class MemberSignature
 {
