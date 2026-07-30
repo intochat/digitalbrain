@@ -120,7 +120,7 @@ public sealed class LlmStreaming(ModuleFixture fixture)
 
         var updates = new List<ChatResponseUpdate>();
 
-        await foreach (var update in test.Client.Get<ILlama32>(ModelName)
+        await foreach (var update in test.Client.GetGrainProxy<ILlama32>(ModelName)
             .RespondStreaming([new ChatMessage(ChatRole.User, UserPrompt)], cancellationToken))
         {
             updates.Add(update);
@@ -137,7 +137,7 @@ public sealed class LlmStreaming(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         test.Chat().Reply(ScriptedReply);
 
-        var updates = await test.Client.Get<IStreamingRelayProbe>(RelayName)
+        var updates = await test.Client.GetGrainProxy<IStreamingRelayProbe>(RelayName)
             .CollectStreamingUpdates(ModelName, UserPrompt);
 
         Assert.NotEmpty(updates);
@@ -151,7 +151,7 @@ public sealed class LlmStreaming(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         test.Chat().Reply(ScriptedReply);
 
-        var response = await test.Client.Get<ILlama32>(ModelName)
+        var response = await test.Client.GetGrainProxy<ILlama32>(ModelName)
             .Respond([new ChatMessage(ChatRole.User, UserPrompt)]);
 
         Assert.Equal(ScriptedReply, response.Text);

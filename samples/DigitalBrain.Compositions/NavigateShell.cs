@@ -22,7 +22,7 @@ public sealed class NavigateShell
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var shell = brain.Get<IShell>(shellName);
+        var shell = brain.GetGrainProxy<IShell>(shellName);
         foreach (var (sceneKey, title) in scenes)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(sceneKey);

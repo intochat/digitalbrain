@@ -14,8 +14,8 @@ public sealed class ActiveNeuronTool(OSMcpFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var other = test.Owner("other");
 
-        await test.Client.Get<IChat>("mine").Read();
-        await other.Client.Get<IChat>("theirs").Read();
+        await test.Client.GetGrainProxy<IChat>("mine").Read();
+        await other.Client.GetGrainProxy<IChat>("theirs").Read();
 
         var tools = new DigitalBrainIntrospectionTools(test.Client, test.Cluster.Client);
         var neurons = await tools.ListActiveNeuronsAsync();

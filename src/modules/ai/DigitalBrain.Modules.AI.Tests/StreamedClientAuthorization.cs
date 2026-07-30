@@ -65,7 +65,7 @@ public sealed class StreamedClientAuthorization(ModuleFixture fixture)
 
         var received = new List<int>();
 
-        await foreach (var element in test.Client.Get<ICountingStreamProbe>(ProbeName)
+        await foreach (var element in test.Client.GetGrainProxy<ICountingStreamProbe>(ProbeName)
             .CountUp(ElementsSpanningSeveralBatches)
             .WithCancellation(cancellationToken))
         {
@@ -83,7 +83,7 @@ public sealed class StreamedClientAuthorization(ModuleFixture fixture)
 
         var received = new List<int>();
 
-        await foreach (var element in test.Client.Get<ICountingStreamProbe>(ProbeName)
+        await foreach (var element in test.Client.GetGrainProxy<ICountingStreamProbe>(ProbeName)
             .CountUp(ElementsSpanningSeveralBatches)
             .WithBatchSize(ReducedBatchSize)
             .WithCancellation(cancellationToken))
@@ -120,7 +120,7 @@ public sealed class StreamedClientAuthorization(ModuleFixture fixture)
         var foreignOwner = test.Owner(ForeignOwnerLabel);
 
         await Assert.ThrowsAsync<NeuronAuthorizationException>(
-            () => test.Client.Get<ICountingStreamProbe>(CallerName)
+            () => test.Client.GetGrainProxy<ICountingStreamProbe>(CallerName)
                 .DrainAnotherOwnersProbe(foreignOwner.Id.Value, ProbeName, elements: 3));
     }
 
@@ -129,7 +129,7 @@ public sealed class StreamedClientAuthorization(ModuleFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        _ = test.Client.Get<ICountingStreamProbe>(ProbeName);
+        _ = test.Client.GetGrainProxy<ICountingStreamProbe>(ProbeName);
 
         var extension = EnumerationExtension(test, ProbeName);
 
@@ -142,7 +142,7 @@ public sealed class StreamedClientAuthorization(ModuleFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        _ = test.Client.Get<ICountingStreamProbe>(ProbeName);
+        _ = test.Client.GetGrainProxy<ICountingStreamProbe>(ProbeName);
 
         var extension = EnumerationExtension(test, ProbeName);
 

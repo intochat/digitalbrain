@@ -21,7 +21,7 @@ public sealed class CapabilityToolSeam(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         test.Chat().Reply(FinalReply);
 
-        await test.Client.Get<IToolAgentProbe>(AgentName).Respond([new(Microsoft.Extensions.AI.ChatRole.User, IdentityPrompt)]);
+        await test.Client.GetGrainProxy<IToolAgentProbe>(AgentName).Respond([new(Microsoft.Extensions.AI.ChatRole.User, IdentityPrompt)]);
 
         Assert.Collection(
             test.Chat().LastMessages,
@@ -53,7 +53,7 @@ public sealed class CapabilityToolSeam(ModuleFixture fixture)
             });
         test.Chat().Reply(FinalReply);
 
-        var response = await test.Client.Get<IToolAgentProbe>(AgentName).Respond(
+        var response = await test.Client.GetGrainProxy<IToolAgentProbe>(AgentName).Respond(
             [new(Microsoft.Extensions.AI.ChatRole.User, "enrich my account from the latest email")]);
 
         var enriched = await enrichment.Outgoing.NextAsync<ProbeAccountEnriched>(cancellationToken);
@@ -78,7 +78,7 @@ public sealed class CapabilityToolSeam(ModuleFixture fixture)
             });
         test.Chat().Reply(FinalReply);
 
-        await test.Client.Get<IToolAgentProbe>(AgentName).Respond(
+        await test.Client.GetGrainProxy<IToolAgentProbe>(AgentName).Respond(
             [new(Microsoft.Extensions.AI.ChatRole.User, "enrich my account")]);
 
         var selected = await agent.Outgoing.NextAsync<CapabilityToolSelected>(cancellationToken);
@@ -94,7 +94,7 @@ public sealed class CapabilityToolSeam(ModuleFixture fixture)
         var agent = test.Neuron<IToolAgentProbe>(AgentName);
         test.Chat().Reply(FinalReply);
 
-        await test.Client.Get<IToolAgentProbe>(AgentName).Respond([new(Microsoft.Extensions.AI.ChatRole.User, "hello")]);
+        await test.Client.GetGrainProxy<IToolAgentProbe>(AgentName).Respond([new(Microsoft.Extensions.AI.ChatRole.User, "hello")]);
 
         var selected = await agent.Outgoing.ReadAsync<CapabilityToolSelected>(afterSequence: 0, cancellationToken);
         Assert.Empty(selected);

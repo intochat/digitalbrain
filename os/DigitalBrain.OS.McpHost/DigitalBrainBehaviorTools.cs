@@ -20,7 +20,7 @@ internal sealed class DigitalBrainBehaviorTools(IDigitalBrain brain, IGrainFacto
         [Description("Behavior id, for example 'com.digitalbrain.account-enrichment'")] string behaviorId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(behaviorId);
-        return brain.Get<IBehaviorNeuron>(behaviorId).Read();
+        return brain.GetGrainProxy<IBehaviorNeuron>(behaviorId).Read();
     }
 
     [McpServerTool(Name = McpHost.ProposeBehaviorRevisionToolName)]
@@ -47,7 +47,7 @@ internal sealed class DigitalBrainBehaviorTools(IDigitalBrain brain, IGrainFacto
             throw new ArgumentException("The command id must be a non-empty GUID.", nameof(commandId));
         }
 
-        return brain.Get<IBehaviorNeuron>(behaviorId).Propose(new ProposeBehaviorRevision(
+        return brain.GetGrainProxy<IBehaviorNeuron>(behaviorId).Propose(new ProposeBehaviorRevision(
             new CommandId(commandIdentity),
             programSource,
             new Dictionary<string, string>(StringComparer.Ordinal) { [featureName] = featureText },
@@ -71,7 +71,7 @@ internal sealed class DigitalBrainBehaviorTools(IDigitalBrain brain, IGrainFacto
             throw new ArgumentException("The command id must be a non-empty GUID.", nameof(commandId));
         }
 
-        return brain.Get<IBehaviorNeuron>(behaviorId).RunTests(
+        return brain.GetGrainProxy<IBehaviorNeuron>(behaviorId).RunTests(
             new RunBehaviorTests(new CommandId(commandIdentity), artifactHash));
     }
 
@@ -107,7 +107,7 @@ internal sealed class DigitalBrainBehaviorTools(IDigitalBrain brain, IGrainFacto
             ISessionNeuron.ForOwner(brain.Owner),
             DateTimeOffset.UtcNow);
 
-        var neuron = brain.Get<IBehaviorNeuron>(behaviorId);
+        var neuron = brain.GetGrainProxy<IBehaviorNeuron>(behaviorId);
         await brain.SendAsync(NeuronId.For<IBehaviorNeuron>(brain.Owner, behaviorId), approval);
 
         var session = grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(brain.Owner).ToGrainId());

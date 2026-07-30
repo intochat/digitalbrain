@@ -1,9 +1,11 @@
+using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.AccountEnrichment;
 
 [GenerateSerializer]
 [Alias("db.account-enrichment.requested")]
+[Description("Request account enrichment from an email")]
 public sealed record EnrichAccountFromEmail(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] string MessageId,
@@ -12,6 +14,7 @@ public sealed record EnrichAccountFromEmail(
 
 [GenerateSerializer]
 [Alias("db.account-enrichment.proposed")]
+[Description("Account enrichment was proposed")]
 public sealed record AccountEnrichmentProposed(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] string MessageId,
@@ -21,6 +24,7 @@ public sealed record AccountEnrichmentProposed(
 
 [GenerateSerializer]
 [Alias("db.account-enrichment.completed")]
+[Description("Account enrichment completed")]
 public sealed record AccountEnriched(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] string MessageId,
@@ -29,5 +33,6 @@ public sealed record AccountEnriched(
 
 [GenerateSerializer]
 [Alias("db.account-enrichment.execute-approved")]
+[Description("Execute an approved account enrichment mutation")]
 internal sealed record ExecuteApprovedAccountEnrichment(
     [property: Id(0)] DigitalBrain.Salesforce.SalesforceMutationApproval Approval) : Synapse;

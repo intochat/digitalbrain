@@ -15,14 +15,6 @@ public sealed partial class DispatchManifestGenerator
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
-    private static readonly DiagnosticDescriptor NeuronAliasIsGenerated = new(
-        "DBGEN002",
-        "Neuron contract aliases are generated",
-        "Neuron contract '{0}' must not declare a type-level Alias; DigitalBrain generates its fully-qualified identity",
-        "DigitalBrain.SourceGeneration",
-        DiagnosticSeverity.Error,
-        isEnabledByDefault: true);
-
     private static NeuronModel? NeuronOf(GeneratorSyntaxContext syntax, CancellationToken cancellationToken)
     {
         if (syntax.Node is not InterfaceDeclarationSyntax declaration
@@ -43,8 +35,7 @@ public sealed partial class DispatchManifestGenerator
             .Select(reference => reference.GetSyntax(cancellationToken))
             .OfType<InterfaceDeclarationSyntax>()
             .All(candidate => candidate.Modifiers.Any(SyntaxKind.PartialKeyword));
-        var hasAlias = contract.GetAttributes()
-            .Any(attribute => attribute.AttributeClass?.ToDisplayString(FullName) == AliasAttribute);
+        var alias = AliasOf(contract);
 
         return new NeuronModel(
             fullName,
@@ -54,26 +45,18 @@ public sealed partial class DispatchManifestGenerator
             contract.Name,
             declaration.Identifier.GetLocation(),
             isPartial,
-            hasAlias);
+            alias);
     }
 
     private static void EmitNeuron(SourceProductionContext production, NeuronModel neuron)
     {
-        var valid = true;
-
         if (!neuron.IsPartial)
         {
             production.ReportDiagnostic(Diagnostic.Create(NeuronMustBePartial, neuron.Location, neuron.FullName));
-            valid = false;
+            return;
         }
 
-        if (neuron.HasAlias)
-        {
-            production.ReportDiagnostic(Diagnostic.Create(NeuronAliasIsGenerated, neuron.Location, neuron.FullName));
-            valid = false;
-        }
-
-        if (!valid)
+        if (neuron.Alias is not null)
         {
             return;
         }
@@ -106,7 +89,7 @@ public sealed partial class DispatchManifestGenerator
         string name,
         Location location,
         bool isPartial,
-        bool hasAlias)
+        string? alias)
     {
         public string FullName { get; } = fullName;
 
@@ -118,6 +101,6 @@ public sealed partial class DispatchManifestGenerator
 
         public bool IsPartial { get; } = isPartial;
 
-        public bool HasAlias { get; } = hasAlias;
+        public string? Alias { get; } = alias;
     }
 }

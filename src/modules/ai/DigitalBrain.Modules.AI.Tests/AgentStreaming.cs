@@ -32,7 +32,7 @@ public sealed class AgentStreaming(ModuleFixture fixture)
         test.Chat().Reply(FinalReply);
 
         var text = new StringBuilder();
-        await foreach (var update in test.Client.Get<IToolAgentProbe>(AgentName)
+        await foreach (var update in test.Client.GetGrainProxy<IToolAgentProbe>(AgentName)
             .RespondStreaming([new ChatMessage(ChatRole.User, EnrichPrompt)], cancellationToken))
         {
             text.Append(update.Text);
@@ -60,7 +60,7 @@ public sealed class AgentStreaming(ModuleFixture fixture)
             });
         test.Chat().Reply(FinalReply);
 
-        await foreach (var _ in test.Client.Get<IToolAgentProbe>(AgentName)
+        await foreach (var _ in test.Client.GetGrainProxy<IToolAgentProbe>(AgentName)
             .RespondStreaming([new ChatMessage(ChatRole.User, EnrichPrompt)], cancellationToken))
         {
         }

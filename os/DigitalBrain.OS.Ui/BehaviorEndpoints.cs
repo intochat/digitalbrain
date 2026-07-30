@@ -21,7 +21,7 @@ internal static class BehaviorEndpoints
                 ArgumentNullException.ThrowIfNull(brain);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var snapshot = await brain.Get<IBehaviorNeuron>(behaviorId).Read();
+                var snapshot = await brain.GetGrainProxy<IBehaviorNeuron>(behaviorId).Read();
                 return Results.Ok(ToDocument(behaviorId, snapshot));
             });
 
@@ -54,7 +54,7 @@ internal static class BehaviorEndpoints
                     ? behaviorId
                     : request.Description.Trim();
 
-                var snapshot = await brain.Get<IBehaviorNeuron>(behaviorId).Propose(new ProposeBehaviorRevision(
+                var snapshot = await brain.GetGrainProxy<IBehaviorNeuron>(behaviorId).Propose(new ProposeBehaviorRevision(
                     CommandId.New(),
                     request.ProgramSource,
                     new Dictionary<string, string>(StringComparer.Ordinal) { [featureName] = request.FeatureText },
@@ -89,7 +89,7 @@ internal static class BehaviorEndpoints
                     return Results.BadRequest();
                 }
 
-                var snapshot = await brain.Get<IBehaviorNeuron>(behaviorId).RunTests(
+                var snapshot = await brain.GetGrainProxy<IBehaviorNeuron>(behaviorId).RunTests(
                     new RunBehaviorTests(CommandId.New(), request.ArtifactHash));
                 return Results.Ok(ToDocument(behaviorId, snapshot));
             });
@@ -123,8 +123,11 @@ internal static class BehaviorEndpoints
                     ISessionNeuron.ForOwner(brain.Owner),
                     DateTimeOffset.UtcNow);
 
-                var neuron = brain.Get<IBehaviorNeuron>(behaviorId);
-                await brain.SendAsync(NeuronId.For<IBehaviorNeuron>(brain.Owner, behaviorId), approval);
+                var neuron = brain.GetGrainProxy<IBehaviorNeuron>(behaviorId);
+                await brain.SendAsync(
+                    NeuronId.For<IBehaviorNeuron>(brain.Owner, behaviorId),
+                    approval,
+                    cancellationToken);
 
                 var session = grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(brain.Owner).ToGrainId());
                 var neuronId = NeuronId.For<IBehaviorNeuron>(brain.Owner, behaviorId);

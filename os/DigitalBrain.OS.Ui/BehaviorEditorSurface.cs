@@ -27,7 +27,7 @@ internal static class BehaviorEditorSurface
                     : behaviorId.Trim();
                 var shellName = string.IsNullOrWhiteSpace(shell) ? "desk" : shell.Trim();
 
-                await brain.Get<IShell>(shellName).Open(
+                await brain.GetGrainProxy<IShell>(shellName).Open(
                     new OpenScene(
                         CommandId.New(),
                         FlutterHttpContract.BehaviorEditorSceneKey,

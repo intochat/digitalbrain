@@ -88,4 +88,63 @@ public sealed class DirectedRequestReply(TestingFixture fixture)
         Assert.All(ownerIncoming, entry => Assert.Equal(test.Client.Owner, entry.Caller.Owner));
         Assert.All(otherIncoming, entry => Assert.Equal(other.Id, entry.Caller.Owner));
     }
+
+    [Fact(DisplayName = "concurrent typed requests receive only their own correlated responses")]
+    public async Task ConcurrentRequestsReceiveOnlyOwnCorrelatedResponses()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var left = test.Neuron<IEcho>("echo-left");
+        var right = test.Neuron<IEcho>("echo-right");
+
+        var firstTask = test.Client.Get<IEcho>(left.Id.Name)
+            .SendAsync(new EchoRequest("first"), cancellationToken);
+        var secondTask = test.Client.Get<IEcho>(right.Id.Name)
+            .SendAsync(new EchoRequest("second"), cancellationToken);
+        await Task.WhenAll(firstTask, secondTask);
+
+        Assert.Equal("first", (await firstTask).Text);
+        Assert.Equal("second", (await secondTask).Text);
+
+        var leftRequest = Assert.Single(await left.Incoming.ReadAsync<EchoRequest>(cancellationToken: cancellationToken));
+        var rightRequest = Assert.Single(await right.Incoming.ReadAsync<EchoRequest>(cancellationToken: cancellationToken));
+        var leftReply = Assert.Single(await left.Outgoing.ReadAsync<EchoResponse>(cancellationToken: cancellationToken));
+        var rightReply = Assert.Single(await right.Outgoing.ReadAsync<EchoResponse>(cancellationToken: cancellationToken));
+        Assert.Equal(leftRequest.CorrelationId, leftReply.CorrelationId);
+        Assert.Equal(rightRequest.CorrelationId, rightReply.CorrelationId);
+        Assert.NotEqual(leftRequest.CorrelationId, rightRequest.CorrelationId);
+    }
+
+    [Fact(DisplayName = "cancellation tears down the watch without corrupting a committed request delivery")]
+    public async Task CancellationDoesNotCorruptCommittedDelivery()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var echo = test.Neuron<IEcho>("cancel-integrity");
+        var reference = test.Client.Get<IEcho>(echo.Id.Name);
+
+        var committed = await reference.SendAsync(new EchoRequest("committed"), cancellationToken);
+        Assert.Equal("committed", committed.Text);
+
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var cancelled = reference.SendAsync(new EchoRequest("cancelled-wait"), linked.Token);
+        await linked.CancelAsync();
+
+        try
+        {
+            await cancelled;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        var requests = await echo.Incoming.ReadAsync<EchoRequest>(cancellationToken: cancellationToken);
+        Assert.Contains(requests, entry => entry.Synapse.Text == "committed");
+
+        var after = await reference.SendAsync(new EchoRequest("after-cancel"), cancellationToken);
+        Assert.Equal("after-cancel", after.Text);
+        var replies = await echo.Outgoing.ReadAsync<EchoResponse>(cancellationToken: cancellationToken);
+        Assert.Contains(replies, entry => entry.Synapse.Text == "committed");
+        Assert.Contains(replies, entry => entry.Synapse.Text == "after-cancel");
+    }
 }

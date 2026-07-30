@@ -1,8 +1,11 @@
+using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Mcp;
 
 [ClientEntryPoint]
+[Alias("mcp.authorization")]
+[Description("MCP OAuth authorization neuron")]
 public partial interface IMcpAuthorization : INeuron
 {
     [Alias(nameof(Begin))]

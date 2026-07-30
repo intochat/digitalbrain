@@ -100,7 +100,7 @@ public sealed class UiHttpRoundTrip(FlutterHttpFixture fixture)
         using var http = CreateClient(app, streaming: true);
         await using var events = await OpenShellEventStreamAsync(http, cancellationToken);
 
-        await test.Client.Get<IShell>(FlutterHttpFixture.DefaultShellName).Open(command);
+        await test.Client.GetGrainProxy<IShell>(FlutterHttpFixture.DefaultShellName).Open(command);
 
         var journaled = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(command.CommandId, journaled.Synapse.CommandId);
@@ -140,7 +140,7 @@ public sealed class UiHttpRoundTrip(FlutterHttpFixture fixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(FlutterHttpFixture.DefaultShellName);
-        await test.Client.Get<IShell>(FlutterHttpFixture.DefaultShellName).Open(
+        await test.Client.GetGrainProxy<IShell>(FlutterHttpFixture.DefaultShellName).Open(
             new OpenScene(CommandId.New(), HomeSceneKey, HomeTitle));
 
         await using var app = await FlutterHttpFixture.StartUiHttpAsync(test, cancellationToken);
@@ -167,7 +167,7 @@ public sealed class UiHttpRoundTrip(FlutterHttpFixture fixture)
         await using var events = await OpenChatEventStreamAsync(http, "pulse", cancellationToken);
 
         var command = new SendMessage(CommandId.New(), "hello");
-        await test.Client.Get<IChat>("pulse").Send(command);
+        await test.Client.GetGrainProxy<IChat>("pulse").Send(command);
         var projected = await UiHttpSse.ReadNextChatTurnAsync(events.Reader, cancellationToken);
 
         Assert.True(projected.Sequence > 0);

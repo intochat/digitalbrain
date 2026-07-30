@@ -34,7 +34,7 @@ public sealed class ShellSceneRoundTrip(FlutterFixture fixture)
             FlutterFixture.PrimaryControlId,
             FlutterFixture.SubmitIntent);
 
-        await test.Client.SendAsync<IScene>(FlutterFixture.HomeSceneKey, activation);
+        await test.Client.SendAsync<IScene>(FlutterFixture.HomeSceneKey, activation, cancellationToken);
 
         var received = await scene.Incoming.NextAsync<ControlActivated>(cancellationToken);
         Assert.Equal(activation.SceneKey, received.Synapse.SceneKey);

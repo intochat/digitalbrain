@@ -41,7 +41,7 @@ public sealed class ChatProductTool(OSMcpFixture fixture)
 
         Assert.Equal(result, retried);
 
-        var transcript = await test.Client.Get<IChat>("main").Read();
+        var transcript = await test.Client.GetGrainProxy<IChat>("main").Read();
         Assert.Collection(
             transcript.Turns,
             user =>

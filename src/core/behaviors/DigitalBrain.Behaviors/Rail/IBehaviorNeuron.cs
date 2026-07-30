@@ -1,8 +1,11 @@
 namespace DigitalBrain.Behaviors;
 
+using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 [ClientEntryPoint]
+[Alias("behaviors.behavior")]
+[Description("Owner behavior rail neuron")]
 public partial interface IBehaviorNeuron : INeuron
 {
     [Alias(nameof(Read))]

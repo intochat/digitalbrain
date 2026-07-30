@@ -1,9 +1,12 @@
+using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Chat;
 
 [ClientEntryPoint]
+[Alias("chat")]
+[Description("Owner conversation neuron")]
 public partial interface IChat : INeuron
 {
     [Alias(nameof(Send))]

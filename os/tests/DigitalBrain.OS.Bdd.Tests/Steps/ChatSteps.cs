@@ -22,7 +22,7 @@ public sealed class ChatSteps(BrainWorld world)
 
     [When("the owner sends {string} to the conversation {string}")]
     public Task WhenTheOwnerSends(string text, string conversation)
-        => world.Brain.Client.Get<IChat>(conversation).Send(new SendMessage(CommandId.New(), text));
+        => world.Brain.Client.GetGrainProxy<IChat>(conversation).Send(new SendMessage(CommandId.New(), text));
 
     [Then("the conversation {string} journals the user message {string}")]
     public async Task ThenTheConversationJournalsTheUserMessage(string conversation, string text)
@@ -45,7 +45,7 @@ public sealed class ChatSteps(BrainWorld world)
     [Then("the conversation {string} transcript has {int} turns")]
     public async Task ThenTheTranscriptHasTurns(string conversation, int expected)
     {
-        var transcript = await world.Brain.Client.Get<IChat>(conversation).Read();
+        var transcript = await world.Brain.Client.GetGrainProxy<IChat>(conversation).Read();
 
         Assert.Equal(expected, transcript.Turns.Count);
     }

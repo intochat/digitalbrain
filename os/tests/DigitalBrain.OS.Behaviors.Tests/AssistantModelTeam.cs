@@ -172,7 +172,7 @@ public sealed class AssistantModelTeam(OSBehaviorsFixture fixture)
     }
 
     private static IAssistant Assistant(TestBrain test)
-        => test.Client.Get<IAssistant>(AssistantName);
+        => test.Client.GetGrainProxy<IAssistant>(AssistantName);
 
     private static void ScriptConvene(TestBrain test, params string[] models)
         => test.Chat().ReplyWithCapabilityCall(

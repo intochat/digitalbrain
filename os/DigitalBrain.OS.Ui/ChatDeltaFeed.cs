@@ -26,7 +26,7 @@ internal static class ChatDeltaFeed
         turn.CancelAfter(TurnBudget);
 
         var command = CommandId.New();
-        await foreach (var chunk in brain.Get<IChat>(chatName)
+        await foreach (var chunk in brain.GetGrainProxy<IChat>(chatName)
             .SendStreaming(new SendMessage(command, text), turn.Token))
         {
             turn.Token.ThrowIfCancellationRequested();

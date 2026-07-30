@@ -1,9 +1,11 @@
+using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Salesforce;
 
 [GenerateSerializer]
 [Alias("db.salesforce.mutation-approval")]
+[Description("Approved Salesforce mutation")]
 public sealed record SalesforceMutationApproval(
     [property: Id(0)] Guid ApprovalId,
     [property: Id(1)] CommandId CommandId,

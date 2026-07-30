@@ -1,9 +1,11 @@
 namespace DigitalBrain.Behaviors;
 
+using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 [GenerateSerializer]
 [Alias("db.behavior.revision-approval")]
+[Description("Owner approval evidence for a proposed behavior revision")]
 public sealed record BehaviorRevisionApproval(
     [property: Id(0)] Guid ApprovalId,
     [property: Id(1)] CommandId CommandId,

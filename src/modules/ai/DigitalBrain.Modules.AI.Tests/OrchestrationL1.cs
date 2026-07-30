@@ -17,18 +17,18 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
 
     [Fact(DisplayName = "Concurrent.Respond fans out to multiple scripted participants")]
     public Task ConcurrentRespondFansOutToMultipleParticipants()
-        => FanOutAsync(test => test.Client.Get<IConcurrentProbe>("concurrent-team"));
+        => FanOutAsync(test => test.Client.GetGrainProxy<IConcurrentProbe>("concurrent-team"));
 
     [Fact(DisplayName = "GroupChat.Respond runs multiple scripted participants")]
     public Task GroupChatRespondRunsMultipleParticipants()
-        => FanOutAsync(test => test.Client.Get<IGroupChatProbe>("group-team"));
+        => FanOutAsync(test => test.Client.GetGrainProxy<IGroupChatProbe>("group-team"));
 
     [Fact(DisplayName = "GroupChat supervised Accept/Continue/Cancel throw until the Orleans path is built")]
     public async Task GroupChatSupervisedAttemptsThrow()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var worker = test.Client.Get<IGroupChatProbe>(SupervisedTeam);
+        var worker = test.Client.GetGrainProxy<IGroupChatProbe>(SupervisedTeam);
         var workerId = test.Neuron<IGroupChatProbe>(SupervisedTeam).Id;
         var taskId = test.Neuron<ILlama32>("task-placeholder").Id;
         var attempt = new AttemptId(Guid.NewGuid());
@@ -48,7 +48,7 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
         ScriptPair(test);
         ScriptPair(test);
 
-        var orchestration = test.Client.Get<IConcurrentProbe>("session-team");
+        var orchestration = test.Client.GetGrainProxy<IConcurrentProbe>("session-team");
         var first = await orchestration.Respond([User()]);
         var second = await orchestration.Respond([User()]);
 
@@ -65,7 +65,7 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         ScriptPair(test);
 
-        var orchestration = test.Client.Get<IParticipantSwapConcurrentProbe>("fingerprint-team");
+        var orchestration = test.Client.GetGrainProxy<IParticipantSwapConcurrentProbe>("fingerprint-team");
         var first = await orchestration.Respond([User()]);
         AssertEither(first);
         Assert.Equal(Pair, test.Chat().CallCount);
@@ -84,7 +84,7 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
 
         var failure = await Assert.ThrowsAsync<OrchestrationRefusedException>(
-            () => test.Client.Get<IUnreachableGroupChatProbe>("unreachable-team").Respond([User()]));
+            () => test.Client.GetGrainProxy<IUnreachableGroupChatProbe>("unreachable-team").Respond([User()]));
 
         Assert.Contains($"Gpt56 '{ProbeParticipants.Left}'", failure.Message, StringComparison.Ordinal);
         Assert.NotNull(failure.InnerException);
@@ -95,7 +95,7 @@ public sealed class OrchestrationL1(ModuleFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var orchestration = test.Client.Get<ISilentSwapConcurrentProbe>("silent-team");
+        var orchestration = test.Client.GetGrainProxy<ISilentSwapConcurrentProbe>("silent-team");
 
         var answer = await orchestration.Respond([User()]);
 

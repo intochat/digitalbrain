@@ -33,6 +33,7 @@ public sealed class ActiveCapabilityCatalog
 
         var moduleIndex = new Dictionary<string, CapabilityManifest>(StringComparer.Ordinal);
         var neurons = new Dictionary<string, NeuronCapabilityDescriptor>(StringComparer.Ordinal);
+        var neuronOwners = new Dictionary<string, ModuleId>(StringComparer.Ordinal);
         var synapses = new Dictionary<(string, int), SynapseCapabilityDescriptor>();
 
         foreach (var manifest in manifests)
@@ -45,7 +46,15 @@ public sealed class ActiveCapabilityCatalog
 
             foreach (var neuron in manifest.Neurons)
             {
-                neurons.TryAdd(neuron.ContractId, neuron);
+                if (!neurons.TryAdd(neuron.ContractId, neuron))
+                {
+                    var prior = neuronOwners[neuron.ContractId];
+                    throw new InvalidOperationException(
+                        $"Duplicate active neuron capability id '{neuron.ContractId}' "
+                        + $"from modules '{prior.Value}' and '{manifest.ModuleId.Value}'.");
+                }
+
+                neuronOwners[neuron.ContractId] = manifest.ModuleId;
                 IndexSynapses(synapses, neuron.Accepted, neuron.ContractId);
                 IndexSynapses(synapses, neuron.Emitted, neuron.ContractId);
             }

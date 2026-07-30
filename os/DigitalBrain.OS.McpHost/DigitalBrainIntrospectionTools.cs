@@ -77,7 +77,7 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain, IGrain
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
 
-        var transcript = await brain.Get<IChat>(chatName).Read();
+        var transcript = await brain.GetGrainProxy<IChat>(chatName).Read();
 
         return new ChatTranscriptPage(
             chatName,

@@ -25,7 +25,7 @@ internal static class FlutterHttpEndpoints
                 ArgumentException.ThrowIfNullOrWhiteSpace(request.Title);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var shell = brain.Get<IShell>(shellName);
+                var shell = brain.GetGrainProxy<IShell>(shellName);
                 await shell.Open(new OpenScene(CommandId.New(), request.SceneKey, request.Title));
 
                 return Results.Accepted();
@@ -80,7 +80,10 @@ internal static class FlutterHttpEndpoints
                     return Results.BadRequest();
                 }
 
-                await brain.SendAsync<IScene>(sceneKey, new ControlActivated(sceneKey, controlId, request.Intent));
+                await brain.SendAsync<IScene>(
+                    sceneKey,
+                    new ControlActivated(sceneKey, controlId, request.Intent),
+                    cancellationToken);
 
                 return Results.Accepted();
             });

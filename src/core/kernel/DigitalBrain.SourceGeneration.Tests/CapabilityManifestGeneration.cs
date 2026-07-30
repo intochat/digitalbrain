@@ -26,6 +26,7 @@ public sealed class CapabilityManifestGeneration
 
             public sealed partial class SampleModule : IModule;
 
+            [Alias("sample.neuron")]
             [Description("Marker neuron")]
             public partial interface ISampleNeuron : INeuron;
 
@@ -61,19 +62,89 @@ public sealed class CapabilityManifestGeneration
             result.GeneratedTrees.Select(tree => tree.ToString()));
 
         Assert.Contains("CapabilityManifest", generated, StringComparison.Ordinal);
+        Assert.Contains("sample.neuron", generated, StringComparison.Ordinal);
         Assert.Contains("sample.other", generated, StringComparison.Ordinal);
         Assert.Contains("sample.request", generated, StringComparison.Ordinal);
         Assert.Contains("sample.response", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("Sample.ISampleNeuron", generated, StringComparison.Ordinal);
 
         var otherIndex = generated.IndexOf("sample.other", StringComparison.Ordinal);
         var requestIndex = generated.IndexOf("sample.request", StringComparison.Ordinal);
         var responseIndex = generated.IndexOf("sample.response", StringComparison.Ordinal);
         Assert.True(otherIndex >= 0 && requestIndex >= 0 && responseIndex >= 0);
-        // Accepted synapses are emitted before emitted synapses; within each list IDs are ordinal.
         Assert.True(requestIndex < otherIndex);
         Assert.True(otherIndex < responseIndex);
-        Assert.Contains("ISampleNeuron", generated, StringComparison.Ordinal);
         Assert.Contains("Marker neuron", generated, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "generator scopes capabilities to the owning module namespace, not the whole assembly")]
+    public void ScopesCapabilitiesToOwningModule()
+    {
+        var result = Run(
+            """
+            using System.ComponentModel;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DigitalBrain.Abstractions;
+            using Orleans;
+
+            namespace Host.Alpha;
+
+            public sealed partial class AlphaModule : IModule;
+
+            [Alias("alpha.neuron")]
+            [Description("Alpha neuron")]
+            public partial interface IAlphaNeuron : INeuron;
+
+            [Alias("alpha.ping")]
+            [Description("Alpha ping")]
+            public sealed record AlphaPing : Synapse;
+
+            public sealed class AlphaNeuron : IAlphaNeuron, IHandle<AlphaPing>
+            {
+                public Task HandleAsync(AlphaPing synapse, CancellationToken cancellationToken)
+                    => Task.CompletedTask;
+            }
+
+            namespace Host.Beta;
+
+            public sealed partial class BetaModule : IModule;
+
+            [Alias("beta.neuron")]
+            [Description("Beta neuron")]
+            public partial interface IBetaNeuron : INeuron;
+
+            [Alias("beta.ping")]
+            [Description("Beta ping")]
+            public sealed record BetaPing : Synapse;
+
+            public sealed class BetaNeuron : IBetaNeuron, IHandle<BetaPing>
+            {
+                public Task HandleAsync(BetaPing synapse, CancellationToken cancellationToken)
+                    => Task.CompletedTask;
+            }
+            """);
+
+        Assert.Empty(result.Diagnostics.Where(diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error
+            && diagnostic.Id.StartsWith("DBGEN", StringComparison.Ordinal)));
+
+        var alpha = result.GeneratedTrees
+            .Select(tree => tree.ToString())
+            .Single(source => source.Contains("partial class AlphaModule", StringComparison.Ordinal));
+        var beta = result.GeneratedTrees
+            .Select(tree => tree.ToString())
+            .Single(source => source.Contains("partial class BetaModule", StringComparison.Ordinal));
+
+        Assert.Contains("alpha.neuron", alpha, StringComparison.Ordinal);
+        Assert.Contains("alpha.ping", alpha, StringComparison.Ordinal);
+        Assert.DoesNotContain("beta.neuron", alpha, StringComparison.Ordinal);
+        Assert.DoesNotContain("beta.ping", alpha, StringComparison.Ordinal);
+
+        Assert.Contains("beta.neuron", beta, StringComparison.Ordinal);
+        Assert.Contains("beta.ping", beta, StringComparison.Ordinal);
+        Assert.DoesNotContain("alpha.neuron", beta, StringComparison.Ordinal);
+        Assert.DoesNotContain("alpha.ping", beta, StringComparison.Ordinal);
     }
 
     [Fact(DisplayName = "generator reports DBGEN007 when a handled synapse is missing an Alias")]
@@ -81,16 +152,21 @@ public sealed class CapabilityManifestGeneration
     {
         var result = Run(
             """
+            using System.ComponentModel;
             using System.Threading;
             using System.Threading.Tasks;
             using DigitalBrain.Abstractions;
+            using Orleans;
 
             namespace Sample;
 
             public sealed partial class SampleModule : IModule;
 
+            [Alias("sample.neuron")]
+            [Description("Marker neuron")]
             public partial interface ISampleNeuron : INeuron;
 
+            [Description("Undescribed request")]
             public sealed record UndescribedRequest : Synapse;
 
             public sealed class SampleNeuron :
@@ -103,6 +179,72 @@ public sealed class CapabilityManifestGeneration
             """);
 
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "DBGEN007");
+    }
+
+    [Fact(DisplayName = "generator reports DBGEN009 when a capability neuron is missing a stable Alias")]
+    public void ReportsMissingNeuronAliasDiagnostic()
+    {
+        var result = Run(
+            """
+            using System.ComponentModel;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DigitalBrain.Abstractions;
+            using Orleans;
+
+            namespace Sample;
+
+            public sealed partial class SampleModule : IModule;
+
+            [Description("Marker neuron")]
+            public partial interface ISampleNeuron : INeuron;
+
+            [Alias("sample.request")]
+            [Description("Sample request")]
+            public sealed record SampleRequest : Synapse;
+
+            public sealed class SampleNeuron :
+                ISampleNeuron,
+                IHandle<SampleRequest>
+            {
+                public Task HandleAsync(SampleRequest synapse, CancellationToken cancellationToken)
+                    => Task.CompletedTask;
+            }
+            """);
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "DBGEN009");
+    }
+
+    [Fact(DisplayName = "generator reports DBGEN008 when a capability description is missing")]
+    public void ReportsMissingDescriptionDiagnostic()
+    {
+        var result = Run(
+            """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DigitalBrain.Abstractions;
+            using Orleans;
+
+            namespace Sample;
+
+            public sealed partial class SampleModule : IModule;
+
+            [Alias("sample.neuron")]
+            public partial interface ISampleNeuron : INeuron;
+
+            [Alias("sample.request")]
+            public sealed record SampleRequest : Synapse;
+
+            public sealed class SampleNeuron :
+                ISampleNeuron,
+                IHandle<SampleRequest>
+            {
+                public Task HandleAsync(SampleRequest synapse, CancellationToken cancellationToken)
+                    => Task.CompletedTask;
+            }
+            """);
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "DBGEN008");
     }
 
     [Fact(DisplayName = "capability description diagnostic descriptor is registered for exact-catalog enforcement")]

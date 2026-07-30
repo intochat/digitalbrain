@@ -24,10 +24,10 @@ public sealed class AiPaneSurface
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var shell = brain.Get<IShell>(shellName);
+        var shell = brain.GetGrainProxy<IShell>(shellName);
         await shell.Open(new OpenScene(CommandId.New(), SceneKey, SceneTitle));
 
-        var model = brain.Get<ILlama32>(modelName);
+        var model = brain.GetGrainProxy<ILlama32>(modelName);
         return await model.Respond([new ChatMessage(ChatRole.User, prompt)]);
     }
 }

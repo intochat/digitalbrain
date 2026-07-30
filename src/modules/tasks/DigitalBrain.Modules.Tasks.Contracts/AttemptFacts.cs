@@ -1,9 +1,11 @@
+using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Tasks;
 
 [GenerateSerializer]
 [Alias("tasks.attempt-fact")]
+[Description("Base attempt lifecycle fact")]
 public abstract record AttemptFact(
     [property: Id(0)] NeuronId Task,
     [property: Id(1)] NeuronId Worker,
@@ -12,6 +14,7 @@ public abstract record AttemptFact(
 
 [GenerateSerializer]
 [Alias("tasks.attempt-accepted")]
+[Description("Worker accepted a task attempt")]
 public sealed record AttemptAccepted(
     NeuronId Task,
     NeuronId Worker,
@@ -20,6 +23,7 @@ public sealed record AttemptAccepted(
 
 [GenerateSerializer]
 [Alias("tasks.attempt-progressed")]
+[Description("Worker reported progress on a task attempt")]
 public sealed record AttemptProgressed(
     NeuronId Task,
     NeuronId Worker,
@@ -28,6 +32,7 @@ public sealed record AttemptProgressed(
 
 [GenerateSerializer]
 [Alias("tasks.attempt-waiting")]
+[Description("Worker is blocked waiting on a task attempt")]
 public sealed record AttemptWaiting(
     NeuronId Task,
     NeuronId Worker,
@@ -37,6 +42,7 @@ public sealed record AttemptWaiting(
 
 [GenerateSerializer]
 [Alias("tasks.attempt-succeeded")]
+[Description("Worker completed a task attempt successfully")]
 public sealed record AttemptSucceeded(
     NeuronId Task,
     NeuronId Worker,
@@ -47,6 +53,7 @@ public sealed record AttemptSucceeded(
 
 [GenerateSerializer]
 [Alias("tasks.attempt-failed")]
+[Description("Worker failed a task attempt")]
 public sealed record AttemptFailed(
     NeuronId Task,
     NeuronId Worker,
@@ -57,6 +64,7 @@ public sealed record AttemptFailed(
 
 [GenerateSerializer]
 [Alias("tasks.attempt-cancelled")]
+[Description("Worker cancelled a task attempt")]
 public sealed record AttemptCancelled(
     NeuronId Task,
     NeuronId Worker,
@@ -65,6 +73,7 @@ public sealed record AttemptCancelled(
 
 [GenerateSerializer]
 [Alias("tasks.attempt-outcome-uncertain")]
+[Description("Worker reported an uncertain task attempt outcome")]
 public sealed record AttemptOutcomeUncertain(
     NeuronId Task,
     NeuronId Worker,

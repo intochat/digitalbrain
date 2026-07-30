@@ -16,14 +16,14 @@
     {
       "name": "IScene",
       "kind": "interface",
-      "alias": "DigitalBrain.Flutter.IScene",
+      "alias": "flutter.scene",
       "properties": [],
       "methods": []
     },
     {
       "name": "IShell",
       "kind": "interface",
-      "alias": "DigitalBrain.Flutter.IShell",
+      "alias": "flutter.shell",
       "properties": [],
       "methods": [
         {

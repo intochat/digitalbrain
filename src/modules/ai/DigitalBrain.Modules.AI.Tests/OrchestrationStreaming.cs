@@ -29,14 +29,14 @@ public sealed class OrchestrationStreaming(ModuleFixture fixture)
         "Concurrent.RespondStreaming yields updates before the orchestration completes")]
     public Task ConcurrentRespondStreamingYieldsBeforeCompletion()
         => YieldsBeforeCompletionAsync(
-            test => test.Client.Get<IStreamingConcurrentProbe>(ConcurrentTeam),
+            test => test.Client.GetGrainProxy<IStreamingConcurrentProbe>(ConcurrentTeam),
             TestContext.Current.CancellationToken);
 
     [Fact(Timeout = StreamingTimeout, DisplayName =
         "GroupChat.RespondStreaming yields updates before the orchestration completes")]
     public Task GroupChatRespondStreamingYieldsBeforeCompletion()
         => YieldsBeforeCompletionAsync(
-            test => test.Client.Get<IStreamingGroupChatProbe>(GroupChatTeam),
+            test => test.Client.GetGrainProxy<IStreamingGroupChatProbe>(GroupChatTeam),
             TestContext.Current.CancellationToken);
 
     [Fact(Timeout = StreamingTimeout, DisplayName =
@@ -48,7 +48,7 @@ public sealed class OrchestrationStreaming(ModuleFixture fixture)
         test.Chat().Reply(ScriptedLeft);
         test.Chat().Reply(ScriptedRight);
 
-        var orchestration = test.Client.Get<IParticipantSwapConcurrentProbe>(SwapTeam);
+        var orchestration = test.Client.GetGrainProxy<IParticipantSwapConcurrentProbe>(SwapTeam);
 
         await foreach (var _ in orchestration.RespondStreaming([new ChatMessage(ChatRole.User, Prompt)], cancellationToken))
         {
@@ -68,7 +68,7 @@ public sealed class OrchestrationStreaming(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         FragmentedParticipantProbe.Arm();
 
-        var stream = test.Client.Get<IFragmentedConcurrentProbe>(FragmentedTeam)
+        var stream = test.Client.GetGrainProxy<IFragmentedConcurrentProbe>(FragmentedTeam)
             .RespondStreaming([new ChatMessage(ChatRole.User, Prompt)], cancellationToken)
             .GetAsyncEnumerator(cancellationToken);
         var text = new StringBuilder();
@@ -140,7 +140,7 @@ public sealed class OrchestrationStreaming(ModuleFixture fixture)
         test.Chat().Reply(ScriptedLeft);
         test.Chat().Reply(ScriptedRight);
 
-        var orchestration = test.Client.Get<IParticipantSwapConcurrentProbe>(AbandonTeam);
+        var orchestration = test.Client.GetGrainProxy<IParticipantSwapConcurrentProbe>(AbandonTeam);
         var stream = orchestration
             .RespondStreaming([new ChatMessage(ChatRole.User, Prompt)], cancellationToken)
             .GetAsyncEnumerator(cancellationToken);
@@ -166,7 +166,7 @@ public sealed class OrchestrationStreaming(ModuleFixture fixture)
         GatedParticipantProbe.Arm();
 
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var stream = test.Client.Get<IHeldFirstGroupChatProbe>(HeldFirstTeam)
+        var stream = test.Client.GetGrainProxy<IHeldFirstGroupChatProbe>(HeldFirstTeam)
             .RespondStreaming([new ChatMessage(ChatRole.User, Prompt)], cancellation.Token)
             .GetAsyncEnumerator(cancellation.Token);
 

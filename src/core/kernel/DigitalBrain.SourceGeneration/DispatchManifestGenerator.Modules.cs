@@ -104,7 +104,7 @@ public sealed partial class DispatchManifestGenerator
             valid = false;
         }
 
-        ReportCapabilityDiagnostics(production, module.Neurons, requireDescriptions: false);
+        ReportCapabilityDiagnostics(production, module.Neurons, requireDescriptions: true);
 
         if (!valid)
         {

@@ -20,6 +20,12 @@ public sealed class ActiveCapabilityCatalogTests
         Assert.False(catalog.TryGetModule(probes.Id, out _));
         Assert.DoesNotContain(catalog.Modules, module => module.ModuleId == probes.Id);
         Assert.Single(catalog.Modules);
+
+        Assert.True(catalog.TryGetNeuron("harness.greeter", out _));
+        Assert.True(catalog.TryGetSynapse("harness.say-hello", schemaVersion: 1, out _));
+        Assert.False(catalog.TryGetNeuron("testing.capability-caller", out _));
+        Assert.False(catalog.TryGetNeuron("testing.capability-target", out _));
+        Assert.False(catalog.TryGetSynapse("db.testing.capability-ping", schemaVersion: 1, out _));
     }
 
     [Fact(DisplayName = "active catalog indexes neurons and synapses by stable ids and schema version")]
@@ -32,8 +38,7 @@ public sealed class ActiveCapabilityCatalogTests
         Assert.Equal("1.0.0", module!.Version);
         Assert.Equal(greeter.Id, module.ModuleId);
 
-        var neuronContract = typeof(IGreeter).FullName!;
-        Assert.True(catalog.TryGetNeuron(neuronContract, out var neuron));
+        Assert.True(catalog.TryGetNeuron("harness.greeter", out var neuron));
         Assert.Equal("default", neuron!.DefaultInstanceName);
 
         Assert.True(catalog.TryGetSynapse("harness.say-hello", schemaVersion: 1, out var accepted));
@@ -53,6 +58,39 @@ public sealed class ActiveCapabilityCatalogTests
             () => ActiveCapabilityCatalog.Create([greeter, greeter]));
 
         Assert.Contains(greeter.Id.Value, failure.Message, StringComparison.Ordinal);
+        Assert.Contains("Duplicate", failure.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact(DisplayName = "duplicate active neuron contract ids fail catalog construction naming both modules")]
+    public void DuplicateNeuronIdsFail()
+    {
+        var left = new ScriptedModule(
+            new ModuleId("catalog.left"),
+            Manifest(
+                "catalog.left",
+                new NeuronCapabilityDescriptor(
+                    "catalog.shared-neuron",
+                    "left neuron",
+                    "default",
+                    [],
+                    [])));
+        var right = new ScriptedModule(
+            new ModuleId("catalog.right"),
+            Manifest(
+                "catalog.right",
+                new NeuronCapabilityDescriptor(
+                    "catalog.shared-neuron",
+                    "right neuron",
+                    "default",
+                    [],
+                    [])));
+
+        var failure = Assert.Throws<InvalidOperationException>(
+            () => ActiveCapabilityCatalog.Create([left, right]));
+
+        Assert.Contains("catalog.shared-neuron", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("catalog.left", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("catalog.right", failure.Message, StringComparison.Ordinal);
         Assert.Contains("Duplicate", failure.Message, StringComparison.OrdinalIgnoreCase);
     }
 

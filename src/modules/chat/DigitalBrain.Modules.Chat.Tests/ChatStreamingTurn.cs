@@ -156,7 +156,7 @@ public sealed class ChatStreamingTurn(ChatFixture fixture)
         ChatStreamingAssistant.Arm();
         ChatStreamingAssistant.Release();
 
-        var chat = test.Client.Get<IChat>("repeated-streaming-turn");
+        var chat = test.Client.GetGrainProxy<IChat>("repeated-streaming-turn");
         var command = CommandId.New();
 
         await DrainAsync(chat.SendStreaming(new SendMessage(command, Prompt), cancellationToken));
@@ -186,7 +186,7 @@ public sealed class ChatStreamingTurn(ChatFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         ChatStreamingAssistant.Arm();
 
-        var chat = test.Client.Get<IChat>(SlowChatName);
+        var chat = test.Client.GetGrainProxy<IChat>(SlowChatName);
         var sending = chat.Send(new SendMessage(CommandId.New(), Prompt));
 
         await Task.Delay(PastResponseTimeout, cancellationToken);

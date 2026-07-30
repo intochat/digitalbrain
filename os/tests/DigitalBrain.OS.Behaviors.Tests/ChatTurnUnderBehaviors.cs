@@ -71,7 +71,7 @@ public sealed class ChatTurnUnderBehaviors(OSBehaviorsFixture fixture)
         var chat = test.Neuron<IChat>(NonStreamedChatName);
         var command = CommandId.New();
 
-        await test.Client.Get<IChat>(NonStreamedChatName).Send(new SendMessage(command, Prompt));
+        await test.Client.GetGrainProxy<IChat>(NonStreamedChatName).Send(new SendMessage(command, Prompt));
 
         for (var settle = 0; settle < SettleAttempts; settle++)
         {
@@ -107,7 +107,7 @@ public sealed class ChatTurnUnderBehaviors(OSBehaviorsFixture fixture)
 
         var chat = test.Neuron<IChat>(SentCorrelationChatName);
 
-        await test.Client.Get<IChat>(SentCorrelationChatName).Send(new SendMessage(CommandId.New(), Prompt));
+        await test.Client.GetGrainProxy<IChat>(SentCorrelationChatName).Send(new SendMessage(CommandId.New(), Prompt));
 
         AssertOneCorrelation(await ChatFactsAsync(chat, cancellationToken));
     }

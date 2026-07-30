@@ -50,7 +50,7 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
         var session = grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(brain.Owner).ToGrainId());
         var command = new CommandId(commandIdentity);
 
-        await brain.Get<IChat>(chatName).Send(new SendMessage(command, text));
+        await brain.GetGrainProxy<IChat>(chatName).Send(new SendMessage(command, text));
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));

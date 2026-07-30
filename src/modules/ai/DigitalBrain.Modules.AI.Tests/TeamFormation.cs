@@ -31,7 +31,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         ScriptPair(test);
 
-        var team = test.Client.Get<ITeam>(ComparisonTeam);
+        var team = test.Client.GetGrainProxy<ITeam>(ComparisonTeam);
         await team.Form(Formation(Gemma, Llama));
 
         var streamed = await StreamAsync(team, cancellationToken);
@@ -50,7 +50,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         ScriptPair(test, QwenReply, GraniteReply);
 
-        var team = test.Client.Get<ITeam>(CorrectedTeam);
+        var team = test.Client.GetGrainProxy<ITeam>(CorrectedTeam);
         await team.Form(Formation(Gemma, Llama));
         await team.Form(Formation(Qwen, Granite));
 
@@ -72,7 +72,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
         ScriptPair(test);
         ScriptPair(test);
 
-        var team = test.Client.Get<ITeam>("idempotent-team");
+        var team = test.Client.GetGrainProxy<ITeam>("idempotent-team");
         await team.Form(Formation(Gemma, Llama));
         var first = await StreamAsync(team, cancellationToken);
 
@@ -93,7 +93,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
 
-        var team = test.Client.Get<ITeam>("unprovisioned-team");
+        var team = test.Client.GetGrainProxy<ITeam>("unprovisioned-team");
         await team.Form(Formation(Gpt, Gemma));
 
         var failure = await Assert.ThrowsAsync<OrchestrationRefusedException>(
@@ -112,7 +112,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         ScriptPair(test);
 
-        var team = test.Client.Get<ITeam>("recovered-team");
+        var team = test.Client.GetGrainProxy<ITeam>("recovered-team");
         await team.Form(Formation(Gpt, Gemma));
 
         await Assert.ThrowsAsync<OrchestrationRefusedException>(() => StreamAsync(team, cancellationToken));
@@ -132,7 +132,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         ScriptPair(test);
 
-        var team = test.Client.Get<ITeam>("re-formed-team");
+        var team = test.Client.GetGrainProxy<ITeam>("re-formed-team");
         await team.Form(Formation(Gemma, Llama));
         await StreamAsync(team, cancellationToken);
 
@@ -153,7 +153,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
 
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => test.Client.Get<ITeam>("unformed-team").Respond([new ChatMessage(ChatRole.User, Prompt)]));
+            () => test.Client.GetGrainProxy<ITeam>("unformed-team").Respond([new ChatMessage(ChatRole.User, Prompt)]));
 
         Assert.Contains("unformed-team", failure.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(ITeam.Form), failure.Message, StringComparison.Ordinal);
@@ -167,7 +167,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
 
         var failure = await Assert.ThrowsAsync<OrchestrationRefusedException>(
-            () => test.Client.Get<ITeam>("unknown-model-team").Form(Formation(Gemma, "Gemini9")));
+            () => test.Client.GetGrainProxy<ITeam>("unknown-model-team").Form(Formation(Gemma, "Gemini9")));
 
         Assert.Contains("Gemini9", failure.Message, StringComparison.Ordinal);
         Assert.All(
@@ -183,7 +183,7 @@ public sealed class TeamFormation(ModuleFixture fixture)
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
 
         var failure = await Assert.ThrowsAsync<ArgumentException>(
-            () => test.Client.Get<ITeam>("duplicate-model-team")
+            () => test.Client.GetGrainProxy<ITeam>("duplicate-model-team")
                 .Form(Formation(Gemma, Gemma.ToUpperInvariant())));
 
         Assert.Contains(Gemma, failure.Message, StringComparison.Ordinal);

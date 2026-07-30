@@ -22,6 +22,14 @@ public sealed partial class DispatchManifestGenerator
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor NeuronAliasRequired = new(
+        "DBGEN009",
+        "Capability neurons require a stable Alias",
+        "Neuron contract '{0}' must declare an Orleans Alias for the capability catalog; CLR full names are not persisted identities",
+        "DigitalBrain.SourceGeneration",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
     private static ImmutableArray<NeuronCapabilityModel> CapabilitiesOf(
         Compilation compilation,
         INamedTypeSymbol module,
@@ -34,6 +42,7 @@ public sealed partial class DispatchManifestGenerator
             return ImmutableArray<NeuronCapabilityModel>.Empty;
         }
 
+        var moduleMarkers = ModuleMarkersIn(module.ContainingAssembly).ToImmutableArray();
         var byContract = new Dictionary<string, NeuronCapabilityAccumulator>(StringComparer.Ordinal);
 
         foreach (var type in TypesIn(module.ContainingAssembly.GlobalNamespace))
@@ -41,6 +50,11 @@ public sealed partial class DispatchManifestGenerator
             cancellationToken.ThrowIfCancellationRequested();
 
             if (type.TypeKind != TypeKind.Class || type.IsAbstract)
+            {
+                continue;
+            }
+
+            if (!IsOwnedByModule(type, module, moduleMarkers))
             {
                 continue;
             }
@@ -61,13 +75,15 @@ public sealed partial class DispatchManifestGenerator
                     continue;
                 }
 
-                var contractId = neuronContract.ToDisplayString(FullName);
+                var alias = AliasOf(neuronContract);
+                var contractId = alias ?? neuronContract.ToDisplayString(FullName);
                 if (!byContract.TryGetValue(contractId, out var accumulator))
                 {
                     var description = DescriptionOf(neuronContract) ?? neuronContract.Name;
                     accumulator = new NeuronCapabilityAccumulator(
                         contractId,
                         description,
+                        alias is not null,
                         DescriptionOf(neuronContract) is not null,
                         neuronContract.Locations.FirstOrDefault() ?? Location.None);
                     byContract[contractId] = accumulator;
@@ -92,11 +108,86 @@ public sealed partial class DispatchManifestGenerator
                 entry.ContractId,
                 entry.Description,
                 "default",
+                entry.HasAlias,
                 entry.HasDescription,
                 entry.Location,
                 DistinctSynapses(entry.Accepted),
                 DistinctSynapses(entry.Emitted)))
             .ToImmutableArray();
+    }
+
+    private static IEnumerable<INamedTypeSymbol> ModuleMarkersIn(IAssemblySymbol assembly)
+    {
+        foreach (var type in TypesIn(assembly.GlobalNamespace))
+        {
+            if (type.TypeKind != TypeKind.Class
+                || type.IsAbstract
+                || type.DeclaredAccessibility != Accessibility.Public)
+            {
+                continue;
+            }
+
+            if (type.AllInterfaces.Any(contract => contract.ToDisplayString(FullName) == ModuleInterface))
+            {
+                yield return type;
+            }
+        }
+    }
+
+    private static bool IsOwnedByModule(
+        INamedTypeSymbol type,
+        INamedTypeSymbol module,
+        ImmutableArray<INamedTypeSymbol> moduleMarkers)
+    {
+        var owner = OwningModule(type, moduleMarkers);
+        return owner is not null && SymbolEqualityComparer.Default.Equals(owner, module);
+    }
+
+    private static INamedTypeSymbol? OwningModule(
+        INamedTypeSymbol type,
+        ImmutableArray<INamedTypeSymbol> moduleMarkers)
+    {
+        var typeNamespace = NamespaceOf(type);
+        INamedTypeSymbol? owner = null;
+        var ownerLength = -1;
+
+        foreach (var candidate in moduleMarkers)
+        {
+            var moduleNamespace = NamespaceOf(candidate);
+            if (!NamespaceOwns(moduleNamespace, typeNamespace))
+            {
+                continue;
+            }
+
+            if (moduleNamespace.Length > ownerLength)
+            {
+                owner = candidate;
+                ownerLength = moduleNamespace.Length;
+            }
+        }
+
+        return owner;
+    }
+
+    private static string NamespaceOf(INamedTypeSymbol type)
+        => type.ContainingNamespace.IsGlobalNamespace
+            ? string.Empty
+            : type.ContainingNamespace.ToDisplayString();
+
+    private static bool NamespaceOwns(string moduleNamespace, string typeNamespace)
+    {
+        if (moduleNamespace.Length == 0)
+        {
+            return true;
+        }
+
+        if (typeNamespace.Length == 0)
+        {
+            return false;
+        }
+
+        return typeNamespace.Equals(moduleNamespace, StringComparison.Ordinal)
+            || typeNamespace.StartsWith(moduleNamespace + ".", StringComparison.Ordinal);
     }
 
     private static ImmutableArray<SynapseCapabilityModel> DistinctSynapses(
@@ -193,6 +284,14 @@ public sealed partial class DispatchManifestGenerator
     {
         foreach (var neuron in neurons)
         {
+            if (!neuron.HasAlias)
+            {
+                production.ReportDiagnostic(Diagnostic.Create(
+                    NeuronAliasRequired,
+                    neuron.Location,
+                    neuron.ContractId));
+            }
+
             if (requireDescriptions && !neuron.HasDescription)
             {
                 production.ReportDiagnostic(Diagnostic.Create(
@@ -283,12 +382,15 @@ public sealed partial class DispatchManifestGenerator
     private sealed class NeuronCapabilityAccumulator(
         string contractId,
         string description,
+        bool hasAlias,
         bool hasDescription,
         Location location)
     {
         public string ContractId { get; } = contractId;
 
         public string Description { get; } = description;
+
+        public bool HasAlias { get; } = hasAlias;
 
         public bool HasDescription { get; } = hasDescription;
 
@@ -303,6 +405,7 @@ public sealed partial class DispatchManifestGenerator
         string contractId,
         string description,
         string defaultInstanceName,
+        bool hasAlias,
         bool hasDescription,
         Location location,
         ImmutableArray<SynapseCapabilityModel> accepted,
@@ -313,6 +416,8 @@ public sealed partial class DispatchManifestGenerator
         public string Description { get; } = description;
 
         public string DefaultInstanceName { get; } = defaultInstanceName;
+
+        public bool HasAlias { get; } = hasAlias;
 
         public bool HasDescription { get; } = hasDescription;
 

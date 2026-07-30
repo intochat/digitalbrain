@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 
@@ -5,10 +6,15 @@ namespace DigitalBrain.TestingTests;
 
 [GenerateSerializer]
 [Alias("db.testing.capability-ping")]
+[Description("Capability probe ping")]
 public sealed record CapabilityPing : Synapse;
 
+[Alias("testing.capability-caller")]
+[Description("Capability probe caller neuron")]
 public partial interface ICapabilityCaller : INeuron;
 
+[Alias("testing.capability-target")]
+[Description("Capability probe target neuron")]
 public partial interface ICapabilityTarget : INeuron
 {
     [Alias(nameof(Poke))]
