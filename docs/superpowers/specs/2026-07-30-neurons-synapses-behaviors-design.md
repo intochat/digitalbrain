@@ -1,6 +1,6 @@
 # DigitalBrain Neurons, Synapses, Behaviors, Memory, and Discovery
 
-**Status:** Approved design, pending written-spec review
+**Status:** Approved
 
 **Date:** 2026-07-30
 
@@ -33,7 +33,7 @@ Adding another module must follow the same path without editing the assistant. P
 3. **One durable lifecycle.** The existing Tasks module owns task state, attempts, blockers, cancellation, retry, continuation, and outcomes. There is no parallel `KernelTask` or `WorkId`.
 4. **Manifests are canonical at runtime.** CLR names, preview compiler lowering, MCP tool names, and provider details do not define persisted identities.
 5. **Behavior intent is readable and executable.** English BDD scenarios define expected behavior; C# implements it.
-6. **External systems stay behind module boundaries.** Quadrant, Gmail MCP, OAuth, and Salesforce details are provider implementation choices.
+6. **External systems stay behind module boundaries.** Qdrant, Gmail MCP, OAuth, and Salesforce details are provider implementation choices.
 7. **Discovery is automatic but verified.** Semantic search finds candidates; the exact active catalog validates them.
 8. **Do not make the kernel understand accounts, providers, or behavior code.**
 
@@ -59,7 +59,7 @@ The important gaps are:
 - The Flutter app can inspect the Behaviors module in Brain, but does not expose behavior listing, explanation, editing, tests, revisions, or operational controls.
 - There is no reusable public vector-memory module or automatic semantic capability projection.
 
-IAW provides useful precedents—Orleans-connected C# scripting, durable startup work, and Quadrant-backed semantic lookup—but DigitalBrain should reuse the ideas through its existing modules, Tasks lifecycle, and directed synapses instead of copying IAW's cluster-client shape.
+IAW provides useful precedents—Orleans-connected C# scripting, durable startup work, and Qdrant-backed semantic lookup—but DigitalBrain should reuse the ideas through its existing modules, Tasks lifecycle, and directed synapses instead of copying IAW's cluster-client shape.
 
 ## 4. Module and synapse programming model
 
@@ -147,14 +147,14 @@ Required scopes include:
 
 Access checks prevent user or community data from overwriting system projections, while still allowing any authorized module or behavior to use vector storage for its own purpose.
 
-Quadrant is an encapsulated provider configured through Aspire, conceptually:
+Qdrant is an encapsulated provider configured through Aspire, conceptually:
 
 ```csharp
 brain.AddModule<MemoryModule>(memory =>
-    memory.WithQuadrant(...));
+    memory.WithQdrant(...));
 ```
 
-Community code programs against `IVectorMemory`, not Quadrant. A private provider neuron may exist internally, but `IQuadrant` is not the portable public contract.
+Community code programs against `IVectorMemory`, not Qdrant. A private provider neuron may exist internally, but `IQdrant` is not the portable public contract.
 
 Graph memory has a different model and different synapses. A future `IGraphMemory` remains separate rather than being forced through vector contracts.
 
@@ -403,7 +403,7 @@ Run real compiled modules in `DigitalBrainFixture`. Fake only external provider 
 
 - MCP provider
 - OAuth callback
-- Quadrant/vector provider
+- Qdrant/vector provider
 - Model response
 
 Assert incoming/outgoing synapses, Task state, and journal evidence.
@@ -420,7 +420,7 @@ Assert incoming/outgoing synapses, Task state, and journal evidence.
 
 ### Provider contract tests
 
-Run the same `IVectorMemory` contract suite against an in-memory provider and Quadrant. Verify scope isolation and provider interchangeability.
+Run the same `IVectorMemory` contract suite against an in-memory provider and Qdrant. Verify scope isolation and provider interchangeability.
 
 ### Critical Aspire tests
 
@@ -471,7 +471,7 @@ This umbrella design should be implemented as separate reviewable plans and PRs:
 ### Slice 4 — MemoryModule and capability projection
 
 - Add reusable `IVectorMemory`.
-- Add in-memory test provider and Quadrant provider.
+- Add in-memory test provider and Qdrant provider.
 - Add protected namespaces and capability/behavior semantic projections.
 
 ### Slice 5 — Google and Salesforce neuron surfaces
@@ -504,7 +504,7 @@ This umbrella design should be implemented as separate reviewable plans and PRs:
 - `KernelTask` or `WorkId`
 - Loading authored behavior assemblies into the silo
 - Vector search as the authoritative capability catalog
-- Public Quadrant coupling
+- Public Qdrant coupling
 - Combining vector and graph memory contracts
 - Automatic subscription merely because a union accepts an event type
 - A full IDE, terminal, package manager, or debugger inside Flutter
