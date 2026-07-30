@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions;
 using Xunit;
 
 namespace DigitalBrain.Tasks.Tests;
@@ -53,5 +54,64 @@ public sealed partial class TaskLifecycle
                 worker.Id)));
 
         Assert.Equal(TaskState.Running, (await task.Reference.Read()).State);
+    }
+
+    [Fact(DisplayName = "Start pins task to behavior id, revision, contract version, case id, and opaque ProtectedPayloadReference")]
+    public async Task StartPinsBehaviorActivationIdentity()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var brain = await fixture.CreateBrainAsync(cancellationToken);
+        var worker = brain.Neuron<IWorker>("pin-worker");
+        var task = brain.Neuron<ITask>("pin-task");
+        var activation = new BehaviorTaskActivation(
+            new BehaviorId("sample"),
+            new BehaviorRevisionId("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+            contractVersion: "1",
+            caseId: "install",
+            protectedPayload: new ProtectedPayloadReference(Guid.Parse("11111111-1111-1111-1111-111111111111")));
+
+        var started = await task.Reference.Start(new StartTask(
+            CommandId.New(),
+            new TestGoal("pinned"),
+            worker.Id,
+            TaskFixtures.SingleAttempt,
+            Activation: activation));
+
+        Assert.Equal(TaskState.Pending, started.State);
+        Assert.NotNull(started.ActiveAttempt);
+        Assert.Equal(activation, started.Activation);
+        Assert.Equal(activation.BehaviorId, started.Activation!.BehaviorId);
+        Assert.Equal(activation.Revision, started.Activation.Revision);
+        Assert.Equal(activation.ContractVersion, started.Activation.ContractVersion);
+        Assert.Equal(activation.CaseId, started.Activation.CaseId);
+        Assert.Equal(activation.ProtectedPayload, started.Activation.ProtectedPayload);
+
+        var read = await task.Reference.Read();
+        Assert.Equal(activation, read.Activation);
+        Assert.Equal(started.ActiveAttempt, read.ActiveAttempt);
+    }
+
+    [Fact(DisplayName = "Start directed request/result is idempotent; recovery cannot create a second attempt")]
+    public async Task StartDirectedRequestResultIsIdempotentAcrossRecovery()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var brain = await fixture.CreateBrainAsync(cancellationToken);
+        var worker = brain.Neuron<IWorker>("directed-worker");
+        var task = brain.Neuron<ITask>("directed-task");
+        var command = StartCommand(new TestGoal("directed"), worker.Id);
+
+        var first = await task.Reference.Start(command);
+        var recovered = await task.Reference.Start(command);
+
+        AssertReceipt(first, recovered);
+        Assert.Equal(first.ActiveAttempt, recovered.ActiveAttempt);
+        Assert.Equal(1, recovered.AttemptCount);
+
+        var secondCommand = StartCommand(new TestGoal("directed-again"), worker.Id);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => task.Reference.Start(secondCommand));
+
+        var read = await task.Reference.Read();
+        Assert.Equal(first.ActiveAttempt, read.ActiveAttempt);
+        Assert.Equal(1, read.AttemptCount);
     }
 }

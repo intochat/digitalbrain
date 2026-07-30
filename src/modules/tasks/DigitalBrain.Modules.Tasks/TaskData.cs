@@ -18,7 +18,8 @@ internal sealed class TaskData(
     NeuronId? retryOf,
     int attemptCount,
     Dictionary<CommandId, TaskSnapshot> receipts,
-    PendingWorkerDispatch? pendingDispatch)
+    PendingWorkerDispatch? pendingDispatch,
+    BehaviorTaskActivation? activation)
 {
     [Id(0)]
     public Goal Goal { get; set; } = goal;
@@ -61,4 +62,7 @@ internal sealed class TaskData(
 
     [Id(13)]
     public PendingWorkerDispatch? PendingDispatch { get; set; } = pendingDispatch;
+
+    [Id(14)]
+    public BehaviorTaskActivation? Activation { get; set; } = activation;
 }

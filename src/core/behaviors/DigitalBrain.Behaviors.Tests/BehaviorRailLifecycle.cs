@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
 using Xunit;
 
@@ -149,6 +150,110 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
         Assert.True(rollbackExecute.Succeeded, rollbackExecute.Outcome);
         Assert.Equal("v1:after-rollback", rollbackExecute.Outcome);
         Assert.Equal(firstHash, rollbackExecute.ArtifactHash);
+    }
+
+    [Fact(DisplayName = "explicit binding/activation starts exactly one existing owner-scoped Tasks ITask pinned to behavior identity")]
+    public async Task ExplicitBindingActivationStartsExactlyOneOwnerScopedTask()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var behavior = test.Neuron<IBehaviorNeuron>(BehaviorsFixture.SampleBehavior);
+        var task = test.Neuron<DigitalBrain.Tasks.ITask>("behavior-activation-task");
+        var worker = test.Neuron<DigitalBrain.Tasks.IWorker>("behavior-activation-worker");
+
+        var active = await InstallAsync(test, behavior, RailPrograms.GreenProgram("pin"), "pin");
+        var binding = BehaviorActivationBindings.ForExistingTask(
+            task.Id,
+            worker.Id,
+            new BehaviorId(BehaviorsFixture.SampleBehavior),
+            new BehaviorRevisionId(active.ActiveArtifactHash!),
+            contractVersion: "1",
+            caseId: "install",
+            protectedPayload: new ProtectedPayloadReference(Guid.Parse("22222222-2222-2222-2222-222222222222")));
+
+        var started = await behavior.Reference.ActivateBound(
+            new ActivateBoundBehavior(
+                CommandId.New(),
+                active.ActiveArtifactHash!,
+                binding));
+
+        Assert.Equal(TaskState.Pending, started.State);
+        Assert.Equal(task.Id, started.TaskId);
+        Assert.Equal(binding.BehaviorId, started.Activation!.BehaviorId);
+        Assert.Equal(binding.Revision, started.Activation.Revision);
+        Assert.Equal(binding.ContractVersion, started.Activation.ContractVersion);
+        Assert.Equal(binding.CaseId, started.Activation.CaseId);
+        Assert.Equal(binding.ProtectedPayload, started.Activation.ProtectedPayload);
+
+        var snapshot = await task.Reference.Read();
+        Assert.Equal(TaskState.Pending, snapshot.State);
+        Assert.NotNull(snapshot.ActiveAttempt);
+        Assert.Equal(binding.BehaviorId, snapshot.Activation!.BehaviorId);
+        Assert.Equal(binding.Revision, snapshot.Activation.Revision);
+        Assert.Equal(binding.ContractVersion, snapshot.Activation.ContractVersion);
+        Assert.Equal(binding.CaseId, snapshot.Activation.CaseId);
+        Assert.Equal(binding.ProtectedPayload, snapshot.Activation.ProtectedPayload);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => behavior.Reference.ActivateBound(
+                new ActivateBoundBehavior(
+                    CommandId.New(),
+                    active.ActiveArtifactHash!,
+                    binding with { CaseId = "other" })));
+
+        Assert.Equal(TaskState.Pending, (await task.Reference.Read()).State);
+    }
+
+    [Fact(DisplayName = "union membership alone creates no subscription or task; only explicit binding activates")]
+    public async Task UnionMembershipAloneCreatesNoSubscriptionOrTask()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var behavior = test.Neuron<IBehaviorNeuron>(BehaviorsFixture.SampleBehavior);
+        var task = test.Neuron<DigitalBrain.Tasks.ITask>("union-only-task");
+
+        var active = await InstallAsync(test, behavior, RailPrograms.GreenProgram("union"), "union");
+        Assert.Equal(BehaviorRevisionStatus.Active, active.Status);
+
+        var unread = await task.Reference.Read();
+        Assert.Equal(TaskState.Pending, unread.State);
+        Assert.Null(unread.ActiveAttempt);
+        Assert.Null(unread.Activation);
+        Assert.Equal(0, unread.Revision);
+    }
+
+    [Fact(DisplayName = "duplicate binding delivery/recovery cannot create a second task")]
+    public async Task DuplicateBindingDeliveryCannotCreateSecondTask()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var behavior = test.Neuron<IBehaviorNeuron>(BehaviorsFixture.SampleBehavior);
+        var task = test.Neuron<DigitalBrain.Tasks.ITask>("duplicate-binding-task");
+        var worker = test.Neuron<DigitalBrain.Tasks.IWorker>("duplicate-binding-worker");
+
+        var active = await InstallAsync(test, behavior, RailPrograms.GreenProgram("dup"), "dup");
+        var commandId = CommandId.New();
+        var binding = BehaviorActivationBindings.ForExistingTask(
+            task.Id,
+            worker.Id,
+            new BehaviorId(BehaviorsFixture.SampleBehavior),
+            new BehaviorRevisionId(active.ActiveArtifactHash!),
+            contractVersion: "1",
+            caseId: "install",
+            protectedPayload: new ProtectedPayloadReference(Guid.Parse("33333333-3333-3333-3333-333333333333")));
+
+        var first = await behavior.Reference.ActivateBound(
+            new ActivateBoundBehavior(commandId, active.ActiveArtifactHash!, binding));
+        var second = await behavior.Reference.ActivateBound(
+            new ActivateBoundBehavior(commandId, active.ActiveArtifactHash!, binding));
+
+        Assert.Equal(first.TaskId, second.TaskId);
+        Assert.Equal(first.ActiveAttempt, second.ActiveAttempt);
+        Assert.Equal(first.Activation, second.Activation);
+
+        var snapshot = await task.Reference.Read();
+        Assert.Equal(first.ActiveAttempt, snapshot.ActiveAttempt);
+        Assert.Equal(1, snapshot.AttemptCount);
     }
 
     private static async Task<BehaviorSnapshot> ProposeGreenAsync(

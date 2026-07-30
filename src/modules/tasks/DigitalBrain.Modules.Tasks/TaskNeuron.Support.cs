@@ -65,7 +65,9 @@ internal sealed partial class TaskNeuron
         data.Result,
         data.Failure,
         [.. data.Evidence],
-        data.RetryOf);
+        data.RetryOf,
+        data.AttemptCount,
+        data.Activation);
 
     private static void Validate(StartTask command)
     {
@@ -87,6 +89,14 @@ internal sealed partial class TaskNeuron
             throw new ArgumentException("A task worker is required.", nameof(command));
         }
 
+        if (command.Activation is { } activation
+            && (string.IsNullOrWhiteSpace(activation.ContractVersion)
+                || string.IsNullOrWhiteSpace(activation.CaseId)))
+        {
+            throw new ArgumentException(
+                "A behavior activation requires a contract version and case id.",
+                nameof(command));
+        }
     }
 
     private static void Validate(CommandId commandId)

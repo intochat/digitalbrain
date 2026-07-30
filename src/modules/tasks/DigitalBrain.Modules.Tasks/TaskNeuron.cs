@@ -33,7 +33,26 @@ internal sealed partial class TaskNeuron :
         _states = ServiceProvider.GetRequiredService<Serializer<TaskData>>();
     }
 
-    public Task<TaskSnapshot> Read() => Task.FromResult(Snapshot(Load()));
+    public Task<TaskSnapshot> Read()
+    {
+        var data = LoadIfStarted();
+        return Task.FromResult(data is null
+            ? new TaskSnapshot(
+                default!,
+                default,
+                default!,
+                TaskState.Pending,
+                Revision: 0,
+                ActiveAttempt: null,
+                Blocker: null,
+                Result: null,
+                Failure: null,
+                Evidence: [],
+                RetryOf: null,
+                AttemptCount: 0,
+                Activation: null)
+            : Snapshot(data));
+    }
 
     Task INeuron.Deliver(SynapseDelivery delivery)
     {

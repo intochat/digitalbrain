@@ -1,3 +1,4 @@
+using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
 
 namespace DigitalBrain.Behaviors.Tests;
@@ -11,5 +12,6 @@ public sealed class BehaviorsFixture : DigitalBrainFixture
     {
         ArgumentNullException.ThrowIfNull(brain);
         brain.AddModule<BehaviorsModule>();
+        brain.AddModule<TasksModule>();
     }
 }

@@ -46,7 +46,8 @@ internal sealed partial class TaskNeuron
             command.RetryOf,
             attemptCount: 1,
             receipts: new Dictionary<CommandId, TaskSnapshot>(),
-            pendingDispatch: null);
+            pendingDispatch: null,
+            activation: command.Activation);
         data.PendingDispatch = new AcceptWorkerDispatch(Request(data));
         var snapshot = Snapshot(data);
         data.Receipts.Add(command.CommandId, snapshot);

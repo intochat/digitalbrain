@@ -17,5 +17,6 @@
     <ProjectReference Include="..\DigitalBrain.Behaviors.Host\DigitalBrain.Behaviors.Host.csproj" />
     <ProjectReference Include="..\..\security\DigitalBrain.Security\DigitalBrain.Security.csproj" />
     <ProjectReference Include="..\..\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="..\..\..\modules\tasks\DigitalBrain.Modules.Tasks\DigitalBrain.Modules.Tasks.csproj" />
   </ItemGroup>
 </Project>
