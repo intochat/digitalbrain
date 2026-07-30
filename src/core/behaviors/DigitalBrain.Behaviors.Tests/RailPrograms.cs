@@ -41,7 +41,53 @@ internal static class RailPrograms
                     IBehaviorContext context,
                     IReadOnlyDictionary<string, string> features,
                     CancellationToken cancellationToken)
-                    => ValueTask.FromResult(BehaviorInstallTestReport.Pass(1, "green"));
+                    => ValueTask.FromResult(BehaviorInstallTestReport.FromResults(
+                    [
+                        new BehaviorScenarioResult(
+                            "scenario.install-gate-passes",
+                            "install gate passes",
+                            "bind.install-gate-passes",
+                            true,
+                            "green"),
+                    ],
+                    "green"));
+            }
+            """;
+
+    public static string UnionGreenProgram()
+        => """
+            using System.Collections.Generic;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DigitalBrain.Abstractions;
+            using DigitalBrain.Behaviors;
+
+            public sealed record ManualResearchRequest(string Prompt) : Synapse;
+            public sealed record GmailMessageReceived(string MessageId) : Synapse;
+            public union ResearchCompanyRequest(ManualResearchRequest, GmailMessageReceived);
+
+            public sealed class SampleProgram : IBehaviorProgram<ManualResearchRequest>
+            {
+                public ValueTask ExecuteAsync(ManualResearchRequest trigger, IBehaviorContext context, CancellationToken cancellationToken)
+                    => ValueTask.CompletedTask;
+            }
+
+            public sealed class SampleInstallTests : IBehaviorInstallTests
+            {
+                public ValueTask<BehaviorInstallTestReport> RunAsync(
+                    IBehaviorContext context,
+                    IReadOnlyDictionary<string, string> features,
+                    CancellationToken cancellationToken)
+                    => ValueTask.FromResult(BehaviorInstallTestReport.FromResults(
+                    [
+                        new BehaviorScenarioResult(
+                            "scenario.install-gate-passes",
+                            "install gate passes",
+                            "bind.install-gate-passes",
+                            true,
+                            "green"),
+                    ],
+                    "green"));
             }
             """;
 
@@ -67,7 +113,16 @@ internal static class RailPrograms
                     IBehaviorContext context,
                     IReadOnlyDictionary<string, string> features,
                     CancellationToken cancellationToken)
-                    => ValueTask.FromResult(BehaviorInstallTestReport.Fail("scenario red"));
+                    => ValueTask.FromResult(BehaviorInstallTestReport.FromResults(
+                    [
+                        new BehaviorScenarioResult(
+                            "scenario.install-gate-fails",
+                            "install gate fails",
+                            "bind.install-gate-fails",
+                            false,
+                            "scenario red"),
+                    ],
+                    "scenario red"));
             }
             """;
 
@@ -106,7 +161,16 @@ internal static class RailPrograms
                     IBehaviorContext context,
                     IReadOnlyDictionary<string, string> features,
                     CancellationToken cancellationToken)
-                    => ValueTask.FromResult(BehaviorInstallTestReport.Pass(1, "account-enrichment"));
+                    => ValueTask.FromResult(BehaviorInstallTestReport.FromResults(
+                    [
+                        new BehaviorScenarioResult(
+                            "scenario.enrich-account-from-email",
+                            "enrich account from email",
+                            "bind.enrich-account-from-email",
+                            true,
+                            "account-enrichment"),
+                    ],
+                    "account-enrichment"));
             }
             """;
 

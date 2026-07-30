@@ -14,9 +14,6 @@ public sealed record BehaviorInstallTestReport(
     string Detail,
     IReadOnlyList<BehaviorScenarioResult> Results)
 {
-    public static BehaviorInstallTestReport Pass(int scenarioCount, string detail = "passed")
-        => new(true, scenarioCount, detail, []);
-
     public static BehaviorInstallTestReport Fail(string detail, int scenarioCount = 0)
         => new(false, scenarioCount, detail, []);
 

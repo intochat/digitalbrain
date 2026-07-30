@@ -3,3 +3,4 @@ using Xunit;
 
 [assembly: AssemblyFixture(typeof(BehaviorsFixture))]
 [assembly: AssemblyFixture(typeof(HostBehaviorsFixture))]
+[assembly: AssemblyFixture(typeof(RunTestsArtifactBindingFixture))]

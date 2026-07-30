@@ -40,7 +40,16 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
                 IBehaviorContext context,
                 IReadOnlyDictionary<string, string> features,
                 CancellationToken cancellationToken)
-                => ValueTask.FromResult(BehaviorInstallTestReport.Pass(1, "green"));
+                => ValueTask.FromResult(BehaviorInstallTestReport.FromResults(
+                [
+                    new BehaviorScenarioResult(
+                        "scenario.install-gate-passes",
+                        "install gate passes",
+                        "bind.install-gate-passes",
+                        true,
+                        "green"),
+                ],
+                "green"));
         }
         """;
 

@@ -120,7 +120,16 @@ internal static class AccountEnrichmentRailProgram
                 IBehaviorContext context,
                 IReadOnlyDictionary<string, string> features,
                 CancellationToken cancellationToken)
-                => ValueTask.FromResult(BehaviorInstallTestReport.Pass(1, "account-enrichment"));
+                => ValueTask.FromResult(BehaviorInstallTestReport.FromResults(
+                [
+                    new BehaviorScenarioResult(
+                        "scenario.enrich-account-from-email",
+                        "enrich account from email",
+                        "bind.enrich-account-from-email",
+                        true,
+                        "account-enrichment"),
+                ],
+                "account-enrichment"));
         }
         """;
 }

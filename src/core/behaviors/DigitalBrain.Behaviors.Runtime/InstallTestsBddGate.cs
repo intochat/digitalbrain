@@ -79,30 +79,17 @@ internal sealed class InstallTestsBddGate : IBehaviorBddGate
                 .GetAwaiter()
                 .GetResult();
 
-            if (report.Results.Count > 0)
+            var withResults = BehaviorScenarioBinder.Bind(
+                envelope.FeatureSource,
+                binding.Scenarios,
+                report.Results);
+            if (!withResults.Passed)
             {
-                var withResults = BehaviorScenarioBinder.Bind(
-                    envelope.FeatureSource,
-                    binding.Scenarios,
-                    report.Results);
-                if (!withResults.Passed)
-                {
-                    return BehaviorInstallTestReport.Fail(withResults.Detail, withResults.ScenarioCount);
-                }
-            }
-            else if (!report.Passed)
-            {
-                return BehaviorInstallTestReport.Fail(report.Detail, binding.ScenarioCount);
-            }
-            else if (report.ScenarioCount != binding.ScenarioCount)
-            {
-                return BehaviorInstallTestReport.Fail(
-                    $"Install tests reported {report.ScenarioCount} scenarios but the feature declares {binding.ScenarioCount}.",
-                    binding.ScenarioCount);
+                return BehaviorInstallTestReport.Fail(withResults.Detail, withResults.ScenarioCount);
             }
 
             return report.Passed
-                ? BehaviorInstallTestReport.Pass(binding.ScenarioCount, report.Detail)
+                ? BehaviorInstallTestReport.FromResults(report.Results, report.Detail)
                 : BehaviorInstallTestReport.Fail(report.Detail, binding.ScenarioCount);
         }
         catch (Exception exception)

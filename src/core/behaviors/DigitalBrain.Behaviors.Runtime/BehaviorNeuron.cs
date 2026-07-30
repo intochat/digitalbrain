@@ -129,28 +129,25 @@ internal sealed partial class BehaviorNeuron :
         }
 
         if (!string.Equals(data.ProposedArtifactHash, command.ArtifactHash, StringComparison.Ordinal)
-            || data.ArtifactBytes is null
-            || data.AssemblyBytes is null
-            || data.Features is null
-            || data.ProgramSource is null)
+            || data.ArtifactBytes is null)
         {
             throw new InvalidOperationException(
                 $"Behavior '{Id}' has no proposed revision for artifact '{command.ArtifactHash}'.");
         }
 
-        var behaviorId = BehaviorIdOfName();
-        var envelope = CreateProposalEnvelope(
-            behaviorId,
-            data.DisplayName ?? behaviorId.Value,
-            data.Description ?? behaviorId.Value,
-            data.ProgramSource,
-            FeatureSourceOf(data.Features),
-            data.AssemblyBytes,
-            """{"diagnostics":[],"languageVersion":"Preview","policy":"contract-only-v1","roslyn":"5.6.0","sdk":"rail","succeeded":true}""");
+        var digest = BehaviorArtifactDigest.Compute(data.ArtifactBytes);
+        if (!string.Equals(digest.Value, data.ProposedArtifactHash, StringComparison.Ordinal)
+            || !string.Equals(digest.Value, command.ArtifactHash, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Behavior '{Id}' artifact digest does not match the proposed revision '{command.ArtifactHash}'.");
+        }
 
+        var behaviorId = BehaviorIdOfName();
+        var envelope = CanonicalArtifactReader.Read(data.ArtifactBytes);
         var report = _bddGate.Evaluate(
             envelope,
-            data.AssemblyBytes,
+            envelope.BehaviorAssembly,
             command.ArtifactHash,
             new GrainBehaviorCapabilityResolver(GrainFactory, Id.Owner),
             TimeProvider);
