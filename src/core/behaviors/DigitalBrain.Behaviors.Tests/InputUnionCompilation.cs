@@ -211,6 +211,123 @@ public sealed class InputUnionCompilation
         Assert.Contains("ResearchCompanyRequest", compile.CompilerEvidenceJson, StringComparison.Ordinal);
     }
 
+    [Fact(DisplayName =
+        "Non-union program with one immutable-record TTrigger lowers to a stable one-case contract")]
+    public void SingleProgramTriggerLowersToStableOneCaseContract()
+    {
+        var source = UnionProgram(
+            """
+            public sealed record SampleTrigger(string Label) : Synapse;
+
+            public sealed class SampleProgram : IBehaviorProgram<SampleTrigger>
+            {
+                public ValueTask ExecuteAsync(SampleTrigger trigger, IBehaviorContext context, CancellationToken cancellationToken)
+                    => ValueTask.CompletedTask;
+            }
+            """);
+
+        var result = Lower(source, "com.digitalbrain.sample");
+
+        Assert.True(result.Succeeded, result.Diagnostics);
+        Assert.NotNull(result.Contract);
+        Assert.Equal("com.digitalbrain.sample", result.Contract!.BehaviorContractId);
+        Assert.Equal(1, result.Contract.ContractMajorVersion);
+        Assert.Equal(["case.SampleTrigger"], result.CaseIds);
+        var single = Assert.Single(result.Contract.Cases);
+        Assert.Equal("case.SampleTrigger", single.CaseId);
+        Assert.Equal(1, single.CaseSchemaVersion);
+        Assert.Equal("SampleTrigger", single.CaseName);
+        Assert.Contains("\"Label\"", single.PayloadSchemaJson, StringComparison.Ordinal);
+        Assert.Contains("\"type\":\"string\"", single.PayloadSchemaJson, StringComparison.Ordinal);
+        Assert.Equal("""{"type":"object"}""", result.Contract.ResultSchemaJson);
+
+        Assert.Contains("\"oneOf\"", result.Contract.OneOfSchemaJson, StringComparison.Ordinal);
+        Assert.Contains("case.SampleTrigger", result.Contract.OneOfSchemaJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"oneOf\":[]", result.Contract.OneOfSchemaJson, StringComparison.Ordinal);
+        Assert.Contains("\"succeeded\":true", result.LoweringEvidenceJson, StringComparison.Ordinal);
+        Assert.Contains("case.SampleTrigger", result.LoweringEvidenceJson, StringComparison.Ordinal);
+
+        var compile = new ContractOnlyBehaviorCompiler().Compile(source, new BehaviorId("com.digitalbrain.sample"));
+        Assert.True(compile.Succeeded, compile.Diagnostics);
+        Assert.NotNull(compile.Contract);
+        Assert.Equal(result.Contract.OneOfSchemaJson, compile.Contract!.OneOfSchemaJson);
+        Assert.Equal(result.Contract.Cases.Select(item => item.CaseId), compile.Contract.Cases.Select(item => item.CaseId));
+    }
+
+    [Fact(DisplayName = "Compiler rejects programs with no logical input synapse")]
+    public void RejectsNoLogicalInput()
+    {
+        var result = Lower(
+            UnionProgram(
+                """
+                public sealed record SampleTrigger(string Label) : Synapse;
+
+                public sealed class SampleInstallTests : IBehaviorInstallTests
+                {
+                    public ValueTask<BehaviorInstallTestReport> RunAsync(
+                        IBehaviorContext context,
+                        IReadOnlyDictionary<string, string> features,
+                        CancellationToken cancellationToken)
+                        => ValueTask.FromResult(BehaviorInstallTestReport.FromResults(
+                        [
+                            new BehaviorScenarioResult(
+                                "scenario.install-gate-passes",
+                                "install gate passes",
+                                "bind.install-gate-passes",
+                                true,
+                                "green"),
+                        ],
+                        "green"));
+                }
+                """),
+            "com.digitalbrain.no-input");
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("logical input", result.Diagnostics, StringComparison.OrdinalIgnoreCase);
+
+        var compile = new ContractOnlyBehaviorCompiler().Compile(
+            UnionProgram(
+                """
+                public sealed record SampleTrigger(string Label) : Synapse;
+                """),
+            new BehaviorId("com.digitalbrain.no-input"));
+        Assert.False(compile.Succeeded);
+        Assert.Contains("logical input", compile.Diagnostics, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(compile.Contract);
+    }
+
+    [Fact(DisplayName = "Compiler rejects more than one distinct root program trigger")]
+    public void RejectsMultipleDistinctProgramTriggers()
+    {
+        var source = UnionProgram(
+            """
+            public sealed record SampleTrigger(string Label) : Synapse;
+            public sealed record OtherTrigger(string Value) : Synapse;
+
+            public sealed class SampleProgram : IBehaviorProgram<SampleTrigger>
+            {
+                public ValueTask ExecuteAsync(SampleTrigger trigger, IBehaviorContext context, CancellationToken cancellationToken)
+                    => ValueTask.CompletedTask;
+            }
+
+            public sealed class OtherProgram : IBehaviorProgram<OtherTrigger>
+            {
+                public ValueTask ExecuteAsync(OtherTrigger trigger, IBehaviorContext context, CancellationToken cancellationToken)
+                    => ValueTask.CompletedTask;
+            }
+            """);
+
+        var result = Lower(source, "com.digitalbrain.two-triggers");
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("more than one distinct program trigger", result.Diagnostics, StringComparison.OrdinalIgnoreCase);
+
+        var compile = new ContractOnlyBehaviorCompiler().Compile(source, new BehaviorId("com.digitalbrain.two-triggers"));
+        Assert.False(compile.Succeeded);
+        Assert.Contains("more than one distinct program trigger", compile.Diagnostics, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(compile.Contract);
+    }
+
     private static InputContractLoweringResult Lower(string source, string behaviorId)
         => BehaviorInputContractCompiler.Lower(
             source,

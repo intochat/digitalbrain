@@ -56,13 +56,18 @@ internal sealed partial class BehaviorNeuron :
         var activeHash = data.ActiveArtifactHash;
         var priorHash = data.PriorArtifactHash;
         var compile = _compiler.Compile(command.ProgramSource, behaviorId);
-        if (!compile.Succeeded)
+        if (!compile.Succeeded
+            || compile.Contract is null
+            || compile.Contract.Cases.Count == 0)
         {
+            var diagnostics = compile.Succeeded
+                ? "A successful compile must produce a non-empty behavior input contract."
+                : compile.Diagnostics;
             data = data with
             {
                 Status = BehaviorRevisionStatus.CompileFailed,
                 ProposedArtifactHash = null,
-                LastCompileFailure = compile.Diagnostics,
+                LastCompileFailure = diagnostics,
                 TestsPassed = false,
                 IsApproved = false,
                 ProgramSource = command.ProgramSource,
@@ -74,7 +79,7 @@ internal sealed partial class BehaviorNeuron :
             };
             data = WithReceipt(data, command.CommandId, Snapshot(data));
             await SaveAsync(data);
-            await EmitAsync(new BehaviorCompileFailed(command.CommandId, behaviorId, compile.Diagnostics));
+            await EmitAsync(new BehaviorCompileFailed(command.CommandId, behaviorId, diagnostics));
             return Snapshot(data);
         }
 

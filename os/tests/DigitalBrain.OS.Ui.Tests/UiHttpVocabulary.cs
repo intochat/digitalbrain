@@ -89,6 +89,7 @@ public sealed class UiHttpVocabulary(FlutterHttpFixture fixture)
                 nameof(IDigitalBrain.ActivateAsync),
                 nameof(IDigitalBrain.EmitAsync),
                 nameof(IDigitalBrain.Get),
+                nameof(IDigitalBrain.GetGrainProxy),
                 nameof(IDigitalBrain.SendAsync),
             ],
             typeof(IDigitalBrain)

@@ -52,13 +52,6 @@ internal static class BehaviorInputContractCompiler
         var model = compilation.GetSemanticModel(tree);
         var unions = FindRootUnions(root, model).ToArray();
 
-        if (unions.Length == 0)
-        {
-            return InputContractLoweringResult.Fail(
-                "A behavior must declare exactly one root input union.",
-                DefaultPolicy);
-        }
-
         if (unions.Length > 1)
         {
             var names = string.Join(", ", unions.Select(static item => item.Name).Order(StringComparer.Ordinal));
@@ -67,7 +60,21 @@ internal static class BehaviorInputContractCompiler
                 DefaultPolicy);
         }
 
-        var union = unions[0];
+        if (unions.Length == 1)
+        {
+            return LowerRootUnion(unions[0], root, model, behavior, resultSchemaJson);
+        }
+
+        return LowerSingleProgramTrigger(root, model, compilation, behavior, resultSchemaJson);
+    }
+
+    private static InputContractLoweringResult LowerRootUnion(
+        UnionDeclarationShape union,
+        CompilationUnitSyntax root,
+        SemanticModel model,
+        BehaviorId behavior,
+        string? resultSchemaJson)
+    {
         if (union.HasDefaultOrNullCase)
         {
             return InputContractLoweringResult.Fail(
@@ -131,18 +138,121 @@ internal static class BehaviorInputContractCompiler
             }
 
             symbols.Add(type);
-            var caseName = type.Name;
-            loweredCases.Add(new BehaviorContractCaseManifest(
-                CaseId: $"case.{caseName}",
-                CaseSchemaVersion: 1,
-                CaseName: caseName,
-                PayloadSchemaJson: PayloadSchemaJson(type)));
+            loweredCases.Add(CaseManifest(type));
         }
 
-        var orderedCases = loweredCases
+        return SucceedContract(behavior, union.Name, loweredCases, resultSchemaJson);
+    }
+
+    private static InputContractLoweringResult LowerSingleProgramTrigger(
+        CompilationUnitSyntax root,
+        SemanticModel model,
+        CSharpCompilation compilation,
+        BehaviorId behavior,
+        string? resultSchemaJson)
+    {
+        var triggers = FindDistinctProgramTriggers(root, model, compilation);
+        if (triggers.Length == 0)
+        {
+            return InputContractLoweringResult.Fail(
+                "A behavior must declare exactly one logical input: a root input union or one public IBehaviorProgram trigger.",
+                DefaultPolicy);
+        }
+
+        if (triggers.Length > 1)
+        {
+            var names = string.Join(", ", triggers.Select(static item => item.Name).Order(StringComparer.Ordinal));
+            return InputContractLoweringResult.Fail(
+                $"A behavior cannot declare more than one distinct program trigger: {names}.",
+                DefaultPolicy);
+        }
+
+        var trigger = triggers[0];
+        if (!IsImmutableRecordShape(trigger))
+        {
+            return InputContractLoweringResult.Fail(
+                $"Program trigger '{trigger.Name}' must be an immutable record shape.",
+                DefaultPolicy);
+        }
+
+        return SucceedContract(
+            behavior,
+            trigger.Name,
+            new List<BehaviorContractCaseManifest> { CaseManifest(trigger) },
+            resultSchemaJson);
+    }
+
+
+    private static INamedTypeSymbol[] FindDistinctProgramTriggers(
+        CompilationUnitSyntax root,
+        SemanticModel model,
+        CSharpCompilation compilation)
+    {
+        var programDefinition = compilation.GetTypeByMetadataName("DigitalBrain.Behaviors.IBehaviorProgram`1");
+        if (programDefinition is null)
+        {
+            return [];
+        }
+
+        var distinct = new Dictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
+        foreach (var declaration in root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>())
+        {
+            if (model.GetDeclaredSymbol(declaration) is not INamedTypeSymbol type
+                || type.DeclaredAccessibility != Accessibility.Public)
+            {
+                continue;
+            }
+
+            foreach (var face in type.AllInterfaces)
+            {
+                if (!face.IsGenericType
+                    || !SymbolEqualityComparer.Default.Equals(face.OriginalDefinition, programDefinition)
+                    || face.TypeArguments[0] is not INamedTypeSymbol trigger)
+                {
+                    continue;
+                }
+
+                trigger = trigger.OriginalDefinition;
+                distinct[trigger.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)] = trigger;
+            }
+        }
+
+        return distinct.Values
+            .OrderBy(static item => item.Name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static BehaviorContractCaseManifest CaseManifest(INamedTypeSymbol type)
+        => new(
+            CaseId: $"case.{type.Name}",
+            CaseSchemaVersion: 1,
+            CaseName: type.Name,
+            PayloadSchemaJson: PayloadSchemaJson(type));
+
+    private static InputContractLoweringResult SucceedContract(
+        BehaviorId behavior,
+        string logicalInputName,
+        List<BehaviorContractCaseManifest> cases,
+        string? resultSchemaJson)
+    {
+        if (cases.Count == 0)
+        {
+            return InputContractLoweringResult.Fail(
+                "A successful behavior input contract must contain at least one case.",
+                DefaultPolicy);
+        }
+
+        var orderedCases = cases
             .OrderBy(static item => item.CaseId, StringComparer.Ordinal)
             .ToArray();
         var oneOf = OneOfSchemaJson(orderedCases);
+        if (string.IsNullOrWhiteSpace(oneOf) || oneOf.Contains("\"oneOf\":[]", StringComparison.Ordinal))
+        {
+            return InputContractLoweringResult.Fail(
+                "A successful behavior input contract cannot lower to an empty oneOf placeholder.",
+                DefaultPolicy);
+        }
+
         var resultSchema = string.IsNullOrWhiteSpace(resultSchemaJson)
             ? """{"type":"object"}"""
             : resultSchemaJson!;
@@ -156,7 +266,7 @@ internal static class BehaviorInputContractCompiler
 
         return InputContractLoweringResult.Ok(
             contract,
-            union.Name,
+            logicalInputName,
             orderedCases.Select(static item => item.CaseId).ToArray(),
             DefaultPolicy);
     }

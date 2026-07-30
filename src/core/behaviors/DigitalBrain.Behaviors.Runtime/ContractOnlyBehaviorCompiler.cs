@@ -66,47 +66,15 @@ internal sealed class ContractOnlyBehaviorCompiler : IBehaviorCompiler
         }
 
         var lowering = BehaviorInputContractCompiler.Lower(programSource, behavior, _references);
-        if (!lowering.Succeeded)
+        if (!lowering.Succeeded || lowering.Contract is null || lowering.Contract.Cases.Count == 0)
         {
-            // Root-union lowering is required only when the source declares a union.
-            // Programs without a root union still compile for existing rail samples.
-            if (!LooksLikeUnionSource(programSource))
-            {
-                return Succeed(assemblyBytes, contract: null, lowering);
-            }
-
-            return Fail(lowering.Diagnostics, contract: null, lowering);
+            var diagnostics = lowering.Succeeded
+                ? "A successful compile must produce a non-empty behavior input contract."
+                : lowering.Diagnostics;
+            return Fail(diagnostics, contract: null, lowering);
         }
 
         return Succeed(assemblyBytes, lowering.Contract, lowering);
-    }
-
-    private static bool LooksLikeUnionSource(string programSource)
-    {
-        foreach (var line in programSource.Split('\n'))
-        {
-            var trimmed = line.TrimStart();
-            if (trimmed.StartsWith("//", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            if (trimmed.Contains(" union ", StringComparison.Ordinal)
-                || trimmed.StartsWith("union ", StringComparison.Ordinal)
-                || trimmed.Contains("\tunion ", StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            // `public union Pet(...)`
-            var tokens = trimmed.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
-            if (tokens.Any(static token => token == "union"))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static string? FindForbiddenUsage(CSharpCompilation compilation)
@@ -135,7 +103,7 @@ internal sealed class ContractOnlyBehaviorCompiler : IBehaviorCompiler
 
     private static BehaviorCompileResult Succeed(
         byte[] assemblyBytes,
-        BehaviorContractManifest? contract,
+        BehaviorContractManifest contract,
         InputContractLoweringResult lowering)
         => new(
             true,

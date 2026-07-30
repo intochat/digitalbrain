@@ -57,16 +57,19 @@ internal sealed partial class BehaviorNeuron
         string featureSource,
         ReadOnlyMemory<byte> assemblyBytes,
         string compilerEvidenceJson,
-        BehaviorContractManifest? contract = null)
+        BehaviorContractManifest contract)
     {
+        ArgumentNullException.ThrowIfNull(contract);
+        if (contract.Cases.Count == 0
+            || string.IsNullOrWhiteSpace(contract.OneOfSchemaJson)
+            || contract.OneOfSchemaJson.Contains("\"oneOf\":[]", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "A behavior proposal requires the compiler's non-empty input contract.");
+        }
+
         var scenarios = BehaviorScenarioBinder.DeriveScenarios(featureSource);
         var overview = BehaviorScenarioBinder.ProjectOverview(displayName, scenarios);
-        var resolvedContract = contract ?? new BehaviorContractManifest(
-            behaviorId.Value,
-            1,
-            """{"oneOf":[]}""",
-            [],
-            """{"type":"object"}""");
 
         return new(
             new BehaviorDefinitionManifest(
@@ -75,7 +78,7 @@ internal sealed partial class BehaviorNeuron
                 description,
                 new BehaviorEntryPoints(
                     [],
-                    resolvedContract),
+                    contract),
                 scenarios,
                 overview,
                 BehaviorInputContractCompiler.DefaultPolicy,

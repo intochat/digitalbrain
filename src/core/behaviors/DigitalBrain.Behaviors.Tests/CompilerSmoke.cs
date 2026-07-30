@@ -16,5 +16,9 @@ public sealed class CompilerSmoke
         Assert.Equal("Preview", result.Policy.LanguageVersion);
         Assert.Contains("\"policy\":\"contract-only-v1\"", result.CompilerEvidenceJson, StringComparison.Ordinal);
         Assert.Contains("\"languageVersion\":\"Preview\"", result.CompilerEvidenceJson, StringComparison.Ordinal);
+        Assert.NotNull(result.Contract);
+        Assert.NotEmpty(result.Contract!.Cases);
+        Assert.Equal("case.SampleTrigger", result.Contract.Cases.Single().CaseId);
+        Assert.DoesNotContain("\"oneOf\":[]", result.Contract.OneOfSchemaJson, StringComparison.Ordinal);
     }
 }
