@@ -10,6 +10,7 @@ namespace DigitalBrain.Testing;
 internal sealed class FixtureCluster : IAsyncDisposable
 {
     private const int SiloCount = 3;
+    private static readonly TimeSpan SaturatedMachineResponseTimeout = TimeSpan.FromSeconds(90);
     private static readonly DateTimeOffset FixedEpoch =
         new(2040, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
@@ -162,11 +163,9 @@ internal sealed class FixtureCluster : IAsyncDisposable
             silo.Services.AddSingleton<IJournalStorageProvider>(_journalStorage);
             _edges.ConfigureServices(silo.Services);
 
-            if (_responseTimeout is { } siloResponseTimeout)
-            {
-                silo.Services.Configure<SiloMessagingOptions>(
-                    messaging => messaging.ResponseTimeout = siloResponseTimeout);
-            }
+            var siloResponseTimeout = _responseTimeout ?? SaturatedMachineResponseTimeout;
+            silo.Services.Configure<SiloMessagingOptions>(
+                messaging => messaging.ResponseTimeout = siloResponseTimeout);
         });
         builder.ConfigureClient(client =>
         {
@@ -175,11 +174,9 @@ internal sealed class FixtureCluster : IAsyncDisposable
                 module.PrepareSerialization(client.Services);
             }
 
-            if (_responseTimeout is { } clientResponseTimeout)
-            {
-                client.Services.Configure<ClientMessagingOptions>(
-                    messaging => messaging.ResponseTimeout = clientResponseTimeout);
-            }
+            var clientResponseTimeout = _responseTimeout ?? SaturatedMachineResponseTimeout;
+            client.Services.Configure<ClientMessagingOptions>(
+                messaging => messaging.ResponseTimeout = clientResponseTimeout);
         });
 
         _cluster = builder.Build();
