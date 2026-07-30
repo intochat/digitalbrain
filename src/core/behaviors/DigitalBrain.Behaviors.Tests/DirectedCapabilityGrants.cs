@@ -2,7 +2,9 @@ using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Reflection;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
+using DigitalBrain.Behaviors.Runtime.Artifacts;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
@@ -212,8 +214,254 @@ public sealed class DirectedCapabilityGrants
         Assert.DoesNotContain(names, name => name.Contains("Alias", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static BehaviorCompileResult Compile(string program)
-        => new ContractOnlyBehaviorCompiler().Compile(program, new BehaviorId("com.digitalbrain.grants"));
+    [Fact(DisplayName = "Production proposal envelope digest carries compile.CapabilityGrants, not empty grants")]
+    public void ProposalManifestDigestContainsCompileCapabilityGrants()
+    {
+        var compile = Compile(NamedTypedSendProgram());
+        Assert.True(compile.Succeeded, compile.Diagnostics);
+        Assert.NotEmpty(compile.CapabilityGrants);
+        Assert.NotNull(compile.Contract);
+
+        var productionEnvelope = CreateProposalEnvelope(
+            new BehaviorId("com.digitalbrain.grants"),
+            "Grants",
+            "Directed grant proposal",
+            NamedTypedSendProgram(),
+            """
+            Feature: grants
+              Scenario: install gate passes
+                Then the install gate passes
+            """,
+            compile.AssemblyBytes,
+            compile.CompilerEvidenceJson,
+            compile.Contract,
+            compile.CapabilityGrants);
+
+        var emptyGrantsEnvelope = CreateProposalEnvelope(
+            new BehaviorId("com.digitalbrain.grants"),
+            "Grants",
+            "Directed grant proposal",
+            NamedTypedSendProgram(),
+            """
+            Feature: grants
+              Scenario: install gate passes
+                Then the install gate passes
+            """,
+            compile.AssemblyBytes,
+            compile.CompilerEvidenceJson,
+            compile.Contract,
+            []);
+
+        Assert.Equal(compile.CapabilityGrants, productionEnvelope.Manifest.CapabilityGrants);
+        Assert.Empty(emptyGrantsEnvelope.Manifest.CapabilityGrants);
+        Assert.NotEqual(
+            CanonicalArtifactWriter.Write(emptyGrantsEnvelope).Digest.Value,
+            CanonicalArtifactWriter.Write(productionEnvelope).Digest.Value);
+    }
+
+    [Fact(DisplayName = "Real production compile/proposal boundary rejects a catalog mismatch before signing")]
+    public void ProductionCompileProposalRejectsCatalogMismatch()
+    {
+        var emptyCatalog = ActiveCapabilityCatalog.Create(Array.Empty<ICompiledModule>());
+        var compile = Compile(NamedTypedSendProgram(), emptyCatalog);
+
+        Assert.False(compile.Succeeded);
+        Assert.Contains("undeclared", compile.Diagnostics, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(compile.CapabilityGrants);
+    }
+
+    [Fact(DisplayName = "Non-v1 request and result schema versions are persisted from the catalog edge")]
+    public void NonV1RequestAndResultVersionsPersistFromCatalog()
+    {
+        var catalog = ActiveCapabilityCatalog.Create(
+        [
+            new CatalogModule(new ModuleId("catalog.gmail"), ActiveManifest(requestVersion: 3, resultVersion: 2)),
+        ]);
+
+        var result = Compile(NamedTypedSendProgram(), catalog);
+
+        Assert.True(result.Succeeded, result.Diagnostics);
+        var grant = Assert.Single(result.CapabilityGrants);
+        Assert.Equal(3, grant.AcceptedRequestSchemaVersion);
+        Assert.Equal(2, grant.EmittedResultSchemaVersion);
+        Assert.NotEqual(1, grant.AcceptedRequestSchemaVersion);
+        Assert.NotEqual(1, grant.EmittedResultSchemaVersion);
+    }
+
+    [Fact(DisplayName = "Admission rejects a neuron that exists only on an inactive module")]
+    public void AdmissionRejectsTrueInactiveModuleNeuron()
+    {
+        var inactiveModule = new CatalogModule(new ModuleId("catalog.inactive"), InactiveManifest());
+        var activeCatalog = ActiveCapabilityCatalog.Create(
+        [
+            new CatalogModule(new ModuleId("catalog.gmail"), ActiveManifest()),
+        ]);
+        Assert.NotNull(inactiveModule.Capabilities.Neurons.SingleOrDefault(neuron =>
+            string.Equals(neuron.ContractId, "test.inactive", StringComparison.Ordinal)));
+        Assert.False(activeCatalog.TryGetNeuron("test.inactive", out _));
+
+        var grants = new[]
+        {
+            new BehaviorCapabilityGrant(
+                "test.inactive",
+                "test.inactive-request",
+                1,
+                "test.inactive-response",
+                1,
+                "default",
+                "default"),
+        };
+
+        var admission = BehaviorContractCompatibility.AdmitCapabilityGrants(grants, activeCatalog);
+
+        Assert.False(admission.IsAdmitted);
+        Assert.Contains("inactive", admission.Detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact(DisplayName = "Admission rejects incompatible result synapse version")]
+    public void AdmissionRejectsIncompatibleResultVersion()
+    {
+        var catalog = ActiveCatalog();
+        var grants = new[]
+        {
+            new BehaviorCapabilityGrant(
+                "test.gmail",
+                "test.gmail-request",
+                1,
+                "test.gmail-response",
+                2,
+                "named",
+                "work"),
+        };
+
+        var admission = BehaviorContractCompatibility.AdmitCapabilityGrants(grants, catalog);
+
+        Assert.False(admission.IsAdmitted);
+        Assert.Contains("result", admission.Detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact(DisplayName = "Compiler rejects non-constant BehaviorBrain.Get instance names")]
+    public void RejectsNonConstantGetInstanceName()
+    {
+        var result = Compile(NonConstantNameProgram());
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("constant", result.Diagnostics, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(result.CapabilityGrants);
+    }
+
+    [Fact(DisplayName = "Compiler rejects ambiguous local BehaviorBrain.Get assignments")]
+    public void RejectsAmbiguousLocalGetAssignments()
+    {
+        var result = Compile(AmbiguousLocalProgram());
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("ambiguous", result.Diagnostics, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(result.CapabilityGrants);
+    }
+
+    [Fact(DisplayName = "Multiple SendAsync edges persist in deterministic order")]
+    public void MultipleSendAsyncEdgesAreDeterministic()
+    {
+        var first = Compile(MultipleSendProgram());
+        var second = Compile(MultipleSendProgram());
+
+        Assert.True(first.Succeeded, first.Diagnostics);
+        Assert.True(second.Succeeded, second.Diagnostics);
+        Assert.Equal(2, first.CapabilityGrants.Count);
+        Assert.Equal(first.CapabilityGrants, second.CapabilityGrants);
+        Assert.Equal(
+            ["test.gmail", "test.notify"],
+            first.CapabilityGrants.Select(grant => grant.TargetNeuronContractId).ToArray());
+    }
+
+    [Fact(DisplayName = "Alias recognition accepts only Orleans.AliasAttribute")]
+    public void RejectsNonOrleansAliasAttribute()
+    {
+        var result = Compile(NonOrleansAliasProgram());
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("Alias", result.Diagnostics, StringComparison.Ordinal);
+        Assert.Empty(result.CapabilityGrants);
+    }
+
+    private static BehaviorCompileResult Compile(string program, ActiveCapabilityCatalog? catalog = null)
+        => new ContractOnlyBehaviorCompiler(catalog ?? ActiveCatalog())
+            .Compile(program, new BehaviorId("com.digitalbrain.grants"));
+
+    private static BehaviorArtifactEnvelope CreateProposalEnvelope(
+        BehaviorId behaviorId,
+        string displayName,
+        string description,
+        string programSource,
+        string featureSource,
+        ReadOnlyMemory<byte> assemblyBytes,
+        string compilerEvidenceJson,
+        BehaviorContractManifest contract,
+        IReadOnlyList<BehaviorCapabilityGrant> capabilityGrants)
+    {
+        var method = typeof(BehaviorNeuron).GetMethod(
+            "CreateProposalEnvelope",
+            BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+        Assert.NotNull(method);
+
+        var parameters = method.GetParameters();
+        Assert.Contains(
+            parameters,
+            parameter => typeof(IReadOnlyList<BehaviorCapabilityGrant>).IsAssignableFrom(parameter.ParameterType));
+
+        var args = new object?[parameters.Length];
+        for (var index = 0; index < parameters.Length; index++)
+        {
+            var parameter = parameters[index];
+            if (parameter.ParameterType == typeof(BehaviorId))
+            {
+                args[index] = behaviorId;
+            }
+            else if (parameter.ParameterType == typeof(string) && parameter.Name is "displayName")
+            {
+                args[index] = displayName;
+            }
+            else if (parameter.ParameterType == typeof(string) && parameter.Name is "description")
+            {
+                args[index] = description;
+            }
+            else if (parameter.ParameterType == typeof(string) && parameter.Name is "programSource")
+            {
+                args[index] = programSource;
+            }
+            else if (parameter.ParameterType == typeof(string) && parameter.Name is "featureSource")
+            {
+                args[index] = featureSource;
+            }
+            else if (parameter.ParameterType == typeof(ReadOnlyMemory<byte>))
+            {
+                args[index] = assemblyBytes;
+            }
+            else if (parameter.ParameterType == typeof(string) && parameter.Name is "compilerEvidenceJson")
+            {
+                args[index] = compilerEvidenceJson;
+            }
+            else if (parameter.ParameterType == typeof(BehaviorContractManifest))
+            {
+                args[index] = contract;
+            }
+            else if (typeof(IReadOnlyList<BehaviorCapabilityGrant>).IsAssignableFrom(parameter.ParameterType))
+            {
+                args[index] = capabilityGrants;
+            }
+            else if (parameter.ParameterType == typeof(string))
+            {
+                args[index] = displayName;
+            }
+            else
+            {
+                throw new InvalidOperationException($"Unexpected CreateProposalEnvelope parameter '{parameter.Name}'.");
+            }
+        }
+
+        return (BehaviorArtifactEnvelope)method.Invoke(null, args)!;
+    }
 
     private static ActiveCapabilityCatalog ActiveCatalog()
         => ActiveCapabilityCatalog.Create(
@@ -222,7 +470,7 @@ public sealed class DirectedCapabilityGrants
             new CatalogModule(new ModuleId("catalog.notify"), NotifyManifest()),
         ]);
 
-    private static CapabilityManifest ActiveManifest()
+    private static CapabilityManifest ActiveManifest(int requestVersion = 1, int resultVersion = 1)
         => new(
             new ModuleId("catalog.gmail"),
             "1.0.0",
@@ -236,7 +484,7 @@ public sealed class DirectedCapabilityGrants
                     [
                         new SynapseCapabilityDescriptor(
                             "test.gmail-request",
-                            1,
+                            requestVersion,
                             "Gmail request",
                             """{"type":"object","properties":{"Prompt":{"type":"string"}}}""",
                             []),
@@ -244,7 +492,7 @@ public sealed class DirectedCapabilityGrants
                     [
                         new SynapseCapabilityDescriptor(
                             "test.gmail-response",
-                            1,
+                            resultVersion,
                             "Gmail response",
                             """{"type":"object","properties":{"Status":{"type":"string"}}}""",
                             []),
@@ -271,6 +519,35 @@ public sealed class DirectedCapabilityGrants
                             []),
                     ],
                     []),
+            ]);
+
+    private static CapabilityManifest InactiveManifest()
+        => new(
+            new ModuleId("catalog.inactive"),
+            "1.0.0",
+            "Inactive catalog",
+            [],
+            [
+                new NeuronCapabilityDescriptor(
+                    "test.inactive",
+                    "Inactive neuron",
+                    "default",
+                    [
+                        new SynapseCapabilityDescriptor(
+                            "test.inactive-request",
+                            1,
+                            "Inactive request",
+                            """{"type":"object","properties":{"Prompt":{"type":"string"}}}""",
+                            []),
+                    ],
+                    [
+                        new SynapseCapabilityDescriptor(
+                            "test.inactive-response",
+                            1,
+                            "Inactive response",
+                            """{"type":"object","properties":{"Status":{"type":"string"}}}""",
+                            []),
+                    ]),
             ]);
 
     private static BehaviorCapabilityGrant CreateLegacyMethodAliasGrant()
@@ -529,6 +806,259 @@ public sealed class DirectedCapabilityGrants
                     var brain = new FakeBrain();
                     var gmail = brain.Get<IGmail>("work");
                     await gmail.SendAsync(new GmailRequest("x"));
+                }
+            }
+
+            public sealed class SampleInstallTests : IBehaviorInstallTests
+            {
+                public ValueTask<BehaviorInstallTestReport> RunAsync(
+                    IBehaviorContext context,
+                    IReadOnlyDictionary<string, string> features,
+                    CancellationToken cancellationToken)
+                    => ValueTask.FromResult(BehaviorInstallTestReport.FromResults(
+                    [
+                        new BehaviorScenarioResult(
+                            "scenario.install-gate-passes",
+                            "install gate passes",
+                            "bind.install-gate-passes",
+                            true,
+                            "green"),
+                    ],
+                    "green"));
+            }
+            """;
+
+    private static string NonConstantNameProgram()
+        => """
+            using System.Collections.Generic;
+            using System.ComponentModel;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DigitalBrain.Abstractions;
+            using DigitalBrain.Behaviors;
+            using Orleans;
+
+            [Alias("test.research-trigger")]
+            public sealed record ResearchTrigger(string Prompt) : Synapse;
+
+            [Alias("test.gmail")]
+            [Description("Test gmail neuron")]
+            public interface IGmail : INeuron;
+
+            [Alias("test.gmail-response")]
+            [Description("Gmail response")]
+            public sealed record GmailResponse(string Status) : Synapse;
+
+            [Alias("test.gmail-request")]
+            [Description("Gmail request")]
+            public sealed record GmailRequest(string Prompt) : RequestSynapse<GmailResponse>;
+
+            public sealed class SampleProgram : IBehaviorProgram<ResearchTrigger>
+            {
+                public ValueTask ExecuteAsync(ResearchTrigger trigger, IBehaviorContext context, CancellationToken cancellationToken)
+                    => ValueTask.CompletedTask;
+            }
+
+            public static class BehaviorEntry
+            {
+                public static async Task RunAsync(BehaviorBrain<ResearchTrigger> brain)
+                {
+                    var instanceName = "work";
+                    var gmail = brain.Get<IGmail>(instanceName);
+                    await gmail.SendAsync(new GmailRequest(brain.Trigger.Prompt));
+                }
+            }
+
+            public sealed class SampleInstallTests : IBehaviorInstallTests
+            {
+                public ValueTask<BehaviorInstallTestReport> RunAsync(
+                    IBehaviorContext context,
+                    IReadOnlyDictionary<string, string> features,
+                    CancellationToken cancellationToken)
+                    => ValueTask.FromResult(BehaviorInstallTestReport.FromResults(
+                    [
+                        new BehaviorScenarioResult(
+                            "scenario.install-gate-passes",
+                            "install gate passes",
+                            "bind.install-gate-passes",
+                            true,
+                            "green"),
+                    ],
+                    "green"));
+            }
+            """;
+
+    private static string AmbiguousLocalProgram()
+        => """
+            using System.Collections.Generic;
+            using System.ComponentModel;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DigitalBrain.Abstractions;
+            using DigitalBrain.Behaviors;
+            using Orleans;
+
+            [Alias("test.research-trigger")]
+            public sealed record ResearchTrigger(string Prompt) : Synapse;
+
+            [Alias("test.gmail")]
+            [Description("Test gmail neuron")]
+            public interface IGmail : INeuron;
+
+            [Alias("test.gmail-response")]
+            [Description("Gmail response")]
+            public sealed record GmailResponse(string Status) : Synapse;
+
+            [Alias("test.gmail-request")]
+            [Description("Gmail request")]
+            public sealed record GmailRequest(string Prompt) : RequestSynapse<GmailResponse>;
+
+            public sealed class SampleProgram : IBehaviorProgram<ResearchTrigger>
+            {
+                public ValueTask ExecuteAsync(ResearchTrigger trigger, IBehaviorContext context, CancellationToken cancellationToken)
+                    => ValueTask.CompletedTask;
+            }
+
+            public static class BehaviorEntry
+            {
+                public static async Task RunAsync(BehaviorBrain<ResearchTrigger> brain)
+                {
+                    BehaviorNeuronReference<IGmail> gmail = brain.Get<IGmail>("alpha");
+                    gmail = brain.Get<IGmail>("beta");
+                    await gmail.SendAsync(new GmailRequest(brain.Trigger.Prompt));
+                }
+            }
+
+            public sealed class SampleInstallTests : IBehaviorInstallTests
+            {
+                public ValueTask<BehaviorInstallTestReport> RunAsync(
+                    IBehaviorContext context,
+                    IReadOnlyDictionary<string, string> features,
+                    CancellationToken cancellationToken)
+                    => ValueTask.FromResult(BehaviorInstallTestReport.FromResults(
+                    [
+                        new BehaviorScenarioResult(
+                            "scenario.install-gate-passes",
+                            "install gate passes",
+                            "bind.install-gate-passes",
+                            true,
+                            "green"),
+                    ],
+                    "green"));
+            }
+            """;
+
+    private static string MultipleSendProgram()
+        => """
+            using System.Collections.Generic;
+            using System.ComponentModel;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DigitalBrain.Abstractions;
+            using DigitalBrain.Behaviors;
+            using Orleans;
+
+            [Alias("test.research-trigger")]
+            public sealed record ResearchTrigger(string Prompt) : Synapse;
+
+            [Alias("test.gmail")]
+            [Description("Test gmail neuron")]
+            public interface IGmail : INeuron;
+
+            [Alias("test.notify")]
+            [Description("Notify neuron")]
+            public interface INotify : INeuron;
+
+            [Alias("test.gmail-response")]
+            [Description("Gmail response")]
+            public sealed record GmailResponse(string Status) : Synapse;
+
+            [Alias("test.gmail-request")]
+            [Description("Gmail request")]
+            public sealed record GmailRequest(string Prompt) : RequestSynapse<GmailResponse>;
+
+            [Alias("test.notify-ping")]
+            [Description("Notify ping")]
+            public sealed record NotifyPing(string Message) : Synapse;
+
+            public sealed class SampleProgram : IBehaviorProgram<ResearchTrigger>
+            {
+                public ValueTask ExecuteAsync(ResearchTrigger trigger, IBehaviorContext context, CancellationToken cancellationToken)
+                    => ValueTask.CompletedTask;
+            }
+
+            public static class BehaviorEntry
+            {
+                public static async Task RunAsync(BehaviorBrain<ResearchTrigger> brain)
+                {
+                    await brain.Get<INotify>().SendAsync(new NotifyPing(brain.Trigger.Prompt));
+                    var gmail = brain.Get<IGmail>("work");
+                    await gmail.SendAsync(new GmailRequest(brain.Trigger.Prompt));
+                }
+            }
+
+            public sealed class SampleInstallTests : IBehaviorInstallTests
+            {
+                public ValueTask<BehaviorInstallTestReport> RunAsync(
+                    IBehaviorContext context,
+                    IReadOnlyDictionary<string, string> features,
+                    CancellationToken cancellationToken)
+                    => ValueTask.FromResult(BehaviorInstallTestReport.FromResults(
+                    [
+                        new BehaviorScenarioResult(
+                            "scenario.install-gate-passes",
+                            "install gate passes",
+                            "bind.install-gate-passes",
+                            true,
+                            "green"),
+                    ],
+                    "green"));
+            }
+            """;
+
+    private static string NonOrleansAliasProgram()
+        => """
+            using System;
+            using System.Collections.Generic;
+            using System.ComponentModel;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DigitalBrain.Abstractions;
+            using DigitalBrain.Behaviors;
+
+            [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface | AttributeTargets.Struct)]
+            public sealed class AliasAttribute(string name) : Attribute
+            {
+                public string Name { get; } = name;
+            }
+
+            [Alias("test.research-trigger")]
+            public sealed record ResearchTrigger(string Prompt) : Synapse;
+
+            [Alias("test.gmail")]
+            [Description("Test gmail neuron")]
+            public interface IGmail : INeuron;
+
+            [Alias("test.gmail-response")]
+            [Description("Gmail response")]
+            public sealed record GmailResponse(string Status) : Synapse;
+
+            [Alias("test.gmail-request")]
+            [Description("Gmail request")]
+            public sealed record GmailRequest(string Prompt) : RequestSynapse<GmailResponse>;
+
+            public sealed class SampleProgram : IBehaviorProgram<ResearchTrigger>
+            {
+                public ValueTask ExecuteAsync(ResearchTrigger trigger, IBehaviorContext context, CancellationToken cancellationToken)
+                    => ValueTask.CompletedTask;
+            }
+
+            public static class BehaviorEntry
+            {
+                public static async Task RunAsync(BehaviorBrain<ResearchTrigger> brain)
+                {
+                    var gmail = brain.Get<IGmail>("work");
+                    await gmail.SendAsync(new GmailRequest(brain.Trigger.Prompt));
                 }
             }
 

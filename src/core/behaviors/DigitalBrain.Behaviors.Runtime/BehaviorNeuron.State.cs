@@ -49,7 +49,7 @@ internal sealed partial class BehaviorNeuron
                 .OrderBy(static pair => pair.Key, StringComparer.Ordinal)
                 .Select(static pair => pair.Value));
 
-    private static BehaviorArtifactEnvelope CreateProposalEnvelope(
+    internal static BehaviorArtifactEnvelope CreateProposalEnvelope(
         BehaviorId behaviorId,
         string displayName,
         string description,
@@ -57,9 +57,11 @@ internal sealed partial class BehaviorNeuron
         string featureSource,
         ReadOnlyMemory<byte> assemblyBytes,
         string compilerEvidenceJson,
-        BehaviorContractManifest contract)
+        BehaviorContractManifest contract,
+        IReadOnlyList<BehaviorCapabilityGrant> capabilityGrants)
     {
         ArgumentNullException.ThrowIfNull(contract);
+        ArgumentNullException.ThrowIfNull(capabilityGrants);
         if (contract.Cases.Count == 0
             || string.IsNullOrWhiteSpace(contract.OneOfSchemaJson)
             || contract.OneOfSchemaJson.Contains("\"oneOf\":[]", StringComparison.Ordinal))
@@ -82,7 +84,7 @@ internal sealed partial class BehaviorNeuron
                 scenarios,
                 overview,
                 BehaviorInputContractCompiler.DefaultPolicy,
-                [],
+                capabilityGrants,
                 new BehaviorResourceLimits(1_000, 64 * 1024 * 1024, 30_000)),
             programSource,
             featureSource,

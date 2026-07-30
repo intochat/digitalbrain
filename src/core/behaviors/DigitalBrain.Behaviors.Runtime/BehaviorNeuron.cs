@@ -91,7 +91,8 @@ internal sealed partial class BehaviorNeuron :
             FeatureSourceOf(command.Features),
             compile.AssemblyBytes,
             compile.CompilerEvidenceJson,
-            compile.Contract);
+            compile.Contract,
+            compile.CapabilityGrants);
 
         var written = CanonicalArtifactWriter.Write(envelope);
         var hash = written.Digest.Value;

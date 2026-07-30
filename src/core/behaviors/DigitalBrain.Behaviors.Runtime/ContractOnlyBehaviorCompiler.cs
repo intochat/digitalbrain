@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Manifest;
+using DigitalBrain.Kernel;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -23,6 +24,17 @@ internal sealed class ContractOnlyBehaviorCompiler : IBehaviorCompiler
     ];
 
     private readonly ImmutableArray<MetadataReference> _references = BuildReferences();
+    private readonly ActiveCapabilityCatalog? _catalog;
+
+    public ContractOnlyBehaviorCompiler()
+        : this(catalog: null)
+    {
+    }
+
+    public ContractOnlyBehaviorCompiler(ActiveCapabilityCatalog? catalog)
+    {
+        _catalog = catalog;
+    }
 
     public BehaviorCompileResult Compile(string programSource, BehaviorId behavior)
     {
@@ -74,10 +86,29 @@ internal sealed class ContractOnlyBehaviorCompiler : IBehaviorCompiler
             return Fail(diagnostics, contract: null, lowering);
         }
 
-        var grants = BehaviorInputContractCompiler.DeriveCapabilityGrants(programSource, _references);
+        var grants = BehaviorInputContractCompiler.DeriveCapabilityGrants(programSource, _references, _catalog);
         if (!grants.Succeeded)
         {
             return Fail(grants.Diagnostics, lowering.Contract, lowering);
+        }
+
+        if (grants.Grants.Count > 0)
+        {
+            if (_catalog is null)
+            {
+                return Fail(
+                    "Active capability catalog is required to admit directed capability grants.",
+                    lowering.Contract,
+                    lowering);
+            }
+
+            var admission = BehaviorContractCompatibility.AdmitCapabilityGrants(grants.Grants, _catalog);
+            if (!admission.IsAdmitted)
+            {
+                return Fail(admission.Detail, lowering.Contract, lowering);
+            }
+
+            return Succeed(assemblyBytes, lowering.Contract, lowering, admission.Grants);
         }
 
         return Succeed(assemblyBytes, lowering.Contract, lowering, grants.Grants);

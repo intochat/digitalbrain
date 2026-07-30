@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Manifest;
+using DigitalBrain.Kernel;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -32,7 +33,8 @@ internal static class BehaviorInputContractCompiler
 
     public static CapabilityGrantDerivationResult DeriveCapabilityGrants(
         string programSource,
-        ImmutableArray<MetadataReference> references)
+        ImmutableArray<MetadataReference> references,
+        ActiveCapabilityCatalog? catalog = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(programSource);
 
@@ -58,6 +60,7 @@ internal static class BehaviorInputContractCompiler
         var brainDefinition = compilation.GetTypeByMetadataName(BehaviorBrainMetadataName);
         var neuronReferenceDefinition = compilation.GetTypeByMetadataName(BehaviorNeuronReferenceMetadataName);
         var requestSynapseDefinition = compilation.GetTypeByMetadataName(RequestSynapseMetadataName);
+        var aliasAttribute = compilation.GetTypeByMetadataName(AliasAttributeMetadataName);
         if (brainDefinition is null || neuronReferenceDefinition is null || requestSynapseDefinition is null)
         {
             return CapabilityGrantDerivationResult.Fail(
@@ -103,6 +106,8 @@ internal static class BehaviorInputContractCompiler
                     neuronType,
                     instanceName,
                     requestSynapseDefinition,
+                    aliasAttribute,
+                    catalog,
                     out var grant,
                     out var grantError))
             {
@@ -345,13 +350,15 @@ internal static class BehaviorInputContractCompiler
         INamedTypeSymbol neuronType,
         string instanceName,
         INamedTypeSymbol requestSynapseDefinition,
+        INamedTypeSymbol? aliasAttribute,
+        ActiveCapabilityCatalog? catalog,
         out BehaviorCapabilityGrant grant,
         out string? error)
     {
         grant = null!;
         error = null;
 
-        if (!TryContractId(neuronType, out var neuronContractId))
+        if (!TryContractId(neuronType, aliasAttribute, out var neuronContractId))
         {
             error = $"Neuron contract '{neuronType.Name}' requires a stable Orleans Alias for capability grants.";
             return false;
@@ -397,9 +404,20 @@ internal static class BehaviorInputContractCompiler
             resultType = null;
         }
 
-        if (!TryContractId(requestType, out var requestContractId))
+        if (!TryContractId(requestType, aliasAttribute, out var requestContractId))
         {
             error = $"Request synapse '{requestType.Name}' requires a stable Orleans Alias for capability grants.";
+            return false;
+        }
+
+        if (!TryResolveSynapseVersion(
+                catalog,
+                neuronContractId,
+                requestContractId,
+                accepted: true,
+                out var requestVersion,
+                out error))
+        {
             return false;
         }
 
@@ -407,13 +425,24 @@ internal static class BehaviorInputContractCompiler
         int? resultVersion = null;
         if (resultType is not null)
         {
-            if (!TryContractId(resultType, out resultContractId))
+            if (!TryContractId(resultType, aliasAttribute, out resultContractId))
             {
                 error = $"Result synapse '{resultType.Name}' requires a stable Orleans Alias for capability grants.";
                 return false;
             }
 
-            resultVersion = 1;
+            if (!TryResolveSynapseVersion(
+                    catalog,
+                    neuronContractId,
+                    resultContractId,
+                    accepted: false,
+                    out var resolvedResultVersion,
+                    out error))
+            {
+                return false;
+            }
+
+            resultVersion = resolvedResultVersion;
         }
 
         var policy = string.Equals(instanceName, DefaultInstanceName, StringComparison.Ordinal)
@@ -423,11 +452,57 @@ internal static class BehaviorInputContractCompiler
         grant = new BehaviorCapabilityGrant(
             neuronContractId,
             requestContractId,
-            1,
+            requestVersion,
             resultContractId,
             resultVersion,
             policy,
             instanceName);
+        return true;
+    }
+
+    private static bool TryResolveSynapseVersion(
+        ActiveCapabilityCatalog? catalog,
+        string neuronContractId,
+        string synapseContractId,
+        bool accepted,
+        out int version,
+        out string? error)
+    {
+        version = 0;
+        error = null;
+
+        if (catalog is null)
+        {
+            error = "Active capability catalog is required to resolve directed grant schema versions.";
+            return false;
+        }
+
+        if (!catalog.TryGetNeuron(neuronContractId, out var neuron) || neuron is null)
+        {
+            error = $"Directed capability edge targets undeclared or inactive neuron '{neuronContractId}'.";
+            return false;
+        }
+
+        var edges = accepted ? neuron.Accepted : neuron.Emitted;
+        var matches = edges
+            .Where(edge => string.Equals(edge.ContractId, synapseContractId, StringComparison.Ordinal))
+            .ToArray();
+
+        if (matches.Length == 0)
+        {
+            error = accepted
+                ? $"Undeclared request synapse '{synapseContractId}' on neuron '{neuronContractId}'."
+                : $"Incompatible result synapse '{synapseContractId}' for neuron '{neuronContractId}'.";
+            return false;
+        }
+
+        if (matches.Length > 1)
+        {
+            error = $"Ambiguous schema versions for synapse '{synapseContractId}' on neuron '{neuronContractId}'.";
+            return false;
+        }
+
+        version = matches[0].SchemaVersion;
         return true;
     }
 
@@ -517,18 +592,23 @@ internal static class BehaviorInputContractCompiler
         return operation;
     }
 
-    private static bool TryContractId(INamedTypeSymbol type, out string contractId)
+    private static bool TryContractId(
+        INamedTypeSymbol type,
+        INamedTypeSymbol? aliasAttribute,
+        out string contractId)
     {
+        contractId = string.Empty;
+        if (aliasAttribute is null)
+        {
+            return false;
+        }
+
         foreach (var attribute in type.GetAttributes())
         {
-            if (attribute.AttributeClass is null)
-            {
-                continue;
-            }
-
-            var attributeName = attribute.AttributeClass.ToDisplayString();
-            if (!string.Equals(attributeName, AliasAttributeMetadataName, StringComparison.Ordinal)
-                && !string.Equals(attribute.AttributeClass.Name, "AliasAttribute", StringComparison.Ordinal))
+            if (attribute.AttributeClass is null
+                || !SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass.OriginalDefinition,
+                    aliasAttribute))
             {
                 continue;
             }
@@ -542,7 +622,6 @@ internal static class BehaviorInputContractCompiler
             }
         }
 
-        contractId = string.Empty;
         return false;
     }
 
