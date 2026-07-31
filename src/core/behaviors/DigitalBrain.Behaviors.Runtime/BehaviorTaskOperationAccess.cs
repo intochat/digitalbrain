@@ -190,40 +190,11 @@ internal sealed class GrainBehaviorTaskOperationAccess(IGrainFactory grains) : I
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        TaskSnapshot snapshot;
-        try
-        {
-            snapshot = await grains.GetGrain<ITask>(task.ToGrainId()).Read().ConfigureAwait(false);
-        }
-        catch (Exception exception) when (
-            exception is InvalidOperationException or NeuronAuthorizationException)
-        {
-            throw new InvalidOperationException("task-not-started");
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (snapshot.Worker == default
-            || !string.Equals(
-                snapshot.Worker.Type,
-                NeuronId.GrainTypeNameOf(typeof(IWorker)),
-                StringComparison.OrdinalIgnoreCase)
-            || snapshot.Worker.Owner != owner)
-        {
-            throw new InvalidOperationException("worker-mismatch");
-        }
-
-        if (snapshot.ActiveAttempt is null || snapshot.ActiveAttempt != attempt)
-        {
-            throw new InvalidOperationException("attempt-mismatch");
-        }
-
-        if (requireActivation && snapshot.Activation is null)
-        {
-            throw new InvalidOperationException("activation-required");
-        }
-
-        return snapshot;
+        var authority = grains.GetGrain<IBehaviorTaskAuthority>(
+            BehaviorTaskAuthority.ForOwner(owner).ToGrainId());
+        return await authority
+            .ReadValidatedTask(task, attempt, requireActivation, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private static async Task<TResponse> PollJournalAsync<TResponse>(

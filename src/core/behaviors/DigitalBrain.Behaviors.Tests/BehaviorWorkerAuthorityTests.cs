@@ -138,6 +138,115 @@ public sealed class BehaviorWorkerAuthorityTests(BehaviorsFixture fixture)
                 request,
                 cancellationToken));
         Assert.Equal("task-not-started", missingTask.Message);
+
+        var ownerMismatch = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await access.PrepareAsync(
+                new OwnerId("other-owner-for-auth"),
+                task.Id,
+                attempt,
+                sequence: 0,
+                edge,
+                request,
+                cancellationToken));
+        Assert.Equal("owner-task-mismatch", ownerMismatch.Message);
+        Assert.NotEqual("task-not-started", ownerMismatch.Message);
+    }
+
+    [Fact(
+        Timeout = 60_000,
+        DisplayName = "concurrent Cancel and Prepare complete without Worker↔Task lock inversion hang")]
+    public async Task ConcurrentCancelAndPrepareDoesNotHang()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var brain = await fixture.CreateBrainAsync(cancellationToken);
+        var (worker, task, attempt) = await StartAcceptedBehaviorTaskAsync(brain, "authority-abba", cancellationToken);
+        var edge = ExactEdge(task.Id.Owner);
+        var request = new ProtectedPayloadReference(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+        var access = new GrainBehaviorTaskOperationAccess(brain.Cluster.Client);
+
+        var prepare = access.PrepareAsync(
+            task.Id.Owner,
+            task.Id,
+            attempt,
+            sequence: 0,
+            edge,
+            request,
+            cancellationToken).AsTask();
+        var cancel = worker.Reference.Cancel(new AttemptCursor(
+            task.Id,
+            worker.Id,
+            attempt,
+            Revision: 0));
+
+        await Task.WhenAny(prepare, cancel).WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
+        await Task.WhenAll(SwallowFaults(prepare), SwallowFaults(cancel))
+            .WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
+
+        Assert.True(prepare.IsCompleted);
+        Assert.True(cancel.IsCompleted);
+
+        static Task SwallowFaults(Task operation)
+            => operation.ContinueWith(
+                static completed =>
+                {
+                    _ = completed.Exception;
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+    }
+
+    [Fact(
+        Timeout = 60_000,
+        DisplayName = "Task permanent phase failure yields bounded operation-timeout (NACK deferred this checkpoint)")]
+    public async Task PermanentTaskPhaseFailureYieldsBoundedOperationTimeout()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var brain = await fixture.CreateBrainAsync(cancellationToken);
+        var (_, task, attempt) = await StartAcceptedBehaviorTaskAsync(brain, "authority-timeout", cancellationToken);
+        var edge = ExactEdge(task.Id.Owner);
+        var request = new ProtectedPayloadReference(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
+        var access = new GrainBehaviorTaskOperationAccess(brain.Cluster.Client);
+
+        await access.PrepareAsync(
+            task.Id.Owner,
+            task.Id,
+            attempt,
+            sequence: 0,
+            edge,
+            request,
+            cancellationToken);
+
+        var started = DateTime.UtcNow;
+        var timeout = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await access.TransitionAsync(
+                task.Id.Owner,
+                task.Id,
+                attempt,
+                sequence: 0,
+                expectedPhase: TaskOperationPhase.Completed,
+                phase: TaskOperationPhase.Dispatched,
+                responsePayload: null,
+                redactedSummary: null,
+                cancellationToken));
+        Assert.Equal("operation-timeout", timeout.Message);
+        Assert.True(
+            DateTime.UtcNow - started < TimeSpan.FromSeconds(35),
+            "operation-timeout must resolve under the access adapter wait bound");
+    }
+
+    [Fact(DisplayName = "Worker Stage methods do not retain RequireBoundWorkerAsync Task.Read RPC")]
+    public void WorkerStageMethodsHaveNoTaskReadHelper()
+    {
+        var workerType = typeof(BehaviorWorkerNeuron);
+        Assert.Null(workerType.GetMethod(
+            "RequireBoundWorkerAsync",
+            System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic
+                | System.Reflection.BindingFlags.Public));
+        Assert.NotNull(workerType.GetMethod(
+            "RequireStageTaskIdentity",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic));
     }
 
     private static async Task<(

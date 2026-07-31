@@ -47,7 +47,7 @@ internal sealed class BehaviorWorkerNeuron : Neuron, IWorker, IBehaviorWorkerBro
     {
         ArgumentNullException.ThrowIfNull(command);
         cancellationToken.ThrowIfCancellationRequested();
-        await RequireBoundWorkerAsync(task, command.Attempt, cancellationToken);
+        RequireStageTaskIdentity(task);
         cancellationToken.ThrowIfCancellationRequested();
 
         var delivery = await SendAsync(task, command);
@@ -61,7 +61,7 @@ internal sealed class BehaviorWorkerNeuron : Neuron, IWorker, IBehaviorWorkerBro
     {
         ArgumentNullException.ThrowIfNull(command);
         cancellationToken.ThrowIfCancellationRequested();
-        await RequireBoundWorkerAsync(task, command.Attempt, cancellationToken);
+        RequireStageTaskIdentity(task);
         cancellationToken.ThrowIfCancellationRequested();
 
         var delivery = await SendAsync(task, command);
@@ -75,17 +75,14 @@ internal sealed class BehaviorWorkerNeuron : Neuron, IWorker, IBehaviorWorkerBro
     {
         ArgumentNullException.ThrowIfNull(command);
         cancellationToken.ThrowIfCancellationRequested();
-        await RequireBoundWorkerAsync(task, command.Attempt, cancellationToken);
+        RequireStageTaskIdentity(task);
         cancellationToken.ThrowIfCancellationRequested();
 
         var delivery = await SendAsync(task, command);
         return new WorkerOperationReceipt(delivery.CorrelationId, Id, task);
     }
 
-    private async Task RequireBoundWorkerAsync(
-        NeuronId task,
-        AttemptId attempt,
-        CancellationToken cancellationToken)
+    private void RequireStageTaskIdentity(NeuronId task)
     {
         if (task == default || task.Owner != Id.Owner)
         {
@@ -98,25 +95,6 @@ internal sealed class BehaviorWorkerNeuron : Neuron, IWorker, IBehaviorWorkerBro
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("invalid-task-identity");
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        var snapshot = await GrainFactory.GetGrain<ITask>(task.ToGrainId()).Read();
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (snapshot.Worker != Id)
-        {
-            throw new InvalidOperationException("worker-mismatch");
-        }
-
-        if (snapshot.ActiveAttempt is null || snapshot.ActiveAttempt != attempt)
-        {
-            throw new InvalidOperationException("attempt-mismatch");
-        }
-
-        if (snapshot.Activation is null)
-        {
-            throw new InvalidOperationException("activation-required");
         }
     }
 
