@@ -1,6 +1,6 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text;
-using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Behaviors.Artifacts;
@@ -8,6 +8,7 @@ using DigitalBrain.Behaviors.Manifest;
 using DigitalBrain.Behaviors.Runtime.Artifacts;
 using DigitalBrain.Security;
 using DigitalBrain.Tasks;
+using DigitalBrain.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -19,9 +20,11 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
     private const string KnownStateProtectionKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
     private const string SurfaceOwner = "l2-surface-owner";
     private const string SurfaceTaskName = "l2-surface-task";
+    private const string ForeignOwner = "l2-foreign-owner";
 
     private const string GreenProgram =
         """
+        using System;
         using System.Collections.Generic;
         using System.Threading;
         using System.Threading.Tasks;
@@ -29,20 +32,20 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         using DigitalBrain.Behaviors;
 
         public sealed record SampleTrigger(string Label) : Synapse;
-
-        public sealed class SampleProgram : IBehaviorProgram<SampleTrigger>
-        {
-            public ValueTask ExecuteAsync(SampleTrigger trigger, IBehaviorContext context, CancellationToken cancellationToken)
-            {
-                context.SetState("outcome", "l2-host:" + trigger.Label);
-                return ValueTask.CompletedTask;
-            }
-        }
+        public union SampleInput(SampleTrigger);
 
         public static class BehaviorEntry
         {
             public static Task RunAsync(BehaviorBrain<SampleTrigger> brain)
-                => Task.CompletedTask;
+            {
+                if (!string.Equals(brain.Trigger.Label, "l2", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Unexpected trigger label '{brain.Trigger.Label}'.");
+                }
+
+                return Task.CompletedTask;
+            }
         }
 
         public sealed class SampleInstallTests : IBehaviorInstallTests
@@ -90,8 +93,160 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         using var health = await healthClient.GetAsync(
             new Uri(TestingAppHostFixture.HealthPath, UriKind.Relative),
             cancellationToken);
-        Assert.Equal(System.Net.HttpStatusCode.OK, health.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, health.StatusCode);
 
+        var digest = await DeployAndActivateSignedSampleAsync(behaviorHost, cancellationToken);
+        using var client = behaviorHost.CreateHttpClient();
+        client.Timeout = TimeSpan.FromMinutes(5);
+
+        var owner = new OwnerId(SurfaceOwner);
+        var task = NeuronId.For<ITask>(owner, SurfaceTaskName);
+        var attempt = new AttemptId(Guid.NewGuid());
+        var execution = BehaviorExecutionId.New();
+        var triggerBytes = Encoding.UTF8.GetBytes("""{"Label":"l2"}""");
+
+        var stored = await StoreTriggerPayloadAsync(
+            client,
+            SurfaceOwner,
+            task,
+            attempt,
+            triggerBytes,
+            cancellationToken);
+
+        using var execute = await client.PostAsJsonAsync(
+            "v1/behaviors/execute",
+            new
+            {
+                owner = SurfaceOwner,
+                behavior = "com.digitalbrain.sample",
+                revision = digest.Value,
+                execution = execution.Value.ToString("N"),
+                artifactHash = digest.Value,
+                triggerTypeName = "SampleTrigger",
+                taskType = task.Type,
+                taskOwner = SurfaceOwner,
+                taskName = SurfaceTaskName,
+                attempt = attempt.Value.ToString("N"),
+                triggerPayloadId = stored.Id,
+                triggerPayloadExpiresAt = stored.ExpiresAt,
+                capabilities = Array.Empty<object>(),
+                utcNow = DateTimeOffset.UtcNow,
+            },
+            cancellationToken);
+        Assert.True(execute.IsSuccessStatusCode, await execute.Content.ReadAsStringAsync(cancellationToken));
+        var outcome = await execute.Content.ReadFromJsonAsync<ExecuteResponse>(cancellationToken: cancellationToken);
+        Assert.NotNull(outcome);
+        Assert.True(outcome.Succeeded, outcome.Outcome);
+        Assert.Equal("executed", outcome.Outcome);
+    }
+
+    [Fact(
+        Timeout = 300_000,
+        DisplayName =
+            "BehaviorHost execute missing taskOwner returns BadRequest missing-task-owner without inventing owner")]
+    public async Task ExecuteMissingTaskOwnerReturnsMissingTaskOwner()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var host = await fixture.StartAsync(cancellationToken);
+        var behaviorHost = host.Resource(TestingAppHostFixture.BehaviorHostResourceName);
+        await behaviorHost.WaitUntilHealthyAsync(cancellationToken);
+
+        var digest = await DeployAndActivateSignedSampleAsync(behaviorHost, cancellationToken);
+        using var client = behaviorHost.CreateHttpClient();
+        client.Timeout = TimeSpan.FromMinutes(5);
+
+        var owner = new OwnerId(SurfaceOwner);
+        var task = NeuronId.For<ITask>(owner, SurfaceTaskName);
+        var attempt = new AttemptId(Guid.NewGuid());
+        var stored = await StoreTriggerPayloadAsync(
+            client,
+            SurfaceOwner,
+            task,
+            attempt,
+            Encoding.UTF8.GetBytes("""{"Label":"l2"}"""),
+            cancellationToken);
+
+        using var execute = await client.PostAsJsonAsync(
+            "v1/behaviors/execute",
+            new
+            {
+                owner = SurfaceOwner,
+                behavior = "com.digitalbrain.sample",
+                revision = digest.Value,
+                execution = BehaviorExecutionId.New().Value.ToString("N"),
+                artifactHash = digest.Value,
+                triggerTypeName = "SampleTrigger",
+                taskType = task.Type,
+                taskName = SurfaceTaskName,
+                attempt = attempt.Value.ToString("N"),
+                triggerPayloadId = stored.Id,
+                triggerPayloadExpiresAt = stored.ExpiresAt,
+                capabilities = Array.Empty<object>(),
+                utcNow = DateTimeOffset.UtcNow,
+            },
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, execute.StatusCode);
+        var body = (await execute.Content.ReadAsStringAsync(cancellationToken)).Trim();
+        Assert.Equal("missing-task-owner", body);
+    }
+
+    [Fact(
+        Timeout = 300_000,
+        DisplayName =
+            "BehaviorHost execute owner/taskOwner mismatch returns BadRequest owner-task-mismatch")]
+    public async Task ExecuteOwnerTaskOwnerMismatchReturnsOwnerTaskMismatch()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var host = await fixture.StartAsync(cancellationToken);
+        var behaviorHost = host.Resource(TestingAppHostFixture.BehaviorHostResourceName);
+        await behaviorHost.WaitUntilHealthyAsync(cancellationToken);
+
+        var digest = await DeployAndActivateSignedSampleAsync(behaviorHost, cancellationToken);
+        using var client = behaviorHost.CreateHttpClient();
+        client.Timeout = TimeSpan.FromMinutes(5);
+
+        var owner = new OwnerId(SurfaceOwner);
+        var task = NeuronId.For<ITask>(owner, SurfaceTaskName);
+        var attempt = new AttemptId(Guid.NewGuid());
+        var stored = await StoreTriggerPayloadAsync(
+            client,
+            SurfaceOwner,
+            task,
+            attempt,
+            Encoding.UTF8.GetBytes("""{"Label":"l2"}"""),
+            cancellationToken);
+
+        using var execute = await client.PostAsJsonAsync(
+            "v1/behaviors/execute",
+            new
+            {
+                owner = SurfaceOwner,
+                behavior = "com.digitalbrain.sample",
+                revision = digest.Value,
+                execution = BehaviorExecutionId.New().Value.ToString("N"),
+                artifactHash = digest.Value,
+                triggerTypeName = "SampleTrigger",
+                taskType = task.Type,
+                taskOwner = ForeignOwner,
+                taskName = SurfaceTaskName,
+                attempt = attempt.Value.ToString("N"),
+                triggerPayloadId = stored.Id,
+                triggerPayloadExpiresAt = stored.ExpiresAt,
+                capabilities = Array.Empty<object>(),
+                utcNow = DateTimeOffset.UtcNow,
+            },
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, execute.StatusCode);
+        var body = (await execute.Content.ReadAsStringAsync(cancellationToken)).Trim();
+        Assert.Equal("owner-task-mismatch", body);
+    }
+
+    private static async Task<BehaviorArtifactDigest> DeployAndActivateSignedSampleAsync(
+        HostedResource behaviorHost,
+        CancellationToken cancellationToken)
+    {
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -166,20 +321,25 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
             cancellationToken);
         Assert.True(activate.IsSuccessStatusCode, await activate.Content.ReadAsStringAsync(cancellationToken));
 
-        var owner = new OwnerId(SurfaceOwner);
-        var task = NeuronId.For<ITask>(owner, SurfaceTaskName);
-        var attempt = new AttemptId(Guid.NewGuid());
-        var execution = BehaviorExecutionId.New();
-        var triggerBytes = Encoding.UTF8.GetBytes("""{"Label":"l2"}""");
+        return written.Digest;
+    }
 
+    private static async Task<StoredPayloadResponse> StoreTriggerPayloadAsync(
+        HttpClient client,
+        string owner,
+        NeuronId task,
+        AttemptId attempt,
+        byte[] triggerBytes,
+        CancellationToken cancellationToken)
+    {
         using var store = await client.PostAsJsonAsync(
-            "v1/behaviors/broker/payloads/store",
+            "v1/behaviors/testing/in-process-payloads/store",
             new
             {
-                owner = SurfaceOwner,
+                owner,
                 taskType = task.Type,
-                taskOwner = SurfaceOwner,
-                taskName = SurfaceTaskName,
+                taskOwner = owner,
+                taskName = task.Name,
                 attempt = attempt.Value.ToString("N"),
                 contentBase64 = Convert.ToBase64String(triggerBytes),
             },
@@ -189,32 +349,7 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
             cancellationToken: cancellationToken);
         Assert.NotNull(stored);
         Assert.False(string.IsNullOrWhiteSpace(stored.Id));
-
-        using var execute = await client.PostAsJsonAsync(
-            "v1/behaviors/execute",
-            new
-            {
-                owner = SurfaceOwner,
-                behavior = "com.digitalbrain.sample",
-                revision = written.Digest.Value,
-                execution = execution.Value.ToString("N"),
-                artifactHash = written.Digest.Value,
-                triggerTypeName = "SampleTrigger",
-                taskType = task.Type,
-                taskOwner = SurfaceOwner,
-                taskName = SurfaceTaskName,
-                attempt = attempt.Value.ToString("N"),
-                triggerPayloadId = stored.Id,
-                triggerPayloadExpiresAt = stored.ExpiresAt,
-                capabilities = Array.Empty<object>(),
-                utcNow = DateTimeOffset.UtcNow,
-            },
-            cancellationToken);
-        Assert.True(execute.IsSuccessStatusCode, await execute.Content.ReadAsStringAsync(cancellationToken));
-        var outcome = await execute.Content.ReadFromJsonAsync<ExecuteResponse>(cancellationToken: cancellationToken);
-        Assert.NotNull(outcome);
-        Assert.True(outcome.Succeeded, outcome.Outcome);
-        Assert.Equal("executed", outcome.Outcome);
+        return stored;
     }
 
     private sealed record StoredPayloadResponse(string Id, DateTimeOffset? ExpiresAt);

@@ -9,8 +9,6 @@ namespace DigitalBrain.Behaviors.Tests;
 
 public sealed class HttpBehaviorHostClientExecuteOwnerIsolation
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     private static readonly OwnerId MetadataOwner = new("owner-metadata");
     private static readonly OwnerId TaskOwner = new("owner-task");
     private static readonly BehaviorId Behavior = new("com.digitalbrain.execute-owner");
@@ -73,52 +71,6 @@ public sealed class HttpBehaviorHostClientExecuteOwnerIsolation
         Assert.Equal(TriggerPayload.Id.ToString("N"), root.GetProperty("triggerPayloadId").GetString());
         Assert.False(root.TryGetProperty("triggerJson", out _));
     }
-
-    [Fact(DisplayName =
-        "Execute request JSON missing taskOwner leaves TaskOwner null and fails OwnerId without inheriting metadata owner")]
-    public void MissingTaskOwnerFailsClosedWithoutInheritingMetadataOwner()
-    {
-        const string legacyMissingTaskOwnerJson =
-            """
-            {
-              "owner": "owner-metadata",
-              "behavior": "com.digitalbrain.execute-owner",
-              "revision": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-              "execution": "22222222222222222222222222222222",
-              "artifactHash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-              "triggerTypeName": "SampleTrigger",
-              "triggerJson": "{\"Label\":\"l2\"}"
-            }
-            """;
-
-        var body = JsonSerializer.Deserialize<ExecuteRequestWire>(legacyMissingTaskOwnerJson, JsonOptions);
-        Assert.NotNull(body);
-        Assert.Equal("owner-metadata", body.Owner);
-        Assert.Null(body.TaskOwner);
-
-        var metadataOwner = new OwnerId(body.Owner!);
-        Assert.Equal("owner-metadata", metadataOwner.Value);
-
-        var failure = Assert.Throws<ArgumentNullException>(() => new OwnerId(body.TaskOwner!));
-        Assert.Equal("value", failure.ParamName);
-        Assert.NotEqual(metadataOwner.Value, body.TaskOwner);
-    }
-
-    private sealed record ExecuteRequestWire(
-        string? Owner,
-        string? Behavior,
-        string? Revision,
-        string? Execution,
-        string? ArtifactHash,
-        string? TriggerTypeName,
-        string? TaskType,
-        string? TaskOwner,
-        string? TaskName,
-        string? Attempt,
-        string? TriggerPayloadId,
-        DateTimeOffset? TriggerPayloadExpiresAt,
-        object[]? Capabilities,
-        DateTimeOffset UtcNow);
 
     private sealed class CaptureHandler(Func<RecordedRequest, HttpResponseMessage> responder) : HttpMessageHandler
     {

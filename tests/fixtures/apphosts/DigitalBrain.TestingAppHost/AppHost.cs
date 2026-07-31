@@ -24,6 +24,10 @@ var behaviorHost = builder.AddProject<Projects.DigitalBrain_OS_BehaviorHost>(Beh
     .WithEnvironment(
         DigitalBrainHostingExtensions.StateProtectionKeyConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
         KnownStateProtectionKey)
+    .WithEnvironment(
+        // TestingAppHost only — never set on product AppHost. Temporary L2 seed until silo reverse-broker.
+        BehaviorHostHosting.TestingInProcessPayloadBrokerConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
+        bool.TrueString)
     .WithHttpHealthCheck("/health")
     .WaitFor(silo);
 

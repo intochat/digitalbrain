@@ -31,7 +31,7 @@ app.MapPost("/v1/behaviors/deploy", async (
     }
     catch (BehaviorHostException exception)
     {
-        return Results.BadRequest(exception.Reason);
+        return Results.Content(exception.Reason, "text/plain", statusCode: StatusCodes.Status400BadRequest);
     }
 });
 
@@ -52,7 +52,7 @@ app.MapPost("/v1/behaviors/activate", async (
     }
     catch (BehaviorHostException exception)
     {
-        return Results.BadRequest(exception.Reason);
+        return Results.Content(exception.Reason, "text/plain", statusCode: StatusCodes.Status400BadRequest);
     }
 });
 
@@ -73,67 +73,67 @@ app.MapPost("/v1/behaviors/deactivate", async (
     }
     catch (BehaviorHostException exception)
     {
-        return Results.BadRequest(exception.Reason);
+        return Results.Content(exception.Reason, "text/plain", statusCode: StatusCodes.Status400BadRequest);
     }
 });
 
-app.MapPost("/v1/behaviors/broker/payloads/store", (
-    StorePayloadRequest body,
-    InMemoryBehaviorHostPayloadStore? store,
-    CancellationToken cancellationToken) =>
+// TestingAppHost-only seed seam (not the production silo reverse broker).
+// Mapped only when DigitalBrain:Behaviors:Broker:TestingInProcessPayloadBroker=true.
+if (BehaviorHostHosting.IsTestingInProcessPayloadBrokerEnabled(app.Configuration))
 {
-    cancellationToken.ThrowIfCancellationRequested();
-    if (store is null)
+    app.MapPost("/v1/behaviors/testing/in-process-payloads/store", (
+        TestingInProcessStorePayloadRequest body,
+        InMemoryBehaviorHostPayloadStore store,
+        CancellationToken cancellationToken) =>
     {
-        return Results.BadRequest("in-memory-payload-store-not-configured");
-    }
-
-    try
-    {
-        var owner = RequireOwner(body.Owner, "missing-owner");
-        var taskOwner = RequireOwner(body.TaskOwner, "missing-task-owner");
-        if (owner != taskOwner)
+        cancellationToken.ThrowIfCancellationRequested();
+        try
         {
-            throw new BehaviorHostException("owner-task-mismatch");
-        }
+            var owner = RequireOwner(body.Owner, "missing-owner");
+            var taskOwner = RequireOwner(body.TaskOwner, "missing-task-owner");
+            if (owner != taskOwner)
+            {
+                throw new BehaviorHostException("owner-task-mismatch");
+            }
 
-        if (string.IsNullOrWhiteSpace(body.ContentBase64))
+            if (string.IsNullOrWhiteSpace(body.ContentBase64))
+            {
+                throw new BehaviorHostException("empty-payload");
+            }
+
+            if (string.IsNullOrWhiteSpace(body.TaskType)
+                || string.IsNullOrWhiteSpace(body.TaskName)
+                || string.IsNullOrWhiteSpace(body.Attempt))
+            {
+                throw new BehaviorHostException("missing-task-identity");
+            }
+
+            if (!Guid.TryParseExact(body.Attempt, "N", out var attemptValue) || attemptValue == Guid.Empty)
+            {
+                throw new BehaviorHostException("invalid-attempt");
+            }
+
+            var reference = store.Store(
+                owner,
+                new NeuronId(body.TaskType, taskOwner, body.TaskName),
+                new AttemptId(attemptValue),
+                Convert.FromBase64String(body.ContentBase64),
+                TimeSpan.FromHours(1));
+
+            return Results.Ok(new ProtectedReferenceResponse(
+                reference.Id.ToString("N"),
+                reference.ExpiresAt));
+        }
+        catch (BehaviorHostException exception)
         {
-            throw new BehaviorHostException("empty-payload");
+            return Results.Content(exception.Reason, "text/plain", statusCode: StatusCodes.Status400BadRequest);
         }
-
-        if (string.IsNullOrWhiteSpace(body.TaskType)
-            || string.IsNullOrWhiteSpace(body.TaskName)
-            || string.IsNullOrWhiteSpace(body.Attempt))
+        catch (FormatException)
         {
-            throw new BehaviorHostException("missing-task-identity");
+            return Results.Content("invalid-payload-content", "text/plain", statusCode: StatusCodes.Status400BadRequest);
         }
-
-        if (!Guid.TryParseExact(body.Attempt, "N", out var attemptValue) || attemptValue == Guid.Empty)
-        {
-            throw new BehaviorHostException("invalid-attempt");
-        }
-
-        var reference = store.Store(
-            owner,
-            new NeuronId(body.TaskType, taskOwner, body.TaskName),
-            new AttemptId(attemptValue),
-            Convert.FromBase64String(body.ContentBase64),
-            TimeSpan.FromHours(1));
-
-        return Results.Ok(new ProtectedReferenceResponse(
-            reference.Id.ToString("N"),
-            reference.ExpiresAt));
-    }
-    catch (BehaviorHostException exception)
-    {
-        return Results.BadRequest(exception.Reason);
-    }
-    catch (FormatException)
-    {
-        return Results.BadRequest("invalid-payload-content");
-    }
-});
+    });
+}
 
 app.MapPost("/v1/behaviors/execute", async (
     ExecuteRequest body,
@@ -204,7 +204,7 @@ app.MapPost("/v1/behaviors/execute", async (
     }
     catch (BehaviorHostException exception)
     {
-        return Results.BadRequest(exception.Reason);
+        return Results.Content(exception.Reason, "text/plain", statusCode: StatusCodes.Status400BadRequest);
     }
 });
 
@@ -255,7 +255,7 @@ internal sealed record CapabilityEdgeRequest(
     string ResponseId,
     int ResponseVersion);
 
-internal sealed record StorePayloadRequest(
+internal sealed record TestingInProcessStorePayloadRequest(
     string Owner,
     string TaskType,
     string TaskOwner,
