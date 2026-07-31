@@ -280,13 +280,17 @@ public sealed class BehaviorWorkerAuthorityTests(BehaviorsFixture fixture)
             new BehaviorRevisionId("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
             contractVersion: "1",
             caseId: "authority",
-            protectedPayload: new ProtectedPayloadReference(Guid.Parse("55555555-5555-5555-5555-555555555555")));
+            protectedPayload: new ProtectedPayloadReference(Guid.Parse("55555555-5555-5555-5555-555555555555")),
+            triggerTypeName: "SampleTrigger",
+            capabilities: []);
         var goal = new BehaviorActivationGoal(
             activation.BehaviorId,
             activation.Revision,
             activation.ContractVersion,
             activation.CaseId,
-            activation.ProtectedPayload);
+            activation.ProtectedPayload,
+            activation.TriggerTypeName,
+            activation.Capabilities);
 
         await task.Reference.Start(new StartTask(
             CommandId.New(),

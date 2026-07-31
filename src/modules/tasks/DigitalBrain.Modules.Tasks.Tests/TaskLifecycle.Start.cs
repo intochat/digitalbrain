@@ -69,7 +69,9 @@ public sealed partial class TaskLifecycle
             contractVersion: "1",
             caseId: "install",
             protectedPayload: new ProtectedPayloadReference(
-                Guid.Parse("11111111-1111-1111-1111-111111111111")));
+                Guid.Parse("11111111-1111-1111-1111-111111111111")),
+            triggerTypeName: "SampleTrigger",
+            capabilities: []);
 
         var started = await task.Reference.Start(new StartTask(
             CommandId.New(),
@@ -117,7 +119,9 @@ public sealed partial class TaskLifecycle
                 contractVersion: "1",
                 caseId: "conflict",
                 protectedPayload: new ProtectedPayloadReference(
-                    Guid.Parse("44444444-4444-4444-4444-444444444444"))),
+                    Guid.Parse("44444444-4444-4444-4444-444444444444")),
+                triggerTypeName: "SampleTrigger",
+                capabilities: []),
         };
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => task.Reference.Start(conflicting));

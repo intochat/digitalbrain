@@ -21,6 +21,7 @@ public sealed partial class BehaviorsModule
         builder.Services.TryAddSingleton<IBehaviorArtifactTrust>(static provider =>
             new SiloBehaviorArtifactTrust(provider.GetRequiredService<IDurablePayloadProtector>()));
         builder.Services.TryAddSingleton<IBehaviorProtectedPayloadAccess, GrainBehaviorProtectedPayloadAccess>();
+        builder.Services.TryAddSingleton<IBehaviorProtectedTriggerAccess, GrainBehaviorProtectedTriggerAccess>();
         builder.Services.TryAddSingleton<IBehaviorTaskOperationAccess, GrainBehaviorTaskOperationAccess>();
         builder.Services.TryAddSingleton<IBehaviorCapabilityDispatchAccess, GrainBehaviorCapabilityDispatchAccess>();
 

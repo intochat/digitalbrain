@@ -95,7 +95,7 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
             cancellationToken);
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
 
-        var digest = await DeployAndActivateSignedSampleAsync(behaviorHost, cancellationToken);
+        var sample = await DeployAndActivateSignedSampleAsync(behaviorHost, cancellationToken);
         using var siloClient = silo.CreateHttpClient();
         siloClient.Timeout = TimeSpan.FromMinutes(5);
         using var client = behaviorHost.CreateHttpClient();
@@ -107,11 +107,12 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         var execution = BehaviorExecutionId.New();
         var triggerBytes = Encoding.UTF8.GetBytes("""{"Label":"l2"}""");
 
-        var stored = await StoreTriggerPayloadAsync(
+        var stored = await StoreActivationTriggerAsync(
             siloClient,
             SurfaceOwner,
             task,
-            attempt,
+            sample.Digest,
+            sample.CaseId,
             triggerBytes,
             cancellationToken);
 
@@ -121,10 +122,10 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
             {
                 owner = SurfaceOwner,
                 behavior = "com.digitalbrain.sample",
-                revision = digest.Value,
+                revision = sample.Digest.Value,
                 execution = execution.Value.ToString("N"),
-                artifactHash = digest.Value,
-                triggerTypeName = "SampleTrigger",
+                artifactHash = sample.Digest.Value,
+                triggerTypeName = sample.TriggerTypeName,
                 taskType = task.Type,
                 taskOwner = SurfaceOwner,
                 taskName = SurfaceTaskName,
@@ -153,7 +154,7 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         var behaviorHost = host.Resource(TestingAppHostFixture.BehaviorHostResourceName);
         await behaviorHost.WaitUntilHealthyAsync(cancellationToken);
 
-        var digest = await DeployAndActivateSignedSampleAsync(behaviorHost, cancellationToken);
+        var sample = await DeployAndActivateSignedSampleAsync(behaviorHost, cancellationToken);
         using var client = behaviorHost.CreateHttpClient();
         client.Timeout = TimeSpan.FromMinutes(5);
 
@@ -167,10 +168,10 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
             {
                 owner = SurfaceOwner,
                 behavior = "com.digitalbrain.sample",
-                revision = digest.Value,
+                revision = sample.Digest.Value,
                 execution = BehaviorExecutionId.New().Value.ToString("N"),
-                artifactHash = digest.Value,
-                triggerTypeName = "SampleTrigger",
+                artifactHash = sample.Digest.Value,
+                triggerTypeName = sample.TriggerTypeName,
                 taskType = task.Type,
                 taskName = SurfaceTaskName,
                 attempt = attempt.Value.ToString("N"),
@@ -197,7 +198,7 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         var behaviorHost = host.Resource(TestingAppHostFixture.BehaviorHostResourceName);
         await behaviorHost.WaitUntilHealthyAsync(cancellationToken);
 
-        var digest = await DeployAndActivateSignedSampleAsync(behaviorHost, cancellationToken);
+        var sample = await DeployAndActivateSignedSampleAsync(behaviorHost, cancellationToken);
         using var client = behaviorHost.CreateHttpClient();
         client.Timeout = TimeSpan.FromMinutes(5);
 
@@ -211,10 +212,10 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
             {
                 owner = SurfaceOwner,
                 behavior = "com.digitalbrain.sample",
-                revision = digest.Value,
+                revision = sample.Digest.Value,
                 execution = BehaviorExecutionId.New().Value.ToString("N"),
-                artifactHash = digest.Value,
-                triggerTypeName = "SampleTrigger",
+                artifactHash = sample.Digest.Value,
+                triggerTypeName = sample.TriggerTypeName,
                 taskType = task.Type,
                 taskOwner = ForeignOwner,
                 taskName = SurfaceTaskName,
@@ -231,7 +232,7 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         Assert.Equal("owner-task-mismatch", body);
     }
 
-    private static async Task<BehaviorArtifactDigest> DeployAndActivateSignedSampleAsync(
+    private static async Task<SignedSample> DeployAndActivateSignedSampleAsync(
         HostedResource behaviorHost,
         CancellationToken cancellationToken)
     {
@@ -248,36 +249,23 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         await using var provider = services.BuildServiceProvider();
         var trust = provider.GetRequiredService<IBehaviorArtifactTrust>();
 
+        var behavior = new BehaviorId("com.digitalbrain.sample");
         var compiler = new ContractOnlyBehaviorCompiler();
-        var compile = compiler.Compile(GreenProgram, new BehaviorId("com.digitalbrain.sample"));
+        var compile = compiler.Compile(GreenProgram, behavior);
         Assert.True(compile.Succeeded, compile.Diagnostics);
+        Assert.NotNull(compile.Contract);
+        var signedCase = Assert.Single(compile.Contract.Cases);
 
-        var envelope = new BehaviorArtifactEnvelope(
-            new BehaviorDefinitionManifest(
-                new BehaviorId("com.digitalbrain.sample"),
-                "Sample",
-                "Sample",
-                new BehaviorEntryPoints(
-                    [],
-                    new BehaviorContractManifest(
-                        "com.digitalbrain.sample",
-                        1,
-                        """{"oneOf":[]}""",
-                        [],
-                        """{"type":"object"}""")),
-                [],
-                "Sample host surface program",
-                new BehaviorCompilerPolicy("11.0.100-preview.6", "5.6.0", "Preview", "contract-only-v1"),
-                [],
-                new BehaviorResourceLimits(1_000, 64 * 1024 * 1024, 30_000)),
+        var envelope = BehaviorNeuron.CreateProposalEnvelope(
+            behavior,
+            "Sample",
+            "Sample host surface program",
             GreenProgram,
             GreenFeature,
-            """{"version":1,"libraries":{}}""",
             compile.AssemblyBytes,
-            """{"runtimeTarget":{"name":"net11.0"}}""",
             compile.CompilerEvidenceJson,
-            """{"result":"approved","policy":"v1"}""",
-            """{"scenarios":1,"passed":true}""");
+            compile.Contract,
+            []);
         var written = CanonicalArtifactWriter.Write(envelope);
         var signature = trust.Sign(written.Digest.Value);
 
@@ -289,7 +277,7 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
             new
             {
                 owner = SurfaceOwner,
-                behavior = "com.digitalbrain.sample",
+                behavior = behavior.Value,
                 artifactHash = written.Digest.Value,
                 artifactBytesBase64 = Convert.ToBase64String(written.Bytes),
                 assemblyBytesBase64 = Convert.ToBase64String(compile.AssemblyBytes.Span),
@@ -303,13 +291,13 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
             new
             {
                 owner = SurfaceOwner,
-                behavior = "com.digitalbrain.sample",
+                behavior = behavior.Value,
                 artifactHash = written.Digest.Value,
             },
             cancellationToken);
         Assert.True(activate.IsSuccessStatusCode, await activate.Content.ReadAsStringAsync(cancellationToken));
 
-        return written.Digest;
+        return new SignedSample(written.Digest, signedCase.CaseId, signedCase.CaseName);
     }
 
     [Fact(
@@ -396,7 +384,7 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         var attempt = new AttemptId(Guid.NewGuid());
         var triggerBytes = Encoding.UTF8.GetBytes("""{"Label":"l2-payload-roundtrip"}""");
 
-        var stored = await StoreTriggerPayloadAsync(
+        var stored = await StoreOperationPayloadAsync(
             client,
             SurfaceOwner,
             task,
@@ -429,17 +417,18 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         Assert.Equal(triggerBytes, Convert.FromBase64String(loaded.ContentBase64));
     }
 
-    private static async Task<StoredPayloadResponse> StoreTriggerPayloadAsync(
+    private static async Task<StoredPayloadResponse> StoreActivationTriggerAsync(
         HttpClient client,
         string owner,
         NeuronId task,
-        AttemptId attempt,
+        BehaviorArtifactDigest revision,
+        string caseId,
         byte[] triggerBytes,
         CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            "v1/behaviors/broker/payloads/store")
+            "v1/behaviors/broker/triggers/store")
         {
             Content = JsonContent.Create(new
             {
@@ -447,7 +436,9 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
                 taskType = task.Type,
                 taskOwner = owner,
                 taskName = task.Name,
-                attempt = attempt.Value.ToString("N"),
+                behavior = "com.digitalbrain.sample",
+                revision = revision.Value,
+                caseId,
                 contentBase64 = Convert.ToBase64String(triggerBytes),
             }),
         };
@@ -463,6 +454,46 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         Assert.False(string.IsNullOrWhiteSpace(stored.Id));
         return stored;
     }
+
+    private static async Task<StoredPayloadResponse> StoreOperationPayloadAsync(
+        HttpClient client,
+        string owner,
+        NeuronId task,
+        AttemptId attempt,
+        byte[] payloadBytes,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "v1/behaviors/broker/payloads/store")
+        {
+            Content = JsonContent.Create(new
+            {
+                owner,
+                taskType = task.Type,
+                taskOwner = owner,
+                taskName = task.Name,
+                attempt = attempt.Value.ToString("N"),
+                contentBase64 = Convert.ToBase64String(payloadBytes),
+            }),
+        };
+        request.Headers.TryAddWithoutValidation(
+            BehaviorBrokerContract.CredentialHeaderName,
+            TestingAppHostFixture.BrokerCredential);
+
+        using var store = await client.SendAsync(request, cancellationToken);
+        Assert.True(store.IsSuccessStatusCode, await store.Content.ReadAsStringAsync(cancellationToken));
+        var stored = await store.Content.ReadFromJsonAsync<StoredPayloadResponse>(
+            cancellationToken: cancellationToken);
+        Assert.NotNull(stored);
+        Assert.False(string.IsNullOrWhiteSpace(stored.Id));
+        return stored;
+    }
+
+    private sealed record SignedSample(
+        BehaviorArtifactDigest Digest,
+        string CaseId,
+        string TriggerTypeName);
 
     private sealed record LoadPayloadResponse(string ContentBase64);
 

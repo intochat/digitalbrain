@@ -351,15 +351,33 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!payloads.TryGetValue(reference.Id, out var bytes))
+            {
+                throw new InvalidOperationException($"Unknown payload reference '{reference.Id}'.");
+            }
+
+            return ValueTask.FromResult<ReadOnlyMemory<byte>>(bytes);
+        }
+
+        public ValueTask<ReadOnlyMemory<byte>> LoadTriggerAsync(
+            OwnerId owner,
+            NeuronId task,
+            BehaviorId behavior,
+            BehaviorRevisionId revision,
+            string caseId,
+            ProtectedPayloadReference reference,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             LoadCount++;
             LastLoadReference = reference;
             LastLoadOwner = owner;
             LastLoadTask = task;
-            LastLoadAttempt = attempt;
+            LastLoadAttempt = Attempt;
 
             if (!payloads.TryGetValue(reference.Id, out var bytes))
             {
-                throw new InvalidOperationException($"Unknown payload reference '{reference.Id}'.");
+                throw new InvalidOperationException($"Unknown trigger reference '{reference.Id}'.");
             }
 
             return ValueTask.FromResult<ReadOnlyMemory<byte>>(bytes);

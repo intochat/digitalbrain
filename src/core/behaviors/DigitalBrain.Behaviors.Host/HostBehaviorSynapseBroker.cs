@@ -69,7 +69,7 @@ internal sealed class HostBehaviorSynapseBroker : IBehaviorSynapseBroker
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var target = NeuronId.For<TNeuron>(metadata.Owner, name);
+        var target = new NeuronId(RequireAlias(typeof(TNeuron)), metadata.Owner, name);
         var requestAlias = RequireAlias(request.GetType());
         var responseAlias = RequireAlias(typeof(TResponse));
         var grant = SelectGrant(target, requestAlias, responseAlias);

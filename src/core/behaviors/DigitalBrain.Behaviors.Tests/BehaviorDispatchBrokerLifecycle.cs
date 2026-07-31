@@ -35,13 +35,17 @@ public sealed class BehaviorDispatchBrokerLifecycle(BehaviorDispatchFixture fixt
             new BehaviorRevisionId("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
             contractVersion: "1",
             caseId: "dispatch-lifecycle",
-            protectedPayload: new ProtectedPayloadReference(Guid.Parse("66666666-6666-6666-6666-666666666666")));
+            protectedPayload: new ProtectedPayloadReference(Guid.Parse("66666666-6666-6666-6666-666666666666")),
+            triggerTypeName: "SampleTrigger",
+            capabilities: []);
         var goal = new BehaviorActivationGoal(
             activation.BehaviorId,
             activation.Revision,
             activation.ContractVersion,
             activation.CaseId,
-            activation.ProtectedPayload);
+            activation.ProtectedPayload,
+            activation.TriggerTypeName,
+            activation.Capabilities);
 
         await task.Reference.Start(new StartTask(
             CommandId.New(),

@@ -1,4 +1,6 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors.Manifest;
+using DigitalBrain.Behaviors.Runtime.Artifacts;
 using DigitalBrain.Tasks;
 
 namespace DigitalBrain.Behaviors;
@@ -46,18 +48,46 @@ internal sealed partial class BehaviorNeuron
                 "Behavior activation requires an existing owner-scoped Task and Worker.");
         }
 
+        if (data.ActiveArtifactBytes is null)
+        {
+            throw new InvalidOperationException(
+                $"Behavior '{Id}' has no signed active artifact bytes for '{command.ArtifactHash}'.");
+        }
+
+        var envelope = CanonicalArtifactReader.Read(data.ActiveArtifactBytes);
+        var contract = envelope.Manifest.EntryPoints.Contract;
+        if (contract.ContractMajorVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            != binding.ContractVersion)
+        {
+            throw new InvalidOperationException(
+                $"Behavior binding contract version '{binding.ContractVersion}' does not match signed contract '{contract.ContractMajorVersion}'.");
+        }
+
+        var signedCase = contract.Cases.FirstOrDefault(
+            item => string.Equals(item.CaseId, binding.CaseId, StringComparison.Ordinal));
+        if (signedCase is null)
+        {
+            throw new InvalidOperationException(
+                $"Behavior binding case '{binding.CaseId}' is not present on the active signed contract.");
+        }
+
+        var capabilities = DeriveResultBearingEdges(Id.Owner, envelope.Manifest.CapabilityGrants);
         var activation = new BehaviorTaskActivation(
             binding.BehaviorId,
             binding.Revision,
             binding.ContractVersion,
             binding.CaseId,
-            binding.ProtectedPayload);
+            binding.ProtectedPayload,
+            signedCase.CaseName,
+            capabilities);
         var goal = new BehaviorActivationGoal(
             binding.BehaviorId,
             binding.Revision,
             binding.ContractVersion,
             binding.CaseId,
-            binding.ProtectedPayload);
+            binding.ProtectedPayload,
+            signedCase.CaseName,
+            capabilities);
         var snapshot = await GrainFactory
             .GetGrain<ITask>(binding.TaskId.ToGrainId())
             .Start(new StartTask(
@@ -78,5 +108,37 @@ internal sealed partial class BehaviorNeuron
             snapshot.State,
             snapshot.ActiveAttempt,
             snapshot.Activation);
+    }
+
+    private static TaskOperationEdge[] DeriveResultBearingEdges(
+        OwnerId owner,
+        IReadOnlyList<BehaviorCapabilityGrant> grants)
+    {
+        ArgumentNullException.ThrowIfNull(grants);
+
+        if (grants.Count == 0)
+        {
+            return [];
+        }
+
+        var edges = new TaskOperationEdge[grants.Count];
+        for (var index = 0; index < grants.Count; index++)
+        {
+            var grant = grants[index];
+            if (string.IsNullOrWhiteSpace(grant.EmittedResultSynapseId)
+                || grant.EmittedResultSchemaVersion is null)
+            {
+                throw new InvalidOperationException("one-way-capability-not-supported");
+            }
+
+            edges[index] = new TaskOperationEdge(
+                new NeuronId(grant.TargetNeuronContractId, owner, grant.TargetInstanceName),
+                grant.AcceptedRequestSynapseId,
+                grant.AcceptedRequestSchemaVersion,
+                grant.EmittedResultSynapseId,
+                grant.EmittedResultSchemaVersion.Value);
+        }
+
+        return edges;
     }
 }

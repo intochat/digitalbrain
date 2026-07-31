@@ -152,6 +152,40 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
         Assert.Equal(firstHash, rollbackExecute.ArtifactHash);
     }
 
+    [Fact(DisplayName = "ActivateBound refuses unknown CaseId and mismatched contract version before Task Start")]
+    public async Task ActivateBoundRefusesUnknownCaseAndMismatchedContractBeforeTaskStart()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var behavior = test.Neuron<IBehaviorNeuron>(BehaviorsFixture.SampleBehavior);
+        var task = test.Neuron<DigitalBrain.Tasks.ITask>("activation-refuse-task");
+        var worker = test.Neuron<DigitalBrain.Tasks.IWorker>("activation-refuse-worker");
+
+        var active = await InstallAsync(test, behavior, RailPrograms.GreenProgram("refuse"), "refuse");
+        var baseBinding = BehaviorActivationBindings.ForExistingTask(
+            task.Id,
+            worker.Id,
+            new BehaviorId(BehaviorsFixture.SampleBehavior),
+            new BehaviorRevisionId(active.ActiveArtifactHash!),
+            contractVersion: "1",
+            caseId: "case.SampleTrigger",
+            protectedPayload: new ProtectedPayloadReference(Guid.Parse("77777777-7777-7777-7777-777777777777")));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            behavior.Reference.ActivateBound(new ActivateBoundBehavior(
+                CommandId.New(),
+                active.ActiveArtifactHash!,
+                baseBinding with { CaseId = "case.DoesNotExist" })));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            behavior.Reference.ActivateBound(new ActivateBoundBehavior(
+                CommandId.New(),
+                active.ActiveArtifactHash!,
+                baseBinding with { ContractVersion = "99" })));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => task.Reference.Read());
+    }
+
     [Fact(DisplayName = "explicit binding/activation starts exactly one existing owner-scoped Tasks ITask pinned to behavior identity")]
     public async Task ExplicitBindingActivationStartsExactlyOneOwnerScopedTask()
     {
@@ -168,7 +202,7 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
             new BehaviorId(BehaviorsFixture.SampleBehavior),
             new BehaviorRevisionId(active.ActiveArtifactHash!),
             contractVersion: "1",
-            caseId: "install",
+            caseId: "case.SampleTrigger",
             protectedPayload: new ProtectedPayloadReference(Guid.Parse("22222222-2222-2222-2222-222222222222")));
 
         var started = await behavior.Reference.ActivateBound(
@@ -184,6 +218,8 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
         Assert.Equal(binding.ContractVersion, started.Activation.ContractVersion);
         Assert.Equal(binding.CaseId, started.Activation.CaseId);
         Assert.Equal(binding.ProtectedPayload, started.Activation.ProtectedPayload);
+        Assert.Equal("SampleTrigger", started.Activation.TriggerTypeName);
+        Assert.Empty(started.Activation.Capabilities);
 
         var snapshot = await task.Reference.Read();
         Assert.Equal(TaskState.Pending, snapshot.State);
@@ -193,13 +229,14 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
         Assert.Equal(binding.ContractVersion, snapshot.Activation.ContractVersion);
         Assert.Equal(binding.CaseId, snapshot.Activation.CaseId);
         Assert.Equal(binding.ProtectedPayload, snapshot.Activation.ProtectedPayload);
+        Assert.Equal("SampleTrigger", snapshot.Activation.TriggerTypeName);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => behavior.Reference.ActivateBound(
                 new ActivateBoundBehavior(
                     CommandId.New(),
                     active.ActiveArtifactHash!,
-                    binding with { CaseId = "other" })));
+                    binding with { CaseId = "case.Unknown" })));
 
         Assert.Equal(TaskState.Pending, (await task.Reference.Read()).State);
     }
@@ -223,7 +260,7 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
             new BehaviorId(BehaviorsFixture.SampleBehavior),
             new BehaviorRevisionId(active.ActiveArtifactHash!),
             contractVersion: "1",
-            caseId: "install",
+            caseId: "case.SampleTrigger",
             protectedPayload: new ProtectedPayloadReference(
                 Guid.Parse("55555555-5555-5555-5555-555555555555")));
         var invalidBindings = new[]
@@ -279,7 +316,7 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
             new BehaviorId(BehaviorsFixture.SampleBehavior),
             new BehaviorRevisionId(active.ActiveArtifactHash!),
             contractVersion: "1",
-            caseId: "install",
+            caseId: "case.SampleTrigger",
             protectedPayload: new ProtectedPayloadReference(Guid.Parse("33333333-3333-3333-3333-333333333333")));
 
         var first = await behavior.Reference.ActivateBound(
@@ -292,7 +329,7 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
                 new ActivateBoundBehavior(
                     commandId,
                     active.ActiveArtifactHash!,
-                    binding with { CaseId = "conflict" })));
+                    binding with { CaseId = "case.Unknown" })));
 
         Assert.Equal(first.TaskId, second.TaskId);
         Assert.Equal(first.ActiveAttempt, second.ActiveAttempt);

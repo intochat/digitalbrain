@@ -12,7 +12,7 @@ public sealed class HostBehaviorSynapseBrokerTests
     private static readonly NeuronId TaskNeuron = NeuronId.For<ITask>(Owner, "host-broker-task");
     private static readonly AttemptId Attempt = new(Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"));
     private const string TargetInstance = "work";
-    private static readonly NeuronId TargetNeuron = NeuronId.For<IHostBrokerMarker>(Owner, TargetInstance);
+    private static readonly NeuronId TargetNeuron = new("test.host-broker.marker", Owner, TargetInstance);
 
     private const string RequestAlias = "test.host-broker.request";
     private const string ResponseAlias = "test.host-broker.response";
@@ -92,6 +92,47 @@ public sealed class HostBehaviorSynapseBrokerTests
         Assert.Equal(firstResponse, secondResponse);
         Assert.Equal("replay-me:ok", secondResponse.Status);
         Assert.Equal(1, client.DispatchCount);
+    }
+
+    [Fact(DisplayName = "grant built from catalog contract Alias (distinct from grain type) dispatches; wrong alias refuses before store")]
+    public async Task CatalogContractAliasDistinctFromGrainTypeDispatchesAndWrongAliasRefuses()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        // Mimic BehaviorHostEngine.DeriveResultBearingEdges: target type is contract alias, not grain type.
+        var grantFromSignedManifest = new BehaviorCapabilityEdge(
+            new NeuronId("test.host-broker.marker", Owner, TargetInstance),
+            RequestAlias,
+            RequestSchemaVersion,
+            ResponseAlias,
+            ResponseSchemaVersion);
+        var grainType = NeuronId.GrainTypeNameOf(typeof(IHostBrokerMarker));
+        Assert.NotEqual("test.host-broker.marker", grainType);
+
+        var client = new RecordingHostBrokerClient();
+        var broker = CreateBroker(client, grantFromSignedManifest);
+        var response = await broker.SendAsync<IHostBrokerMarker, HostBrokerResponse>(
+            TargetInstance,
+            new HostBrokerRequest("alias-ok"),
+            cancellationToken);
+        Assert.Equal("alias-ok:ok", response.Status);
+        Assert.Equal(1, client.DispatchCount);
+        Assert.True(client.StoreCount >= 1);
+
+        var wrongAliasClient = new RecordingHostBrokerClient();
+        var wrongAliasGrant = new BehaviorCapabilityEdge(
+            new NeuronId(grainType, Owner, TargetInstance),
+            RequestAlias,
+            RequestSchemaVersion,
+            ResponseAlias,
+            ResponseSchemaVersion);
+        var wrongAliasBroker = CreateBroker(wrongAliasClient, wrongAliasGrant);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            wrongAliasBroker.SendAsync<IHostBrokerMarker, HostBrokerResponse>(
+                TargetInstance,
+                new HostBrokerRequest("nope"),
+                cancellationToken));
+        Assert.Equal(0, wrongAliasClient.StoreCount);
+        Assert.Equal(0, wrongAliasClient.DispatchCount);
     }
 
     [Fact(DisplayName = "wrong target or alias is rejected before payload store or dispatch")]
@@ -239,6 +280,16 @@ public sealed class HostBehaviorSynapseBrokerTests
             LoadCount++;
             return ValueTask.FromResult<ReadOnlyMemory<byte>>(bytes);
         }
+
+        public ValueTask<ReadOnlyMemory<byte>> LoadTriggerAsync(
+            OwnerId owner,
+            NeuronId task,
+            BehaviorId behavior,
+            BehaviorRevisionId revision,
+            string caseId,
+            ProtectedPayloadReference reference,
+            CancellationToken cancellationToken)
+            => throw new NotSupportedException("Trigger load is not used by HostBehaviorSynapseBroker tests.");
 
         public ValueTask<TaskOperationSnapshot> PrepareAsync(
             PrepareTaskOperation command,

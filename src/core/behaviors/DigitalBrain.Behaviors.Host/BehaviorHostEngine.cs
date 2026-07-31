@@ -153,10 +153,13 @@ public sealed class BehaviorHostEngine : IBehaviorHostGateway
 
         cancellationToken.ThrowIfCancellationRequested();
         var client = brokerFactory.Create(command.Metadata.Owner, command.Task, command.Attempt);
-        var triggerBytes = await client.LoadPayloadAsync(
+        var triggerCase = ResolveTriggerCase(envelope.Manifest.EntryPoints.Contract, command.TriggerTypeName);
+        var triggerBytes = await client.LoadTriggerAsync(
             command.Metadata.Owner,
             command.Task,
-            command.Attempt,
+            command.Metadata.Behavior,
+            command.Metadata.Revision,
+            triggerCase.CaseId,
             command.TriggerPayload,
             cancellationToken).ConfigureAwait(false);
 
@@ -228,6 +231,34 @@ public sealed class BehaviorHostEngine : IBehaviorHostGateway
 
         trust.Verify(revision.ArtifactHash, revision.Signature);
         return revision;
+    }
+
+    private static BehaviorContractCaseManifest ResolveTriggerCase(
+        BehaviorContractManifest contract,
+        string triggerTypeName)
+    {
+        ArgumentNullException.ThrowIfNull(contract);
+        ArgumentException.ThrowIfNullOrWhiteSpace(triggerTypeName);
+
+        BehaviorContractCaseManifest? selected = null;
+        foreach (var item in contract.Cases)
+        {
+            if (!string.Equals(item.CaseName, triggerTypeName, StringComparison.Ordinal)
+                && !string.Equals(item.CaseName, triggerTypeName, StringComparison.OrdinalIgnoreCase)
+                && !triggerTypeName.EndsWith("." + item.CaseName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (selected is not null)
+            {
+                throw new BehaviorHostException("ambiguous-trigger-case");
+            }
+
+            selected = item;
+        }
+
+        return selected ?? throw new BehaviorHostException("unknown-trigger-case");
     }
 
     private static BehaviorCapabilityEdge[] DeriveResultBearingEdges(
