@@ -32,6 +32,7 @@ public sealed class HostBehaviorSynapseBrokerTests
             cancellationToken);
 
         Assert.Equal("hello-work:ok", response.Status);
+        Assert.Equal("ok", response.DetailCode);
         Assert.Equal(1, client.DispatchCount);
         Assert.NotNull(client.LastDispatchedEdge);
         Assert.Equal(TargetNeuron, client.LastDispatchedEdge!.Target);
@@ -41,6 +42,30 @@ public sealed class HostBehaviorSynapseBrokerTests
         Assert.Equal(ResponseSchemaVersion, client.LastDispatchedEdge.ResponseSchemaVersion);
         Assert.True(client.StoreCount >= 1);
         Assert.True(client.LoadCount >= 1);
+    }
+
+    [Fact(DisplayName = "Host response load uses shared payload JSON contract so non-default camelCase properties survive")]
+    public async Task HostResponseLoadPreservesCamelCasePropertiesViaSharedPayloadContract()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = new RecordingHostBrokerClient(serializeDispatchResponseAsCamelCaseOnly: true);
+        var broker = CreateBroker(client, ExactGrant());
+
+        var response = await broker.SendAsync<IHostBrokerMarker, HostBrokerResponse>(
+            TargetInstance,
+            new HostBrokerRequest("case-roundtrip"),
+            cancellationToken);
+
+        Assert.Equal("case-roundtrip:ok", response.Status);
+        Assert.Equal("ok", response.DetailCode);
+
+        var raw = Encoding.UTF8.GetString(client.LastResponseBytes!);
+        Assert.Contains("\"detailCode\"", raw, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"DetailCode\"", raw, StringComparison.Ordinal);
+
+        var withoutContract = JsonSerializer.Deserialize<HostBrokerResponse>(client.LastResponseBytes);
+        Assert.NotNull(withoutContract);
+        Assert.Null(withoutContract.DetailCode);
     }
 
     [Fact(DisplayName = "new broker instance replays completed Task result without redispatch")]
@@ -153,12 +178,13 @@ public sealed class HostBehaviorSynapseBrokerTests
     internal sealed record HostBrokerRequest(string Prompt) : RequestSynapse<HostBrokerResponse>;
 
     [Alias(ResponseAlias)]
-    internal sealed record HostBrokerResponse(string Status) : Synapse;
+    internal sealed record HostBrokerResponse(string Status, string? DetailCode = null) : Synapse;
 
     [Alias("test.host-broker.one-way")]
     internal sealed record HostBrokerOneWay(string Note) : Synapse;
 
-    private sealed class RecordingHostBrokerClient : IBehaviorHostBrokerClient
+    private sealed class RecordingHostBrokerClient(bool serializeDispatchResponseAsCamelCaseOnly = false)
+        : IBehaviorHostBrokerClient
     {
         private readonly Dictionary<Guid, byte[]> payloads = new();
         private readonly Dictionary<(Guid Attempt, int Sequence), TaskOperationSnapshot> operations = new();
@@ -170,6 +196,8 @@ public sealed class HostBehaviorSynapseBrokerTests
         public int DispatchCount { get; private set; }
 
         public BehaviorCapabilityEdge? LastDispatchedEdge { get; private set; }
+
+        public byte[]? LastResponseBytes { get; private set; }
 
         public ValueTask<ProtectedPayloadReference> StorePayloadAsync(
             OwnerId owner,
@@ -304,11 +332,14 @@ public sealed class HostBehaviorSynapseBrokerTests
                 throw new InvalidOperationException($"Unknown request payload '{requestPayload.Id}'.");
             }
 
-            var request = JsonSerializer.Deserialize<HostBrokerRequest>(requestBytes)
+            var request = BehaviorPayloadJson.Deserialize<HostBrokerRequest>(requestBytes)
                 ?? throw new InvalidOperationException("Request payload deserialized to null.");
 
-            var response = new HostBrokerResponse($"{request.Prompt}:ok");
-            var responseBytes = JsonSerializer.SerializeToUtf8Bytes(response);
+            var response = new HostBrokerResponse($"{request.Prompt}:ok", DetailCode: "ok");
+            var responseBytes = serializeDispatchResponseAsCamelCaseOnly
+                ? BehaviorPayloadJson.Serialize(response, typeof(HostBrokerResponse))
+                : BehaviorPayloadJson.Serialize(response, typeof(HostBrokerResponse));
+            LastResponseBytes = responseBytes;
             var responseId = Guid.NewGuid();
             payloads[responseId] = responseBytes;
 

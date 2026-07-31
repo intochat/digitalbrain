@@ -15,12 +15,6 @@ internal sealed class BehaviorWorkerNeuron :
     IHandle<DispatchWorkerContinue>,
     IHandle<DispatchWorkerCancel>
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-    };
-
     public async Task Accept(AttemptRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -133,68 +127,30 @@ internal sealed class BehaviorWorkerNeuron :
             throw new ArgumentException("invalid-attempt", paramName: null);
         }
 
-        if (edge.Target.Owner != Id.Owner)
-        {
-            throw new InvalidOperationException("foreign-target-owner");
-        }
-
         if (requestPayload.Id == Guid.Empty)
         {
             throw new ArgumentException("invalid-protected-reference", paramName: null);
         }
 
+        var authority = GrainFactory.GetGrain<IBehaviorTaskAuthority>(
+            BehaviorTaskAuthority.ForOwner(Id.Owner).ToGrainId());
+        var snapshot = await authority.ReadValidatedTask(
+            task,
+            attempt,
+            requireActivation: true,
+            cancellationToken);
+        if (snapshot.Worker != Id)
+        {
+            throw new InvalidOperationException("worker-mismatch");
+        }
+
         var catalog = ServiceProvider.GetRequiredService<ActiveCapabilityCatalog>();
         var typeMap = ServiceProvider.GetRequiredService<ActiveModuleContractTypeMap>();
         var payloads = ServiceProvider.GetRequiredService<IBehaviorProtectedPayloadAccess>();
-
-        if (!catalog.TryGetNeuron(edge.Target.Type, out var neuron) || neuron is null)
-        {
-            throw new InvalidOperationException("unknown-target-neuron");
-        }
-
-        var accepted = neuron.Accepted.Any(item =>
-            string.Equals(item.ContractId, edge.RequestSynapseId, StringComparison.Ordinal)
-            && item.SchemaVersion == edge.RequestSchemaVersion);
-        if (!accepted)
-        {
-            throw new InvalidOperationException("unknown-request-synapse");
-        }
-
-        var emitted = neuron.Emitted.Any(item =>
-            string.Equals(item.ContractId, edge.ResponseSynapseId, StringComparison.Ordinal)
-            && item.SchemaVersion == edge.ResponseSchemaVersion);
-        if (!emitted)
-        {
-            throw new InvalidOperationException("unknown-response-synapse");
-        }
-
-        if (!typeMap.TryGetNeuronGrainType(edge.Target.Type, out var grainType)
-            || string.IsNullOrWhiteSpace(grainType))
-        {
-            throw new InvalidOperationException("unknown-target-neuron-type");
-        }
-
-        if (!typeMap.TryGetSynapseType(edge.RequestSynapseId, edge.RequestSchemaVersion, out var requestType)
-            || requestType is null)
-        {
-            throw new InvalidOperationException("unknown-request-type");
-        }
-
-        if (!typeMap.TryGetSynapseType(edge.ResponseSynapseId, edge.ResponseSchemaVersion, out var responseType)
-            || responseType is null)
-        {
-            throw new InvalidOperationException("unknown-response-type");
-        }
-
-        if (!IsRequestSynapseOf(requestType, responseType))
-        {
-            throw new InvalidOperationException("request-response-type-mismatch");
-        }
+        var resolved = BehaviorCapabilityEdgeAuthority.ResolveExact(Id.Owner, edge, catalog, typeMap);
 
         cancellationToken.ThrowIfCancellationRequested();
-        var plaintext = await payloads
-            .LoadAsync(Id.Owner, task, attempt, requestPayload, cancellationToken)
-            ;
+        var plaintext = await payloads.LoadAsync(Id.Owner, task, attempt, requestPayload, cancellationToken);
         if (plaintext.IsEmpty)
         {
             throw new InvalidOperationException("invalid-payload-content");
@@ -203,7 +159,7 @@ internal sealed class BehaviorWorkerNeuron :
         object? materialised;
         try
         {
-            materialised = JsonSerializer.Deserialize(plaintext.Span, requestType, JsonOptions);
+            materialised = BehaviorPayloadJson.Deserialize(plaintext.Span, resolved.RequestType);
         }
         catch (JsonException exception)
         {
@@ -215,28 +171,9 @@ internal sealed class BehaviorWorkerNeuron :
             throw new InvalidOperationException("invalid-request-payload");
         }
 
-        var deliveryTarget = new NeuronId(grainType, edge.Target.Owner, edge.Target.Name);
         cancellationToken.ThrowIfCancellationRequested();
-        var delivery = await SendAsync(deliveryTarget, requestSynapse);
+        var delivery = await SendAsync(resolved.DeliveryTarget, requestSynapse);
         return new WorkerOperationReceipt(delivery.CorrelationId, Id, task);
-    }
-
-    private static bool IsRequestSynapseOf(Type requestType, Type responseType)
-    {
-        var current = requestType;
-        while (current is not null)
-        {
-            if (current.IsGenericType
-                && current.GetGenericTypeDefinition() == typeof(RequestSynapse<>)
-                && current.GetGenericArguments()[0] == responseType)
-            {
-                return true;
-            }
-
-            current = current.BaseType;
-        }
-
-        return false;
     }
 
     private void RequireStageTaskIdentity(NeuronId task)

@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime;
 
 namespace DigitalBrain.Behaviors;
 
@@ -22,11 +21,6 @@ internal sealed class GrainBehaviorCapabilityDispatchAccess : IBehaviorCapabilit
 {
     private static readonly TimeSpan OperationWaitBound = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan JournalPollInterval = TimeSpan.FromMilliseconds(50);
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-    };
 
     private readonly IGrainFactory grains;
     private readonly ActiveCapabilityCatalog catalog;
@@ -69,8 +63,7 @@ internal sealed class GrainBehaviorCapabilityDispatchAccess : IBehaviorCapabilit
         cancellationToken.ThrowIfCancellationRequested();
 
         ValidateIdentity(owner, task, attempt);
-        RequireExactActiveEdge(owner, edge);
-        var resolved = ResolveContractTypes(edge);
+        var resolved = BehaviorCapabilityEdgeAuthority.ResolveExact(owner, edge, catalog, typeMap);
 
         var snapshot = await ReadAndValidateTaskAsync(owner, task, attempt, cancellationToken)
             .ConfigureAwait(false);
@@ -108,10 +101,7 @@ internal sealed class GrainBehaviorCapabilityDispatchAccess : IBehaviorCapabilit
                 .ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
-            var responseBytes = JsonSerializer.SerializeToUtf8Bytes(
-                responseSynapse,
-                resolved.ResponseType,
-                JsonOptions);
+            var responseBytes = BehaviorPayloadJson.Serialize(responseSynapse, resolved.ResponseType);
             if (responseBytes.Length == 0)
             {
                 throw new InvalidOperationException("empty-response-payload");
@@ -173,76 +163,6 @@ internal sealed class GrainBehaviorCapabilityDispatchAccess : IBehaviorCapabilit
         }
     }
 
-    private void RequireExactActiveEdge(OwnerId owner, BehaviorCapabilityEdge edge)
-    {
-        if (edge.Target.Owner != owner)
-        {
-            throw new InvalidOperationException("foreign-target-owner");
-        }
-
-        if (IsMethodShaped(edge))
-        {
-            throw new InvalidOperationException("method-shaped-edge");
-        }
-
-        if (!catalog.TryGetNeuron(edge.Target.Type, out var neuron) || neuron is null)
-        {
-            throw new InvalidOperationException("unknown-target-neuron");
-        }
-
-        var acceptedMatch = neuron.Accepted.FirstOrDefault(item =>
-            string.Equals(item.ContractId, edge.RequestSynapseId, StringComparison.Ordinal)
-            && item.SchemaVersion == edge.RequestSchemaVersion);
-        if (acceptedMatch is null)
-        {
-            var knownId = neuron.Accepted.Any(item =>
-                string.Equals(item.ContractId, edge.RequestSynapseId, StringComparison.Ordinal));
-            throw new InvalidOperationException(
-                knownId ? "incompatible-request-version" : "unknown-request-synapse");
-        }
-
-        var emittedMatch = neuron.Emitted.FirstOrDefault(item =>
-            string.Equals(item.ContractId, edge.ResponseSynapseId, StringComparison.Ordinal)
-            && item.SchemaVersion == edge.ResponseSchemaVersion);
-        if (emittedMatch is null)
-        {
-            var knownId = neuron.Emitted.Any(item =>
-                string.Equals(item.ContractId, edge.ResponseSynapseId, StringComparison.Ordinal));
-            throw new InvalidOperationException(
-                knownId ? "incompatible-response-version" : "unknown-response-synapse");
-        }
-    }
-
-    private ResolvedContracts ResolveContractTypes(BehaviorCapabilityEdge edge)
-    {
-        if (!typeMap.TryGetNeuronGrainType(edge.Target.Type, out var grainType) || string.IsNullOrWhiteSpace(grainType))
-        {
-            throw new InvalidOperationException("unknown-target-neuron-type");
-        }
-
-        if (!typeMap.TryGetSynapseType(edge.RequestSynapseId, edge.RequestSchemaVersion, out var requestType)
-            || requestType is null)
-        {
-            throw new InvalidOperationException("unknown-request-type");
-        }
-
-        if (!typeMap.TryGetSynapseType(edge.ResponseSynapseId, edge.ResponseSchemaVersion, out var responseType)
-            || responseType is null)
-        {
-            throw new InvalidOperationException("unknown-response-type");
-        }
-
-        if (!IsRequestSynapseOf(requestType, responseType))
-        {
-            throw new InvalidOperationException("request-response-type-mismatch");
-        }
-
-        return new ResolvedContracts(
-            new NeuronId(grainType, edge.Target.Owner, edge.Target.Name),
-            requestType,
-            responseType);
-    }
-
     private async Task<TaskSnapshot> ReadAndValidateTaskAsync(
         OwnerId owner,
         NeuronId task,
@@ -299,30 +219,4 @@ internal sealed class GrainBehaviorCapabilityDispatchAccess : IBehaviorCapabilit
         cancellationToken.ThrowIfCancellationRequested();
         throw new InvalidOperationException("operation-timeout");
     }
-
-    private static bool IsMethodShaped(BehaviorCapabilityEdge edge)
-        => string.Equals(edge.RequestSynapseId, "ReadMessage", StringComparison.Ordinal)
-            || edge.RequestSynapseId.Contains("Method", StringComparison.OrdinalIgnoreCase)
-            || edge.ResponseSynapseId.Contains("Method", StringComparison.OrdinalIgnoreCase)
-            || edge.Target.Type.Contains("method", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsRequestSynapseOf(Type requestType, Type responseType)
-    {
-        var current = requestType;
-        while (current is not null)
-        {
-            if (current.IsGenericType
-                && current.GetGenericTypeDefinition() == typeof(RequestSynapse<>)
-                && current.GetGenericArguments()[0] == responseType)
-            {
-                return true;
-            }
-
-            current = current.BaseType;
-        }
-
-        return false;
-    }
-
-    private sealed record ResolvedContracts(NeuronId DeliveryTarget, Type RequestType, Type ResponseType);
 }

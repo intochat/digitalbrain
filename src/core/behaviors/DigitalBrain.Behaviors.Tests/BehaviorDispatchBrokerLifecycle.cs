@@ -17,19 +17,15 @@ namespace DigitalBrain.Behaviors.Tests;
 public sealed class BehaviorDispatchBrokerLifecycle(BehaviorDispatchFixture fixture)
 {
     private const string ValidCredential = "lifecycle-dispatch-broker-credential";
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    };
 
     [Fact(
         Timeout = 120_000,
         DisplayName =
-            "real silo HTTP dispatch through Worker authority delivers once to harness neuron, stores response, and completed replay performs no second provider call")]
-    public async Task RealSiloDispatchThroughWorkerAuthorityOnceAndReplaySkipsProvider()
+            "BehaviorOperationBroker with HttpBehaviorHostBrokerClient naturally Prepare/Dispatch/Complete once; fresh broker replays sequence 0 without second delivery")]
+    public async Task NaturalBrokerDispatchOnceAndReplaySkipsProvider()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        DispatchHarness.Reset();
+        var probeText = $"dispatch-once-{Guid.NewGuid():N}";
         await using var brain = await fixture.CreateBrainAsync(cancellationToken);
         var worker = brain.Neuron<IWorker>("dispatch-lifecycle-worker");
         var task = brain.Neuron<ITask>("dispatch-lifecycle-task");
@@ -62,10 +58,7 @@ public sealed class BehaviorDispatchBrokerLifecycle(BehaviorDispatchFixture fixt
 
         var catalog = brain.Cluster.ClientServices.GetRequiredService<ActiveCapabilityCatalog>();
         var payloads = new GrainBehaviorProtectedPayloadAccess(brain.Cluster.Client);
-        var dispatch = new GrainBehaviorCapabilityDispatchAccess(
-            brain.Cluster.Client,
-            catalog,
-            payloads);
+        var dispatch = new GrainBehaviorCapabilityDispatchAccess(brain.Cluster.Client, catalog, payloads);
         var operations = new GrainBehaviorTaskOperationAccess(brain.Cluster.Client);
 
         await using var host = await StartHostAsync(dispatch, operations, payloads, cancellationToken);
@@ -74,25 +67,6 @@ public sealed class BehaviorDispatchBrokerLifecycle(BehaviorDispatchFixture fixt
             BehaviorBrokerContract.CredentialHeaderName,
             ValidCredential);
 
-        var plaintext = DispatchHarness.SerializeRequest("dispatch-once");
-        using var store = await PostAuthorizedAsync(
-            http,
-            "/v1/behaviors/broker/payloads/store",
-            new
-            {
-                owner = task.Id.Owner.Value,
-                taskType = task.Id.Type,
-                taskOwner = task.Id.Owner.Value,
-                taskName = task.Id.Name,
-                attempt = attempt.Value.ToString("N"),
-                contentBase64 = Convert.ToBase64String(plaintext),
-            },
-            cancellationToken);
-        Assert.Equal(HttpStatusCode.OK, store.StatusCode);
-        var requestRef = await store.Content.ReadFromJsonAsync<ProtectedReferenceResponse>(
-            cancellationToken: cancellationToken);
-        Assert.NotNull(requestRef);
-
         var edge = new BehaviorCapabilityEdge(
             new NeuronId(DispatchHarness.NeuronContractId, task.Id.Owner, probe.Id.Name),
             DispatchHarness.RequestContractId,
@@ -100,142 +74,61 @@ public sealed class BehaviorDispatchBrokerLifecycle(BehaviorDispatchFixture fixt
             DispatchHarness.ResponseContractId,
             1);
 
-        using var firstHttp = await PostAuthorizedAsync(
-            http,
-            "/v1/behaviors/broker/dispatch",
-            new
-            {
-                owner = task.Id.Owner.Value,
-                taskType = task.Id.Type,
-                taskOwner = task.Id.Owner.Value,
-                taskName = task.Id.Name,
-                attempt = attempt.Value.ToString("N"),
-                edge = new
-                {
-                    targetType = edge.Target.Type,
-                    targetOwner = edge.Target.Owner.Value,
-                    targetName = edge.Target.Name,
-                    requestId = edge.RequestSynapseId,
-                    requestVersion = edge.RequestSchemaVersion,
-                    responseId = edge.ResponseSynapseId,
-                    responseVersion = edge.ResponseSchemaVersion,
-                },
-                requestPayload = new { id = requestRef.Id, expiresAt = requestRef.ExpiresAt },
-            },
-            cancellationToken);
-        Assert.Equal(HttpStatusCode.OK, firstHttp.StatusCode);
-        var responseRef = await firstHttp.Content.ReadFromJsonAsync<ProtectedReferenceResponse>(
-            cancellationToken: cancellationToken);
-        Assert.NotNull(responseRef);
-        Assert.False(string.IsNullOrWhiteSpace(responseRef.Id));
-        Assert.Equal(1, DispatchHarness.DeliveryCount);
-        Assert.Equal("dispatch-once", DispatchHarness.LastText);
-
-        using var load = await PostAuthorizedAsync(
-            http,
-            "/v1/behaviors/broker/payloads/load",
-            new
-            {
-                owner = task.Id.Owner.Value,
-                taskType = task.Id.Type,
-                taskOwner = task.Id.Owner.Value,
-                taskName = task.Id.Name,
-                attempt = attempt.Value.ToString("N"),
-                reference = new { id = responseRef.Id, expiresAt = responseRef.ExpiresAt },
-            },
-            cancellationToken);
-        Assert.Equal(HttpStatusCode.OK, load.StatusCode);
-        var loaded = await load.Content.ReadFromJsonAsync<LoadPayloadResponse>(cancellationToken: cancellationToken);
-        Assert.NotNull(loaded);
-        var responseBytes = Convert.FromBase64String(loaded.ContentBase64);
-        var decoded = JsonSerializer.Deserialize<DispatchProbeResponse>(responseBytes, JsonOptions);
-        Assert.NotNull(decoded);
-        Assert.Equal("dispatch-once", decoded.Text);
-
-        // Seed a completed durable operation from the first protected response so replay composes
-        // BehaviorOperationBroker without a second provider delivery.
         var brokerClient = new HttpBehaviorHostBrokerClient(http, task.Id.Owner, task.Id, attempt);
-        var history = new TaskOwnedOperationHistory(task.Id, attempt, brokerClient);
-        var prepared = await history.PrepareAsync(
-            sequence: 0,
-            edge,
-            new ProtectedPayloadReference(Guid.ParseExact(requestRef.Id, "N"), requestRef.ExpiresAt),
+        var requestBytes = BehaviorPayloadJson.Serialize(
+            new DispatchProbeRequest(probeText),
+            typeof(DispatchProbeRequest));
+        var requestRef = await brokerClient.StorePayloadAsync(
+            task.Id.Owner,
+            task.Id,
+            attempt,
+            requestBytes,
             cancellationToken);
-        Assert.Equal(BehaviorOperationPhase.Prepared, prepared.Phase);
-        var dispatched = await history.TransitionAsync(
-            prepared.Identity,
-            BehaviorOperationPhase.Prepared,
-            BehaviorOperationPhase.Dispatched,
-            responsePayload: null,
-            redactedSummary: null,
-            cancellationToken);
-        Assert.Equal(BehaviorOperationPhase.Dispatched, dispatched.Phase);
-        var completedSeed = await history.TransitionAsync(
-            dispatched.Identity,
-            BehaviorOperationPhase.Dispatched,
-            BehaviorOperationPhase.Completed,
-            new ProtectedPayloadReference(Guid.ParseExact(responseRef.Id, "N"), responseRef.ExpiresAt),
-            redactedSummary: null,
-            cancellationToken);
-        Assert.Equal(BehaviorOperationPhase.Completed, completedSeed.Phase);
-        Assert.Equal(1, DispatchHarness.DeliveryCount);
 
-        var brokerA = new BehaviorOperationBroker(history, edge, brokerClient);
-        var completed = await brokerA.ExecuteAsync(
+        var history = new TaskOwnedOperationHistory(task.Id, attempt, brokerClient);
+        var firstBroker = new BehaviorOperationBroker(history, edge, brokerClient);
+        var completed = await firstBroker.ExecuteAsync(
             edge.Target,
             edge.RequestSynapseId,
             edge.RequestSchemaVersion,
             edge.ResponseSynapseId,
             edge.ResponseSchemaVersion,
-            new ProtectedPayloadReference(Guid.ParseExact(requestRef.Id, "N"), requestRef.ExpiresAt),
+            requestRef,
             cancellationToken);
+
         Assert.Equal(BehaviorOperationPhase.Completed, completed.Phase);
         Assert.NotNull(completed.ResponsePayload);
-        Assert.Equal(
-            Guid.ParseExact(responseRef.Id, "N"),
-            completed.ResponsePayload!.Value.Id);
-        Assert.Equal(1, DispatchHarness.DeliveryCount);
+        Assert.Equal(1, DispatchHarness.CountFor(probeText));
 
-        // Fresh broker instance restarts sequence claim at 0 and must replay completed history.
-        var brokerB = new BehaviorOperationBroker(history, edge, brokerClient);
-        var replayed = await brokerB.ExecuteAsync(
+        var durable = await history.ReadAsync(
+            new BehaviorOperationIdentity(task.Id, attempt, sequence: 0),
+            cancellationToken);
+        Assert.NotNull(durable);
+        Assert.Equal(BehaviorOperationPhase.Completed, durable!.Phase);
+
+        var secondBroker = new BehaviorOperationBroker(history, edge, brokerClient);
+        var replayed = await secondBroker.ExecuteAsync(
             edge.Target,
             edge.RequestSynapseId,
             edge.RequestSchemaVersion,
             edge.ResponseSynapseId,
             edge.ResponseSchemaVersion,
-            new ProtectedPayloadReference(Guid.ParseExact(requestRef.Id, "N"), requestRef.ExpiresAt),
+            requestRef,
             cancellationToken);
         Assert.Equal(BehaviorOperationPhase.Completed, replayed.Phase);
         Assert.Equal(completed.ResponsePayload, replayed.ResponsePayload);
-        Assert.Equal(1, DispatchHarness.DeliveryCount);
+        Assert.Equal(1, DispatchHarness.CountFor(probeText));
 
-        using var foreign = await PostAuthorizedAsync(
-            http,
-            "/v1/behaviors/broker/dispatch",
-            new
-            {
-                owner = task.Id.Owner.Value,
-                taskType = task.Id.Type,
-                taskOwner = task.Id.Owner.Value,
-                taskName = task.Id.Name,
-                attempt = attempt.Value.ToString("N"),
-                edge = new
-                {
-                    targetType = "unknown.neuron",
-                    targetOwner = task.Id.Owner.Value,
-                    targetName = "nope",
-                    requestId = edge.RequestSynapseId,
-                    requestVersion = 1,
-                    responseId = edge.ResponseSynapseId,
-                    responseVersion = 1,
-                },
-                requestPayload = new { id = requestRef.Id, expiresAt = requestRef.ExpiresAt },
-            },
+        var loaded = await brokerClient.LoadPayloadAsync(
+            task.Id.Owner,
+            task.Id,
+            attempt,
+            completed.ResponsePayload!.Value,
             cancellationToken);
-        Assert.Equal(HttpStatusCode.BadRequest, foreign.StatusCode);
-        Assert.Equal("unknown-target-neuron", (await foreign.Content.ReadAsStringAsync(cancellationToken)).Trim());
-        Assert.Equal(1, DispatchHarness.DeliveryCount);
+        var decoded = BehaviorPayloadJson.Deserialize<DispatchProbeResponse>(loaded.Span);
+        Assert.NotNull(decoded);
+        Assert.Equal(probeText, decoded.Text);
+        Assert.Equal("once-code", decoded.DetailCode);
 
         using var versionDrift = await PostAuthorizedAsync(
             http,
@@ -257,42 +150,14 @@ public sealed class BehaviorDispatchBrokerLifecycle(BehaviorDispatchFixture fixt
                     responseId = edge.ResponseSynapseId,
                     responseVersion = 1,
                 },
-                requestPayload = new { id = requestRef.Id, expiresAt = requestRef.ExpiresAt },
+                requestPayload = new { id = requestRef.Id.ToString("N"), expiresAt = requestRef.ExpiresAt },
             },
             cancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, versionDrift.StatusCode);
-        var versionReason = (await versionDrift.Content.ReadAsStringAsync(cancellationToken)).Trim();
-        Assert.True(
-            versionReason is "unknown-request-synapse" or "incompatible-request-version",
-            versionReason);
-        Assert.Equal(1, DispatchHarness.DeliveryCount);
-
-        using var cancelledCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        await cancelledCts.CancelAsync();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-            await PostAuthorizedAsync(
-                http,
-                "/v1/behaviors/broker/dispatch",
-                new
-                {
-                    owner = task.Id.Owner.Value,
-                    taskType = task.Id.Type,
-                    taskOwner = task.Id.Owner.Value,
-                    taskName = task.Id.Name,
-                    attempt = attempt.Value.ToString("N"),
-                    edge = new
-                    {
-                        targetType = edge.Target.Type,
-                        targetOwner = edge.Target.Owner.Value,
-                        targetName = edge.Target.Name,
-                        requestId = edge.RequestSynapseId,
-                        requestVersion = edge.RequestSchemaVersion,
-                        responseId = edge.ResponseSynapseId,
-                        responseVersion = edge.ResponseSchemaVersion,
-                    },
-                    requestPayload = new { id = requestRef.Id, expiresAt = requestRef.ExpiresAt },
-                },
-                cancelledCts.Token));
+        Assert.Equal(
+            "incompatible-request-version",
+            (await versionDrift.Content.ReadAsStringAsync(cancellationToken)).Trim());
+        Assert.Equal(1, DispatchHarness.CountFor(probeText));
     }
 
     private static async Task<TaskSnapshot> WaitForRunningAsync(
@@ -379,10 +244,6 @@ public sealed class BehaviorDispatchBrokerLifecycle(BehaviorDispatchFixture fixt
 
         public ValueTask DisposeAsync() => app.DisposeAsync();
     }
-
-    private sealed record ProtectedReferenceResponse(string Id, DateTimeOffset? ExpiresAt);
-
-    private sealed record LoadPayloadResponse(string ContentBase64);
 }
 
 public sealed class BehaviorDispatchFixture : DigitalBrainFixture

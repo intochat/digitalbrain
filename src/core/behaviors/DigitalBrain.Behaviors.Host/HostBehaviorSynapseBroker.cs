@@ -74,7 +74,7 @@ internal sealed class HostBehaviorSynapseBroker : IBehaviorSynapseBroker
         var responseAlias = RequireAlias(typeof(TResponse));
         var grant = SelectGrant(target, requestAlias, responseAlias);
 
-        var plaintext = JsonSerializer.SerializeToUtf8Bytes(request, request.GetType());
+        var plaintext = BehaviorPayloadJson.Serialize(request, request.GetType());
         var requestPayload = await client
             .StorePayloadAsync(metadata.Owner, task, attempt, plaintext, cancellationToken)
             .ConfigureAwait(false);
@@ -112,7 +112,7 @@ internal sealed class HostBehaviorSynapseBroker : IBehaviorSynapseBroker
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var response = JsonSerializer.Deserialize<TResponse>(responseBytes.Span);
+        var response = BehaviorPayloadJson.Deserialize<TResponse>(responseBytes.Span);
         if (response is null)
         {
             throw new InvalidOperationException("Response payload deserialized to null.");

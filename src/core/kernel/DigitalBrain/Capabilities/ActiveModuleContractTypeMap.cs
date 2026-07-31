@@ -4,7 +4,7 @@ using Orleans;
 
 namespace DigitalBrain.Kernel;
 
-public sealed class ActiveModuleContractTypeMap
+internal sealed class ActiveModuleContractTypeMap
 {
     private readonly IReadOnlyDictionary<(string ContractId, int SchemaVersion), Type> _synapses;
     private readonly IReadOnlyDictionary<string, string> _neuronGrainTypes;
@@ -33,6 +33,7 @@ public sealed class ActiveModuleContractTypeMap
         var catalogSynapses = IndexCatalogSynapses(catalog);
         var synapses = new Dictionary<(string, int), Type>();
         var neuronGrainTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+        var interfaceGrainHints = new Dictionary<string, string>(StringComparer.Ordinal);
 
         foreach (var assembly in assemblies.OrderBy(static item => item.FullName, StringComparer.Ordinal))
         {
@@ -66,9 +67,62 @@ public sealed class ActiveModuleContractTypeMap
 
                 if (typeof(INeuron).IsAssignableFrom(type) && type.IsInterface)
                 {
-                    IndexNeuron(catalog, neuronGrainTypes, type, alias);
+                    if (!catalog.TryGetNeuron(alias, out _))
+                    {
+                        continue;
+                    }
+
+                    interfaceGrainHints[alias] = NeuronId.GrainTypeNameOf(type);
                 }
             }
+
+            foreach (var type in types.OrderBy(static item => item.FullName, StringComparer.Ordinal))
+            {
+                if (type is null || type.IsInterface || type.IsAbstract || !typeof(INeuron).IsAssignableFrom(type))
+                {
+                    continue;
+                }
+
+                var declaredGrain = ReadGrainType(type);
+                if (declaredGrain is null)
+                {
+                    continue;
+                }
+
+                foreach (var iface in type.GetInterfaces())
+                {
+                    var contractId = ReadSingleAlias(iface);
+                    if (contractId is null || !catalog.TryGetNeuron(contractId, out _))
+                    {
+                        continue;
+                    }
+
+                    if (neuronGrainTypes.TryGetValue(contractId, out var existing)
+                        && !string.Equals(existing, declaredGrain, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException(
+                            $"Collision mapping neuron '{contractId}' to grain types '{existing}' and '{declaredGrain}'.");
+                    }
+
+                    neuronGrainTypes[contractId] = declaredGrain;
+                }
+            }
+        }
+
+        foreach (var (contractId, interfaceGrain) in interfaceGrainHints.OrderBy(static item => item.Key, StringComparer.Ordinal))
+        {
+            if (neuronGrainTypes.TryGetValue(contractId, out var implementationGrain))
+            {
+                if (!string.Equals(interfaceGrain, implementationGrain, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        $"Neuron contract '{contractId}' grain type diverges: interface resolves to '{interfaceGrain}' but implementation [GrainType] is '{implementationGrain}'.");
+                }
+
+                continue;
+            }
+
+            neuronGrainTypes[contractId] = interfaceGrain;
         }
 
         return new ActiveModuleContractTypeMap(synapses, neuronGrainTypes);
@@ -150,28 +204,6 @@ public sealed class ActiveModuleContractTypeMap
         }
     }
 
-    private static void IndexNeuron(
-        ActiveCapabilityCatalog catalog,
-        Dictionary<string, string> neuronGrainTypes,
-        Type type,
-        string alias)
-    {
-        if (!catalog.TryGetNeuron(alias, out _))
-        {
-            return;
-        }
-
-        var grainType = NeuronId.GrainTypeNameOf(type);
-        if (neuronGrainTypes.TryGetValue(alias, out var existing)
-            && !string.Equals(existing, grainType, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                $"Collision mapping neuron '{alias}' to grain types '{existing}' and '{grainType}'.");
-        }
-
-        neuronGrainTypes[alias] = grainType;
-    }
-
     private static string? ReadSingleAlias(Type type)
     {
         string? selected = null;
@@ -191,6 +223,26 @@ public sealed class ActiveModuleContractTypeMap
         }
 
         return selected;
+    }
+
+    private static string? ReadGrainType(Type type)
+    {
+        foreach (var attribute in type.GetCustomAttributesData())
+        {
+            if (attribute.AttributeType != typeof(GrainTypeAttribute)
+                || attribute.ConstructorArguments.Count == 0)
+            {
+                continue;
+            }
+
+            if (attribute.ConstructorArguments[0].Value is string value
+                && !string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
     }
 
     private static void CollectAssemblies(Assembly root, HashSet<Assembly> assemblies)

@@ -1,5 +1,5 @@
+using System.Collections.Concurrent;
 using System.ComponentModel;
-using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,8 +18,10 @@ public sealed record DispatchProbeRequest([property: Id(0)] string Text) : Reque
 
 [GenerateSerializer]
 [Alias(DispatchHarness.ResponseContractId)]
-[Description("Dispatch probe response text")]
-public sealed record DispatchProbeResponse([property: Id(0)] string Text) : Synapse;
+[Description("Dispatch probe response text and detail code")]
+public sealed record DispatchProbeResponse(
+    [property: Id(0)] string Text,
+    [property: Id(1)] string? DetailCode = null) : Synapse;
 
 [GrainType(DispatchHarness.GrainTypeName)]
 internal sealed class DispatchProbeNeuron :
@@ -32,7 +34,7 @@ internal sealed class DispatchProbeNeuron :
     {
         ArgumentNullException.ThrowIfNull(request);
         DispatchHarness.RecordDelivery(request.Text);
-        return ReplyAsync(new DispatchProbeResponse(request.Text), cancellationToken);
+        return ReplyAsync(new DispatchProbeResponse(request.Text, DetailCode: "once-code"), cancellationToken);
     }
 }
 
@@ -64,7 +66,7 @@ public sealed class BehaviorDispatchHarnessModule : IModule, ICompiledModule
                     new SynapseCapabilityDescriptor(
                         DispatchHarness.ResponseContractId,
                         1,
-                        "Dispatch probe response text",
+                        "Dispatch probe response text and detail code",
                         CapabilitySchema.For(typeof(DispatchProbeResponse)),
                         Array.Empty<string>()),
                 ]),
@@ -87,37 +89,19 @@ public sealed class BehaviorDispatchHarnessModule : IModule, ICompiledModule
 
 internal static class DispatchHarness
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    };
-
     public const string NeuronContractId = "behaviors.dispatch-probe";
     public const string RequestContractId = "behaviors.dispatch-probe-request";
     public const string ResponseContractId = "behaviors.dispatch-probe-response";
     public const string GrainTypeName = "dispatchprobe";
 
-    private static int deliveryCount;
-    private static string? lastText;
+    private static readonly ConcurrentDictionary<string, int> Deliveries = new(StringComparer.Ordinal);
 
-    public static int DeliveryCount => Volatile.Read(ref deliveryCount);
-
-    public static string? LastText => Volatile.Read(ref lastText);
-
-    public static void Reset()
-    {
-        Volatile.Write(ref deliveryCount, 0);
-        Volatile.Write(ref lastText, null);
-    }
+    public static int CountFor(string text)
+        => Deliveries.TryGetValue(text, out var count) ? count : 0;
 
     public static void RecordDelivery(string text)
-    {
-        Interlocked.Increment(ref deliveryCount);
-        Volatile.Write(ref lastText, text);
-    }
+        => Deliveries.AddOrUpdate(text, 1, static (_, current) => current + 1);
 
     public static byte[] SerializeRequest(string text)
-        => JsonSerializer.SerializeToUtf8Bytes(
-            new DispatchProbeRequest(text),
-            JsonOptions);
+        => BehaviorPayloadJson.Serialize(new DispatchProbeRequest(text), typeof(DispatchProbeRequest));
 }

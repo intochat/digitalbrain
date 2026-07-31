@@ -112,7 +112,7 @@ public sealed class BehaviorDispatchBrokerEndpointsTests
         Assert.Equal(0, access.DispatchCalls);
     }
 
-    [Fact(DisplayName = "foreign owner/wrong task/wrong attempt and invalid edge shapes are stable refusals before access delivery")]
+    [Fact(DisplayName = "endpoint parse layer refuses foreign owner, missing owner, and invalid edge shapes before access delivery")]
     public async Task IdentityAndEdgeRefusalsAreStable()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -225,7 +225,7 @@ public sealed class BehaviorDispatchBrokerEndpointsTests
                 cancelled.Token));
     }
 
-    [Fact(DisplayName = "access-layer catalog refusals map to stable reasons without performing target delivery")]
+    [Fact(DisplayName = "endpoint maps access InvalidOperationException message to stable text/plain BadRequest")]
     public async Task AccessCatalogRefusalsMapToStableReasons()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
