@@ -1,5 +1,6 @@
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Behaviors;
+using DigitalBrain.Tasks;
 
 const string Silo = "silo";
 const string BehaviorHost = "behavior-host";
@@ -11,6 +12,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var brain = builder.AddDigitalBrain("brain");
 brain.AddModule<BehaviorsModule>();
+brain.AddModule<TasksModule>();
 
 var silo = builder.AddProject<Projects.DigitalBrain_OS_Host>(Silo)
     .WithReference(brain)

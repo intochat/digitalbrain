@@ -14,6 +14,7 @@ using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.OS;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
+using DigitalBrain.Tasks;
 using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -36,6 +37,7 @@ brain.AddModule<FlutterModule>(flutter => flutter
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 brain.AddModule<BehaviorsModule>();
+brain.AddModule<TasksModule>();
 
 var behaviorBrokerCredential = builder.ExecutionContext.IsRunMode
     ? builder.AddParameter(

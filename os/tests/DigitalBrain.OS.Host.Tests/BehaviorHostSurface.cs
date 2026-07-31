@@ -315,6 +315,72 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
     [Fact(
         Timeout = 300_000,
         DisplayName =
+            "Silo reverse broker operation routes require credential and return stable task-not-started without Task prose")]
+    public async Task SiloReverseBrokerOperationRoutesAuthAndStableTaskNotStarted()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var host = await fixture.StartAsync(cancellationToken);
+        var silo = host.Resource(TestingAppHostFixture.SiloResourceName);
+        await silo.WaitUntilHealthyAsync(cancellationToken);
+
+        using var client = silo.CreateHttpClient();
+        client.Timeout = TimeSpan.FromMinutes(5);
+        var owner = new OwnerId(SurfaceOwner);
+        var task = NeuronId.For<ITask>(owner, SurfaceTaskName);
+        var attempt = new AttemptId(Guid.NewGuid());
+        var edge = new
+        {
+            targetType = "provider",
+            targetOwner = SurfaceOwner,
+            targetName = "gmail",
+            requestId = "test.provider-request",
+            requestVersion = 1,
+            responseId = "test.provider-response",
+            responseVersion = 1,
+        };
+        var body = new
+        {
+            owner = SurfaceOwner,
+            taskType = task.Type,
+            taskOwner = SurfaceOwner,
+            taskName = task.Name,
+            attempt = attempt.Value.ToString("N"),
+            sequence = 0,
+            edge,
+            requestPayload = new
+            {
+                id = Guid.NewGuid().ToString("N"),
+                expiresAt = DateTimeOffset.UtcNow.AddHours(1),
+            },
+        };
+
+        using var missing = await client.PostAsJsonAsync(
+            "v1/behaviors/broker/operations/prepare",
+            body,
+            cancellationToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, missing.StatusCode);
+        Assert.Equal("unauthorized", (await missing.Content.ReadAsStringAsync(cancellationToken)).Trim());
+
+        using var prepareRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            "v1/behaviors/broker/operations/prepare")
+        {
+            Content = JsonContent.Create(body),
+        };
+        prepareRequest.Headers.TryAddWithoutValidation(
+            BehaviorBrokerContract.CredentialHeaderName,
+            TestingAppHostFixture.BrokerCredential);
+        using var prepare = await client.SendAsync(prepareRequest, cancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, prepare.StatusCode);
+        var reason = (await prepare.Content.ReadAsStringAsync(cancellationToken)).Trim();
+        Assert.Equal("task-not-started", reason);
+        Assert.DoesNotContain("Exception", reason, StringComparison.Ordinal);
+        Assert.DoesNotContain("Task '", reason, StringComparison.Ordinal);
+    }
+
+    [Fact(
+        Timeout = 300_000,
+        DisplayName =
             "Silo reverse broker store/load round-trips trigger payload without testing plaintext seed")]
     public async Task SiloReverseBrokerPayloadRoundTrip()
     {

@@ -8,6 +8,7 @@
     <ProjectReference Include="..\..\..\..\src\core\aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\..\..\src\core\behaviors\DigitalBrain.Behaviors.Runtime\DigitalBrain.Behaviors.Runtime.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\..\..\src\core\behaviors\DigitalBrain.Behaviors.Host\DigitalBrain.Behaviors.Host.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\..\..\src\modules\tasks\DigitalBrain.Modules.Tasks\DigitalBrain.Modules.Tasks.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\..\..\os\DigitalBrain.OS.Host\DigitalBrain.OS.Host.csproj" />
     <ProjectReference Include="..\..\..\..\os\DigitalBrain.OS.BehaviorHost\DigitalBrain.OS.BehaviorHost.csproj" />
   </ItemGroup>

@@ -16,4 +16,5 @@ var app = builder.Build();
 app.UseBehaviorBrokerAuthentication();
 app.MapDefaultEndpoints();
 app.MapBehaviorProtectedPayloadBroker();
+app.MapBehaviorTaskOperationBroker();
 app.Run();

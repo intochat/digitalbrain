@@ -1,0 +1,137 @@
+using DigitalBrain.Abstractions;
+using DigitalBrain.Kernel;
+using DigitalBrain.Tasks;
+
+namespace DigitalBrain.Behaviors;
+
+[GrainType("worker")]
+internal sealed class BehaviorWorkerNeuron : Neuron, IWorker, IBehaviorWorkerBroker
+{
+    public async Task Accept(AttemptRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        RequireSelf(request.Worker, request.Task);
+
+        if (request.Goal is not BehaviorActivationGoal)
+        {
+            throw new NeuronAuthorizationException(
+                $"Worker '{Id}' accepts only behavior activations.");
+        }
+
+        await SendAsync(
+            request.Task,
+            new AttemptAccepted(request.Task, request.Worker, request.Attempt, request.Revision));
+    }
+
+    public Task Continue(AttemptCursor cursor)
+    {
+        ArgumentNullException.ThrowIfNull(cursor);
+        RequireSelf(cursor.Worker, cursor.Task);
+        return Task.CompletedTask;
+    }
+
+    public async Task Cancel(AttemptCursor cursor)
+    {
+        ArgumentNullException.ThrowIfNull(cursor);
+        RequireSelf(cursor.Worker, cursor.Task);
+
+        await SendAsync(
+            cursor.Task,
+            new AttemptCancelled(cursor.Task, cursor.Worker, cursor.Attempt, cursor.Revision));
+    }
+
+    public async Task<WorkerOperationReceipt> StagePrepare(
+        NeuronId task,
+        PrepareTaskOperation command,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        cancellationToken.ThrowIfCancellationRequested();
+        await RequireBoundWorkerAsync(task, command.Attempt, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var delivery = await SendAsync(task, command);
+        return new WorkerOperationReceipt(delivery.CorrelationId, Id, task);
+    }
+
+    public async Task<WorkerOperationReceipt> StageTransition(
+        NeuronId task,
+        TransitionTaskOperation command,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        cancellationToken.ThrowIfCancellationRequested();
+        await RequireBoundWorkerAsync(task, command.Attempt, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var delivery = await SendAsync(task, command);
+        return new WorkerOperationReceipt(delivery.CorrelationId, Id, task);
+    }
+
+    public async Task<WorkerOperationReceipt> StageRead(
+        NeuronId task,
+        ReadTaskOperation command,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        cancellationToken.ThrowIfCancellationRequested();
+        await RequireBoundWorkerAsync(task, command.Attempt, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var delivery = await SendAsync(task, command);
+        return new WorkerOperationReceipt(delivery.CorrelationId, Id, task);
+    }
+
+    private async Task RequireBoundWorkerAsync(
+        NeuronId task,
+        AttemptId attempt,
+        CancellationToken cancellationToken)
+    {
+        if (task == default || task.Owner != Id.Owner)
+        {
+            throw new InvalidOperationException("owner-task-mismatch");
+        }
+
+        if (!string.Equals(
+                task.Type,
+                NeuronId.GrainTypeNameOf(typeof(ITask)),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("invalid-task-identity");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var snapshot = await GrainFactory.GetGrain<ITask>(task.ToGrainId()).Read();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (snapshot.Worker != Id)
+        {
+            throw new InvalidOperationException("worker-mismatch");
+        }
+
+        if (snapshot.ActiveAttempt is null || snapshot.ActiveAttempt != attempt)
+        {
+            throw new InvalidOperationException("attempt-mismatch");
+        }
+
+        if (snapshot.Activation is null)
+        {
+            throw new InvalidOperationException("activation-required");
+        }
+    }
+
+    private void RequireSelf(NeuronId worker, NeuronId task)
+    {
+        if (worker != Id)
+        {
+            throw new NeuronAuthorizationException(
+                $"Worker '{Id}' cannot act as '{worker}'.");
+        }
+
+        if (task.Owner != Id.Owner)
+        {
+            throw new NeuronAuthorizationException(
+                $"Worker '{Id}' cannot act on task '{task}' owned by '{task.Owner}'.");
+        }
+    }
+}
