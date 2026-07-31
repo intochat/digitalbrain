@@ -620,10 +620,22 @@ public sealed class BehaviorProtectedPayloadBrokerEndpointsTests
             AttemptId attempt,
             ReadOnlyMemory<byte> plaintext,
             CancellationToken cancellationToken)
+            => StoreAsync(owner, task, attempt, plaintext, TimeSpan.FromHours(1), cancellationToken);
+
+        public ValueTask<ProtectedPayloadReference> StoreAsync(
+            OwnerId owner,
+            NeuronId task,
+            AttemptId attempt,
+            ReadOnlyMemory<byte> plaintext,
+            TimeSpan lifetime,
+            CancellationToken cancellationToken,
+            Guid stableEntryId = default)
         {
             StoreCalls++;
+            _ = lifetime;
+            var id = stableEntryId != Guid.Empty ? stableEntryId : Guid.NewGuid();
             return ValueTask.FromResult(
-                new ProtectedPayloadReference(Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(1)));
+                new ProtectedPayloadReference(id, DateTimeOffset.UtcNow.AddHours(1)));
         }
 
         public ValueTask<ReadOnlyMemory<byte>> LoadAsync(
@@ -657,7 +669,17 @@ public sealed class BehaviorProtectedPayloadBrokerEndpointsTests
             AttemptId attempt,
             ReadOnlyMemory<byte> plaintext,
             CancellationToken cancellationToken)
-            => store.StoreAsync(storeOwner, task, attempt.Value, plaintext, TimeSpan.FromHours(1), cancellationToken);
+            => StoreAsync(storeOwner, task, attempt, plaintext, TimeSpan.FromHours(1), cancellationToken);
+
+        public ValueTask<ProtectedPayloadReference> StoreAsync(
+            OwnerId storeOwner,
+            NeuronId task,
+            AttemptId attempt,
+            ReadOnlyMemory<byte> plaintext,
+            TimeSpan lifetime,
+            CancellationToken cancellationToken,
+            Guid stableEntryId = default)
+            => store.StoreAsync(storeOwner, task, attempt.Value, plaintext, lifetime, cancellationToken, stableEntryId);
 
         public ValueTask<ReadOnlyMemory<byte>> LoadAsync(
             OwnerId loadOwner,

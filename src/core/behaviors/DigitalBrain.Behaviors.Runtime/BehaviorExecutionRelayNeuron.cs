@@ -82,6 +82,23 @@ internal sealed class BehaviorExecutionRelayNeuron :
             cancelled = true;
             outcome = new BehaviorExecutionOutcome(false, BehaviorExecutionCodes.Cancelled);
         }
+        catch (BehaviorUserActionRequiredException userActionRequired)
+        {
+            var requirement = userActionRequired.Requirement
+                ?? throw new InvalidOperationException(
+                    "User action required exception is missing the bound requirement.");
+            if (!MatchesAttempt(requirement, envelope.Attempt))
+            {
+                outcome = new BehaviorExecutionOutcome(false, BehaviorExecutionCodes.Exception);
+            }
+            else
+            {
+                outcome = new BehaviorExecutionOutcome(
+                    false,
+                    BehaviorExecutionCodes.UserActionRequired,
+                    BehaviorUserActionSurface.FromRequirement(requirement));
+            }
+        }
         catch (BehaviorHostException exception)
         {
             outcome = new BehaviorExecutionOutcome(
@@ -106,14 +123,47 @@ internal sealed class BehaviorExecutionRelayNeuron :
             stableCode = BehaviorExecutionCodes.InProcessClosed;
         }
 
+        UserActionRequired? userAction = null;
+        if (!outcome.Succeeded
+            && string.Equals(stableCode, BehaviorExecutionCodes.UserActionRequired, StringComparison.Ordinal))
+        {
+            if (outcome.UserAction is null
+                || !MatchesAttempt(outcome.UserAction, envelope.Attempt))
+            {
+                // Bare stable-code-only or mismatched identity must not strand Running as a park.
+                stableCode = BehaviorExecutionCodes.Exception;
+            }
+            else
+            {
+                userAction = outcome.UserAction.ToRequirement();
+            }
+        }
+
         await SendAsync(
             envelope.Worker,
             new CompleteHostedBehaviorExecution(
                 envelope.Attempt,
                 outcome.Succeeded && !cancelled,
                 stableCode,
-                cancelled));
+                cancelled,
+                userAction));
     }
+
+    private static bool MatchesAttempt(UserActionRequired requirement, AttemptRequest attempt)
+        => requirement.Task == attempt.Task
+            && requirement.Attempt == attempt.Attempt
+            && requirement.ParkRevision == attempt.Revision
+            && requirement.ActionEpoch != Guid.Empty
+            && requirement.Completer != default
+            && requirement.Module != default;
+
+    private static bool MatchesAttempt(BehaviorUserActionSurface surface, AttemptRequest attempt)
+        => surface.Task == attempt.Task
+            && surface.Attempt == attempt.Attempt
+            && surface.ParkRevision == attempt.Revision
+            && surface.ActionEpoch != Guid.Empty
+            && surface.Completer != default
+            && surface.Module != default;
 
     private static BehaviorCapabilityEdge[] ToCapabilityEdges(IReadOnlyList<TaskOperationEdge> edges)
     {

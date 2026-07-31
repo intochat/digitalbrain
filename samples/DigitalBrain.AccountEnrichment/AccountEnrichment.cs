@@ -126,9 +126,10 @@ internal sealed class AccountEnrichment :
             mutation.Description));
     }
 
-    Task INeuron.Deliver(SynapseDelivery delivery)
+    Task INeuron.Deliver(SynapseDelivery delivery, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(delivery);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (delivery.Synapse is SalesforceMutationApproval approval
             && (delivery.Caller != approval.Approver
@@ -138,7 +139,7 @@ internal sealed class AccountEnrichment :
             return Task.CompletedTask;
         }
 
-        return base.Deliver(delivery);
+        return base.Deliver(delivery, cancellationToken);
     }
 
     private async Task<SynapseDelivery> ApprovalEvidenceAsync(SalesforceMutationApproval approval)

@@ -27,6 +27,12 @@ public sealed class TestNeuron<TNeuron>
     public JournalFaultHandle FailNextJournalCommit(string message)
         => _brain.ArmJournalFault(Id, message);
 
+    public JournalFaultHandle FailJournalCommitAfter(int allowCommitsBeforeFault, string message)
+        => _brain.ArmJournalFault(Id, message, allowCommitsBeforeFault);
+
+    public Task<bool> HasOutboxWakeupAsync()
+        => _brain.HasOutboxWakeupAsync(Id);
+
     public Task RestartHostAsync(CancellationToken cancellationToken = default)
         => _brain.RestartHostAsync(Id, cancellationToken);
 }

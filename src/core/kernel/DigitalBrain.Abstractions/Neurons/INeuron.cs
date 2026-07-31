@@ -4,7 +4,7 @@ public partial interface INeuron : IGrainWithStringKey
 {
     [Alias(nameof(Deliver))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
-    Task Deliver(SynapseDelivery delivery);
+    Task Deliver(SynapseDelivery delivery, CancellationToken cancellationToken = default);
 
     [Alias(nameof(ReadJournal))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]

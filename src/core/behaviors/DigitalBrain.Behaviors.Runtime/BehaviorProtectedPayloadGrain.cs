@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Kernel;
 using DigitalBrain.Security;
 using DigitalBrain.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,7 +13,9 @@ internal interface IBehaviorProtectedPayloadGrain : IGrainWithStringKey
         NeuronId task,
         AttemptId attempt,
         byte[] plaintext,
-        CancellationToken cancellationToken);
+        TimeSpan lifetime,
+        CancellationToken cancellationToken,
+        Guid stableEntryId = default);
 
     Task<byte[]> LoadAsync(
         NeuronId task,
@@ -34,22 +37,32 @@ internal sealed class BehaviorProtectedPayloadGrain : DurableGrain, IBehaviorPro
         var state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
         var protector = ServiceProvider.GetRequiredService<IDurablePayloadProtector>();
         var owner = new OwnerId(this.GetPrimaryKeyString());
+        var time = ServiceProvider.GetKeyedService<TimeProvider>(NeuronTime.ServiceKey)
+            ?? ServiceProvider.GetService<TimeProvider>()
+            ?? TimeProvider.System;
         store = new DurableProtectedPayloadStore(
             state,
             CommitAsync,
             protector,
             owner,
-            TimeProvider.System);
+            time);
     }
 
     public async Task<ProtectedPayloadReference> StoreAsync(
         NeuronId task,
         AttemptId attempt,
         byte[] plaintext,
-        CancellationToken cancellationToken)
+        TimeSpan lifetime,
+        CancellationToken cancellationToken,
+        Guid stableEntryId = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(plaintext);
+
+        if (lifetime <= TimeSpan.Zero)
+        {
+            lifetime = DefaultLifetime;
+        }
 
         var owner = new OwnerId(this.GetPrimaryKeyString());
         return await store.StoreAsync(
@@ -57,8 +70,9 @@ internal sealed class BehaviorProtectedPayloadGrain : DurableGrain, IBehaviorPro
             task,
             attempt.Value,
             plaintext,
-            DefaultLifetime,
-            cancellationToken);
+            lifetime,
+            cancellationToken,
+            stableEntryId);
     }
 
     public async Task<byte[]> LoadAsync(

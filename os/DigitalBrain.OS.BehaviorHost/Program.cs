@@ -159,7 +159,32 @@ app.MapPost("/v1/behaviors/execute", async (
         var code = outcome.Succeeded
             ? BehaviorExecutionCodes.Succeeded
             : BehaviorExecutionCodes.MapHostFailure(outcome.Outcome);
-        return Results.Ok(new ExecuteResponse(outcome.Succeeded, code));
+        ExecuteUserActionResponse? userAction = null;
+        if (!outcome.Succeeded
+            && string.Equals(code, BehaviorExecutionCodes.UserActionRequired, StringComparison.Ordinal)
+            && outcome.UserAction is { } surface)
+        {
+            userAction = new ExecuteUserActionResponse(
+                surface.Task.Type,
+                surface.Task.Owner.Value,
+                surface.Task.Name,
+                surface.Attempt.Value.ToString("N"),
+                surface.Module.Type,
+                surface.Module.Owner.Value,
+                surface.Module.Name,
+                surface.ModuleId,
+                surface.DisplayText,
+                surface.ActionReference.Id.ToString("N"),
+                surface.ActionReference.ExpiresAt,
+                surface.ActionEpoch.ToString("N"),
+                surface.ParkRevision,
+                surface.ExpiresAt,
+                surface.Completer.Type,
+                surface.Completer.Owner.Value,
+                surface.Completer.Name);
+        }
+
+        return Results.Ok(new ExecuteResponse(outcome.Succeeded, code, userAction));
     }
     catch (BehaviorHostException exception)
     {
@@ -217,4 +242,26 @@ internal sealed record CapabilityEdgeRequest(
     string ResponseId,
     int ResponseVersion);
 
-internal sealed record ExecuteResponse(bool Succeeded, string Outcome);
+internal sealed record ExecuteResponse(
+    bool Succeeded,
+    string Outcome,
+    ExecuteUserActionResponse? UserAction = null);
+
+internal sealed record ExecuteUserActionResponse(
+    string TaskType,
+    string TaskOwner,
+    string TaskName,
+    string Attempt,
+    string ModuleType,
+    string ModuleOwner,
+    string ModuleName,
+    string ModuleId,
+    string DisplayText,
+    string ActionReferenceId,
+    DateTimeOffset? ActionReferenceExpiresAt,
+    string ActionEpoch,
+    long ParkRevision,
+    DateTimeOffset ExpiresAt,
+    string CompleterType,
+    string CompleterOwner,
+    string CompleterName);

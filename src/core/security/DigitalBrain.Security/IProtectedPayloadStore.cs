@@ -10,7 +10,8 @@ internal interface IProtectedPayloadStore
         Guid attempt,
         ReadOnlyMemory<byte> plaintext,
         TimeSpan lifetime,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        Guid stableEntryId = default);
 
     ValueTask<ReadOnlyMemory<byte>> LoadAsync(
         OwnerId owner,

@@ -237,19 +237,47 @@ internal sealed class HttpBehaviorHostBrokerClient : IBehaviorHostBrokerClient
     {
         ArgumentNullException.ThrowIfNull(edge);
 
-        var response = await PostAsync(
-            "v1/behaviors/broker/dispatch",
-            new DispatchRequestDto
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClient
+                .PostAsJsonAsync(
+                    "v1/behaviors/broker/dispatch",
+                    new DispatchRequestDto
+                    {
+                        Owner = owner.Value,
+                        TaskType = task.Type,
+                        TaskOwner = task.Owner.Value,
+                        TaskName = task.Name,
+                        Attempt = FormatGuid(this.attempt.Value),
+                        Edge = ToWire(edge),
+                        RequestPayload = ToWire(requestPayload)
+                    },
+                    JsonOptions,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw new BehaviorHostException("broker-http-failed", exception);
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            using (response)
             {
-                Owner = owner.Value,
-                TaskType = task.Type,
-                TaskOwner = task.Owner.Value,
-                TaskName = task.Name,
-                Attempt = FormatGuid(this.attempt.Value),
-                Edge = ToWire(edge),
-                RequestPayload = ToWire(requestPayload)
-            },
-            cancellationToken).ConfigureAwait(false);
+                var body = await response.Content
+                    .ReadFromJsonAsync<UserActionRequiredDto>(JsonOptions, cancellationToken)
+                    .ConfigureAwait(false)
+                    ?? throw new BehaviorHostException("invalid-user-action-response");
+                throw new BehaviorUserActionRequiredException(FromUserActionWire(body));
+            }
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowForNonSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        }
 
         return await ReadProtectedReferenceAsync(response, cancellationToken).ConfigureAwait(false);
     }
@@ -420,6 +448,56 @@ internal sealed class HttpBehaviorHostBrokerClient : IBehaviorHostBrokerClient
         return new ProtectedPayloadReference(id, dto.ExpiresAt);
     }
 
+    private static UserActionRequired FromUserActionWire(UserActionRequiredDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Outcome)
+            || !string.Equals(dto.Outcome, BehaviorExecutionCodes.UserActionRequired, StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(dto.TaskType)
+            || string.IsNullOrWhiteSpace(dto.TaskOwner)
+            || string.IsNullOrWhiteSpace(dto.TaskName)
+            || string.IsNullOrWhiteSpace(dto.Attempt)
+            || string.IsNullOrWhiteSpace(dto.ModuleType)
+            || string.IsNullOrWhiteSpace(dto.ModuleOwner)
+            || string.IsNullOrWhiteSpace(dto.ModuleName)
+            || string.IsNullOrWhiteSpace(dto.ModuleId)
+            || string.IsNullOrWhiteSpace(dto.DisplayText)
+            || string.IsNullOrWhiteSpace(dto.ActionReferenceId)
+            || string.IsNullOrWhiteSpace(dto.ActionEpoch)
+            || string.IsNullOrWhiteSpace(dto.CompleterType)
+            || string.IsNullOrWhiteSpace(dto.CompleterOwner)
+            || string.IsNullOrWhiteSpace(dto.CompleterName))
+        {
+            throw new BehaviorHostException("invalid-user-action-response");
+        }
+
+        if (!Guid.TryParseExact(dto.Attempt, "N", out var attemptValue) || attemptValue == Guid.Empty)
+        {
+            throw new BehaviorHostException("invalid-user-action-response");
+        }
+
+        if (!Guid.TryParseExact(dto.ActionReferenceId, "N", out var referenceValue) || referenceValue == Guid.Empty)
+        {
+            throw new BehaviorHostException("invalid-user-action-response");
+        }
+
+        if (!Guid.TryParseExact(dto.ActionEpoch, "N", out var epochValue) || epochValue == Guid.Empty)
+        {
+            throw new BehaviorHostException("invalid-user-action-response");
+        }
+
+        return ModuleUserActionBoundary.Create(
+            new NeuronId(dto.TaskType, new OwnerId(dto.TaskOwner), dto.TaskName),
+            new AttemptId(attemptValue),
+            new NeuronId(dto.ModuleType, new OwnerId(dto.ModuleOwner), dto.ModuleName),
+            dto.ModuleId,
+            dto.DisplayText,
+            new ProtectedPayloadReference(referenceValue, dto.ActionReferenceExpiresAt),
+            epochValue,
+            dto.ParkRevision,
+            dto.ExpiresAt,
+            new NeuronId(dto.CompleterType, new OwnerId(dto.CompleterOwner), dto.CompleterName));
+    }
+
     private static TaskOperationEdge FromWire(EdgeDto dto)
     {
         if (string.IsNullOrWhiteSpace(dto.TargetType)
@@ -487,6 +565,28 @@ internal sealed class HttpBehaviorHostBrokerClient : IBehaviorHostBrokerClient
 
     private static JsonSerializerOptions CreateJsonOptions()
         => new(JsonSerializerDefaults.Web);
+
+    private sealed class UserActionRequiredDto
+    {
+        public string? Outcome { get; set; }
+        public string? TaskType { get; set; }
+        public string? TaskOwner { get; set; }
+        public string? TaskName { get; set; }
+        public string? Attempt { get; set; }
+        public string? ModuleType { get; set; }
+        public string? ModuleOwner { get; set; }
+        public string? ModuleName { get; set; }
+        public string? ModuleId { get; set; }
+        public string? DisplayText { get; set; }
+        public string? ActionReferenceId { get; set; }
+        public DateTimeOffset? ActionReferenceExpiresAt { get; set; }
+        public string? ActionEpoch { get; set; }
+        public long ParkRevision { get; set; }
+        public DateTimeOffset ExpiresAt { get; set; }
+        public string? CompleterType { get; set; }
+        public string? CompleterOwner { get; set; }
+        public string? CompleterName { get; set; }
+    }
 
     private sealed class StorePayloadRequestDto
     {

@@ -12,6 +12,15 @@ internal interface IBehaviorProtectedPayloadAccess
         ReadOnlyMemory<byte> plaintext,
         CancellationToken cancellationToken);
 
+    ValueTask<ProtectedPayloadReference> StoreAsync(
+        OwnerId owner,
+        NeuronId task,
+        AttemptId attempt,
+        ReadOnlyMemory<byte> plaintext,
+        TimeSpan lifetime,
+        CancellationToken cancellationToken,
+        Guid stableEntryId = default);
+
     ValueTask<ReadOnlyMemory<byte>> LoadAsync(
         OwnerId owner,
         NeuronId task,
@@ -22,12 +31,24 @@ internal interface IBehaviorProtectedPayloadAccess
 
 internal sealed class GrainBehaviorProtectedPayloadAccess(IGrainFactory grains) : IBehaviorProtectedPayloadAccess
 {
-    public async ValueTask<ProtectedPayloadReference> StoreAsync(
+    private static readonly TimeSpan DefaultLifetime = TimeSpan.FromHours(1);
+
+    public ValueTask<ProtectedPayloadReference> StoreAsync(
         OwnerId owner,
         NeuronId task,
         AttemptId attempt,
         ReadOnlyMemory<byte> plaintext,
         CancellationToken cancellationToken)
+        => StoreAsync(owner, task, attempt, plaintext, DefaultLifetime, cancellationToken);
+
+    public async ValueTask<ProtectedPayloadReference> StoreAsync(
+        OwnerId owner,
+        NeuronId task,
+        AttemptId attempt,
+        ReadOnlyMemory<byte> plaintext,
+        TimeSpan lifetime,
+        CancellationToken cancellationToken,
+        Guid stableEntryId = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(grains);
@@ -42,9 +63,14 @@ internal sealed class GrainBehaviorProtectedPayloadAccess(IGrainFactory grains) 
             throw new InvalidOperationException("owner-task-mismatch");
         }
 
+        if (lifetime <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(lifetime), lifetime, "Lifetime must be positive.");
+        }
+
         var grain = grains.GetGrain<IBehaviorProtectedPayloadGrain>(owner.Value);
         return await grain
-            .StoreAsync(task, attempt, plaintext.ToArray(), cancellationToken)
+            .StoreAsync(task, attempt, plaintext.ToArray(), lifetime, cancellationToken, stableEntryId)
             .ConfigureAwait(false);
     }
 

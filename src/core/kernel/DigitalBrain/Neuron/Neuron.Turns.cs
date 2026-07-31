@@ -30,9 +30,9 @@ public abstract partial class Neuron
         }
     }
 
-    private Task DispatchAsync(Synapse synapse)
+    private Task DispatchAsync(Synapse synapse, CancellationToken cancellationToken)
         => SynapseDispatch.HandlersFor(GetType()).TryGetValue(synapse.GetType(), out var handler)
-            ? handler(this, synapse, CancellationToken.None)
+            ? handler(this, synapse, cancellationToken)
             : Task.CompletedTask;
 
     private void FlushOutgoing()

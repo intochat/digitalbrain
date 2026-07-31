@@ -13,9 +13,13 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     public IJournalStorage CreateStorage(JournalId journalId)
         => new RecordingJournalStorage(this, journalId, inner.CreateStorage(journalId));
 
-    internal JournalFaultRegistration ArmFault(NeuronId target, string message)
+    internal JournalFaultRegistration ArmFault(
+        NeuronId target,
+        string message,
+        int allowCommitsBeforeFault = 0)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        ArgumentOutOfRangeException.ThrowIfNegative(allowCommitsBeforeFault);
 
         lock (_failureLock)
         {
@@ -26,7 +30,7 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
                     $"A journal commit fault is already armed for neuron '{target}'.");
             }
 
-            var state = new JournalFaultState(message);
+            var state = new JournalFaultState(message, allowCommitsBeforeFault);
             _failures.Add(journalId, state);
             return new(target, message, state.Consumed.Task, state);
         }
@@ -54,22 +58,31 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     {
         lock (_failureLock)
         {
-            if (!_failures.Remove(journalId, out var failure))
+            if (!_failures.TryGetValue(journalId, out var failure))
             {
                 return;
             }
 
+            if (failure.RemainingAllowedCommits > 0)
+            {
+                failure.RemainingAllowedCommits--;
+                return;
+            }
+
+            _failures.Remove(journalId);
             failure.Consumed.TrySetResult();
             throw new InvalidOperationException(failure.Message);
         }
     }
 
-    private sealed class JournalFaultState(string message)
+    private sealed class JournalFaultState(string message, int allowCommitsBeforeFault)
     {
         internal TaskCompletionSource Consumed { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         internal string Message { get; } = message;
+
+        internal int RemainingAllowedCommits { get; set; } = allowCommitsBeforeFault;
     }
 
     private sealed class RecordingJournalStorage(

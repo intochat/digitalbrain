@@ -53,6 +53,31 @@ public static class BehaviorDispatchBrokerEndpoints
         {
             throw;
         }
+        catch (BehaviorUserActionRequiredException userAction)
+            when (userAction.Requirement is { } requirement)
+        {
+            return Results.Json(
+                new UserActionRequiredResponse(
+                    BehaviorExecutionCodes.UserActionRequired,
+                    requirement.Task.Type,
+                    requirement.Task.Owner.Value,
+                    requirement.Task.Name,
+                    requirement.Attempt.Value.ToString("N"),
+                    requirement.Module.Type,
+                    requirement.Module.Owner.Value,
+                    requirement.Module.Name,
+                    requirement.ModuleId,
+                    requirement.DisplayText,
+                    requirement.ActionReference.Id.ToString("N"),
+                    requirement.ActionReference.ExpiresAt,
+                    requirement.ActionEpoch.ToString("N"),
+                    requirement.ParkRevision,
+                    requirement.ExpiresAt,
+                    requirement.Completer.Type,
+                    requirement.Completer.Owner.Value,
+                    requirement.Completer.Name),
+                statusCode: StatusCodes.Status409Conflict);
+        }
         catch (ArgumentException exception)
         {
             return Failure(MapArgumentReason(exception));
@@ -258,4 +283,24 @@ public static class BehaviorDispatchBrokerEndpoints
     }
 
     internal sealed record ProtectedReferenceResponse(string Id, DateTimeOffset? ExpiresAt);
+
+    internal sealed record UserActionRequiredResponse(
+        string Outcome,
+        string TaskType,
+        string TaskOwner,
+        string TaskName,
+        string Attempt,
+        string ModuleType,
+        string ModuleOwner,
+        string ModuleName,
+        string ModuleId,
+        string DisplayText,
+        string ActionReferenceId,
+        DateTimeOffset? ActionReferenceExpiresAt,
+        string ActionEpoch,
+        long ParkRevision,
+        DateTimeOffset ExpiresAt,
+        string CompleterType,
+        string CompleterOwner,
+        string CompleterName);
 }

@@ -75,11 +75,21 @@ internal sealed class FixtureCluster : IAsyncDisposable
 
     internal TestEdgeRegistry Edges => _edges;
 
-    internal JournalFaultRegistration ArmJournalFault(NeuronId target, string message)
-        => _journalStorage.ArmFault(target, message);
+    internal JournalFaultRegistration ArmJournalFault(
+        NeuronId target,
+        string message,
+        int allowCommitsBeforeFault = 0)
+        => _journalStorage.ArmFault(target, message, allowCommitsBeforeFault);
 
     internal bool DisarmJournalFault(JournalFaultRegistration registration)
         => _journalStorage.DisarmFault(registration);
+
+    internal async Task<bool> HasOutboxWakeupAsync(NeuronId neuron)
+    {
+        var grainId = GrainId.Create(OutboxWakeup.GrainTypeName, neuron.ToString());
+        var entry = await _reminderTable.ReadRow(grainId, OutboxWakeup.ReminderName);
+        return entry is not null;
+    }
 
     internal async Task<(TestClock Clock, long EdgeGeneration)> PrepareMethodAsync(string scope, BrainTestDiagnostics diagnostics)
     {

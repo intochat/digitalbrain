@@ -24,7 +24,8 @@ internal sealed class DurableProtectedPayloadStore(
         Guid attempt,
         ReadOnlyMemory<byte> plaintext,
         TimeSpan lifetime,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid stableEntryId = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(state);
@@ -61,10 +62,27 @@ internal sealed class DurableProtectedPayloadStore(
             throw new ArgumentOutOfRangeException(nameof(lifetime), lifetime, "Lifetime must produce a future expiry.");
         }
 
-        var id = Guid.NewGuid();
-        var purpose = PurposeFor(storeOwner, task, attempt);
-        var protectedBytes = protector.Protect(purpose, plaintext.Span);
+        cancellationToken.ThrowIfCancellationRequested();
         var entries = ReadEntries();
+        if (stableEntryId != Guid.Empty
+            && entries.TryGetValue(stableEntryId, out var existing))
+        {
+            // Authenticated binding/content check always precedes any expiry branch. Exact reissue
+            // returns the original reference/expiry (live or expired; non-resurrecting). Divergent
+            // plaintext permanently refuses — never overwrite a stable id with mismatched material.
+            return RequireStableIdExactMatch(
+                stableEntryId,
+                existing,
+                storeOwner,
+                task,
+                attempt,
+                plaintext);
+        }
+
+        var id = stableEntryId != Guid.Empty ? stableEntryId : Guid.NewGuid();
+        var purpose = PurposeFor(storeOwner, task, attempt);
+        cancellationToken.ThrowIfCancellationRequested();
+        var protectedBytes = protector.Protect(purpose, plaintext.Span);
         entries[id] = new StoredEntry(
             expiresAt,
             protectedBytes,
@@ -76,8 +94,11 @@ internal sealed class DurableProtectedPayloadStore(
         var previous = state.Value;
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             state.Value = JsonSerializer.SerializeToUtf8Bytes(entries, JsonOptions);
+            cancellationToken.ThrowIfCancellationRequested();
             await commit().ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
         }
         catch
         {
@@ -108,6 +129,7 @@ internal sealed class DurableProtectedPayloadStore(
             throw new CryptographicException("The protected payload reference is invalid.");
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var entries = ReadEntries();
         if (!entries.TryGetValue(reference.Id, out var entry))
         {
@@ -139,9 +161,56 @@ internal sealed class DurableProtectedPayloadStore(
             throw new CryptographicException("The protected payload reference is invalid.");
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var purpose = PurposeFor(loadOwner, task, attempt);
         var plaintext = protector.Unprotect(purpose, protectedPayload);
+        cancellationToken.ThrowIfCancellationRequested();
         return ValueTask.FromResult<ReadOnlyMemory<byte>>(plaintext);
+    }
+
+    private ProtectedPayloadReference RequireStableIdExactMatch(
+        Guid stableEntryId,
+        StoredEntry existing,
+        OwnerId storeOwner,
+        NeuronId task,
+        Guid attempt,
+        ReadOnlyMemory<byte> plaintext)
+    {
+        if (!string.Equals(existing.TaskType, task.Type, StringComparison.Ordinal)
+            || !string.Equals(existing.TaskOwner, task.Owner.Value, StringComparison.Ordinal)
+            || !string.Equals(existing.TaskName, task.Name, StringComparison.Ordinal)
+            || existing.Attempt != attempt)
+        {
+            throw new InvalidOperationException(
+                $"Protected payload entry '{stableEntryId:N}' is already bound to a different task/attempt.");
+        }
+
+        if (existing.ProtectedPayload is not { Length: > 0 } protectedPayload)
+        {
+            throw new InvalidOperationException(
+                $"Protected payload entry '{stableEntryId:N}' cannot be reissued with divergent content.");
+        }
+
+        byte[] existingPlaintext;
+        try
+        {
+            existingPlaintext = protector.Unprotect(PurposeFor(storeOwner, task, attempt), protectedPayload);
+        }
+        catch (CryptographicException exception)
+        {
+            throw new InvalidOperationException(
+                $"Protected payload entry '{stableEntryId:N}' cannot be reissued with divergent content.",
+                exception);
+        }
+
+        if (existingPlaintext.Length != plaintext.Length
+            || !CryptographicOperations.FixedTimeEquals(existingPlaintext, plaintext.Span))
+        {
+            throw new InvalidOperationException(
+                $"Protected payload entry '{stableEntryId:N}' cannot be reissued with divergent content.");
+        }
+
+        return new ProtectedPayloadReference(stableEntryId, existing.ExpiresAt);
     }
 
     private void RequireBoundOwner(OwnerId requested)

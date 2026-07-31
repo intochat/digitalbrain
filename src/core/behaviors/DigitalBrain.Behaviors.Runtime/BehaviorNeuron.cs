@@ -438,9 +438,10 @@ internal sealed partial class BehaviorNeuron :
         return Task.CompletedTask;
     }
 
-    Task INeuron.Deliver(SynapseDelivery delivery)
+    Task INeuron.Deliver(SynapseDelivery delivery, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(delivery);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (delivery.Synapse is BehaviorRevisionApproval approval
             && (delivery.Caller != approval.Approver
@@ -450,6 +451,6 @@ internal sealed partial class BehaviorNeuron :
             return Task.CompletedTask;
         }
 
-        return base.Deliver(delivery);
+        return base.Deliver(delivery, cancellationToken);
     }
 }

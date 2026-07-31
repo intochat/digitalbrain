@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
+using DigitalBrain.Mcp;
 using DigitalBrain.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -51,10 +52,53 @@ internal sealed class BehaviorWorkerNeuron :
     }
 
     public Task Continue(AttemptCursor cursor)
+        => Continue(cursor, TurnCancellationToken);
+
+    public async Task Continue(AttemptCursor cursor, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(cursor);
+        cancellationToken.ThrowIfCancellationRequested();
         RequireSelf(cursor.Worker, cursor.Task);
-        return Task.CompletedTask;
+
+        // Fresh worker after user-action park: restage hosted execution through the same durable
+        // double-hop relay so this Worker turn ends before reverse-broker callbacks re-enter.
+        // Handler/outbox delivery token is threaded explicitly into ReadValidatedTask (not None).
+        var authority = GrainFactory.GetGrain<IBehaviorTaskAuthority>(
+            BehaviorTaskAuthority.ForOwner(Id.Owner).ToGrainId());
+        var snapshot = await authority.ReadValidatedTask(
+            cursor.Task,
+            cursor.Attempt,
+            requireActivation: true,
+            cancellationToken);
+        if (snapshot.Worker != Id)
+        {
+            throw new NeuronAuthorizationException("worker-mismatch");
+        }
+
+        if (snapshot.Goal is not BehaviorActivationGoal goal)
+        {
+            throw new NeuronAuthorizationException(
+                $"Worker '{Id}' continues only behavior activations.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var request = new AttemptRequest(
+            cursor.Task,
+            cursor.Worker,
+            cursor.Attempt,
+            cursor.Revision,
+            goal);
+        var relay = new NeuronId(
+            BehaviorExecutionRelay.GrainTypeName,
+            Id.Owner,
+            Guid.NewGuid().ToString("N"));
+        await SendAsync(
+            relay,
+            new RelayHostedBehaviorExecution(
+                Id,
+                request,
+                BehaviorExecutionId.New(),
+                TimeProvider.GetUtcNow()));
     }
 
     public async Task Cancel(AttemptCursor cursor)
@@ -78,7 +122,8 @@ internal sealed class BehaviorWorkerNeuron :
     {
         ArgumentNullException.ThrowIfNull(command);
         cancellationToken.ThrowIfCancellationRequested();
-        return Continue(command.Cursor);
+        // Pass the Deliver/outbox handler token explicitly into Continue/ReadValidatedTask.
+        return Continue(command.Cursor, cancellationToken);
     }
 
     public Task HandleAsync(DispatchWorkerCancel command, CancellationToken cancellationToken)
@@ -115,6 +160,28 @@ internal sealed class BehaviorWorkerNeuron :
                     request.Revision,
                     new BehaviorTaskResult(BehaviorExecutionCodes.Succeeded),
                     Evidence: []));
+            return;
+        }
+
+        if (string.Equals(stableCode, BehaviorExecutionCodes.UserActionRequired, StringComparison.Ordinal))
+        {
+            if (completion.UserAction is not { } userAction
+                || userAction.Task != request.Task
+                || userAction.Attempt != request.Attempt)
+            {
+                await SendAsync(
+                    request.Task,
+                    new AttemptFailed(
+                        request.Task,
+                        request.Worker,
+                        request.Attempt,
+                        request.Revision,
+                        new BehaviorTaskFailure(BehaviorExecutionCodes.Exception),
+                        Retryable: false));
+                return;
+            }
+
+            await SendAsync(request.Task, userAction);
             return;
         }
 
@@ -249,7 +316,71 @@ internal sealed class BehaviorWorkerNeuron :
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var delivery = await SendAsync(resolved.DeliveryTarget, requestSynapse);
+
+        // Direct awaited Deliver (no outbox) so module-owned authorization failures surface on this
+        // turn instead of being swallowed by outbox retry and leaving the host poll stranded.
+        var delivery = SynapseDelivery.Create(
+            requestSynapse,
+            Id,
+            sequence: 1,
+            cause: null,
+            TimeProvider,
+            CorrelationId.New());
+        try
+        {
+            await GrainFactory.GetGrain<INeuron>(resolved.DeliveryTarget.ToGrainId()).Deliver(delivery, cancellationToken);
+        }
+        catch (McpAuthorizationRequiredException authorizationRequired)
+            when (authorizationRequired.Requirement is { } requirement)
+        {
+            var lifetime = TimeSpan.FromHours(1);
+            // Deterministic epoch from the durable authorization command so StageDispatch redelivery
+            // of the same command/task/attempt reproduces the same completer/binding surface.
+            var actionEpoch = requirement.CommandId.Value;
+            var completer = UserActionCompletionBridge.For(Id.Owner, actionEpoch);
+            var custody = ServiceProvider.GetRequiredService<IUserActionCustody>();
+            var issued = await ModuleUserActionBoundary.IssueFromAuthorizationRequiredAsync(
+                custody,
+                Id.Owner,
+                task,
+                attempt,
+                resolved.DeliveryTarget,
+                requirement.ServerKey,
+                requirement.ServerDisplayName,
+                requirement.SignInUrl,
+                requirement.State,
+                parkRevision: snapshot.Revision,
+                lifetime,
+                completer,
+                actionEpoch,
+                cancellationToken);
+
+            var bind = new BindUserActionCompletion(
+                task,
+                attempt,
+                resolved.DeliveryTarget,
+                issued.Requirement.ModuleId,
+                issued.Requirement.ActionReference,
+                issued.Requirement.ActionEpoch,
+                issued.Requirement.ParkRevision,
+                issued.Requirement.ExpiresAt,
+                requirement.CommandId,
+                requirement.ServerKey,
+                requirement.State);
+            // Direct Deliver (not outbox): bind must complete before the park exception surfaces.
+            await GrainFactory.GetGrain<INeuron>(completer.ToGrainId()).Deliver(
+                SynapseDelivery.Create(bind, Id, sequence: 1, cause: null, TimeProvider, CorrelationId.New()),
+                cancellationToken);
+
+            var authorization = GrainFactory.GetGrain<IMcpAuthorization>(
+                NeuronId.For<IMcpAuthorization>(Id.Owner, McpAuthorizationNeuron.InstanceName).ToGrainId());
+            await authorization.BindCompletionTarget(
+                new BindMcpAuthorizationCompletionTarget(requirement.CommandId, completer),
+                cancellationToken);
+
+            throw new BehaviorUserActionRequiredException(issued.Requirement);
+        }
+
         return new WorkerOperationReceipt(delivery.CorrelationId, Id, task);
     }
 

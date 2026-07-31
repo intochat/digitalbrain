@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Tasks;
 
 namespace DigitalBrain.Behaviors;
 
@@ -174,7 +175,7 @@ internal static class BehaviorProgramLoader
         }
         catch (Exception exception)
         {
-            _ = exception;
+            var userAction = UnwrapUserActionRequired(exception);
             if (brain is IAsyncDisposable asyncDisposable)
             {
                 try
@@ -186,12 +187,34 @@ internal static class BehaviorProgramLoader
                 }
             }
 
+            if (userAction is not null)
+            {
+                return new BehaviorExecutionOutcome(
+                    false,
+                    BehaviorExecutionCodes.UserActionRequired,
+                    BehaviorUserActionSurface.FromRequirement(userAction));
+            }
+
             return new BehaviorExecutionOutcome(false, BehaviorExecutionCodes.Exception);
         }
         finally
         {
             loadContext.Unload();
         }
+    }
+
+    private static UserActionRequired? UnwrapUserActionRequired(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is BehaviorUserActionRequiredException userAction
+                && userAction.Requirement is { } requirement)
+            {
+                return requirement;
+            }
+        }
+
+        return null;
     }
 
     private static AssemblyLoadContext CreateCollectibleContext(BehaviorExecutionId execution)

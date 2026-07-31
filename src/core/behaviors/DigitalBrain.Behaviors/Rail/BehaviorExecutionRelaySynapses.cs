@@ -34,4 +34,5 @@ internal sealed record CompleteHostedBehaviorExecution(
     [property: Id(0)] AttemptRequest Attempt,
     [property: Id(1)] bool Succeeded,
     [property: Id(2)] string StableCode,
-    [property: Id(3)] bool Cancelled) : Synapse;
+    [property: Id(3)] bool Cancelled,
+    [property: Id(4)] UserActionRequired? UserAction = null) : Synapse;

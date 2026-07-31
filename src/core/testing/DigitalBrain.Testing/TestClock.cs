@@ -67,23 +67,20 @@ public sealed class TestClock
                     throw DrainLimitFailure(target);
                 }
 
-                if (nextIsTimer)
-                {
-                    if (!_provider.TryFireNextDue(target))
-                    {
-                        throw new InvalidOperationException(
-                            "A deterministic timer disappeared before it could be fired.");
-                    }
-                }
-                else if (!await _reminders.TryDeliverNextDueAsync(target, cancellationToken))
-                {
-                    throw new InvalidOperationException(
-                        "A deterministic reminder disappeared before it could be delivered.");
-                }
+                // Select then fire/deliver is not atomic: a prior due item's grain work may Disarm or
+                // Dispose the next selection before this attempt. Re-poll; the drain bound still caps spins.
+                var delivered = nextIsTimer
+                    ? _provider.TryFireNextDue(target)
+                    : await _reminders.TryDeliverNextDueAsync(target, cancellationToken);
 
                 operations++;
                 await Task.Yield();
                 cancellationToken.ThrowIfCancellationRequested();
+
+                if (!delivered)
+                {
+                    continue;
+                }
             }
         }
         finally

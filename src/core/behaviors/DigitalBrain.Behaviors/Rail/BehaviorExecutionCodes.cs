@@ -14,6 +14,8 @@ public static class BehaviorExecutionCodes
     public const string GrantMismatch = "capability-grant-mismatch";
     public const string ContractMismatch = "behavior-contract-mismatch";
     public const string HostNotConfigured = "protected-trigger-broker-not-configured";
+    public const string UserActionRequired = "behavior-user-action-required";
+    public const string UserActionDenied = "behavior-user-action-denied";
 
     public static string MapHostFailure(string? reason)
     {
@@ -35,6 +37,8 @@ public static class BehaviorExecutionCodes
             GrantMismatch => GrantMismatch,
             ContractMismatch => ContractMismatch,
             HostNotConfigured => HostNotConfigured,
+            UserActionRequired => UserActionRequired,
+            UserActionDenied => UserActionDenied,
             "unknown-trigger-case" => ContractMismatch,
             "ambiguous-trigger-case" => ContractMismatch,
             "manifest-behavior-mismatch" => ContractMismatch,

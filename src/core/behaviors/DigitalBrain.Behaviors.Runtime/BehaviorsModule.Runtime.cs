@@ -1,4 +1,5 @@
 using DigitalBrain.Security;
+using DigitalBrain.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
@@ -24,6 +25,15 @@ public sealed partial class BehaviorsModule
         builder.Services.TryAddSingleton<IBehaviorProtectedTriggerAccess, GrainBehaviorProtectedTriggerAccess>();
         builder.Services.TryAddSingleton<IBehaviorTaskOperationAccess, GrainBehaviorTaskOperationAccess>();
         builder.Services.TryAddSingleton<IBehaviorCapabilityDispatchAccess, GrainBehaviorCapabilityDispatchAccess>();
+        builder.Services.TryAddSingleton<IUserActionCustody>(static provider =>
+        {
+            var time = provider.GetKeyedService<TimeProvider>(DigitalBrain.Kernel.NeuronTime.ServiceKey)
+                ?? provider.GetService<TimeProvider>()
+                ?? TimeProvider.System;
+            return new GrainUserActionCustody(
+                provider.GetRequiredService<IBehaviorProtectedPayloadAccess>(),
+                time);
+        });
 
         var executor = builder.Configuration[ExecutorConfigurationKey];
         if (string.Equals(executor, HostExecutorName, StringComparison.OrdinalIgnoreCase))

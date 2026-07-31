@@ -243,6 +243,117 @@ public sealed class BehaviorOperationReplay
         Assert.Contains("protectedPayload", durable, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact(DisplayName =
+        "stable-id store with same task/attempt but divergent plaintext permanently refuses — does not return old ciphertext or extend expiry")]
+    public async Task StableIdSameTaskAttemptDivergentPlaintextPermanentlyRefuses()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var time = new AdjustableTimeProvider(DateTimeOffset.Parse("2026-07-31T12:00:00Z", CultureInfo.InvariantCulture));
+        var state = new TestDurableValue<byte[]>([]);
+        ValueTask Commit() => ValueTask.CompletedTask;
+        var store = new DurableProtectedPayloadStore(state, Commit, new XorProtector(), OwnerA, time);
+        var stableId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        var firstPlaintext = "custody-material-v1"u8.ToArray();
+        var divergentPlaintext = "custody-material-v2-divergent"u8.ToArray();
+        var firstLifetime = TimeSpan.FromMinutes(30);
+
+        var first = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            firstPlaintext,
+            firstLifetime,
+            cancellationToken,
+            stableEntryId: stableId);
+        Assert.Equal(stableId, first.Id);
+        var firstExpiry = first.ExpiresAt;
+        Assert.NotNull(firstExpiry);
+
+        var loadedFirst = await store.LoadAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            first,
+            cancellationToken);
+        Assert.Equal(firstPlaintext, loadedFirst.ToArray());
+
+        // Same stable id + same task/attempt + different plaintext must permanently refuse.
+        // Must not return the prior reference/ciphertext or extend the prior expiry.
+        var divergent = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await store.StoreAsync(
+                OwnerA,
+                TaskNeuron,
+                Attempt.Value,
+                divergentPlaintext,
+                TimeSpan.FromHours(2),
+                cancellationToken,
+                stableEntryId: stableId));
+        Assert.Contains(stableId.ToString("N"), divergent.Message, StringComparison.OrdinalIgnoreCase);
+
+        var stillFirst = await store.LoadAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            first,
+            cancellationToken);
+        Assert.Equal(firstPlaintext, stillFirst.ToArray());
+        Assert.Equal(firstExpiry, first.ExpiresAt);
+
+        // Idempotent exact redelivery of the same plaintext still returns the original binding
+        // without extending expiry once content equality is enforced.
+        var sameMaterial = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            firstPlaintext,
+            TimeSpan.FromHours(2),
+            cancellationToken,
+            stableEntryId: stableId);
+        Assert.Equal(stableId, sameMaterial.Id);
+        Assert.Equal(firstExpiry, sameMaterial.ExpiresAt);
+
+        // Expired row: divergent plaintext under the same stable id is a permanent same-epoch
+        // alias refusal — no stale mismatched overwrite, no mint/extend of the expired row.
+        time.Advance(TimeSpan.FromMinutes(31));
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, TaskNeuron, Attempt.Value, first, cancellationToken).AsTask());
+
+        var persistedBeforeExpiredDivergent = state.Value?.ToArray() ?? [];
+        var expiredDivergent = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await store.StoreAsync(
+                OwnerA,
+                TaskNeuron,
+                Attempt.Value,
+                divergentPlaintext,
+                TimeSpan.FromMinutes(15),
+                cancellationToken,
+                stableEntryId: stableId));
+        Assert.Contains(stableId.ToString("N"), expiredDivergent.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(persistedBeforeExpiredDivergent, state.Value);
+        Assert.Equal(firstExpiry, first.ExpiresAt);
+
+        // Exact expired reissue is non-resurrecting: return the original expired reference/expiry
+        // (idempotent), do not mint/extend/overwrite; subsequent Load remains expired.
+        var persistedBeforeExactExpired = state.Value?.ToArray() ?? [];
+        var exactExpired = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            firstPlaintext,
+            TimeSpan.FromHours(2),
+            cancellationToken,
+            stableEntryId: stableId);
+        Assert.Equal(stableId, exactExpired.Id);
+        Assert.Equal(firstExpiry, exactExpired.ExpiresAt);
+        Assert.True(exactExpired.ExpiresAt <= time.GetUtcNow());
+        Assert.Equal(persistedBeforeExactExpired, state.Value);
+
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, TaskNeuron, Attempt.Value, first, cancellationToken).AsTask());
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, TaskNeuron, Attempt.Value, exactExpired, cancellationToken).AsTask());
+    }
+
     [Fact(DisplayName = "protected payload store and load observe cancellation")]
     public async Task ProtectedPayloadStoreAndLoadObserveCancellation()
     {
