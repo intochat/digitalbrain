@@ -11,6 +11,9 @@ internal sealed partial class TaskNeuron :
     Neuron,
     ITask,
     IHandle<StartTask>,
+    IHandle<PrepareTaskOperation>,
+    IHandle<TransitionTaskOperation>,
+    IHandle<ReadTaskOperation>,
     IHandle<AttemptAccepted>,
     IHandle<AttemptProgressed>,
     IHandle<AttemptWaiting>,
@@ -51,8 +54,35 @@ internal sealed partial class TaskNeuron :
     {
         ArgumentNullException.ThrowIfNull(delivery);
 
-        return delivery.Synapse is AttemptFact fact && delivery.Caller != fact.Worker
-            ? Task.CompletedTask
-            : base.Deliver(delivery);
+        if (delivery.Synapse is AttemptFact fact && delivery.Caller != fact.Worker)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (delivery.Synapse is PrepareTaskOperation or TransitionTaskOperation)
+        {
+            var data = LoadIfStarted();
+            if (data is null || delivery.Caller != data.Worker)
+            {
+                throw new NeuronAuthorizationException(
+                    $"Caller '{delivery.Caller}' is not authorized to submit task operations for Task '{Id}'.");
+            }
+        }
+        else if (delivery.Synapse is ReadTaskOperation)
+        {
+            var data = LoadIfStarted();
+            if (data is null || !IsAuthorizedOperationReader(delivery.Caller, data.Worker))
+            {
+                throw new NeuronAuthorizationException(
+                    $"Caller '{delivery.Caller}' is not authorized to read task operations for Task '{Id}'.");
+            }
+        }
+
+        return base.Deliver(delivery);
     }
+
+    private bool IsAuthorizedOperationReader(NeuronId caller, NeuronId worker)
+        => caller == worker
+            || (caller.Owner == Id.Owner
+                && string.Equals(caller.Type, ISessionNeuron.GrainTypeName, StringComparison.OrdinalIgnoreCase));
 }

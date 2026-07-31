@@ -1,6 +1,7 @@
 namespace DigitalBrain.Behaviors;
 
 using DigitalBrain.Abstractions;
+using DigitalBrain.Tasks;
 
 public sealed record BehaviorHostDeployCommand(
     OwnerId Owner,
@@ -23,7 +24,9 @@ public sealed record BehaviorHostDeactivationCommand(
 public sealed record BehaviorHostExecuteCommand(
     BehaviorExecutionMetadata Metadata,
     string ArtifactHash,
+    NeuronId Task,
+    AttemptId Attempt,
     string TriggerTypeName,
-    string TriggerJson,
-    IBehaviorCapabilityResolver Capabilities,
-    TimeProvider Time);
+    ProtectedPayloadReference TriggerPayload,
+    IReadOnlyList<BehaviorCapabilityEdge> Capabilities,
+    DateTimeOffset UtcNow);

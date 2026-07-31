@@ -19,7 +19,8 @@ internal sealed class TaskData(
     int attemptCount,
     Dictionary<CommandId, TaskSnapshot> receipts,
     PendingWorkerDispatch? pendingDispatch,
-    BehaviorTaskActivation? activation)
+    BehaviorTaskActivation? activation,
+    Dictionary<string, TaskOperationSnapshot> operations)
 {
     [Id(0)]
     public Goal Goal { get; set; } = goal;
@@ -65,4 +66,7 @@ internal sealed class TaskData(
 
     [Id(14)]
     public BehaviorTaskActivation? Activation { get; set; } = activation;
+
+    [Id(15)]
+    public Dictionary<string, TaskOperationSnapshot> Operations { get; set; } = operations ?? new Dictionary<string, TaskOperationSnapshot>(StringComparer.Ordinal);
 }

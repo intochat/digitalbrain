@@ -8,12 +8,24 @@ namespace DigitalBrain.Behaviors;
 
 internal sealed class InProcessBehaviorExecutor : IBehaviorExecutor
 {
+    public ValueTask<BehaviorExecutionOutcome> ExecuteAsync(
+        BehaviorExecutionRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(
+            new BehaviorExecutionOutcome(
+                false,
+                "Hardened execution requires an isolated host/broker; in-process raw execution is closed."));
+    }
+
     [SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
         Justification = "Execution seam maps any program failure to a typed outcome for journaling.")]
-    public async ValueTask<BehaviorExecutionOutcome> ExecuteAsync(
-        BehaviorExecutionRequest request,
+    public async ValueTask<BehaviorExecutionOutcome> ExecuteLegacyAsync(
+        LegacyBehaviorExecutionRequest request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);

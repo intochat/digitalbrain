@@ -1,20 +1,13 @@
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Aspire;
 using DigitalBrain.Behaviors;
 using DigitalBrain.ServiceDefaults;
+using DigitalBrain.Tasks;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
-builder.AddKeyedAzureTableServiceClient("brain-clustering");
-builder.AddDigitalBrainClient();
 builder.Services.AddBehaviorHostEngine(builder.Configuration);
-builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton<IBehaviorCapabilityResolver>(static services =>
-    new HostGrainCapabilityResolver(
-        services.GetRequiredService<IGrainFactory>(),
-        new OwnerId(DigitalBrainClientHostingExtensions.ResolveOwner(services.GetRequiredService<IConfiguration>()))));
 
 var app = builder.Build();
 app.MapDefaultEndpoints();
@@ -88,8 +81,6 @@ app.MapPost("/v1/behaviors/deactivate", async (
 app.MapPost("/v1/behaviors/execute", async (
     ExecuteRequest body,
     BehaviorHostEngine host,
-    IBehaviorCapabilityResolver capabilities,
-    TimeProvider time,
     CancellationToken cancellationToken) =>
 {
     try
@@ -102,10 +93,21 @@ app.MapPost("/v1/behaviors/execute", async (
                     new BehaviorRevisionId(body.Revision),
                     new BehaviorExecutionId(Guid.Parse(body.Execution))),
                 body.ArtifactHash,
+                new NeuronId(body.TaskType, new OwnerId(body.TaskOwner), body.TaskName),
+                new AttemptId(Guid.Parse(body.Attempt)),
                 body.TriggerTypeName,
-                body.TriggerJson,
-                capabilities,
-                time),
+                new ProtectedPayloadReference(
+                    Guid.Parse(body.TriggerPayloadId),
+                    body.TriggerPayloadExpiresAt),
+                body.Capabilities
+                    .Select(static edge => new BehaviorCapabilityEdge(
+                        new NeuronId(edge.TargetType, new OwnerId(edge.TargetOwner), edge.TargetName),
+                        edge.RequestId,
+                        edge.RequestVersion,
+                        edge.ResponseId,
+                        edge.ResponseVersion))
+                    .ToArray(),
+                body.UtcNow),
             cancellationToken);
         return Results.Ok(new ExecuteResponse(outcome.Succeeded, outcome.Outcome));
     }
@@ -134,16 +136,22 @@ internal sealed record ExecuteRequest(
     string Execution,
     string ArtifactHash,
     string TriggerTypeName,
-    string TriggerJson);
+    string TaskType,
+    string TaskOwner,
+    string TaskName,
+    string Attempt,
+    string TriggerPayloadId,
+    DateTimeOffset? TriggerPayloadExpiresAt,
+    CapabilityEdgeRequest[] Capabilities,
+    DateTimeOffset UtcNow);
+
+internal sealed record CapabilityEdgeRequest(
+    string TargetType,
+    string TargetOwner,
+    string TargetName,
+    string RequestId,
+    int RequestVersion,
+    string ResponseId,
+    int ResponseVersion);
 
 internal sealed record ExecuteResponse(bool Succeeded, string Outcome);
-
-file sealed class HostGrainCapabilityResolver(IGrainFactory grains, OwnerId owner) : IBehaviorCapabilityResolver
-{
-    public TContract Get<TContract>(string name)
-        where TContract : class, INeuron
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        return grains.GetGrain<TContract>(NeuronId.For<TContract>(owner, name).ToGrainId());
-    }
-}

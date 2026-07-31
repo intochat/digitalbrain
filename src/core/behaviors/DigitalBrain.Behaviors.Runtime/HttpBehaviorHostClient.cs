@@ -66,7 +66,23 @@ internal sealed class HttpBehaviorHostClient(HttpClient http) : IBehaviorHostGat
                 command.Metadata.Execution.Value.ToString("N"),
                 command.ArtifactHash,
                 command.TriggerTypeName,
-                command.TriggerJson),
+                command.Task.Type,
+                command.Task.Owner.Value,
+                command.Task.Name,
+                command.Attempt.Value.ToString("N"),
+                command.TriggerPayload.Id.ToString("N"),
+                command.TriggerPayload.ExpiresAt,
+                command.Capabilities
+                    .Select(static edge => new CapabilityEdgeBody(
+                        edge.Target.Type,
+                        edge.Target.Owner.Value,
+                        edge.Target.Name,
+                        edge.RequestSynapseId,
+                        edge.RequestSchemaVersion,
+                        edge.ResponseSynapseId,
+                        edge.ResponseSchemaVersion))
+                    .ToArray(),
+                command.UtcNow),
             JsonOptions,
             cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
@@ -75,6 +91,16 @@ internal sealed class HttpBehaviorHostClient(HttpClient http) : IBehaviorHostGat
             .ConfigureAwait(false)
             ?? throw new BehaviorHostException("empty-execute-response");
         return new BehaviorExecutionOutcome(body.Succeeded, body.Outcome);
+    }
+
+    public ValueTask<BehaviorExecutionOutcome> ExecuteLegacyAsync(
+        LegacyBehaviorExecutionRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromException<BehaviorExecutionOutcome>(
+            new BehaviorHostException("legacy-execution-not-transportable"));
     }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
@@ -106,7 +132,23 @@ internal sealed class HttpBehaviorHostClient(HttpClient http) : IBehaviorHostGat
         string Execution,
         string ArtifactHash,
         string TriggerTypeName,
-        string TriggerJson);
+        string TaskType,
+        string TaskOwner,
+        string TaskName,
+        string Attempt,
+        string TriggerPayloadId,
+        DateTimeOffset? TriggerPayloadExpiresAt,
+        CapabilityEdgeBody[] Capabilities,
+        DateTimeOffset UtcNow);
+
+    private sealed record CapabilityEdgeBody(
+        string TargetType,
+        string TargetOwner,
+        string TargetName,
+        string RequestId,
+        int RequestVersion,
+        string ResponseId,
+        int ResponseVersion);
 
     private sealed record ExecuteResultBody(bool Succeeded, string Outcome);
 }

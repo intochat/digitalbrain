@@ -1,3 +1,6 @@
+using System.ComponentModel;
+using DigitalBrain.Abstractions;
+
 namespace DigitalBrain.Tasks.Tests;
 
 [GenerateSerializer]
@@ -29,6 +32,27 @@ public sealed record TestResult(
 [Alias("tasks.tests.failure")]
 public sealed record TestFailure(
     [property: Id(0)] string Label) : Failure;
+
+[GenerateSerializer]
+[Alias("tasks.tests.prepare-operation-probe")]
+[Description("Probe that asks a worker to prepare a task operation")]
+public sealed record PrepareOperationProbe(
+    [property: Id(0)] NeuronId Task,
+    [property: Id(1)] AttemptId Attempt,
+    [property: Id(2)] int Sequence,
+    [property: Id(3)] TaskOperationEdge Edge,
+    [property: Id(4)] ProtectedPayloadReference RequestPayload) : Synapse;
+
+[GenerateSerializer]
+[Alias("tasks.tests.transition-operation-probe")]
+[Description("Probe that asks a worker to transition a task operation phase")]
+public sealed record TransitionOperationProbe(
+    [property: Id(0)] NeuronId Task,
+    [property: Id(1)] AttemptId Attempt,
+    [property: Id(2)] int Sequence,
+    [property: Id(3)] TaskOperationPhase ExpectedPhase,
+    [property: Id(4)] TaskOperationPhase Phase,
+    [property: Id(5)] ProtectedPayloadReference? ResponsePayload) : Synapse;
 
 public static class TaskFixtures
 {

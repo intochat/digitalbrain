@@ -6,7 +6,12 @@ namespace DigitalBrain.Tasks.Tests;
 public sealed partial class TasksHarnessModule : IModule;
 
 [GrainType(GrainTypeName)]
-internal sealed class ScriptedWorker : Neuron, IWorker
+internal sealed class ScriptedWorker :
+    Neuron,
+    IWorker,
+    IHandle<PrepareOperationProbe>,
+    IHandle<TransitionOperationProbe>,
+    IHandle<TaskOperationSnapshot>
 {
     internal const string GrainTypeName = "worker";
 
@@ -72,5 +77,38 @@ internal sealed class ScriptedWorker : Neuron, IWorker
         ArgumentNullException.ThrowIfNull(cursor);
 
         return SendAsync(cursor.Task, new AttemptCancelled(cursor.Task, cursor.Worker, cursor.Attempt, cursor.Revision));
+    }
+
+    public async Task HandleAsync(PrepareOperationProbe probe, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(probe);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await SendAsync(
+            probe.Task,
+            new PrepareTaskOperation(probe.Attempt, probe.Sequence, probe.Edge, probe.RequestPayload));
+    }
+
+    public async Task HandleAsync(TransitionOperationProbe probe, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(probe);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await SendAsync(
+            probe.Task,
+            new TransitionTaskOperation(
+                probe.Attempt,
+                probe.Sequence,
+                probe.ExpectedPhase,
+                probe.Phase,
+                probe.ResponsePayload,
+                RedactedSummary: null));
+    }
+
+    public Task HandleAsync(TaskOperationSnapshot snapshot, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
     }
 }

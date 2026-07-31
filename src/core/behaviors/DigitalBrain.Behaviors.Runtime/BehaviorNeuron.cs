@@ -404,8 +404,8 @@ internal sealed partial class BehaviorNeuron :
             new BehaviorRevisionId(data.ActiveArtifactHash),
             BehaviorExecutionId.New());
 
-        var outcome = await _executor.ExecuteAsync(
-            new BehaviorExecutionRequest(
+        var outcome = await _executor.ExecuteLegacyAsync(
+            new LegacyBehaviorExecutionRequest(
                 metadata,
                 data.ActiveAssemblyBytes,
                 data.ActiveArtifactHash,

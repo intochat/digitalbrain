@@ -11,10 +11,20 @@ internal sealed class HostedBehaviorExecutor(IBehaviorHostGateway host) : IBehav
             new BehaviorHostExecuteCommand(
                 request.Metadata,
                 request.ArtifactHash,
+                request.Task,
+                request.Attempt,
                 request.TriggerTypeName,
-                request.TriggerJson,
+                request.TriggerPayload,
                 request.Capabilities,
-                request.Time),
+                request.UtcNow),
             cancellationToken);
+    }
+
+    public ValueTask<BehaviorExecutionOutcome> ExecuteLegacyAsync(
+        LegacyBehaviorExecutionRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return host.ExecuteLegacyAsync(request, cancellationToken);
     }
 }

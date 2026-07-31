@@ -1,13 +1,32 @@
 using System.Collections.Concurrent;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Artifacts;
+using DigitalBrain.Behaviors.Manifest;
+using DigitalBrain.Behaviors.Runtime.Artifacts;
+using DigitalBrain.Tasks;
 
 namespace DigitalBrain.Behaviors;
 
-public sealed class BehaviorHostEngine(IBehaviorArtifactTrust trust) : IBehaviorHostGateway
+public sealed class BehaviorHostEngine : IBehaviorHostGateway
 {
+    private readonly IBehaviorArtifactTrust trust;
+    private readonly IBehaviorHostBrokerClientFactory? brokerFactory;
     private readonly ConcurrentDictionary<string, DeployedRevision> _deployed = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string> _active = new(StringComparer.Ordinal);
+
+    public BehaviorHostEngine(IBehaviorArtifactTrust trust)
+        : this(trust, brokerFactory: null)
+    {
+    }
+
+    internal BehaviorHostEngine(
+        IBehaviorArtifactTrust trust,
+        IBehaviorHostBrokerClientFactory? brokerFactory)
+    {
+        ArgumentNullException.ThrowIfNull(trust);
+        this.trust = trust;
+        this.brokerFactory = brokerFactory;
+    }
 
     public ValueTask DeployAsync(BehaviorHostDeployCommand command, CancellationToken cancellationToken)
     {
@@ -30,13 +49,19 @@ public sealed class BehaviorHostEngine(IBehaviorArtifactTrust trust) : IBehavior
 
         trust.Verify(command.ArtifactHash, command.Signature.Span);
 
+        var envelope = CanonicalArtifactReader.Read(command.ArtifactBytes);
+        if (!envelope.BehaviorAssembly.Span.SequenceEqual(command.AssemblyBytes.Span))
+        {
+            throw new BehaviorHostException("embedded-assembly-mismatch");
+        }
+
         var key = RevisionKey(command.Owner, command.Behavior, command.ArtifactHash);
         _deployed[key] = new DeployedRevision(
             command.Owner,
             command.Behavior,
             command.ArtifactHash,
             command.ArtifactBytes.ToArray(),
-            command.AssemblyBytes.ToArray(),
+            envelope.BehaviorAssembly.ToArray(),
             command.Signature.ToArray());
 
         return ValueTask.CompletedTask;
@@ -82,34 +107,186 @@ public sealed class BehaviorHostEngine(IBehaviorArtifactTrust trust) : IBehavior
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentException.ThrowIfNullOrWhiteSpace(command.ArtifactHash);
         ArgumentNullException.ThrowIfNull(command.Capabilities);
-        ArgumentNullException.ThrowIfNull(command.Time);
 
-        var behaviorKey = BehaviorKey(command.Metadata.Owner, command.Metadata.Behavior);
+        var revision = EnsureActiveDeployedRevision(
+            command.Metadata.Owner,
+            command.Metadata.Behavior,
+            command.ArtifactHash);
+
+        if (command.Metadata.Behavior != revision.Behavior)
+        {
+            throw new BehaviorHostException("behavior-mismatch");
+        }
+
+        if (command.Metadata.Owner != command.Task.Owner)
+        {
+            throw new BehaviorHostException("owner-task-mismatch");
+        }
+
+        var taskGrainType = NeuronId.GrainTypeNameOf(typeof(ITask));
+        if (!string.Equals(command.Task.Type, taskGrainType, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new BehaviorHostException("task-not-itask");
+        }
+
+        if (!string.Equals(command.Metadata.Revision.Value, command.ArtifactHash, StringComparison.Ordinal))
+        {
+            throw new BehaviorHostException("revision-hash-mismatch");
+        }
+
+        var envelope = CanonicalArtifactReader.Read(revision.ArtifactBytes);
+        if (envelope.Manifest.Behavior != command.Metadata.Behavior)
+        {
+            throw new BehaviorHostException("manifest-behavior-mismatch");
+        }
+
+        var signedEdges = DeriveResultBearingEdges(command.Metadata.Owner, envelope.Manifest.CapabilityGrants);
+        if (!CapabilityMultisetsEqual(command.Capabilities, signedEdges))
+        {
+            throw new BehaviorHostException("capability-grant-mismatch");
+        }
+
+        if (brokerFactory is null)
+        {
+            throw new BehaviorHostException("protected-trigger-broker-not-configured");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var client = brokerFactory.Create(command.Metadata.Owner, command.Task, command.Attempt);
+        var triggerBytes = await client.LoadPayloadAsync(
+            command.Metadata.Owner,
+            command.Task,
+            command.Attempt,
+            command.TriggerPayload,
+            cancellationToken).ConfigureAwait(false);
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var broker = new HostBehaviorSynapseBroker(
+            command.Metadata,
+            command.Task,
+            command.Attempt,
+            signedEdges,
+            client);
+
+        return await BehaviorProgramLoader.ExecuteAsync(
+            new BehaviorExecutionRequest(
+                command.Metadata,
+                envelope.BehaviorAssembly,
+                command.ArtifactHash,
+                command.Task,
+                command.Attempt,
+                command.TriggerTypeName,
+                command.TriggerPayload,
+                signedEdges,
+                command.UtcNow),
+            triggerBytes,
+            broker,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async ValueTask<BehaviorExecutionOutcome> ExecuteLegacyAsync(
+        LegacyBehaviorExecutionRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.ArtifactHash);
+        ArgumentNullException.ThrowIfNull(request.Capabilities);
+        ArgumentNullException.ThrowIfNull(request.Time);
+
+        var revision = EnsureActiveDeployedRevision(
+            request.Metadata.Owner,
+            request.Metadata.Behavior,
+            request.ArtifactHash);
+
+        return await BehaviorProgramLoader.ExecuteAsync(
+            new LegacyBehaviorExecutionRequest(
+                request.Metadata,
+                revision.AssemblyBytes,
+                revision.ArtifactHash,
+                request.TriggerTypeName,
+                request.TriggerJson,
+                request.Capabilities,
+                request.Time),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private DeployedRevision EnsureActiveDeployedRevision(OwnerId owner, BehaviorId behavior, string artifactHash)
+    {
+        var behaviorKey = BehaviorKey(owner, behavior);
         if (!_active.TryGetValue(behaviorKey, out var activeHash)
-            || !string.Equals(activeHash, command.ArtifactHash, StringComparison.Ordinal))
+            || !string.Equals(activeHash, artifactHash, StringComparison.Ordinal))
         {
             throw new BehaviorHostException("revision-not-active");
         }
 
-        var revisionKey = RevisionKey(command.Metadata.Owner, command.Metadata.Behavior, command.ArtifactHash);
+        var revisionKey = RevisionKey(owner, behavior, artifactHash);
         if (!_deployed.TryGetValue(revisionKey, out var revision))
         {
             throw new BehaviorHostException("revision-not-deployed");
         }
 
         trust.Verify(revision.ArtifactHash, revision.Signature);
-
-        return await BehaviorProgramLoader.ExecuteAsync(
-            new BehaviorExecutionRequest(
-                command.Metadata,
-                revision.AssemblyBytes,
-                revision.ArtifactHash,
-                command.TriggerTypeName,
-                command.TriggerJson,
-                command.Capabilities,
-                command.Time),
-            cancellationToken).ConfigureAwait(false);
+        return revision;
     }
+
+    private static BehaviorCapabilityEdge[] DeriveResultBearingEdges(
+        OwnerId owner,
+        IReadOnlyList<BehaviorCapabilityGrant> grants)
+    {
+        ArgumentNullException.ThrowIfNull(grants);
+
+        var edges = new BehaviorCapabilityEdge[grants.Count];
+        for (var index = 0; index < grants.Count; index++)
+        {
+            var grant = grants[index];
+            if (string.IsNullOrWhiteSpace(grant.EmittedResultSynapseId)
+                || grant.EmittedResultSchemaVersion is null)
+            {
+                throw new BehaviorHostException("one-way-capability-not-supported");
+            }
+
+            edges[index] = new BehaviorCapabilityEdge(
+                new NeuronId(grant.TargetNeuronContractId, owner, grant.TargetInstanceName),
+                grant.AcceptedRequestSynapseId,
+                grant.AcceptedRequestSchemaVersion,
+                grant.EmittedResultSynapseId,
+                grant.EmittedResultSchemaVersion.Value);
+        }
+
+        return edges;
+    }
+
+    private static bool CapabilityMultisetsEqual(
+        IReadOnlyList<BehaviorCapabilityEdge> left,
+        BehaviorCapabilityEdge[] right)
+    {
+        if (left.Count != right.Length)
+        {
+            return false;
+        }
+
+        var remaining = new List<BehaviorCapabilityEdge>(right);
+        foreach (var edge in left)
+        {
+            var match = remaining.FindIndex(candidate => EdgesEqual(edge, candidate));
+            if (match < 0)
+            {
+                return false;
+            }
+
+            remaining.RemoveAt(match);
+        }
+
+        return remaining.Count == 0;
+    }
+
+    private static bool EdgesEqual(BehaviorCapabilityEdge left, BehaviorCapabilityEdge right)
+        => left.Target == right.Target
+            && string.Equals(left.RequestSynapseId, right.RequestSynapseId, StringComparison.Ordinal)
+            && left.RequestSchemaVersion == right.RequestSchemaVersion
+            && string.Equals(left.ResponseSynapseId, right.ResponseSynapseId, StringComparison.Ordinal)
+            && left.ResponseSchemaVersion == right.ResponseSchemaVersion;
 
     private static string BehaviorKey(OwnerId owner, BehaviorId behavior)
         => $"{owner.Value}\u001f{behavior.Value}";
