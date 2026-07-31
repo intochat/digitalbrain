@@ -10,7 +10,7 @@ public sealed class TasksVocabulary
         typeof(ITask).Namespace
         ?? throw new InvalidOperationException($"{nameof(ITask)} has no namespace.");
 
-    [Fact(DisplayName = "Tasks.Contracts public vocabulary is task/worker/attempt only — never AI or schedule types")]
+    [Fact(DisplayName = "Tasks.Contracts public vocabulary is task/worker/attempt/activation/operation surface — never AI or schedule types")]
     public void PublicVocabularyIsTaskWorkerAndAttemptSurfaceOnly()
     {
         var contracts = typeof(ITask).Assembly;
@@ -36,6 +36,7 @@ public sealed class TasksVocabulary
                 nameof(AttemptRequest),
                 nameof(AttemptSucceeded),
                 nameof(AttemptWaiting),
+                nameof(BehaviorTaskActivation),
                 nameof(BlockerId),
                 nameof(CancelTask),
                 nameof(DependencyPending),
@@ -46,13 +47,20 @@ public sealed class TasksVocabulary
                 nameof(IWorker),
                 nameof(InputRequired),
                 nameof(OutcomeUncertain),
+                nameof(PrepareTaskOperation),
+                nameof(ReadTaskOperation),
+                nameof(ReadTaskOperationResult),
                 nameof(Result),
                 nameof(RetryScheduled),
                 nameof(StartTask),
                 nameof(TaskBlocker),
+                nameof(TaskOperationEdge),
+                nameof(TaskOperationPhase),
+                nameof(TaskOperationSnapshot),
                 nameof(TaskPolicy),
                 nameof(TaskSnapshot),
                 nameof(TaskState),
+                nameof(TransitionTaskOperation),
             ],
             vocabulary);
 
