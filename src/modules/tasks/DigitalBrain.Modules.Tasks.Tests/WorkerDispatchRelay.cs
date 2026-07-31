@@ -52,6 +52,55 @@ public sealed class WorkerDispatchRelayTests(TasksFixture fixture)
         Assert.Equal(started.ActiveAttempt, running.ActiveAttempt);
     }
 
+    [Fact(DisplayName = "AttemptProgressed stages Continue via one-shot relay with exact cursor")]
+    public async Task AttemptProgressedStagesContinueThroughOneShotRelay()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var brain = await fixture.CreateBrainAsync(cancellationToken);
+        var worker = brain.Neuron<IWorker>("relay-continue-worker");
+        var task = brain.Neuron<ITask>("relay-continue-task");
+
+        var started = await task.Reference.Start(new StartTask(
+            CommandId.New(),
+            new ProgressGoal("relay-continue"),
+            worker.Id,
+            TaskFixtures.SingleAttempt));
+
+        _ = await task.Incoming.NextAsync<AttemptAccepted>(cancellationToken);
+        var progressed = await task.Incoming.NextAsync<AttemptProgressed>(cancellationToken);
+        Assert.Equal(started.ActiveAttempt, progressed.Synapse.Attempt);
+
+        var envelopes = await WaitForAsync(
+            () => task.Outgoing.ReadAsync<RelayWorkerContinue>(afterSequence: 0, cancellationToken),
+            list => list.Count > 0,
+            cancellationToken);
+        var envelope = Assert.Single(envelopes);
+        Assert.Equal(worker.Id, envelope.Synapse.Worker);
+        Assert.Equal(task.Id, envelope.Synapse.Cursor.Task);
+        Assert.Equal(worker.Id, envelope.Synapse.Cursor.Worker);
+        Assert.Equal(started.ActiveAttempt, envelope.Synapse.Cursor.Attempt);
+        Assert.Equal(started.Revision + 1, envelope.Synapse.Cursor.Revision);
+
+        Assert.Empty(await task.Outgoing.ReadAsync<DispatchWorkerContinue>(afterSequence: 0, cancellationToken));
+
+        var delivered = await WaitForAsync(
+            () => worker.Incoming.ReadAsync<DispatchWorkerContinue>(afterSequence: 0, cancellationToken),
+            list => list.Count > 0,
+            cancellationToken);
+        var observed = Assert.Single(delivered);
+        Assert.Equal(WorkerDispatchRelay.GrainTypeName, observed.Caller.Type);
+        Assert.Equal(envelope.Synapse.Cursor, observed.Synapse.Cursor);
+
+        var running = await WaitForStateAsync(task, TaskState.Running, cancellationToken);
+        Assert.Equal(started.ActiveAttempt, running.ActiveAttempt);
+        Assert.Equal(started.Revision + 1, running.Revision);
+        Assert.Null(running.Blocker);
+
+        var responsive = await task.Reference.Read().WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        Assert.Equal(TaskState.Running, responsive.State);
+        Assert.Equal(worker.Id, responsive.Worker);
+    }
+
     [Fact(DisplayName = "Cancel stages Cancel via one-shot relay with exact cursor payload")]
     public async Task CancelStagesThroughOneShotRelayWithExactCursor()
     {
@@ -94,6 +143,42 @@ public sealed class WorkerDispatchRelayTests(TasksFixture fixture)
         Assert.Equal(TaskState.Cancelled, terminal.State);
     }
 
+    [Fact(DisplayName =
+        "after Task stages relay Accept, ownership transfer leaves a single relay envelope even after dispatch-reminder horizon")]
+    public async Task AfterStagingOwnershipTransferDoesNotResendAcceptOnReminderHorizon()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var brain = await fixture.CreateBrainAsync(cancellationToken);
+        var worker = brain.Neuron<IWorker>("relay-ownership-worker");
+        var task = brain.Neuron<ITask>("relay-ownership-task");
+
+        await task.Reference.Start(new StartTask(
+            CommandId.New(),
+            new TestGoal("relay-ownership"),
+            worker.Id,
+            TaskFixtures.SingleAttempt));
+        _ = await task.Incoming.NextAsync<AttemptAccepted>(cancellationToken);
+        _ = await WaitForStateAsync(task, TaskState.Running, cancellationToken);
+
+        var first = await task.Outgoing
+            .ReadAsync<RelayWorkerAccept>(afterSequence: 0, cancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+        Assert.Single(first);
+
+        // Dispatch reminder period is 1 minute; PendingDispatch is already cleared after staging.
+        await brain.Clock.AdvanceAsync(TimeSpan.FromMinutes(2), cancellationToken);
+        await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+
+        var after = await task.Outgoing
+            .ReadAsync<RelayWorkerAccept>(afterSequence: 0, cancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+        Assert.Single(after);
+        Assert.Single(
+            await worker.Incoming
+                .ReadAsync<DispatchWorkerAccept>(afterSequence: 0, cancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
+    }
+
     [Fact(DisplayName = "idempotent Start receipt does not stage a second Accept dispatch")]
     public async Task IdempotentStartDoesNotStageSecondAcceptDispatch()
     {
@@ -131,6 +216,154 @@ public sealed class WorkerDispatchRelayTests(TasksFixture fixture)
             list => list.Count > 0,
             cancellationToken);
         Assert.Single(accepts);
+    }
+
+    [Fact(DisplayName = "idempotent Cancel receipt does not stage a second Cancel dispatch")]
+    public async Task IdempotentCancelDoesNotStageSecondCancelDispatch()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var brain = await fixture.CreateBrainAsync(cancellationToken);
+        var worker = brain.Neuron<IWorker>("relay-cancel-idemp-worker");
+        var task = brain.Neuron<ITask>("relay-cancel-idemp-task");
+
+        await task.Reference.Start(new StartTask(
+            CommandId.New(),
+            new TestGoal("relay-cancel-idemp"),
+            worker.Id,
+            TaskFixtures.SingleAttempt));
+        _ = await task.Incoming.NextAsync<AttemptAccepted>(cancellationToken);
+        var running = await WaitForStateAsync(task, TaskState.Running, cancellationToken);
+
+        var command = new CancelTask(CommandId.New(), running.Revision);
+        var first = await task.Reference.Cancel(command);
+        Assert.Equal(TaskState.Cancelling, first.State);
+
+        var envelopes = await WaitForAsync(
+            () => task.Outgoing.ReadAsync<RelayWorkerCancel>(afterSequence: 0, cancellationToken),
+            list => list.Count > 0,
+            cancellationToken);
+        Assert.Single(envelopes);
+
+        var repeated = await task.Reference.Cancel(command);
+        Assert.Equal(first.State, repeated.State);
+        Assert.Equal(first.Revision, repeated.Revision);
+
+        await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+        Assert.Single(
+            await task.Outgoing
+                .ReadAsync<RelayWorkerCancel>(afterSequence: 0, cancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
+
+        _ = await task.Incoming.NextAsync<AttemptCancelled>(cancellationToken);
+        _ = await WaitForStateAsync(task, TaskState.Cancelled, cancellationToken);
+    }
+
+    [Fact(DisplayName = "relay refuses foreign-owner Worker target without staging Worker Accept")]
+    public async Task RelayRefusesForeignOwnerWorkerWithoutStagingWorkerAccept()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var brain = await fixture.CreateBrainAsync(cancellationToken);
+        var worker = brain.Neuron<IWorker>("relay-refuse-worker");
+        var task = brain.Neuron<ITask>("relay-refuse-task");
+
+        var started = await task.Reference.Start(new StartTask(
+            CommandId.New(),
+            new TestGoal("relay-refuse"),
+            worker.Id,
+            TaskFixtures.SingleAttempt));
+        _ = await task.Incoming.NextAsync<AttemptAccepted>(cancellationToken);
+        _ = await WaitForStateAsync(task, TaskState.Running, cancellationToken);
+
+        var acceptsBefore = await worker.Incoming
+            .ReadAsync<DispatchWorkerAccept>(afterSequence: 0, cancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+        Assert.Single(acceptsBefore);
+
+        var foreignWorker = new NeuronId(
+            NeuronId.GrainTypeNameOf(typeof(IWorker)),
+            new OwnerId("foreign-relay-owner"),
+            "foreign-worker");
+        var relay = new NeuronId(
+            WorkerDispatchRelay.GrainTypeName,
+            task.Id.Owner,
+            Guid.NewGuid().ToString("N"));
+        await brain.Client
+            .SendAsync(
+                relay,
+                new RelayWorkerAccept(
+                    foreignWorker,
+                    new AttemptRequest(
+                        task.Id,
+                        foreignWorker,
+                        started.ActiveAttempt!.Value,
+                        started.Revision,
+                        new TestGoal("relay-refuse"))),
+                cancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+        await Task.Delay(TimeSpan.FromMilliseconds(300), cancellationToken);
+        var acceptsAfter = await worker.Incoming
+            .ReadAsync<DispatchWorkerAccept>(afterSequence: 0, cancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+        Assert.Single(acceptsAfter);
+
+        var stillRunning = await task.Reference.Read().WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        Assert.Equal(TaskState.Running, stillRunning.State);
+    }
+
+    [Fact(DisplayName = "relay refuses embedded Worker/Task mismatch without staging Worker Accept")]
+    public async Task RelayRefusesWorkerTaskMismatchWithoutStagingWorkerAccept()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var brain = await fixture.CreateBrainAsync(cancellationToken);
+        var worker = brain.Neuron<IWorker>("relay-mismatch-worker");
+        var otherWorker = brain.Neuron<IWorker>("relay-mismatch-other-worker");
+        var task = brain.Neuron<ITask>("relay-mismatch-task");
+
+        var started = await task.Reference.Start(new StartTask(
+            CommandId.New(),
+            new TestGoal("relay-mismatch"),
+            worker.Id,
+            TaskFixtures.SingleAttempt));
+        _ = await task.Incoming.NextAsync<AttemptAccepted>(cancellationToken);
+        _ = await WaitForStateAsync(task, TaskState.Running, cancellationToken);
+
+        var acceptsBefore = await worker.Incoming
+            .ReadAsync<DispatchWorkerAccept>(afterSequence: 0, cancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+        Assert.Single(acceptsBefore);
+
+        var foreignTask = new NeuronId(
+            NeuronId.GrainTypeNameOf(typeof(ITask)),
+            new OwnerId("foreign-task-owner"),
+            "foreign-task");
+        var relay = new NeuronId(
+            WorkerDispatchRelay.GrainTypeName,
+            task.Id.Owner,
+            Guid.NewGuid().ToString("N"));
+        await brain.Client
+            .SendAsync(
+                relay,
+                new RelayWorkerAccept(
+                    worker.Id,
+                    new AttemptRequest(
+                        foreignTask,
+                        otherWorker.Id,
+                        started.ActiveAttempt!.Value,
+                        started.Revision,
+                        new TestGoal("relay-mismatch"))),
+                cancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+        await Task.Delay(TimeSpan.FromMilliseconds(300), cancellationToken);
+        Assert.Single(
+            await worker.Incoming
+                .ReadAsync<DispatchWorkerAccept>(afterSequence: 0, cancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
+        Assert.Empty(
+            await otherWorker.Incoming
+                .ReadAsync<DispatchWorkerAccept>(afterSequence: 0, cancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
     }
 
     [Fact(DisplayName = "internal worker-dispatch vocabulary is not exported from Tasks.Contracts")]

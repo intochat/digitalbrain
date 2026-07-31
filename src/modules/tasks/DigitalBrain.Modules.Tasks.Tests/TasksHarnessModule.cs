@@ -76,6 +76,16 @@ internal sealed class ScriptedWorker :
                         ]));
                 return;
 
+            case ProgressGoal:
+                await SendAsync(
+                    request.Task,
+                    new AttemptProgressed(
+                        request.Task,
+                        request.Worker,
+                        request.Attempt,
+                        request.Revision));
+                return;
+
             case StaleProbeGoal:
                 await SendAsync(
                     request.Task,

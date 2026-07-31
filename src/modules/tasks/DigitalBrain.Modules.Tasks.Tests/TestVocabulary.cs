@@ -24,6 +24,11 @@ public sealed record SuccessGoal(
     [property: Id(0)] string Label) : Goal;
 
 [GenerateSerializer]
+[Alias("tasks.tests.progress-goal")]
+public sealed record ProgressGoal(
+    [property: Id(0)] string Label) : Goal;
+
+[GenerateSerializer]
 [Alias("tasks.tests.result")]
 public sealed record TestResult(
     [property: Id(0)] string Label) : Result;

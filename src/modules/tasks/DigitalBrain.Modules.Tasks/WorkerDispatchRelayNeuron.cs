@@ -15,9 +15,10 @@ internal sealed class WorkerDispatchRelayNeuron :
         ArgumentNullException.ThrowIfNull(envelope);
         cancellationToken.ThrowIfCancellationRequested();
         ValidateWorker(envelope.Worker);
+        ValidateTask(envelope.Request.Task);
         if (envelope.Request.Worker != envelope.Worker)
         {
-            throw new InvalidOperationException("worker-mismatch");
+            throw new NeuronAuthorizationException("worker-mismatch");
         }
 
         return SendAsync(envelope.Worker, new DispatchWorkerAccept(envelope.Request));
@@ -28,9 +29,10 @@ internal sealed class WorkerDispatchRelayNeuron :
         ArgumentNullException.ThrowIfNull(envelope);
         cancellationToken.ThrowIfCancellationRequested();
         ValidateWorker(envelope.Worker);
+        ValidateTask(envelope.Cursor.Task);
         if (envelope.Cursor.Worker != envelope.Worker)
         {
-            throw new InvalidOperationException("worker-mismatch");
+            throw new NeuronAuthorizationException("worker-mismatch");
         }
 
         return SendAsync(envelope.Worker, new DispatchWorkerContinue(envelope.Cursor));
@@ -41,9 +43,10 @@ internal sealed class WorkerDispatchRelayNeuron :
         ArgumentNullException.ThrowIfNull(envelope);
         cancellationToken.ThrowIfCancellationRequested();
         ValidateWorker(envelope.Worker);
+        ValidateTask(envelope.Cursor.Task);
         if (envelope.Cursor.Worker != envelope.Worker)
         {
-            throw new InvalidOperationException("worker-mismatch");
+            throw new NeuronAuthorizationException("worker-mismatch");
         }
 
         return SendAsync(envelope.Worker, new DispatchWorkerCancel(envelope.Cursor));
@@ -55,7 +58,7 @@ internal sealed class WorkerDispatchRelayNeuron :
             || string.IsNullOrWhiteSpace(worker.Type)
             || string.IsNullOrWhiteSpace(worker.Name))
         {
-            throw new InvalidOperationException("invalid-worker-identity");
+            throw new NeuronAuthorizationException("invalid-worker-identity");
         }
 
         if (worker.Owner != Id.Owner)
@@ -69,7 +72,31 @@ internal sealed class WorkerDispatchRelayNeuron :
                 NeuronId.GrainTypeNameOf(typeof(IWorker)),
                 StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("invalid-worker-identity");
+            throw new NeuronAuthorizationException("invalid-worker-identity");
+        }
+    }
+
+    private void ValidateTask(NeuronId task)
+    {
+        if (task == default
+            || string.IsNullOrWhiteSpace(task.Type)
+            || string.IsNullOrWhiteSpace(task.Name))
+        {
+            throw new NeuronAuthorizationException("invalid-task-identity");
+        }
+
+        if (task.Owner != Id.Owner)
+        {
+            throw new NeuronAuthorizationException(
+                $"Relay '{Id}' cannot carry task '{task}' owned by '{task.Owner}'.");
+        }
+
+        if (!string.Equals(
+                task.Type,
+                NeuronId.GrainTypeNameOf(typeof(ITask)),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NeuronAuthorizationException("invalid-task-identity");
         }
     }
 }

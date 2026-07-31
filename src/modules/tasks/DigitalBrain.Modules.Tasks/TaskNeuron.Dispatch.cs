@@ -46,6 +46,10 @@ internal sealed partial class TaskNeuron
                 $"Task '{Id}' has an unsupported pending Worker dispatch '{pending.GetType().Name}'."),
         };
 
+        // Fresh one-shot relay identity per staging attempt. Sharing a deterministic relay would let a
+        // prior relay→Worker drain coexist with a new Task→relay delivery on the same activation and
+        // re-create Task↔Worker turn coupling through that hop. Lifecycle GC of idle relay activations
+        // is deferred; storage cost is the conscious tradeoff for the ABBA break.
         var relay = new NeuronId(
             WorkerDispatchRelay.GrainTypeName,
             Id.Owner,
@@ -53,6 +57,11 @@ internal sealed partial class TaskNeuron
 
         try
         {
+            // Ownership transfer: once Task durably stages Task→relay, PendingDispatch clears and the
+            // dispatch reminder unregisters. Downstream relay→Worker delivery (and any permanent refuse
+            // of a correct envelope) is owned by the durable outbox on the relay activation — Task does
+            // not re-stage a second relay for the same pending, which would duplicate Accept/Continue/Cancel.
+            // Correlated NACK of permanent Worker refusal back into Task state remains deferred this checkpoint.
             await SendAsync(relay, envelope);
         }
         catch (Exception)

@@ -180,33 +180,50 @@ public sealed class BehaviorWorkerAuthorityTests(BehaviorsFixture fixture)
         var cancel = task.Reference.Cancel(new CancelTask(CommandId.New(), preRace.Revision));
 
         await Task.WhenAny(prepare, cancel).WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
-        // Prepare may run to its 30s adapter bound when Cancel wins and no reply arrives.
-        await Task.WhenAll(SwallowFaults(prepare), SwallowFaults(cancel))
+        await Task.WhenAll(prepare.ContinueWith(static _ => { }, TaskScheduler.Default), cancel)
             .WaitAsync(TimeSpan.FromSeconds(40), cancellationToken);
 
-        Assert.True(prepare.IsCompleted);
-        Assert.True(cancel.IsCompleted);
+        Assert.True(cancel.IsCompletedSuccessfully);
+        var cancelSnapshot = await cancel;
+        Assert.Equal(TaskState.Cancelling, cancelSnapshot.State);
 
-        var postRace = await task.Reference.Read().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
-        Assert.NotEqual(default, postRace.Worker);
+        if (prepare.IsFaulted)
+        {
+            var failure = prepare.Exception?.GetBaseException();
+            var timeout = Assert.IsType<InvalidOperationException>(failure);
+            Assert.Equal("operation-timeout", timeout.Message);
+        }
+        else
+        {
+            Assert.True(prepare.IsCompletedSuccessfully);
+            var prepared = await prepare;
+            Assert.Equal(TaskOperationPhase.Prepared, prepared.Phase);
+        }
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+        TaskSnapshot postRace;
+        do
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            postRace = await task.Reference.Read().WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            if (postRace.State == TaskState.Cancelled)
+            {
+                break;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
+        }
+        while (DateTime.UtcNow < deadline);
+
+        Assert.Equal(TaskState.Cancelled, postRace.State);
         Assert.Equal(worker.Id, postRace.Worker);
 
-        // Both activations remain responsive after the opposing-turn race.
         var secondRead = await task.Reference.Read().WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        Assert.Equal(TaskState.Cancelled, secondRead.State);
         Assert.Equal(worker.Id, secondRead.Worker);
         _ = await worker.Incoming
             .ReadAsync<Synapse>(afterSequence: 0, cancellationToken)
             .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
-
-        static Task SwallowFaults(Task operation)
-            => operation.ContinueWith(
-                static completed =>
-                {
-                    _ = completed.Exception;
-                },
-                CancellationToken.None,
-                TaskContinuationOptions.ExecuteSynchronously,
-                TaskScheduler.Default);
     }
 
     [Fact(
