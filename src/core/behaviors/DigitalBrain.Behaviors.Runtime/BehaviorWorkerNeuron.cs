@@ -13,12 +13,9 @@ internal sealed class BehaviorWorkerNeuron :
     IBehaviorWorkerBroker,
     IHandle<DispatchWorkerAccept>,
     IHandle<DispatchWorkerContinue>,
-    IHandle<DispatchWorkerCancel>
+    IHandle<DispatchWorkerCancel>,
+    IHandle<CompleteHostedBehaviorExecution>
 {
-    private const string InProcessClosedOutcome =
-        "Hardened execution requires an isolated host/broker; in-process raw execution is closed.";
-    private const int FailureReasonMaxLength = 256;
-
     public async Task Accept(AttemptRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -34,70 +31,23 @@ internal sealed class BehaviorWorkerNeuron :
             request.Task,
             new AttemptAccepted(request.Task, request.Worker, request.Attempt, request.Revision));
 
-        var executor = ServiceProvider.GetRequiredService<IBehaviorExecutor>();
-        var time = TimeProvider;
-        var utcNow = time.GetUtcNow();
-        var execution = BehaviorExecutionId.New();
-        var capabilities = ToCapabilityEdges(goal.Capabilities);
-
-        BehaviorExecutionOutcome outcome;
-        try
-        {
-            outcome = await executor.ExecuteAsync(
-                new BehaviorExecutionRequest(
-                    new BehaviorExecutionMetadata(
-                        Id.Owner,
-                        goal.BehaviorId,
-                        goal.Revision,
-                        execution),
-                    ArtifactBytes: ReadOnlyMemory<byte>.Empty,
-                    goal.Revision.Value,
-                    request.Task,
-                    request.Attempt,
-                    goal.TriggerTypeName,
-                    goal.ProtectedPayload,
-                    capabilities,
-                    utcNow),
-                CancellationToken.None);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            // Never journal exception text — it may include trigger/provider content.
-            _ = exception;
-            outcome = new BehaviorExecutionOutcome(false, "behavior-execution-exception");
-        }
-
-        // In-process executor stays closed until Task 5; leave the attempt Running so reverse-broker
-        // operation tests retain an active attempt without hosted product configuration.
-        if (!outcome.Succeeded
-            && string.Equals(outcome.Outcome, InProcessClosedOutcome, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        if (outcome.Succeeded)
-        {
-            await SendAsync(
-                request.Task,
-                new AttemptSucceeded(
-                    request.Task,
-                    request.Worker,
-                    request.Attempt,
-                    request.Revision,
-                    new BehaviorTaskResult(Redact(outcome.Outcome)),
-                    Evidence: []));
-            return;
-        }
-
+        // Stage hosted work on a one-shot relay so this Worker turn ends before reverse-broker
+        // StageDispatch re-enters the same non-reentrant grain. Terminal completion returns via
+        // CompleteHostedBehaviorExecution on a later serialized turn.
+        // Cancel→CTS linkage for in-flight host execution is deferred to Task 4 (Stop wiring);
+        // Cancel still emits AttemptCancelled on its own turn, and late terminals are idempotent.
+        var relay = new NeuronId(
+            BehaviorExecutionRelay.GrainTypeName,
+            Id.Owner,
+            Guid.NewGuid().ToString("N"));
         await SendAsync(
-            request.Task,
-            new AttemptFailed(
-                request.Task,
-                request.Worker,
-                request.Attempt,
-                request.Revision,
-                new BehaviorTaskFailure("behavior-execution-failed"),
-                Retryable: false));
+            relay,
+            new RelayHostedBehaviorExecution(
+                Id,
+                request,
+                BehaviorExecutionId.New(),
+                TimeProvider.GetUtcNow()));
+        _ = goal;
     }
 
     public Task Continue(AttemptCursor cursor)
@@ -136,6 +86,64 @@ internal sealed class BehaviorWorkerNeuron :
         ArgumentNullException.ThrowIfNull(command);
         cancellationToken.ThrowIfCancellationRequested();
         return Cancel(command.Cursor);
+    }
+
+    public async Task HandleAsync(CompleteHostedBehaviorExecution completion, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(completion);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var request = completion.Attempt;
+        RequireSelf(request.Worker, request.Task);
+
+        if (BehaviorExecutionCodes.IsInProcessClosed(completion.StableCode))
+        {
+            // In-process executor stays closed until Task 5; leave the attempt Running so reverse-broker
+            // operation tests retain an active attempt without hosted product configuration.
+            return;
+        }
+
+        var stableCode = BehaviorExecutionCodes.MapHostFailure(completion.StableCode);
+        if (completion.Succeeded)
+        {
+            await SendAsync(
+                request.Task,
+                new AttemptSucceeded(
+                    request.Task,
+                    request.Worker,
+                    request.Attempt,
+                    request.Revision,
+                    new BehaviorTaskResult(BehaviorExecutionCodes.Succeeded),
+                    Evidence: []));
+            return;
+        }
+
+        // Execution-path cancellation is a stable bounded failure code (not free-form text).
+        // Product Cancel still uses AttemptCancelled via Cancel(). Linking Cancel→host CTS is Task 4.
+        if (completion.Cancelled
+            || string.Equals(stableCode, BehaviorExecutionCodes.Cancelled, StringComparison.Ordinal))
+        {
+            await SendAsync(
+                request.Task,
+                new AttemptFailed(
+                    request.Task,
+                    request.Worker,
+                    request.Attempt,
+                    request.Revision,
+                    new BehaviorTaskFailure(BehaviorExecutionCodes.Cancelled),
+                    Retryable: false));
+            return;
+        }
+
+        await SendAsync(
+            request.Task,
+            new AttemptFailed(
+                request.Task,
+                request.Worker,
+                request.Attempt,
+                request.Revision,
+                new BehaviorTaskFailure(stableCode),
+                Retryable: false));
     }
 
     public async Task<WorkerOperationReceipt> StagePrepare(
@@ -243,40 +251,6 @@ internal sealed class BehaviorWorkerNeuron :
         cancellationToken.ThrowIfCancellationRequested();
         var delivery = await SendAsync(resolved.DeliveryTarget, requestSynapse);
         return new WorkerOperationReceipt(delivery.CorrelationId, Id, task);
-    }
-
-    private static BehaviorCapabilityEdge[] ToCapabilityEdges(IReadOnlyList<TaskOperationEdge> edges)
-    {
-        ArgumentNullException.ThrowIfNull(edges);
-        var result = new BehaviorCapabilityEdge[edges.Count];
-        for (var index = 0; index < edges.Count; index++)
-        {
-            var edge = edges[index];
-            result[index] = new BehaviorCapabilityEdge(
-                edge.Target,
-                edge.RequestSynapseId,
-                edge.RequestSchemaVersion,
-                edge.ResponseSynapseId,
-                edge.ResponseSchemaVersion);
-        }
-
-        return result;
-    }
-
-    private static string Redact(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return "execution-failed";
-        }
-
-        var trimmed = value.Trim();
-        if (trimmed.Length <= FailureReasonMaxLength)
-        {
-            return trimmed;
-        }
-
-        return trimmed[..FailureReasonMaxLength];
     }
 
     private void RequireStageTaskIdentity(NeuronId task)

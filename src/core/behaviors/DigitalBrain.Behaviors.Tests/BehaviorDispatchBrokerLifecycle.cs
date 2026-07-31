@@ -78,7 +78,7 @@ public sealed class BehaviorDispatchBrokerLifecycle(BehaviorDispatchFixture fixt
             DispatchHarness.ResponseContractId,
             1);
 
-        var brokerClient = new HttpBehaviorHostBrokerClient(http, task.Id.Owner, task.Id, attempt);
+        var brokerClient = new HttpBehaviorHostBrokerClient(http, task.Id.Owner, task.Id, attempt, worker.Id);
         var requestBytes = BehaviorPayloadJson.Serialize(
             new DispatchProbeRequest(probeText),
             typeof(DispatchProbeRequest));

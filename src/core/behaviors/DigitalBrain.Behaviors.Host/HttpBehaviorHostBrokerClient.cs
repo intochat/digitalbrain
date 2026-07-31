@@ -14,18 +14,21 @@ internal sealed class HttpBehaviorHostBrokerClient : IBehaviorHostBrokerClient
     private readonly OwnerId owner;
     private readonly NeuronId task;
     private readonly AttemptId attempt;
+    private readonly NeuronId worker;
 
     public HttpBehaviorHostBrokerClient(
         HttpClient httpClient,
         OwnerId owner,
         NeuronId task,
-        AttemptId attempt)
+        AttemptId attempt,
+        NeuronId worker)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         this.httpClient = httpClient;
         this.owner = owner;
         this.task = task;
         this.attempt = attempt;
+        this.worker = worker;
     }
 
     public async ValueTask<ProtectedPayloadReference> StorePayloadAsync(
@@ -102,6 +105,10 @@ internal sealed class HttpBehaviorHostBrokerClient : IBehaviorHostBrokerClient
                 TaskType = this.task.Type,
                 TaskOwner = this.task.Owner.Value,
                 TaskName = this.task.Name,
+                Attempt = FormatGuid(this.attempt.Value),
+                WorkerType = this.worker.Type,
+                WorkerOwner = this.worker.Owner.Value,
+                WorkerName = this.worker.Name,
                 Behavior = behavior.Value,
                 Revision = revision.Value,
                 CaseId = caseId,
@@ -507,6 +514,10 @@ internal sealed class HttpBehaviorHostBrokerClient : IBehaviorHostBrokerClient
         public string TaskType { get; set; } = "";
         public string TaskOwner { get; set; } = "";
         public string TaskName { get; set; } = "";
+        public string Attempt { get; set; } = "";
+        public string WorkerType { get; set; } = "";
+        public string WorkerOwner { get; set; } = "";
+        public string WorkerName { get; set; } = "";
         public string Behavior { get; set; } = "";
         public string Revision { get; set; } = "";
         public string CaseId { get; set; } = "";

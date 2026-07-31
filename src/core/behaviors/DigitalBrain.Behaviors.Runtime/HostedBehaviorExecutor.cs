@@ -16,7 +16,8 @@ internal sealed class HostedBehaviorExecutor(IBehaviorHostGateway host) : IBehav
                 request.TriggerTypeName,
                 request.TriggerPayload,
                 request.Capabilities,
-                request.UtcNow),
+                request.UtcNow,
+                request.Worker),
             cancellationToken);
     }
 

@@ -77,8 +77,8 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
     [Fact(
         Timeout = 300_000,
         DisplayName =
-            "TestingAppHost boots BehaviorHost Healthy and executes one signed approved revision end-to-end")]
-    public async Task BehaviorHostIsHealthyAndExecutesSignedRevision()
+            "TestingAppHost boots BehaviorHost Healthy, deploys signed revision, and execute without silo activation authority fails closed")]
+    public async Task BehaviorHostIsHealthyAndExecuteRequiresSiloActivationAuthority()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var host = await fixture.StartAsync(cancellationToken);
@@ -95,26 +95,17 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
             cancellationToken);
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
 
+        // Trigger store is silo-side grain custody only (no reverse-broker HTTP store).
+        // Seeded hosted success is covered by Behaviors.Tests grain + host harness.
         var sample = await DeployAndActivateSignedSampleAsync(behaviorHost, cancellationToken);
-        using var siloClient = silo.CreateHttpClient();
-        siloClient.Timeout = TimeSpan.FromMinutes(5);
         using var client = behaviorHost.CreateHttpClient();
         client.Timeout = TimeSpan.FromMinutes(5);
 
         var owner = new OwnerId(SurfaceOwner);
         var task = NeuronId.For<ITask>(owner, SurfaceTaskName);
+        var worker = NeuronId.For<IWorker>(owner, "l2-surface-worker");
         var attempt = new AttemptId(Guid.NewGuid());
         var execution = BehaviorExecutionId.New();
-        var triggerBytes = Encoding.UTF8.GetBytes("""{"Label":"l2"}""");
-
-        var stored = await StoreActivationTriggerAsync(
-            siloClient,
-            SurfaceOwner,
-            task,
-            sample.Digest,
-            sample.CaseId,
-            triggerBytes,
-            cancellationToken);
 
         using var execute = await client.PostAsJsonAsync(
             "v1/behaviors/execute",
@@ -130,17 +121,26 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
                 taskOwner = SurfaceOwner,
                 taskName = SurfaceTaskName,
                 attempt = attempt.Value.ToString("N"),
-                triggerPayloadId = stored.Id,
-                triggerPayloadExpiresAt = stored.ExpiresAt,
+                workerType = worker.Type,
+                workerOwner = SurfaceOwner,
+                workerName = worker.Name,
+                triggerPayloadId = Guid.NewGuid().ToString("N"),
+                triggerPayloadExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
                 capabilities = Array.Empty<object>(),
                 utcNow = DateTimeOffset.UtcNow,
             },
             cancellationToken);
-        Assert.True(execute.IsSuccessStatusCode, await execute.Content.ReadAsStringAsync(cancellationToken));
-        var outcome = await execute.Content.ReadFromJsonAsync<ExecuteResponse>(cancellationToken: cancellationToken);
-        Assert.NotNull(outcome);
-        Assert.True(outcome.Succeeded, outcome.Outcome);
-        Assert.Equal("executed", outcome.Outcome);
+        Assert.Equal(HttpStatusCode.BadRequest, execute.StatusCode);
+        var body = (await execute.Content.ReadAsStringAsync(cancellationToken)).Trim();
+        Assert.False(string.IsNullOrWhiteSpace(body));
+        Assert.DoesNotContain("secret", body, StringComparison.OrdinalIgnoreCase);
+        Assert.True(
+            body is BehaviorExecutionCodes.TriggerUnauthorized
+                or BehaviorExecutionCodes.TriggerMissing
+                or "task-not-started"
+                or "behavior-trigger-unauthorized"
+                or "behavior-trigger-missing",
+            $"unexpected execute failure '{body}'");
     }
 
     [Fact(
@@ -415,44 +415,6 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
             cancellationToken: cancellationToken);
         Assert.NotNull(loaded);
         Assert.Equal(triggerBytes, Convert.FromBase64String(loaded.ContentBase64));
-    }
-
-    private static async Task<StoredPayloadResponse> StoreActivationTriggerAsync(
-        HttpClient client,
-        string owner,
-        NeuronId task,
-        BehaviorArtifactDigest revision,
-        string caseId,
-        byte[] triggerBytes,
-        CancellationToken cancellationToken)
-    {
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            "v1/behaviors/broker/triggers/store")
-        {
-            Content = JsonContent.Create(new
-            {
-                owner,
-                taskType = task.Type,
-                taskOwner = owner,
-                taskName = task.Name,
-                behavior = "com.digitalbrain.sample",
-                revision = revision.Value,
-                caseId,
-                contentBase64 = Convert.ToBase64String(triggerBytes),
-            }),
-        };
-        request.Headers.TryAddWithoutValidation(
-            BehaviorBrokerContract.CredentialHeaderName,
-            TestingAppHostFixture.BrokerCredential);
-
-        using var store = await client.SendAsync(request, cancellationToken);
-        Assert.True(store.IsSuccessStatusCode, await store.Content.ReadAsStringAsync(cancellationToken));
-        var stored = await store.Content.ReadFromJsonAsync<StoredPayloadResponse>(
-            cancellationToken: cancellationToken);
-        Assert.NotNull(stored);
-        Assert.False(string.IsNullOrWhiteSpace(stored.Id));
-        return stored;
     }
 
     private static async Task<StoredPayloadResponse> StoreOperationPayloadAsync(

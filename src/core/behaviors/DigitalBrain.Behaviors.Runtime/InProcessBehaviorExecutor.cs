@@ -17,7 +17,7 @@ internal sealed class InProcessBehaviorExecutor : IBehaviorExecutor
         return ValueTask.FromResult(
             new BehaviorExecutionOutcome(
                 false,
-                "Hardened execution requires an isolated host/broker; in-process raw execution is closed."));
+                BehaviorExecutionCodes.InProcessClosed));
     }
 
     [SuppressMessage(

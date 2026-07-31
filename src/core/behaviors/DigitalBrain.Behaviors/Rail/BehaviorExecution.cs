@@ -12,7 +12,8 @@ public sealed record BehaviorExecutionRequest(
     string TriggerTypeName,
     ProtectedPayloadReference TriggerPayload,
     IReadOnlyList<BehaviorCapabilityEdge> Capabilities,
-    DateTimeOffset UtcNow);
+    DateTimeOffset UtcNow,
+    NeuronId Worker = default);
 
 public sealed record LegacyBehaviorExecutionRequest(
     BehaviorExecutionMetadata Metadata,

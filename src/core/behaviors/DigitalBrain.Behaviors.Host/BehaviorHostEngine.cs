@@ -148,20 +148,44 @@ public sealed class BehaviorHostEngine : IBehaviorHostGateway
 
         if (brokerFactory is null)
         {
-            throw new BehaviorHostException("protected-trigger-broker-not-configured");
+            throw new BehaviorHostException(BehaviorExecutionCodes.HostNotConfigured);
+        }
+
+        if (command.Worker == default
+            || command.Worker.Owner != command.Metadata.Owner
+            || !string.Equals(
+                command.Worker.Type,
+                NeuronId.GrainTypeNameOf(typeof(IWorker)),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new BehaviorHostException(BehaviorExecutionCodes.TriggerUnauthorized);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var client = brokerFactory.Create(command.Metadata.Owner, command.Task, command.Attempt);
-        var triggerCase = ResolveTriggerCase(envelope.Manifest.EntryPoints.Contract, command.TriggerTypeName);
-        var triggerBytes = await client.LoadTriggerAsync(
+        var client = brokerFactory.Create(
             command.Metadata.Owner,
             command.Task,
-            command.Metadata.Behavior,
-            command.Metadata.Revision,
-            triggerCase.CaseId,
-            command.TriggerPayload,
-            cancellationToken).ConfigureAwait(false);
+            command.Attempt,
+            command.Worker);
+        var triggerCase = ResolveTriggerCase(envelope.Manifest.EntryPoints.Contract, command.TriggerTypeName);
+        ReadOnlyMemory<byte> triggerBytes;
+        try
+        {
+            triggerBytes = await client.LoadTriggerAsync(
+                command.Metadata.Owner,
+                command.Task,
+                command.Metadata.Behavior,
+                command.Metadata.Revision,
+                triggerCase.CaseId,
+                command.TriggerPayload,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (BehaviorHostException exception)
+        {
+            throw new BehaviorHostException(
+                BehaviorExecutionCodes.MapHostFailure(exception.Reason),
+                exception);
+        }
 
         cancellationToken.ThrowIfCancellationRequested();
         var broker = new HostBehaviorSynapseBroker(

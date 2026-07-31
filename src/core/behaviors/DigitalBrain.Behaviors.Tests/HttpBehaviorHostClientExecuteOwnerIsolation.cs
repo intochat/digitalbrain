@@ -13,6 +13,7 @@ public sealed class HttpBehaviorHostClientExecuteOwnerIsolation
     private static readonly OwnerId TaskOwner = new("owner-task");
     private static readonly BehaviorId Behavior = new("com.digitalbrain.execute-owner");
     private static readonly NeuronId TaskNeuron = NeuronId.For<ITask>(TaskOwner, "execute-task");
+    private static readonly NeuronId WorkerNeuron = NeuronId.For<IWorker>(MetadataOwner, "execute-worker");
     private static readonly AttemptId Attempt = new(Guid.Parse("11111111111111111111111111111111"));
     private static readonly BehaviorExecutionId Execution =
         new(Guid.Parse("22222222222222222222222222222222"));
@@ -54,7 +55,8 @@ public sealed class HttpBehaviorHostClientExecuteOwnerIsolation
                 "SampleTrigger",
                 TriggerPayload,
                 Capabilities: [],
-                new DateTimeOffset(2026, 7, 31, 12, 0, 0, TimeSpan.Zero)),
+                new DateTimeOffset(2026, 7, 31, 12, 0, 0, TimeSpan.Zero),
+                WorkerNeuron),
             TestContext.Current.CancellationToken);
 
         Assert.True(outcome.Succeeded, outcome.Outcome);

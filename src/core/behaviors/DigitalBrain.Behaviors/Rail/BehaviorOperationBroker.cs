@@ -54,7 +54,7 @@ internal interface IBehaviorHostBrokerClient : ITaskOperationClient, IBehaviorOp
 
 internal interface IBehaviorHostBrokerClientFactory
 {
-    IBehaviorHostBrokerClient Create(OwnerId owner, NeuronId task, AttemptId attempt);
+    IBehaviorHostBrokerClient Create(OwnerId owner, NeuronId task, AttemptId attempt, NeuronId worker);
 }
 
 internal sealed class TaskOwnedOperationHistory

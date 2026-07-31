@@ -19,6 +19,7 @@ public sealed class HttpBehaviorHostBrokerClientTests
     private static readonly OwnerId BoundOwner = new("owner-bound");
     private static readonly NeuronId BoundTask = NeuronId.For<ITask>(BoundOwner, "broker-task");
     private static readonly AttemptId BoundAttempt = new(Guid.Parse("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    private static readonly NeuronId BoundWorker = NeuronId.For<IWorker>(BoundOwner, "broker-worker");
     private static readonly NeuronId CapabilityTarget = NeuronId.For<ITask>(BoundOwner, "capability-target");
     private const string RequestSynapseId = "request-synapse";
     private const string ResponseSynapseId = "response-synapse";
@@ -55,7 +56,7 @@ public sealed class HttpBehaviorHostBrokerClientTests
         });
 
         var factory = CreateFactory(handler);
-        var client = factory.Create(BoundOwner, BoundTask, BoundAttempt);
+        var client = factory.Create(BoundOwner, BoundTask, BoundAttempt, BoundWorker);
 
         var stored = await client.StorePayloadAsync(
             BoundOwner,
@@ -136,7 +137,7 @@ public sealed class HttpBehaviorHostBrokerClientTests
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
-        var client = CreateFactory(handler).Create(BoundOwner, BoundTask, BoundAttempt);
+        var client = CreateFactory(handler).Create(BoundOwner, BoundTask, BoundAttempt, BoundWorker);
 
         var prepared = await client.PrepareAsync(
             new PrepareTaskOperation(BoundAttempt, Sequence: 7, edge, requestRef),
@@ -203,7 +204,7 @@ public sealed class HttpBehaviorHostBrokerClientTests
             });
         });
 
-        var client = CreateFactory(handler).Create(BoundOwner, BoundTask, BoundAttempt);
+        var client = CreateFactory(handler).Create(BoundOwner, BoundTask, BoundAttempt, BoundWorker);
 
         var dispatched = await client.DispatchAsync(edge, requestPayload, CancellationToken.None);
 
@@ -223,7 +224,7 @@ public sealed class HttpBehaviorHostBrokerClientTests
         using var handler = new RecordingHttpMessageHandler(_ =>
             throw new InvalidOperationException("HTTP must not be reached for identity misuse."));
 
-        var client = CreateFactory(handler).Create(BoundOwner, BoundTask, BoundAttempt);
+        var client = CreateFactory(handler).Create(BoundOwner, BoundTask, BoundAttempt, BoundWorker);
         var otherOwner = new OwnerId("owner-other");
         var otherTask = NeuronId.For<ITask>(BoundOwner, "other-task");
         var otherAttempt = new AttemptId(Guid.Parse("11111111111111111111111111111111"));

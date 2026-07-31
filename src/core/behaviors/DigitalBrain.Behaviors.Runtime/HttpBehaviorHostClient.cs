@@ -82,7 +82,10 @@ internal sealed class HttpBehaviorHostClient(HttpClient http) : IBehaviorHostGat
                         edge.ResponseSynapseId,
                         edge.ResponseSchemaVersion))
                     .ToArray(),
-                command.UtcNow),
+                command.UtcNow,
+                command.Worker.Type,
+                command.Worker.Owner.Value,
+                command.Worker.Name),
             JsonOptions,
             cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
@@ -139,7 +142,10 @@ internal sealed class HttpBehaviorHostClient(HttpClient http) : IBehaviorHostGat
         string TriggerPayloadId,
         DateTimeOffset? TriggerPayloadExpiresAt,
         CapabilityEdgeBody[] Capabilities,
-        DateTimeOffset UtcNow);
+        DateTimeOffset UtcNow,
+        string WorkerType,
+        string WorkerOwner,
+        string WorkerName);
 
     private sealed record CapabilityEdgeBody(
         string TargetType,

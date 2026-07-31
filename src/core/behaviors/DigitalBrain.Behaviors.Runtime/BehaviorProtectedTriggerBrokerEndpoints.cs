@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -12,89 +13,27 @@ public static class BehaviorProtectedTriggerBrokerEndpoints
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
-        endpoints.MapPost("/v1/behaviors/broker/triggers/store", StoreAsync);
         endpoints.MapPost("/v1/behaviors/broker/triggers/load", LoadAsync);
         return endpoints;
-    }
-
-    private static async Task<IResult> StoreAsync(
-        StoreTriggerRequest body,
-        IBehaviorProtectedTriggerAccess access,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        ArgumentNullException.ThrowIfNull(access);
-
-        try
-        {
-            var identity = RequireIdentity(body);
-
-            if (string.IsNullOrWhiteSpace(body.ContentBase64))
-            {
-                return Failure("empty-payload");
-            }
-
-            byte[] plaintext;
-            try
-            {
-                plaintext = Convert.FromBase64String(body.ContentBase64);
-            }
-            catch (FormatException)
-            {
-                return Failure("invalid-payload-content");
-            }
-
-            if (plaintext.Length == 0)
-            {
-                return Failure("empty-payload");
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            var reference = await access
-                .StoreAsync(
-                    identity.Owner,
-                    identity.Task,
-                    identity.Behavior,
-                    identity.Revision,
-                    identity.CaseId,
-                    plaintext,
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-            return Results.Ok(new ProtectedReferenceResponse(
-                reference.Id.ToString("N"),
-                reference.ExpiresAt));
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (ArgumentException exception)
-        {
-            return Failure(MapArgumentReason(exception));
-        }
-        catch (InvalidOperationException exception) when (IsStableReason(exception.Message))
-        {
-            return Failure(exception.Message);
-        }
-        catch (CryptographicException)
-        {
-            return Failure("invalid-protected-reference");
-        }
     }
 
     private static async Task<IResult> LoadAsync(
         LoadTriggerRequest body,
         IBehaviorProtectedTriggerAccess access,
+        IGrainFactory grains,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(access);
+        ArgumentNullException.ThrowIfNull(grains);
 
         try
         {
             var identity = RequireIdentity(body);
             var reference = RequireReference(body.Reference);
+
+            cancellationToken.ThrowIfCancellationRequested();
+            await RequireActiveTaskAuthorityAsync(grains, identity, cancellationToken).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
             var plaintext = await access
@@ -110,7 +49,7 @@ public static class BehaviorProtectedTriggerBrokerEndpoints
 
             if (plaintext.IsEmpty)
             {
-                return Failure("invalid-payload-content");
+                return Failure(BehaviorExecutionCodes.TriggerMissing);
             }
 
             return Results.Ok(new LoadTriggerResponse(Convert.ToBase64String(plaintext.Span)));
@@ -125,15 +64,46 @@ public static class BehaviorProtectedTriggerBrokerEndpoints
         }
         catch (InvalidOperationException exception) when (IsStableReason(exception.Message))
         {
-            return Failure(exception.Message);
+            return Failure(BehaviorExecutionCodes.MapHostFailure(exception.Message));
         }
         catch (CryptographicException)
         {
-            return Failure("invalid-protected-reference");
+            return Failure(BehaviorExecutionCodes.TriggerMissing);
         }
     }
 
-    private static BoundTriggerIdentity RequireIdentity(ITriggerIdentityBody body)
+    private static async Task RequireActiveTaskAuthorityAsync(
+        IGrainFactory grains,
+        BoundTriggerIdentity identity,
+        CancellationToken cancellationToken)
+    {
+        var authority = grains.GetGrain<IBehaviorTaskAuthority>(
+            BehaviorTaskAuthority.ForOwner(identity.Owner).ToGrainId());
+        var snapshot = await authority
+            .ReadValidatedTask(identity.Task, identity.Attempt, requireActivation: true, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (snapshot.Worker != identity.Worker)
+        {
+            throw new InvalidOperationException("worker-mismatch");
+        }
+
+        if (snapshot.Activation is null)
+        {
+            throw new InvalidOperationException("activation-required");
+        }
+
+        var activation = snapshot.Activation;
+        if (activation.BehaviorId != identity.Behavior
+            || activation.Revision != identity.Revision
+            || !string.Equals(activation.CaseId, identity.CaseId, StringComparison.Ordinal)
+            || activation.ProtectedPayload.Id != identity.ReferenceId)
+        {
+            throw new InvalidOperationException("activation-mismatch");
+        }
+    }
+
+    private static BoundTriggerIdentity RequireIdentity(LoadTriggerRequest body)
     {
         if (string.IsNullOrWhiteSpace(body.Owner))
         {
@@ -166,19 +136,63 @@ public static class BehaviorProtectedTriggerBrokerEndpoints
             || string.IsNullOrWhiteSpace(body.TaskName)
             || string.IsNullOrWhiteSpace(body.Behavior)
             || string.IsNullOrWhiteSpace(body.Revision)
-            || string.IsNullOrWhiteSpace(body.CaseId))
+            || string.IsNullOrWhiteSpace(body.CaseId)
+            || string.IsNullOrWhiteSpace(body.Attempt)
+            || string.IsNullOrWhiteSpace(body.WorkerType)
+            || string.IsNullOrWhiteSpace(body.WorkerOwner)
+            || string.IsNullOrWhiteSpace(body.WorkerName))
         {
             throw new ArgumentException(paramName: null, message: "missing-task-identity");
         }
 
+        if (!Guid.TryParseExact(body.Attempt, "N", out var attemptValue) || attemptValue == Guid.Empty)
+        {
+            throw new ArgumentException(paramName: null, message: "invalid-attempt");
+        }
+
+        OwnerId workerOwner;
         try
         {
+            workerOwner = new OwnerId(body.WorkerOwner);
+        }
+        catch (ArgumentException)
+        {
+            throw new ArgumentException(paramName: null, message: "invalid-request");
+        }
+
+        if (workerOwner != owner)
+        {
+            throw new InvalidOperationException("worker-mismatch");
+        }
+
+        try
+        {
+            var task = new NeuronId(body.TaskType, taskOwner, body.TaskName);
+            var worker = new NeuronId(body.WorkerType, workerOwner, body.WorkerName);
+            if (!string.Equals(
+                    worker.Type,
+                    NeuronId.GrainTypeNameOf(typeof(IWorker)),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("worker-mismatch");
+            }
+
+            if (body.Reference is null || string.IsNullOrWhiteSpace(body.Reference.Id)
+                || !Guid.TryParseExact(body.Reference.Id, "N", out var referenceId)
+                || referenceId == Guid.Empty)
+            {
+                throw new ArgumentException(paramName: null, message: "invalid-protected-reference");
+            }
+
             return new BoundTriggerIdentity(
                 owner,
-                new NeuronId(body.TaskType, taskOwner, body.TaskName),
+                task,
+                worker,
+                new AttemptId(attemptValue),
                 new BehaviorId(body.Behavior),
                 new BehaviorRevisionId(body.Revision),
-                body.CaseId);
+                body.CaseId,
+                referenceId);
         }
         catch (ArgumentException)
         {
@@ -210,17 +224,12 @@ public static class BehaviorProtectedTriggerBrokerEndpoints
 
     private static string MapArgumentReason(ArgumentException exception)
     {
-        if (exception.ParamName is "plaintext")
-        {
-            return "empty-payload";
-        }
-
         if (IsStableReason(exception.Message))
         {
-            return exception.Message;
+            return BehaviorExecutionCodes.MapHostFailure(exception.Message);
         }
 
-        return "invalid-request";
+        return BehaviorExecutionCodes.TriggerUnauthorized;
     }
 
     private static bool IsStableReason(string? reason)
@@ -231,7 +240,14 @@ public static class BehaviorProtectedTriggerBrokerEndpoints
             or "empty-payload"
             or "invalid-payload-content"
             or "invalid-protected-reference"
-            or "invalid-request";
+            or "invalid-request"
+            or "invalid-attempt"
+            or "worker-mismatch"
+            or "attempt-mismatch"
+            or "activation-required"
+            or "activation-mismatch"
+            or "task-not-started"
+            or "invalid-task-identity";
 
     private static IResult Failure(string reason)
         => Results.Content(reason, "text/plain", statusCode: StatusCodes.Status400BadRequest);
@@ -239,39 +255,23 @@ public static class BehaviorProtectedTriggerBrokerEndpoints
     private sealed record BoundTriggerIdentity(
         OwnerId Owner,
         NeuronId Task,
+        NeuronId Worker,
+        AttemptId Attempt,
         BehaviorId Behavior,
         BehaviorRevisionId Revision,
-        string CaseId);
+        string CaseId,
+        Guid ReferenceId);
 
-    private interface ITriggerIdentityBody
-    {
-        string? Owner { get; }
-        string? TaskType { get; }
-        string? TaskOwner { get; }
-        string? TaskName { get; }
-        string? Behavior { get; }
-        string? Revision { get; }
-        string? CaseId { get; }
-    }
-
-    internal sealed class StoreTriggerRequest : ITriggerIdentityBody
+    internal sealed class LoadTriggerRequest
     {
         public string? Owner { get; set; }
         public string? TaskType { get; set; }
         public string? TaskOwner { get; set; }
         public string? TaskName { get; set; }
-        public string? Behavior { get; set; }
-        public string? Revision { get; set; }
-        public string? CaseId { get; set; }
-        public string? ContentBase64 { get; set; }
-    }
-
-    internal sealed class LoadTriggerRequest : ITriggerIdentityBody
-    {
-        public string? Owner { get; set; }
-        public string? TaskType { get; set; }
-        public string? TaskOwner { get; set; }
-        public string? TaskName { get; set; }
+        public string? Attempt { get; set; }
+        public string? WorkerType { get; set; }
+        public string? WorkerOwner { get; set; }
+        public string? WorkerName { get; set; }
         public string? Behavior { get; set; }
         public string? Revision { get; set; }
         public string? CaseId { get; set; }
@@ -283,8 +283,6 @@ public static class BehaviorProtectedTriggerBrokerEndpoints
         public string? Id { get; set; }
         public DateTimeOffset? ExpiresAt { get; set; }
     }
-
-    internal sealed record ProtectedReferenceResponse(string Id, DateTimeOffset? ExpiresAt);
 
     internal sealed record LoadTriggerResponse(string ContentBase64);
 }

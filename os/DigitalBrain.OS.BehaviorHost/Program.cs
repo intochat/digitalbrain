@@ -117,6 +117,19 @@ app.MapPost("/v1/behaviors/execute", async (
             throw new BehaviorHostException("invalid-trigger-payload");
         }
 
+        if (string.IsNullOrWhiteSpace(body.WorkerType)
+            || string.IsNullOrWhiteSpace(body.WorkerOwner)
+            || string.IsNullOrWhiteSpace(body.WorkerName))
+        {
+            throw new BehaviorHostException("missing-worker-identity");
+        }
+
+        var workerOwner = RequireOwner(body.WorkerOwner, "missing-worker-identity");
+        if (owner != workerOwner)
+        {
+            throw new BehaviorHostException("owner-task-mismatch");
+        }
+
         var outcome = await host.ExecuteAsync(
             new BehaviorHostExecuteCommand(
                 new BehaviorExecutionMetadata(
@@ -140,9 +153,13 @@ app.MapPost("/v1/behaviors/execute", async (
                         edge.ResponseId,
                         edge.ResponseVersion))
                     .ToArray(),
-                body.UtcNow),
+                body.UtcNow,
+                new NeuronId(body.WorkerType, workerOwner, body.WorkerName)),
             cancellationToken);
-        return Results.Ok(new ExecuteResponse(outcome.Succeeded, outcome.Outcome));
+        var code = outcome.Succeeded
+            ? BehaviorExecutionCodes.Succeeded
+            : BehaviorExecutionCodes.MapHostFailure(outcome.Outcome);
+        return Results.Ok(new ExecuteResponse(outcome.Succeeded, code));
     }
     catch (BehaviorHostException exception)
     {
@@ -186,7 +203,10 @@ internal sealed record ExecuteRequest(
     string TriggerPayloadId,
     DateTimeOffset? TriggerPayloadExpiresAt,
     CapabilityEdgeRequest[] Capabilities,
-    DateTimeOffset UtcNow);
+    DateTimeOffset UtcNow,
+    string? WorkerType = null,
+    string? WorkerOwner = null,
+    string? WorkerName = null);
 
 internal sealed record CapabilityEdgeRequest(
     string TargetType,
