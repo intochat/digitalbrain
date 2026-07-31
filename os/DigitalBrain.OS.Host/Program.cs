@@ -1,3 +1,4 @@
+using DigitalBrain.Behaviors;
 using DigitalBrain.Kernel;
 using DigitalBrain.ServiceDefaults;
 
@@ -12,4 +13,5 @@ builder.UseOrleans(silo => silo
 
 var app = builder.Build();
 app.MapDefaultEndpoints();
+app.MapBehaviorProtectedPayloadBroker();
 app.Run();

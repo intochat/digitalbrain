@@ -6,8 +6,9 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812;CA2007;NU1608</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" ExcludeAssets="analyzers" />
-    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Orleans.Journaling" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />

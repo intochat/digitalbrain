@@ -96,6 +96,8 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
 
         var digest = await DeployAndActivateSignedSampleAsync(behaviorHost, cancellationToken);
+        using var siloClient = silo.CreateHttpClient();
+        siloClient.Timeout = TimeSpan.FromMinutes(5);
         using var client = behaviorHost.CreateHttpClient();
         client.Timeout = TimeSpan.FromMinutes(5);
 
@@ -106,7 +108,7 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         var triggerBytes = Encoding.UTF8.GetBytes("""{"Label":"l2"}""");
 
         var stored = await StoreTriggerPayloadAsync(
-            client,
+            siloClient,
             SurfaceOwner,
             task,
             attempt,
@@ -158,13 +160,6 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         var owner = new OwnerId(SurfaceOwner);
         var task = NeuronId.For<ITask>(owner, SurfaceTaskName);
         var attempt = new AttemptId(Guid.NewGuid());
-        var stored = await StoreTriggerPayloadAsync(
-            client,
-            SurfaceOwner,
-            task,
-            attempt,
-            Encoding.UTF8.GetBytes("""{"Label":"l2"}"""),
-            cancellationToken);
 
         using var execute = await client.PostAsJsonAsync(
             "v1/behaviors/execute",
@@ -179,8 +174,8 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
                 taskType = task.Type,
                 taskName = SurfaceTaskName,
                 attempt = attempt.Value.ToString("N"),
-                triggerPayloadId = stored.Id,
-                triggerPayloadExpiresAt = stored.ExpiresAt,
+                triggerPayloadId = Guid.NewGuid().ToString("N"),
+                triggerPayloadExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
                 capabilities = Array.Empty<object>(),
                 utcNow = DateTimeOffset.UtcNow,
             },
@@ -209,13 +204,6 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         var owner = new OwnerId(SurfaceOwner);
         var task = NeuronId.For<ITask>(owner, SurfaceTaskName);
         var attempt = new AttemptId(Guid.NewGuid());
-        var stored = await StoreTriggerPayloadAsync(
-            client,
-            SurfaceOwner,
-            task,
-            attempt,
-            Encoding.UTF8.GetBytes("""{"Label":"l2"}"""),
-            cancellationToken);
 
         using var execute = await client.PostAsJsonAsync(
             "v1/behaviors/execute",
@@ -231,8 +219,8 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
                 taskOwner = ForeignOwner,
                 taskName = SurfaceTaskName,
                 attempt = attempt.Value.ToString("N"),
-                triggerPayloadId = stored.Id,
-                triggerPayloadExpiresAt = stored.ExpiresAt,
+                triggerPayloadId = Guid.NewGuid().ToString("N"),
+                triggerPayloadExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
                 capabilities = Array.Empty<object>(),
                 utcNow = DateTimeOffset.UtcNow,
             },
@@ -324,6 +312,51 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         return written.Digest;
     }
 
+    [Fact(
+        Timeout = 300_000,
+        DisplayName =
+            "Silo reverse broker store/load round-trips trigger payload without testing plaintext seed")]
+    public async Task SiloReverseBrokerPayloadRoundTrip()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var host = await fixture.StartAsync(cancellationToken);
+        var silo = host.Resource(TestingAppHostFixture.SiloResourceName);
+        await silo.WaitUntilHealthyAsync(cancellationToken);
+
+        using var client = silo.CreateHttpClient();
+        client.Timeout = TimeSpan.FromMinutes(5);
+        var owner = new OwnerId(SurfaceOwner);
+        var task = NeuronId.For<ITask>(owner, SurfaceTaskName);
+        var attempt = new AttemptId(Guid.NewGuid());
+        var triggerBytes = Encoding.UTF8.GetBytes("""{"Label":"l2-payload-roundtrip"}""");
+
+        var stored = await StoreTriggerPayloadAsync(
+            client,
+            SurfaceOwner,
+            task,
+            attempt,
+            triggerBytes,
+            cancellationToken);
+
+        using var load = await client.PostAsJsonAsync(
+            "v1/behaviors/broker/payloads/load",
+            new
+            {
+                owner = SurfaceOwner,
+                taskType = task.Type,
+                taskOwner = SurfaceOwner,
+                taskName = task.Name,
+                attempt = attempt.Value.ToString("N"),
+                reference = new { id = stored.Id, expiresAt = stored.ExpiresAt },
+            },
+            cancellationToken);
+        Assert.True(load.IsSuccessStatusCode, await load.Content.ReadAsStringAsync(cancellationToken));
+        var loaded = await load.Content.ReadFromJsonAsync<LoadPayloadResponse>(
+            cancellationToken: cancellationToken);
+        Assert.NotNull(loaded);
+        Assert.Equal(triggerBytes, Convert.FromBase64String(loaded.ContentBase64));
+    }
+
     private static async Task<StoredPayloadResponse> StoreTriggerPayloadAsync(
         HttpClient client,
         string owner,
@@ -333,7 +366,7 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         CancellationToken cancellationToken)
     {
         using var store = await client.PostAsJsonAsync(
-            "v1/behaviors/testing/in-process-payloads/store",
+            "v1/behaviors/broker/payloads/store",
             new
             {
                 owner,
@@ -351,6 +384,8 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         Assert.False(string.IsNullOrWhiteSpace(stored.Id));
         return stored;
     }
+
+    private sealed record LoadPayloadResponse(string ContentBase64);
 
     private sealed record StoredPayloadResponse(string Id, DateTimeOffset? ExpiresAt);
 

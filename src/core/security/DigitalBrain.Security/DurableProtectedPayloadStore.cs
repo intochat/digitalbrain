@@ -22,6 +22,8 @@ internal sealed class DurableProtectedPayloadStore(
 
     public async ValueTask<ProtectedPayloadReference> StoreAsync(
         OwnerId storeOwner,
+        NeuronId task,
+        Guid attempt,
         ReadOnlyMemory<byte> plaintext,
         TimeSpan lifetime,
         CancellationToken cancellationToken)
@@ -32,6 +34,8 @@ internal sealed class DurableProtectedPayloadStore(
         ArgumentNullException.ThrowIfNull(protector);
         ArgumentNullException.ThrowIfNull(time);
         RequireBoundOwner(storeOwner);
+        RequireTask(task);
+        RequireAttempt(attempt);
 
         if (plaintext.IsEmpty)
         {
@@ -62,14 +66,18 @@ internal sealed class DurableProtectedPayloadStore(
         var id = Guid.NewGuid();
         var protectedBytes = protector.Protect(purpose, plaintext.Span);
         var entries = ReadEntries();
-        entries[id] = new StoredEntry(expiresAt, protectedBytes);
+        entries[id] = new StoredEntry(
+            expiresAt,
+            protectedBytes,
+            task.Type,
+            task.Owner.Value,
+            task.Name,
+            attempt);
 
         var previous = state.Value;
-        byte[]? serialized = null;
         try
         {
-            serialized = JsonSerializer.SerializeToUtf8Bytes(entries, JsonOptions);
-            state.Value = serialized;
+            state.Value = JsonSerializer.SerializeToUtf8Bytes(entries, JsonOptions);
             await commit().ConfigureAwait(false);
         }
         catch
@@ -83,6 +91,8 @@ internal sealed class DurableProtectedPayloadStore(
 
     public ValueTask<ReadOnlyMemory<byte>> LoadAsync(
         OwnerId loadOwner,
+        NeuronId task,
+        Guid attempt,
         ProtectedPayloadReference reference,
         CancellationToken cancellationToken)
     {
@@ -91,6 +101,8 @@ internal sealed class DurableProtectedPayloadStore(
         ArgumentNullException.ThrowIfNull(protector);
         ArgumentNullException.ThrowIfNull(time);
         RequireBoundOwner(loadOwner);
+        RequireTask(task);
+        RequireAttempt(attempt);
 
         if (reference.Id == Guid.Empty)
         {
@@ -99,6 +111,14 @@ internal sealed class DurableProtectedPayloadStore(
 
         var entries = ReadEntries();
         if (!entries.TryGetValue(reference.Id, out var entry))
+        {
+            throw new CryptographicException("The protected payload reference is invalid.");
+        }
+
+        if (!string.Equals(entry.TaskType, task.Type, StringComparison.Ordinal)
+            || !string.Equals(entry.TaskOwner, task.Owner.Value, StringComparison.Ordinal)
+            || !string.Equals(entry.TaskName, task.Name, StringComparison.Ordinal)
+            || entry.Attempt != attempt)
         {
             throw new CryptographicException("The protected payload reference is invalid.");
         }
@@ -132,6 +152,25 @@ internal sealed class DurableProtectedPayloadStore(
         }
     }
 
+    private static void RequireTask(NeuronId task)
+    {
+        if (task == default
+            || string.IsNullOrWhiteSpace(task.Type)
+            || string.IsNullOrWhiteSpace(task.Name)
+            || task.Owner == default)
+        {
+            throw new ArgumentException("Task neuron id is required.", nameof(task));
+        }
+    }
+
+    private static void RequireAttempt(Guid attempt)
+    {
+        if (attempt == Guid.Empty)
+        {
+            throw new ArgumentException("Attempt id is required.", nameof(attempt));
+        }
+    }
+
     private Dictionary<Guid, StoredEntry> ReadEntries()
     {
         if (state.Value is not { Length: > 0 } bytes)
@@ -143,5 +182,11 @@ internal sealed class DurableProtectedPayloadStore(
         return entries ?? new Dictionary<Guid, StoredEntry>();
     }
 
-    private sealed record StoredEntry(DateTimeOffset ExpiresAt, byte[] ProtectedPayload);
+    private sealed record StoredEntry(
+        DateTimeOffset ExpiresAt,
+        byte[] ProtectedPayload,
+        string TaskType,
+        string TaskOwner,
+        string TaskName,
+        Guid Attempt);
 }

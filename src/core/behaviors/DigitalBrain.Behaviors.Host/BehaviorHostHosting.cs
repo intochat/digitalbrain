@@ -10,11 +10,6 @@ public static class BehaviorHostHosting
     public const string BrokerBaseAddressConfigurationKey = "DigitalBrain:Behaviors:Broker:BaseAddress";
     public const string BrokerHttpClientName = "DigitalBrain.Behaviors.Broker";
 
-    // Explicit TestingAppHost-only switch. Must never be set in product AppHost.
-    // Enables an unprotected in-process payload seed/broker for L2 until silo reverse-broker exists.
-    public const string TestingInProcessPayloadBrokerConfigurationKey =
-        "DigitalBrain:Behaviors:Broker:TestingInProcessPayloadBroker";
-
     public static IServiceCollection AddBehaviorHostEngine(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -41,11 +36,6 @@ public static class BehaviorHostHosting
             });
             services.TryAddSingleton<IBehaviorHostBrokerClientFactory, HttpBehaviorHostBrokerClientFactory>();
         }
-        else if (IsTestingInProcessPayloadBrokerEnabled(configuration))
-        {
-            services.TryAddSingleton<InMemoryBehaviorHostPayloadStore>();
-            services.TryAddSingleton<IBehaviorHostBrokerClientFactory, InMemoryBehaviorHostBrokerClientFactory>();
-        }
 
         services.TryAddSingleton(static provider =>
             new BehaviorHostEngine(
@@ -54,12 +44,5 @@ public static class BehaviorHostHosting
         services.TryAddSingleton<IBehaviorHostGateway>(static provider =>
             provider.GetRequiredService<BehaviorHostEngine>());
         return services;
-    }
-
-    public static bool IsTestingInProcessPayloadBrokerEnabled(IConfiguration configuration)
-    {
-        ArgumentNullException.ThrowIfNull(configuration);
-        var value = configuration[TestingInProcessPayloadBrokerConfigurationKey];
-        return bool.TryParse(value, out var enabled) && enabled;
     }
 }

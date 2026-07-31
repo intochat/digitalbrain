@@ -38,11 +38,15 @@ var silo = builder.AddProject<Projects.DigitalBrain_OS_Host>(ProductSurfaceResou
     .WithReference(brain)
     .WithEnvironment(
         BehaviorsModule.ExecutorConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
-        BehaviorsModule.HostExecutorName);
+        BehaviorsModule.HostExecutorName)
+    .WithHttpHealthCheck("/health");
 
 var behaviorHost = builder.AddProject<Projects.DigitalBrain_OS_BehaviorHost>(ProductSurfaceResources.BehaviorHost)
     .WithReference(brain.AsClient())
     .WithStateProtectionKey(brain)
+    .WithEnvironment(
+        BehaviorHostHosting.BrokerBaseAddressConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
+        silo.GetEndpoint("http"))
     .WithHttpHealthCheck("/health")
     .WaitFor(silo)
     .WithEnvironment(

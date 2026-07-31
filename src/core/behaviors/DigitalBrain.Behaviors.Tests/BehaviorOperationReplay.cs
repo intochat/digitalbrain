@@ -55,18 +55,29 @@ public sealed class BehaviorOperationReplay
         var plaintext = Encoding.UTF8.GetBytes("trigger-payload");
         var lifetime = TimeSpan.FromMinutes(15);
 
-        var reference = await store.StoreAsync(OwnerA, plaintext, lifetime, cancellationToken);
+        var reference = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            plaintext,
+            lifetime,
+            cancellationToken);
 
         Assert.NotEqual(Guid.Empty, reference.Id);
         Assert.NotNull(reference.ExpiresAt);
         Assert.True(reference.ExpiresAt > time.GetUtcNow());
 
         var recovered = new DurableProtectedPayloadStore(state, Commit, new RecordingProtector(), OwnerA, time);
-        var restored = await recovered.LoadAsync(OwnerA, reference, cancellationToken);
+        var restored = await recovered.LoadAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            reference,
+            cancellationToken);
         Assert.Equal(plaintext, restored.ToArray());
     }
 
-    [Fact(DisplayName = "protected payload expires and refuses cross-owner access")]
+    [Fact(DisplayName = "protected payload expires and refuses cross-owner or wrong task/attempt access")]
     public async Task ProtectedPayloadExpiresAndRefusesCrossOwner()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -76,15 +87,94 @@ public sealed class BehaviorOperationReplay
         var store = new DurableProtectedPayloadStore(state, Commit, new RecordingProtector(), OwnerA, time);
         var plaintext = Encoding.UTF8.GetBytes("owner-scoped-secret");
 
-        var expired = await store.StoreAsync(OwnerA, plaintext, TimeSpan.FromMinutes(5), cancellationToken);
+        var expired = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            plaintext,
+            TimeSpan.FromMinutes(5),
+            cancellationToken);
         time.Advance(TimeSpan.FromMinutes(6));
         await Assert.ThrowsAsync<CryptographicException>(
-            () => store.LoadAsync(OwnerA, expired, cancellationToken).AsTask());
+            () => store.LoadAsync(OwnerA, TaskNeuron, Attempt.Value, expired, cancellationToken).AsTask());
 
         time.Advance(TimeSpan.FromHours(-1));
-        var live = await store.StoreAsync(OwnerA, plaintext, TimeSpan.FromHours(1), cancellationToken);
+        var live = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            plaintext,
+            TimeSpan.FromHours(1),
+            cancellationToken);
         await Assert.ThrowsAsync<CryptographicException>(
-            () => store.LoadAsync(OwnerB, live, cancellationToken).AsTask());
+            () => store.LoadAsync(OwnerB, TaskNeuron, Attempt.Value, live, cancellationToken).AsTask());
+
+        var otherTask = NeuronId.For<ITask>(OwnerA, "other-task");
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, otherTask, Attempt.Value, live, cancellationToken).AsTask());
+
+        var otherAttempt = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, TaskNeuron, otherAttempt, live, cancellationToken).AsTask());
+    }
+
+    [Fact(DisplayName = "durable protected payload state holds ciphertext and expiry only, never plaintext")]
+    public async Task DurableStateHoldsCiphertextNotPlaintext()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var time = new AdjustableTimeProvider(DateTimeOffset.Parse("2026-07-31T12:00:00Z", CultureInfo.InvariantCulture));
+        var state = new TestDurableValue<byte[]>([]);
+        ValueTask Commit() => ValueTask.CompletedTask;
+        var store = new DurableProtectedPayloadStore(state, Commit, new XorProtector(), OwnerA, time);
+        var secret = "owner-scoped-secret-never-journaled"u8.ToArray();
+
+        await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            secret,
+            TimeSpan.FromHours(1),
+            cancellationToken);
+
+        Assert.NotNull(state.Value);
+        Assert.NotEmpty(state.Value);
+        var durable = Encoding.UTF8.GetString(state.Value);
+        Assert.DoesNotContain("owner-scoped-secret-never-journaled", durable, StringComparison.Ordinal);
+        Assert.DoesNotContain(Convert.ToBase64String(secret), durable, StringComparison.Ordinal);
+        Assert.Contains("expiresAt", durable, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("protectedPayload", durable, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact(DisplayName = "protected payload store and load observe cancellation")]
+    public async Task ProtectedPayloadStoreAndLoadObserveCancellation()
+    {
+        var time = new AdjustableTimeProvider(DateTimeOffset.Parse("2026-07-31T12:00:00Z", CultureInfo.InvariantCulture));
+        var state = new TestDurableValue<byte[]>([]);
+        ValueTask Commit() => ValueTask.CompletedTask;
+        var store = new DurableProtectedPayloadStore(state, Commit, new RecordingProtector(), OwnerA, time);
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await store.StoreAsync(
+                OwnerA,
+                TaskNeuron,
+                Attempt.Value,
+                "x"u8.ToArray(),
+                TimeSpan.FromHours(1),
+                cancelled.Token));
+
+        var liveToken = TestContext.Current.CancellationToken;
+        var reference = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            "live"u8.ToArray(),
+            TimeSpan.FromHours(1),
+            liveToken);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await store.LoadAsync(OwnerA, TaskNeuron, Attempt.Value, reference, cancelled.Token));
     }
 
     [Fact(DisplayName = "ProtectedPayloadReference stays opaque: Id + ExpiresAt only")]
@@ -334,6 +424,23 @@ public sealed class BehaviorOperationReplay
         public byte[] Protect(string purpose, ReadOnlySpan<byte> plaintext) => plaintext.ToArray();
 
         public byte[] Unprotect(string purpose, ReadOnlySpan<byte> protectedPayload) => protectedPayload.ToArray();
+    }
+
+    private sealed class XorProtector : IDurablePayloadProtector
+    {
+        public byte[] Protect(string purpose, ReadOnlySpan<byte> plaintext)
+        {
+            var protectedPayload = plaintext.ToArray();
+            for (var index = 0; index < protectedPayload.Length; index++)
+            {
+                protectedPayload[index] ^= 0x5A;
+            }
+
+            return protectedPayload;
+        }
+
+        public byte[] Unprotect(string purpose, ReadOnlySpan<byte> protectedPayload)
+            => Protect(purpose, protectedPayload);
     }
 
     private sealed class AdjustableTimeProvider(DateTimeOffset start) : TimeProvider

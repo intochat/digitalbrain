@@ -77,64 +77,6 @@ app.MapPost("/v1/behaviors/deactivate", async (
     }
 });
 
-// TestingAppHost-only seed seam (not the production silo reverse broker).
-// Mapped only when DigitalBrain:Behaviors:Broker:TestingInProcessPayloadBroker=true.
-if (BehaviorHostHosting.IsTestingInProcessPayloadBrokerEnabled(app.Configuration))
-{
-    app.MapPost("/v1/behaviors/testing/in-process-payloads/store", (
-        TestingInProcessStorePayloadRequest body,
-        InMemoryBehaviorHostPayloadStore store,
-        CancellationToken cancellationToken) =>
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        try
-        {
-            var owner = RequireOwner(body.Owner, "missing-owner");
-            var taskOwner = RequireOwner(body.TaskOwner, "missing-task-owner");
-            if (owner != taskOwner)
-            {
-                throw new BehaviorHostException("owner-task-mismatch");
-            }
-
-            if (string.IsNullOrWhiteSpace(body.ContentBase64))
-            {
-                throw new BehaviorHostException("empty-payload");
-            }
-
-            if (string.IsNullOrWhiteSpace(body.TaskType)
-                || string.IsNullOrWhiteSpace(body.TaskName)
-                || string.IsNullOrWhiteSpace(body.Attempt))
-            {
-                throw new BehaviorHostException("missing-task-identity");
-            }
-
-            if (!Guid.TryParseExact(body.Attempt, "N", out var attemptValue) || attemptValue == Guid.Empty)
-            {
-                throw new BehaviorHostException("invalid-attempt");
-            }
-
-            var reference = store.Store(
-                owner,
-                new NeuronId(body.TaskType, taskOwner, body.TaskName),
-                new AttemptId(attemptValue),
-                Convert.FromBase64String(body.ContentBase64),
-                TimeSpan.FromHours(1));
-
-            return Results.Ok(new ProtectedReferenceResponse(
-                reference.Id.ToString("N"),
-                reference.ExpiresAt));
-        }
-        catch (BehaviorHostException exception)
-        {
-            return Results.Content(exception.Reason, "text/plain", statusCode: StatusCodes.Status400BadRequest);
-        }
-        catch (FormatException)
-        {
-            return Results.Content("invalid-payload-content", "text/plain", statusCode: StatusCodes.Status400BadRequest);
-        }
-    });
-}
-
 app.MapPost("/v1/behaviors/execute", async (
     ExecuteRequest body,
     BehaviorHostEngine host,
@@ -254,15 +196,5 @@ internal sealed record CapabilityEdgeRequest(
     int RequestVersion,
     string ResponseId,
     int ResponseVersion);
-
-internal sealed record TestingInProcessStorePayloadRequest(
-    string Owner,
-    string TaskType,
-    string TaskOwner,
-    string TaskName,
-    string Attempt,
-    string ContentBase64);
-
-internal sealed record ProtectedReferenceResponse(string Id, DateTimeOffset? ExpiresAt);
 
 internal sealed record ExecuteResponse(bool Succeeded, string Outcome);

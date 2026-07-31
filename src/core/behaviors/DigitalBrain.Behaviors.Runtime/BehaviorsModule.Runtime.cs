@@ -20,6 +20,7 @@ public sealed partial class BehaviorsModule
         builder.Services.AddSingleton<IBehaviorBddGate, InstallTestsBddGate>();
         builder.Services.TryAddSingleton<IBehaviorArtifactTrust>(static provider =>
             new SiloBehaviorArtifactTrust(provider.GetRequiredService<IDurablePayloadProtector>()));
+        builder.Services.TryAddSingleton<IBehaviorProtectedPayloadAccess, GrainBehaviorProtectedPayloadAccess>();
 
         var executor = builder.Configuration[ExecutorConfigurationKey];
         if (string.Equals(executor, HostExecutorName, StringComparison.OrdinalIgnoreCase))

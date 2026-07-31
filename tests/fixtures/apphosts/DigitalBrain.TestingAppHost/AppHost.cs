@@ -17,7 +17,8 @@ var silo = builder.AddProject<Projects.DigitalBrain_OS_Host>(Silo)
         KnownStateProtectionKey)
     .WithEnvironment(
         BehaviorsModule.ExecutorConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
-        BehaviorsModule.HostExecutorName);
+        BehaviorsModule.HostExecutorName)
+    .WithHttpHealthCheck("/health");
 
 var behaviorHost = builder.AddProject<Projects.DigitalBrain_OS_BehaviorHost>(BehaviorHost)
     .WithReference(brain.AsClient())
@@ -25,9 +26,8 @@ var behaviorHost = builder.AddProject<Projects.DigitalBrain_OS_BehaviorHost>(Beh
         DigitalBrainHostingExtensions.StateProtectionKeyConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
         KnownStateProtectionKey)
     .WithEnvironment(
-        // TestingAppHost only — never set on product AppHost. Temporary L2 seed until silo reverse-broker.
-        BehaviorHostHosting.TestingInProcessPayloadBrokerConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
-        bool.TrueString)
+        BehaviorHostHosting.BrokerBaseAddressConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
+        silo.GetEndpoint("http"))
     .WithHttpHealthCheck("/health")
     .WaitFor(silo);
 

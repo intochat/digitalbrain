@@ -266,7 +266,7 @@ public sealed class HttpBehaviorHostBrokerClientTests
     }
 
     [Fact(DisplayName =
-        "AddBehaviorHostEngine fails closed without broker address, enables testing in-process only by explicit switch, and uses HTTP broker for absolute address")]
+        "AddBehaviorHostEngine fails closed without broker address and uses HTTP reverse broker for absolute address")]
     public void AddBehaviorHostEngineRegistersBrokerFactoryOnlyForValidAbsoluteAddress()
     {
         var absentConfiguration = new ConfigurationBuilder()
@@ -280,22 +280,6 @@ public sealed class HttpBehaviorHostBrokerClientTests
         absent.AddBehaviorHostEngine(absentConfiguration);
         using var absentProvider = absent.BuildServiceProvider();
         Assert.Null(absentProvider.GetService<IBehaviorHostBrokerClientFactory>());
-        Assert.Null(absentProvider.GetService<InMemoryBehaviorHostPayloadStore>());
-
-        var testingConfiguration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["DigitalBrain:Security:StateProtectionKey"] = Convert.ToBase64String(new byte[32]),
-                [BehaviorHostHosting.TestingInProcessPayloadBrokerConfigurationKey] = bool.TrueString
-            })
-            .Build();
-
-        var testing = new ServiceCollection();
-        testing.AddBehaviorHostEngine(testingConfiguration);
-        using var testingProvider = testing.BuildServiceProvider();
-        Assert.IsType<InMemoryBehaviorHostBrokerClientFactory>(
-            testingProvider.GetService<IBehaviorHostBrokerClientFactory>());
-        Assert.NotNull(testingProvider.GetService<InMemoryBehaviorHostPayloadStore>());
 
         var presentConfiguration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -311,7 +295,6 @@ public sealed class HttpBehaviorHostBrokerClientTests
 
         var factory = presentProvider.GetService<IBehaviorHostBrokerClientFactory>();
         Assert.IsType<HttpBehaviorHostBrokerClientFactory>(factory);
-        Assert.Null(presentProvider.GetService<InMemoryBehaviorHostPayloadStore>());
 
         var httpClientFactory = presentProvider.GetRequiredService<IHttpClientFactory>();
         using var named = httpClientFactory.CreateClient(BehaviorHostHosting.BrokerHttpClientName);

@@ -16,6 +16,7 @@
     <ProjectReference Include="..\DigitalBrain.OS.BehaviorHost\DigitalBrain.OS.BehaviorHost.csproj" />
     <ProjectReference Include="..\DigitalBrain.OS.McpHost\DigitalBrain.OS.McpHost.csproj" />
     <ProjectReference Include="..\..\src\core\behaviors\DigitalBrain.Behaviors.Runtime\DigitalBrain.Behaviors.Runtime.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\src\core\behaviors\DigitalBrain.Behaviors.Host\DigitalBrain.Behaviors.Host.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
   <PropertyGroup>
     <CodeGraphRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..'))</CodeGraphRoot>
