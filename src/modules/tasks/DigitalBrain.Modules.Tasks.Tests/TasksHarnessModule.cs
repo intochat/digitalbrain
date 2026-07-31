@@ -9,11 +9,35 @@ public sealed partial class TasksHarnessModule : IModule;
 internal sealed class ScriptedWorker :
     Neuron,
     IWorker,
+    IHandle<DispatchWorkerAccept>,
+    IHandle<DispatchWorkerContinue>,
+    IHandle<DispatchWorkerCancel>,
     IHandle<PrepareOperationProbe>,
     IHandle<TransitionOperationProbe>,
     IHandle<TaskOperationSnapshot>
 {
     internal const string GrainTypeName = "worker";
+
+    public Task HandleAsync(DispatchWorkerAccept command, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Accept(command.Request);
+    }
+
+    public Task HandleAsync(DispatchWorkerContinue command, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Continue(command.Cursor);
+    }
+
+    public Task HandleAsync(DispatchWorkerCancel command, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Cancel(command.Cursor);
+    }
 
     public async Task Accept(AttemptRequest request)
     {

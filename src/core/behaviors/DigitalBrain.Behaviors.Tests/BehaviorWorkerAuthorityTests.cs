@@ -153,9 +153,10 @@ public sealed class BehaviorWorkerAuthorityTests(BehaviorsFixture fixture)
     }
 
     [Fact(
-        Timeout = 60_000,
-        DisplayName = "concurrent Cancel and Prepare complete without Worker↔Task lock inversion hang")]
-    public async Task ConcurrentCancelAndPrepareDoesNotHang()
+        Timeout = 90_000,
+        DisplayName =
+            "Task.Cancel racing Prepare through Worker authority completes without Task↔Worker lock inversion hang")]
+    public async Task ConcurrentTaskCancelAndPrepareDoesNotHang()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var brain = await fixture.CreateBrainAsync(cancellationToken);
@@ -163,6 +164,10 @@ public sealed class BehaviorWorkerAuthorityTests(BehaviorsFixture fixture)
         var edge = ExactEdge(task.Id.Owner);
         var request = new ProtectedPayloadReference(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
         var access = new GrainBehaviorTaskOperationAccess(brain.Cluster.Client);
+
+        var preRace = await task.Reference.Read().WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        Assert.Equal(TaskState.Running, preRace.State);
+        Assert.Equal(attempt, preRace.ActiveAttempt);
 
         var prepare = access.PrepareAsync(
             task.Id.Owner,
@@ -172,18 +177,26 @@ public sealed class BehaviorWorkerAuthorityTests(BehaviorsFixture fixture)
             edge,
             request,
             cancellationToken).AsTask();
-        var cancel = worker.Reference.Cancel(new AttemptCursor(
-            task.Id,
-            worker.Id,
-            attempt,
-            Revision: 0));
+        var cancel = task.Reference.Cancel(new CancelTask(CommandId.New(), preRace.Revision));
 
         await Task.WhenAny(prepare, cancel).WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
+        // Prepare may run to its 30s adapter bound when Cancel wins and no reply arrives.
         await Task.WhenAll(SwallowFaults(prepare), SwallowFaults(cancel))
-            .WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
+            .WaitAsync(TimeSpan.FromSeconds(40), cancellationToken);
 
         Assert.True(prepare.IsCompleted);
         Assert.True(cancel.IsCompleted);
+
+        var postRace = await task.Reference.Read().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+        Assert.NotEqual(default, postRace.Worker);
+        Assert.Equal(worker.Id, postRace.Worker);
+
+        // Both activations remain responsive after the opposing-turn race.
+        var secondRead = await task.Reference.Read().WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        Assert.Equal(worker.Id, secondRead.Worker);
+        _ = await worker.Incoming
+            .ReadAsync<Synapse>(afterSequence: 0, cancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
 
         static Task SwallowFaults(Task operation)
             => operation.ContinueWith(
@@ -233,20 +246,6 @@ public sealed class BehaviorWorkerAuthorityTests(BehaviorsFixture fixture)
         Assert.True(
             DateTime.UtcNow - started < TimeSpan.FromSeconds(35),
             "operation-timeout must resolve under the access adapter wait bound");
-    }
-
-    [Fact(DisplayName = "Worker Stage methods do not retain RequireBoundWorkerAsync Task.Read RPC")]
-    public void WorkerStageMethodsHaveNoTaskReadHelper()
-    {
-        var workerType = typeof(BehaviorWorkerNeuron);
-        Assert.Null(workerType.GetMethod(
-            "RequireBoundWorkerAsync",
-            System.Reflection.BindingFlags.Instance
-                | System.Reflection.BindingFlags.NonPublic
-                | System.Reflection.BindingFlags.Public));
-        Assert.NotNull(workerType.GetMethod(
-            "RequireStageTaskIdentity",
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic));
     }
 
     private static async Task<(

@@ -68,6 +68,17 @@ public sealed class TasksVocabulary
         Assert.Null(contracts.GetType($"{TasksNamespace}.ICountdown"));
         Assert.Null(contracts.GetType($"{TasksNamespace}.ILLM"));
         Assert.Null(contracts.GetType($"{TasksNamespace}.IBehavior"));
+        Assert.DoesNotContain(
+            contracts.GetExportedTypes(),
+            type => type.Name is "RelayWorkerAccept"
+                or "RelayWorkerContinue"
+                or "RelayWorkerCancel"
+                or "DispatchWorkerAccept"
+                or "DispatchWorkerContinue"
+                or "DispatchWorkerCancel"
+                or "WorkerDispatchRelay"
+                || type.Name.Contains("DispatchWorker", StringComparison.Ordinal)
+                || type.Name.Contains("RelayWorker", StringComparison.Ordinal));
     }
 
     [Fact(DisplayName = "ITask methods are unsuffixed, aliased, and return TaskSnapshot")]

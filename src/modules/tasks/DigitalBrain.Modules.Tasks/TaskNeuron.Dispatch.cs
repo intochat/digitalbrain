@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Tasks;
 
@@ -17,7 +18,7 @@ internal sealed partial class TaskNeuron
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
-        Justification = "A durable pending dispatch remains registered for reminder-driven redelivery after any Worker failure.")]
+        Justification = "A durable pending dispatch remains registered for reminder-driven redelivery after any staging failure.")]
     private async Task TryDispatchPendingAsync()
     {
         var data = LoadIfStarted();
@@ -36,30 +37,23 @@ internal sealed partial class TaskNeuron
             return;
         }
 
-        if (pending is not (AcceptWorkerDispatch or ContinueWorkerDispatch or CancelWorkerDispatch))
+        Synapse envelope = pending switch
         {
-            throw new InvalidOperationException(
-                $"Task '{Id}' has an unsupported pending Worker dispatch '{pending.GetType().Name}'.");
-        }
+            AcceptWorkerDispatch accept => new RelayWorkerAccept(data.Worker, accept.Request),
+            ContinueWorkerDispatch continuation => new RelayWorkerContinue(data.Worker, continuation.Cursor),
+            CancelWorkerDispatch cancellation => new RelayWorkerCancel(data.Worker, cancellation.Cursor),
+            _ => throw new InvalidOperationException(
+                $"Task '{Id}' has an unsupported pending Worker dispatch '{pending.GetType().Name}'."),
+        };
+
+        var relay = new NeuronId(
+            WorkerDispatchRelay.GrainTypeName,
+            Id.Owner,
+            Guid.NewGuid().ToString("N"));
 
         try
         {
-            var worker = Worker(data);
-
-            switch (pending)
-            {
-                case AcceptWorkerDispatch accept:
-                    await worker.Accept(accept.Request);
-                    break;
-
-                case ContinueWorkerDispatch continuation:
-                    await worker.Continue(continuation.Cursor);
-                    break;
-
-                case CancelWorkerDispatch cancellation:
-                    await worker.Cancel(cancellation.Cursor);
-                    break;
-            }
+            await SendAsync(relay, envelope);
         }
         catch (Exception)
         {
@@ -78,7 +72,4 @@ internal sealed partial class TaskNeuron
         await SaveAsync(current);
         await UnregisterReminderAsync(DispatchReminderName);
     }
-
-    private IWorker Worker(TaskData data)
-        => GrainFactory.GetGrain<IWorker>(data.Worker.ToGrainId());
 }

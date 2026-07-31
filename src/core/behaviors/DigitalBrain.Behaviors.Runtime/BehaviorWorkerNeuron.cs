@@ -5,7 +5,13 @@ using DigitalBrain.Tasks;
 namespace DigitalBrain.Behaviors;
 
 [GrainType("worker")]
-internal sealed class BehaviorWorkerNeuron : Neuron, IWorker, IBehaviorWorkerBroker
+internal sealed class BehaviorWorkerNeuron :
+    Neuron,
+    IWorker,
+    IBehaviorWorkerBroker,
+    IHandle<DispatchWorkerAccept>,
+    IHandle<DispatchWorkerContinue>,
+    IHandle<DispatchWorkerCancel>
 {
     public async Task Accept(AttemptRequest request)
     {
@@ -38,6 +44,27 @@ internal sealed class BehaviorWorkerNeuron : Neuron, IWorker, IBehaviorWorkerBro
         await SendAsync(
             cursor.Task,
             new AttemptCancelled(cursor.Task, cursor.Worker, cursor.Attempt, cursor.Revision));
+    }
+
+    public Task HandleAsync(DispatchWorkerAccept command, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Accept(command.Request);
+    }
+
+    public Task HandleAsync(DispatchWorkerContinue command, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Continue(command.Cursor);
+    }
+
+    public Task HandleAsync(DispatchWorkerCancel command, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Cancel(command.Cursor);
     }
 
     public async Task<WorkerOperationReceipt> StagePrepare(
