@@ -22,6 +22,7 @@ public sealed partial class BehaviorsModule
             new SiloBehaviorArtifactTrust(provider.GetRequiredService<IDurablePayloadProtector>()));
         builder.Services.TryAddSingleton<IBehaviorProtectedPayloadAccess, GrainBehaviorProtectedPayloadAccess>();
         builder.Services.TryAddSingleton<IBehaviorTaskOperationAccess, GrainBehaviorTaskOperationAccess>();
+        builder.Services.TryAddSingleton<IBehaviorCapabilityDispatchAccess, GrainBehaviorCapabilityDispatchAccess>();
 
         var executor = builder.Configuration[ExecutorConfigurationKey];
         if (string.Equals(executor, HostExecutorName, StringComparison.OrdinalIgnoreCase))

@@ -68,6 +68,11 @@ internal sealed class FixtureCluster : IAsyncDisposable
             ?? throw new InvalidOperationException(
                 "The DigitalBrain fixture cluster is not running.");
 
+    internal IServiceProvider ClientServices
+        => (_cluster?.Client as IClusterClient)?.ServiceProvider
+            ?? throw new InvalidOperationException(
+                "The DigitalBrain fixture cluster client services are not available.");
+
     internal TestEdgeRegistry Edges => _edges;
 
     internal JournalFaultRegistration ArmJournalFault(NeuronId target, string message)
@@ -173,6 +178,13 @@ internal sealed class FixtureCluster : IAsyncDisposable
             {
                 module.PrepareSerialization(client.Services);
             }
+
+            var selected = _modules
+                .OrderBy(module => module.Id.Value, StringComparer.Ordinal)
+                .ToArray();
+            var capabilities = ActiveCapabilityCatalog.Create(selected);
+            client.Services.AddSingleton(capabilities);
+            client.Services.AddSingleton(ActiveModuleContractTypeMap.Create(selected, capabilities));
 
             var clientResponseTimeout = _responseTimeout ?? SaturatedMachineResponseTimeout;
             client.Services.Configure<ClientMessagingOptions>(

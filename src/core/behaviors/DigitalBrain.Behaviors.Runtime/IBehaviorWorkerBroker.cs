@@ -23,6 +23,14 @@ internal interface IBehaviorWorkerBroker : IGrainWithStringKey
         NeuronId task,
         ReadTaskOperation command,
         CancellationToken cancellationToken);
+
+    [Alias(nameof(StageDispatch))]
+    Task<WorkerOperationReceipt> StageDispatch(
+        NeuronId task,
+        AttemptId attempt,
+        BehaviorCapabilityEdge edge,
+        ProtectedPayloadReference requestPayload,
+        CancellationToken cancellationToken);
 }
 
 [GenerateSerializer]

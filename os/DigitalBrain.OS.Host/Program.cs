@@ -17,4 +17,5 @@ app.UseBehaviorBrokerAuthentication();
 app.MapDefaultEndpoints();
 app.MapBehaviorProtectedPayloadBroker();
 app.MapBehaviorTaskOperationBroker();
+app.MapBehaviorDispatchBroker();
 app.Run();

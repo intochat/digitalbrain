@@ -30,6 +30,7 @@ public static class DigitalBrainRuntime
         builder.AddIncomingGrainCallFilter<OwnerBoundCallFilter>();
         builder.AddOutgoingGrainCallFilter<OutgoingReificationFilter>();
         builder.Services.AddSingleton(capabilities);
+        builder.Services.AddSingleton(ActiveModuleContractTypeMap.Create(selected, capabilities));
         builder.Services.AddSingleton(services =>
         {
             var catalog = new BroadcastCatalog();
