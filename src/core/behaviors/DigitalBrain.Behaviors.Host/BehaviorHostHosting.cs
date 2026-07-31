@@ -36,6 +36,11 @@ public static class BehaviorHostHosting
             });
             services.TryAddSingleton<IBehaviorHostBrokerClientFactory, HttpBehaviorHostBrokerClientFactory>();
         }
+        else
+        {
+            services.TryAddSingleton<InMemoryBehaviorHostPayloadStore>();
+            services.TryAddSingleton<IBehaviorHostBrokerClientFactory, InMemoryBehaviorHostBrokerClientFactory>();
+        }
 
         services.TryAddSingleton(static provider =>
             new BehaviorHostEngine(

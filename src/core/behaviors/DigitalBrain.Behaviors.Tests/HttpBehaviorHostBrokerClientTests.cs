@@ -265,7 +265,8 @@ public sealed class HttpBehaviorHostBrokerClientTests
         Assert.Empty(handler.Requests);
     }
 
-    [Fact(DisplayName = "AddBehaviorHostEngine leaves broker factory absent without address and injects it for valid absolute address")]
+    [Fact(DisplayName =
+        "AddBehaviorHostEngine uses in-memory owner-bound broker without address and HTTP broker for absolute address")]
     public void AddBehaviorHostEngineRegistersBrokerFactoryOnlyForValidAbsoluteAddress()
     {
         var absentConfiguration = new ConfigurationBuilder()
@@ -278,7 +279,9 @@ public sealed class HttpBehaviorHostBrokerClientTests
         var absent = new ServiceCollection();
         absent.AddBehaviorHostEngine(absentConfiguration);
         using var absentProvider = absent.BuildServiceProvider();
-        Assert.Null(absentProvider.GetService<IBehaviorHostBrokerClientFactory>());
+        Assert.IsType<InMemoryBehaviorHostBrokerClientFactory>(
+            absentProvider.GetService<IBehaviorHostBrokerClientFactory>());
+        Assert.NotNull(absentProvider.GetService<InMemoryBehaviorHostPayloadStore>());
 
         var presentConfiguration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -293,7 +296,7 @@ public sealed class HttpBehaviorHostBrokerClientTests
         using var presentProvider = present.BuildServiceProvider();
 
         var factory = presentProvider.GetService<IBehaviorHostBrokerClientFactory>();
-        Assert.NotNull(factory);
+        Assert.IsType<HttpBehaviorHostBrokerClientFactory>(factory);
 
         var httpClientFactory = presentProvider.GetRequiredService<IHttpClientFactory>();
         using var named = httpClientFactory.CreateClient(BehaviorHostHosting.BrokerHttpClientName);

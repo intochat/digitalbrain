@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
 using DigitalBrain.ServiceDefaults;
@@ -21,7 +20,7 @@ app.MapPost("/v1/behaviors/deploy", async (
     {
         await host.DeployAsync(
             new BehaviorHostDeployCommand(
-                new OwnerId(body.Owner),
+                RequireOwner(body.Owner, "missing-owner"),
                 new BehaviorId(body.Behavior),
                 body.ArtifactHash,
                 Convert.FromBase64String(body.ArtifactBytesBase64),
@@ -45,7 +44,7 @@ app.MapPost("/v1/behaviors/activate", async (
     {
         await host.ActivateAsync(
             new BehaviorHostActivationCommand(
-                new OwnerId(body.Owner),
+                RequireOwner(body.Owner, "missing-owner"),
                 new BehaviorId(body.Behavior),
                 body.ArtifactHash),
             cancellationToken);
@@ -66,7 +65,7 @@ app.MapPost("/v1/behaviors/deactivate", async (
     {
         await host.DeactivateAsync(
             new BehaviorHostDeactivationCommand(
-                new OwnerId(body.Owner),
+                RequireOwner(body.Owner, "missing-owner"),
                 new BehaviorId(body.Behavior),
                 body.ArtifactHash),
             cancellationToken);
@@ -78,6 +77,64 @@ app.MapPost("/v1/behaviors/deactivate", async (
     }
 });
 
+app.MapPost("/v1/behaviors/broker/payloads/store", (
+    StorePayloadRequest body,
+    InMemoryBehaviorHostPayloadStore? store,
+    CancellationToken cancellationToken) =>
+{
+    cancellationToken.ThrowIfCancellationRequested();
+    if (store is null)
+    {
+        return Results.BadRequest("in-memory-payload-store-not-configured");
+    }
+
+    try
+    {
+        var owner = RequireOwner(body.Owner, "missing-owner");
+        var taskOwner = RequireOwner(body.TaskOwner, "missing-task-owner");
+        if (owner != taskOwner)
+        {
+            throw new BehaviorHostException("owner-task-mismatch");
+        }
+
+        if (string.IsNullOrWhiteSpace(body.ContentBase64))
+        {
+            throw new BehaviorHostException("empty-payload");
+        }
+
+        if (string.IsNullOrWhiteSpace(body.TaskType)
+            || string.IsNullOrWhiteSpace(body.TaskName)
+            || string.IsNullOrWhiteSpace(body.Attempt))
+        {
+            throw new BehaviorHostException("missing-task-identity");
+        }
+
+        if (!Guid.TryParseExact(body.Attempt, "N", out var attemptValue) || attemptValue == Guid.Empty)
+        {
+            throw new BehaviorHostException("invalid-attempt");
+        }
+
+        var reference = store.Store(
+            owner,
+            new NeuronId(body.TaskType, taskOwner, body.TaskName),
+            new AttemptId(attemptValue),
+            Convert.FromBase64String(body.ContentBase64),
+            TimeSpan.FromHours(1));
+
+        return Results.Ok(new ProtectedReferenceResponse(
+            reference.Id.ToString("N"),
+            reference.ExpiresAt));
+    }
+    catch (BehaviorHostException exception)
+    {
+        return Results.BadRequest(exception.Reason);
+    }
+    catch (FormatException)
+    {
+        return Results.BadRequest("invalid-payload-content");
+    }
+});
+
 app.MapPost("/v1/behaviors/execute", async (
     ExecuteRequest body,
     BehaviorHostEngine host,
@@ -85,23 +142,57 @@ app.MapPost("/v1/behaviors/execute", async (
 {
     try
     {
+        var owner = RequireOwner(body.Owner, "missing-owner");
+        var taskOwner = RequireOwner(body.TaskOwner, "missing-task-owner");
+        if (owner != taskOwner)
+        {
+            throw new BehaviorHostException("owner-task-mismatch");
+        }
+
+        if (string.IsNullOrWhiteSpace(body.TaskType)
+            || string.IsNullOrWhiteSpace(body.TaskName)
+            || string.IsNullOrWhiteSpace(body.Attempt)
+            || string.IsNullOrWhiteSpace(body.TriggerPayloadId)
+            || string.IsNullOrWhiteSpace(body.Execution)
+            || body.Capabilities is null)
+        {
+            throw new BehaviorHostException("missing-execute-identity");
+        }
+
+        if (!Guid.TryParseExact(body.Execution, "N", out var executionValue)
+            || executionValue == Guid.Empty)
+        {
+            throw new BehaviorHostException("invalid-execution");
+        }
+
+        if (!Guid.TryParseExact(body.Attempt, "N", out var attemptValue) || attemptValue == Guid.Empty)
+        {
+            throw new BehaviorHostException("invalid-attempt");
+        }
+
+        if (!Guid.TryParseExact(body.TriggerPayloadId, "N", out var payloadValue) || payloadValue == Guid.Empty)
+        {
+            throw new BehaviorHostException("invalid-trigger-payload");
+        }
+
         var outcome = await host.ExecuteAsync(
             new BehaviorHostExecuteCommand(
                 new BehaviorExecutionMetadata(
-                    new OwnerId(body.Owner),
+                    owner,
                     new BehaviorId(body.Behavior),
                     new BehaviorRevisionId(body.Revision),
-                    new BehaviorExecutionId(Guid.Parse(body.Execution))),
+                    new BehaviorExecutionId(executionValue)),
                 body.ArtifactHash,
-                new NeuronId(body.TaskType, new OwnerId(body.TaskOwner), body.TaskName),
-                new AttemptId(Guid.Parse(body.Attempt)),
+                new NeuronId(body.TaskType, taskOwner, body.TaskName),
+                new AttemptId(attemptValue),
                 body.TriggerTypeName,
-                new ProtectedPayloadReference(
-                    Guid.Parse(body.TriggerPayloadId),
-                    body.TriggerPayloadExpiresAt),
+                new ProtectedPayloadReference(payloadValue, body.TriggerPayloadExpiresAt),
                 body.Capabilities
                     .Select(static edge => new BehaviorCapabilityEdge(
-                        new NeuronId(edge.TargetType, new OwnerId(edge.TargetOwner), edge.TargetName),
+                        new NeuronId(
+                            edge.TargetType,
+                            RequireOwner(edge.TargetOwner, "missing-capability-owner"),
+                            edge.TargetName),
                         edge.RequestId,
                         edge.RequestVersion,
                         edge.ResponseId,
@@ -118,6 +209,16 @@ app.MapPost("/v1/behaviors/execute", async (
 });
 
 app.Run();
+
+static OwnerId RequireOwner(string? value, string reason)
+{
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        throw new BehaviorHostException(reason);
+    }
+
+    return new OwnerId(value);
+}
 
 internal sealed record DeployRequest(
     string Owner,
@@ -153,5 +254,15 @@ internal sealed record CapabilityEdgeRequest(
     int RequestVersion,
     string ResponseId,
     int ResponseVersion);
+
+internal sealed record StorePayloadRequest(
+    string Owner,
+    string TaskType,
+    string TaskOwner,
+    string TaskName,
+    string Attempt,
+    string ContentBase64);
+
+internal sealed record ProtectedReferenceResponse(string Id, DateTimeOffset? ExpiresAt);
 
 internal sealed record ExecuteResponse(bool Succeeded, string Outcome);
