@@ -118,6 +118,39 @@ public sealed class BehaviorProtectedPayloadBrokerEndpointsTests
         Assert.Equal(0, access.LoadCalls);
     }
 
+    [Fact(DisplayName = "multi-value broker credential header fails closed without store access")]
+    public async Task MultiValueCredentialHeaderFailsClosedWithoutStoreAccess()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var access = new RecordingAccess();
+        await using var host = await StartHostAsync(cancellationToken, access: access);
+        using var client = host.CreateClient();
+
+        var body = new
+        {
+            owner = BoundOwner.Value,
+            taskType = BoundTask.Type,
+            taskOwner = BoundTask.Owner.Value,
+            taskName = BoundTask.Name,
+            attempt = BoundAttempt.Value.ToString("N"),
+            contentBase64 = Convert.ToBase64String(Plaintext),
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/behaviors/broker/payloads/store")
+        {
+            Content = JsonContent.Create(body),
+        };
+        request.Headers.TryAddWithoutValidation(
+            BehaviorBrokerContract.CredentialHeaderName,
+            [ValidCredential, "smuggled-extra-credential"]);
+
+        using var response = await client.SendAsync(request, cancellationToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("unauthorized", (await response.Content.ReadAsStringAsync(cancellationToken)).Trim());
+        Assert.Equal(0, access.StoreCalls);
+        Assert.Equal(0, access.LoadCalls);
+    }
+
     [Fact(DisplayName = "correct broker credential authorizes store and reaches access layer")]
     public async Task CorrectCredentialAuthorizesStore()
     {
@@ -195,6 +228,37 @@ public sealed class BehaviorProtectedPayloadBrokerEndpointsTests
             cancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, missing.StatusCode);
         Assert.Equal(0, access.StoreCalls);
+    }
+
+    [Fact(DisplayName = "identity-invalid owner slash maps to stable invalid-request without identity prose")]
+    public async Task IdentityInvalidOwnerSlashMapsToStableInvalidRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var access = new RecordingAccess();
+        await using var host = await StartHostAsync(cancellationToken, access: access);
+        using var client = host.CreateClient();
+
+        using var response = await PostAuthorizedAsync(
+            client,
+            "/v1/behaviors/broker/payloads/store",
+            new
+            {
+                owner = "bad/owner",
+                taskType = BoundTask.Type,
+                taskOwner = "bad/owner",
+                taskName = BoundTask.Name,
+                attempt = BoundAttempt.Value.ToString("N"),
+                contentBase64 = Convert.ToBase64String(Plaintext),
+            },
+            cancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = (await response.Content.ReadAsStringAsync(cancellationToken)).Trim();
+        Assert.Equal("invalid-request", body);
+        Assert.DoesNotContain("Identity parts", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("ArgumentException", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("grain keys", body, StringComparison.Ordinal);
+        Assert.Equal(0, access.StoreCalls);
+        Assert.Equal(0, access.LoadCalls);
     }
 
     [Fact(DisplayName = "reverse broker rejects cross-owner, wrong task/attempt, empty content, and invalid base64")]
