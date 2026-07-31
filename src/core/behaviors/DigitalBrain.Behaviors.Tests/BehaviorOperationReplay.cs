@@ -118,6 +118,104 @@ public sealed class BehaviorOperationReplay
             () => store.LoadAsync(OwnerA, TaskNeuron, otherAttempt, live, cancellationToken).AsTask());
     }
 
+    [Fact(DisplayName = "ciphertext purpose is bound to owner/task/attempt and cannot be transplanted")]
+    public async Task CiphertextPurposeIsBoundToOwnerTaskAndAttempt()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var time = new AdjustableTimeProvider(DateTimeOffset.Parse("2026-07-31T12:00:00Z", CultureInfo.InvariantCulture));
+        var state = new TestDurableValue<byte[]>([]);
+        ValueTask Commit() => ValueTask.CompletedTask;
+        var store = new DurableProtectedPayloadStore(state, Commit, new PurposeAwareProtector(), OwnerA, time);
+        var plaintext = Encoding.UTF8.GetBytes("binding-secret");
+
+        var reference = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            plaintext,
+            TimeSpan.FromHours(1),
+            cancellationToken);
+
+        var restored = await store.LoadAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            reference,
+            cancellationToken);
+        Assert.Equal(plaintext, restored.ToArray());
+
+        var otherTask = NeuronId.For<ITask>(OwnerA, "transplant-task");
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, otherTask, Attempt.Value, reference, cancellationToken).AsTask());
+
+        var otherAttempt = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, TaskNeuron, otherAttempt, reference, cancellationToken).AsTask());
+
+        // Rewrite entry metadata so store-level checks pass; purpose-bound ciphertext must still fail.
+        RewriteStoredEntryIdentity(state, reference.Id, otherTask, Attempt.Value);
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, otherTask, Attempt.Value, reference, cancellationToken).AsTask());
+
+        RewriteStoredEntryIdentity(state, reference.Id, TaskNeuron, otherAttempt);
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, TaskNeuron, otherAttempt, reference, cancellationToken).AsTask());
+    }
+
+    private static void RewriteStoredEntryIdentity(
+        TestDurableValue<byte[]> state,
+        Guid id,
+        NeuronId task,
+        Guid attempt)
+    {
+        using var document = JsonDocument.Parse(state.Value);
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                if (!Guid.TryParse(property.Name, out var entryId) || entryId != id)
+                {
+                    property.WriteTo(writer);
+                    continue;
+                }
+
+                writer.WritePropertyName(property.Name);
+                writer.WriteStartObject();
+                foreach (var field in property.Value.EnumerateObject())
+                {
+                    if (field.NameEquals("taskType"))
+                    {
+                        writer.WriteString("taskType", task.Type);
+                    }
+                    else if (field.NameEquals("taskOwner"))
+                    {
+                        writer.WriteString("taskOwner", task.Owner.Value);
+                    }
+                    else if (field.NameEquals("taskName"))
+                    {
+                        writer.WriteString("taskName", task.Name);
+                    }
+                    else if (field.NameEquals("attempt"))
+                    {
+                        writer.WriteString("attempt", attempt);
+                    }
+                    else
+                    {
+                        field.WriteTo(writer);
+                    }
+                }
+
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndObject();
+        }
+
+        state.Value = stream.ToArray();
+    }
+
     [Fact(DisplayName = "durable protected payload state holds ciphertext and expiry only, never plaintext")]
     public async Task DurableStateHoldsCiphertextNotPlaintext()
     {
@@ -441,6 +539,32 @@ public sealed class BehaviorOperationReplay
 
         public byte[] Unprotect(string purpose, ReadOnlySpan<byte> protectedPayload)
             => Protect(purpose, protectedPayload);
+    }
+
+    private sealed class PurposeAwareProtector : IDurablePayloadProtector
+    {
+        public byte[] Protect(string purpose, ReadOnlySpan<byte> plaintext)
+        {
+            var purposeBytes = Encoding.UTF8.GetBytes(purpose);
+            var protectedPayload = new byte[purposeBytes.Length + 1 + plaintext.Length];
+            purposeBytes.CopyTo(protectedPayload, 0);
+            protectedPayload[purposeBytes.Length] = 0;
+            plaintext.CopyTo(protectedPayload.AsSpan(purposeBytes.Length + 1));
+            return protectedPayload;
+        }
+
+        public byte[] Unprotect(string purpose, ReadOnlySpan<byte> protectedPayload)
+        {
+            var purposeBytes = Encoding.UTF8.GetBytes(purpose);
+            if (protectedPayload.Length <= purposeBytes.Length + 1
+                || protectedPayload[purposeBytes.Length] != 0
+                || !protectedPayload[..purposeBytes.Length].SequenceEqual(purposeBytes))
+            {
+                throw new CryptographicException("Purpose mismatch.");
+            }
+
+            return protectedPayload[(purposeBytes.Length + 1)..].ToArray();
+        }
     }
 
     private sealed class AdjustableTimeProvider(DateTimeOffset start) : TimeProvider

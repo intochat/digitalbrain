@@ -72,7 +72,7 @@ public static class BehaviorProtectedPayloadBrokerEndpoints
         {
             return Failure(MapArgumentReason(exception));
         }
-        catch (InvalidOperationException exception) when (!string.IsNullOrWhiteSpace(exception.Message))
+        catch (InvalidOperationException exception) when (IsStableReason(exception.Message))
         {
             return Failure(exception.Message);
         }
@@ -120,7 +120,7 @@ public static class BehaviorProtectedPayloadBrokerEndpoints
         {
             return Failure(MapArgumentReason(exception));
         }
-        catch (InvalidOperationException exception) when (!string.IsNullOrWhiteSpace(exception.Message))
+        catch (InvalidOperationException exception) when (IsStableReason(exception.Message))
         {
             return Failure(exception.Message);
         }
@@ -139,16 +139,26 @@ public static class BehaviorProtectedPayloadBrokerEndpoints
     {
         if (string.IsNullOrWhiteSpace(ownerValue))
         {
-            throw new ArgumentException("missing-owner");
+            throw new ArgumentException(paramName: null, message: "missing-owner");
         }
 
         if (string.IsNullOrWhiteSpace(taskOwnerValue))
         {
-            throw new ArgumentException("missing-task-owner");
+            throw new ArgumentException(paramName: null, message: "missing-task-owner");
         }
 
-        var owner = new OwnerId(ownerValue);
-        var taskOwner = new OwnerId(taskOwnerValue);
+        OwnerId owner;
+        OwnerId taskOwner;
+        try
+        {
+            owner = new OwnerId(ownerValue);
+            taskOwner = new OwnerId(taskOwnerValue);
+        }
+        catch (ArgumentException)
+        {
+            throw new ArgumentException(paramName: null, message: "invalid-request");
+        }
+
         if (owner != taskOwner)
         {
             throw new InvalidOperationException("owner-task-mismatch");
@@ -158,37 +168,74 @@ public static class BehaviorProtectedPayloadBrokerEndpoints
             || string.IsNullOrWhiteSpace(taskName)
             || string.IsNullOrWhiteSpace(attemptValue))
         {
-            throw new ArgumentException("missing-task-identity");
+            throw new ArgumentException(paramName: null, message: "missing-task-identity");
         }
 
         if (!Guid.TryParseExact(attemptValue, "N", out var attemptGuid) || attemptGuid == Guid.Empty)
         {
-            throw new ArgumentException("invalid-attempt");
+            throw new ArgumentException(paramName: null, message: "invalid-attempt");
         }
 
-        return new BoundIdentity(
-            owner,
-            new NeuronId(taskType, taskOwner, taskName),
-            new AttemptId(attemptGuid));
+        try
+        {
+            return new BoundIdentity(
+                owner,
+                new NeuronId(taskType, taskOwner, taskName),
+                new AttemptId(attemptGuid));
+        }
+        catch (ArgumentException)
+        {
+            throw new ArgumentException(paramName: null, message: "invalid-request");
+        }
     }
 
     private static ProtectedPayloadReference RequireReference(ProtectedReferenceBody? body)
     {
         if (body is null || string.IsNullOrWhiteSpace(body.Id))
         {
-            throw new ArgumentException("invalid-protected-reference");
+            throw new ArgumentException(paramName: null, message: "invalid-protected-reference");
         }
 
         if (!Guid.TryParseExact(body.Id, "N", out var id) || id == Guid.Empty)
         {
-            throw new ArgumentException("invalid-protected-reference");
+            throw new ArgumentException(paramName: null, message: "invalid-protected-reference");
         }
 
-        return new ProtectedPayloadReference(id, body.ExpiresAt);
+        try
+        {
+            return new ProtectedPayloadReference(id, body.ExpiresAt);
+        }
+        catch (ArgumentException)
+        {
+            throw new ArgumentException(paramName: null, message: "invalid-protected-reference");
+        }
     }
 
     private static string MapArgumentReason(ArgumentException exception)
-        => string.IsNullOrWhiteSpace(exception.Message) ? "invalid-request" : exception.Message;
+    {
+        if (exception.ParamName is "plaintext")
+        {
+            return "empty-payload";
+        }
+
+        if (IsStableReason(exception.Message))
+        {
+            return exception.Message;
+        }
+
+        return "invalid-request";
+    }
+
+    private static bool IsStableReason(string? reason)
+        => reason is "missing-owner"
+            or "missing-task-owner"
+            or "owner-task-mismatch"
+            or "missing-task-identity"
+            or "invalid-attempt"
+            or "empty-payload"
+            or "invalid-payload-content"
+            or "invalid-protected-reference"
+            or "invalid-request";
 
     private static IResult Failure(string reason)
         => Results.Content(reason, "text/plain", statusCode: StatusCodes.Status400BadRequest);

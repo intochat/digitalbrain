@@ -338,9 +338,11 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
             triggerBytes,
             cancellationToken);
 
-        using var load = await client.PostAsJsonAsync(
-            "v1/behaviors/broker/payloads/load",
-            new
+        using var loadRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            "v1/behaviors/broker/payloads/load")
+        {
+            Content = JsonContent.Create(new
             {
                 owner = SurfaceOwner,
                 taskType = task.Type,
@@ -348,8 +350,12 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
                 taskName = task.Name,
                 attempt = attempt.Value.ToString("N"),
                 reference = new { id = stored.Id, expiresAt = stored.ExpiresAt },
-            },
-            cancellationToken);
+            }),
+        };
+        loadRequest.Headers.TryAddWithoutValidation(
+            BehaviorBrokerContract.CredentialHeaderName,
+            TestingAppHostFixture.BrokerCredential);
+        using var load = await client.SendAsync(loadRequest, cancellationToken);
         Assert.True(load.IsSuccessStatusCode, await load.Content.ReadAsStringAsync(cancellationToken));
         var loaded = await load.Content.ReadFromJsonAsync<LoadPayloadResponse>(
             cancellationToken: cancellationToken);
@@ -365,9 +371,11 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         byte[] triggerBytes,
         CancellationToken cancellationToken)
     {
-        using var store = await client.PostAsJsonAsync(
-            "v1/behaviors/broker/payloads/store",
-            new
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "v1/behaviors/broker/payloads/store")
+        {
+            Content = JsonContent.Create(new
             {
                 owner,
                 taskType = task.Type,
@@ -375,8 +383,13 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
                 taskName = task.Name,
                 attempt = attempt.Value.ToString("N"),
                 contentBase64 = Convert.ToBase64String(triggerBytes),
-            },
-            cancellationToken);
+            }),
+        };
+        request.Headers.TryAddWithoutValidation(
+            BehaviorBrokerContract.CredentialHeaderName,
+            TestingAppHostFixture.BrokerCredential);
+
+        using var store = await client.SendAsync(request, cancellationToken);
         Assert.True(store.IsSuccessStatusCode, await store.Content.ReadAsStringAsync(cancellationToken));
         var stored = await store.Content.ReadFromJsonAsync<StoredPayloadResponse>(
             cancellationToken: cancellationToken);

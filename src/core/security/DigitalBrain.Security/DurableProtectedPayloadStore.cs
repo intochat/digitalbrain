@@ -12,13 +12,11 @@ internal sealed class DurableProtectedPayloadStore(
     OwnerId owner,
     TimeProvider time) : IProtectedPayloadStore
 {
-    private const string PurposePrefix = "DigitalBrain.Security.ProtectedPayloadStore/v1/";
+    private const string PurposePrefix = "DigitalBrain.Security.ProtectedPayloadStore/v2/";
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
-
-    private readonly string purpose = PurposePrefix + owner.Value;
 
     public async ValueTask<ProtectedPayloadReference> StoreAsync(
         OwnerId storeOwner,
@@ -64,6 +62,7 @@ internal sealed class DurableProtectedPayloadStore(
         }
 
         var id = Guid.NewGuid();
+        var purpose = PurposeFor(storeOwner, task, attempt);
         var protectedBytes = protector.Protect(purpose, plaintext.Span);
         var entries = ReadEntries();
         entries[id] = new StoredEntry(
@@ -140,6 +139,7 @@ internal sealed class DurableProtectedPayloadStore(
             throw new CryptographicException("The protected payload reference is invalid.");
         }
 
+        var purpose = PurposeFor(loadOwner, task, attempt);
         var plaintext = protector.Unprotect(purpose, protectedPayload);
         return ValueTask.FromResult<ReadOnlyMemory<byte>>(plaintext);
     }
@@ -151,6 +151,18 @@ internal sealed class DurableProtectedPayloadStore(
             throw new CryptographicException("The protected payload reference is invalid.");
         }
     }
+
+    private static string PurposeFor(OwnerId boundOwner, NeuronId task, Guid attempt)
+        => PurposePrefix
+            + boundOwner.Value
+            + "/"
+            + task.Type
+            + "/"
+            + task.Owner.Value
+            + "/"
+            + task.Name
+            + "/"
+            + attempt.ToString("N");
 
     private static void RequireTask(NeuronId task)
     {

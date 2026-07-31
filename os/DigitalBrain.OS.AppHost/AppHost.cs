@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Publishing;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.Ollama;
@@ -34,11 +37,24 @@ brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 brain.AddModule<BehaviorsModule>();
 
+var behaviorBrokerCredential = builder.ExecutionContext.IsRunMode
+    ? builder.AddParameter(
+        "behavior-broker-credential",
+        new BehaviorBrokerCredentialParameterDefault(),
+        secret: true,
+        persist: true)
+    : builder.AddParameter("behavior-broker-credential", secret: true);
+behaviorBrokerCredential.WithDescription(
+    "Shared service credential for the BehaviorHost → silo reverse payload broker. Not an owner identity.");
+
 var silo = builder.AddProject<Projects.DigitalBrain_OS_Host>(ProductSurfaceResources.Silo)
     .WithReference(brain)
     .WithEnvironment(
         BehaviorsModule.ExecutorConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
         BehaviorsModule.HostExecutorName)
+    .WithEnvironment(
+        BehaviorBrokerContract.CredentialConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
+        behaviorBrokerCredential)
     .WithHttpHealthCheck("/health");
 
 var behaviorHost = builder.AddProject<Projects.DigitalBrain_OS_BehaviorHost>(ProductSurfaceResources.BehaviorHost)
@@ -47,6 +63,9 @@ var behaviorHost = builder.AddProject<Projects.DigitalBrain_OS_BehaviorHost>(Pro
     .WithEnvironment(
         BehaviorHostHosting.BrokerBaseAddressConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
         silo.GetEndpoint("http"))
+    .WithEnvironment(
+        BehaviorBrokerContract.CredentialConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
+        behaviorBrokerCredential)
     .WithHttpHealthCheck("/health")
     .WaitFor(silo)
     .WithEnvironment(
@@ -75,3 +94,12 @@ builder.AddProject<Projects.DigitalBrain_OS_McpHost>(ProductSurfaceResources.Mcp
 #pragma warning restore ASPIREMCP001
 
 builder.Build().Run();
+
+file sealed class BehaviorBrokerCredentialParameterDefault : ParameterDefault
+{
+    public override string GetDefaultValue()
+        => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
+    public override void WriteToManifest(ManifestPublishingContext context)
+        => throw new InvalidOperationException("Local behavior-broker credential defaults cannot be published.");
+}

@@ -285,7 +285,8 @@ public sealed class HttpBehaviorHostBrokerClientTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["DigitalBrain:Security:StateProtectionKey"] = Convert.ToBase64String(new byte[32]),
-                [BehaviorHostHosting.BrokerBaseAddressConfigurationKey] = "https://broker.example/"
+                [BehaviorHostHosting.BrokerBaseAddressConfigurationKey] = "https://broker.example/",
+                [BehaviorHostHosting.BrokerCredentialConfigurationKey] = "unit-test-broker-credential",
             })
             .Build();
 
@@ -299,6 +300,26 @@ public sealed class HttpBehaviorHostBrokerClientTests
         var httpClientFactory = presentProvider.GetRequiredService<IHttpClientFactory>();
         using var named = httpClientFactory.CreateClient(BehaviorHostHosting.BrokerHttpClientName);
         Assert.Equal(new Uri("https://broker.example/"), named.BaseAddress);
+        Assert.True(named.DefaultRequestHeaders.Contains(BehaviorHostHosting.BrokerCredentialHeaderName));
+        Assert.Equal(
+            "unit-test-broker-credential",
+            named.DefaultRequestHeaders.GetValues(BehaviorHostHosting.BrokerCredentialHeaderName).Single());
+
+        Assert.Throws<InvalidOperationException>(() =>
+        {
+            var incomplete = new ServiceCollection();
+            incomplete.AddBehaviorHostEngine(new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["DigitalBrain:Security:StateProtectionKey"] = Convert.ToBase64String(new byte[32]),
+                    [BehaviorHostHosting.BrokerBaseAddressConfigurationKey] = "https://broker.example/",
+                })
+                .Build());
+            using var incompleteProvider = incomplete.BuildServiceProvider();
+            _ = incompleteProvider.GetService<IBehaviorHostBrokerClientFactory>();
+            _ = incompleteProvider.GetRequiredService<IHttpClientFactory>()
+                .CreateClient(BehaviorHostHosting.BrokerHttpClientName);
+        });
     }
 
     private static IBehaviorHostBrokerClientFactory CreateFactory(RecordingHttpMessageHandler handler)
@@ -307,7 +328,8 @@ public sealed class HttpBehaviorHostBrokerClientTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["DigitalBrain:Security:StateProtectionKey"] = Convert.ToBase64String(new byte[32]),
-                [BehaviorHostHosting.BrokerBaseAddressConfigurationKey] = "https://broker.test/"
+                [BehaviorHostHosting.BrokerBaseAddressConfigurationKey] = "https://broker.test/",
+                [BehaviorHostHosting.BrokerCredentialConfigurationKey] = "unit-test-broker-credential",
             })
             .Build();
 

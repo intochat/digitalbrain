@@ -4,6 +4,8 @@ using DigitalBrain.Behaviors;
 const string Silo = "silo";
 const string BehaviorHost = "behavior-host";
 const string KnownStateProtectionKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+// TestingAppHost-only shared broker credential. Not a production secret; product uses a secret parameter.
+const string KnownBrokerCredential = "testing-behavior-broker-credential-v1";
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -18,6 +20,9 @@ var silo = builder.AddProject<Projects.DigitalBrain_OS_Host>(Silo)
     .WithEnvironment(
         BehaviorsModule.ExecutorConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
         BehaviorsModule.HostExecutorName)
+    .WithEnvironment(
+        BehaviorBrokerContract.CredentialConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
+        KnownBrokerCredential)
     .WithHttpHealthCheck("/health");
 
 var behaviorHost = builder.AddProject<Projects.DigitalBrain_OS_BehaviorHost>(BehaviorHost)
@@ -28,6 +33,9 @@ var behaviorHost = builder.AddProject<Projects.DigitalBrain_OS_BehaviorHost>(Beh
     .WithEnvironment(
         BehaviorHostHosting.BrokerBaseAddressConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
         silo.GetEndpoint("http"))
+    .WithEnvironment(
+        BehaviorBrokerContract.CredentialConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
+        KnownBrokerCredential)
     .WithHttpHealthCheck("/health")
     .WaitFor(silo);
 

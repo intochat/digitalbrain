@@ -21,4 +21,6 @@ public sealed class TestingAppHostFixture :
     public const string BehaviorHostResourceName = "behavior-host";
 
     public const string HealthPath = "/health";
+
+    public const string BrokerCredential = "testing-behavior-broker-credential-v1";
 }
