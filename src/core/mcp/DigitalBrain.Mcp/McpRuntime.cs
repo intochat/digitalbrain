@@ -10,6 +10,10 @@ internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
 {
     internal const string HttpClientName = "DigitalBrain.Mcp";
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2025:Ensure tasks using 'IDisposable' instances complete before the instances are disposed",
+        Justification = "On authorization deny the MCP SDK CreateAsync may never complete; the open token is canceled and the parked Task.Run is abandoned so the grain turn can return.")]
     internal async ValueTask<T> RunAsync<T>(
         McpServerDefinition server,
         IDurableValue<byte[]> tokenState,
@@ -34,7 +38,13 @@ internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
             server.DisplayName,
             owner,
             grains);
+        // Register by command id immediately so DeliverCallback deny can always signal this ambient.
+        McpAuthorizationCodeHub.RegisterAmbient(commandId.ToString(), ambient);
         using var scope = McpAuthorizationAmbient.Enter(ambient);
+        using var openLinked = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            ambient.OpenCancellation);
+        var openToken = openLinked.Token;
 
         // Run the MCP open off the grain turn so OAuth's wait on BeginCompleted cannot
         // deadlock against this turn's WhenAny/Begin sequence under Orleans serialization.
@@ -46,16 +56,17 @@ internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
                 durableIdentity,
                 ambient,
                 callback,
-                cancellationToken),
-            cancellationToken);
+                openToken),
+            openToken);
+
+        var authorization = grains.GetGrain<IMcpAuthorization>(
+            NeuronId.For<IMcpAuthorization>(owner, McpAuthorizationNeuron.InstanceName).ToGrainId());
 
         var step = await Task.WhenAny(work, ambient.SignInReady.Task);
         if (step == ambient.SignInReady.Task && !work.IsCompleted)
         {
             var signIn = await ambient.SignInReady.Task;
             McpAuthorizationCodeHub.RegisterAmbient(signIn.State, ambient);
-            var authorization = grains.GetGrain<IMcpAuthorization>(
-                NeuronId.For<IMcpAuthorization>(owner, McpAuthorizationNeuron.InstanceName).ToGrainId());
             await authorization.Begin(
                 new BeginMcpAuthorization(
                     commandId,
@@ -65,6 +76,16 @@ internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
                     signIn.State),
                 cancellationToken);
             ambient.BeginCompleted.TrySetResult();
+        }
+
+        // Race hold-open work against deny. On deny, cancel and abandon the parked CreateAsync —
+        // awaiting it after a null AuthorizationResult can hang forever on session Completion.
+        var settled = await Task.WhenAny(work, ambient.Denied.Task);
+        if (ReferenceEquals(settled, ambient.Denied.Task) && !work.IsCompleted)
+        {
+            ambient.CancelOpen();
+            throw new McpAuthorizationDeniedException(
+                $"Authorization for '{server.Key}' was denied for command '{commandId}'.");
         }
 
         return await work;

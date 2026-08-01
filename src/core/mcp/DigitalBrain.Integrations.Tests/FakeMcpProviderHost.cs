@@ -36,25 +36,38 @@ internal sealed class FakeMcpProviderHost : IAsyncDisposable
         "client_secret_basic",
         "none",
     ];
-    private static readonly string[] ScopesSupported =
+    private static readonly string[] GmailScopesSupported =
     [
         "https://www.googleapis.com/auth/gmail.readonly",
+    ];
+    private static readonly string[] SalesforceScopesSupported =
+    [
+        "mcp_api",
+        "refresh_token",
     ];
 
     private readonly ConcurrentDictionary<string, PendingCode> _codes = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, IssuedToken> _tokens = new(StringComparer.Ordinal);
+    private readonly string[] _scopesSupported;
+    private readonly Func<FakeMcpProviderHost, McpServerTool> _toolFactory;
     private readonly WebApplication _app;
     private int _bearerHits;
 
     private FakeMcpProviderHost(
         WebApplication app,
         Uri baseAddress,
+        string[] scopesSupported,
+        Func<FakeMcpProviderHost, McpServerTool> toolFactory,
         string sampleMessageId,
         string sampleSubject,
         string sampleSender,
-        string sampleBody)
+        string sampleBody,
+        string sampleAccountId,
+        string sampleDescription)
     {
         _app = app;
+        _scopesSupported = scopesSupported;
+        _toolFactory = toolFactory;
         BaseAddress = baseAddress;
         AuthorizeEndpoint = new Uri(baseAddress, "/authorize");
         TokenEndpoint = new Uri(baseAddress, "/token");
@@ -63,6 +76,8 @@ internal sealed class FakeMcpProviderHost : IAsyncDisposable
         SampleSubject = sampleSubject;
         SampleSender = sampleSender;
         SampleBody = sampleBody;
+        SampleAccountId = sampleAccountId;
+        SampleDescription = sampleDescription;
     }
 
     internal Uri BaseAddress { get; }
@@ -73,15 +88,53 @@ internal sealed class FakeMcpProviderHost : IAsyncDisposable
     internal string SampleSubject { get; }
     internal string SampleSender { get; }
     internal string SampleBody { get; }
+    internal string SampleAccountId { get; }
+    internal string SampleDescription { get; }
     internal bool DenyNextAuthorization { get; set; }
     internal int BearerHits => Volatile.Read(ref _bearerHits);
     internal string? LastBearerToken { get; private set; }
 
-    internal static async Task<FakeMcpProviderHost> StartAsync(
+    internal static Task<FakeMcpProviderHost> StartAsync(
         string sampleMessageId,
         string sampleSubject,
         string sampleSender,
         string sampleBody,
+        CancellationToken cancellationToken)
+        => StartCoreAsync(
+            GmailScopesSupported,
+            CreateAdmittedGetMessage,
+            sampleMessageId,
+            sampleSubject,
+            sampleSender,
+            sampleBody,
+            sampleAccountId: string.Empty,
+            sampleDescription: string.Empty,
+            cancellationToken);
+
+    internal static Task<FakeMcpProviderHost> StartForSalesforceAsync(
+        string sampleAccountId,
+        string sampleDescription,
+        CancellationToken cancellationToken)
+        => StartCoreAsync(
+            SalesforceScopesSupported,
+            host => AdmittedMcpTools.SalesforceSoqlQuery(host.SampleAccountId, host.SampleDescription),
+            sampleMessageId: string.Empty,
+            sampleSubject: string.Empty,
+            sampleSender: string.Empty,
+            sampleBody: string.Empty,
+            sampleAccountId,
+            sampleDescription,
+            cancellationToken);
+
+    private static async Task<FakeMcpProviderHost> StartCoreAsync(
+        string[] scopesSupported,
+        Func<FakeMcpProviderHost, McpServerTool> toolFactory,
+        string sampleMessageId,
+        string sampleSubject,
+        string sampleSender,
+        string sampleBody,
+        string sampleAccountId,
+        string sampleDescription,
         CancellationToken cancellationToken)
     {
         var port = FreePort();
@@ -106,29 +159,25 @@ internal sealed class FakeMcpProviderHost : IAsyncDisposable
                 {
                     Resource = baseAddress.AbsoluteUri,
                     AuthorizationServers = { baseAddress.AbsoluteUri },
-                    ScopesSupported =
-                    [
-                        "https://www.googleapis.com/auth/gmail.readonly",
-                    ],
+                    ScopesSupported = [.. scopesSupported],
                     BearerMethodsSupported = ["header"],
                 };
             });
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton<IOpaqueTokenValidator>(
             new DelegateTokenValidator(token => host?.TryValidateBearer(token) == true));
-        // Capture sample payload into the admitted Gmail tool so wire-shape matches L1.
         McpServerTool? tool = null;
         builder.Services
             .AddMcpServer()
             .WithHttpTransport(options => options.Stateless = true)
             .WithListToolsHandler((_, _) =>
             {
-                tool ??= CreateAdmittedGetMessage(host!);
+                tool ??= toolFactory(host!);
                 return ValueTask.FromResult(new ListToolsResult { Tools = [tool.ProtocolTool] });
             })
             .WithCallToolHandler(async (request, cancellation) =>
             {
-                tool ??= CreateAdmittedGetMessage(host!);
+                tool ??= toolFactory(host!);
                 return await tool.InvokeAsync(request, cancellation);
             });
 
@@ -136,10 +185,14 @@ internal sealed class FakeMcpProviderHost : IAsyncDisposable
         host = new FakeMcpProviderHost(
             app,
             baseAddress,
+            scopesSupported,
+            toolFactory,
             sampleMessageId,
             sampleSubject,
             sampleSender,
-            sampleBody);
+            sampleBody,
+            sampleAccountId,
+            sampleDescription);
 
         app.UseAuthentication();
         app.UseAuthorization();
@@ -163,7 +216,7 @@ internal sealed class FakeMcpProviderHost : IAsyncDisposable
                 grant_types_supported = GrantTypesSupported,
                 code_challenge_methods_supported = CodeChallengeMethodsSupported,
                 token_endpoint_auth_methods_supported = TokenEndpointAuthMethodsSupported,
-                scopes_supported = ScopesSupported,
+                scopes_supported = host._scopesSupported,
             });
         });
 

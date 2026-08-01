@@ -22,8 +22,14 @@ internal static class McpAuthorizationAmbient
     }
 }
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Design",
+    "CA1001:Types that own disposable fields should be disposable",
+    Justification = "OpenLifetime is cancel-only for the hold-open attempt lifetime; McpRuntime does not dispose it mid-flight under Task.Run.")]
 internal sealed class McpAuthorizationAmbientState
 {
+    private readonly CancellationTokenSource _openLifetime = new();
+
     internal McpAuthorizationAmbientState(
         CommandId commandId,
         string serverKey,
@@ -40,6 +46,7 @@ internal sealed class McpAuthorizationAmbientState
             TaskCreationOptions.RunContinuationsAsynchronously);
         BeginCompleted = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
+        Denied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     internal CommandId CommandId { get; }
@@ -49,6 +56,25 @@ internal sealed class McpAuthorizationAmbientState
     internal IGrainFactory Grains { get; }
     internal TaskCompletionSource<McpAuthorizationSignIn> SignInReady { get; }
     internal TaskCompletionSource BeginCompleted { get; }
+    internal TaskCompletionSource Denied { get; }
+    internal CancellationToken OpenCancellation => _openLifetime.Token;
+
+    internal void SignalDenied()
+    {
+        Denied.TrySetResult();
+        CancelOpen();
+    }
+
+    internal void CancelOpen()
+    {
+        try
+        {
+            _openLifetime.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
 }
 
 internal sealed record McpAuthorizationSignIn(Uri SignInUrl, string State);

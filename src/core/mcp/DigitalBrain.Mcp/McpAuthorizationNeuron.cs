@@ -199,6 +199,7 @@ internal sealed class McpAuthorizationNeuron :
             else if (pending.Outcome is PendingAuthorizationOutcome.Denied)
             {
                 McpAuthorizationCodeHub.Complete(delivery.State, result: null);
+                McpAuthorizationCodeHub.SignalDenied(pending.CommandId);
             }
 
             // Explicit callback redelivery redrives the completion target even after a prior notify,
@@ -218,6 +219,8 @@ internal sealed class McpAuthorizationNeuron :
             await EmitAsync(new AuthorizationDenied(pending.CommandId, pending.ServerKey, pending.State));
             await NotifyCompletionTargetAsync(pending);
             McpAuthorizationCodeHub.Complete(delivery.State, result: null);
+            // Command-id signal is authoritative: releases hold-open even if OAuth state keys diverge.
+            McpAuthorizationCodeHub.SignalDenied(pending.CommandId);
             return new McpAuthorizationCallbackDelivery(Accepted: true, Completed: false, Denied: true);
         }
 
