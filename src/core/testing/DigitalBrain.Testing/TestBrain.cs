@@ -171,14 +171,19 @@ public sealed class TestBrain : IAsyncDisposable
     internal JournalFaultHandle ArmJournalFault(
         NeuronId target,
         string message,
-        int allowCommitsBeforeFault = 0)
+        int allowCommitsBeforeFault = 0,
+        bool stickyUntilDisarm = false)
     {
         lock (_faultGate)
         {
             try
             {
                 ObjectDisposedException.ThrowIf(Volatile.Read(ref _release) is null, this);
-                var registration = Cluster.ArmJournalFault(target, message, allowCommitsBeforeFault);
+                var registration = Cluster.ArmJournalFault(
+                    target,
+                    message,
+                    allowCommitsBeforeFault,
+                    stickyUntilDisarm);
                 var handle = new JournalFaultHandle(registration, RetireJournalFault, _diagnostics);
                 _faults.Add(handle);
                 return handle;

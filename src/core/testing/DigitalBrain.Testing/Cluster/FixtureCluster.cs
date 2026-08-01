@@ -78,8 +78,9 @@ internal sealed class FixtureCluster : IAsyncDisposable
     internal JournalFaultRegistration ArmJournalFault(
         NeuronId target,
         string message,
-        int allowCommitsBeforeFault = 0)
-        => _journalStorage.ArmFault(target, message, allowCommitsBeforeFault);
+        int allowCommitsBeforeFault = 0,
+        bool stickyUntilDisarm = false)
+        => _journalStorage.ArmFault(target, message, allowCommitsBeforeFault, stickyUntilDisarm);
 
     internal bool DisarmJournalFault(JournalFaultRegistration registration)
         => _journalStorage.DisarmFault(registration);

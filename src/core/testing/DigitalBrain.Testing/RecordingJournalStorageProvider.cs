@@ -16,7 +16,8 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     internal JournalFaultRegistration ArmFault(
         NeuronId target,
         string message,
-        int allowCommitsBeforeFault = 0)
+        int allowCommitsBeforeFault = 0,
+        bool stickyUntilDisarm = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
         ArgumentOutOfRangeException.ThrowIfNegative(allowCommitsBeforeFault);
@@ -30,7 +31,7 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
                     $"A journal commit fault is already armed for neuron '{target}'.");
             }
 
-            var state = new JournalFaultState(message, allowCommitsBeforeFault);
+            var state = new JournalFaultState(message, allowCommitsBeforeFault, stickyUntilDisarm);
             _failures.Add(journalId, state);
             return new(target, message, state.Consumed.Task, state);
         }
@@ -69,13 +70,19 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
                 return;
             }
 
-            _failures.Remove(journalId);
             failure.Consumed.TrySetResult();
+            // One-shot faults remove themselves so later commits succeed. Sticky faults keep
+            // failing until DisarmFault so outbox redelivery cannot leap past a faulted turn.
+            if (!failure.StickyUntilDisarm)
+            {
+                _failures.Remove(journalId);
+            }
+
             throw new InvalidOperationException(failure.Message);
         }
     }
 
-    private sealed class JournalFaultState(string message, int allowCommitsBeforeFault)
+    private sealed class JournalFaultState(string message, int allowCommitsBeforeFault, bool stickyUntilDisarm)
     {
         internal TaskCompletionSource Consumed { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -83,6 +90,8 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
         internal string Message { get; } = message;
 
         internal int RemainingAllowedCommits { get; set; } = allowCommitsBeforeFault;
+
+        internal bool StickyUntilDisarm { get; } = stickyUntilDisarm;
     }
 
     private sealed class RecordingJournalStorage(

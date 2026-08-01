@@ -655,9 +655,11 @@ public sealed partial class TaskLifecycle
             hasWakeup => !hasWakeup,
             cancellationToken);
 
-        await using (var fault = task.FailJournalCommitAfter(
-            allowCommitsBeforeFault: 0,
-            message: complete
+        // Sticky hold: completer stages Complete/Deny via SendAsync, so after a faulted Task turn the
+        // worker outbox redelivers. One-shot faults would let that redelivery leap to terminal before
+        // the atomic surface is observed. Sticky keeps the faulted-turn surface readable as Waiting.
+        await using (var fault = task.FailJournalCommitsUntilDisposed(
+            complete
                 ? "task complete sole final outer-turn journal write fails"
                 : "task deny sole final outer-turn journal write fails"))
         {
@@ -694,22 +696,22 @@ public sealed partial class TaskLifecycle
             Assert.True(
                 fault.IsConsumed,
                 "Task journal fault must fire on the sole final outer-turn commit during complete/deny handling.");
+
+            await brain.Clock.AdvanceAsync(TimeSpan.FromSeconds(2), cancellationToken);
+            await task.RestartHostAsync(cancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+
+            task = brain.Neuron<ITask>($"{label}-task");
+            worker = brain.Neuron<IWorker>($"{label}-worker");
+
+            // Faulted sole final commit leaves no durable terminal state/receipt/effect.
+            // Correct atomic surface: still Waiting with blocker so redrive can converge exactly once.
+            var afterFault = await task.Reference.Read()
+                .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            Assert.Equal(TaskState.Waiting, afterFault.State);
+            Assert.NotNull(afterFault.Blocker);
+            Assert.Equal(started.ActiveAttempt, afterFault.ActiveAttempt);
         }
-
-        await brain.Clock.AdvanceAsync(TimeSpan.FromSeconds(2), cancellationToken);
-        await task.RestartHostAsync(cancellationToken)
-            .WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
-
-        task = brain.Neuron<ITask>($"{label}-task");
-        worker = brain.Neuron<IWorker>($"{label}-worker");
-
-        // Faulted sole final commit leaves no durable terminal state/receipt/effect.
-        // Correct atomic surface: still Waiting with blocker so redrive can converge exactly once.
-        var afterFault = await task.Reference.Read()
-            .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
-        Assert.Equal(TaskState.Waiting, afterFault.State);
-        Assert.NotNull(afterFault.Blocker);
-        Assert.Equal(started.ActiveAttempt, afterFault.ActiveAttempt);
 
         if (complete)
         {
