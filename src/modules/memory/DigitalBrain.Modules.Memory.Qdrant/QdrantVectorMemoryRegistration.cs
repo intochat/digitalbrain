@@ -9,7 +9,7 @@ public static class QdrantVectorMemoryRegistration
     public const string CollectionNameConfigurationKey = "DigitalBrain:Memory:Qdrant:CollectionName";
     public const string DefaultConnectionName = "memory-qdrant";
 
-    public static QdrantClient CreateClient(string connectionString)
+    internal static QdrantClient CreateClient(string connectionString)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         if (!TryParseConnectionString(connectionString, out var endpoint, out var apiKey))
@@ -23,7 +23,7 @@ public static class QdrantVectorMemoryRegistration
             : new QdrantClient(endpoint, apiKey: apiKey);
     }
 
-    public static bool TryParseConnectionString(
+    internal static bool TryParseConnectionString(
         string connectionString,
         out Uri endpoint,
         out string? apiKey)

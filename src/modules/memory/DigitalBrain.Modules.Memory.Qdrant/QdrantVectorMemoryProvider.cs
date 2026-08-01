@@ -7,7 +7,7 @@ using Qdrant.Client.Grpc;
 
 namespace DigitalBrain.Memory.Qdrant;
 
-public sealed class QdrantVectorMemoryProvider : IAsyncDisposable
+internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
 {
     internal const string DefaultCollectionName = "digitalbrain_vector_memory";
 
@@ -468,7 +468,7 @@ public sealed class QdrantVectorMemoryProvider : IAsyncDisposable
     }
 }
 
-public sealed record QdrantVectorMemoryHit(
+internal sealed record QdrantVectorMemoryHit(
     string Key,
     string Text,
     IReadOnlyDictionary<string, string> Metadata,

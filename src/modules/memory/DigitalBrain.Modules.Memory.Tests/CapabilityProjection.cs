@@ -197,6 +197,40 @@ public sealed class CapabilityProjectionContract(MemoryFixture fixture)
         Assert.False(removed.Removed);
     }
 
+    [Fact(DisplayName = "ProjectionBootNeuron handles DigitalBrainActivated and emits reconcile facts")]
+    public void Projection_boot_neuron_is_activation_reconciler()
+    {
+        Assert.Contains(
+            typeof(IHandle<DigitalBrainActivated>),
+            typeof(ProjectionBootNeuron).GetInterfaces());
+        Assert.Contains(
+            typeof(IEmit<VectorProjectionReconciled>),
+            typeof(ProjectionBootNeuron).GetInterfaces());
+        Assert.Equal(
+            "memory-projection-boot",
+            NeuronId.GrainTypeNameOf(typeof(ProjectionBootNeuron)));
+
+        var source = File.ReadAllText(
+            Path.Combine(RepoRoot(), "src", "modules", "memory", "DigitalBrain.Modules.Memory", "MemoryModule.cs"));
+        Assert.Contains(nameof(ProjectionReconciler), source, StringComparison.Ordinal);
+    }
+
+    private static string RepoRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Could not locate repository root from test base directory.");
+    }
+
     private static ICompiledModule GreeterModule()
     {
         var sayHello = new SynapseCapabilityDescriptor(

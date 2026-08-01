@@ -1,3 +1,4 @@
+using System.Reflection;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Memory.Qdrant;
 using DigitalBrain.Testing;
@@ -261,6 +262,23 @@ public sealed class QdrantVectorMemoryContract : IAsyncLifetime
             Assert.DoesNotContain("Qdrant", type.FullName, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Qdrant", type.Namespace, StringComparison.OrdinalIgnoreCase);
         }
+    }
+
+    [Fact(DisplayName = "Memory.Qdrant package exports only configuration surface, not provider DTOs")]
+    public void Qdrant_package_exports_only_registration_surface()
+    {
+        var exported = typeof(QdrantVectorMemoryRegistration).Assembly
+            .GetExportedTypes()
+            .Select(static type => type.Name)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal([nameof(QdrantVectorMemoryRegistration)], exported);
+        Assert.DoesNotContain("QdrantVectorMemoryProvider", exported);
+        Assert.DoesNotContain("QdrantVectorMemoryHit", exported);
+        Assert.Null(typeof(QdrantVectorMemoryRegistration).GetMethod(
+            "CreateClient",
+            BindingFlags.Public | BindingFlags.Static));
     }
 
     [Fact(DisplayName = "WithQdrant is the public Aspire projection entry point")]
