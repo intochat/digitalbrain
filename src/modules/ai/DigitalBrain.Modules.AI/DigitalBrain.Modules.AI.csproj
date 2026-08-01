@@ -15,7 +15,9 @@
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.AI.Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain\DigitalBrain.csproj" />
+    <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\security\DigitalBrain.Security\DigitalBrain.Security.csproj" />
+    <ProjectReference Include="..\..\memory\DigitalBrain.Modules.Memory.Contracts\DigitalBrain.Modules.Memory.Contracts.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
 </Project>

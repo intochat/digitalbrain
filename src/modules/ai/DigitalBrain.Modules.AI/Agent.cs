@@ -1,6 +1,8 @@
 using System.Runtime.CompilerServices;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.AI;
 
@@ -17,9 +19,10 @@ public abstract class Agent : Neuron, IAgent
             .Build();
     }
 
-    protected abstract IReadOnlyList<CapabilityTool> ToolsFor(IReadOnlyList<ChatMessage> messages);
-
     protected virtual string? Instructions => null;
+
+    protected virtual IReadOnlyList<CapabilityTool> AdditionalToolsFor(IReadOnlyList<ChatMessage> messages)
+        => [];
 
     protected static CapabilityTool Capability(string name, string description, Delegate invoke)
         => new(name, description, invoke);
@@ -29,11 +32,13 @@ public abstract class Agent : Neuron, IAgent
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(messages);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var turnScheduler = TaskScheduler.Current;
+        var tools = await ResolveToolsAsync(messages, cancellationToken);
         var options = new ChatOptions
         {
-            Tools = [.. ToolsFor(messages).Select(tool => tool.BindTo(turnScheduler))],
+            Tools = [.. tools.Select(tool => tool.BindTo(turnScheduler))],
             ToolMode = ChatToolMode.Auto,
         };
         var instructions = Instructions;
@@ -61,5 +66,99 @@ public abstract class Agent : Neuron, IAgent
         ArgumentNullException.ThrowIfNull(messages);
 
         return RespondStreaming(messages).ToChatResponseAsync();
+    }
+
+    public Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+
+        return RespondStreaming(messages, cancellationToken).ToChatResponseAsync(cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<CapabilityTool>> ResolveToolsAsync(
+        IReadOnlyList<ChatMessage> messages,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var additional = AdditionalToolsFor(messages);
+        var discovered = await DiscoverCatalogToolsAsync(messages, cancellationToken);
+
+        if (additional.Count == 0)
+        {
+            return discovered;
+        }
+
+        if (discovered.Count == 0)
+        {
+            return additional;
+        }
+
+        var merged = new List<CapabilityTool>(additional.Count + discovered.Count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var tool in additional.Concat(discovered))
+        {
+            if (seen.Add(tool.Name))
+            {
+                merged.Add(tool);
+            }
+        }
+
+        return merged;
+    }
+
+    private async Task<IReadOnlyList<CapabilityTool>> DiscoverCatalogToolsAsync(
+        IReadOnlyList<ChatMessage> messages,
+        CancellationToken cancellationToken)
+    {
+        var catalog = ServiceProvider.GetService<ActiveCapabilityCatalog>();
+        if (catalog is null)
+        {
+            return [];
+        }
+
+        var typeMap = ServiceProvider.GetService<ActiveModuleContractTypeMap>();
+        var search = ServiceProvider.GetService<ICapabilityCandidateSearch>()
+            ?? new VectorMemoryCapabilitySearch(GrainFactory);
+        var router = new CapabilityRouter(catalog, search);
+        var prompt = LatestOwnerText(messages);
+        if (string.IsNullOrWhiteSpace(prompt))
+        {
+            return [];
+        }
+
+        var selected = await router.SelectAsync(Id.Owner, prompt, cancellationToken);
+        if (selected.Count == 0 || typeMap is null)
+        {
+            return [];
+        }
+
+        var tools = new List<CapabilityTool>(selected.Count);
+        foreach (var capability in selected)
+        {
+            try
+            {
+                tools.Add(SynapseCapabilityTool.Materialize(capability, GrainFactory, Id.Owner, typeMap));
+            }
+            catch (InvalidOperationException)
+            {
+                // Catalog may contain accepted synapses whose CLR types are not loadable in this process.
+            }
+        }
+
+        return tools;
+    }
+
+    private static string LatestOwnerText(IReadOnlyList<ChatMessage> messages)
+    {
+        for (var turn = messages.Count - 1; turn >= 0; turn--)
+        {
+            if (messages[turn].Role == ChatRole.User)
+            {
+                return messages[turn].Text;
+            }
+        }
+
+        return string.Empty;
     }
 }

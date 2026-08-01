@@ -15,7 +15,16 @@ public sealed class CapabilityTool
         _function = AIFunctionFactory.Create(invoke, name, description);
     }
 
+    private CapabilityTool(AIFunction function)
+    {
+        ArgumentNullException.ThrowIfNull(function);
+        _function = function;
+    }
+
     public string Name => _function.Name;
+
+    public static CapabilityTool FromFunction(AIFunction function)
+        => new(function);
 
     internal AIFunction BindTo(TaskScheduler turnScheduler)
         => new TurnBoundFunction(_function, turnScheduler);

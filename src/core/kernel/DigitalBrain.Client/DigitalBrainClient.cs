@@ -113,6 +113,28 @@ public sealed class DigitalBrainClient : IDigitalBrain
         CancellationToken cancellationToken)
         where TResponse : Synapse
     {
+        var response = await SendRequestAsync(receiver, request, typeof(TResponse), cancellationToken)
+            .ConfigureAwait(false);
+        return (TResponse)response;
+    }
+
+    public async Task<Synapse> SendRequestAsync(
+        NeuronId receiver,
+        Synapse request,
+        Type responseType,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(responseType);
+        if (!typeof(Synapse).IsAssignableFrom(responseType) || responseType.IsAbstract || responseType.IsInterface)
+        {
+            throw new ArgumentException(
+                $"Response type '{responseType}' must be a concrete Synapse.",
+                nameof(responseType));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
         var sessionId = ISessionNeuron.ForOwner(Owner);
         var session = Session();
         var cursor = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, afterSequence: 0);
@@ -124,9 +146,10 @@ public sealed class DigitalBrainClient : IDigitalBrain
             await session.WatchNeuron(sessionId, JournalKind.Incoming, cursor.ResumeSequence, reference);
 
             var delivery = await SendValidatedAsync(receiver, request, cancellationToken);
-            return await WaitForResponseAsync<TResponse>(
+            return await WaitForResponseAsync(
                 observer,
                 delivery.CorrelationId,
+                responseType,
                 cancellationToken);
         }
         finally
@@ -151,26 +174,26 @@ public sealed class DigitalBrainClient : IDigitalBrain
         return await Session().Fire(receiver, synapse);
     }
 
-    private static async Task<TResponse> WaitForResponseAsync<TResponse>(
+    private static async Task<Synapse> WaitForResponseAsync(
         ChannelJournalObserver observer,
         CorrelationId correlation,
+        Type responseType,
         CancellationToken cancellationToken)
-        where TResponse : Synapse
     {
         await foreach (var page in observer.Reads.ReadAllAsync(cancellationToken))
         {
             foreach (var delivery in page.Delta)
             {
                 if (delivery.CorrelationId == correlation
-                    && delivery.Synapse is TResponse response)
+                    && responseType.IsInstanceOfType(delivery.Synapse))
                 {
-                    return response;
+                    return delivery.Synapse;
                 }
             }
         }
 
         throw new InvalidOperationException(
-            $"The session journal watch ended before a '{typeof(TResponse).Name}' response arrived for correlation '{correlation}'.");
+            $"The session journal watch ended before a '{responseType.Name}' response arrived for correlation '{correlation}'.");
     }
 
     [SuppressMessage(

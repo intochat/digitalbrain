@@ -4,7 +4,7 @@ using Orleans;
 
 namespace DigitalBrain.Kernel;
 
-internal sealed class ActiveModuleContractTypeMap
+public sealed class ActiveModuleContractTypeMap
 {
     private readonly IReadOnlyDictionary<(string ContractId, int SchemaVersion), Type> _synapses;
     private readonly IReadOnlyDictionary<string, string> _neuronGrainTypes;
