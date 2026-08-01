@@ -444,17 +444,23 @@ public sealed partial class TaskLifecycle
         _ = await task.Incoming.NextAsync<AttemptAccepted>(cancellationToken);
         var required = await task.Incoming.NextAsync<UserActionRequired>(cancellationToken);
         _ = await WaitForStateAsync(task, TaskState.Waiting, cancellationToken);
+        // Completer rendezvous must land before authority probes; otherwise harness completion can
+        // race the Task's ParkReady outbox drain under serialized non-reentrant turns.
+        _ = await worker.Incoming.NextAsync<UserActionParkReady>(cancellationToken);
+        _ = await WaitForAsync(
+            task.HasOutboxWakeupAsync,
+            hasWakeup => !hasWakeup,
+            cancellationToken);
 
         await brain.Clock.AdvanceAsync(TimeSpan.FromMinutes(6), cancellationToken);
-        await brain.Client.SendAsync<IWorker>(
-            worker.Id.Name,
-            new CompleteParkedUserAction(
-                task.Id,
-                required.Synapse.ActionReference,
-                required.Synapse.ActionEpoch,
-                required.Synapse.ParkRevision),
+        await AssertPermanentRefusalAsync(
+            brain,
+            worker,
+            task.Id,
+            required.Synapse.ActionReference,
+            required.Synapse.ActionEpoch,
+            required.Synapse.ParkRevision,
             cancellationToken);
-        await Task.Delay(TimeSpan.FromMilliseconds(150), cancellationToken);
 
         var stillWaiting = await task.Reference.Read();
         Assert.Equal(TaskState.Waiting, stillWaiting.State);
@@ -470,6 +476,11 @@ public sealed partial class TaskLifecycle
         _ = await denyTask.Incoming.NextAsync<AttemptAccepted>(cancellationToken);
         var denyRequired = await denyTask.Incoming.NextAsync<UserActionRequired>(cancellationToken);
         var denyWaiting = await WaitForStateAsync(denyTask, TaskState.Waiting, cancellationToken);
+        _ = await denyWorker.Incoming.NextAsync<UserActionParkReady>(cancellationToken);
+        _ = await WaitForAsync(
+            denyTask.HasOutboxWakeupAsync,
+            hasWakeup => !hasWakeup,
+            cancellationToken);
 
         await brain.Client.SendAsync<IWorker>(
             denyWorker.Id.Name,

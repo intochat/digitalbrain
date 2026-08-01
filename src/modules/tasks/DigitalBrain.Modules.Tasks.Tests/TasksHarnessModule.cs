@@ -250,60 +250,33 @@ internal sealed class ScriptedWorker :
         return Task.CompletedTask;
     }
 
-    public async Task HandleAsync(CompleteParkedUserAction command, CancellationToken cancellationToken)
+    public Task HandleAsync(CompleteParkedUserAction command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         cancellationToken.ThrowIfCancellationRequested();
-        try
-        {
-            // Direct Deliver so Task authority is evaluated with this worker as Caller.
-            await GrainFactory.GetGrain<INeuron>(command.Task.ToGrainId()).Deliver(
-                SynapseDelivery.Create(
-                    new CompleteUserAction(
-                        CommandId.New(),
-                        command.ActionReference,
-                        command.ActionEpoch,
-                        command.ExpectedParkRevision),
-                    Id,
-                    sequence: 1,
-                    cause: null,
-                    TimeProvider),
-                cancellationToken);
-        }
-        catch (InvalidOperationException)
-        {
-            // Fail-closed at Task; do not poison the session outbox with redelivery.
-        }
-        catch (NeuronAuthorizationException)
-        {
-        }
+        // Outbox SendAsync matches production bridge completion: Caller is this worker completer,
+        // and delivery does not reenter the Task while its ParkReady drain turn is still open
+        // (Direct Deliver deadlocks against serialized turns until DeliveryAttemptTimeout).
+        return SendAsync(
+            command.Task,
+            new CompleteUserAction(
+                CommandId.New(),
+                command.ActionReference,
+                command.ActionEpoch,
+                command.ExpectedParkRevision));
     }
 
-    public async Task HandleAsync(DenyParkedUserAction command, CancellationToken cancellationToken)
+    public Task HandleAsync(DenyParkedUserAction command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         cancellationToken.ThrowIfCancellationRequested();
-        try
-        {
-            await GrainFactory.GetGrain<INeuron>(command.Task.ToGrainId()).Deliver(
-                SynapseDelivery.Create(
-                    new DenyUserAction(
-                        CommandId.New(),
-                        command.ActionReference,
-                        command.ActionEpoch,
-                        command.ExpectedParkRevision),
-                    Id,
-                    sequence: 1,
-                    cause: null,
-                    TimeProvider),
-                cancellationToken);
-        }
-        catch (InvalidOperationException)
-        {
-        }
-        catch (NeuronAuthorizationException)
-        {
-        }
+        return SendAsync(
+            command.Task,
+            new DenyUserAction(
+                CommandId.New(),
+                command.ActionReference,
+                command.ActionEpoch,
+                command.ExpectedParkRevision));
     }
 
     public async Task HandleAsync(ProbeUserActionCompletionDisposition command, CancellationToken cancellationToken)
