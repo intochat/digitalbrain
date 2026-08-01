@@ -387,7 +387,9 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
 
         var stopped = await behavior.Reference.StopRun(new StopBehavior(stopCommand));
         Assert.False(stopped.ActivationGateOpen);
-        Assert.Equal(BehaviorRunState.Stopped, stopped.RunState);
+        Assert.True(
+            stopped.RunState is BehaviorRunState.Stopping or BehaviorRunState.Stopped,
+            $"Stop must close the gate without holding the grain turn; residual tasks leave Stopping (got {stopped.RunState}).");
 
         var gateClosed = await gateClosedWait;
         var cancelRequested = await cancelRequestedWait;
@@ -400,6 +402,13 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
         Assert.True(
             terminal.State is TaskState.Cancelled or TaskState.Waiting,
             $"Expected cancelled or uncertain-waiting task, got {terminal.State}.");
+
+        if (stopped.RunState == BehaviorRunState.Stopping)
+        {
+            var settled = await behavior.Reference.StopRun(new StopBehavior(CommandId.New()));
+            Assert.Equal(BehaviorRunState.Stopped, settled.RunState);
+            Assert.False(settled.ActivationGateOpen);
+        }
 
         var secondTask = test.Neuron<ITask>("stop-gate-task-2");
         var secondWorker = test.Neuron<IWorker>("stop-gate-worker-2");

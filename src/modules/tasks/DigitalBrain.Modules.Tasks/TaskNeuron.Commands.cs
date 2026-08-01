@@ -114,10 +114,11 @@ internal sealed partial class TaskNeuron
         {
             data.State = TaskState.Waiting;
             data.Blocker = new OutcomeUncertain(uncertainBlocker);
-            data.PendingDispatch = null;
+            data.PendingDispatch = new CancelWorkerDispatch(Cursor(data));
 
             var uncertainSnapshot = Snapshot(data);
             data.Receipts.Add(command.CommandId, uncertainSnapshot);
+            await RegisterDispatchReminderAsync();
             await SaveAsync(data);
             await EmitAsync(new AttemptOutcomeUncertain(
                 Id,
@@ -126,7 +127,7 @@ internal sealed partial class TaskNeuron
                 data.Revision,
                 uncertainBlocker));
             await UnregisterReminderAsync(RetryReminderName);
-            await UnregisterReminderAsync(DispatchReminderName);
+            await TryDispatchPendingAsync();
             return uncertainSnapshot;
         }
 

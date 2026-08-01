@@ -188,11 +188,6 @@ internal sealed partial class BehaviorNeuron
 
             if (!IsTaskSettledForStop(snapshot))
             {
-                snapshot = await WaitForTaskSettledAsync(task, snapshot);
-            }
-
-            if (!IsTaskSettledForStop(snapshot))
-            {
                 remaining.Add(taskId);
             }
         }
@@ -250,27 +245,6 @@ internal sealed partial class BehaviorNeuron
     private static bool IsTaskSettledForStop(TaskSnapshot snapshot)
         => snapshot.State is TaskState.Succeeded or TaskState.Failed or TaskState.Cancelled
             || (snapshot.State == TaskState.Waiting && snapshot.Blocker is OutcomeUncertain);
-
-    private static async Task<TaskSnapshot> WaitForTaskSettledAsync(ITask task, TaskSnapshot current)
-    {
-        if (IsTaskSettledForStop(current))
-        {
-            return current;
-        }
-
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        while (DateTime.UtcNow < deadline)
-        {
-            await Task.Delay(TimeSpan.FromMilliseconds(25));
-            current = await task.Read();
-            if (IsTaskSettledForStop(current))
-            {
-                return current;
-            }
-        }
-
-        return current;
-    }
 
     private static TaskOperationEdge[] DeriveResultBearingEdges(
         OwnerId owner,

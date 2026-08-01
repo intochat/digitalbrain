@@ -33,7 +33,8 @@ internal sealed partial class TaskNeuron
         var data = Load();
 
         if (!Matches(data, fact)
-            || data.State is not (TaskState.Pending or TaskState.Running or TaskState.Waiting))
+            || data.State is not (TaskState.Pending or TaskState.Running or TaskState.Waiting)
+            || IsOutcomeUncertain(data))
         {
             return Task.CompletedTask;
         }
@@ -56,7 +57,8 @@ internal sealed partial class TaskNeuron
         var data = Load();
 
         if (!Matches(data, fact)
-            || data.State is not (TaskState.Running or TaskState.Waiting))
+            || data.State is not (TaskState.Running or TaskState.Waiting)
+            || IsOutcomeUncertain(data))
         {
             return;
         }
@@ -83,7 +85,8 @@ internal sealed partial class TaskNeuron
         var data = Load();
 
         if (!Matches(data, fact)
-            || data.State is TaskState.Succeeded or TaskState.Failed or TaskState.Cancelled)
+            || data.State is TaskState.Succeeded or TaskState.Failed or TaskState.Cancelled
+            || IsOutcomeUncertain(data))
         {
             return Task.CompletedTask;
         }
@@ -111,7 +114,7 @@ internal sealed partial class TaskNeuron
 
         var data = Load();
 
-        if (!Matches(data, fact) || IsTerminal(data.State))
+        if (!Matches(data, fact) || IsTerminal(data.State) || IsOutcomeUncertain(data))
         {
             return;
         }

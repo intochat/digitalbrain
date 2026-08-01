@@ -16,6 +16,7 @@ internal sealed class ScriptedWorker :
     IHandle<DispatchWorkerCancel>,
     IHandle<PrepareOperationProbe>,
     IHandle<TransitionOperationProbe>,
+    IHandle<LateAttemptSucceededProbe>,
     IHandle<TaskOperationSnapshot>,
     IHandle<UserActionParkReady>,
     IHandle<CompleteParkedUserAction>,
@@ -373,6 +374,25 @@ internal sealed class ScriptedWorker :
                 probe.Phase,
                 probe.ResponsePayload,
                 RedactedSummary: null));
+    }
+
+    public async Task HandleAsync(LateAttemptSucceededProbe probe, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(probe);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await SendAsync(
+            probe.Task,
+            new AttemptSucceeded(
+                probe.Task,
+                Id,
+                probe.Attempt,
+                probe.Revision,
+                TaskFixtures.Done,
+                Evidence:
+                [
+                    new FactReference(Id, SynapseId.New()),
+                ]));
     }
 
     public Task HandleAsync(TaskOperationSnapshot snapshot, CancellationToken cancellationToken)

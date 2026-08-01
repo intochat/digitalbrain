@@ -8,8 +8,24 @@ internal sealed partial class BehaviorNeuron
 {
     private BehaviorData LoadOrEmpty()
         => _state.Value is { Length: > 0 } serialized
-            ? _states.Deserialize(serialized)
+            ? RepairActiveRehydrate(_states.Deserialize(serialized))
             : BehaviorData.Empty;
+
+    internal static BehaviorData RepairActiveRehydrate(BehaviorData data)
+    {
+        if (data.Status == BehaviorRevisionStatus.Active
+            && data.RunState == BehaviorRunState.Idle
+            && data.ActiveArtifactHash is not null)
+        {
+            return data with
+            {
+                RunState = BehaviorRunState.Running,
+                ActivationGateOpen = true,
+            };
+        }
+
+        return data;
+    }
 
     private async Task SaveAsync(BehaviorData data)
     {

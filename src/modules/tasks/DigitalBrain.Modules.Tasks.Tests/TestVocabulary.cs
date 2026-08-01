@@ -158,6 +158,14 @@ public sealed record TransitionOperationProbe(
     [property: Id(4)] TaskOperationPhase Phase,
     [property: Id(5)] ProtectedPayloadReference? ResponsePayload) : Synapse;
 
+[GenerateSerializer]
+[Alias("tasks.tests.late-attempt-succeeded-probe")]
+[Description("Probe that injects a late AttemptSucceeded from the worker after cancel")]
+public sealed record LateAttemptSucceededProbe(
+    [property: Id(0)] NeuronId Task,
+    [property: Id(1)] AttemptId Attempt,
+    [property: Id(2)] long Revision) : Synapse;
+
 public static class TaskFixtures
 {
     public static readonly TestResult Done = new("done");
