@@ -183,6 +183,9 @@ internal sealed class McpAuthorizationNeuron :
 
         if (!_pending.TryGetValue(delivery.State, out var serialized))
         {
+            // Unknown/foreign state: complete any hub waiter for this state only. Do not AbortOpen
+            // other ambients — a live hold-open for a different state must keep parking.
+            McpAuthorizationCodeHub.Complete(delivery.State, result: null);
             return new McpAuthorizationCallbackDelivery(Accepted: false, Completed: false, Denied: false);
         }
 
@@ -198,8 +201,9 @@ internal sealed class McpAuthorizationNeuron :
             }
             else if (pending.Outcome is PendingAuthorizationOutcome.Denied)
             {
+                // Abort before any re-delivery that might re-enter the requesting grain turn.
                 McpAuthorizationCodeHub.Complete(delivery.State, result: null);
-                McpAuthorizationCodeHub.SignalDenied(pending.CommandId);
+                McpAuthorizationCodeHub.AbortOpen(pending.CommandId);
             }
 
             // Explicit callback redelivery redrives the completion target even after a prior notify,
@@ -216,11 +220,12 @@ internal sealed class McpAuthorizationNeuron :
             || string.IsNullOrWhiteSpace(delivery.Code))
         {
             pending = await PersistOutcomeAsync(pending, PendingAuthorizationOutcome.Denied, code: null, iss: null);
+            // Release hold-open BEFORE Emit/Notify: NotifyCompletionTarget can re-enter the
+            // requesting grain still parked on Terminal — abort first so that turn can finish.
+            McpAuthorizationCodeHub.Complete(delivery.State, result: null);
+            McpAuthorizationCodeHub.AbortOpen(pending.CommandId);
             await EmitAsync(new AuthorizationDenied(pending.CommandId, pending.ServerKey, pending.State));
             await NotifyCompletionTargetAsync(pending);
-            McpAuthorizationCodeHub.Complete(delivery.State, result: null);
-            // Command-id signal is authoritative: releases hold-open even if OAuth state keys diverge.
-            McpAuthorizationCodeHub.SignalDenied(pending.CommandId);
             return new McpAuthorizationCallbackDelivery(Accepted: true, Completed: false, Denied: true);
         }
 
@@ -229,11 +234,12 @@ internal sealed class McpAuthorizationNeuron :
             PendingAuthorizationOutcome.Completed,
             delivery.Code,
             delivery.Iss);
-        await EmitAsync(new AuthorizationCompleted(pending.CommandId, pending.ServerKey, pending.State));
-        await NotifyCompletionTargetAsync(pending);
+        // Hub first so a hold-open TakeCompletedCode/AwaitAsync can resume before journal drain.
         McpAuthorizationCodeHub.Complete(
             delivery.State,
             new McpAuthorizationCodeResult(delivery.Code, delivery.Iss));
+        await EmitAsync(new AuthorizationCompleted(pending.CommandId, pending.ServerKey, pending.State));
+        await NotifyCompletionTargetAsync(pending);
         return new McpAuthorizationCallbackDelivery(Accepted: true, Completed: true, Denied: false);
     }
 

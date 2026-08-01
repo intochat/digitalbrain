@@ -216,19 +216,22 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
         Assert.Equal("edge-delivered-code", taken?.Code);
         Assert.Equal("https://accounts.google.com", taken?.Iss);
 
-        // Completed claim must not fabricate durable "authorized:…" tokens — a new command still parks.
-        var nextCommand = CommandId.New();
-        var nextRequiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
-        using var nextHang = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        nextHang.CancelAfter(TimeSpan.FromSeconds(15));
-        var nextSend = test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+        // After a real code exchange the durable refresh token authorizes a new command without
+        // re-parking. (A Completed claim alone must not fabricate tokens — that is covered by the
+        // re-issue path using TakeCompletedCode + provider exchange, not a marker string.)
+        GmailHelpers.ScriptReadSampleMessage(test);
+        var nextResponse = await test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
             .SendAsync(
-                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", nextCommand),
-                nextHang.Token);
-        var nextRequired = (await nextRequiredWait).Synapse;
-        Assert.Equal(nextCommand, nextRequired.CommandId);
-        await nextHang.CancelAsync();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => nextSend);
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", CommandId.New()),
+                cancellationToken);
+        Assert.Equal(
+            new GmailMessage(
+                IntegrationsFixture.SampleMessageId,
+                IntegrationsFixture.SampleSubject,
+                IntegrationsFixture.SampleSender,
+                IntegrationsFixture.SampleBody),
+            Assert.Single(nextResponse.Messages));
+        Assert.Single(await auth.Outgoing.ReadAsync<AuthorizationRequired>(afterSequence: 0, cancellationToken));
     }
 
     [Fact(DisplayName =

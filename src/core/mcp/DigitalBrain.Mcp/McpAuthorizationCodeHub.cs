@@ -21,12 +21,31 @@ internal static class McpAuthorizationCodeHub
         AmbientsByCommand[ambient.CommandId.Value] = ambient;
     }
 
+    internal static void UnregisterAmbient(McpAuthorizationAmbientState ambient)
+    {
+        ArgumentNullException.ThrowIfNull(ambient);
+        AmbientsByCommand.TryRemove(ambient.CommandId.Value, out _);
+        foreach (var pair in AmbientsByState.ToArray())
+        {
+            if (ReferenceEquals(pair.Value, ambient))
+            {
+                AmbientsByState.TryRemove(pair.Key, out _);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Completes the hub waiter for <paramref name="state"/>. A null result is a no-code outcome:
+    /// the matching ambient (if any) is aborted so hold-open CreateAsync is abandoned.
+    /// Unknown/foreign states complete only the hub — they must not abort a live park for a
+    /// different state.
+    /// </summary>
     internal static void Complete(string state, McpAuthorizationCodeResult? result)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(state);
 
         var outcome = result is null
-            ? CodeHubOutcome.AsDenied()
+            ? CodeHubOutcome.AsNoCode()
             : CodeHubOutcome.AsCompleted(result);
 
         Completions[state] = outcome;
@@ -37,30 +56,63 @@ internal static class McpAuthorizationCodeHub
 
         if (result is null)
         {
-            // Deny must release every hold-open ambient in this process. State-key mismatch between
-            // the authorize URL and callback must not leave Task.Run parked.
-            foreach (var open in AmbientsByCommand.Values.ToArray())
+            if (AmbientsByState.TryRemove(state, out var ambient))
             {
-                open.SignalDenied();
+                AmbientsByCommand.TryRemove(ambient.CommandId.Value, out _);
+                ambient.AbortOpen();
             }
 
-            AmbientsByCommand.Clear();
-            AmbientsByState.Clear();
             return;
         }
 
-        if (AmbientsByState.TryRemove(state, out var ambient))
+        if (AmbientsByState.TryRemove(state, out var completed))
         {
-            AmbientsByCommand.TryRemove(ambient.CommandId.Value, out _);
+            AmbientsByCommand.TryRemove(completed.CommandId.Value, out _);
         }
     }
 
-    internal static void SignalDenied(CommandId commandId)
+    /// <summary>
+    /// Aborts the hold-open ambient for <paramref name="commandId"/> by command identity.
+    /// Authoritative for deny/cancel when OAuth state keys diverge from the register key.
+    /// </summary>
+    internal static void AbortOpen(CommandId commandId)
     {
         if (AmbientsByCommand.TryRemove(commandId.Value, out var ambient))
         {
-            ambient.SignalDenied();
+            UnregisterAmbient(ambient);
+            ambient.AbortOpen();
         }
+    }
+
+    /// <summary>
+    /// Releases every in-process hold-open OAuth attempt (teardown / tests).
+    /// </summary>
+    internal static void AbortAllOpenSessions()
+    {
+        foreach (var waiter in Waiters.Values.ToArray())
+        {
+            waiter.TrySetResult(CodeHubOutcome.AsNoCode());
+        }
+
+        Waiters.Clear();
+
+        foreach (var ambient in AmbientsByCommand.Values.ToArray())
+        {
+            ambient.AbortOpen();
+        }
+
+        AmbientsByCommand.Clear();
+        AmbientsByState.Clear();
+    }
+
+    /// <summary>
+    /// Test isolation: drop static waiters/completions/ambients so a parked session cannot leak
+    /// across method scopes or fixture lifetime.
+    /// </summary>
+    internal static void ResetForTests()
+    {
+        AbortAllOpenSessions();
+        Completions.Clear();
     }
 
     internal static async Task<McpAuthorizationCodeResult?> AwaitAsync(string state, CancellationToken cancellationToken)
@@ -101,20 +153,20 @@ internal static class McpAuthorizationCodeHub
 
     private readonly struct CodeHubOutcome
     {
-        private CodeHubOutcome(bool denied, McpAuthorizationCodeResult? result)
+        private CodeHubOutcome(bool withoutCode, McpAuthorizationCodeResult? result)
         {
-            Denied = denied;
+            WithoutCode = withoutCode;
             Result = result;
         }
 
-        private bool Denied { get; }
+        private bool WithoutCode { get; }
         private McpAuthorizationCodeResult? Result { get; }
 
-        internal static CodeHubOutcome AsDenied() => new(denied: true, result: null);
+        internal static CodeHubOutcome AsNoCode() => new(withoutCode: true, result: null);
 
         internal static CodeHubOutcome AsCompleted(McpAuthorizationCodeResult result)
-            => new(denied: false, result: result);
+            => new(withoutCode: false, result: result);
 
-        internal McpAuthorizationCodeResult? ToResult() => Denied ? null : Result;
+        internal McpAuthorizationCodeResult? ToResult() => WithoutCode ? null : Result;
     }
 }

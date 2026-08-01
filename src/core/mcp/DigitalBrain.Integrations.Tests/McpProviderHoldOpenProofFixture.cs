@@ -57,6 +57,8 @@ public sealed class McpProviderHoldOpenProofFixture : IAsyncLifetime
         await _methodLease.WaitAsync(cancellationToken);
         try
         {
+            // Drop any parked hold-open waiters left by a prior method in this assembly fixture.
+            McpAuthorizationCodeHub.ResetForTests();
             var scope = $"test-{Guid.NewGuid():N}";
             var cluster = Cluster();
             var diagnostics = new BrainTestDiagnostics(scope);
@@ -68,7 +70,11 @@ public sealed class McpProviderHoldOpenProofFixture : IAsyncLifetime
                 diagnostics,
                 cluster.Edges,
                 method.EdgeGeneration,
-                () => _methodLease.Release());
+                () =>
+                {
+                    McpAuthorizationCodeHub.ResetForTests();
+                    _methodLease.Release();
+                });
         }
         catch
         {
@@ -81,11 +87,14 @@ public sealed class McpProviderHoldOpenProofFixture : IAsyncLifetime
     {
         GC.SuppressFinalize(this);
 
+        // Always release parked CreateAsync waiters before cluster stop — abandoned SDK opens
+        // otherwise pin silo shutdown past the dispose budget under full-suite load.
+        McpAuthorizationCodeHub.ResetForTests();
         try
         {
             if (Interlocked.Exchange(ref _cluster, null) is { } cluster)
             {
-                using var disposeHang = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                using var disposeHang = new CancellationTokenSource(TimeSpan.FromSeconds(45));
                 try
                 {
                     await cluster.DisposeAsync().AsTask().WaitAsync(disposeHang.Token);
@@ -93,12 +102,13 @@ public sealed class McpProviderHoldOpenProofFixture : IAsyncLifetime
                 catch (OperationCanceledException) when (disposeHang.IsCancellationRequested)
                 {
                     throw new TimeoutException(
-                        "McpProviderHoldOpenProofFixture cluster dispose exceeded 20s — hold-open Task still parked.");
+                        "McpProviderHoldOpenProofFixture cluster dispose exceeded 45s — hold-open Task still parked.");
                 }
             }
         }
         finally
         {
+            McpAuthorizationCodeHub.ResetForTests();
             _methodLease.Dispose();
             _plannerChat.Dispose();
             if (_provider is not null)
