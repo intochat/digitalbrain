@@ -34,8 +34,8 @@ brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
 brain.AddModule<OSBehaviorsModule>();
 brain.AddModule<FlutterModule>(flutter => flutter
     .WithUiEdge()
-     .WithHeadlessHost() // pure-Dart host; swap with window for headless-only dev
-                         //.WithWindowHost()
+    //.WithHeadlessHost() // pure-Dart host; swap with window for headless-only dev
+    .WithWindowHost()
     );
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
