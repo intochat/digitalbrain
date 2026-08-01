@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/shell_test_support.dart';
 
 void main() {
-  testWidgets('the workspace exposes Chat, Activity, and Brain destinations', (
+  testWidgets('the workspace exposes Chat, Activity, Brain, and Behaviors destinations', (
     tester,
   ) async {
     await prepareShellSurface(tester);
@@ -22,6 +22,7 @@ void main() {
     expect(find.byKey(const Key('destination_chat')), findsOneWidget);
     expect(find.byKey(const Key('destination_activity')), findsOneWidget);
     expect(find.byKey(const Key('destination_brain')), findsOneWidget);
+    expect(find.byKey(const Key('destination_behaviors')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('destination_activity')));
     await tester.pumpAndSettle();
@@ -31,6 +32,12 @@ void main() {
     await tester.tap(find.byKey(const Key('destination_brain')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('brain_screen')), findsOneWidget);
+    await drainShellTimers(tester);
+
+    await tester.tap(find.byKey(const Key('destination_behaviors')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('behavior_workspace')), findsOneWidget);
+    expect(find.byKey(const Key('behavior_library')), findsOneWidget);
     await drainShellTimers(tester);
   });
 

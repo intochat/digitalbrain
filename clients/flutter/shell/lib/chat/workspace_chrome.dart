@@ -61,6 +61,11 @@ final class WorkspaceNavigationBar extends StatelessWidget {
           selectedIcon: Icon(Icons.hub, key: Key('destination_brain')),
           label: 'Brain',
         ),
+        NavigationDestination(
+          icon: Icon(Icons.account_tree_outlined, key: Key('destination_behaviors')),
+          selectedIcon: Icon(Icons.account_tree, key: Key('destination_behaviors')),
+          label: 'Behaviors',
+        ),
       ],
     );
   }
@@ -81,6 +86,11 @@ const workspaceRailDestinations = <NavigationRailDestination>[
     icon: Icon(Icons.hub_outlined, key: Key('destination_brain')),
     selectedIcon: Icon(Icons.hub, key: Key('destination_brain')),
     label: Text('Brain'),
+  ),
+  NavigationRailDestination(
+    icon: Icon(Icons.account_tree_outlined, key: Key('destination_behaviors')),
+    selectedIcon: Icon(Icons.account_tree, key: Key('destination_behaviors')),
+    label: Text('Behaviors'),
   ),
 ];
 
@@ -165,5 +175,6 @@ final class WorkspaceStatusBar extends StatelessWidget {
 String workspaceSectionName(int index) => switch (index) {
   0 => 'Chat',
   1 => 'Activity',
-  _ => 'Brain',
+  2 => 'Brain',
+  _ => 'Behaviors',
 };

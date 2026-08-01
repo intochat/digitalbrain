@@ -2,6 +2,7 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../brain_theme.dart';
+import '../user_actions/user_action_card.dart';
 import 'brain_workspace.dart';
 import 'chat_contracts.dart';
 
@@ -17,6 +18,8 @@ final class BrainChatApp extends StatelessWidget {
     this.onSend,
     this.onStream,
     this.onOpenSignIn,
+    this.behaviorClient,
+    this.userActions = const [],
     this.statusMessage,
   });
 
@@ -27,6 +30,8 @@ final class BrainChatApp extends StatelessWidget {
   final SendMessage? onSend;
   final StreamMessage? onStream;
   final OpenUrl? onOpenSignIn;
+  final BehaviorClient? behaviorClient;
+  final List<UserActionCardModel> userActions;
   final String? statusMessage;
 
   @override
@@ -43,6 +48,8 @@ final class BrainChatApp extends StatelessWidget {
         onSend: onSend,
         onStream: onStream,
         onOpenSignIn: onOpenSignIn,
+        behaviorClient: behaviorClient,
+        userActions: userActions,
         statusMessage: statusMessage,
       ),
     );

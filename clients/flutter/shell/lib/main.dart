@@ -20,6 +20,10 @@ void main() {
 
   final edge = client;
 
+  final behaviorClient = edge == null
+      ? null
+      : BehaviorClient(baseUri: edge.baseUri);
+
   runApp(
     BrainChatApp(
       chatName: chat,
@@ -31,6 +35,7 @@ void main() {
           ? null
           : (text) => edge.streamMessage(chatName: chat, text: text),
       onOpenSignIn: openSystemBrowser,
+      behaviorClient: behaviorClient,
     ),
   );
 }
