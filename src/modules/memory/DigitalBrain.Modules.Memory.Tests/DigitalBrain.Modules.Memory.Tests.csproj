@@ -20,5 +20,6 @@
     <ProjectReference Include="..\DigitalBrain.Modules.Memory.Qdrant\DigitalBrain.Modules.Memory.Qdrant.csproj" />
     <ProjectReference Include="..\DigitalBrain.Modules.Memory.Aspire.Hosting\DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" />
     <ProjectReference Include="..\..\..\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="..\..\..\..\samples\DigitalBrain.VectorMemory\DigitalBrain.VectorMemory.csproj" />
   </ItemGroup>
 </Project>

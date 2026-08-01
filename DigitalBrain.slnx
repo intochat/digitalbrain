@@ -74,6 +74,7 @@
   <Folder Name="/samples/">
     <Project Path="samples/DigitalBrain.AccountEnrichment/DigitalBrain.AccountEnrichment.csproj" />
     <Project Path="samples/DigitalBrain.Compositions/DigitalBrain.Compositions.csproj" />
+    <Project Path="samples/DigitalBrain.VectorMemory/DigitalBrain.VectorMemory.csproj" />
   </Folder>
   <Folder Name="/tests/fixtures/apphosts/">
     <Project Path="tests/fixtures/apphosts/DigitalBrain.TestingAppHost/DigitalBrain.TestingAppHost.csproj" />
