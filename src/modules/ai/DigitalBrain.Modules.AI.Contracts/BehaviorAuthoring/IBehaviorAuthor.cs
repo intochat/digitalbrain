@@ -4,7 +4,8 @@ public interface IBehaviorAuthor
 {
     BehaviorScenarioProposal ProposeScenarios(BehaviorChangeRequest request);
 
-    BehaviorChangeResult ApplyApprovedScenarios(
+    Task<BehaviorChangeResult> ApplyApprovedScenarios(
         BehaviorChangeRequest request,
-        BehaviorScenarioProposal approved);
+        BehaviorScenarioProposal approved,
+        CancellationToken cancellationToken = default);
 }

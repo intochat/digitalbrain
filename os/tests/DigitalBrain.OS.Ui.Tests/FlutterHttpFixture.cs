@@ -28,7 +28,10 @@ public sealed class FlutterHttpFixture : DigitalBrainFixture
         return new Uri(configured.TrimEnd('/') + "/");
     }
 
-    public static async Task<WebApplication> StartUiHttpAsync(TestBrain test, CancellationToken cancellationToken)
+    public static async Task<WebApplication> StartUiHttpAsync(
+        TestBrain test,
+        CancellationToken cancellationToken,
+        Action<IServiceCollection>? configureServices = null)
     {
         ArgumentNullException.ThrowIfNull(test);
 
@@ -46,6 +49,10 @@ public sealed class FlutterHttpFixture : DigitalBrainFixture
         builder.Services.AddSingleton(test.Client);
         builder.Services.AddSingleton<IGrainFactory>(test.Cluster.Client);
         builder.Services.AddFlutterHttpServices();
+        // L1 UI host has no live model: inject a fixed author so scenario approval still proposes.
+        builder.Services.AddSingleton<IBehaviorAuthor>(_ => new BehaviorAuthor(
+            static (_, _) => Task.FromResult(AccountEnrichmentEditorSeed.ProgramSource)));
+        configureServices?.Invoke(builder.Services);
 
         var app = builder.Build();
         app.UseDefaultFiles();

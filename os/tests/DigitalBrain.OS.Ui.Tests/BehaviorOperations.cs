@@ -2,8 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.AI;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DigitalBrain.Flutter.Http.Tests;
@@ -83,7 +85,15 @@ public sealed class BehaviorOperations(FlutterHttpFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        await using var app = await FlutterHttpFixture.StartUiHttpAsync(test, cancellationToken);
+        var generatedProgram = AccountEnrichmentEditorSeed.ProgramSource.Replace(
+            "AccountEnrichmentProgram",
+            "AccountEnrichmentProgramAuthored",
+            StringComparison.Ordinal);
+        await using var app = await FlutterHttpFixture.StartUiHttpAsync(
+            test,
+            cancellationToken,
+            services => services.AddSingleton<IBehaviorAuthor>(_ => new BehaviorAuthor(
+                (_, _) => Task.FromResult(generatedProgram))));
         using var http = CreateClient(app);
 
         using var proposeResponse = await http.PostAsJsonAsync(
@@ -108,6 +118,8 @@ public sealed class BehaviorOperations(FlutterHttpFixture fixture)
         Assert.NotNull(document);
         Assert.Equal(nameof(BehaviorRevisionStatus.Proposed), document.Status);
         Assert.Contains("also enrich phone numbers", document.FeatureText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("AccountEnrichmentProgramAuthored", document.ProgramSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("public sealed class Program {}", document.ProgramSource, StringComparison.Ordinal);
     }
 
     [Fact(DisplayName = "binding enable/disable flips Enabled without deleting the registered binding")]

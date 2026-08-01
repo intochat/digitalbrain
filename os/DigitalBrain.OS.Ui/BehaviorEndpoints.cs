@@ -11,8 +11,6 @@ internal static class BehaviorEndpoints
     private static readonly ConcurrentDictionary<string, BehaviorChangeProposalDocument> PendingChanges =
         new(StringComparer.Ordinal);
 
-    private static readonly BehaviorAuthor ScenarioAuthor = new();
-
     public static IEndpointRouteBuilder MapBehaviors(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -345,11 +343,13 @@ internal static class BehaviorEndpoints
                 string behaviorId,
                 BehaviorChangeProposeRequest request,
                 IDigitalBrain brain,
+                IBehaviorAuthor author,
                 CancellationToken cancellationToken) =>
             {
                 ArgumentException.ThrowIfNullOrWhiteSpace(behaviorId);
                 ArgumentNullException.ThrowIfNull(request);
                 ArgumentNullException.ThrowIfNull(brain);
+                ArgumentNullException.ThrowIfNull(author);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 if (string.IsNullOrWhiteSpace(request.RequestText))
@@ -363,7 +363,7 @@ internal static class BehaviorEndpoints
                 var featureName = string.IsNullOrWhiteSpace(current.FeatureName)
                     ? "install"
                     : current.FeatureName;
-                var authored = ScenarioAuthor.ProposeScenarios(new BehaviorChangeRequest(
+                var authored = author.ProposeScenarios(new BehaviorChangeRequest(
                     behaviorId,
                     request.RequestText.Trim(),
                     current.FeatureText,
@@ -389,11 +389,13 @@ internal static class BehaviorEndpoints
                 string behaviorId,
                 BehaviorScenarioApprovalRequest request,
                 IDigitalBrain brain,
+                IBehaviorAuthor author,
                 CancellationToken cancellationToken) =>
             {
                 ArgumentException.ThrowIfNullOrWhiteSpace(behaviorId);
                 ArgumentNullException.ThrowIfNull(request);
                 ArgumentNullException.ThrowIfNull(brain);
+                ArgumentNullException.ThrowIfNull(author);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 if (string.IsNullOrWhiteSpace(request.ProposalId)
@@ -412,7 +414,7 @@ internal static class BehaviorEndpoints
                 var current = ToDocument(
                     behaviorId,
                     await brain.GetGrainProxy<IBehaviorNeuron>(behaviorId).Read());
-                var applied = ScenarioAuthor.ApplyApprovedScenarios(
+                var applied = await author.ApplyApprovedScenarios(
                     new BehaviorChangeRequest(
                         behaviorId,
                         proposal.RequestText,
@@ -427,7 +429,8 @@ internal static class BehaviorEndpoints
                         string.IsNullOrWhiteSpace(request.FeatureText)
                             ? proposal.ProposedFeatureText
                             : request.FeatureText!,
-                        proposal.DiffSummary ?? "approved scenario change"));
+                        proposal.DiffSummary ?? "approved scenario change"),
+                    cancellationToken);
                 var featureName = string.IsNullOrWhiteSpace(request.FeatureName)
                     ? applied.FeatureName
                     : request.FeatureName;
