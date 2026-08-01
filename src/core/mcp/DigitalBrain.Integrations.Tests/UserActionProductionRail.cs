@@ -1115,13 +1115,10 @@ public sealed class UserActionProductionRail(UserActionProductionRailFixture fix
     }
 
     private static void CatalogGmail(TestBrain test)
-        => test.Mcp().Catalog(
-            IntegrationsFixture.GmailServerKey,
-            AdmittedMcpTools.GmailGetMessage(
-                id: IntegrationsFixture.SampleMessageId,
-                subject: IntegrationsFixture.SampleSubject,
-                sender: IntegrationsFixture.SampleSender,
-                plaintextBody: IntegrationsFixture.SampleBody));
+    {
+        ArgumentNullException.ThrowIfNull(test);
+        GmailHelpers.CatalogSampleMessage(test);
+    }
 
     private static async Task<(
         BehaviorActivationGoal Goal,

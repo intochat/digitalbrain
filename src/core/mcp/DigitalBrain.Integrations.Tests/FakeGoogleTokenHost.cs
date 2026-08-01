@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace DigitalBrain.Google.Tests.Auth;
+namespace DigitalBrain.Integrations.Tests;
 
 internal sealed class FakeGoogleTokenHost : IAsyncDisposable
 {

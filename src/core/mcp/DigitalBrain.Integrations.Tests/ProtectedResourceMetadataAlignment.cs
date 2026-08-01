@@ -46,7 +46,7 @@ public sealed class ProtectedResourceMetadataAlignment
     {
         var payload = Encoding.UTF8.GetBytes(
             """
-            {"resource":"https://gmailmcp.googleapis.com/mcp/v1","authorization_servers":["https://accounts.google.com/"]}
+            {"resource":"https://gmailmcp.googleapis.com/mcp/v1","authorization_servers":["https://accounts.google.com"]}
             """);
 
         Assert.False(McpProtectedResourceMetadataAlignmentHandler.TryAlign(payload, out _));

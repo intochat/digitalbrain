@@ -51,13 +51,8 @@ public sealed class AccountEnrichmentProcessSample(IntegrationsFixture fixture)
     private static async Task<AccountEnriched> RunEnrichmentToCompletionAsync(TestBrain test, CancellationToken cancellationToken)
     {
         var expectedDescription = IntegrationsFixture.SampleEnrichmentDescription;
-        test.Mcp().Catalog(
-            IntegrationsFixture.GmailServerKey,
-            AdmittedMcpTools.GmailGetMessage(
-                id: IntegrationsFixture.SampleMessageId,
-                subject: IntegrationsFixture.SampleSubject,
-                sender: IntegrationsFixture.SampleSender,
-                plaintextBody: IntegrationsFixture.SampleBody));
+        GmailHelpers.CatalogSampleMessage(test);
+        await GmailHelpers.SeedAuthorizationAsync(test, cancellationToken: cancellationToken);
         test.Mcp().Catalog(
             IntegrationsFixture.SalesforceServerKey,
             AdmittedMcpTools.SalesforceUpdateAccount(),

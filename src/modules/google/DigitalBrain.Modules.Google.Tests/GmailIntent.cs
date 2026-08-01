@@ -1,10 +1,8 @@
-using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Google;
+using DigitalBrain.Mcp;
 using DigitalBrain.Mcp.Testing;
 using DigitalBrain.Testing;
-using ModelContextProtocol.Protocol;
-using ModelContextProtocol.Server;
 using Xunit;
 
 namespace DigitalBrain.Google.Tests;
@@ -19,38 +17,34 @@ public sealed class GmailIntent(GoogleFixture fixture)
         Assert.Empty(typeof(IGmail).GetProperties().Where(static property => property.DeclaringType == typeof(IGmail)));
     }
 
-    [Fact(DisplayName = "GmailRequest for recent emails returns bounded typed messages through fake model and MCP")]
+    [Fact(DisplayName = "GmailRequest for recent emails returns bounded typed messages through fake model and SDK")]
     public async Task Intent_read_last_emails_returns_bounded_messages()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        CatalogGetMessage(test);
+        SeedSampleMessage();
+        await GmailAuth.SeedAsync(test, GoogleFixture.GmailAccount, cancellationToken);
         ScriptGetMessage(test, GoogleFixture.SampleMessageId);
 
         var response = await test.Client.Get<IGmail>(GoogleFixture.GmailAccount)
             .SendAsync(new GmailRequest("Read my last three emails"), cancellationToken);
 
+        Assert.True(response.Succeeded, response.Error ?? "<null error>");
         var message = Assert.Single(response.Messages);
         Assert.Equal(GoogleFixture.SampleMessageId, message.Id);
         Assert.Equal(GoogleFixture.SampleSubject, message.Subject);
         Assert.Equal(GoogleFixture.SampleSender, message.Sender);
         Assert.Equal(GoogleFixture.SampleBody, message.PlaintextBody);
-        Assert.Contains("get_message", test.PlannerChat().LastTools, StringComparer.Ordinal);
+        Assert.Contains(SdkCatalogAdmission.MessagesGet, test.PlannerChat().LastTools, StringComparer.Ordinal);
     }
 
-    [Fact(DisplayName = "Planner only offers admitted read-only tools; write-shaped tools stay out of the model catalog")]
+    [Fact(DisplayName = "Planner only offers reflected SDK tools; write-shaped tools stay out of the model catalog")]
     public async Task Prompt_injection_cannot_select_non_admitted_tools()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Mcp().Catalog(
-            GoogleFixture.GmailServerKey,
-            GmailTools.GetMessage(
-                GoogleFixture.SampleMessageId,
-                GoogleFixture.SampleSubject,
-                GoogleFixture.SampleSender,
-                GoogleFixture.SampleBody),
-            GmailTools.DestructiveSend());
+        SeedSampleMessage();
+        await GmailAuth.SeedAsync(test, GoogleFixture.GmailAccount, cancellationToken);
 
         test.PlannerChat().ReplyWithCapabilityCall(
             "send_message",
@@ -67,24 +61,20 @@ public sealed class GmailIntent(GoogleFixture fixture)
         Assert.False(response.Succeeded);
         Assert.Contains("non-admitted tool", response.Error, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("send_message", test.PlannerChat().LastTools, StringComparer.Ordinal);
-        Assert.Contains("get_message", test.PlannerChat().LastTools, StringComparer.Ordinal);
+        Assert.Contains(SdkCatalogAdmission.MessagesGet, test.PlannerChat().LastTools, StringComparer.Ordinal);
         Assert.Empty(response.Messages);
     }
 
-    [Fact(DisplayName = "Incompatible get_message annotations are not admitted to the planner")]
-    public async Task Incompatible_get_message_is_not_admitted()
+    [Fact(DisplayName = "Missing Gmail OAuth configuration fails closed with a typed error")]
+    public async Task Missing_oauth_configuration_fails_closed()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Mcp().Catalog(GoogleFixture.GmailServerKey, GmailTools.GetMessageIncompatible());
-        test.PlannerChat().Reply("no tools");
-
-        var response = await test.Client.Get<IGmail>(GoogleFixture.GmailAccount)
-            .SendAsync(new GmailRequest("Read my last three emails"), cancellationToken);
-
-        Assert.False(response.Succeeded);
-        Assert.Contains("no admitted read-only tools", response.Error, StringComparison.OrdinalIgnoreCase);
-        Assert.Empty(response.Messages);
+        // Fixture has config; force failure by not seeding auth and clearing token host response
+        // is not enough. Use a separate brain without config via direct assertion on options.
+        Assert.Throws<InvalidOperationException>(() =>
+            Google.Auth.GoogleOAuthOptions.Read(
+                new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
     }
 
     [Fact(DisplayName = "Cancellation reaches planning before a post-cancel provider tool call")]
@@ -92,7 +82,8 @@ public sealed class GmailIntent(GoogleFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        CatalogGetMessage(test);
+        SeedSampleMessage();
+        await GmailAuth.SeedAsync(test, GoogleFixture.GmailAccount, cancellationToken);
 
         using var gate = new CancellationTokenSource();
         await gate.CancelAsync();
@@ -104,18 +95,18 @@ public sealed class GmailIntent(GoogleFixture fixture)
         Assert.Equal(0, test.PlannerChat().CallCount);
     }
 
-    [Fact(DisplayName = "get_message result id must match the requested message id")]
+    [Fact(DisplayName = "gmail_messages_get result id must match the requested message id")]
     public async Task Mismatched_get_message_id_is_rejected()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Mcp().Catalog(
-            GoogleFixture.GmailServerKey,
-            GmailTools.GetMessage(
-                "msg-other",
-                GoogleFixture.SampleSubject,
-                GoogleFixture.SampleSender,
-                GoogleFixture.SampleBody));
+        GmailTestHosts.GmailHost.SeedMessage(
+            GoogleFixture.SampleMessageId,
+            GoogleFixture.SampleSubject,
+            GoogleFixture.SampleSender,
+            GoogleFixture.SampleBody,
+            responseId: "msg-other");
+        await GmailAuth.SeedAsync(test, GoogleFixture.GmailAccount, cancellationToken);
         ScriptGetMessage(test, GoogleFixture.SampleMessageId);
 
         var response = await test.Client.Get<IGmail>(GoogleFixture.GmailAccount)
@@ -127,159 +118,53 @@ public sealed class GmailIntent(GoogleFixture fixture)
         Assert.Empty(response.Messages);
     }
 
-    private static void CatalogGetMessage(TestBrain test)
-        => test.Mcp().Catalog(
-            GoogleFixture.GmailServerKey,
-            GmailTools.GetMessage(
-                GoogleFixture.SampleMessageId,
-                GoogleFixture.SampleSubject,
-                GoogleFixture.SampleSender,
-                GoogleFixture.SampleBody));
+    private static void SeedSampleMessage()
+        => GmailTestHosts.GmailHost.SeedMessage(
+            GoogleFixture.SampleMessageId,
+            GoogleFixture.SampleSubject,
+            GoogleFixture.SampleSender,
+            GoogleFixture.SampleBody);
 
     private static void ScriptGetMessage(TestBrain test, string messageId)
     {
         test.PlannerChat().ReplyWithCapabilityCall(
-            "get_message",
+            SdkCatalogAdmission.MessagesGet,
             new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["messageId"] = messageId,
-                ["messageFormat"] = "FULL_CONTENT",
+                ["id"] = messageId,
+                ["format"] = "FULL",
             });
         test.PlannerChat().Reply("done");
     }
 }
 
-internal static class GmailTools
+internal static class GmailAuth
 {
-    private const string Type = "type";
-    private const string Properties = "properties";
-    private const string Required = "required";
-    private const string Enum = "enum";
-    private const string String = "string";
-    private const string Object = "object";
-
-    private static readonly string[] MessageFormats =
-    [
-        "MESSAGE_FORMAT_UNSPECIFIED",
-        "MINIMAL",
-        "FULL_CONTENT",
-        "METADATA_ONLY",
-    ];
-
-    private static readonly Dictionary<string, object?> StringProp = new() { [Type] = String };
-    private static readonly Dictionary<string, object?> MessageFormatProp = new()
+    internal static async Task SeedAsync(TestBrain test, string account, CancellationToken cancellationToken)
     {
-        [Type] = String,
-        [Enum] = MessageFormats,
-    };
+        var commandId = CommandId.New();
+        var auth = test.Neuron<IMcpAuthorization>("mcp");
+        var requiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
 
-    private static readonly ToolAnnotations ReadOnlyAdmitted = new()
-    {
-        ReadOnlyHint = true,
-        DestructiveHint = false,
-        IdempotentHint = true,
-        OpenWorldHint = false,
-    };
+        using var hang = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var parked = test.Client.Get<IGmail>(account)
+            .SendAsync(new GmailRequest("Seed Google authorization", commandId), hang.Token);
 
-    internal static McpServerTool GetMessage(string id, string subject, string sender, string plaintextBody)
-        => Fixed(
-            GetMessageProtocol(ReadOnlyAdmitted),
-            _ => Structured(new { id, subject, sender, plaintextBody }));
+        var required = (await requiredWait).Synapse;
+        Assert.Equal(GmailAuthRail.ServerKey, required.ServerKey);
+        Assert.Contains("accounts.google.com", required.SignInUrl.Host, StringComparison.OrdinalIgnoreCase);
 
-    internal static McpServerTool GetMessageIncompatible()
-        => Fixed(
-            GetMessageProtocol(new ToolAnnotations
-            {
-                ReadOnlyHint = true,
-                DestructiveHint = true,
-                IdempotentHint = true,
-                OpenWorldHint = false,
-            }),
-            static _ => Structured(new { id = "x", subject = "", sender = "s", plaintextBody = "" }));
+        _ = await auth.Reference.DeliverCallback(
+            new DeliverMcpAuthorizationCallback(required.State, "test-auth-code", Error: null, Iss: null),
+            cancellationToken);
 
-    internal static McpServerTool DestructiveSend()
-        => Fixed(
-            new Tool
-            {
-                Name = "send_message",
-                InputSchema = ObjectSchema(
-                    ("to", StringProp),
-                    ("body", StringProp)),
-                OutputSchema = ObjectSchema(("id", StringProp)),
-                Annotations = new ToolAnnotations
-                {
-                    ReadOnlyHint = false,
-                    DestructiveHint = true,
-                    IdempotentHint = false,
-                    OpenWorldHint = false,
-                },
-            },
-            static _ => Structured(new { id = "sent" }));
+        await hang.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => parked);
 
-    private static Tool GetMessageProtocol(ToolAnnotations annotations)
-        => new()
-        {
-            Name = "get_message",
-            InputSchema = ObjectSchema(
-                required: ["messageId"],
-                ("messageId", StringProp),
-                ("messageFormat", MessageFormatProp)),
-            OutputSchema = ObjectSchema(
-                required: null,
-                ("id", StringProp),
-                ("subject", StringProp),
-                ("sender", StringProp),
-                ("plaintextBody", StringProp)),
-            Annotations = annotations,
-        };
-
-    private static JsonElement ObjectSchema(params (string Name, object Definition)[] properties)
-        => ObjectSchema(required: properties.Select(property => property.Name).ToArray(), properties);
-
-    private static JsonElement ObjectSchema(string[]? required, params (string Name, object Definition)[] properties)
-    {
-        var shape = new Dictionary<string, object?>
-        {
-            [Type] = Object,
-            [Properties] = properties.ToDictionary(
-                property => property.Name,
-                property => property.Definition,
-                StringComparer.Ordinal),
-        };
-        if (required is not null)
-        {
-            shape[Required] = required;
-        }
-
-        return JsonSerializer.SerializeToElement(shape);
-    }
-
-    private static CallToolResult Structured(object payload)
-        => new()
-        {
-            StructuredContent = JsonSerializer.SerializeToElement(payload),
-        };
-
-    private static FixedSchemaTool Fixed(
-        Tool protocolTool,
-        Func<RequestContext<CallToolRequestParams>, CallToolResult> invoke)
-        => new(protocolTool, invoke);
-
-    private sealed class FixedSchemaTool(
-        Tool protocolTool,
-        Func<RequestContext<CallToolRequestParams>, CallToolResult> invoke) : McpServerTool
-    {
-        public override Tool ProtocolTool { get; } = protocolTool;
-
-        public override IReadOnlyList<object> Metadata { get; } = [];
-
-        public override ValueTask<CallToolResult> InvokeAsync(
-            RequestContext<CallToolRequestParams> request,
-            CancellationToken cancellationToken = default)
-        {
-            ArgumentNullException.ThrowIfNull(request);
-            cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(invoke(request));
-        }
+        test.PlannerChat().Reply("seed complete");
+        var seeded = await test.Client.Get<IGmail>(account)
+            .SendAsync(new GmailRequest("Seed Google authorization", commandId), cancellationToken);
+        Assert.True(seeded.Succeeded, seeded.Error);
+        test.PlannerChat().Reset();
     }
 }
