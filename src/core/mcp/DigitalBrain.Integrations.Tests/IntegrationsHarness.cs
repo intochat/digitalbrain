@@ -2,6 +2,8 @@ using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace DigitalBrain.Integrations.Tests;
 
@@ -25,4 +27,15 @@ internal sealed class IntegrationDriver :
     }
 }
 
-public sealed partial class IntegrationsHarnessModule : IModule;
+public sealed partial class IntegrationsHarnessModule : IModule
+{
+    // OS.Ui (and other product assemblies) load AI grain contracts into the AppDomain even when
+    // AIModule is not selected. Register the JSON codecs those grain methods require.
+    static partial void ConfigureSerialization(IServiceCollection services)
+        => services.AddSerializer(
+            serializer => serializer.AddJsonSerializer(
+                static type => type == typeof(Microsoft.Extensions.AI.ChatMessage)
+                    || type == typeof(Microsoft.Extensions.AI.ChatResponse)
+                    || type == typeof(Microsoft.Extensions.AI.ChatResponseUpdate)
+                    || typeof(Microsoft.Extensions.AI.AIContent).IsAssignableFrom(type)));
+}

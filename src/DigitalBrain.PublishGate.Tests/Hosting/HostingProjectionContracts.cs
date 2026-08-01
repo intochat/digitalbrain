@@ -20,7 +20,6 @@ public sealed class HostingProjectionContracts
         FlutterHostingProjectionSupport.JournalConnectionEnvironmentKey,
         ConfigurationEnvironment(DigitalBrainHostingExtensions.StateProtectionKeyConfigurationKey),
         ConfigurationEnvironment("DigitalBrain:AI:Ollama:Endpoint"),
-        ConfigurationEnvironment("DigitalBrain:Integrations:Mcp:AuthorizationMode"),
         ConfigurationEnvironment("DigitalBrain:Google:Gmail:ClientId"),
         ConfigurationEnvironment("DigitalBrain:Salesforce:ClientId"),
     ];

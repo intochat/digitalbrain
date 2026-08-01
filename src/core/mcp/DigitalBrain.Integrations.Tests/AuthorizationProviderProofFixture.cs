@@ -127,13 +127,12 @@ public sealed class AuthorizationProviderProofFixture : IAsyncLifetime
         brain.AddModule<FlutterModule>();
         brain.AddModule<IntegrationsHarnessModule>();
         // Real HttpMcpClientSessionFactory — do not ConfigureMcpEdge / scripted factory.
+        // Leave PublicSignInBase unset so the rail does not preflight-park; SDK hold-open OAuth
+        // journals AuthorizationRequired with the provider authorize URL.
         brain.ConfigureServiceEdge(
             services => services.AddSingleton<IChatClient>(_plannerChat),
             _plannerChat,
             static chat => chat.Reset());
-        brain.Configure(McpRuntimeHosting.AuthorizationModeKey, McpRuntimeHosting.EdgeMode);
-        brain.Configure(McpRuntimeHosting.AuthorizationPreflightKey, "false");
-        brain.Configure(McpRuntimeHosting.PublicSignInBaseKey, provider.BaseAddress.AbsoluteUri);
         brain.Configure("DigitalBrain:Google:Gmail:Endpoint", provider.McpEndpoint.AbsoluteUri);
         brain.Configure("DigitalBrain:Google:Gmail:ClientId", FakeMcpProviderHost.ClientId);
         brain.Configure("DigitalBrain:Google:Gmail:ClientSecret", FakeMcpProviderHost.ClientSecret);

@@ -21,7 +21,6 @@ public sealed class AuthorizationRailFixture : DigitalBrainFixture
         brain.AddModule<FlutterModule>();
         brain.AddModule<IntegrationsHarnessModule>();
         brain.ConfigureMcpEdge();
-        brain.Configure(McpRuntimeHosting.AuthorizationModeKey, McpRuntimeHosting.EdgeMode);
         brain.Configure(McpRuntimeHosting.PublicSignInBaseKey, PublicSignInBase);
     }
 }

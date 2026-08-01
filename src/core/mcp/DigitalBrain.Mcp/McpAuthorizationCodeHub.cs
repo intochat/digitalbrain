@@ -10,7 +10,6 @@ internal static class McpAuthorizationCodeHub
         new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, McpAuthorizationAmbientState> Ambients =
         new(StringComparer.Ordinal);
-    private static McpAuthorizationAmbientState? _activeAmbient;
 
     internal static void RegisterAmbient(string state, McpAuthorizationAmbientState ambient)
     {
@@ -18,12 +17,6 @@ internal static class McpAuthorizationCodeHub
         ArgumentNullException.ThrowIfNull(ambient);
         Ambients[state] = ambient;
         Ambients[ambient.CommandId.ToString()] = ambient;
-        Volatile.Write(ref _activeAmbient, ambient);
-        // If the edge already completed (race), surface it immediately.
-        if (Completions.TryGetValue(state, out var prior))
-        {
-            ambient.CodeReady.TrySetResult(prior);
-        }
     }
 
     internal static void Complete(string state, McpAuthorizationCodeResult? result)
@@ -33,17 +26,6 @@ internal static class McpAuthorizationCodeHub
         if (Waiters.TryGetValue(state, out var waiter))
         {
             waiter.TrySetResult(result);
-        }
-
-        var active = Volatile.Read(ref _activeAmbient);
-        if (active is not null)
-        {
-            active.CodeReady.TrySetResult(result);
-        }
-
-        foreach (var ambient in Ambients.Values.Distinct())
-        {
-            ambient.CodeReady.TrySetResult(result);
         }
 
         Ambients.Clear();

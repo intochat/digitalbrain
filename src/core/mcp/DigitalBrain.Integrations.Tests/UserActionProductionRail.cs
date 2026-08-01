@@ -1407,7 +1407,6 @@ public sealed class UserActionProductionRailFixture : DigitalBrainFixture
         brain.AddModule<UserActionBridgeDispositionProbeModule>();
         brain.AddModule<IntegrationsHarnessModule>();
         brain.ConfigureMcpEdge();
-        brain.Configure(McpRuntimeHosting.AuthorizationModeKey, McpRuntimeHosting.EdgeMode);
         brain.Configure(McpRuntimeHosting.PublicSignInBaseKey, AuthorizationRailFixture.PublicSignInBase);
         // In-process executor leaves Accept Running (InProcessClosed) so StageDispatch can park.
         brain.Configure(BehaviorsModule.ExecutorConfigurationKey, BehaviorsModule.InProcessExecutorName);
