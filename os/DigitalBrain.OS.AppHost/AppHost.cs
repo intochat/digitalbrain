@@ -11,6 +11,8 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
+using DigitalBrain.Memory;
+using DigitalBrain.Memory.Aspire.Hosting;
 using DigitalBrain.OS;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
@@ -28,6 +30,7 @@ brain.AddModule<AIModule>(ai =>
     ai.WithLlm<Llama32>();
 });
 brain.AddModule<ChatModule>();
+brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
 brain.AddModule<OSBehaviorsModule>();
 brain.AddModule<FlutterModule>(flutter => flutter
     .WithUiEdge()

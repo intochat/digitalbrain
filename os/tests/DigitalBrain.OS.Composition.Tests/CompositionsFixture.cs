@@ -1,6 +1,7 @@
 using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Flutter;
+using DigitalBrain.Memory;
 using DigitalBrain.Testing;
 using DigitalBrain.Time;
 
@@ -14,6 +15,7 @@ public sealed class CompositionsFixture : DigitalBrainFixture
         brain.AddModule<FlutterModule>();
         brain.AddModule<TimeModule>();
         brain.AddModule<AIModule>();
+        brain.AddModule<MemoryModule>();
         brain.ConfigureScriptedChat(typeof(Llama32));
     }
 }
