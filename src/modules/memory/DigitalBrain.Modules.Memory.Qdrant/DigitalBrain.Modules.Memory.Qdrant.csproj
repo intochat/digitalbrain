@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Internal Qdrant vector memory provider for DigitalBrain Memory module.</Description>
+    <RootNamespace>DigitalBrain.Memory.Qdrant</RootNamespace>
+    <NoWarn>$(NoWarn);CA1812;CA2007</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\core\kernel\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Qdrant.Client" />
+  </ItemGroup>
+</Project>

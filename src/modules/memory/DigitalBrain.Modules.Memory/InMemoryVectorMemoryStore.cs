@@ -5,9 +5,10 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
     private readonly object _gate = new();
     private readonly Dictionary<(string Owner, string Namespace, string Key), VectorMemoryEntry> _entries = new();
 
-    public void Upsert(VectorMemoryEntry entry)
+    public Task UpsertAsync(VectorMemoryEntry entry, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entry);
+        cancellationToken.ThrowIfCancellationRequested();
         lock (_gate)
         {
             _entries[(entry.Owner, entry.Namespace, entry.Key)] = entry with
@@ -15,19 +16,23 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
                 Metadata = SnapshotMetadata(entry.Metadata),
             };
         }
+
+        return Task.CompletedTask;
     }
 
-    public IReadOnlyList<VectorMemoryMatch> Search(
+    public Task<IReadOnlyList<VectorMemoryMatch>> SearchAsync(
         string owner,
         string @namespace,
         float[] queryEmbedding,
         int limit,
-        IReadOnlyDictionary<string, string>? metadataFilter)
+        IReadOnlyDictionary<string, string>? metadataFilter,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
         ArgumentException.ThrowIfNullOrWhiteSpace(@namespace);
         ArgumentNullException.ThrowIfNull(queryEmbedding);
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        cancellationToken.ThrowIfCancellationRequested();
 
         lock (_gate)
         {
@@ -53,7 +58,7 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
                 scored.Add((entry, CosineSimilarity(queryEmbedding, entry.Embedding)));
             }
 
-            return scored
+            IReadOnlyList<VectorMemoryMatch> matches = scored
                 .OrderByDescending(static s => s.Score)
                 .ThenBy(static s => s.Entry.Key, StringComparer.Ordinal)
                 .Take(limit)
@@ -63,18 +68,21 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
                     SnapshotMetadata(s.Entry.Metadata),
                     s.Entry.Payload))
                 .ToArray();
+
+            return Task.FromResult(matches);
         }
     }
 
-    public bool Remove(string owner, string @namespace, string key)
+    public Task<bool> RemoveAsync(string owner, string @namespace, string key, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
         ArgumentException.ThrowIfNullOrWhiteSpace(@namespace);
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        cancellationToken.ThrowIfCancellationRequested();
 
         lock (_gate)
         {
-            return _entries.Remove((owner, @namespace, key));
+            return Task.FromResult(_entries.Remove((owner, @namespace, key)));
         }
     }
 

@@ -49,14 +49,16 @@ public sealed class VectorMemoryNeuron :
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             : new Dictionary<string, string>(synapse.Metadata, StringComparer.Ordinal);
 
-        _store.Upsert(new VectorMemoryEntry(
-            Id.Owner.Value,
-            synapse.Namespace.Value,
-            synapse.Key,
-            synapse.Text,
-            metadata,
-            synapse.Payload,
-            embedding));
+        await _store.UpsertAsync(
+            new VectorMemoryEntry(
+                Id.Owner.Value,
+                synapse.Namespace.Value,
+                synapse.Key,
+                synapse.Text,
+                metadata,
+                synapse.Payload,
+                embedding),
+            cancellationToken);
 
         await ReplyAsync(
             new VectorMemoryStored(
@@ -75,24 +77,29 @@ public sealed class VectorMemoryNeuron :
 
         var queryEmbedding = await EmbedAsync(synapse.Query, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        var matches = _store.Search(
+        var matches = await _store.SearchAsync(
             Id.Owner.Value,
             synapse.Namespace.Value,
             queryEmbedding,
             synapse.Limit,
-            synapse.Metadata);
+            synapse.Metadata,
+            cancellationToken);
 
         await ReplyAsync(new VectorMemoryMatches(synapse.Namespace, matches), cancellationToken);
     }
 
-    public Task HandleAsync(RemoveVectorMemory synapse, CancellationToken cancellationToken)
+    public async Task HandleAsync(RemoveVectorMemory synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
         ValidateRemove(synapse);
 
-        var removed = _store.Remove(Id.Owner.Value, synapse.Namespace.Value, synapse.Key);
-        return ReplyAsync(new VectorMemoryRemoved(removed, synapse.Namespace, synapse.Key), cancellationToken);
+        var removed = await _store.RemoveAsync(
+            Id.Owner.Value,
+            synapse.Namespace.Value,
+            synapse.Key,
+            cancellationToken);
+        await ReplyAsync(new VectorMemoryRemoved(removed, synapse.Namespace, synapse.Key), cancellationToken);
     }
 
     private async Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken)
