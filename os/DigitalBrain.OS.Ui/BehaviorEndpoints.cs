@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using DigitalBrain.Abstractions;
+using DigitalBrain.AI;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Client;
 
@@ -9,6 +10,8 @@ internal static class BehaviorEndpoints
 {
     private static readonly ConcurrentDictionary<string, BehaviorChangeProposalDocument> PendingChanges =
         new(StringComparer.Ordinal);
+
+    private static readonly BehaviorAuthor ScenarioAuthor = new();
 
     public static IEndpointRouteBuilder MapBehaviors(this IEndpointRouteBuilder endpoints)
     {
@@ -360,25 +363,22 @@ internal static class BehaviorEndpoints
                 var featureName = string.IsNullOrWhiteSpace(current.FeatureName)
                     ? "install"
                     : current.FeatureName;
-                var baseFeature = string.IsNullOrWhiteSpace(current.FeatureText)
-                    ? $"Feature: {current.DisplayName}\n"
-                    : current.FeatureText.TrimEnd() + "\n";
-                var scenarioTitle = SanitizeScenarioTitle(request.RequestText);
-                var proposedFeature =
-                    baseFeature
-                    + $"  Scenario: {scenarioTitle}\n"
-                    + "    Given the requested change is approved\n"
-                    + "    When the behavior runs\n"
-                    + "    Then the outcome matches the request\n";
-
-                var proposal = new BehaviorChangeProposalDocument(
-                    Guid.NewGuid().ToString("N"),
+                var authored = ScenarioAuthor.ProposeScenarios(new BehaviorChangeRequest(
                     behaviorId,
                     request.RequestText.Trim(),
-                    proposedFeature,
+                    current.FeatureText,
+                    current.ProgramSource,
+                    current.DisplayName,
+                    featureName));
+
+                var proposal = new BehaviorChangeProposalDocument(
+                    authored.ProposalId,
+                    behaviorId,
+                    request.RequestText.Trim(),
+                    authored.ProposedFeatureText,
                     featureName,
                     Status: "awaiting-scenario-approval",
-                    DiffSummary: $"Add scenario '{scenarioTitle}' before any source generation.");
+                    authored.DiffSummary);
                 PendingChanges[proposal.ProposalId] = proposal;
                 return Results.Ok(proposal);
             });
@@ -412,21 +412,31 @@ internal static class BehaviorEndpoints
                 var current = ToDocument(
                     behaviorId,
                     await brain.GetGrainProxy<IBehaviorNeuron>(behaviorId).Read());
-                var featureText = string.IsNullOrWhiteSpace(request.FeatureText)
-                    ? proposal.ProposedFeatureText
-                    : request.FeatureText;
+                var applied = ScenarioAuthor.ApplyApprovedScenarios(
+                    new BehaviorChangeRequest(
+                        behaviorId,
+                        proposal.RequestText,
+                        current.FeatureText,
+                        string.IsNullOrWhiteSpace(current.ProgramSource)
+                            ? AccountEnrichmentEditorSeed.ProgramSource
+                            : current.ProgramSource,
+                        current.DisplayName,
+                        proposal.ProposedFeatureName),
+                    new BehaviorScenarioProposal(
+                        proposal.ProposalId,
+                        string.IsNullOrWhiteSpace(request.FeatureText)
+                            ? proposal.ProposedFeatureText
+                            : request.FeatureText!,
+                        proposal.DiffSummary ?? "approved scenario change"));
                 var featureName = string.IsNullOrWhiteSpace(request.FeatureName)
-                    ? proposal.ProposedFeatureName
+                    ? applied.FeatureName
                     : request.FeatureName;
-                var programSource = string.IsNullOrWhiteSpace(current.ProgramSource)
-                    ? AccountEnrichmentEditorSeed.ProgramSource
-                    : current.ProgramSource;
 
                 var snapshot = await brain.GetGrainProxy<IBehaviorNeuron>(behaviorId).Propose(
                     new ProposeBehaviorRevision(
                         CommandId.New(),
-                        programSource,
-                        new Dictionary<string, string>(StringComparer.Ordinal) { [featureName] = featureText },
+                        applied.ProgramSource,
+                        new Dictionary<string, string>(StringComparer.Ordinal) { [featureName] = applied.FeatureText },
                         current.DisplayName,
                         current.Description));
 
@@ -659,16 +669,4 @@ internal static class BehaviorEndpoints
         return scenarios.ToArray();
     }
 
-    private static string SanitizeScenarioTitle(string requestText)
-    {
-        var collapsed = string.Join(
-            ' ',
-            requestText.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-        if (collapsed.Length > 80)
-        {
-            collapsed = collapsed[..80].TrimEnd();
-        }
-
-        return string.IsNullOrWhiteSpace(collapsed) ? "requested change" : collapsed;
-    }
 }
