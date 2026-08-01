@@ -64,16 +64,17 @@ One assumption remains load-bearing and unmeasured: **that a model can reliably 
 ```text
 src/       published packages: core/ (framework) and modules/ (IModule domains),
            plus the publish gate that polices them
-os/        the product: silo, northbound MCP host (OS.McpHost), Flutter UI edge
-           (OS.Ui), assistant neuron, AppHost
+os/        the product: silo (OS.Host, northbound MCP folded in), Flutter UI edge
+           (OS.Ui), behavior worker, assistant neuron, AppHost
 clients/   flutter/core (pure Dart edge) and flutter/shell (Material chrome)
 samples/   product-shaped compositions and process neurons (not packable product)
 tests/     fixtures/apphosts — shared L2 AppHost scaffolding
 ```
 
 Southbound MCP transport lives in package `DigitalBrain.Mcp` (integrations mechanics shared by
-Google/Salesforce). Northbound agent tools live in `DigitalBrain.OS.McpHost`. Older docs that say
-`DigitalBrain.Integrations.Mcp` mean the southbound package.
+Google/Salesforce). Northbound agent tools live in library `DigitalBrain.OS.McpHost`, mapped on the
+silo host — not a separate product process. Older docs that say `DigitalBrain.Integrations.Mcp` mean
+the southbound package.
 
 Retired prototype generations live in git history — `git log --diff-filter=D --summary`, then
 `git show <sha>^:<path>`.

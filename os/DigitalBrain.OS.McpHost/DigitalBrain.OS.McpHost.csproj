@@ -1,18 +1,14 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <NoWarn>$(NoWarn);CA2007;NU1608</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Aspire.Azure.Data.Tables" />
-    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
-    <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\modules\chat\DigitalBrain.Modules.Chat.Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
     <ProjectReference Include="..\..\src\core\behaviors\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
-    <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
-    <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
     <ProjectReference Include="..\..\src\core\mcp\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
   </ItemGroup>

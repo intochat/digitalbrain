@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Server;
 
 namespace DigitalBrain.OS.McpHost;
