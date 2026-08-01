@@ -1,3 +1,5 @@
+using DigitalBrain.Behaviors;
+using DigitalBrain.Testing;
 using Xunit;
 
 namespace DigitalBrain.Behaviors.Tests;
@@ -36,6 +38,9 @@ public sealed class MemoryUserActionCustodyConcurrency
         Assert.True(File.Exists(harness));
         var harnessSource = File.ReadAllText(harness);
         Assert.Contains("MemoryUserActionCustody", harnessSource, StringComparison.Ordinal);
+
+        Assert.Equal("DigitalBrain.Testing", typeof(MemoryUserActionCustody).Assembly.GetName().Name);
+        Assert.Null(typeof(IBehaviorNeuron).Assembly.GetType("DigitalBrain.Behaviors.MemoryUserActionCustody"));
     }
 
     private static string FindRepositoryRoot()

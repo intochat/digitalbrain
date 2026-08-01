@@ -1,9 +1,10 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors;
 using DigitalBrain.Tasks;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Testing;
 
 public sealed class MemoryUserActionCustody(TimeProvider time) : IUserActionCustody
 {
@@ -99,7 +100,6 @@ public sealed class MemoryUserActionCustody(TimeProvider time) : IUserActionCust
 
         var now = time.GetUtcNow();
         var expiresAt = now + lifetime;
-        // Deterministic reference id so redelivery of the same epoch reproduces the same surface.
         var reference = new ProtectedPayloadReference(actionEpoch, expiresAt);
 
         _entries[reference.Id] = new StoredAction(
@@ -130,7 +130,6 @@ public sealed class MemoryUserActionCustody(TimeProvider time) : IUserActionCust
         var issued = new IssuedUserAction(requirement);
         if (!_issuedByEpoch.TryAdd(actionEpoch, issued))
         {
-            // Concurrent first-writer: re-validate against the winner (harness race deferred).
             return ValueTask.FromResult(
                 RequireExactEpochReissue(
                     _issuedByEpoch[actionEpoch],

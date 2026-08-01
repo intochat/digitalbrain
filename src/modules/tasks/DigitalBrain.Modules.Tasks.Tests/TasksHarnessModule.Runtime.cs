@@ -1,4 +1,5 @@
-using DigitalBrain.Behaviors;
+using DigitalBrain.Tasks;
+using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
