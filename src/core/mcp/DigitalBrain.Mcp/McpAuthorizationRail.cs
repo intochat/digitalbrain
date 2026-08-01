@@ -118,10 +118,10 @@ internal static class McpAuthorizationRail
         {
             return new Uri(
                 baseUri,
-                $"oauth/mcp/authorize?server={Uri.EscapeDataString(server.Key)}&state={Uri.EscapeDataString(state)}");
+                $"oauth/authorize?server={Uri.EscapeDataString(server.Key)}&state={Uri.EscapeDataString(state)}");
         }
 
         return new Uri(
-            $"https://auth.digitalbrain.local/oauth/mcp/authorize?server={Uri.EscapeDataString(server.Key)}&state={Uri.EscapeDataString(state)}");
+            $"https://auth.digitalbrain.local/oauth/authorize?server={Uri.EscapeDataString(server.Key)}&state={Uri.EscapeDataString(state)}");
     }
 }

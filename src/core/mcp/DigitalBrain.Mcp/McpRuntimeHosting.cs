@@ -15,11 +15,9 @@ internal static class McpRuntimeHosting
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.AddTransient<McpProtectedResourceMetadataAlignmentHandler>();
         services.AddHttpClient(
-                McpRuntime.HttpClientName,
-                static client => client.Timeout = TimeSpan.FromMinutes(5))
-            .AddHttpMessageHandler<McpProtectedResourceMetadataAlignmentHandler>();
+            McpRuntime.HttpClientName,
+            static client => client.Timeout = TimeSpan.FromMinutes(5));
         DurablePayloadProtectionHosting.Configure(services, configuration);
         services.TryAddSingleton<IMcpClientSessionFactory, HttpMcpClientSessionFactory>();
         services.TryAddSingleton<McpRuntime>();

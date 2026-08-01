@@ -46,36 +46,85 @@ internal static class BrowserSignInCallback
         var authorization = ambient.Grains.GetGrain<IMcpAuthorization>(
             NeuronId.For<IMcpAuthorization>(ambient.Owner, McpAuthorizationNeuron.InstanceName).ToGrainId());
 
-        // Prefer the in-process hub; fall back to durable TakeCompletedCode for activation restarts
-        // and any race where the hub signal is missed.
+        // Hub + terminal + durable claim/code. Any no-code outcome must throw OCE so CreateAsync
+        // does not park on session Completion after a null AuthorizationResult.
         var hubTask = McpAuthorizationCodeHub.AwaitAsync(state, cancellationToken);
-        while (!hubTask.IsCompleted)
+        var terminalTask = ambient.Terminal.Task;
+        while (!hubTask.IsCompleted && !terminalTask.IsCompleted)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (await IsDeniedAsync(authorization, ambient.CommandId, cancellationToken))
+            {
+                return FailNoCode(ambient);
+            }
+
             var taken = await authorization.TakeCompletedCode(state, cancellationToken);
             if (taken is not null)
             {
                 return ToAuthorizationResult(taken, state);
             }
 
-            await Task.WhenAny(hubTask, Task.Delay(GrainPollInterval, cancellationToken));
+            await Task.WhenAny(hubTask, terminalTask, Task.Delay(GrainPollInterval, cancellationToken));
+        }
+
+        if (terminalTask.IsCompleted || await IsDeniedAsync(authorization, ambient.CommandId, cancellationToken))
+        {
+            return FailNoCode(ambient);
         }
 
         try
         {
             var hubDelivered = await hubTask;
-            if (hubDelivered is not null)
+            if (hubDelivered is null)
             {
-                return ToAuthorizationResult(hubDelivered, state);
+                return FailNoCode(ambient);
             }
+
+            return ToAuthorizationResult(hubDelivered, state);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             // Hub waiter canceled without the outer token — fall through to grain.
         }
 
-        return ToAuthorizationResult(
-            await authorization.TakeCompletedCode(state, cancellationToken),
-            state);
+        if (await IsDeniedAsync(authorization, ambient.CommandId, cancellationToken))
+        {
+            return FailNoCode(ambient);
+        }
+
+        var afterHub = await authorization.TakeCompletedCode(state, cancellationToken);
+        if (afterHub is null)
+        {
+            return FailNoCode(ambient);
+        }
+
+        return ToAuthorizationResult(afterHub, state);
+    }
+
+    private static async Task<bool> IsDeniedAsync(
+        IMcpAuthorization authorization,
+        CommandId commandId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var claim = await authorization.Claim(commandId, cancellationToken);
+            return claim.Kind is McpAuthorizationClaimKind.Denied;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static AuthorizationResult? FailNoCode(McpAuthorizationAmbientState ambient)
+    {
+        ambient.AbortOpen();
+        // Returning null makes MCP SDK 2.0 CreateAsync await session Completion after the OAuth
+        // failure, which can park forever. OperationCanceledException is excluded from that path.
+        throw new OperationCanceledException(
+            "MCP authorization ended without a code; the pending session open was canceled.");
     }
 
     private static AuthorizationResult? ToAuthorizationResult(
