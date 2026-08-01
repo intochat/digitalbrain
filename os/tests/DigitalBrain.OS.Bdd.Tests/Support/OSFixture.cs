@@ -2,8 +2,11 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Chat;
 using DigitalBrain.Flutter;
+using DigitalBrain.Memory;
 using DigitalBrain.OS;
 using DigitalBrain.Testing;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.OS.Bdd.Tests;
 
@@ -15,7 +18,12 @@ public sealed class OSFixture : DigitalBrainFixture
         brain.AddModule<FlutterModule>();
         brain.AddModule<ChatModule>();
         brain.AddModule<AIModule>();
+        brain.AddModule<MemoryModule>();
         brain.AddModule<OSBehaviorsModule>();
         brain.ConfigureScriptedChat(typeof(Gemma4));
+        brain.ConfigureServiceEdge(
+            static services => services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>, ScriptedEmbeddingGenerator>(),
+            new object(),
+            static _ => { });
     }
 }

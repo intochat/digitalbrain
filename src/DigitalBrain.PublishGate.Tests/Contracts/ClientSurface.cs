@@ -106,6 +106,7 @@ public sealed class ClientSurface
                 nameof(DigitalBrainClient.Get),
                 nameof(DigitalBrainClient.GetGrainProxy),
                 nameof(DigitalBrainClient.SendAsync),
+                nameof(DigitalBrainClient.SendRequestAsync),
             ],
             methods);
         Assert.NotNull(typeof(DigitalBrainClient).GetProperty(nameof(DigitalBrainClient.Owner)));

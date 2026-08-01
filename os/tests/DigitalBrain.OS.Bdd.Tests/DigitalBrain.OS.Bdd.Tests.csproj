@@ -17,6 +17,8 @@
     <ProjectReference Include="..\..\DigitalBrain.OS.Behaviors\DigitalBrain.OS.Behaviors.csproj" />
     <ProjectReference Include="..\..\..\src\modules\chat\DigitalBrain.Modules.Chat\DigitalBrain.Modules.Chat.csproj" />
     <ProjectReference Include="..\..\..\src\modules\flutter\DigitalBrain.Modules.Flutter\DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="..\..\..\src\modules\memory\DigitalBrain.Modules.Memory\DigitalBrain.Modules.Memory.csproj" />
+    <ProjectReference Include="..\..\..\src\core\behaviors\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
     <ProjectReference Include="..\..\..\src\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
   </ItemGroup>
 </Project>
