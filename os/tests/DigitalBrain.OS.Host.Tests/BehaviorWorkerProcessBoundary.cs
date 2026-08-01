@@ -2,10 +2,10 @@ using Xunit;
 
 namespace DigitalBrain.HostTests;
 
-// Product packaging Option A (Wave 3 / I1a): one digitalbrain product image will supervise
-// silo + behavior-host as separate child processes. Authored assemblies load only in the
-// behavior-host process; the silo residual in-process executor stays closed. Full image
-// entrypoint is Wave 11 — this gate pins the process boundary in product composition.
+// Product packaging Option A (I1a): digitalbrain image entrypoint supervises silo +
+// behavior-host as separate child processes (os/DigitalBrain.OS.Host/docker-entrypoint.sh).
+// Authored assemblies load only in behavior-host; silo residual in-process executor stays closed.
+// This gate pins the process boundary in product composition (AppHost + project refs).
 public sealed class BehaviorWorkerProcessBoundary
 {
     [Fact(DisplayName =

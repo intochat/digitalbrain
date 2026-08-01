@@ -1,6 +1,7 @@
 // Product packaging Option A (I1a): the digitalbrain product image supervises silo and
 // behavior-host as separate child processes. Authored behavior assemblies load only in
-// behavior-host; silo residual in-process execution stays closed. Docker entrypoint: Wave 11.
+// behavior-host; silo residual in-process execution stays closed.
+// Docker: os/DigitalBrain.OS.Host/Dockerfile + docker-entrypoint.sh (AppHost stays local-only).
 internal static class ProductSurfaceResources
 {
     public const string Brain = "brain";

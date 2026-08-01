@@ -1,0 +1,96 @@
+# Local smoke for product images (Wave 11). Not a production topology.
+#
+# Platform dependencies are external to product Hub images:
+#   - Qdrant: start separately or uncomment the service below (not a product image)
+#   - Ollama / Azure OpenAI: point DigitalBrain__AI__* at your endpoint
+#   - Azure Storage: Azurite below is for smoke only
+#
+# Build:
+#   docker compose build
+#
+# Secrets: never commit real values. Prefer env file or Key Vault-injected env
+# (see headers in os/DigitalBrain.OS.Host/Dockerfile and os/DigitalBrain.OS.Ui/Dockerfile).
+
+services:
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+
+  # External platform dependency — not the digitalbrain product image.
+  # Uncomment for an in-compose Qdrant; otherwise set ConnectionStrings__memory-qdrant
+  # to a host/remote instance (e.g. http://host.docker.internal:6334).
+  # qdrant:
+  #   image: qdrant/qdrant:v1.18.0
+  #   ports:
+  #     - "6333:6333"
+  #     - "6334:6334"
+
+  digitalbrain:
+    image: digitalbrain:local
+    build:
+      context: .
+      dockerfile: os/DigitalBrain.OS.Host/Dockerfile
+    ports:
+      - "8080:8080"
+      - "5000:5000"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      # --- Key Vault / secret injection surface (empty here on purpose) ---
+      # DigitalBrain__Google__Gmail__ClientId:
+      # DigitalBrain__Google__Gmail__ClientSecret:
+      # DigitalBrain__Google__Gmail__RedirectUri: http://localhost:5080/oauth/mcp/callback
+      # DigitalBrain__Salesforce__ClientId:
+      # DigitalBrain__Salesforce__RedirectUri: http://localhost:5080/oauth/mcp/callback
+      # DigitalBrain__AI__Ollama__Endpoint: http://host.docker.internal:11434
+      # DigitalBrain__AI__OpenAI__ApiKey:
+      # DigitalBrain__AI__OpenAI__Endpoint:
+      # DigitalBrain__Behaviors__Broker__Credential:  # required for behavior rail
+      # DigitalBrain__Security__StateProtectionKey:   # required for durable payload protection
+      ConnectionStrings__brain-clustering: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
+      ConnectionStrings__brain-reminders: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
+      ConnectionStrings__journal: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+      DigitalBrain__Memory__Provider: Qdrant
+      DigitalBrain__Memory__Qdrant__ConnectionName: memory-qdrant
+      # Point at external Qdrant (host or uncommented qdrant service):
+      ConnectionStrings__memory-qdrant: "Endpoint=http://host.docker.internal:6334"
+      DigitalBrain__Modules__0: DigitalBrain.AI.AIModule
+      DigitalBrain__Modules__1: DigitalBrain.Chat.ChatModule
+      DigitalBrain__Modules__2: DigitalBrain.Memory.MemoryModule
+      DigitalBrain__Modules__3: DigitalBrain.OS.OSBehaviorsModule
+      DigitalBrain__Modules__4: DigitalBrain.Flutter.FlutterModule
+      DigitalBrain__Modules__5: DigitalBrain.Google.GoogleModule
+      DigitalBrain__Modules__6: DigitalBrain.Salesforce.SalesforceModule
+      DigitalBrain__Modules__7: DigitalBrain.Behaviors.BehaviorsModule
+      DigitalBrain__Modules__8: DigitalBrain.Tasks.TasksModule
+    depends_on:
+      - azurite
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  digitalbrain-ui:
+    image: digitalbrain-ui:local
+    build:
+      context: .
+      dockerfile: os/DigitalBrain.OS.Ui/Dockerfile
+    ports:
+      - "5080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DigitalBrain__Owner: dev
+      ConnectionStrings__brain-clustering: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
+      DigitalBrain__Modules__0: DigitalBrain.AI.AIModule
+      DigitalBrain__Modules__1: DigitalBrain.Chat.ChatModule
+      DigitalBrain__Modules__2: DigitalBrain.Memory.MemoryModule
+      DigitalBrain__Modules__3: DigitalBrain.OS.OSBehaviorsModule
+      DigitalBrain__Modules__4: DigitalBrain.Flutter.FlutterModule
+      DigitalBrain__Modules__5: DigitalBrain.Google.GoogleModule
+      DigitalBrain__Modules__6: DigitalBrain.Salesforce.SalesforceModule
+      DigitalBrain__Modules__7: DigitalBrain.Behaviors.BehaviorsModule
+      DigitalBrain__Modules__8: DigitalBrain.Tasks.TasksModule
+    depends_on:
+      - azurite
+      - digitalbrain
