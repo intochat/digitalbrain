@@ -76,8 +76,10 @@ public sealed class AccountEnrichmentBehaviorRail(IntegrationsFixture fixture)
             CommandId.New(),
             "EnrichTrigger",
             $$"""{"MessageId":"{{IntegrationsFixture.SampleMessageId}}","AccountId":"{{IntegrationsFixture.SampleAccountId}}","GmailAccount":"{{IntegrationsFixture.SampleGmailAccount}}"}"""));
-        Assert.True(executed.Succeeded, executed.Outcome);
-        Assert.Contains(IntegrationsFixture.SampleAccountId, executed.Outcome, StringComparison.Ordinal);
+        // Silo residual is closed: process enrichment already proved on the module rail above.
+        // Authored program load/execute is isolated to the Behavior Host (see HostBehaviorsFixture / OS.Host isolation).
+        Assert.False(executed.Succeeded);
+        Assert.Equal(BehaviorExecutionCodes.InProcessClosed, executed.Outcome);
         Assert.True(test.Mcp().SessionCount >= 2);
     }
 }

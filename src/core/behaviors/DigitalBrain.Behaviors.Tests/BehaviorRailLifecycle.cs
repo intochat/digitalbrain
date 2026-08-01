@@ -116,40 +116,24 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
         Assert.Equal(second.ProposedArtifactHash, approved.ProposedArtifactHash);
     }
 
-    [Fact(DisplayName = "activate → execute via test executor → result journaled; rollback restores prior revision for next execution")]
-    public async Task ActivateExecuteAndRollbackRestorePriorRevision()
+    [Fact(DisplayName = "activate → execute without host is closed; silo residual never loads authored assemblies")]
+    public async Task ActivateExecuteWithoutHostIsClosed()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var behavior = test.Neuron<IBehaviorNeuron>(BehaviorsFixture.SampleBehavior);
 
-        var first = await InstallAsync(test, behavior, RailPrograms.GreenProgram("v1"), "v1");
-        var firstHash = first.ActiveArtifactHash!;
-
-        var second = await InstallAsync(test, behavior, RailPrograms.GreenProgram("v2"), "v2");
-        Assert.Equal(firstHash, second.PriorArtifactHash);
-        Assert.NotEqual(firstHash, second.ActiveArtifactHash);
+        var active = await InstallAsync(test, behavior, RailPrograms.GreenProgram("closed"), "closed");
+        Assert.Equal(BehaviorRevisionStatus.Active, active.Status);
 
         var executeWait = behavior.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
         var executed = await behavior.Reference.Execute(new ExecuteBehaviorRevision(
             CommandId.New(),
             "SampleTrigger",
-            """{"Label":"run"}"""));
-        Assert.True(executed.Succeeded, executed.Outcome);
-        Assert.Equal("v2:run", executed.Outcome);
-        Assert.Equal(second.ActiveArtifactHash, (await executeWait).Synapse.ArtifactHash);
-
-        var rolled = await behavior.Reference.Rollback(new RollbackBehaviorRevision(CommandId.New()));
-        Assert.Equal(firstHash, rolled.ActiveArtifactHash);
-        Assert.Equal(second.ActiveArtifactHash, rolled.PriorArtifactHash);
-
-        var rollbackExecute = await behavior.Reference.Execute(new ExecuteBehaviorRevision(
-            CommandId.New(),
-            "SampleTrigger",
-            """{"Label":"after-rollback"}"""));
-        Assert.True(rollbackExecute.Succeeded, rollbackExecute.Outcome);
-        Assert.Equal("v1:after-rollback", rollbackExecute.Outcome);
-        Assert.Equal(firstHash, rollbackExecute.ArtifactHash);
+            """{"Label":"closed"}"""));
+        Assert.False(executed.Succeeded);
+        Assert.Equal(BehaviorExecutionCodes.InProcessClosed, executed.Outcome);
+        Assert.Equal(active.ActiveArtifactHash, (await executeWait).Synapse.ArtifactHash);
     }
 
     [Fact(DisplayName = "ActivateBound refuses unknown CaseId and mismatched contract version before Task Start")]

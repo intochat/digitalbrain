@@ -150,8 +150,8 @@ internal sealed class BehaviorWorkerNeuron :
 
         if (BehaviorExecutionCodes.IsInProcessClosed(completion.StableCode))
         {
-            // In-process executor stays closed until Task 5; leave the attempt Running so reverse-broker
-            // operation tests retain an active attempt without hosted product configuration.
+            // Closed residual: leave the attempt Running so reverse-broker operation tests retain an
+            // active attempt without requiring a live Behavior Host.
             return;
         }
 

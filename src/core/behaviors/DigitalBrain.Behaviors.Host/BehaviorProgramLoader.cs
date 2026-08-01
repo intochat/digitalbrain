@@ -20,21 +20,7 @@ internal static class BehaviorProgramLoader
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var loadContext = new AssemblyLoadContext(
-            $"behavior-host-{request.Metadata.Execution.Value:N}",
-            isCollectible: true);
-        loadContext.Resolving += static (_, name) =>
-        {
-            try
-            {
-                return AssemblyLoadContext.Default.LoadFromAssemblyName(name);
-            }
-            catch (Exception)
-            {
-                return null;
-            }
-        };
-
+        var loadContext = CreateCollectibleContext(request.Metadata.Execution);
         try
         {
             using var stream = new MemoryStream(request.ArtifactBytes.ToArray());

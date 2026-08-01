@@ -310,11 +310,11 @@ internal sealed partial class BehaviorNeuron :
             PriorArtifactHash = prior,
             ActiveArtifactHash = command.ArtifactHash,
             ActiveArtifactBytes = data.ArtifactBytes,
-            ActiveAssemblyBytes = data.AssemblyBytes,
+            ActiveAssemblyBytes = null,
             ActiveArtifactSignature = data.ArtifactSignature,
             ActiveProgramSource = data.ProgramSource,
             PriorArtifactBytes = data.ActiveArtifactBytes,
-            PriorAssemblyBytes = data.ActiveAssemblyBytes,
+            PriorAssemblyBytes = null,
             PriorArtifactSignature = data.ActiveArtifactSignature,
             PriorProgramSource = data.ActiveProgramSource,
             RunState = BehaviorRunState.Running,
@@ -367,11 +367,11 @@ internal sealed partial class BehaviorNeuron :
             ActiveArtifactHash = restored,
             PriorArtifactHash = demoted,
             ActiveArtifactBytes = data.PriorArtifactBytes,
-            ActiveAssemblyBytes = data.PriorAssemblyBytes,
+            ActiveAssemblyBytes = null,
             ActiveArtifactSignature = data.PriorArtifactSignature,
             ActiveProgramSource = data.PriorProgramSource,
             PriorArtifactBytes = data.ActiveArtifactBytes,
-            PriorAssemblyBytes = data.ActiveAssemblyBytes,
+            PriorAssemblyBytes = null,
             PriorArtifactSignature = data.ActiveArtifactSignature,
             PriorProgramSource = data.ActiveProgramSource,
         };
@@ -394,8 +394,7 @@ internal sealed partial class BehaviorNeuron :
 
         var data = LoadOrEmpty();
         if (data.ActiveArtifactHash is null
-            || data.ActiveArtifactBytes is null
-            || data.ActiveAssemblyBytes is null)
+            || data.ActiveArtifactBytes is null)
         {
             throw new InvalidOperationException($"Behavior '{Id}' has no active revision to execute.");
         }
@@ -409,7 +408,7 @@ internal sealed partial class BehaviorNeuron :
         var outcome = await _executor.ExecuteLegacyAsync(
             new LegacyBehaviorExecutionRequest(
                 metadata,
-                data.ActiveAssemblyBytes,
+                ReadOnlyMemory<byte>.Empty,
                 data.ActiveArtifactHash,
                 command.TriggerTypeName,
                 command.TriggerJson,

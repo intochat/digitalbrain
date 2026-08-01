@@ -36,9 +36,14 @@ public sealed partial class BehaviorsModule
         });
 
         var executor = builder.Configuration[ExecutorConfigurationKey];
-        if (string.Equals(executor, HostExecutorName, StringComparison.OrdinalIgnoreCase))
+        var baseAddress = builder.Configuration[HostBaseAddressConfigurationKey];
+        var useHost =
+            string.Equals(executor, HostExecutorName, StringComparison.OrdinalIgnoreCase)
+            || (!string.IsNullOrWhiteSpace(baseAddress)
+                && !string.Equals(executor, InProcessExecutorName, StringComparison.OrdinalIgnoreCase));
+
+        if (useHost)
         {
-            var baseAddress = builder.Configuration[HostBaseAddressConfigurationKey];
             if (!string.IsNullOrWhiteSpace(baseAddress))
             {
                 builder.Services.AddHttpClient<IBehaviorHostGateway, HttpBehaviorHostClient>(client =>
@@ -51,6 +56,7 @@ public sealed partial class BehaviorsModule
             return;
         }
 
+        // Closed residual only: never loads authored assemblies in the silo process.
         builder.Services.AddSingleton<IBehaviorExecutor, InProcessBehaviorExecutor>();
     }
 }

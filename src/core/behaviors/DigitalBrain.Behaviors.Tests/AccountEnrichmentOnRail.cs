@@ -1,17 +1,17 @@
-using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Testing;
 using Xunit;
 
 namespace DigitalBrain.Behaviors.Tests;
 
-public sealed class AccountEnrichmentOnRail(BehaviorsFixture fixture)
+public sealed class AccountEnrichmentOnRail(HostBehaviorsFixture fixture)
 {
     [Fact(DisplayName =
-        "AccountEnrichment behavior rides the rail propose→compile→BDD→approve→activate→execute")]
+        "AccountEnrichment behavior rides the rail propose→compile→BDD→approve→activate→execute on host")]
     public async Task AccountEnrichmentBehaviorRidesTheRail()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        BehaviorHostTestFaults.Reset();
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var rail = test.Neuron<IBehaviorNeuron>(BehaviorsFixture.AccountEnrichmentBehavior);
 
@@ -62,8 +62,8 @@ public sealed class AccountEnrichmentOnRail(BehaviorsFixture fixture)
             CommandId.New(),
             "EnrichTrigger",
             """{"MessageId":"msg-enrich-1","AccountId":"001xx000003DGbYAAW","GmailAccount":"reader@example.com"}"""));
-        Assert.True(executed.Succeeded);
-        Assert.Contains("001xx000003DGbYAAW", executed.Outcome, StringComparison.Ordinal);
+        Assert.True(executed.Succeeded, executed.Outcome);
+        Assert.Equal(BehaviorExecutionCodes.Succeeded, executed.Outcome);
         Assert.Equal(proposed.ProposedArtifactHash, (await executedWait).Synapse.ArtifactHash);
     }
 }
