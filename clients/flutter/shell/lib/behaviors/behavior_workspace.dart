@@ -122,6 +122,9 @@ final class _BehaviorWorkspaceState extends State<BehaviorWorkspace> {
             programSource: program,
             featureText: feature,
           ),
+          onRunTests: _controller.runTestsSelected,
+          onApprove: _controller.approveSelected,
+          onActivate: _controller.activateSelected,
         );
       case BehaviorStudioView.revisions:
         return BehaviorRevisionsView(

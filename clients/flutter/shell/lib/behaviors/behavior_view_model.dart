@@ -281,4 +281,82 @@ final class BehaviorStudioController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> runTestsSelected() async {
+    final edge = client;
+    final current = selected;
+    final artifactHash = current?.proposedArtifactHash;
+    if (edge == null || current == null || artifactHash == null || artifactHash.isEmpty) {
+      return;
+    }
+
+    loading = true;
+    statusMessage = null;
+    notifyListeners();
+    try {
+      selected = await edge.runTests(
+        behaviorId: current.behaviorId,
+        artifactHash: artifactHash,
+      );
+    } on Object catch (error) {
+      statusMessage = '$error';
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> approveSelected() async {
+    final edge = client;
+    final current = selected;
+    final artifactHash = current?.proposedArtifactHash;
+    if (edge == null || current == null || artifactHash == null || artifactHash.isEmpty) {
+      return;
+    }
+
+    loading = true;
+    statusMessage = null;
+    notifyListeners();
+    try {
+      selected = await edge.approve(
+        behaviorId: current.behaviorId,
+        artifactHash: artifactHash,
+        approvalId: _newApprovalId(),
+      );
+    } on Object catch (error) {
+      statusMessage = '$error';
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> activateSelected() async {
+    final edge = client;
+    final current = selected;
+    final artifactHash = current?.proposedArtifactHash ?? current?.activeArtifactHash;
+    if (edge == null || current == null || artifactHash == null || artifactHash.isEmpty) {
+      return;
+    }
+
+    loading = true;
+    statusMessage = null;
+    notifyListeners();
+    try {
+      selected = await edge.activate(
+        behaviorId: current.behaviorId,
+        artifactHash: artifactHash,
+      );
+    } on Object catch (error) {
+      statusMessage = '$error';
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  static String _newApprovalId() {
+    final now = DateTime.now().toUtc().microsecondsSinceEpoch.toRadixString(16).padLeft(12, '0');
+    return '00000000-0000-4000-8000-${now.substring(now.length - 12)}';
+  }
 }

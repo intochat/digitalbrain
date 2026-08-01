@@ -9,10 +9,16 @@ final class BehaviorSourceView extends StatefulWidget {
     super.key,
     required this.document,
     this.onPropose,
+    this.onRunTests,
+    this.onApprove,
+    this.onActivate,
   });
 
   final BehaviorDocument document;
   final void Function(String programSource, String featureText)? onPropose;
+  final VoidCallback? onRunTests;
+  final VoidCallback? onApprove;
+  final VoidCallback? onActivate;
 
   @override
   State<BehaviorSourceView> createState() => _BehaviorSourceViewState();
@@ -86,6 +92,34 @@ final class _BehaviorSourceViewState extends State<BehaviorSourceView> {
               const Text(
                 'Generated overview stays read-only. Only Behavior.cs and Behavior.feature are authored.',
                 style: BrainType.bodyMuted,
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton.tonal(
+                    key: const Key('behavior_source_run_tests'),
+                    onPressed: document.proposedArtifactHash == null
+                        ? null
+                        : widget.onRunTests,
+                    child: const Text('Run tests'),
+                  ),
+                  FilledButton.tonal(
+                    key: const Key('behavior_source_approve'),
+                    onPressed: document.proposedArtifactHash == null || !document.testsPassed
+                        ? null
+                        : widget.onApprove,
+                    child: const Text('Approve'),
+                  ),
+                  FilledButton(
+                    key: const Key('behavior_source_activate'),
+                    onPressed: document.proposedArtifactHash == null || !document.isApproved
+                        ? null
+                        : widget.onActivate,
+                    child: const Text('Activate'),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               BehaviorEvidencePanel(document: document),
