@@ -2,6 +2,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.AccountEnrichment;
 using DigitalBrain.Flutter;
 using DigitalBrain.Mcp.Testing;
+using DigitalBrain.Salesforce;
 using DigitalBrain.Testing;
 using Xunit;
 
@@ -82,6 +83,10 @@ public sealed class AccountEnrichmentProcessSample(IntegrationsFixture fixture)
 
         var approval = IntegrationsFixture.Approval(test, commandId, proposed.Fingerprint);
         var completedWait = enrichment.Outgoing.NextAsync<AccountEnriched>(cancellationToken);
+
+        var approved = await SalesforceHelpers.ApproveAsync(test, approval, cancellationToken);
+        Assert.True(approved.Succeeded);
+        Assert.Equal(SalesforceMutationState.Completed, approved.Mutation!.State);
 
         await test.Client.SendAsync(enrichment.Id, approval, cancellationToken);
         return (await completedWait).Synapse;

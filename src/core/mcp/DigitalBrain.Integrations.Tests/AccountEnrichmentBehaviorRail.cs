@@ -69,6 +69,8 @@ public sealed class AccountEnrichmentBehaviorRail(IntegrationsFixture fixture)
 
         var sfApproval = IntegrationsFixture.Approval(test, commandId, enrichmentProposed.Fingerprint);
         var completedWait = enrichment.Outgoing.NextAsync<AccountEnriched>(cancellationToken);
+        var approved = await SalesforceHelpers.ApproveAsync(test, sfApproval, cancellationToken);
+        Assert.True(approved.Succeeded);
         await test.Client.SendAsync(enrichment.Id, sfApproval, cancellationToken);
         var completed = (await completedWait).Synapse;
         Assert.Equal(IntegrationsFixture.SampleAccountId, completed.AccountId);

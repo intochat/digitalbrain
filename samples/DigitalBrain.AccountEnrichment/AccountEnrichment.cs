@@ -1,6 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Client;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
@@ -14,8 +12,9 @@ internal sealed class AccountEnrichment :
     Neuron,
     IAccountEnrichment,
     IHandle<EnrichAccountFromEmail>,
+    IHandle<GmailResponse>,
+    IHandle<SalesforceResponse>,
     IHandle<SalesforceMutationApproval>,
-    IHandle<ExecuteApprovedAccountEnrichment>,
     IEmit<AccountEnrichmentProposed>,
     IEmit<AccountEnriched>
 {
@@ -48,40 +47,86 @@ internal sealed class AccountEnrichment :
                 synapse.AccountId,
                 Description: string.Empty,
                 MutationFingerprint: string.Empty,
-                Completed: false));
+                Completed: false,
+                Phase: RequestPhase.ReadingGmail));
 
-        var mail = await ReadGmailAsync(synapse.GmailAccount, synapse.MessageId, synapse.CommandId, cancellationToken);
-        var message = SelectMessage(mail, synapse.MessageId);
+        await SendAsync(
+            NeuronId.For<IGmail>(Id.Owner, synapse.GmailAccount),
+            new GmailRequest($"Read Gmail message {synapse.MessageId}", synapse.CommandId));
+    }
 
-        var salesforce = GrainFactory.GetGrain<ISalesforce>(NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
+    public async Task HandleAsync(GmailResponse synapse, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var request = Load(synapse.CommandId)
+            ?? throw new InvalidOperationException($"Account enrichment '{synapse.CommandId}' has no durable request.");
+        if (request.Completed || request.Phase is not RequestPhase.ReadingGmail)
+        {
+            return;
+        }
+
+        if (!synapse.Succeeded)
+        {
+            throw new InvalidOperationException(synapse.Error ?? "Gmail intent failed.");
+        }
+
+        var message = SelectMessage(synapse, request.MessageId);
         var description =
             $"Email from {message.Sender}: {message.Subject}\n{message.PlaintextBody}";
-        var mutation = await salesforce.ProposeAccountDescription(
-            synapse.CommandId,
-            Id,
-            synapse.AccountId,
-            description,
-            cancellationToken);
 
         Stage(
             synapse.CommandId,
-            new Request(
-                synapse.MessageId,
-                synapse.GmailAccount,
-                synapse.AccountId,
-                description,
-                mutation.Fingerprint,
-                Completed: false));
+            request with
+            {
+                Description = description,
+                Phase = RequestPhase.ProposingSalesforce,
+            });
+
+        await SendAsync(
+            NeuronId.For<ISalesforce>(Id.Owner, "salesforce"),
+            new SalesforceRequest(
+                $"Propose Account Description for {request.AccountId}",
+                synapse.CommandId,
+                request.AccountId,
+                description));
+    }
+
+    public async Task HandleAsync(SalesforceResponse synapse, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var request = Load(synapse.CommandId)
+            ?? throw new InvalidOperationException($"Account enrichment '{synapse.CommandId}' has no durable request.");
+        if (request.Completed || request.Phase is not RequestPhase.ProposingSalesforce)
+        {
+            return;
+        }
+
+        if (!synapse.Succeeded || synapse.Mutation is null)
+        {
+            throw new InvalidOperationException(synapse.Error ?? "Salesforce propose failed.");
+        }
+
+        Stage(
+            synapse.CommandId,
+            request with
+            {
+                MutationFingerprint = synapse.Mutation.Fingerprint,
+                Phase = RequestPhase.AwaitingApproval,
+            });
 
         await EmitAsync(new AccountEnrichmentProposed(
             synapse.CommandId,
-            synapse.MessageId,
-            synapse.AccountId,
-            description,
-            mutation.Fingerprint));
+            request.MessageId,
+            request.AccountId,
+            request.Description,
+            synapse.Mutation.Fingerprint));
     }
 
-    public Task HandleAsync(SalesforceMutationApproval synapse, CancellationToken cancellationToken)
+    public async Task HandleAsync(SalesforceMutationApproval synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
@@ -90,7 +135,7 @@ internal sealed class AccountEnrichment :
             ?? throw new InvalidOperationException($"Account enrichment '{synapse.CommandId}' has no durable request.");
         if (request.Completed)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         if (!string.Equals(request.MutationFingerprint, synapse.Fingerprint, StringComparison.Ordinal))
@@ -99,43 +144,14 @@ internal sealed class AccountEnrichment :
                 $"Salesforce approval '{synapse.ApprovalId}' does not match the enrichment proposal.");
         }
 
-        return SendAsync(Id, new ExecuteApprovedAccountEnrichment(synapse));
-    }
-
-    public async Task HandleAsync(ExecuteApprovedAccountEnrichment synapse, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(synapse);
-        var approval = synapse.Approval;
-
-        var request = Load(approval.CommandId)
-            ?? throw new InvalidOperationException($"Account enrichment '{approval.CommandId}' has no durable request.");
-        if (request.Completed)
-        {
-            return;
-        }
-
-        if (!string.Equals(request.MutationFingerprint, approval.Fingerprint, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                $"Salesforce approval '{approval.ApprovalId}' does not match the enrichment proposal.");
-        }
-
-        var evidence = await ApprovalEvidenceAsync(approval);
-        var salesforce = GrainFactory.GetGrain<ISalesforce>(NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
-        var mutation = await salesforce.ApproveAccountDescription(approval, evidence, cancellationToken);
-
-        if (mutation.State is not SalesforceMutationState.Completed)
-        {
-            throw new InvalidOperationException(
-                $"Salesforce could not prove completion of Account '{mutation.AccountId}' enrichment.");
-        }
-
-        Stage(approval.CommandId, request with { Completed = true });
+        // Human session approves Salesforce directly; this neuron records completion after the owner
+        // posts the matching approval fact (session-owned evidence is validated by Salesforce itself).
+        Stage(synapse.CommandId, request with { Completed = true, Phase = RequestPhase.Completed });
         await EmitAsync(new AccountEnriched(
-            mutation.CommandId,
+            synapse.CommandId,
             request.MessageId,
-            mutation.AccountId,
-            mutation.Description));
+            request.AccountId,
+            request.Description));
     }
 
     Task INeuron.Deliver(SynapseDelivery delivery, CancellationToken cancellationToken)
@@ -152,17 +168,6 @@ internal sealed class AccountEnrichment :
         }
 
         return base.Deliver(delivery, cancellationToken);
-    }
-
-    private async Task<SynapseDelivery> ApprovalEvidenceAsync(SalesforceMutationApproval approval)
-    {
-        var incoming = await ReadJournal(JournalKind.Incoming, afterSequence: 0);
-        return incoming.Delta.FirstOrDefault(delivery =>
-                delivery.Caller == approval.Approver
-                && delivery.Synapse is SalesforceMutationApproval recorded
-                && recorded == approval)
-            ?? throw new InvalidOperationException(
-                $"Salesforce approval '{approval.ApprovalId}' has no durable human delivery evidence.");
     }
 
     private Request? Load(CommandId commandId)
@@ -211,27 +216,6 @@ internal sealed class AccountEnrichment :
         ArgumentException.ThrowIfNullOrWhiteSpace(request.GmailAccount);
     }
 
-    [SuppressMessage(
-        "Usage",
-        "CA1849:Call async methods when in an async method",
-        Justification = "DigitalBrainClient.Connect is the in-silo factory; ConnectAsync is the behavior-worker surface.")]
-    private async Task<GmailResponse> ReadGmailAsync(
-        string account,
-        string messageId,
-        CommandId commandId,
-        CancellationToken cancellationToken)
-    {
-        var brain = DigitalBrainClient.Connect(GrainFactory, Id.Owner.Value);
-        var response = await brain.Get<IGmail>(account)
-            .SendAsync(new GmailRequest($"Read Gmail message {messageId}", commandId), cancellationToken);
-        if (!response.Succeeded)
-        {
-            throw new InvalidOperationException(response.Error ?? "Gmail intent failed.");
-        }
-
-        return response;
-    }
-
     private static GmailMessage SelectMessage(GmailResponse mail, string messageId)
     {
         for (var index = 0; index < mail.Messages.Count; index++)
@@ -257,5 +241,14 @@ internal sealed class AccountEnrichment :
         [property: Id(2)] string AccountId,
         [property: Id(3)] string Description,
         [property: Id(4)] string MutationFingerprint,
-        [property: Id(5)] bool Completed);
+        [property: Id(5)] bool Completed,
+        [property: Id(6)] RequestPhase Phase);
+
+    internal enum RequestPhase
+    {
+        ReadingGmail = 0,
+        ProposingSalesforce = 1,
+        AwaitingApproval = 2,
+        Completed = 3,
+    }
 }

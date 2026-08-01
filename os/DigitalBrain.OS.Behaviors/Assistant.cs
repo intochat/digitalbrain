@@ -159,15 +159,22 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         message ??= mail.Messages.Count > 0
             ? mail.Messages[0]
             : throw new InvalidOperationException($"Gmail returned no message for '{messageId}'.");
-        var mutation = await Salesforce().ProposeAccountDescription(
-            CommandId.New(),
-            Id,
-            accountId,
-            $"Email from {message.Sender}: {message.Subject}\n{message.PlaintextBody}",
-            CancellationToken.None);
+        var description = $"Email from {message.Sender}: {message.Subject}\n{message.PlaintextBody}";
+        var proposed = await brain.Get<ISalesforce>(DefaultSalesforceAccount)
+            .SendAsync(
+                new SalesforceRequest(
+                    $"Propose Account Description for {accountId}",
+                    CommandId.New(),
+                    accountId,
+                    description),
+                CancellationToken.None);
+        if (!proposed.Succeeded || proposed.Mutation is null)
+        {
+            throw new InvalidOperationException(proposed.Error ?? "Salesforce propose failed.");
+        }
 
         return $"Proposed a description for account {accountId} from message {messageId}. "
-            + $"It is {mutation.State} and will not be written until you approve it.";
+            + $"It is {proposed.Mutation.State} and will not be written until you approve it.";
     }
 
     private static void ValidateAccountId(string accountId)
@@ -182,6 +189,4 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         }
     }
 
-    private ISalesforce Salesforce()
-        => GrainFactory.GetGrain<ISalesforce>(NeuronId.For<ISalesforce>(Id.Owner, DefaultSalesforceAccount).ToGrainId());
 }
