@@ -12,7 +12,6 @@ public sealed class AssistantModelTeam(OSBehaviorsFixture fixture)
     private const int FactTimeout = 120_000;
     private const string AssistantName = "assistant";
     private const string ConveneModelTeam = "convene_model_team";
-    private const string EnrichAccountFromEmail = "enrich_account_from_email";
     private const string Gemma = "Gemma4";
     private const string Llama = "Llama32";
     private const string RecasedGemma = "GEMMA4";
@@ -166,9 +165,8 @@ public sealed class AssistantModelTeam(OSBehaviorsFixture fixture)
         await assistant.Respond([new ChatMessage(ChatRole.User, ComparePrompt)]);
         var offeredToAComparison = test.Chat().LastTools;
 
-        Assert.Equal([EnrichAccountFromEmail], offeredToAGreeting);
-        Assert.Contains(ConveneModelTeam, offeredToAComparison);
-        Assert.Contains(EnrichAccountFromEmail, offeredToAComparison);
+        Assert.Empty(offeredToAGreeting);
+        Assert.Equal([ConveneModelTeam], offeredToAComparison);
     }
 
     private static IAssistant Assistant(TestBrain test)
