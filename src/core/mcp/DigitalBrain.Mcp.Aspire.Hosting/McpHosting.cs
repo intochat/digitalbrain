@@ -60,11 +60,14 @@ internal static class McpProviderHosting
         internal McpApplicationParameters(IDistributedApplicationBuilder builder)
         {
             _builder = builder;
-            AuthorizationMode = _builder
-                .AddParameter("mcp-authorization-mode")
-                .WithDescription(
-                    "MCP authorization execution mode. Set `LocalLoopbackDevelopment` only for a local silo when interactive provider OAuth is required; every other value disables interactive authorization.",
-                    enableMarkdown: true);
+            var localRun = _builder.ExecutionContext.IsRunMode;
+            AuthorizationMode = Parameter(
+                "mcp-authorization-mode",
+                secret: false,
+                description:
+                "Interactive provider OAuth mode. Local `aspire run` defaults to `LocalLoopbackDevelopment`. " +
+                "Any other value disables interactive sign-in. Do not use this parameter as a client secret.",
+                localRun ? LocalDevelopmentProductSurface.LocalLoopbackAuthorizationMode : null);
         }
 
         internal IResourceBuilder<ParameterResource> AuthorizationMode { get; }
@@ -84,22 +87,26 @@ internal static class McpProviderHosting
                 return existing;
             }
 
+            var localRun = _builder.ExecutionContext.IsRunMode;
             var created = new McpProviderParameters(
                 definition,
                 Parameter(
                     $"{definition.ParameterPrefix}-client-id",
                     secret: false,
-                    description: definition.ClientIdDescription),
+                    description: definition.ClientIdDescription,
+                    localValue: null),
                 definition.ClientSecretDescription is { } clientSecretDescription
                     ? Parameter(
                         $"{definition.ParameterPrefix}-client-secret",
                         secret: true,
-                        description: clientSecretDescription)
+                        description: clientSecretDescription,
+                        localValue: null)
                     : null,
                 Parameter(
                     $"{definition.ParameterPrefix}-redirect-uri",
                     secret: false,
-                    description: definition.RedirectUriDescription));
+                    description: definition.RedirectUriDescription,
+                    localRun ? LocalDevelopmentProductSurface.LocalDevelopmentOAuthCallbackUri : null));
             _providers.Add(definition.Key, created);
             return created;
         }
@@ -107,10 +114,15 @@ internal static class McpProviderHosting
         private IResourceBuilder<ParameterResource> Parameter(
             string name,
             bool secret,
-            string description)
-            => _builder
-                .AddParameter(name, secret: secret)
-                .WithDescription(description, enableMarkdown: true);
+            string description,
+            string? localValue)
+        {
+            var resource = localValue is null
+                ? _builder.AddParameter(name, secret: secret)
+                : _builder.AddParameter(name, localValue, secret: secret);
+
+            return resource.WithDescription(description, enableMarkdown: true);
+        }
     }
 
     private sealed class McpBrainProjection : DigitalBrainModuleProjection

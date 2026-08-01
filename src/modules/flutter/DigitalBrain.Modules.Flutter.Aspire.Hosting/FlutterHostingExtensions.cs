@@ -114,7 +114,10 @@ public static class FlutterHostingExtensions
             _ui = appHost
                 .AddProject(resourceName, projectPath)
                 .WithReference(brain.AsClient())
-                .WithHttpEndpoint(name: UiEdgeEndpointName)
+                .WithHttpEndpoint(
+                    port: LocalDevelopmentProductSurface.UiHttpPort,
+                    name: UiEdgeEndpointName,
+                    isProxied: false)
                 .WithHttpHealthCheck(UiEdgeHealthPath)
                 .WithEnvironment(OwnerEnvironmentVariable, owner);
         }
