@@ -13,7 +13,7 @@ public sealed class IntegrationsFixture : DigitalBrainFixture
 {
     public const string GmailServerKey = "google.gmail";
     public const string SalesforceServerKey = "salesforce";
-    public const string GmailGetMessageTool = "get_message";
+    public const string GmailGetMessageTool = "gmail_messages_get";
     public const string SessionName = ISessionNeuron.InstanceName;
     public const string ShellName = "desk";
     public const string EnrichmentSceneKey = "enrichment";
@@ -50,6 +50,8 @@ public sealed class IntegrationsFixture : DigitalBrainFixture
         brain.AddModule<EnrichmentModule>();
         brain.AddModule<FlutterModule>();
         brain.AddModule<IntegrationsHarnessModule>();
+        IntegrationsGmailHosts.ResetRuntimeState();
+        IntegrationsGmailHosts.ApplyConfiguration(brain);
         brain.ConfigureMcpEdge();
     }
 }

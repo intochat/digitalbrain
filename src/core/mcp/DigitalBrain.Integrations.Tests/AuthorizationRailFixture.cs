@@ -20,6 +20,8 @@ public sealed class AuthorizationRailFixture : DigitalBrainFixture
         brain.AddModule<EnrichmentModule>();
         brain.AddModule<FlutterModule>();
         brain.AddModule<IntegrationsHarnessModule>();
+        IntegrationsGmailHosts.ResetRuntimeState();
+        IntegrationsGmailHosts.ApplyConfiguration(brain);
         brain.ConfigureMcpEdge();
         brain.Configure(McpRuntimeHosting.PublicSignInBaseKey, PublicSignInBase);
     }

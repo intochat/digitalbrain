@@ -35,10 +35,7 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
         Assert.Equal("DigitalBrain Gmail", required.ServerDisplayName);
         Assert.False(string.IsNullOrWhiteSpace(required.State));
         Assert.Contains(required.State, required.SignInUrl.AbsoluteUri, StringComparison.Ordinal);
-        Assert.StartsWith(
-            AuthorizationRailFixture.PublicSignInBase.TrimEnd('/'),
-            required.SignInUrl.AbsoluteUri,
-            StringComparison.Ordinal);
+        Assert.Contains("accounts.google.com", required.SignInUrl.Host, StringComparison.OrdinalIgnoreCase);
         await AssertJournalHasNoSecretsAsync(auth, required.State, cancellationToken);
 
         await hang.CancelAsync();
@@ -46,7 +43,7 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
     }
 
     [Fact(DisplayName =
-        "expired token uses the same authorization-required rail")]
+        "expired refresh uses the same authorization-required rail")]
     public async Task ExpiredTokenParksAsAuthorizationRequired()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -81,6 +78,10 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
                 cancellationToken);
         Assert.Equal(IntegrationsFixture.SampleMessageId, Assert.Single(seeded.Messages).Id);
 
+        // Permanent refresh failure clears custody and re-parks once the access token is
+        // considered expired under the silo's TimeProvider-backed Google IClock.
+        IntegrationsGmailHosts.TokenHost.RefreshStatusCode = System.Net.HttpStatusCode.BadRequest;
+        IntegrationsGmailHosts.TokenHost.RefreshError = new { error = "invalid_grant", error_description = "expired" };
         await test.Clock.AdvanceAsync(TimeSpan.FromHours(2), cancellationToken);
 
         var expiredCommand = CommandId.New();
@@ -123,7 +124,6 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
         var required = (await requiredWait).Synapse;
         Assert.NotNull(required);
 
-        // Stop the parking delivery so the authorization grain is free for the deny callback.
         await hang.CancelAsync();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
 

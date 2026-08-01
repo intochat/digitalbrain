@@ -95,7 +95,10 @@ internal sealed class GoogleSignIn : IAsyncDisposable, IDisposable
         return _flow.ExchangeCodeForTokenAsync(userKey, code, redirectUri, cancellationToken);
     }
 
-    public async Task<GmailService> CreateServiceAsync(string userKey, CancellationToken cancellationToken)
+    public async Task<GmailService> CreateServiceAsync(
+        string userKey,
+        CancellationToken cancellationToken,
+        string? baseUri = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(userKey);
@@ -105,11 +108,17 @@ internal sealed class GoogleSignIn : IAsyncDisposable, IDisposable
             ?? throw new InvalidOperationException($"No stored Google token for user '{userKey}'.");
 
         var credential = new UserCredential(_flow, userKey, token);
-        return new GmailService(new BaseClientService.Initializer
+        var initializer = new BaseClientService.Initializer
         {
             HttpClientInitializer = credential,
             ApplicationName = "DigitalBrain",
-        });
+        };
+        if (!string.IsNullOrWhiteSpace(baseUri))
+        {
+            initializer.BaseUri = baseUri;
+        }
+
+        return new GmailService(initializer);
     }
 
     public void Dispose()

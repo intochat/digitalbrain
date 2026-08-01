@@ -16,7 +16,9 @@ public sealed class GoogleFixture : DigitalBrainFixture
     protected override void Configure(DigitalBrainTestBuilder brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
+        GmailTestHosts.ResetRuntimeState();
         brain.AddModule<GoogleModule>();
+        GmailTestHosts.ApplyConfiguration(brain);
         brain.ConfigureMcpChatEdge();
     }
 }
