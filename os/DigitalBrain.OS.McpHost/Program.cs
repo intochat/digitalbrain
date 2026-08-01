@@ -7,14 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddKeyedAzureTableServiceClient("brain-clustering");
 builder.AddDigitalBrainClient();
-
-builder.Services
-    .AddMcpServer()
-    .WithHttpTransport()
-    .WithTools<DigitalBrainMcpTools>()
-    .WithTools<DigitalBrainIntrospectionTools>()
-    .WithTools<DigitalBrainBehaviorTools>();
-
+builder.Services.AddDigitalBrainMcpServer();
 
 var app = builder.Build();
 app.MapDefaultEndpoints();

@@ -60,7 +60,20 @@ var silo = builder.AddProject<Projects.DigitalBrain_OS_Host>(ProductSurfaceResou
     .WithEnvironment(
         BehaviorBrokerContract.CredentialConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
         behaviorBrokerCredential)
+    .WithEnvironment(
+        FlutterHostingExtensions.OwnerEnvironmentVariable,
+        FlutterHostingExtensions.DefaultOwner)
+    .WithHttpEndpoint(
+        port: ProductSurfaceResources.McpHttpPort,
+        name: ProductSurfaceResources.McpHttpEndpointName,
+        isProxied: false)
     .WithHttpHealthCheck("/health");
+
+#pragma warning disable ASPIREMCP001
+silo.WithMcpServer(
+    ProductSurfaceResources.McpPath,
+    ProductSurfaceResources.McpHttpEndpointName);
+#pragma warning restore ASPIREMCP001
 
 var behaviorHost = builder.AddProject<Projects.DigitalBrain_OS_BehaviorHost>(ProductSurfaceResources.BehaviorHost)
     .WithReference(brain.AsClient())
@@ -81,22 +94,6 @@ silo.WithReference(behaviorHost)
     .WithEnvironment(
         BehaviorsModule.HostBaseAddressConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
         behaviorHost.GetEndpoint("http"));
-
-#pragma warning disable ASPIREMCP001
-builder.AddProject<Projects.DigitalBrain_OS_McpHost>(ProductSurfaceResources.Mcp)
-    .WithReference(brain.AsClient())
-    .WaitFor(silo)
-    .WithEnvironment(
-        FlutterHostingExtensions.OwnerEnvironmentVariable,
-        FlutterHostingExtensions.DefaultOwner)
-    .WithHttpEndpoint(
-        port: ProductSurfaceResources.McpHttpPort,
-        name: ProductSurfaceResources.McpHttpEndpointName,
-        isProxied: false)
-    .WithMcpServer(
-        ProductSurfaceResources.McpPath,
-        ProductSurfaceResources.McpHttpEndpointName);
-#pragma warning restore ASPIREMCP001
 
 builder.Build().Run();
 

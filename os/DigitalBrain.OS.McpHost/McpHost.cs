@@ -1,3 +1,5 @@
+using ModelContextProtocol.Server;
+
 namespace DigitalBrain.OS.McpHost;
 
 internal static class McpHost
@@ -12,6 +14,19 @@ internal static class McpHost
     public const string RunBehaviorTestsToolName = "run_behavior_tests";
     public const string ApproveBehaviorRevisionToolName = "approve_behavior_revision";
 
+    public static IServiceCollection AddDigitalBrainMcpServer(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services
+            .AddMcpServer()
+            .WithHttpTransport()
+            .WithTools<DigitalBrainMcpTools>()
+            .WithTools<DigitalBrainIntrospectionTools>()
+            .WithTools<DigitalBrainBehaviorTools>();
+
+        return services;
+    }
 
     public static WebApplication MapMcpHost(this WebApplication app)
     {
