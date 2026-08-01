@@ -59,10 +59,9 @@ public sealed class McpProviderParameterHonesty
             LocalDevelopmentProductSurface.LocalDevelopmentOAuthCallbackUri,
             await ResolveDefaultOrValue(parameters["salesforce-redirect-uri"]).ConfigureAwait(true));
 
-        Assert.True(parameters.ContainsKey("mcp-authorization-mode"));
-        Assert.Equal(
-            LocalDevelopmentProductSurface.LocalLoopbackAuthorizationMode,
-            await ResolveDefaultOrValue(parameters["mcp-authorization-mode"]).ConfigureAwait(true));
+        Assert.False(
+            parameters.ContainsKey("mcp-authorization-mode"),
+            "mcp-authorization-mode is deleted; sign-in is one flow.");
 
         // Aspire only enables dashboard user-secrets persistence when parameters are registered
         // with persist:true and the AppHost has a UserSecretsId (see DigitalBrain.OS.AppHost.csproj).
@@ -75,7 +74,7 @@ public sealed class McpProviderParameterHonesty
     {
         Assert.Equal(5080, LocalDevelopmentProductSurface.UiHttpPort);
         Assert.Equal(
-            "http://localhost:5080/oauth/mcp/callback",
+            "http://localhost:5080/oauth/callback",
             LocalDevelopmentProductSurface.LocalDevelopmentOAuthCallbackUri);
     }
 

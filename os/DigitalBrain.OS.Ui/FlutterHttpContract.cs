@@ -34,7 +34,7 @@ public static class FlutterHttpContract
 
     public const string BrainTopologyPath = "/brain/topology";
 
-    public const string McpOAuthCallbackPath = "/oauth/mcp/callback";
+    public const string McpOAuthCallbackPath = "/oauth/callback";
 
     public const string AuthorizationEventsPath = "/authorizations/events";
 

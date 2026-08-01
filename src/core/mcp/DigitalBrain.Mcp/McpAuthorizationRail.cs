@@ -2,7 +2,6 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using ModelContextProtocol.Authentication;
 using Orleans.Journaling;
 
 namespace DigitalBrain.Mcp;
@@ -34,14 +33,6 @@ internal static class McpAuthorizationRail
         }
 
         var configuration = services.GetRequiredService<IConfiguration>();
-        if (!string.Equals(
-                configuration[McpRuntimeHosting.AuthorizationModeKey],
-                McpRuntimeHosting.EdgeMode,
-                StringComparison.Ordinal))
-        {
-            return;
-        }
-
         var protector = services.GetRequiredService<IDurablePayloadProtector>();
         var purpose = McpTokenPresence.Purpose(server.Key, durableIdentity);
         var authorization = grains.GetGrain<IMcpAuthorization>(
@@ -71,24 +62,8 @@ internal static class McpAuthorizationRail
                         claim.Denied
                         ?? throw new InvalidOperationException("Authorization claim is missing the denied fact."));
                 case McpAuthorizationClaimKind.Completed:
-                    if (!missingOrExpired)
-                    {
-                        return;
-                    }
-
-                    await McpTokenPresence.StoreAsync(
-                        tokenState,
-                        commit,
-                        protector,
-                        purpose,
-                        new TokenContainer
-                        {
-                            TokenType = "Bearer",
-                            AccessToken = $"authorized:{commandId}:{server.Key}",
-                            ObtainedAt = time.GetUtcNow(),
-                            ExpiresIn = 3600,
-                        },
-                        cancellationToken);
+                    // Missing real token: open the session so the SDK exchanges the delivered code.
+                    // Never fabricate a credential marker.
                     return;
                 default:
                     throw new InvalidOperationException($"Authorization claim kind '{claim.Kind}' is unsupported.");
@@ -100,11 +75,11 @@ internal static class McpAuthorizationRail
             return;
         }
 
-        // Expired durable tokens always re-park so callers resume with a fresh command claim.
-        // Pure missing tokens may skip preflight when hold-open OAuth is configured for real
-        // HttpMcpClientSessionFactory proofs (AuthorizationPreflight=false).
-        var preflight = PreflightEnabled(configuration);
-        if (hadProtectedToken || preflight)
+        // Expired durable tokens always re-park. Pure missing tokens park when a public sign-in
+        // base is configured (scripted park/continue). Real HttpMcpClientSessionFactory proofs
+        // leave PublicSignInBase unset so SDK hold-open OAuth journals the provider authorize URL.
+        var publicSignInBase = configuration[McpRuntimeHosting.PublicSignInBaseKey];
+        if (hadProtectedToken || !string.IsNullOrWhiteSpace(publicSignInBase))
         {
             var required = await BeginNewAsync(
                 authorization,
@@ -114,17 +89,6 @@ internal static class McpAuthorizationRail
                 cancellationToken);
             throw new McpAuthorizationRequiredException(required);
         }
-    }
-
-    private static bool PreflightEnabled(IConfiguration configuration)
-    {
-        var configured = configuration[McpRuntimeHosting.AuthorizationPreflightKey];
-        if (string.IsNullOrWhiteSpace(configured))
-        {
-            return true;
-        }
-
-        return !string.Equals(configured, "false", StringComparison.OrdinalIgnoreCase);
     }
 
     private static Task<AuthorizationRequired> BeginNewAsync(

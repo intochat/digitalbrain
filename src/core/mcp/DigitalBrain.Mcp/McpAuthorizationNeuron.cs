@@ -1,5 +1,7 @@
+using System.Text;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
+using DigitalBrain.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
@@ -17,10 +19,12 @@ internal sealed class McpAuthorizationNeuron :
     internal const string InstanceName = "mcp";
     private const string PendingName = "mcp.authorization.pending";
     private const string CommandsName = "mcp.authorization.commands";
+    private const string CodeProtectionPurposePrefix = "mcp/authorization/code";
     private readonly IDurableDictionary<string, byte[]> _pending;
     private readonly IDurableDictionary<Guid, byte[]> _commands;
     private readonly Serializer<PendingAuthorization> _serializer;
     private readonly Serializer<CommandAuthorizationRecord> _commandsSerializer;
+    private readonly IDurablePayloadProtector _protector;
 
     public McpAuthorizationNeuron()
     {
@@ -28,6 +32,7 @@ internal sealed class McpAuthorizationNeuron :
         _commands = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(CommandsName);
         _serializer = ServiceProvider.GetRequiredService<Serializer<PendingAuthorization>>();
         _commandsSerializer = ServiceProvider.GetRequiredService<Serializer<CommandAuthorizationRecord>>();
+        _protector = ServiceProvider.GetRequiredService<IDurablePayloadProtector>();
     }
 
     public async Task<AuthorizationRequired> Begin(
@@ -189,7 +194,7 @@ internal sealed class McpAuthorizationNeuron :
             {
                 McpAuthorizationCodeHub.Complete(
                     delivery.State,
-                    new McpAuthorizationCodeResult(pending.Code, pending.Iss));
+                    new McpAuthorizationCodeResult(UnprotectCode(delivery.State, pending.Code), pending.Iss));
             }
             else if (pending.Outcome is PendingAuthorizationOutcome.Denied)
             {
@@ -216,7 +221,11 @@ internal sealed class McpAuthorizationNeuron :
             return new McpAuthorizationCallbackDelivery(Accepted: true, Completed: false, Denied: true);
         }
 
-        pending = await PersistOutcomeAsync(pending, PendingAuthorizationOutcome.Completed, delivery.Code, delivery.Iss);
+        pending = await PersistOutcomeAsync(
+            pending,
+            PendingAuthorizationOutcome.Completed,
+            delivery.Code,
+            delivery.Iss);
         await EmitAsync(new AuthorizationCompleted(pending.CommandId, pending.ServerKey, pending.State));
         await NotifyCompletionTargetAsync(pending);
         McpAuthorizationCodeHub.Complete(
@@ -288,7 +297,7 @@ internal sealed class McpAuthorizationNeuron :
         }
 
         return Task.FromResult<McpAuthorizationCodeResult?>(
-            new McpAuthorizationCodeResult(pending.Code, pending.Iss));
+            new McpAuthorizationCodeResult(UnprotectCode(state, pending.Code), pending.Iss));
     }
 
     private async Task NotifyCompletionTargetAsync(PendingAuthorization pending, bool force = false)
@@ -331,12 +340,32 @@ internal sealed class McpAuthorizationNeuron :
         string? code,
         string? iss)
     {
-        var updated = pending with { Outcome = outcome, Code = code, Iss = iss };
-        _pending[pending.State] = _serializer.SerializeToArray(updated);
+        string? protectedCode = null;
+        byte[]? protectedBytes = null;
+        if (!string.IsNullOrWhiteSpace(code))
+        {
+            protectedBytes = _protector.Protect(
+                CodePurpose(pending.State),
+                Encoding.UTF8.GetBytes(code));
+            // Store as base64 so durable payload never contains the raw OAuth code string.
+            protectedCode = Convert.ToBase64String(protectedBytes);
+        }
+
+        var updated = pending with { Outcome = outcome, Code = protectedCode, Iss = iss };
+        var durablePayload = _serializer.SerializeToArray(updated);
+        AuthorizationCodeCustodyProbe.Record(pending.State, durablePayload, protectedBytes);
+        _pending[pending.State] = durablePayload;
         _commands[pending.CommandId.Value] = _commandsSerializer.SerializeToArray(ToCommandRecord(updated));
         await WriteStateAsync();
         return updated;
     }
+
+    private string UnprotectCode(string state, string protectedCode)
+        => Encoding.UTF8.GetString(
+            _protector.Unprotect(CodePurpose(state), Convert.FromBase64String(protectedCode)));
+
+    private static string CodePurpose(string state)
+        => $"{CodeProtectionPurposePrefix}/{state}";
 
     private static NeuronId? CaptureRequestingNeuron()
     {

@@ -40,8 +40,6 @@ internal sealed class McpAuthorizationAmbientState
             TaskCreationOptions.RunContinuationsAsynchronously);
         BeginCompleted = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        CodeReady = new TaskCompletionSource<McpAuthorizationCodeResult?>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     internal CommandId CommandId { get; }
@@ -51,7 +49,6 @@ internal sealed class McpAuthorizationAmbientState
     internal IGrainFactory Grains { get; }
     internal TaskCompletionSource<McpAuthorizationSignIn> SignInReady { get; }
     internal TaskCompletionSource BeginCompleted { get; }
-    internal TaskCompletionSource<McpAuthorizationCodeResult?> CodeReady { get; }
 }
 
 internal sealed record McpAuthorizationSignIn(Uri SignInUrl, string State);

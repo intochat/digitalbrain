@@ -10,32 +10,10 @@ internal static class McpAuthorizationCallback
         McpAuthorizationAmbientState? ambient = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+        _ = configuration;
 
-        var mode = configuration[McpRuntimeHosting.AuthorizationModeKey];
-        if (string.Equals(mode, McpRuntimeHosting.LocalLoopbackDevelopmentMode, StringComparison.Ordinal))
-        {
-            return LocalLoopbackMcpAuthorizationCallback.AuthorizeAsync;
-        }
-
-        if (string.Equals(mode, McpRuntimeHosting.EdgeMode, StringComparison.Ordinal))
-        {
-            // Capture ambient at OpenAsync time — AsyncLocal does not survive Orleans/HTTP continuations.
-            return (context, cancellationToken) =>
-                EdgeMcpAuthorizationCallback.AuthorizeAsync(context, ambient, cancellationToken);
-        }
-
-        return RejectAsync;
-    }
-
-    private static Task<AuthorizationResult?> RejectAsync(
-        AuthorizationCallbackContext context,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromException<AuthorizationResult?>(new InvalidOperationException(
-            "Interactive MCP authorization is disabled. "
-            + "Use a durable pre-authorized token, enable Edge authorization, "
-            + "or explicitly enable the local loopback development adapter."));
+        // Capture ambient at OpenAsync time — AsyncLocal does not survive Orleans/HTTP continuations.
+        return (context, cancellationToken) =>
+            BrowserSignInCallback.AuthorizeAsync(context, ambient, cancellationToken);
     }
 }

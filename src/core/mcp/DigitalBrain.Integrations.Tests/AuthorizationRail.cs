@@ -211,6 +211,67 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
         await AssertJournalHasNoSecretsAsync(auth, required.State, cancellationToken);
         Assert.Single(await auth.Outgoing.ReadAsync<AuthorizationRequired>(afterSequence: 0, cancellationToken));
         Assert.Single(await auth.Outgoing.ReadAsync<AuthorizationCompleted>(afterSequence: 0, cancellationToken));
+
+        var taken = await auth.Reference.TakeCompletedCode(required.State, cancellationToken);
+        Assert.Equal("edge-delivered-code", taken?.Code);
+        Assert.Equal("https://accounts.google.com", taken?.Iss);
+
+        // Completed claim must not fabricate durable "authorized:…" tokens — a new command still parks.
+        var nextCommand = CommandId.New();
+        var nextRequiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
+        using var nextHang = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        nextHang.CancelAfter(TimeSpan.FromSeconds(15));
+        var nextSend = test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", nextCommand),
+                nextHang.Token);
+        var nextRequired = (await nextRequiredWait).Synapse;
+        Assert.Equal(nextCommand, nextRequired.CommandId);
+        await nextHang.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => nextSend);
+    }
+
+    [Fact(DisplayName =
+        "pending authorization code is protected at rest — durable payload bytes do not contain the raw code")]
+    public async Task PendingAuthorizationCodeIsProtectedAtRest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var auth = test.Neuron<IMcpAuthorization>(McpAuthorizationNeuron.InstanceName);
+        var commandId = CommandId.New();
+        var state = Guid.NewGuid().ToString("N");
+        var rawCode = $"raw-oauth-code-{Guid.NewGuid():N}-must-not-be-plaintext";
+
+        await auth.Reference.Begin(
+            new BeginMcpAuthorization(
+                commandId,
+                IntegrationsFixture.GmailServerKey,
+                "DigitalBrain Gmail",
+                new Uri($"{AuthorizationRailFixture.PublicSignInBase}oauth/mcp/authorize?state={state}"),
+                state),
+            cancellationToken);
+
+        var delivery = await auth.Reference.DeliverCallback(
+            new DeliverMcpAuthorizationCallback(state, rawCode, Error: null, Iss: null),
+            cancellationToken);
+        Assert.True(delivery.Completed);
+
+        var taken = await auth.Reference.TakeCompletedCode(state, cancellationToken);
+        Assert.Equal(rawCode, taken?.Code);
+
+        Assert.True(
+            AuthorizationCodeCustodyProbe.TryGetDurablePayload(state, out var durableBytes),
+            "Expected durable pending payload to be recorded at write time.");
+        Assert.NotEmpty(durableBytes);
+        Assert.False(
+            ContainsAscii(durableBytes, rawCode),
+            "Durable pending authorization payload must not embed the raw OAuth code as UTF-8.");
+        Assert.True(
+            AuthorizationCodeCustodyProbe.TryGetProtectedCode(state, out var protectedCode),
+            "Expected a protected code envelope.");
+        Assert.False(
+            ContainsAscii(protectedCode, rawCode),
+            "Protected code envelope must not embed the raw OAuth code as UTF-8.");
     }
 
     [Fact(DisplayName =
@@ -274,4 +335,34 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
             Assert.Contains(state, payload, StringComparison.Ordinal);
         }
     }
+
+    private static bool ContainsAscii(byte[] haystack, string needle)
+    {
+        var needleBytes = System.Text.Encoding.UTF8.GetBytes(needle);
+        if (needleBytes.Length == 0 || haystack.Length < needleBytes.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i <= haystack.Length - needleBytes.Length; i++)
+        {
+            var matched = true;
+            for (var j = 0; j < needleBytes.Length; j++)
+            {
+                if (haystack[i + j] != needleBytes[j])
+                {
+                    matched = false;
+                    break;
+                }
+            }
+
+            if (matched)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
+
