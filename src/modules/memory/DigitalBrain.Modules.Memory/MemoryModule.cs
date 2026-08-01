@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Memory.Qdrant;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -20,10 +21,16 @@ public sealed partial class MemoryModule : IModule
             builder.Services.TryAddSingleton(CreateQdrantClient);
             builder.Services.TryAddSingleton(CreateQdrantProvider);
             builder.Services.AddSingleton<IVectorMemoryStore, QdrantVectorMemoryStore>();
-            return;
+        }
+        else
+        {
+            builder.Services.TryAddSingleton<IVectorMemoryStore, InMemoryVectorMemoryStore>();
         }
 
-        builder.Services.TryAddSingleton<IVectorMemoryStore, InMemoryVectorMemoryStore>();
+        builder.Services.TryAddSingleton(static services =>
+            new ProjectionReconciler(
+                services.GetRequiredService<IVectorMemoryStore>(),
+                services.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>()));
     }
 
     private static QdrantClient CreateQdrantClient(IServiceProvider services)

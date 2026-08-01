@@ -15,6 +15,8 @@ internal interface IVectorMemoryStore
         CancellationToken cancellationToken);
 
     Task<bool> RemoveAsync(string owner, string @namespace, string key, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<string>> ListKeysAsync(string owner, string @namespace, CancellationToken cancellationToken);
 }
 
 internal sealed record VectorMemoryEntry(

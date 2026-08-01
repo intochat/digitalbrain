@@ -235,6 +235,76 @@ public sealed class QdrantVectorMemoryProvider : IAsyncDisposable
         }
     }
 
+    public async Task<IReadOnlyList<string>> ListKeysAsync(
+        string owner,
+        string @namespace,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(@namespace);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!await CollectionExistsAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return [];
+        }
+
+        var keys = new List<string>();
+        PointId? offset = null;
+        var filter = new Filter
+        {
+            Must =
+            {
+                MatchKeyword(OwnerField, owner),
+                MatchKeyword(NamespaceField, @namespace),
+            },
+        };
+
+        try
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var page = await _client.ScrollAsync(
+                        _collectionName,
+                        filter: filter,
+                        limit: 256,
+                        offset: offset,
+                        payloadSelector: true,
+                        vectorsSelector: false,
+                        cancellationToken: cancellationToken)
+                    .ConfigureAwait(false);
+
+                foreach (var point in page.Result)
+                {
+                    var key = ReadString(point.Payload, KeyField);
+                    if (key.Length > 0)
+                    {
+                        keys.Add(key);
+                    }
+                }
+
+                if (page.NextPageOffset is null || page.Result.Count == 0)
+                {
+                    break;
+                }
+
+                offset = page.NextPageOffset;
+            }
+
+            keys.Sort(StringComparer.Ordinal);
+            return keys;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("Vector memory list keys failed.", ex);
+        }
+    }
+
     private async Task EnsureCollectionAsync(int vectorSize, CancellationToken cancellationToken)
     {
         if (_collectionReady && _vectorSize == vectorSize)

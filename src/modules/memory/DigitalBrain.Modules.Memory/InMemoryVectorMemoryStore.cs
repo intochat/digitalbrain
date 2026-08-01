@@ -86,6 +86,28 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
         }
     }
 
+    public Task<IReadOnlyList<string>> ListKeysAsync(
+        string owner,
+        string @namespace,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(@namespace);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            IReadOnlyList<string> keys = _entries.Values
+                .Where(entry =>
+                    string.Equals(entry.Owner, owner, StringComparison.Ordinal)
+                    && string.Equals(entry.Namespace, @namespace, StringComparison.Ordinal))
+                .Select(static entry => entry.Key)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            return Task.FromResult(keys);
+        }
+    }
+
     private static Dictionary<string, string> SnapshotMetadata(IReadOnlyDictionary<string, string> metadata)
         => new(metadata, StringComparer.Ordinal);
 

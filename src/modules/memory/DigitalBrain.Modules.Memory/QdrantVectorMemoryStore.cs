@@ -45,4 +45,10 @@ internal sealed class QdrantVectorMemoryStore(QdrantVectorMemoryProvider provide
 
     public Task<bool> RemoveAsync(string owner, string @namespace, string key, CancellationToken cancellationToken)
         => _provider.RemoveAsync(owner, @namespace, key, cancellationToken);
+
+    public Task<IReadOnlyList<string>> ListKeysAsync(
+        string owner,
+        string @namespace,
+        CancellationToken cancellationToken)
+        => _provider.ListKeysAsync(owner, @namespace, cancellationToken);
 }

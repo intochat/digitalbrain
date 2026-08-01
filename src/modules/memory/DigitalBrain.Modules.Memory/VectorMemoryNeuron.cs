@@ -94,6 +94,12 @@ public sealed class VectorMemoryNeuron :
         cancellationToken.ThrowIfCancellationRequested();
         ValidateRemove(synapse);
 
+        if (IsReserved(synapse.Namespace))
+        {
+            await ReplyAsync(new VectorMemoryRemoved(Removed: false, synapse.Namespace, synapse.Key), cancellationToken);
+            return;
+        }
+
         var removed = await _store.RemoveAsync(
             Id.Owner.Value,
             synapse.Namespace.Value,
