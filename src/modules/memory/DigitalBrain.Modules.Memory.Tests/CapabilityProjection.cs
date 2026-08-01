@@ -47,6 +47,53 @@ public sealed class CapabilityProjectionContract(MemoryFixture fixture)
         });
     }
 
+    [Fact(DisplayName = "NL-like retrieval returns projected synapse metadata that is candidate-shaped for exact validation")]
+    public async Task Nl_like_retrieval_returns_candidate_shaped_synapse_metadata()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var catalog = ActiveCapabilityCatalog.Create([GreeterModule()]);
+        var store = new InMemoryVectorMemoryStore();
+        using var embeddings = new DeterministicEmbeddingGenerator();
+        var reconciler = new ProjectionReconciler(store, embeddings);
+        var entries = CapabilityProjection.FromCatalog(catalog);
+        await reconciler.ReconcileAsync(
+            "owner-a",
+            VectorMemoryNamespace.Capabilities,
+            entries,
+            cancellationToken);
+
+        var embedding = DeterministicEmbeddingGenerator.Embed("ask the greeter to say hello");
+        var matches = await store.SearchAsync(
+            "owner-a",
+            VectorMemoryNamespace.Capabilities.Value,
+            embedding,
+            limit: 8,
+            metadataFilter: null,
+            cancellationToken);
+
+        var synapse = Assert.Single(
+            matches,
+            match => match.Key == "harness.say-hello@v1"
+                || (match.Metadata.GetValueOrDefault(VectorProjectionMetadataKeys.Kind)
+                        == VectorProjectionKinds.Synapse
+                    && match.Metadata.GetValueOrDefault(VectorProjectionMetadataKeys.ContractId)
+                        == "harness.say-hello"));
+
+        Assert.Equal(VectorProjectionKinds.Synapse, synapse.Metadata[VectorProjectionMetadataKeys.Kind]);
+        Assert.Equal("harness.say-hello", synapse.Metadata[VectorProjectionMetadataKeys.ContractId]);
+        Assert.Equal("1", synapse.Metadata[VectorProjectionMetadataKeys.SchemaVersion]);
+        Assert.Equal("harness.greeter", synapse.Metadata[VectorProjectionMetadataKeys.NeuronContractId]);
+        Assert.Equal(
+            "digitalbrain.testing.greeter",
+            synapse.Metadata[VectorProjectionMetadataKeys.ModuleId]);
+        Assert.Null(synapse.Payload);
+
+        Assert.True(catalog.TryGetSynapse("harness.say-hello", schemaVersion: 1, out var exact));
+        Assert.Equal(1, exact!.SchemaVersion);
+        Assert.Equal("harness.say-hello", exact.ContractId);
+        Assert.False(catalog.TryGetSynapse("harness.say-hello", schemaVersion: 99, out _));
+    }
+
     [Fact(DisplayName = "Capability projection rebuild is idempotent and removes stale inactive entries")]
     public async Task Rebuild_is_idempotent_and_removes_stale()
     {
