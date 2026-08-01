@@ -117,9 +117,21 @@ internal static class McpProviderHosting
             string description,
             string? localValue)
         {
-            var resource = localValue is null
-                ? _builder.AddParameter(name, secret: secret)
-                : _builder.AddParameter(name, localValue, secret: secret);
+            // persist: true enables Aspire dashboard "Save to user secrets" (requires AppHost UserSecretsId).
+            // Run-mode defaults (redirect, auth mode) use ConstantParameterDefault; operator secrets do not.
+            var resource = _builder.ExecutionContext.IsRunMode
+                ? localValue is null
+                    ? _builder.AddParameter(
+                        name,
+                        new OperatorSuppliedParameterDefault(name),
+                        secret: secret,
+                        persist: true)
+                    : _builder.AddParameter(
+                        name,
+                        new ConstantParameterDefault(localValue),
+                        secret: secret,
+                        persist: true)
+                : _builder.AddParameter(name, secret: secret);
 
             return resource.WithDescription(description, enableMarkdown: true);
         }

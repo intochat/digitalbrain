@@ -63,6 +63,11 @@ public sealed class McpProviderParameterHonesty
         Assert.Equal(
             LocalDevelopmentProductSurface.LocalLoopbackAuthorizationMode,
             await ResolveDefaultOrValue(parameters["mcp-authorization-mode"]).ConfigureAwait(true));
+
+        // Aspire only enables dashboard user-secrets persistence when parameters are registered
+        // with persist:true and the AppHost has a UserSecretsId (see DigitalBrain.OS.AppHost.csproj).
+        Assert.NotNull(parameters["google-client-secret"].Default);
+        Assert.NotNull(parameters["google-client-id"].Default);
     }
 
     [Fact(DisplayName = "Flutter UI edge binds the stable local OAuth callback host port")]
@@ -74,24 +79,52 @@ public sealed class McpProviderParameterHonesty
             LocalDevelopmentProductSurface.LocalDevelopmentOAuthCallbackUri);
     }
 
+    [Fact(DisplayName = "product AppHost declares UserSecretsId so dashboard can save parameter secrets")]
+    public void ProductAppHostDeclaresUserSecretsId()
+    {
+        var csproj = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..", "..", "..", "..", "..",
+            "os", "DigitalBrain.OS.AppHost", "DigitalBrain.OS.AppHost.csproj"));
+        if (!File.Exists(csproj))
+        {
+            csproj = Path.GetFullPath(Path.Combine(
+                AppContext.BaseDirectory,
+                "..", "..", "..", "..", "..", "..",
+                "os", "DigitalBrain.OS.AppHost", "DigitalBrain.OS.AppHost.csproj"));
+        }
+
+        Assert.True(File.Exists(csproj), $"AppHost csproj not found near test base '{AppContext.BaseDirectory}'.");
+        var text = File.ReadAllText(csproj);
+        Assert.Contains("<UserSecretsId>", text, StringComparison.Ordinal);
+        Assert.Contains("digitalbrain-os-apphost-", text, StringComparison.Ordinal);
+    }
+
     private static async Task AssertCredentialHasNoFakeDefault(ParameterResource parameter)
     {
         if (parameter.Default is not null)
         {
-            var defaultValue = parameter.Default.GetDefaultValue();
-            foreach (var placeholder in ForbiddenCredentialPlaceholders)
+            try
             {
-                Assert.False(
-                    string.Equals(defaultValue, placeholder, StringComparison.Ordinal),
-                    $"Parameter '{parameter.Name}' must not default to placeholder '{placeholder}'.");
-            }
+                var defaultValue = parameter.Default.GetDefaultValue();
+                foreach (var placeholder in ForbiddenCredentialPlaceholders)
+                {
+                    Assert.False(
+                        string.Equals(defaultValue, placeholder, StringComparison.Ordinal),
+                        $"Parameter '{parameter.Name}' must not default to placeholder '{placeholder}'.");
+                }
 
-            Assert.False(
-                string.Equals(
-                    defaultValue,
-                    LocalDevelopmentProductSurface.LocalDevelopmentOAuthCallbackUri,
-                    StringComparison.Ordinal),
-                $"Credential parameter '{parameter.Name}' must not default to the OAuth callback URL.");
+                Assert.False(
+                    string.Equals(
+                        defaultValue,
+                        LocalDevelopmentProductSurface.LocalDevelopmentOAuthCallbackUri,
+                        StringComparison.Ordinal),
+                    $"Credential parameter '{parameter.Name}' must not default to the OAuth callback URL.");
+            }
+            catch (MissingParameterValueException)
+            {
+                // Operator-supplied defaults fail closed until user secrets are set — expected.
+            }
         }
 
         try
@@ -113,7 +146,14 @@ public sealed class McpProviderParameterHonesty
     {
         if (parameter.Default is not null)
         {
-            return parameter.Default.GetDefaultValue();
+            try
+            {
+                return parameter.Default.GetDefaultValue();
+            }
+            catch (MissingParameterValueException)
+            {
+                return null;
+            }
         }
 
         try
