@@ -79,6 +79,16 @@ internal sealed partial class BehaviorNeuron
                 $"Behavior binding case '{binding.CaseId}' is not present on the active signed contract.");
         }
 
+        var bindingId = BindingIdFor(binding);
+        var registered = data.RegisteredBindings ?? [];
+        var existing = registered.FirstOrDefault(
+            item => string.Equals(item.BindingId, bindingId, StringComparison.Ordinal));
+        if (existing is not null && !existing.Enabled)
+        {
+            throw new InvalidOperationException(
+                $"Behavior binding '{bindingId}' is disabled; enable it before activation.");
+        }
+
         var capabilities = DeriveResultBearingEdges(Id.Owner, envelope.Manifest.CapabilityGrants);
         var activation = new BehaviorTaskActivation(
             binding.BehaviorId,
@@ -111,12 +121,29 @@ internal sealed partial class BehaviorNeuron
                 $"Task '{binding.TaskId}' is already bound to a different activation.");
         }
 
-        if (!data.ActiveTaskIds.Contains(binding.TaskId))
+        var nextBindings = new List<BehaviorRegisteredBinding>(registered);
+        nextBindings.RemoveAll(item => string.Equals(item.BindingId, bindingId, StringComparison.Ordinal));
+        nextBindings.Add(new BehaviorRegisteredBinding(
+            bindingId,
+            SourceModule: binding.TaskId.Type,
+            SourceSynapse: nameof(ActivateBoundBehavior),
+            TargetCase: binding.CaseId,
+            ContractVersion: binding.ContractVersion,
+            Enabled: true,
+            ConfigurationHint: "opaque"));
+
+        var trackedTasks = new List<NeuronId>(data.ActiveTaskIds);
+        if (!trackedTasks.Contains(binding.TaskId))
         {
-            var tracked = new List<NeuronId>(data.ActiveTaskIds) { binding.TaskId };
-            data = data with { ActiveTaskIds = tracked };
-            await SaveAsync(data);
+            trackedTasks.Add(binding.TaskId);
         }
+
+        data = data with
+        {
+            ActiveTaskIds = trackedTasks,
+            RegisteredBindings = nextBindings,
+        };
+        await SaveAsync(data);
 
         return new BoundBehaviorActivationResult(
             binding.TaskId,
@@ -124,6 +151,37 @@ internal sealed partial class BehaviorNeuron
             snapshot.ActiveAttempt,
             snapshot.Activation);
     }
+
+    public async Task<BehaviorSnapshot> SetBindingEnabled(SetBehaviorBindingEnabled command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ValidateCommand(command.CommandId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command.BindingId);
+
+        var data = LoadOrEmpty();
+        if (TryReceipt(data, command.CommandId, out var received))
+        {
+            return received;
+        }
+
+        var bindings = new List<BehaviorRegisteredBinding>(data.RegisteredBindings ?? []);
+        var index = bindings.FindIndex(
+            item => string.Equals(item.BindingId, command.BindingId, StringComparison.Ordinal));
+        if (index < 0)
+        {
+            throw new InvalidOperationException(
+                $"Behavior '{Id}' has no registered binding '{command.BindingId}'.");
+        }
+
+        bindings[index] = bindings[index] with { Enabled = command.Enabled };
+        data = data with { RegisteredBindings = bindings };
+        data = WithReceipt(data, command.CommandId, Snapshot(data));
+        await SaveAsync(data);
+        return Snapshot(data);
+    }
+
+    private static string BindingIdFor(BehaviorActivationBinding binding)
+        => $"{binding.TaskId.Name}__{binding.CaseId}";
 
     public async Task<BehaviorSnapshot> StopRun(StopBehavior command)
     {

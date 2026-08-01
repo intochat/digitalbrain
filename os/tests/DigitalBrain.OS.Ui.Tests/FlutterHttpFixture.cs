@@ -4,6 +4,7 @@ using DigitalBrain.Chat;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.ServiceDefaults;
+using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
 
 namespace DigitalBrain.Flutter.Http.Tests;
@@ -40,6 +41,7 @@ public sealed class FlutterHttpFixture : DigitalBrainFixture
                 ["DigitalBrain:Modules:0"] = FlutterModule.Id.Value,
                 ["DigitalBrain:Modules:1"] = ChatModule.Id.Value,
                 ["DigitalBrain:Modules:2"] = BehaviorsModule.Id.Value,
+                ["DigitalBrain:Modules:3"] = TasksModule.Id.Value,
             });
         builder.Services.AddSingleton(test.Client);
         builder.Services.AddSingleton<IGrainFactory>(test.Cluster.Client);
@@ -63,5 +65,6 @@ public sealed class FlutterHttpFixture : DigitalBrainFixture
         brain.AddModule<ChatModule>();
         brain.AddModule<AIModule>();
         brain.AddModule<BehaviorsModule>();
+        brain.AddModule<TasksModule>();
     }
 }

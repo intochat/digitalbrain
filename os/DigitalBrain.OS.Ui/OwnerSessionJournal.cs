@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
 using DigitalBrain.Flutter;
@@ -83,6 +84,20 @@ internal sealed class OwnerSessionJournal
 
         return WatchOutgoingAsync(
             NeuronId.For<IMcpAuthorization>(_owner, McpAuthorizationNeuron.InstanceName),
+            afterSequence,
+            cancellationToken);
+    }
+
+    public IAsyncEnumerable<JournalRead> WatchBehaviorOutgoingAsync(
+        string behaviorId,
+        long afterSequence,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(behaviorId);
+        ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
+
+        return WatchOutgoingAsync(
+            NeuronId.For<IBehaviorNeuron>(_owner, behaviorId),
             afterSequence,
             cancellationToken);
     }

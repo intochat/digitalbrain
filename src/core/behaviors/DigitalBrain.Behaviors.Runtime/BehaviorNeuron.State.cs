@@ -45,7 +45,48 @@ internal sealed partial class BehaviorNeuron
     }
 
     private BehaviorSnapshot Snapshot(BehaviorData data)
-        => new(
+    {
+        var featureName = data.Features?
+            .Keys
+            .Order(StringComparer.Ordinal)
+            .FirstOrDefault();
+        var featureText = data.Features is null || data.Features.Count == 0
+            ? null
+            : FeatureSourceOf(data.Features);
+        var displayName = data.DisplayName;
+        var scenarios = featureText is null
+            ? Array.Empty<BehaviorScenarioSnapshot>()
+            : BehaviorScenarioBinder.DeriveScenarios(featureText)
+                .Select(static scenario => new BehaviorScenarioSnapshot(
+                    scenario.ScenarioId,
+                    scenario.Title,
+                    scenario.BindingKey,
+                    Passed: null,
+                    Detail: null))
+                .ToArray();
+        var overview = displayName is null
+            ? null
+            : BehaviorScenarioBinder.ProjectOverview(
+                displayName,
+                featureText is null
+                    ? []
+                    : BehaviorScenarioBinder.DeriveScenarios(featureText));
+        var signature = data.ActiveArtifactSignature ?? data.ArtifactSignature;
+        var signatureHex = signature is null
+            ? null
+            : Convert.ToHexString(signature);
+        var bindings = (data.RegisteredBindings ?? [])
+            .Select(static binding => new BehaviorBindingSnapshot(
+                binding.BindingId,
+                binding.SourceModule,
+                binding.SourceSynapse,
+                binding.TargetCase,
+                binding.ContractVersion,
+                binding.Enabled,
+                binding.ConfigurationHint))
+            .ToArray();
+
+        return new(
             BehaviorIdOfName(),
             data.Status,
             data.ProposedArtifactHash,
@@ -56,7 +97,18 @@ internal sealed partial class BehaviorNeuron
             data.IsApproved,
             data.LastExecutionOutcome,
             data.RunState,
-            data.ActivationGateOpen);
+            data.ActivationGateOpen,
+            displayName,
+            data.Description,
+            data.ProgramSource,
+            featureName,
+            featureText,
+            overview,
+            signatureHex,
+            data.ActiveTaskIds.Count,
+            bindings,
+            scenarios);
+    }
 
     private BehaviorId BehaviorIdOfName() => new(Id.Name);
 
@@ -194,6 +246,7 @@ internal sealed partial class BehaviorNeuron
             RunState = BehaviorRunState.Idle,
             ActivationGateOpen = false,
             ActiveTaskIds = [],
+            RegisteredBindings = [],
             Receipts = new Dictionary<Guid, BehaviorSnapshot>(),
         };
 
@@ -283,5 +336,18 @@ internal sealed partial class BehaviorNeuron
 
         [Id(28)]
         public List<NeuronId> ActiveTaskIds { get; init; } = [];
+
+        [Id(29)]
+        public List<BehaviorRegisteredBinding> RegisteredBindings { get; init; } = [];
     }
+
+    [GenerateSerializer]
+    internal sealed record BehaviorRegisteredBinding(
+        [property: Id(0)] string BindingId,
+        [property: Id(1)] string SourceModule,
+        [property: Id(2)] string SourceSynapse,
+        [property: Id(3)] string TargetCase,
+        [property: Id(4)] string ContractVersion,
+        [property: Id(5)] bool Enabled,
+        [property: Id(6)] string ConfigurationHint);
 }

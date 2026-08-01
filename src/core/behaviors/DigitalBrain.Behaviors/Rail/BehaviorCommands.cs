@@ -167,3 +167,10 @@ public sealed record StopBehavior(
 [Alias("db.behavior.start")]
 public sealed record StartBehavior(
     [property: Id(0)] CommandId CommandId);
+
+[GenerateSerializer]
+[Alias("db.behavior.set-binding-enabled")]
+public sealed record SetBehaviorBindingEnabled(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] string BindingId,
+    [property: Id(2)] bool Enabled);

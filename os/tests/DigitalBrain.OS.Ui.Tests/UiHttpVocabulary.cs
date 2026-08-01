@@ -44,10 +44,22 @@ public sealed class UiHttpVocabulary(FlutterHttpFixture fixture)
         Assert.Equal("/oauth/mcp/callback", FlutterHttpContract.McpOAuthCallbackPath);
         Assert.Equal("/authorizations/events", FlutterHttpContract.AuthorizationEventsPath);
         Assert.Equal("authorization", FlutterHttpContract.AuthorizationEvent);
+        Assert.Equal("/behaviors", FlutterHttpContract.BehaviorsPath);
         Assert.Equal("/behaviors/{behaviorId}", FlutterHttpContract.BehaviorPath);
         Assert.Equal("/behaviors/{behaviorId}/propose", FlutterHttpContract.BehaviorProposePath);
         Assert.Equal("/behaviors/{behaviorId}/tests", FlutterHttpContract.BehaviorTestsPath);
         Assert.Equal("/behaviors/{behaviorId}/approve", FlutterHttpContract.BehaviorApprovePath);
+        Assert.Equal("/behaviors/{behaviorId}/activate", FlutterHttpContract.BehaviorActivatePath);
+        Assert.Equal("/behaviors/{behaviorId}/stop", FlutterHttpContract.BehaviorStopPath);
+        Assert.Equal("/behaviors/{behaviorId}/start", FlutterHttpContract.BehaviorStartPath);
+        Assert.Equal("/behaviors/{behaviorId}/run-once", FlutterHttpContract.BehaviorRunOncePath);
+        Assert.Equal("/behaviors/{behaviorId}/rollback", FlutterHttpContract.BehaviorRollbackPath);
+        Assert.Equal("/behaviors/{behaviorId}/bindings", FlutterHttpContract.BehaviorBindingsPath);
+        Assert.Equal("/behaviors/{behaviorId}/bindings/{bindingId}", FlutterHttpContract.BehaviorBindingPath);
+        Assert.Equal("/behaviors/{behaviorId}/events", FlutterHttpContract.BehaviorEventsPath);
+        Assert.Equal("/behaviors/{behaviorId}/change/propose", FlutterHttpContract.BehaviorChangeProposePath);
+        Assert.Equal("/behaviors/{behaviorId}/change/approve", FlutterHttpContract.BehaviorChangeApprovePath);
+        Assert.Equal("behavior", FlutterHttpContract.BehaviorEvent);
         Assert.Equal("/surfaces/behavior-editor", FlutterHttpContract.BehaviorEditorSurfacePath);
     }
 
