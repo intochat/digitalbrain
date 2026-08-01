@@ -1,7 +1,9 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Manifest;
 using DigitalBrain.Behaviors.Runtime.Artifacts;
+using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Behaviors;
 
@@ -203,6 +205,7 @@ internal sealed partial class BehaviorNeuron
 
         if (data.RunState == BehaviorRunState.Stopped)
         {
+            UnpublishExactCapability();
             await EmitAsync(new BehaviorStopped(command.CommandId, behaviorId));
         }
 
@@ -238,8 +241,43 @@ internal sealed partial class BehaviorNeuron
         };
         data = WithReceipt(data, command.CommandId, Snapshot(data));
         await SaveAsync(data);
+        PublishExactCapability(data);
         await EmitAsync(new BehaviorStarted(command.CommandId, BehaviorIdOfName()));
         return Snapshot(data);
+    }
+
+    private void PublishExactCapability(BehaviorData data)
+    {
+        if (data.ActiveArtifactHash is null
+            || string.IsNullOrWhiteSpace(data.DisplayName)
+            || string.IsNullOrWhiteSpace(data.Description))
+        {
+            return;
+        }
+
+        var catalog = ServiceProvider.GetService<ActiveCapabilityCatalog>();
+        if (catalog is null)
+        {
+            return;
+        }
+
+        var scenarios = data.Features?.Keys.Order(StringComparer.Ordinal).ToArray()
+            ?? Array.Empty<string>();
+        catalog.PublishBehavior(new ActiveBehaviorCapability(
+            BehaviorIdOfName().Value,
+            data.DisplayName,
+            data.Description,
+            data.ActiveArtifactHash,
+            Id.Name,
+            neuronContractId: "behaviors.behavior",
+            jsonSchema: """{"type":"object","properties":{"triggerTypeName":{"type":"string"},"triggerJson":{"type":"string"}},"required":["triggerTypeName","triggerJson"]}""",
+            scenarioTitles: scenarios));
+    }
+
+    private void UnpublishExactCapability()
+    {
+        var catalog = ServiceProvider.GetService<ActiveCapabilityCatalog>();
+        catalog?.UnpublishBehavior(BehaviorIdOfName().Value);
     }
 
     private static bool IsTaskSettledForStop(TaskSnapshot snapshot)

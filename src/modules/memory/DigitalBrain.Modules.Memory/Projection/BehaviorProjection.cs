@@ -1,4 +1,5 @@
 using System.Text;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Memory;
 
@@ -6,6 +7,19 @@ public static class BehaviorProjection
 {
     public static bool IsSearchable(BehaviorProjectionVisibility visibility)
         => visibility == BehaviorProjectionVisibility.Published;
+
+    public static IReadOnlyList<VectorProjectionEntry> FromActiveCatalog(ActiveCapabilityCatalog catalog)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+
+        return FromSources(catalog.Behaviors.Select(static behavior => new BehaviorProjectionSource(
+            behavior.BehaviorId,
+            behavior.DisplayName,
+            behavior.Description,
+            behavior.ScenarioTitles,
+            behavior.ArtifactHash,
+            BehaviorProjectionVisibility.Published)));
+    }
 
     public static IReadOnlyList<VectorProjectionEntry> FromSources(IEnumerable<BehaviorProjectionSource> sources)
     {
