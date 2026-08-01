@@ -12,7 +12,7 @@ public static class GoogleHostingExtensions
         "DigitalBrain:Google:Gmail",
         "OAuth client ID from [Google Auth Platform](https://console.cloud.google.com/auth/clients).",
         "OAuth client secret from [Google Auth Platform](https://console.cloud.google.com/auth/clients).",
-        "OAuth callback URI registered on the Google client. Use an HTTP loopback callback only with the explicit local development authorization mode.");
+        "OAuth callback URI registered on the Google client. Product path is the UI base URL + `/oauth/mcp/callback`. Use an HTTP loopback callback only with the explicit local development authorization mode.");
 
     public static DigitalBrainModuleBuilder<GoogleModule> WithGmail(this DigitalBrainModuleBuilder<GoogleModule> module)
     {

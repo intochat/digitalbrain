@@ -30,8 +30,15 @@ internal static class McpOAuthOptions
 
     private static string? Optional(IConfiguration configuration, McpServerDefinition server, string name)
     {
-        var value = configuration[$"{server.ConfigurationRoot}:{name}"];
-        return !string.IsNullOrWhiteSpace(value) ? value : null;
+        var key = $"{server.ConfigurationRoot}:{name}";
+        var value = configuration[key];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        RejectPlaceholder(server, key, value);
+        return value;
     }
 
     private static string Required(IConfiguration configuration, McpServerDefinition server, string name)
@@ -39,10 +46,25 @@ internal static class McpOAuthOptions
         var key = $"{server.ConfigurationRoot}:{name}";
         var value = configuration[key];
 
-        return !string.IsNullOrWhiteSpace(value)
-            ? value
-            : throw new InvalidOperationException(
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException(
                 $"{server.DisplayName} requires projected configuration '{key}'.");
+        }
+
+        RejectPlaceholder(server, key, value);
+        return value;
+    }
+
+    private static void RejectPlaceholder(McpServerDefinition server, string key, string value)
+    {
+        if (string.Equals(value, "local-dev", StringComparison.Ordinal)
+            || string.Equals(value, "local-dev-secret", StringComparison.Ordinal)
+            || string.Equals(value, "http://localhost/oauth/callback", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"{server.DisplayName} is using a disallowed placeholder for '{key}'. Configure a real application credential.");
+        }
     }
 
     private static Uri RequiredUri(IConfiguration configuration, McpServerDefinition server, string name)

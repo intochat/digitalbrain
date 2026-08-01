@@ -60,11 +60,10 @@ internal static class McpProviderHosting
         internal McpApplicationParameters(IDistributedApplicationBuilder builder)
         {
             _builder = builder;
-            AuthorizationMode = (_builder.ExecutionContext.IsRunMode
-                    ? _builder.AddParameter("mcp-authorization-mode", "LocalLoopbackDevelopment")
-                    : _builder.AddParameter("mcp-authorization-mode"))
+            AuthorizationMode = _builder
+                .AddParameter("mcp-authorization-mode")
                 .WithDescription(
-                    "MCP authorization execution mode. Use `LocalLoopbackDevelopment` only for a local silo; every other value disables interactive authorization.",
+                    "MCP authorization execution mode. Set `LocalLoopbackDevelopment` only for a local silo when interactive provider OAuth is required; every other value disables interactive authorization.",
                     enableMarkdown: true);
         }
 
@@ -85,46 +84,33 @@ internal static class McpProviderHosting
                 return existing;
             }
 
-            var localRun = _builder.ExecutionContext.IsRunMode;
             var created = new McpProviderParameters(
                 definition,
                 Parameter(
                     $"{definition.ParameterPrefix}-client-id",
-                    localValue: "local-dev",
                     secret: false,
-                    description: definition.ClientIdDescription,
-                    localRun),
+                    description: definition.ClientIdDescription),
                 definition.ClientSecretDescription is { } clientSecretDescription
                     ? Parameter(
                         $"{definition.ParameterPrefix}-client-secret",
-                        localValue: "local-dev-secret",
                         secret: true,
-                        description: clientSecretDescription,
-                        localRun)
+                        description: clientSecretDescription)
                     : null,
                 Parameter(
                     $"{definition.ParameterPrefix}-redirect-uri",
-                    localValue: "http://localhost/oauth/callback",
                     secret: false,
-                    description: definition.RedirectUriDescription,
-                    localRun));
+                    description: definition.RedirectUriDescription));
             _providers.Add(definition.Key, created);
             return created;
         }
 
         private IResourceBuilder<ParameterResource> Parameter(
             string name,
-            string localValue,
             bool secret,
-            string description,
-            bool localRun)
-        {
-            var resource = localRun
-                ? _builder.AddParameter(name, localValue, secret: secret)
-                : _builder.AddParameter(name, secret: secret);
-
-            return resource.WithDescription(description, enableMarkdown: true);
-        }
+            string description)
+            => _builder
+                .AddParameter(name, secret: secret)
+                .WithDescription(description, enableMarkdown: true);
     }
 
     private sealed class McpBrainProjection : DigitalBrainModuleProjection

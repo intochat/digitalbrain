@@ -12,7 +12,7 @@ public static class SalesforceHostingExtensions
         "DigitalBrain:Salesforce",
         "Consumer key from the Salesforce [External Client App](https://developer.salesforce.com/docs/platform/hosted-mcp-servers/guide/create-external-client-app.html).",
         ClientSecretDescription: null,
-        "OAuth callback URI registered on the Salesforce External Client App. Use an HTTP loopback callback only with the explicit local development authorization mode.");
+        "OAuth callback URI registered on the Salesforce External Client App. Product path is the UI base URL + `/oauth/mcp/callback`. Use an HTTP loopback callback only with the explicit local development authorization mode.");
 
     public static DigitalBrainModuleBuilder<SalesforceModule> WithSalesforce(
         this DigitalBrainModuleBuilder<SalesforceModule> module)
