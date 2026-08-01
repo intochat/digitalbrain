@@ -36,21 +36,28 @@ The plan of record. Nothing is shipped unless it says Built.
 |---|---|
 | Neuron/synapse foundation, owner-scoped client, module activation, AppHost composition, testing path | **Built** |
 | Typed AI, Tasks, Google, Salesforce, Chat, Flutter, Quickstart families | **Built** |
+| Memory / vector infrastructure (`IVectorMemory`, Qdrant hosting) | **Built** |
+| Automatic discovery — exact catalog + semantic projection (lab) | **Built** (product claim pending live E1) |
 | Flutter vertical — shell/scene vocabulary, UI HTTP/SSE edge (`WithUiEdge`/`WithHeadlessHost`/`WithWindowHost`), headless Dart host, Windows chrome | **Built** |
 | Product shell — responsive Chat, content-safe Activity, live 3D-projected Brain topology, pulses and inspector | **Built** |
+| Behavior Studio surface (six views, host APIs) | **Built** |
+| NL → C# behavior authoring (C1 ladder) | Designed until C1 green |
 | Product MCP surface — durable chat send/read, neuron journal observation, active-neuron discovery | **Built** |
+| Dual live Google + Salesforce OAuth productization | In progress — honest config (no placeholder credentials); live dual-provider proof pending |
 | Time — durable one-shot `ICountdown` and its recovery tests | **Built** |
 | Time — reminders, recurring interval/calendar scheduling, DST | Designed |
 | Multi-principal IdP edge, journal observation on `IDigitalBrain` | Designed |
+| Multi-model UI combine / Settings model switch | Designed |
+| Two Docker Hub product images (`digitalbrain`, `digitalbrain-ui`) | Designed |
 | Behavior rail — proposal, compile, BDD gate, approval, activation, rollback, signed BehaviorHost deploy/execute (L1/L2) | **Built** |
 | Observability spine — host OpenTelemetry, structured logs, causal kernel spans, GenAI spans and metrics | **Built** |
 
 `DigitalBrain.Behaviors` is a packable SDK foundation (authoring interfaces, constrained context,
-manifests, artifact identities) and holds the canonical artifact codec. It is not a compiler, builder,
-broker or execution rail. Nothing in the product runs on it today: chat owns its whole turn in
-`ChatNeuron`, and no shipped neuron implements `IIntentProgram`.
+manifests, artifact identities) and holds the canonical artifact codec. The product AppHost loads
+`BehaviorsModule` and the Behavior Studio surface; full NL→C# authoring is not ship-claimed until C1
+is green. Chat still owns its turn in `ChatNeuron` today.
 
-One assumption is load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
+One assumption remains load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
 
 ## Repository shape
 
