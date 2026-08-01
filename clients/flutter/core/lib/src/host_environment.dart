@@ -1,4 +1,7 @@
-import 'dart:io' show Platform;
+import 'process_environment_stub.dart'
+    if (dart.library.io) 'process_environment_io.dart' as process_env;
+import 'runtime_surface_io.dart'
+    if (dart.library.html) 'runtime_surface_web.dart' as surface;
 
 abstract final class DigitalBrainHostEnv {
   static const uiBaseVariable = 'DIGITALBRAIN_UI_BASE';
@@ -20,7 +23,7 @@ abstract final class DigitalBrainHostEnv {
     if (fromDefine.isNotEmpty) {
       return fromDefine;
     }
-    final process = processEnvironment ?? Platform.environment;
+    final process = processEnvironment ?? process_env.readProcessEnvironment();
     return process[uiBaseVariable] ?? '';
   }
 
@@ -32,12 +35,19 @@ abstract final class DigitalBrainHostEnv {
       fromDefine: fromDefine,
       processEnvironment: processEnvironment,
     );
-    if (raw.isEmpty) {
-      throw StateError(
-        '$uiBaseVariable is required (AppHost WithFlutterHost injects it).',
-      );
+    if (raw.isNotEmpty) {
+      return Uri.parse(raw);
     }
-    return Uri.parse(raw);
+
+    // Deployed shell served from digitalbrain-ui (same origin) has no process env.
+    final sameOrigin = surface.sameOriginUiBase();
+    if (sameOrigin != null) {
+      return sameOrigin;
+    }
+
+    throw StateError(
+      '$uiBaseVariable is required (AppHost WithFlutterHost injects it).',
+    );
   }
 
   static String resolveShell({
@@ -47,7 +57,7 @@ abstract final class DigitalBrainHostEnv {
     if (fromDefine.isNotEmpty) {
       return fromDefine;
     }
-    final process = processEnvironment ?? Platform.environment;
+    final process = processEnvironment ?? process_env.readProcessEnvironment();
     final raw = process[shellVariable] ?? '';
     if (raw.isEmpty) {
       return defaultShellName;
@@ -62,7 +72,7 @@ abstract final class DigitalBrainHostEnv {
     if (fromDefine.isNotEmpty) {
       return fromDefine;
     }
-    final process = processEnvironment ?? Platform.environment;
+    final process = processEnvironment ?? process_env.readProcessEnvironment();
     final raw = process[chatVariable] ?? '';
     if (raw.isEmpty) {
       return defaultChatName;

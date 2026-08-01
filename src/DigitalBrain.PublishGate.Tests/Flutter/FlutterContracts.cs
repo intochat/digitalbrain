@@ -103,7 +103,7 @@ public sealed class FlutterContracts
     }
 
     [Fact(DisplayName =
-        "Flutter.Aspire.Hosting public surface is projection API only — WithHeadlessHost/WithWindowHost, no marker types")]
+        "Flutter.Aspire.Hosting public surface is projection API only — WithHeadlessHost/WithWindowHost/WithWebHost, no marker types")]
     public void HostingPublicSurfaceIsProjectionApiOnly()
     {
         var hostingNamespace = typeof(FlutterHostingExtensions).Namespace;

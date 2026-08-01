@@ -1,9 +1,8 @@
-import 'dart:io';
-
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
 import 'chat_screen.dart';
+import 'open_url_io.dart' if (dart.library.html) 'open_url_web.dart' as open_url;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,22 +33,10 @@ void main() {
       onStream: edge == null
           ? null
           : (text) => edge.streamMessage(chatName: chat, text: text),
-      onOpenSignIn: openSystemBrowser,
+      onOpenSignIn: openExternalUrl,
       behaviorClient: behaviorClient,
     ),
   );
 }
 
-Future<void> openSystemBrowser(Uri url) async {
-  if (Platform.isWindows) {
-    await Process.start('cmd', ['/c', 'start', '', url.toString()]);
-    return;
-  }
-
-  if (Platform.isMacOS) {
-    await Process.start('open', [url.toString()]);
-    return;
-  }
-
-  await Process.start('xdg-open', [url.toString()]);
-}
+Future<void> openExternalUrl(Uri url) => open_url.openExternalUrl(url);

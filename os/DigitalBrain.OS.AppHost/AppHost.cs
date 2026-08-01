@@ -35,6 +35,7 @@ brain.AddModule<OSBehaviorsModule>();
 brain.AddModule<FlutterModule>(flutter => flutter
     .WithUiEdge()
     //.WithHeadlessHost() // pure-Dart host; swap with window for headless-only dev
+    //.WithWebHost() // deploy UX: flutter run -d chrome under shell/; local default stays window
     .WithWindowHost()
     );
 brain.AddModule<GoogleModule>(google => google.WithGmail());

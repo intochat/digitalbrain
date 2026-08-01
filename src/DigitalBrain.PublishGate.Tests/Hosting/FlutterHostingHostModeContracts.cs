@@ -189,4 +189,95 @@ public sealed class FlutterHostingHostModeContracts
 
         FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);
     }
+
+    [Fact(DisplayName =
+        "WithWebHost projects flutter run -d chrome under shell/ with dart-defines and exclusive edge env")]
+    public async Task WithWebHostProjectsFlutterRunUnderShell()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddDigitalBrain("brain");
+        await FlutterHostingProjectionSupport.AssertShellWebLayoutAsync(
+            FlutterHostingProjectionSupport.FlutterShellDirectory,
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
+
+        const string pinnedFlutterCommand = "flutter";
+        brain.AddModule<FlutterModule>(flutter => flutter
+            .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+            .WithWebHost(options =>
+            {
+                options.WorkingDirectory = FlutterHostingProjectionSupport.FlutterClientDirectory;
+                options.FlutterCommand = pinnedFlutterCommand;
+            }));
+
+        _ = builder
+            .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
+            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
+            .WithReference(brain);
+
+        var host = Assert.Single(
+            builder.Resources.OfType<ExecutableResource>(),
+            resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
+
+        Assert.Equal(pinnedFlutterCommand, host.Command, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(
+            Path.GetFullPath(FlutterHostingProjectionSupport.FlutterShellDirectory),
+            Path.GetFullPath(host.WorkingDirectory),
+            StringComparer.OrdinalIgnoreCase);
+        var args = await FlutterHostingProjectionSupport.ResolvedArgsOf(host).ConfigureAwait(true);
+        Assert.Equal(
+            ["run", "-d", FlutterHostingExtensions.DefaultWebDeviceTarget],
+            args.Take(3).ToArray());
+        Assert.Contains(
+            $"--dart-define={FlutterHostingExtensions.ShellEnvironmentVariable}={FlutterHostingExtensions.DefaultShellName}",
+            args,
+            StringComparer.Ordinal);
+        Assert.Contains(
+            $"--dart-define={FlutterHostingExtensions.ChatEnvironmentVariable}={FlutterHostingExtensions.DefaultChatName}",
+            args,
+            StringComparer.Ordinal);
+
+        // UI base is an endpoint ReferenceExpression (resolved by DCP at run); still a dart-define carrier.
+        var rawArgs = await FlutterHostingProjectionSupport.RawArgsOf(host).ConfigureAwait(true);
+        Assert.Contains(
+            rawArgs,
+            arg => arg is ReferenceExpression expression
+                && expression.ValueExpression.Contains(
+                    FlutterHostingExtensions.UIBaseEnvironmentVariable,
+                    StringComparison.Ordinal));
+
+        var environment = await FlutterHostingProjectionSupport.EnvironmentOf(host).ConfigureAwait(true);
+        FlutterHostingProjectionSupport.AssertExclusiveFlutterHostEnvironment(
+            environment.Keys.ToHashSet(StringComparer.Ordinal));
+    }
+
+    [Fact(DisplayName =
+        "WithWebHost without web markers throws — no silent window fallback")]
+    public void WithWebHostWithoutMarkersThrows()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddDigitalBrain("brain");
+        var windowOnly = Directory.CreateTempSubdirectory("db-flutter-window-only-");
+        try
+        {
+            File.WriteAllText(
+                Path.Combine(windowOnly.FullName, "pubspec.yaml"),
+                "name: window_only\n");
+            Directory.CreateDirectory(Path.Combine(windowOnly.FullName, "lib"));
+            File.WriteAllText(Path.Combine(windowOnly.FullName, "lib", "main.dart"), "void main() {}\n");
+            Directory.CreateDirectory(
+                Path.Combine(windowOnly.FullName, FlutterHostingExtensions.DefaultDeviceTarget));
+
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                brain.AddModule<FlutterModule>(flutter => flutter
+                    .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+                    .WithWebHost(options => options.WorkingDirectory = windowOnly.FullName)));
+
+            Assert.Contains(nameof(FlutterHostingExtensions.WithWindowHost), exception.Message, StringComparison.Ordinal);
+            FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);
+        }
+        finally
+        {
+            windowOnly.Delete(recursive: true);
+        }
+    }
 }

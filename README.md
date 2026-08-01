@@ -38,7 +38,7 @@ The plan of record. Nothing is shipped unless it says Built.
 | Typed AI, Tasks, Google, Salesforce, Chat, Flutter, Quickstart families | **Built** |
 | Memory / vector infrastructure (`IVectorMemory`, Qdrant hosting) | **Built** |
 | Automatic discovery — exact catalog + semantic projection (lab) | **Built** (product claim pending live E1) |
-| Flutter vertical — shell/scene vocabulary, UI HTTP/SSE edge (`WithUiEdge`/`WithHeadlessHost`/`WithWindowHost`), headless Dart host, Windows chrome | **Built** |
+| Flutter vertical — shell/scene vocabulary, UI HTTP/SSE edge (`WithUiEdge`/`WithHeadlessHost`/`WithWindowHost`/`WithWebHost`), headless Dart host, Windows + web chrome | **Built** (web deploy host; K1 six-view pixel parity on web still open) |
 | Product shell — responsive Chat, content-safe Activity, live 3D-projected Brain topology, pulses and inspector | **Built** |
 | Behavior Studio surface (six views, host APIs) | **Built** |
 | NL → C# behavior authoring (C1 ladder) | Designed until C1 green |

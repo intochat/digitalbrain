@@ -4,6 +4,7 @@ internal enum FlutterHostKind
 {
     Window = 0,
     Headless = 1,
+    Web = 2,
 }
 
 internal static class FlutterHostLaunch
@@ -29,6 +30,7 @@ internal static class FlutterHostLaunch
         {
             FlutterHostKind.Window => ResolveWindow(packageRoot, options, configuration),
             FlutterHostKind.Headless => ResolveHeadless(packageRoot, options, configuration),
+            FlutterHostKind.Web => ResolveWeb(packageRoot, options, configuration),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
     }
@@ -94,6 +96,51 @@ internal static class FlutterHostLaunch
             ["run", FlutterHostingExtensions.HeadlessHostEntry]);
     }
 
+    private static string? ResolveWebPackageDirectory(string packageRoot)
+    {
+        if (HasWebMarkers(packageRoot))
+        {
+            return packageRoot;
+        }
+
+        var nestedShell = Path.Combine(packageRoot, ShellPackageDirectoryName);
+        if (HasWebMarkers(nestedShell))
+        {
+            return nestedShell;
+        }
+
+        var siblingShell = Path.GetFullPath(Path.Combine(packageRoot, "..", ShellPackageDirectoryName));
+        if (HasWebMarkers(siblingShell))
+        {
+            return siblingShell;
+        }
+
+        return null;
+    }
+
+    private static Result ResolveWeb(
+        string packageRoot,
+        FlutterHostOptions options,
+        Microsoft.Extensions.Configuration.IConfiguration? configuration)
+    {
+        var deviceTarget = string.IsNullOrWhiteSpace(options.DeviceTarget)
+            || string.Equals(
+                options.DeviceTarget,
+                FlutterHostingExtensions.DefaultDeviceTarget,
+                StringComparison.OrdinalIgnoreCase)
+            ? FlutterHostingExtensions.DefaultWebDeviceTarget
+            : options.DeviceTarget;
+        var workDir = ResolveWebPackageDirectory(packageRoot)
+            ?? throw new InvalidOperationException(
+                $"Web Flutter host needs lib/main.dart and a 'web/' folder " +
+                $"under '{packageRoot}', '{packageRoot}/{ShellPackageDirectoryName}', " +
+                $"or the sibling '../{ShellPackageDirectoryName}' (clients/flutter/shell). " +
+                $"Use {nameof(FlutterHostingExtensions.WithWindowHost)}() for Windows chrome, " +
+                $"or {nameof(FlutterHostingExtensions.WithHeadlessHost)}() for the pure-Dart host.");
+
+        return new Result(ResolveFlutterCommand(options, configuration), workDir, ["run", "-d", deviceTarget]);
+    }
+
     private static bool HasWindowMarkers(string workingDirectory, string deviceTarget)
     {
         var mainDart = Path.Combine(workingDirectory, "lib", "main.dart");
@@ -103,6 +150,21 @@ internal static class FlutterHostLaunch
         }
 
         return Directory.Exists(Path.Combine(workingDirectory, deviceTarget));
+    }
+
+    private static bool HasWebMarkers(string workingDirectory)
+    {
+        var mainDart = Path.Combine(workingDirectory, "lib", "main.dart");
+        if (!File.Exists(mainDart))
+        {
+            return false;
+        }
+
+        return Directory.Exists(Path.Combine(workingDirectory, FlutterHostingExtensions.WebPlatformDirectoryName))
+            && File.Exists(Path.Combine(
+                workingDirectory,
+                FlutterHostingExtensions.WebPlatformDirectoryName,
+                "index.html"));
     }
 
     /// <summary>
