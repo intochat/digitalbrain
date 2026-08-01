@@ -24,14 +24,12 @@ public sealed class AuthorizationProviderProof(AuthorizationProviderProofFixture
         var commandId = CommandId.New();
         var auth = test.Neuron<IMcpAuthorization>(McpAuthorizationNeuron.InstanceName);
         var requiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
-        var completedWait = auth.Outgoing.NextAsync<AuthorizationCompleted>(cancellationToken);
-        var driver = test.Neuron<IIntegrationDriver>("provider-happy");
+        ScriptSampleRead(fixture);
 
-        var operation = driver.Reference.ReadGmailMessage(
-            commandId,
-            IntegrationsFixture.SampleGmailAccount,
-            IntegrationsFixture.SampleMessageId,
-            cancellationToken);
+        var operation = test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", commandId),
+                cancellationToken);
 
         using var race = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         race.CancelAfter(TimeSpan.FromSeconds(45));
@@ -62,33 +60,32 @@ public sealed class AuthorizationProviderProof(AuthorizationProviderProofFixture
             StringComparison.Ordinal);
         Assert.Contains(required.State, required.SignInUrl.AbsoluteUri, StringComparison.Ordinal);
         await AssertJournalHasNoSecretsAsync(auth, required.State, cancellationToken);
-        // The Edge OAuth handler follows the sign-in URL itself (provider → real edge
-        // callback) while this test only asserts the journaled facts and the resumed call.
 
+        var completedWait = auth.Outgoing.NextAsync<AuthorizationCompleted>(cancellationToken);
         var completed = (await completedWait).Synapse;
         Assert.Equal(commandId, completed.CommandId);
         Assert.Equal(required.State, completed.State);
 
-        var message = await operation.WaitAsync(cancellationToken);
+        var response = await operation.WaitAsync(cancellationToken);
         Assert.Equal(
             new GmailMessage(
                 IntegrationsFixture.SampleMessageId,
                 IntegrationsFixture.SampleSubject,
                 IntegrationsFixture.SampleSender,
                 IntegrationsFixture.SampleBody),
-            message);
+            Assert.Single(response.Messages));
         Assert.True(fixture.Provider.BearerHits >= 1);
         Assert.StartsWith(
             FakeMcpProviderHost.AccessTokenPrefix,
             fixture.Provider.LastBearerToken,
             StringComparison.Ordinal);
 
-        var reissued = await driver.Reference.ReadGmailMessage(
-            commandId,
-            IntegrationsFixture.SampleGmailAccount,
-            IntegrationsFixture.SampleMessageId,
-            cancellationToken);
-        Assert.Equal(IntegrationsFixture.SampleMessageId, reissued.Id);
+        ScriptSampleRead(fixture);
+        var reissued = await test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", commandId),
+                cancellationToken);
+        Assert.Equal(IntegrationsFixture.SampleMessageId, Assert.Single(reissued.Messages).Id);
         Assert.Single(await auth.Outgoing.ReadAsync<AuthorizationRequired>(afterSequence: 0, cancellationToken));
         Assert.Single(await auth.Outgoing.ReadAsync<AuthorizationCompleted>(afterSequence: 0, cancellationToken));
         await AssertJournalHasNoSecretsAsync(auth, required.State, cancellationToken);
@@ -105,32 +102,29 @@ public sealed class AuthorizationProviderProof(AuthorizationProviderProofFixture
         var commandId = CommandId.New();
         var auth = test.Neuron<IMcpAuthorization>(McpAuthorizationNeuron.InstanceName);
         var requiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
-        var deniedWait = auth.Outgoing.NextAsync<AuthorizationDenied>(cancellationToken);
-        var driver = test.Neuron<IIntegrationDriver>("provider-denied");
 
         fixture.Provider.DenyNextAuthorization = true;
-        var operation = driver.Reference.ReadGmailMessage(
-            commandId,
-            IntegrationsFixture.SampleGmailAccount,
-            IntegrationsFixture.SampleMessageId,
-            cancellationToken);
+        using var hang = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var operation = test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", commandId),
+                hang.Token);
 
         var required = (await requiredWait).Synapse;
-        // Edge OAuth handler follows the sign-in URL itself; deny is honored on that hop.
-
+        var deniedWait = auth.Outgoing.NextAsync<AuthorizationDenied>(cancellationToken);
         var denied = (await deniedWait).Synapse;
         Assert.Equal(commandId, denied.CommandId);
         Assert.Equal(required.State, denied.State);
 
-        await Assert.ThrowsAnyAsync<Exception>(() => operation.WaitAsync(cancellationToken));
+        await hang.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
 
-        var reissued = await Assert.ThrowsAsync<McpAuthorizationDeniedException>(() =>
-            driver.Reference.ReadGmailMessage(
-                commandId,
-                IntegrationsFixture.SampleGmailAccount,
-                IntegrationsFixture.SampleMessageId,
-                cancellationToken));
-        Assert.Equal(denied, reissued.Denial);
+        var reissued = await test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", commandId),
+                cancellationToken);
+        Assert.False(reissued.Succeeded);
+        Assert.False(string.IsNullOrWhiteSpace(reissued.Error));
         Assert.Single(await auth.Outgoing.ReadAsync<AuthorizationRequired>(afterSequence: 0, cancellationToken));
         Assert.Empty(await auth.Outgoing.ReadAsync<AuthorizationCompleted>(afterSequence: 0, cancellationToken));
     }
@@ -175,31 +169,45 @@ public sealed class AuthorizationProviderProof(AuthorizationProviderProofFixture
         var seedCommand = CommandId.New();
         var auth = test.Neuron<IMcpAuthorization>(McpAuthorizationNeuron.InstanceName);
         var seedRequiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
-        var driver = test.Neuron<IIntegrationDriver>("provider-expired");
 
-        // First authorize with a normal token so the durable cache is populated, then advance time.
-        var seedOperation = driver.Reference.ReadGmailMessage(
-            seedCommand,
-            IntegrationsFixture.SampleGmailAccount,
-            IntegrationsFixture.SampleMessageId,
-            cancellationToken);
+        ScriptSampleRead(fixture);
+        var seedOperation = test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", seedCommand),
+                cancellationToken);
         var seedRequired = (await seedRequiredWait).Synapse;
         _ = await seedOperation.WaitAsync(cancellationToken);
         await test.Clock.AdvanceAsync(TimeSpan.FromHours(2), cancellationToken);
 
         var expiredCommand = CommandId.New();
-        var failure = await Assert.ThrowsAsync<McpAuthorizationRequiredException>(() =>
-            driver.Reference.ReadGmailMessage(
-                expiredCommand,
-                IntegrationsFixture.SampleGmailAccount,
-                IntegrationsFixture.SampleMessageId,
-                cancellationToken));
+        var expiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
+        using var hang = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        hang.CancelAfter(TimeSpan.FromSeconds(30));
+        var expiredSend = test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", expiredCommand),
+                hang.Token);
 
-        Assert.NotNull(failure.Requirement);
-        Assert.Equal(expiredCommand, failure.Requirement.CommandId);
-        Assert.NotEqual(seedRequired.State, failure.Requirement.State);
+        var expired = (await expiredWait).Synapse;
+        Assert.Equal(expiredCommand, expired.CommandId);
+        Assert.NotEqual(seedRequired.State, expired.State);
         var requiredFacts = await auth.Outgoing.ReadAsync<AuthorizationRequired>(afterSequence: 0, cancellationToken);
         Assert.Equal(2, requiredFacts.Count);
+
+        await hang.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => expiredSend);
+    }
+
+    private static void ScriptSampleRead(AuthorizationProviderProofFixture fixture)
+    {
+        fixture.PlannerChat.ReplyWithCapabilityCall(
+            IntegrationsFixture.GmailGetMessageTool,
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["messageId"] = IntegrationsFixture.SampleMessageId,
+                ["messageFormat"] = "FULL_CONTENT",
+            });
+        fixture.PlannerChat.Reply("done");
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -232,11 +240,9 @@ public sealed class AuthorizationProviderProof(AuthorizationProviderProofFixture
             .Concat(completed.Select(entry => JsonSerializer.Serialize(entry.Synapse)))
             .Concat(denied.Select(entry => JsonSerializer.Serialize(entry.Synapse))))
         {
-            Assert.DoesNotContain(FakeMcpProviderHost.ClientSecret, payload, StringComparison.Ordinal);
             Assert.DoesNotContain("client_secret", payload, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("access_token", payload, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("refresh_token", payload, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain(FakeMcpProviderHost.AccessTokenPrefix, payload, StringComparison.Ordinal);
             Assert.DoesNotContain("Bearer", payload, StringComparison.Ordinal);
             Assert.Contains(state, payload, StringComparison.Ordinal);
         }

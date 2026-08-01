@@ -11,7 +11,23 @@ internal sealed partial class Gmail
         ["MESSAGE_FORMAT_UNSPECIFIED", "MINIMAL", "FULL_CONTENT", "METADATA_ONLY"];
     private static readonly string[] RequiredInputProperties = ["messageId"];
 
-    private static McpClientTool AdmitGetMessage(IList<McpClientTool> tools)
+    internal static IReadOnlyList<McpClientTool> AdmitReadTools(IList<McpClientTool> tools)
+    {
+        ArgumentNullException.ThrowIfNull(tools);
+
+        var admitted = new List<McpClientTool>();
+        foreach (var tool in tools)
+        {
+            if (IsSafeReadTool(tool))
+            {
+                admitted.Add(tool);
+            }
+        }
+
+        return admitted;
+    }
+
+    internal static McpClientTool AdmitGetMessage(IList<McpClientTool> tools)
     {
         ArgumentNullException.ThrowIfNull(tools);
         var matches = tools
@@ -24,19 +40,42 @@ internal sealed partial class Gmail
         }
 
         var tool = matches[0];
-        var annotations = tool.ProtocolTool.Annotations;
-
-        if (!HasInputSchema(tool.ProtocolTool.InputSchema)
-            || !HasOutputSchema(tool.ProtocolTool.OutputSchema)
-            || annotations?.ReadOnlyHint is not true
-            || annotations.DestructiveHint is not false
-            || annotations.IdempotentHint is not true
-            || annotations.OpenWorldHint is not false)
+        if (!IsGetMessageContract(tool))
         {
             throw Incompatible(tool.Name);
         }
 
         return tool;
+    }
+
+    private static bool IsSafeReadTool(McpClientTool tool)
+    {
+        var annotations = tool.ProtocolTool.Annotations;
+        if (annotations?.ReadOnlyHint is not true
+            || annotations.DestructiveHint is not false
+            || annotations.IdempotentHint is not true
+            || annotations.OpenWorldHint is not false)
+        {
+            return false;
+        }
+
+        if (string.Equals(tool.Name, GetMessageName, StringComparison.Ordinal))
+        {
+            return IsGetMessageContract(tool);
+        }
+
+        return true;
+    }
+
+    private static bool IsGetMessageContract(McpClientTool tool)
+    {
+        var annotations = tool.ProtocolTool.Annotations;
+        return HasInputSchema(tool.ProtocolTool.InputSchema)
+            && HasOutputSchema(tool.ProtocolTool.OutputSchema)
+            && annotations?.ReadOnlyHint is true
+            && annotations.DestructiveHint is false
+            && annotations.IdempotentHint is true
+            && annotations.OpenWorldHint is false;
     }
 
     private static bool HasInputSchema(JsonElement schema) =>
@@ -84,5 +123,5 @@ internal sealed partial class Gmail
             : [];
 
     private static InvalidOperationException Incompatible(string tool) =>
-        new($"{DefaultServer.DisplayName} MCP tool '{tool}' is incompatible with the admitted '{GetMessageName}' contract.");
+        new($"{DefaultServer.DisplayName} MCP tool '{tool}' is incompatible with the admitted read contract.");
 }

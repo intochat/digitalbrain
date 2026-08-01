@@ -29,6 +29,7 @@ public sealed class AccountEnrichmentBehaviorRail(IntegrationsFixture fixture)
             AdmittedMcpTools.SalesforceSoqlQuery(
                 IntegrationsFixture.SampleAccountId,
                 IntegrationsFixture.SampleEnrichmentDescription));
+        GmailHelpers.ScriptReadSampleMessage(test);
 
         var rail = test.Neuron<IBehaviorNeuron>("com.digitalbrain.account-enrichment");
         var proposed = await rail.Reference.Propose(new ProposeBehaviorRevision(

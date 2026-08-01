@@ -61,6 +61,7 @@ public sealed class AccountEnrichmentProcessSample(IntegrationsFixture fixture)
             IntegrationsFixture.SalesforceServerKey,
             AdmittedMcpTools.SalesforceUpdateAccount(),
             AdmittedMcpTools.SalesforceSoqlQuery(IntegrationsFixture.SampleAccountId, expectedDescription));
+        GmailHelpers.ScriptReadSampleMessage(test);
 
         var enrichment = test.Neuron<IAccountEnrichment>("enricher");
         var commandId = CommandId.New();

@@ -10,6 +10,8 @@ using DigitalBrain.Mcp.Testing;
 using DigitalBrain.Testing;
 using DigitalBrain.Flutter.Http;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DigitalBrain.Integrations.Tests;
@@ -17,9 +19,12 @@ namespace DigitalBrain.Integrations.Tests;
 public sealed class AuthorizationProviderProofFixture : IAsyncLifetime
 {
     private readonly SemaphoreSlim _methodLease = new(1, 1);
+    private readonly ScriptedChatClient _plannerChat = new();
     private FakeMcpProviderHost? _provider;
     private FixtureCluster? _cluster;
     private int _uiPort;
+
+    internal ScriptedChatClient PlannerChat => _plannerChat;
 
     internal FakeMcpProviderHost Provider
         => _provider ?? throw new InvalidOperationException("Fake MCP provider is not started.");
@@ -85,6 +90,7 @@ public sealed class AuthorizationProviderProofFixture : IAsyncLifetime
         finally
         {
             _methodLease.Dispose();
+            _plannerChat.Dispose();
             if (_provider is not null)
             {
                 await _provider.DisposeAsync();
@@ -121,6 +127,10 @@ public sealed class AuthorizationProviderProofFixture : IAsyncLifetime
         brain.AddModule<FlutterModule>();
         brain.AddModule<IntegrationsHarnessModule>();
         // Real HttpMcpClientSessionFactory — do not ConfigureMcpEdge / scripted factory.
+        brain.ConfigureServiceEdge(
+            services => services.AddSingleton<IChatClient>(_plannerChat),
+            _plannerChat,
+            static chat => chat.Reset());
         brain.Configure(McpRuntimeHosting.AuthorizationModeKey, McpRuntimeHosting.EdgeMode);
         brain.Configure(McpRuntimeHosting.AuthorizationPreflightKey, "false");
         brain.Configure(McpRuntimeHosting.PublicSignInBaseKey, provider.BaseAddress.AbsoluteUri);

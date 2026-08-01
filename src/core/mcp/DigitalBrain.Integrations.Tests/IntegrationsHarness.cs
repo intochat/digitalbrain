@@ -11,13 +11,6 @@ namespace DigitalBrain.Integrations.Tests;
 [Description("Integration harness driver neuron")]
 public partial interface IIntegrationDriver : INeuron
 {
-    [Alias(nameof(ReadGmailMessage))]
-    Task<GmailMessage> ReadGmailMessage(
-        CommandId commandId,
-        string account,
-        string messageId,
-        CancellationToken cancellationToken);
-
     [Alias(nameof(ProposeSalesforceAccountDescription))]
     Task<SalesforceAccountDescriptionMutation> ProposeSalesforceAccountDescription(
         CommandId commandId,
@@ -47,20 +40,6 @@ internal sealed class IntegrationDriver :
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
         return Task.CompletedTask;
-    }
-
-    public Task<GmailMessage> ReadGmailMessage(
-        CommandId commandId,
-        string account,
-        string messageId,
-        CancellationToken cancellationToken)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(account);
-        ArgumentException.ThrowIfNullOrWhiteSpace(messageId);
-
-        return GrainFactory
-            .GetGrain<IGmail>(NeuronId.For<IGmail>(Id.Owner, account).ToGrainId())
-            .ReadMessage(commandId, messageId, cancellationToken);
     }
 
     public Task<SalesforceAccountDescriptionMutation> ProposeSalesforceAccountDescription(

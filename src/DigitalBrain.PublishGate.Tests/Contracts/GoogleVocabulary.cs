@@ -12,7 +12,7 @@ public sealed class GoogleVocabulary
         ?? throw new InvalidOperationException($"{nameof(IGmail)} has no namespace.");
 
     [Fact(DisplayName =
-        "Google.Contracts public vocabulary is IGmail and GmailMessage only — ICalendar remains absent")]
+        "Google.Contracts public vocabulary is IGmail, GmailMessage, GmailRequest, and GmailResponse — ICalendar remains absent")]
     public void PublicVocabularyIsGmailOnly()
     {
         var contracts = typeof(IGmail).Assembly;
@@ -24,7 +24,9 @@ public sealed class GoogleVocabulary
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal([nameof(GmailMessage), nameof(IGmail)], vocabulary);
+        Assert.Equal(
+            [nameof(GmailMessage), nameof(GmailRequest), nameof(GmailResponse), nameof(IGmail)],
+            vocabulary);
         Assert.Null(contracts.GetType($"{GoogleNamespace}.ICalendar"));
         Assert.DoesNotContain(
             contracts.GetExportedTypes(),
@@ -32,21 +34,40 @@ public sealed class GoogleVocabulary
     }
 
     [Fact(DisplayName =
-        "IGmail.ReadMessage is unsuffixed, aliased, and returns GmailMessage")]
-    public void ReadMessageIsUnsuffixedAliasedAndReturnsGmailMessage()
+        "IGmail is a marker INeuron with no declared operation methods")]
+    public void IGmailIsMarkerWithNoOperationMethods()
     {
         var methods = typeof(IGmail)
             .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
 
-        Assert.Equal([nameof(IGmail.ReadMessage)], methods.Select(method => method.Name));
-        Assert.All(methods, method =>
-        {
-            Assert.DoesNotContain("Async", method.Name, StringComparison.Ordinal);
-            Assert.Equal(method.Name, method.GetCustomAttribute<AliasAttribute>()?.Alias);
-            Assert.Equal(typeof(Task<GmailMessage>), method.ReturnType);
-        });
-
+        Assert.Empty(methods);
         Assert.Contains(typeof(INeuron), typeof(IGmail).GetInterfaces());
+    }
+
+    [Fact(DisplayName =
+        "GmailRequest is an intent-level RequestSynapse of GmailResponse")]
+    public void GmailRequestIsIntentRequestSynapse()
+    {
+        Assert.True(typeof(RequestSynapse<GmailResponse>).IsAssignableFrom(typeof(GmailRequest)));
+
+        var alias = typeof(GmailRequest)
+            .GetCustomAttributes<AliasAttribute>(inherit: false)
+            .Select(attribute => attribute.Alias)
+            .Single();
+        Assert.Equal("db.google.gmail-request", alias);
+
+        var properties = typeof(GmailRequest)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(property => property.Name)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(
+            [
+                nameof(GmailRequest.CommandId),
+                nameof(GmailRequest.Intent),
+            ],
+            properties);
     }
 
     [Fact(DisplayName =

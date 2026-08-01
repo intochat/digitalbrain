@@ -1,16 +1,21 @@
-using System.Text.Json;
+using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Mcp;
 using DigitalBrain.Kernel;
+using DigitalBrain.Mcp;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
 namespace DigitalBrain.Google;
 
-internal sealed partial class Gmail : Neuron, IGmail
+internal sealed partial class Gmail :
+    Neuron,
+    IGmail,
+    IHandle<GmailRequest>,
+    IEmit<GmailResponse>
 {
-    private const string GetMessageName = "get_message";
+    internal const string GetMessageName = "get_message";
     private const string TokensName = "google.gmail.oauth";
     private const string ConfigurationRoot = "DigitalBrain:Google:Gmail";
     private static readonly McpServerDefinition DefaultServer = new(
@@ -19,6 +24,7 @@ internal sealed partial class Gmail : Neuron, IGmail
         new Uri("https://gmailmcp.googleapis.com/mcp/v1"),
         ConfigurationRoot,
         ["https://www.googleapis.com/auth/gmail.readonly"]);
+
     private readonly McpRuntime _runtime;
     private readonly IDurableValue<byte[]> _tokenState;
     private readonly string _durableIdentity;
@@ -26,66 +32,77 @@ internal sealed partial class Gmail : Neuron, IGmail
 
     public Gmail(McpRuntime runtime)
     {
+        ArgumentNullException.ThrowIfNull(runtime);
+
         _runtime = runtime;
         _tokenState = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(TokensName);
         _durableIdentity = Id.ToString();
         _server = ResolveServer(ServiceProvider.GetRequiredService<IConfiguration>());
     }
 
-    public async Task<GmailMessage> ReadMessage(
-        CommandId commandId,
-        string messageId,
-        CancellationToken cancellationToken)
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Planner/provider failures become a typed GmailResponse so directed request/reply does not retry forever.")]
+    public async Task HandleAsync(GmailRequest synapse, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(messageId);
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        await McpAuthorizationRail.EnsureAuthorizedAsync(
-            GrainFactory,
-            Id.Owner,
-            ServiceProvider,
-            TimeProvider,
-            commandId,
-            _server,
-            _tokenState,
-            () => WriteStateAsync(),
-            _durableIdentity,
-            cancellationToken);
+        try
+        {
+            await McpAuthorizationRail.EnsureAuthorizedAsync(
+                GrainFactory,
+                Id.Owner,
+                ServiceProvider,
+                TimeProvider,
+                synapse.CommandId,
+                _server,
+                _tokenState,
+                () => WriteStateAsync(),
+                _durableIdentity,
+                cancellationToken);
 
-        return await _runtime.RunAsync(
-            _server,
-            _tokenState,
-            () => WriteStateAsync(),
-            _durableIdentity,
-            commandId,
-            Id.Owner,
-            GrainFactory,
-            async (client, callbackCancellation) =>
-            {
-                var tools = await client.ListToolsAsync(cancellationToken: callbackCancellation);
-                var tool = AdmitGetMessage(tools);
-                var result = await tool.CallAsync(
-                    new Dictionary<string, object?>(StringComparer.Ordinal)
-                    {
-                        ["messageId"] = messageId,
-                        ["messageFormat"] = "FULL_CONTENT",
-                    },
-                    cancellationToken: callbackCancellation);
-                var content = McpRuntime.RequireStructuredContent(result, _server, GetMessageName);
-                var responseId = Required(content, "id");
+            var chat = ServiceProvider.GetRequiredService<IChatClient>();
+            var messages = await _runtime.RunAsync(
+                _server,
+                _tokenState,
+                () => WriteStateAsync(),
+                _durableIdentity,
+                synapse.CommandId,
+                Id.Owner,
+                GrainFactory,
+                (client, callbackCancellation) => GmailPlanner.PlanAsync(
+                    chat,
+                    client,
+                    _server,
+                    synapse.Intent,
+                    callbackCancellation),
+                cancellationToken);
 
-                if (!string.Equals(messageId, responseId, StringComparison.Ordinal))
-                {
-                    throw new InvalidOperationException(
-                        $"Gmail get_message returned id '{responseId}' for requested message '{messageId}'.");
-                }
-
-                return new GmailMessage(
-                    responseId,
-                    RequiredContent(content, "subject"),
-                    Required(content, "sender"),
-                    RequiredContent(content, "plaintextBody"));
-            },
-            cancellationToken);
+            await ReplyAsync(
+                new GmailResponse(synapse.CommandId, synapse.Intent, messages),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (McpAuthorizationRequiredException)
+        {
+            // Delivery retries after the owner completes sign-in for the same CommandId.
+            throw;
+        }
+        catch (Exception failure)
+        {
+            await ReplyAsync(
+                new GmailResponse(
+                    synapse.CommandId,
+                    synapse.Intent,
+                    [],
+                    failure.Message),
+                cancellationToken);
+        }
     }
 
     private static McpServerDefinition ResolveServer(IConfiguration configuration)
@@ -103,30 +120,5 @@ internal sealed partial class Gmail : Neuron, IGmail
         }
 
         return DefaultServer.WithEndpoint(uri);
-    }
-
-    private static string Required(JsonElement content, string property)
-    {
-        if (content.TryGetProperty(property, out var value)
-            && value.ValueKind == JsonValueKind.String
-            && !string.IsNullOrWhiteSpace(value.GetString()))
-        {
-            return value.GetString()!;
-        }
-
-        throw new InvalidOperationException($"Gmail get_message returned no {property}.");
-    }
-
-    private static string RequiredContent(JsonElement content, string property)
-    {
-        if (content.TryGetProperty(property, out var value)
-            && value.ValueKind == JsonValueKind.String
-            && value.GetString() is { } text
-            && (text.Length == 0 || !string.IsNullOrWhiteSpace(text)))
-        {
-            return text;
-        }
-
-        throw new InvalidOperationException($"Gmail get_message returned no {property}.");
     }
 }

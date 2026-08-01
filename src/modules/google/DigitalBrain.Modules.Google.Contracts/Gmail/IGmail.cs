@@ -1,9 +1,7 @@
+using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Google;
 
-public partial interface IGmail : INeuron
-{
-    [Alias(nameof(ReadMessage))]
-    Task<GmailMessage> ReadMessage(CommandId commandId, string messageId, CancellationToken cancellationToken);
-}
+[Description("Owner-scoped Gmail neuron identified by module-owned connection name")]
+public partial interface IGmail : INeuron;

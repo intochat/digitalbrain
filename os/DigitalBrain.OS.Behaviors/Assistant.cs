@@ -1,7 +1,9 @@
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
+using DigitalBrain.Client;
 using DigitalBrain.Google;
 using DigitalBrain.Salesforce;
 using Microsoft.Extensions.AI;
@@ -127,12 +129,36 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
             ? $"{failure.Message} Cause: {cause.Message}"
             : failure.Message;
 
+    [SuppressMessage(
+        "Usage",
+        "CA1849:Call async methods when in an async method",
+        Justification = "DigitalBrainClient.Connect is the in-silo factory; ConnectAsync is the behavior-worker surface.")]
     private async Task<string> ProposeEnrichmentAsync(string accountId, string messageId)
     {
         ValidateAccountId(accountId);
         ArgumentException.ThrowIfNullOrWhiteSpace(messageId);
 
-        var message = await Gmail().ReadMessage(CommandId.New(), messageId, CancellationToken.None);
+        var brain = DigitalBrainClient.Connect(GrainFactory, Id.Owner.Value);
+        var mail = await brain.Get<IGmail>(DefaultGmailAccount)
+            .SendAsync(new GmailRequest($"Read Gmail message {messageId}"), CancellationToken.None);
+        if (!mail.Succeeded)
+        {
+            throw new InvalidOperationException(mail.Error ?? "Gmail intent failed.");
+        }
+
+        GmailMessage? message = null;
+        for (var index = 0; index < mail.Messages.Count; index++)
+        {
+            if (string.Equals(mail.Messages[index].Id, messageId, StringComparison.Ordinal))
+            {
+                message = mail.Messages[index];
+                break;
+            }
+        }
+
+        message ??= mail.Messages.Count > 0
+            ? mail.Messages[0]
+            : throw new InvalidOperationException($"Gmail returned no message for '{messageId}'.");
         var mutation = await Salesforce().ProposeAccountDescription(
             CommandId.New(),
             Id,
@@ -155,9 +181,6 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
             throw new ArgumentException("A Salesforce Account ID must be a 15- or 18-character alphanumeric value.", nameof(accountId));
         }
     }
-
-    private IGmail Gmail()
-        => GrainFactory.GetGrain<IGmail>(NeuronId.For<IGmail>(Id.Owner, DefaultGmailAccount).ToGrainId());
 
     private ISalesforce Salesforce()
         => GrainFactory.GetGrain<ISalesforce>(NeuronId.For<ISalesforce>(Id.Owner, DefaultSalesforceAccount).ToGrainId());

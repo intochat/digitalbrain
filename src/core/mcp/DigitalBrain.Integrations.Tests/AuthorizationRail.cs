@@ -11,24 +11,23 @@ namespace DigitalBrain.Integrations.Tests;
 public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
 {
     [Fact(DisplayName =
-        "no token journals AuthorizationRequired with sign-in URL and state, completes as authorization-required, and keeps secrets out of the journal")]
+        "no token journals AuthorizationRequired with sign-in URL and state, and keeps secrets out of the journal")]
     public async Task MissingTokenParksAsAuthorizationRequiredWithoutSecrets()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        CatalogGmail(test);
+        GmailHelpers.CatalogSampleMessage(test);
 
         var commandId = CommandId.New();
         var auth = test.Neuron<IMcpAuthorization>(McpAuthorizationNeuron.InstanceName);
         var requiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
-        var driver = test.Neuron<IIntegrationDriver>("auth-missing");
 
-        var failure = await Assert.ThrowsAsync<McpAuthorizationRequiredException>(() =>
-            driver.Reference.ReadGmailMessage(
-                commandId,
-                IntegrationsFixture.SampleGmailAccount,
-                IntegrationsFixture.SampleMessageId,
-                cancellationToken));
+        using var hang = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        hang.CancelAfter(TimeSpan.FromSeconds(15));
+        var send = test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", commandId),
+                hang.Token);
 
         var required = (await requiredWait).Synapse;
         Assert.Equal(commandId, required.CommandId);
@@ -40,8 +39,10 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
             AuthorizationRailFixture.PublicSignInBase.TrimEnd('/'),
             required.SignInUrl.AbsoluteUri,
             StringComparison.Ordinal);
-        Assert.Equal(required, failure.Requirement);
         await AssertJournalHasNoSecretsAsync(auth, required.State, cancellationToken);
+
+        await hang.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send);
     }
 
     [Fact(DisplayName =
@@ -50,46 +51,56 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        CatalogGmail(test);
+        GmailHelpers.CatalogSampleMessage(test);
 
         var seedCommand = CommandId.New();
         var auth = test.Neuron<IMcpAuthorization>(McpAuthorizationNeuron.InstanceName);
-        var driver = test.Neuron<IIntegrationDriver>("auth-expired");
 
-        var seedRequired = await Assert.ThrowsAsync<McpAuthorizationRequiredException>(() =>
-            driver.Reference.ReadGmailMessage(
-                seedCommand,
-                IntegrationsFixture.SampleGmailAccount,
-                IntegrationsFixture.SampleMessageId,
-                cancellationToken));
-        Assert.NotNull(seedRequired.Requirement);
+        var seedRequiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
+        using var seedHang = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var seedSend = test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", seedCommand),
+                seedHang.Token);
+        var seedRequired = (await seedRequiredWait).Synapse;
+        Assert.NotNull(seedRequired);
 
+        var seedCompleted = auth.Outgoing.NextAsync<AuthorizationCompleted>(cancellationToken);
         await auth.Reference.DeliverCallback(
-            new DeliverMcpAuthorizationCallback(seedRequired.Requirement.State, "seed-code", Error: null, Iss: null),
+            new DeliverMcpAuthorizationCallback(seedRequired.State, "seed-code", Error: null, Iss: null),
             cancellationToken);
-        var seeded = await driver.Reference.ReadGmailMessage(
-            seedCommand,
-            IntegrationsFixture.SampleGmailAccount,
-            IntegrationsFixture.SampleMessageId,
-            cancellationToken);
-        Assert.Equal(IntegrationsFixture.SampleMessageId, seeded.Id);
+        _ = await seedCompleted;
+
+        await seedHang.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => seedSend);
+
+        GmailHelpers.ScriptReadSampleMessage(test);
+        var seeded = await test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", seedCommand),
+                cancellationToken);
+        Assert.Equal(IntegrationsFixture.SampleMessageId, Assert.Single(seeded.Messages).Id);
 
         await test.Clock.AdvanceAsync(TimeSpan.FromHours(2), cancellationToken);
 
         var expiredCommand = CommandId.New();
-        var failure = await Assert.ThrowsAsync<McpAuthorizationRequiredException>(() =>
-            driver.Reference.ReadGmailMessage(
-                expiredCommand,
-                IntegrationsFixture.SampleGmailAccount,
-                IntegrationsFixture.SampleMessageId,
-                cancellationToken));
+        var expiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
+        using var expiredHang = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        expiredHang.CancelAfter(TimeSpan.FromSeconds(15));
+        var expiredSend = test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", expiredCommand),
+                expiredHang.Token);
 
-        Assert.NotNull(failure.Requirement);
-        Assert.Equal(expiredCommand, failure.Requirement.CommandId);
-        Assert.NotEqual(seedRequired.Requirement.State, failure.Requirement.State);
+        var expired = (await expiredWait).Synapse;
+        Assert.Equal(expiredCommand, expired.CommandId);
+        Assert.NotEqual(seedRequired.State, expired.State);
         var requiredFacts = await auth.Outgoing.ReadAsync<AuthorizationRequired>(afterSequence: 0, cancellationToken);
         Assert.Equal(2, requiredFacts.Count);
-        Assert.Contains(requiredFacts, observed => observed.Synapse == failure.Requirement);
+        Assert.Contains(requiredFacts, observed => observed.Synapse == expired);
+
+        await expiredHang.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => expiredSend);
     }
 
     [Fact(DisplayName =
@@ -98,24 +109,28 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        CatalogGmail(test);
+        GmailHelpers.CatalogSampleMessage(test);
 
         var commandId = CommandId.New();
         var auth = test.Neuron<IMcpAuthorization>(McpAuthorizationNeuron.InstanceName);
+
+        var requiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
+        using var hang = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var first = test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", commandId),
+                hang.Token);
+        var required = (await requiredWait).Synapse;
+        Assert.NotNull(required);
+
+        // Stop the parking delivery so the authorization grain is free for the deny callback.
+        await hang.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+
         var deniedWait = auth.Outgoing.NextAsync<AuthorizationDenied>(cancellationToken);
-        var driver = test.Neuron<IIntegrationDriver>("auth-denied");
-
-        var required = await Assert.ThrowsAsync<McpAuthorizationRequiredException>(() =>
-            driver.Reference.ReadGmailMessage(
-                commandId,
-                IntegrationsFixture.SampleGmailAccount,
-                IntegrationsFixture.SampleMessageId,
-                cancellationToken));
-        Assert.NotNull(required.Requirement);
-
         var delivery = await auth.Reference.DeliverCallback(
             new DeliverMcpAuthorizationCallback(
-                required.Requirement.State,
+                required.State,
                 Code: null,
                 Error: "access_denied",
                 Iss: null),
@@ -127,16 +142,15 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
 
         var denied = (await deniedWait).Synapse;
         Assert.Equal(commandId, denied.CommandId);
-        Assert.Equal(required.Requirement.State, denied.State);
+        Assert.Equal(required.State, denied.State);
 
-        var reissued = await Assert.ThrowsAsync<McpAuthorizationDeniedException>(() =>
-            driver.Reference.ReadGmailMessage(
-                commandId,
-                IntegrationsFixture.SampleGmailAccount,
-                IntegrationsFixture.SampleMessageId,
-                cancellationToken));
+        var reissued = await test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", commandId),
+                cancellationToken);
 
-        Assert.Equal(denied, reissued.Denial);
+        Assert.False(reissued.Succeeded);
+        Assert.False(string.IsNullOrWhiteSpace(reissued.Error));
         var requiredAgain = await auth.Outgoing.ReadAsync<AuthorizationRequired>(afterSequence: 0, cancellationToken);
         Assert.Single(requiredAgain);
     }
@@ -147,24 +161,25 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        CatalogGmail(test);
+        GmailHelpers.CatalogSampleMessage(test);
 
         var commandId = CommandId.New();
         var auth = test.Neuron<IMcpAuthorization>(McpAuthorizationNeuron.InstanceName);
+        var requiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
+
+        using var hang = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var parked = test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", commandId),
+                hang.Token);
+
+        var required = (await requiredWait).Synapse;
+        Assert.NotNull(required);
+
         var completedWait = auth.Outgoing.NextAsync<AuthorizationCompleted>(cancellationToken);
-        var driver = test.Neuron<IIntegrationDriver>("auth-completed");
-
-        var required = await Assert.ThrowsAsync<McpAuthorizationRequiredException>(() =>
-            driver.Reference.ReadGmailMessage(
-                commandId,
-                IntegrationsFixture.SampleGmailAccount,
-                IntegrationsFixture.SampleMessageId,
-                cancellationToken));
-        Assert.NotNull(required.Requirement);
-
         var delivery = await auth.Reference.DeliverCallback(
             new DeliverMcpAuthorizationCallback(
-                required.Requirement.State,
+                required.State,
                 Code: "edge-delivered-code",
                 Error: null,
                 Iss: "https://accounts.google.com"),
@@ -176,22 +191,24 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
 
         var completed = (await completedWait).Synapse;
         Assert.Equal(commandId, completed.CommandId);
-        Assert.Equal(required.Requirement.State, completed.State);
+        Assert.Equal(required.State, completed.State);
 
-        var message = await driver.Reference.ReadGmailMessage(
-            commandId,
-            IntegrationsFixture.SampleGmailAccount,
-            IntegrationsFixture.SampleMessageId,
-            cancellationToken);
+        await hang.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => parked);
 
+        GmailHelpers.ScriptReadSampleMessage(test);
+        var response = await test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", commandId),
+                cancellationToken);
         Assert.Equal(
             new GmailMessage(
                 IntegrationsFixture.SampleMessageId,
                 IntegrationsFixture.SampleSubject,
                 IntegrationsFixture.SampleSender,
                 IntegrationsFixture.SampleBody),
-            message);
-        await AssertJournalHasNoSecretsAsync(auth, required.Requirement.State, cancellationToken);
+            Assert.Single(response.Messages));
+        await AssertJournalHasNoSecretsAsync(auth, required.State, cancellationToken);
         Assert.Single(await auth.Outgoing.ReadAsync<AuthorizationRequired>(afterSequence: 0, cancellationToken));
         Assert.Single(await auth.Outgoing.ReadAsync<AuthorizationCompleted>(afterSequence: 0, cancellationToken));
     }
@@ -202,18 +219,19 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        CatalogGmail(test);
+        GmailHelpers.CatalogSampleMessage(test);
 
         var commandId = CommandId.New();
         var auth = test.Neuron<IMcpAuthorization>(McpAuthorizationNeuron.InstanceName);
-        var driver = test.Neuron<IIntegrationDriver>("auth-mismatch");
+        var requiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
 
-        _ = await Assert.ThrowsAsync<McpAuthorizationRequiredException>(() =>
-            driver.Reference.ReadGmailMessage(
-                commandId,
-                IntegrationsFixture.SampleGmailAccount,
-                IntegrationsFixture.SampleMessageId,
-                cancellationToken));
+        using var hang = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        hang.CancelAfter(TimeSpan.FromSeconds(15));
+        var send = test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", commandId),
+                hang.Token);
+        _ = await requiredWait;
 
         var delivery = await auth.Reference.DeliverCallback(
             new DeliverMcpAuthorizationCallback(
@@ -229,16 +247,10 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
 
         var completed = await auth.Outgoing.ReadAsync<AuthorizationCompleted>(afterSequence: 0, cancellationToken);
         Assert.Empty(completed);
-    }
 
-    private static void CatalogGmail(TestBrain test)
-        => test.Mcp().Catalog(
-            IntegrationsFixture.GmailServerKey,
-            AdmittedMcpTools.GmailGetMessage(
-                id: IntegrationsFixture.SampleMessageId,
-                subject: IntegrationsFixture.SampleSubject,
-                sender: IntegrationsFixture.SampleSender,
-                plaintextBody: IntegrationsFixture.SampleBody));
+        await hang.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send);
+    }
 
     private static async Task AssertJournalHasNoSecretsAsync(
         TestNeuron<IMcpAuthorization> auth,

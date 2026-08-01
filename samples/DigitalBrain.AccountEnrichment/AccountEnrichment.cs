@@ -1,4 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Client;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
@@ -38,10 +40,20 @@ internal sealed class AccountEnrichment :
             return;
         }
 
-        var gmail = GrainFactory.GetGrain<IGmail>(NeuronId.For<IGmail>(Id.Owner, synapse.GmailAccount).ToGrainId());
-        var salesforce = GrainFactory.GetGrain<ISalesforce>(NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
+        Stage(
+            synapse.CommandId,
+            new Request(
+                synapse.MessageId,
+                synapse.GmailAccount,
+                synapse.AccountId,
+                Description: string.Empty,
+                MutationFingerprint: string.Empty,
+                Completed: false));
 
-        var message = await gmail.ReadMessage(synapse.CommandId, synapse.MessageId, cancellationToken);
+        var mail = await ReadGmailAsync(synapse.GmailAccount, synapse.MessageId, synapse.CommandId, cancellationToken);
+        var message = SelectMessage(mail, synapse.MessageId);
+
+        var salesforce = GrainFactory.GetGrain<ISalesforce>(NeuronId.For<ISalesforce>(Id.Owner, "salesforce").ToGrainId());
         var description =
             $"Email from {message.Sender}: {message.Subject}\n{message.PlaintextBody}";
         var mutation = await salesforce.ProposeAccountDescription(
@@ -197,6 +209,45 @@ internal sealed class AccountEnrichment :
         ArgumentException.ThrowIfNullOrWhiteSpace(request.MessageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.AccountId);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.GmailAccount);
+    }
+
+    [SuppressMessage(
+        "Usage",
+        "CA1849:Call async methods when in an async method",
+        Justification = "DigitalBrainClient.Connect is the in-silo factory; ConnectAsync is the behavior-worker surface.")]
+    private async Task<GmailResponse> ReadGmailAsync(
+        string account,
+        string messageId,
+        CommandId commandId,
+        CancellationToken cancellationToken)
+    {
+        var brain = DigitalBrainClient.Connect(GrainFactory, Id.Owner.Value);
+        var response = await brain.Get<IGmail>(account)
+            .SendAsync(new GmailRequest($"Read Gmail message {messageId}", commandId), cancellationToken);
+        if (!response.Succeeded)
+        {
+            throw new InvalidOperationException(response.Error ?? "Gmail intent failed.");
+        }
+
+        return response;
+    }
+
+    private static GmailMessage SelectMessage(GmailResponse mail, string messageId)
+    {
+        for (var index = 0; index < mail.Messages.Count; index++)
+        {
+            if (string.Equals(mail.Messages[index].Id, messageId, StringComparison.Ordinal))
+            {
+                return mail.Messages[index];
+            }
+        }
+
+        if (mail.Messages.Count > 0)
+        {
+            return mail.Messages[0];
+        }
+
+        throw new InvalidOperationException($"Gmail returned no message for '{messageId}'.");
     }
 
     [GenerateSerializer]

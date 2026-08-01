@@ -1,5 +1,6 @@
 using System.IO.Pipelines;
 using DigitalBrain.Testing;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ModelContextProtocol.Client;
@@ -14,21 +15,49 @@ public static class McpTestEdge
     public static void ConfigureMcpEdge(this DigitalBrainTestBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        var script = new McpEdgeScript();
+        _ = ConfigureMcpChatEdge(builder);
+    }
+
+    public static McpChatEdgeScript ConfigureMcpChatEdge(this DigitalBrainTestBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        var script = new McpChatEdgeScript();
         builder.ConfigureServiceEdge(
             services =>
             {
                 services.RemoveAll<IMcpClientSessionFactory>();
-                services.AddSingleton<IMcpClientSessionFactory>(new ScriptedMcpSessionFactory(script));
+                services.AddSingleton<IMcpClientSessionFactory>(new ScriptedMcpSessionFactory(script.Mcp));
+                services.RemoveAll<IChatClient>();
+                services.AddSingleton<IChatClient>(script.Chat);
             },
             script,
             static edge => edge.Reset());
+        return script;
     }
 
     public static McpEdgeScript Mcp(this TestBrain brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
-        return brain.ServiceEdgeScript<McpEdgeScript>();
+        return brain.ServiceEdgeScript<McpChatEdgeScript>().Mcp;
+    }
+
+    public static ScriptedChatClient PlannerChat(this TestBrain brain)
+    {
+        ArgumentNullException.ThrowIfNull(brain);
+        return brain.ServiceEdgeScript<McpChatEdgeScript>().Chat;
+    }
+}
+
+public sealed class McpChatEdgeScript
+{
+    public McpEdgeScript Mcp { get; } = new();
+
+    public ScriptedChatClient Chat { get; } = new();
+
+    public void Reset()
+    {
+        Mcp.Reset();
+        Chat.Reset();
     }
 }
 
