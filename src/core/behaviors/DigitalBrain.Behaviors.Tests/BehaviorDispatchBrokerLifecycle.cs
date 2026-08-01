@@ -100,7 +100,7 @@ public sealed class BehaviorDispatchBrokerLifecycle(BehaviorDispatchFixture fixt
             requestRef,
             cancellationToken);
 
-        Assert.Equal(BehaviorOperationPhase.Completed, completed.Phase);
+        Assert.Equal(TaskOperationPhase.Completed, completed.Phase);
         Assert.NotNull(completed.ResponsePayload);
         Assert.Equal(1, DispatchHarness.CountFor(probeText));
 
@@ -108,7 +108,7 @@ public sealed class BehaviorDispatchBrokerLifecycle(BehaviorDispatchFixture fixt
             new BehaviorOperationIdentity(task.Id, attempt, sequence: 0),
             cancellationToken);
         Assert.NotNull(durable);
-        Assert.Equal(BehaviorOperationPhase.Completed, durable!.Phase);
+        Assert.Equal(TaskOperationPhase.Completed, durable!.Phase);
 
         var secondBroker = new BehaviorOperationBroker(history, edge, brokerClient);
         var replayed = await secondBroker.ExecuteAsync(
@@ -119,7 +119,7 @@ public sealed class BehaviorDispatchBrokerLifecycle(BehaviorDispatchFixture fixt
             edge.ResponseSchemaVersion,
             requestRef,
             cancellationToken);
-        Assert.Equal(BehaviorOperationPhase.Completed, replayed.Phase);
+        Assert.Equal(TaskOperationPhase.Completed, replayed.Phase);
         Assert.Equal(completed.ResponsePayload, replayed.ResponsePayload);
         Assert.Equal(1, DispatchHarness.CountFor(probeText));
 

@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Tasks;
 
 namespace DigitalBrain.Behaviors;
 
@@ -8,7 +9,7 @@ public sealed record BehaviorOperationResult
 {
     public BehaviorOperationResult(
         BehaviorOperationIdentity identity,
-        BehaviorOperationPhase phase,
+        TaskOperationPhase phase,
         ProtectedPayloadReference? responsePayload = null)
     {
         ArgumentNullException.ThrowIfNull(identity);
@@ -23,7 +24,7 @@ public sealed record BehaviorOperationResult
     public BehaviorOperationIdentity Identity { get; }
 
     [Id(1)]
-    public BehaviorOperationPhase Phase { get; }
+    public TaskOperationPhase Phase { get; }
 
     [Id(2)]
     public ProtectedPayloadReference? ResponsePayload { get; }

@@ -113,16 +113,6 @@ public sealed record BehaviorCapabilityEdge
 }
 
 [GenerateSerializer]
-[Alias("db.behavior.operation-phase")]
-public enum BehaviorOperationPhase
-{
-    Prepared = 0,
-    Dispatched = 1,
-    Completed = 2,
-    Uncertain = 3,
-}
-
-[GenerateSerializer]
 [Alias("db.behavior.operation")]
 public sealed record BehaviorOperation
 {
@@ -130,7 +120,7 @@ public sealed record BehaviorOperation
         BehaviorOperationIdentity identity,
         BehaviorCapabilityEdge edge,
         ProtectedPayloadReference requestPayload,
-        BehaviorOperationPhase phase,
+        TaskOperationPhase phase,
         ProtectedPayloadReference? responsePayload = null,
         string? redactedSummary = null)
     {
@@ -162,7 +152,7 @@ public sealed record BehaviorOperation
     public ProtectedPayloadReference RequestPayload { get; }
 
     [Id(3)]
-    public BehaviorOperationPhase Phase { get; }
+    public TaskOperationPhase Phase { get; }
 
     [Id(4)]
     public ProtectedPayloadReference? ResponsePayload { get; }
@@ -184,12 +174,12 @@ public sealed record BehaviorOperation
     }
 
     internal static void ValidatePhaseAndResponse(
-        BehaviorOperationPhase phase,
+        TaskOperationPhase phase,
         ProtectedPayloadReference? responsePayload)
     {
         switch (phase)
         {
-            case BehaviorOperationPhase.Completed:
+            case TaskOperationPhase.Completed:
                 if (responsePayload is null)
                 {
                     throw new ArgumentException(
@@ -200,9 +190,9 @@ public sealed record BehaviorOperation
                 ValidateReference(responsePayload.Value, nameof(responsePayload));
                 break;
 
-            case BehaviorOperationPhase.Prepared:
-            case BehaviorOperationPhase.Dispatched:
-            case BehaviorOperationPhase.Uncertain:
+            case TaskOperationPhase.Prepared:
+            case TaskOperationPhase.Dispatched:
+            case TaskOperationPhase.Uncertain:
                 if (responsePayload is not null)
                 {
                     throw new ArgumentException(
@@ -213,7 +203,7 @@ public sealed record BehaviorOperation
                 break;
 
             default:
-                throw new ArgumentOutOfRangeException(nameof(phase), phase, "Unknown behavior operation phase.");
+                throw new ArgumentOutOfRangeException(nameof(phase), phase, "Unknown task operation phase.");
         }
     }
 }

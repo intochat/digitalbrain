@@ -94,7 +94,7 @@ internal sealed class HostBehaviorSynapseBroker : IBehaviorSynapseBroker
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (operation.Phase != BehaviorOperationPhase.Completed)
+        if (operation.Phase != TaskOperationPhase.Completed)
         {
             throw new InvalidOperationException(
                 $"Capability operation ended in phase '{operation.Phase}'.");

@@ -129,8 +129,8 @@ internal sealed class TaskOwnedOperationHistory
 
     public async ValueTask<BehaviorOperation> TransitionAsync(
         BehaviorOperationIdentity identity,
-        BehaviorOperationPhase expectedPhase,
-        BehaviorOperationPhase phase,
+        TaskOperationPhase expectedPhase,
+        TaskOperationPhase phase,
         ProtectedPayloadReference? responsePayload,
         string? redactedSummary,
         CancellationToken cancellationToken)
@@ -143,8 +143,8 @@ internal sealed class TaskOwnedOperationHistory
             new TransitionTaskOperation(
                 identity.Attempt,
                 identity.Sequence,
-                ToTaskPhase(expectedPhase),
-                ToTaskPhase(phase),
+                expectedPhase,
+                phase,
                 responsePayload,
                 redactedSummary),
             cancellationToken).ConfigureAwait(false);
@@ -170,7 +170,7 @@ internal sealed class TaskOwnedOperationHistory
             new BehaviorOperationIdentity(task, snapshot.Attempt, snapshot.Sequence),
             FromTaskEdge(snapshot.Edge),
             snapshot.RequestPayload,
-            FromTaskPhase(snapshot.Phase),
+            snapshot.Phase,
             snapshot.ResponsePayload,
             snapshot.RedactedSummary);
     }
@@ -190,26 +190,6 @@ internal sealed class TaskOwnedOperationHistory
             edge.RequestSchemaVersion,
             edge.ResponseSynapseId,
             edge.ResponseSchemaVersion);
-
-    private static TaskOperationPhase ToTaskPhase(BehaviorOperationPhase phase)
-        => phase switch
-        {
-            BehaviorOperationPhase.Prepared => TaskOperationPhase.Prepared,
-            BehaviorOperationPhase.Dispatched => TaskOperationPhase.Dispatched,
-            BehaviorOperationPhase.Completed => TaskOperationPhase.Completed,
-            BehaviorOperationPhase.Uncertain => TaskOperationPhase.Uncertain,
-            _ => throw new ArgumentOutOfRangeException(nameof(phase), phase, "Unknown behavior operation phase."),
-        };
-
-    private static BehaviorOperationPhase FromTaskPhase(TaskOperationPhase phase)
-        => phase switch
-        {
-            TaskOperationPhase.Prepared => BehaviorOperationPhase.Prepared,
-            TaskOperationPhase.Dispatched => BehaviorOperationPhase.Dispatched,
-            TaskOperationPhase.Completed => BehaviorOperationPhase.Completed,
-            TaskOperationPhase.Uncertain => BehaviorOperationPhase.Uncertain,
-            _ => throw new ArgumentOutOfRangeException(nameof(phase), phase, "Unknown task operation phase."),
-        };
 }
 
 internal sealed class BehaviorOperationBroker
@@ -294,8 +274,8 @@ internal sealed class BehaviorOperationBroker
 
         var transitioned = await history.TransitionAsync(
             identity,
-            BehaviorOperationPhase.Prepared,
-            BehaviorOperationPhase.Dispatched,
+            TaskOperationPhase.Prepared,
+            TaskOperationPhase.Dispatched,
             responsePayload: null,
             redactedSummary: null,
             cancellationToken).ConfigureAwait(false);
@@ -363,15 +343,15 @@ internal sealed class BehaviorOperationBroker
 
         switch (operation.Phase)
         {
-            case BehaviorOperationPhase.Completed:
-            case BehaviorOperationPhase.Uncertain:
+            case TaskOperationPhase.Completed:
+            case TaskOperationPhase.Uncertain:
                 return ToResult(operation);
 
-            case BehaviorOperationPhase.Dispatched:
+            case TaskOperationPhase.Dispatched:
                 return await MarkUncertainAsync(operation.Identity, cancellationToken)
                     .ConfigureAwait(false);
 
-            case BehaviorOperationPhase.Prepared:
+            case TaskOperationPhase.Prepared:
                 return await DispatchPreparedAsync(operation, cancellationToken)
                     .ConfigureAwait(false);
 
@@ -389,8 +369,8 @@ internal sealed class BehaviorOperationBroker
 
         var dispatched = await history.TransitionAsync(
             prepared.Identity,
-            BehaviorOperationPhase.Prepared,
-            BehaviorOperationPhase.Dispatched,
+            TaskOperationPhase.Prepared,
+            TaskOperationPhase.Dispatched,
             responsePayload: null,
             redactedSummary: null,
             cancellationToken).ConfigureAwait(false);
@@ -409,8 +389,8 @@ internal sealed class BehaviorOperationBroker
         cancellationToken.ThrowIfCancellationRequested();
         var completed = await history.TransitionAsync(
             dispatched.Identity,
-            BehaviorOperationPhase.Dispatched,
-            BehaviorOperationPhase.Completed,
+            TaskOperationPhase.Dispatched,
+            TaskOperationPhase.Completed,
             response,
             redactedSummary: null,
             cancellationToken).ConfigureAwait(false);
@@ -426,8 +406,8 @@ internal sealed class BehaviorOperationBroker
         cancellationToken.ThrowIfCancellationRequested();
         var uncertain = await history.TransitionAsync(
             identity,
-            BehaviorOperationPhase.Dispatched,
-            BehaviorOperationPhase.Uncertain,
+            TaskOperationPhase.Dispatched,
+            TaskOperationPhase.Uncertain,
             responsePayload: null,
             redactedSummary: null,
             cancellationToken).ConfigureAwait(false);

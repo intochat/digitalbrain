@@ -428,7 +428,7 @@ public sealed class BehaviorOperationReplay
             requestPayload: new ProtectedPayloadReference(Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(1)),
             cancellationToken);
 
-        Assert.Equal(BehaviorOperationPhase.Completed, first.Phase);
+        Assert.Equal(TaskOperationPhase.Completed, first.Phase);
         Assert.NotNull(first.ResponsePayload);
         Assert.Equal(1, provider.InvokeCount);
 
@@ -447,7 +447,7 @@ public sealed class BehaviorOperationReplay
 
         Assert.Equal(first.Identity, replay.Identity);
         Assert.Equal(first.ResponsePayload, replay.ResponsePayload);
-        Assert.Equal(BehaviorOperationPhase.Completed, replay.Phase);
+        Assert.Equal(TaskOperationPhase.Completed, replay.Phase);
         Assert.Equal(1, provider.InvokeCount);
     }
 
@@ -470,7 +470,7 @@ public sealed class BehaviorOperationReplay
             requestPayload: new ProtectedPayloadReference(Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(1)),
             cancellationToken);
 
-        Assert.Equal(BehaviorOperationPhase.Prepared, prepared.Phase);
+        Assert.Equal(TaskOperationPhase.Prepared, prepared.Phase);
         Assert.Equal(0, provider.InvokeCount);
 
         var clientB = new DurableTaskOperationClient(state, TaskNeuron, WorkerNeuron, Attempt);
@@ -478,7 +478,7 @@ public sealed class BehaviorOperationReplay
         var brokerB = new BehaviorOperationBroker(historyB, ExactGrant(), provider);
         var recovered = await brokerB.RecoverAsync(prepared.Identity, cancellationToken);
 
-        Assert.Equal(BehaviorOperationPhase.Completed, recovered.Phase);
+        Assert.Equal(TaskOperationPhase.Completed, recovered.Phase);
         Assert.Equal(1, provider.InvokeCount);
         Assert.NotNull(recovered.ResponsePayload);
     }
@@ -503,7 +503,7 @@ public sealed class BehaviorOperationReplay
             cancellationToken);
         var dispatched = await brokerA.MarkDispatchedAsync(prepared.Identity, cancellationToken);
 
-        Assert.Equal(BehaviorOperationPhase.Dispatched, dispatched.Phase);
+        Assert.Equal(TaskOperationPhase.Dispatched, dispatched.Phase);
         Assert.Equal(0, provider.InvokeCount);
 
         var clientB = new DurableTaskOperationClient(state, TaskNeuron, WorkerNeuron, Attempt);
@@ -511,7 +511,7 @@ public sealed class BehaviorOperationReplay
         var brokerB = new BehaviorOperationBroker(historyB, ExactGrant(), provider);
         var recovered = await brokerB.RecoverAsync(dispatched.Identity, cancellationToken);
 
-        Assert.Equal(BehaviorOperationPhase.Uncertain, recovered.Phase);
+        Assert.Equal(TaskOperationPhase.Uncertain, recovered.Phase);
         Assert.Equal(0, provider.InvokeCount);
         Assert.Null(recovered.ResponsePayload);
 
@@ -543,7 +543,7 @@ public sealed class BehaviorOperationReplay
             requestPayload: new ProtectedPayloadReference(Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(1)),
             cancellationToken);
 
-        Assert.Equal(BehaviorOperationPhase.Completed, result.Phase);
+        Assert.Equal(TaskOperationPhase.Completed, result.Phase);
         Assert.Equal(1, provider.InvokeCount);
         Assert.NotNull(result.ResponsePayload);
     }
