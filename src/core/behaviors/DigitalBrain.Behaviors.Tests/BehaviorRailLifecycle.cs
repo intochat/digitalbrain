@@ -340,6 +340,168 @@ public sealed class BehaviorRailLifecycle(BehaviorsFixture fixture)
         Assert.Equal(1, snapshot.AttemptCount);
     }
 
+    [Fact(DisplayName = "active revision is Running with open activation gate; Stop moves Running → Stopping → Stopped")]
+    public async Task StopMovesRunningThroughStoppingToStopped()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var behavior = test.Neuron<IBehaviorNeuron>(BehaviorsFixture.SampleBehavior);
+
+        var active = await InstallAsync(test, behavior, RailPrograms.GreenProgram("stop-lifecycle"), "stop-lifecycle");
+        Assert.Equal(BehaviorRevisionStatus.Active, active.Status);
+        Assert.Equal(BehaviorRunState.Running, active.RunState);
+        Assert.True(active.ActivationGateOpen);
+
+        var stopCommand = CommandId.New();
+        var gateClosedWait = behavior.Outgoing.NextAsync<BehaviorActivationGateClosed>(cancellationToken);
+        var stoppingWait = behavior.Outgoing.NextAsync<BehaviorStopping>(cancellationToken);
+        var stoppedWait = behavior.Outgoing.NextAsync<BehaviorStopped>(cancellationToken);
+
+        var stopped = await behavior.Reference.StopRun(new StopBehavior(stopCommand));
+
+        Assert.Equal(BehaviorRunState.Stopped, stopped.RunState);
+        Assert.False(stopped.ActivationGateOpen);
+        Assert.Equal(BehaviorRevisionStatus.Active, stopped.Status);
+        Assert.Equal(active.ActiveArtifactHash, stopped.ActiveArtifactHash);
+
+        var gateClosed = await gateClosedWait;
+        var stopping = await stoppingWait;
+        var stoppedFact = await stoppedWait;
+        Assert.Equal(stopCommand, gateClosed.Synapse.CommandId);
+        Assert.Equal(stopCommand, stopping.Synapse.CommandId);
+        Assert.Equal(stopCommand, stoppedFact.Synapse.CommandId);
+        Assert.True(gateClosed.Sequence < stopping.Sequence);
+        Assert.True(stopping.Sequence < stoppedFact.Sequence);
+    }
+
+    [Fact(DisplayName = "Stop closes activation gate before any task cancel request and refuses new bound activations")]
+    public async Task StopClosesActivationGateBeforeTaskCancelAndBlocksNewActivations()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var behavior = test.Neuron<IBehaviorNeuron>(BehaviorsFixture.SampleBehavior);
+        var task = test.Neuron<ITask>("stop-gate-task");
+        var worker = test.Neuron<IWorker>("stop-gate-worker");
+
+        var active = await InstallAsync(test, behavior, RailPrograms.GreenProgram("stop-gate"), "stop-gate");
+        var binding = BehaviorActivationBindings.ForExistingTask(
+            task.Id,
+            worker.Id,
+            new BehaviorId(BehaviorsFixture.SampleBehavior),
+            new BehaviorRevisionId(active.ActiveArtifactHash!),
+            contractVersion: "1",
+            caseId: "case.SampleTrigger",
+            protectedPayload: new ProtectedPayloadReference(Guid.Parse("44444444-4444-4444-4444-444444444444")));
+
+        await behavior.Reference.ActivateBound(
+            new ActivateBoundBehavior(CommandId.New(), active.ActiveArtifactHash!, binding));
+        _ = await task.Incoming.NextAsync<AttemptAccepted>(cancellationToken);
+
+        var stopCommand = CommandId.New();
+        var gateClosedWait = behavior.Outgoing.NextAsync<BehaviorActivationGateClosed>(cancellationToken);
+        var cancelRequestedWait = behavior.Outgoing.NextAsync<BehaviorTaskCancelRequested>(cancellationToken);
+
+        var stopped = await behavior.Reference.StopRun(new StopBehavior(stopCommand));
+        Assert.False(stopped.ActivationGateOpen);
+        Assert.Equal(BehaviorRunState.Stopped, stopped.RunState);
+
+        var gateClosed = await gateClosedWait;
+        var cancelRequested = await cancelRequestedWait;
+        Assert.Equal(task.Id, cancelRequested.Synapse.Task);
+        Assert.True(
+            gateClosed.Sequence < cancelRequested.Sequence,
+            "Activation gate must close before any cooperative task cancel is requested.");
+
+        var terminal = await WaitForTaskSettledAsync(task, cancellationToken);
+        Assert.True(
+            terminal.State is TaskState.Cancelled or TaskState.Waiting,
+            $"Expected cancelled or uncertain-waiting task, got {terminal.State}.");
+
+        var secondTask = test.Neuron<ITask>("stop-gate-task-2");
+        var secondWorker = test.Neuron<IWorker>("stop-gate-worker-2");
+        var secondBinding = BehaviorActivationBindings.ForExistingTask(
+            secondTask.Id,
+            secondWorker.Id,
+            new BehaviorId(BehaviorsFixture.SampleBehavior),
+            new BehaviorRevisionId(active.ActiveArtifactHash!),
+            contractVersion: "1",
+            caseId: "case.SampleTrigger",
+            protectedPayload: new ProtectedPayloadReference(Guid.Parse("45454545-4545-4545-4545-454545454545")));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            behavior.Reference.ActivateBound(
+                new ActivateBoundBehavior(CommandId.New(), active.ActiveArtifactHash!, secondBinding)));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => secondTask.Reference.Read());
+    }
+
+    [Fact(DisplayName = "Stop preserves revision, source, scenarios, and does not rewrite bindings; Start reopens the gate")]
+    public async Task StopPreservesArtifactsAndStartReopensGateWithoutNewRevision()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var behavior = test.Neuron<IBehaviorNeuron>(BehaviorsFixture.SampleBehavior);
+
+        var program = RailPrograms.GreenProgram("preserve");
+        var active = await InstallAsync(test, behavior, program, "preserve");
+        var beforeHash = active.ActiveArtifactHash;
+        Assert.Equal(BehaviorRunState.Running, active.RunState);
+
+        var stopped = await behavior.Reference.StopRun(new StopBehavior(CommandId.New()));
+        Assert.Equal(BehaviorRunState.Stopped, stopped.RunState);
+        Assert.False(stopped.ActivationGateOpen);
+        Assert.Equal(BehaviorRevisionStatus.Active, stopped.Status);
+        Assert.Equal(beforeHash, stopped.ActiveArtifactHash);
+        Assert.Equal(active.ProposedArtifactHash, stopped.ProposedArtifactHash);
+        Assert.Equal(active.PriorArtifactHash, stopped.PriorArtifactHash);
+        Assert.True(stopped.IsApproved);
+        Assert.True(stopped.TestsPassed);
+
+        var startCommand = CommandId.New();
+        var startedWait = behavior.Outgoing.NextAsync<BehaviorStarted>(cancellationToken);
+        var started = await behavior.Reference.StartRun(new StartBehavior(startCommand));
+        Assert.Equal(BehaviorRunState.Running, started.RunState);
+        Assert.True(started.ActivationGateOpen);
+        Assert.Equal(beforeHash, started.ActiveArtifactHash);
+        Assert.Equal(BehaviorRevisionStatus.Active, started.Status);
+        Assert.Equal(startCommand, (await startedWait).Synapse.CommandId);
+
+        var task = test.Neuron<ITask>("start-reopen-task");
+        var worker = test.Neuron<IWorker>("start-reopen-worker");
+        var binding = BehaviorActivationBindings.ForExistingTask(
+            task.Id,
+            worker.Id,
+            new BehaviorId(BehaviorsFixture.SampleBehavior),
+            new BehaviorRevisionId(beforeHash!),
+            contractVersion: "1",
+            caseId: "case.SampleTrigger",
+            protectedPayload: new ProtectedPayloadReference(Guid.Parse("46464646-4646-4646-4646-464646464646")));
+        var bound = await behavior.Reference.ActivateBound(
+            new ActivateBoundBehavior(CommandId.New(), beforeHash!, binding));
+        Assert.Equal(TaskState.Pending, bound.State);
+    }
+
+    private static async Task<TaskSnapshot> WaitForTaskSettledAsync(
+        TestNeuron<ITask> task,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var snapshot = await task.Reference.Read();
+            if (snapshot.State is TaskState.Cancelled or TaskState.Succeeded or TaskState.Failed
+                || (snapshot.State == TaskState.Waiting && snapshot.Blocker is OutcomeUncertain))
+            {
+                return snapshot;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(25), cancellationToken);
+        }
+
+        var final = await task.Reference.Read();
+        throw new TimeoutException($"Task '{task.Id}' stayed in {final.State} instead of settling after stop.");
+    }
+
     private static async Task<BehaviorSnapshot> ProposeGreenAsync(
         TestNeuron<IBehaviorNeuron> behavior,
         string outcome = "v1-green")

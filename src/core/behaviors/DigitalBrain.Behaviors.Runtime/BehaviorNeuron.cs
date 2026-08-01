@@ -317,6 +317,8 @@ internal sealed partial class BehaviorNeuron :
             PriorAssemblyBytes = data.ActiveAssemblyBytes,
             PriorArtifactSignature = data.ActiveArtifactSignature,
             PriorProgramSource = data.ActiveProgramSource,
+            RunState = BehaviorRunState.Running,
+            ActivationGateOpen = true,
         };
         data = WithReceipt(data, command.CommandId, Snapshot(data));
         await SaveAsync(data);

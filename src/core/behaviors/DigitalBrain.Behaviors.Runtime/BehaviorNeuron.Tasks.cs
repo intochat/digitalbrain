@@ -20,6 +20,12 @@ internal sealed partial class BehaviorNeuron
         var binding = command.Binding;
         var behaviorId = BehaviorIdOfName();
 
+        if (!data.ActivationGateOpen || data.RunState is BehaviorRunState.Stopping or BehaviorRunState.Stopped)
+        {
+            throw new InvalidOperationException(
+                $"Behavior '{Id}' activation gate is closed; bound activations are refused.");
+        }
+
         if (!string.Equals(data.ActiveArtifactHash, command.ArtifactHash, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
@@ -103,11 +109,167 @@ internal sealed partial class BehaviorNeuron
                 $"Task '{binding.TaskId}' is already bound to a different activation.");
         }
 
+        if (!data.ActiveTaskIds.Contains(binding.TaskId))
+        {
+            var tracked = new List<NeuronId>(data.ActiveTaskIds) { binding.TaskId };
+            data = data with { ActiveTaskIds = tracked };
+            await SaveAsync(data);
+        }
+
         return new BoundBehaviorActivationResult(
             binding.TaskId,
             snapshot.State,
             snapshot.ActiveAttempt,
             snapshot.Activation);
+    }
+
+    public async Task<BehaviorSnapshot> StopRun(StopBehavior command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ValidateCommand(command.CommandId);
+
+        var data = LoadOrEmpty();
+        if (TryReceipt(data, command.CommandId, out var received))
+        {
+            return received;
+        }
+
+        if (data.Status != BehaviorRevisionStatus.Active || data.ActiveArtifactHash is null)
+        {
+            throw new InvalidOperationException($"Behavior '{Id}' has no active revision to stop.");
+        }
+
+        if (data.RunState == BehaviorRunState.Stopped && !data.ActivationGateOpen)
+        {
+            data = WithReceipt(data, command.CommandId, Snapshot(data));
+            await SaveAsync(data);
+            return Snapshot(data);
+        }
+
+        var behaviorId = BehaviorIdOfName();
+
+        data = data with
+        {
+            ActivationGateOpen = false,
+            RunState = BehaviorRunState.Stopping,
+        };
+        await SaveAsync(data);
+        await EmitAsync(new BehaviorActivationGateClosed(command.CommandId, behaviorId));
+        await EmitAsync(new BehaviorStopping(command.CommandId, behaviorId));
+
+        var remaining = new List<NeuronId>();
+        foreach (var taskId in data.ActiveTaskIds)
+        {
+            var task = GrainFactory.GetGrain<ITask>(taskId.ToGrainId());
+            TaskSnapshot snapshot;
+            try
+            {
+                snapshot = await task.Read();
+            }
+            catch (InvalidOperationException)
+            {
+                continue;
+            }
+
+            if (IsTaskSettledForStop(snapshot))
+            {
+                continue;
+            }
+
+            await EmitAsync(new BehaviorTaskCancelRequested(command.CommandId, behaviorId, taskId));
+            try
+            {
+                snapshot = await task.Cancel(new CancelTask(CommandId.New(), snapshot.Revision));
+            }
+            catch (InvalidOperationException)
+            {
+                snapshot = await task.Read();
+            }
+
+            if (!IsTaskSettledForStop(snapshot))
+            {
+                snapshot = await WaitForTaskSettledAsync(task, snapshot);
+            }
+
+            if (!IsTaskSettledForStop(snapshot))
+            {
+                remaining.Add(taskId);
+            }
+        }
+
+        data = data with
+        {
+            ActiveTaskIds = remaining,
+            RunState = remaining.Count == 0 ? BehaviorRunState.Stopped : BehaviorRunState.Stopping,
+            ActivationGateOpen = false,
+        };
+        data = WithReceipt(data, command.CommandId, Snapshot(data));
+        await SaveAsync(data);
+
+        if (data.RunState == BehaviorRunState.Stopped)
+        {
+            await EmitAsync(new BehaviorStopped(command.CommandId, behaviorId));
+        }
+
+        return Snapshot(data);
+    }
+
+    public async Task<BehaviorSnapshot> StartRun(StartBehavior command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ValidateCommand(command.CommandId);
+
+        var data = LoadOrEmpty();
+        if (TryReceipt(data, command.CommandId, out var received))
+        {
+            return received;
+        }
+
+        if (data.Status != BehaviorRevisionStatus.Active || data.ActiveArtifactHash is null)
+        {
+            throw new InvalidOperationException($"Behavior '{Id}' has no active revision to start.");
+        }
+
+        if (data.RunState is not (BehaviorRunState.Stopped or BehaviorRunState.Stopping))
+        {
+            throw new InvalidOperationException(
+                $"Behavior '{Id}' can only start from Stopped/Stopping (current {data.RunState}).");
+        }
+
+        data = data with
+        {
+            RunState = BehaviorRunState.Running,
+            ActivationGateOpen = true,
+        };
+        data = WithReceipt(data, command.CommandId, Snapshot(data));
+        await SaveAsync(data);
+        await EmitAsync(new BehaviorStarted(command.CommandId, BehaviorIdOfName()));
+        return Snapshot(data);
+    }
+
+    private static bool IsTaskSettledForStop(TaskSnapshot snapshot)
+        => snapshot.State is TaskState.Succeeded or TaskState.Failed or TaskState.Cancelled
+            || (snapshot.State == TaskState.Waiting && snapshot.Blocker is OutcomeUncertain);
+
+    private static async Task<TaskSnapshot> WaitForTaskSettledAsync(ITask task, TaskSnapshot current)
+    {
+        if (IsTaskSettledForStop(current))
+        {
+            return current;
+        }
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(25));
+            current = await task.Read();
+            if (IsTaskSettledForStop(current))
+            {
+                return current;
+            }
+        }
+
+        return current;
     }
 
     private static TaskOperationEdge[] DeriveResultBearingEdges(

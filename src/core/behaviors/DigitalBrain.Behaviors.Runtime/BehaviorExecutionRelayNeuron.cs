@@ -72,10 +72,14 @@ internal sealed class BehaviorExecutionRelayNeuron :
 
         BehaviorExecutionOutcome outcome;
         var cancelled = false;
+        // Link request/turn token with process-local attempt CTS (never durable).
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            BehaviorAttemptCancellation.TokenOrNone(envelope.Attempt.Task, envelope.Attempt.Attempt));
         try
         {
             var executor = ServiceProvider.GetRequiredService<IBehaviorExecutor>();
-            outcome = await executor.ExecuteAsync(request, cancellationToken);
+            outcome = await executor.ExecuteAsync(request, linked.Token);
         }
         catch (OperationCanceledException)
         {

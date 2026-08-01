@@ -26,6 +26,12 @@ public partial interface IBehaviorNeuron : INeuron
     [Alias(nameof(ActivateBound))]
     Task<BoundBehaviorActivationResult> ActivateBound(ActivateBoundBehavior command);
 
+    [Alias(nameof(StopRun))]
+    Task<BehaviorSnapshot> StopRun(StopBehavior command);
+
+    [Alias(nameof(StartRun))]
+    Task<BehaviorSnapshot> StartRun(StartBehavior command);
+
     [Alias(nameof(Rollback))]
     Task<BehaviorSnapshot> Rollback(RollbackBehaviorRevision command);
 

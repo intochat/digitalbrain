@@ -101,3 +101,34 @@ public sealed record BehaviorHostLoadRefused(
     [property: Id(1)] BehaviorId Behavior,
     [property: Id(2)] string ArtifactHash,
     [property: Id(3)] string Reason) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.behavior.activation-gate-closed")]
+public sealed record BehaviorActivationGateClosed(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] BehaviorId Behavior) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.behavior.stopping")]
+public sealed record BehaviorStopping(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] BehaviorId Behavior) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.behavior.stopped")]
+public sealed record BehaviorStopped(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] BehaviorId Behavior) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.behavior.started")]
+public sealed record BehaviorStarted(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] BehaviorId Behavior) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.behavior.task-cancel-requested")]
+public sealed record BehaviorTaskCancelRequested(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] BehaviorId Behavior,
+    [property: Id(2)] NeuronId Task) : Synapse;

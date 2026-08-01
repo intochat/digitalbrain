@@ -157,3 +157,13 @@ public sealed record ExecuteBehaviorRevision(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] string TriggerTypeName,
     [property: Id(2)] string TriggerJson);
+
+[GenerateSerializer]
+[Alias("db.behavior.stop")]
+public sealed record StopBehavior(
+    [property: Id(0)] CommandId CommandId);
+
+[GenerateSerializer]
+[Alias("db.behavior.start")]
+public sealed record StartBehavior(
+    [property: Id(0)] CommandId CommandId);

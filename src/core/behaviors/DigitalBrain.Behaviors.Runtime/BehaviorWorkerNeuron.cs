@@ -32,11 +32,13 @@ internal sealed class BehaviorWorkerNeuron :
             request.Task,
             new AttemptAccepted(request.Task, request.Worker, request.Attempt, request.Revision));
 
+        // Process-local CTS for this attempt (never durable). Cancel links into host execution via
+        // BehaviorAttemptCancellation; late terminals remain idempotent on the Task.
+        BehaviorAttemptCancellation.Rent(request.Task, request.Attempt);
+
         // Stage hosted work on a one-shot relay so this Worker turn ends before reverse-broker
         // StageDispatch re-enters the same non-reentrant grain. Terminal completion returns via
         // CompleteHostedBehaviorExecution on a later serialized turn.
-        // Cancel→CTS linkage for in-flight host execution is deferred to Task 4 (Stop wiring);
-        // Cancel still emits AttemptCancelled on its own turn, and late terminals are idempotent.
         var relay = new NeuronId(
             BehaviorExecutionRelay.GrainTypeName,
             Id.Owner,
@@ -88,6 +90,7 @@ internal sealed class BehaviorWorkerNeuron :
             cursor.Attempt,
             cursor.Revision,
             goal);
+        BehaviorAttemptCancellation.Rent(cursor.Task, cursor.Attempt);
         var relay = new NeuronId(
             BehaviorExecutionRelay.GrainTypeName,
             Id.Owner,
@@ -105,6 +108,9 @@ internal sealed class BehaviorWorkerNeuron :
     {
         ArgumentNullException.ThrowIfNull(cursor);
         RequireSelf(cursor.Worker, cursor.Task);
+
+        // Cooperative: cancel the process-local attempt token before journaling AttemptCancelled.
+        BehaviorAttemptCancellation.Cancel(cursor.Task, cursor.Attempt);
 
         await SendAsync(
             cursor.Task,
@@ -140,6 +146,7 @@ internal sealed class BehaviorWorkerNeuron :
 
         var request = completion.Attempt;
         RequireSelf(request.Worker, request.Task);
+        BehaviorAttemptCancellation.Release(request.Task, request.Attempt);
 
         if (BehaviorExecutionCodes.IsInProcessClosed(completion.StableCode))
         {
@@ -185,8 +192,8 @@ internal sealed class BehaviorWorkerNeuron :
             return;
         }
 
-        // Execution-path cancellation is a stable bounded failure code (not free-form text).
-        // Product Cancel still uses AttemptCancelled via Cancel(). Linking Cancel→host CTS is Task 4.
+        // Host-path cancellation (linked attempt CTS or turn cancel) surfaces as Cancelled code.
+        // Product Cancel still journals AttemptCancelled via Cancel(); late terminals stay idempotent.
         if (completion.Cancelled
             || string.Equals(stableCode, BehaviorExecutionCodes.Cancelled, StringComparison.Ordinal))
         {

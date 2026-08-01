@@ -110,6 +110,26 @@ internal sealed partial class TaskNeuron
             return cancelled;
         }
 
+        if (TryMarkDispatchedOperationsUncertain(data, out var uncertainBlocker))
+        {
+            data.State = TaskState.Waiting;
+            data.Blocker = new OutcomeUncertain(uncertainBlocker);
+            data.PendingDispatch = null;
+
+            var uncertainSnapshot = Snapshot(data);
+            data.Receipts.Add(command.CommandId, uncertainSnapshot);
+            await SaveAsync(data);
+            await EmitAsync(new AttemptOutcomeUncertain(
+                Id,
+                data.Worker,
+                data.ActiveAttempt.Value,
+                data.Revision,
+                uncertainBlocker));
+            await UnregisterReminderAsync(RetryReminderName);
+            await UnregisterReminderAsync(DispatchReminderName);
+            return uncertainSnapshot;
+        }
+
         data.State = TaskState.Cancelling;
         data.Blocker = null;
         data.PendingDispatch = new CancelWorkerDispatch(Cursor(data));
@@ -122,5 +142,44 @@ internal sealed partial class TaskNeuron
         await TryDispatchPendingAsync();
 
         return snapshot;
+    }
+
+    private bool TryMarkDispatchedOperationsUncertain(TaskData data, out BlockerId blockerId)
+    {
+        blockerId = default;
+        var operations = data.Operations;
+        if (operations is null || operations.Count == 0 || data.ActiveAttempt is null)
+        {
+            return false;
+        }
+
+        var attempt = data.ActiveAttempt.Value;
+        BlockerId? first = null;
+        var changed = false;
+        foreach (var (key, operation) in operations)
+        {
+            if (operation.Attempt != attempt || operation.Phase != TaskOperationPhase.Dispatched)
+            {
+                continue;
+            }
+
+            var id = OperationBlockerId(Id, attempt, operation.Sequence);
+            first ??= id;
+            operations[key] = operation with
+            {
+                Phase = TaskOperationPhase.Uncertain,
+                ResponsePayload = null,
+            };
+            changed = true;
+        }
+
+        if (!changed || first is null)
+        {
+            return false;
+        }
+
+        data.Operations = operations;
+        blockerId = first.Value;
+        return true;
     }
 }

@@ -38,7 +38,9 @@ internal sealed partial class BehaviorNeuron
             data.LastCompileFailure,
             data.TestsPassed,
             data.IsApproved,
-            data.LastExecutionOutcome);
+            data.LastExecutionOutcome,
+            data.RunState,
+            data.ActivationGateOpen);
 
     private BehaviorId BehaviorIdOfName() => new(Id.Name);
 
@@ -173,6 +175,9 @@ internal sealed partial class BehaviorNeuron
         public static BehaviorData Empty { get; } = new()
         {
             Status = BehaviorRevisionStatus.Empty,
+            RunState = BehaviorRunState.Idle,
+            ActivationGateOpen = false,
+            ActiveTaskIds = [],
             Receipts = new Dictionary<Guid, BehaviorSnapshot>(),
         };
 
@@ -253,5 +258,14 @@ internal sealed partial class BehaviorNeuron
 
         [Id(25)]
         public byte[]? PriorArtifactSignature { get; init; }
+
+        [Id(26)]
+        public BehaviorRunState RunState { get; init; }
+
+        [Id(27)]
+        public bool ActivationGateOpen { get; init; }
+
+        [Id(28)]
+        public List<NeuronId> ActiveTaskIds { get; init; } = [];
     }
 }
