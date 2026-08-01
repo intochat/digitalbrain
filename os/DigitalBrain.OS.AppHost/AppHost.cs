@@ -52,6 +52,8 @@ var behaviorBrokerCredential = builder.ExecutionContext.IsRunMode
 behaviorBrokerCredential.WithDescription(
     "Shared service credential for the BehaviorHost → silo reverse payload broker. Not an owner identity.");
 
+// Option A process boundary: distinct project resources — not co-hosted in one process.
+// Silo residual executor is Host (HTTP to BehaviorHost); authored load is BehaviorHost-only.
 var silo = builder.AddProject<Projects.DigitalBrain_OS_Host>(ProductSurfaceResources.Silo)
     .WithReference(brain)
     .WithEnvironment(
