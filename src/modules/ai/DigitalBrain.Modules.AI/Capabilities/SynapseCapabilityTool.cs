@@ -155,7 +155,8 @@ public static class SynapseCapabilityTool
             _target = target;
             _requestType = requestType;
             _responseType = responseType;
-            using var document = JsonDocument.Parse(capability.JsonSchema);
+            using var document = JsonDocument.Parse(
+                CapabilitySchema.NormalizeForToolProviders(capability.JsonSchema));
             _schema = document.RootElement.Clone();
         }
 

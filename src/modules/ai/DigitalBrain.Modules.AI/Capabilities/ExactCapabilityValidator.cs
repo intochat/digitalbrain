@@ -375,6 +375,12 @@ public sealed class ExactCapabilityValidator
             : string.Create(CultureInfo.InvariantCulture, $"{synapse.Description} Examples: {examples}.");
     }
 
+    private static readonly char[] TermSeparators =
+    [
+        ' ', '\t', '\r', '\n', '.', ',', ';', ':', '/', '\\', '-', '_', '@',
+        '(', ')', '[', ']', '{', '}', '"', '\'',
+    ];
+
     private static bool ContainsTerm(string prompt, string? term)
     {
         if (string.IsNullOrWhiteSpace(term))
@@ -382,6 +388,26 @@ public sealed class ExactCapabilityValidator
             return false;
         }
 
-        return prompt.Contains(term, StringComparison.OrdinalIgnoreCase);
+        if (prompt.Contains(term, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        // Catalog descriptions are long; match substantial tokens so "Gmail" hits
+        // "Intent-level Gmail request..." without requiring the full description in the prompt.
+        foreach (var token in term.Split(TermSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (token.Length < 4)
+            {
+                continue;
+            }
+
+            if (prompt.Contains(token, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
