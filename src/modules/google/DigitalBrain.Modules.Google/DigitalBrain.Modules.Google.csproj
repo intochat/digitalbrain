@@ -6,12 +6,15 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812;CA2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Google.Apis.Auth" />
+    <PackageReference Include="Google.Apis.Gmail.v1" />
     <PackageReference Include="Microsoft.Extensions.AI" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.Google.Contracts\DigitalBrain.Modules.Google.Contracts.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\mcp\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain\DigitalBrain.csproj" />
+    <ProjectReference Include="..\..\..\..\src\core\security\DigitalBrain.Security\DigitalBrain.Security.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"
