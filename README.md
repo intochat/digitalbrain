@@ -43,7 +43,7 @@ The plan of record. Nothing is shipped unless it says Built.
 | Behavior Studio surface (six views, host APIs) | **Built** |
 | NL → C# behavior authoring (C1 ladder) | Designed until C1 green |
 | Product MCP surface — durable chat send/read, neuron journal observation, active-neuron discovery | **Built** |
-| Dual live Google + Salesforce OAuth productization | In progress — honest config (no placeholder credentials); live dual-provider proof pending |
+| Dual live Google + Salesforce OAuth productization | In progress — Gmail is Google SDK (REST) with reflected read-only catalog + typed ops; one browser sign-in flow via app callback `/oauth/callback`; Salesforce stays MCP. Unverified Google app in Testing mode: re-consent every 7 days, ≤100 test users. Register redirect `http://localhost:5080/oauth/callback` (owner re-registration pending, lane g6). Live dual-provider proof pending |
 | Time — durable one-shot `ICountdown` and its recovery tests | **Built** |
 | Time — reminders, recurring interval/calendar scheduling, DST | Designed |
 | Multi-principal IdP edge, journal observation on `IDigitalBrain` | Designed |
@@ -71,10 +71,11 @@ samples/   product-shaped compositions and process neurons (not packable product
 tests/     fixtures/apphosts — shared L2 AppHost scaffolding
 ```
 
-Southbound MCP transport lives in package `DigitalBrain.Mcp` (integrations mechanics shared by
-Google/Salesforce). Northbound agent tools live in library `DigitalBrain.OS.McpHost`, mapped on the
-silo host — not a separate product process. Older docs that say `DigitalBrain.Integrations.Mcp` mean
-the southbound package.
+Southbound MCP transport lives in package `DigitalBrain.Mcp` (Salesforce and shared OAuth rail
+mechanics). Gmail no longer uses southbound MCP — it calls Gmail REST through `Google.Apis.Gmail.v1`
+with a reflected read-only planner catalog. Northbound agent tools live in library
+`DigitalBrain.OS.McpHost`, mapped on the silo host — not a separate product process. Older docs that
+say `DigitalBrain.Integrations.Mcp` mean the southbound package.
 
 Retired prototype generations live in git history — `git log --diff-filter=D --summary`, then
 `git show <sha>^:<path>`.

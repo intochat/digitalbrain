@@ -247,7 +247,7 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
                 commandId,
                 IntegrationsFixture.GmailServerKey,
                 "DigitalBrain Gmail",
-                new Uri($"{AuthorizationRailFixture.PublicSignInBase}oauth/mcp/authorize?state={state}"),
+                new Uri($"{AuthorizationRailFixture.PublicSignInBase}oauth/authorize?state={state}"),
                 state),
             cancellationToken);
 

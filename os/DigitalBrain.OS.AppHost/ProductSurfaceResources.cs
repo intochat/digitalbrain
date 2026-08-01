@@ -19,5 +19,5 @@ internal static class ProductSurfaceResources
     // Stable host ports so Google/Salesforce OAuth redirect URIs need registering only once.
     // Must match DigitalBrain.Aspire.Hosting.LocalDevelopmentProductSurface.
     public const int UiHttpPort = 5080;
-    public const string LocalDevelopmentOAuthCallbackUri = "http://localhost:5080/oauth/mcp/callback";
+    public const string LocalDevelopmentOAuthCallbackUri = "http://localhost:5080/oauth/callback";
 }
