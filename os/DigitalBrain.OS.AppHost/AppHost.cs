@@ -20,6 +20,7 @@ using DigitalBrain.Tasks;
 using DigitalBrain.Time;
 using Microsoft.Extensions.Hosting;
 using DigitalBrain.Behaviors.Runtime;
+using DigitalBrain.Behaviors.Host;
 
 var builder = DistributedApplication.CreateBuilder(args);
 

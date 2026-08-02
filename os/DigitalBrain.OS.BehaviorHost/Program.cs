@@ -2,6 +2,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
 using DigitalBrain.ServiceDefaults;
 using DigitalBrain.Tasks;
+using DigitalBrain.Behaviors.Host;
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -4,7 +4,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Security;
 using DigitalBrain.Tasks;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Host;
 
 internal sealed class HttpBehaviorHostBrokerClient : IBehaviorHostBrokerClient
 {

@@ -1,4 +1,4 @@
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Host;
 
 internal static class BehaviorHostTestFaults
 {

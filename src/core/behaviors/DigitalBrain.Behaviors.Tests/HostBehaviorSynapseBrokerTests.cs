@@ -3,6 +3,7 @@ using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Tasks;
 using Xunit;
+using DigitalBrain.Behaviors.Host;
 
 namespace DigitalBrain.Behaviors.Tests;
 

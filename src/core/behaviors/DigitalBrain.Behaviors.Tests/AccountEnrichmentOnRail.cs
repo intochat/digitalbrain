@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Testing;
 using Xunit;
+using DigitalBrain.Behaviors.Host;
 
 namespace DigitalBrain.Behaviors.Tests;
 

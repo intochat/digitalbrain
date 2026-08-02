@@ -4,7 +4,7 @@ using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
 using DigitalBrain.Tasks;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Host;
 
 public sealed class BehaviorHostEngine : IBehaviorHostGateway
 {

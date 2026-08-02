@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Host;
 
 internal sealed class HostBehaviorContext(
     BehaviorExecutionMetadata execution,

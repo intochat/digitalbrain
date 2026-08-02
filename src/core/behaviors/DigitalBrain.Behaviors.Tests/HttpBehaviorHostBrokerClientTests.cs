@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Options;
 using Xunit;
+using DigitalBrain.Behaviors.Host;
 
 namespace DigitalBrain.Behaviors.Tests;
 

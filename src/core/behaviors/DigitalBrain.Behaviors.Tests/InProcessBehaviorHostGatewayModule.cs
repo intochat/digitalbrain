@@ -2,6 +2,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
+using DigitalBrain.Behaviors.Host;
 
 namespace DigitalBrain.Behaviors.Tests;
 
