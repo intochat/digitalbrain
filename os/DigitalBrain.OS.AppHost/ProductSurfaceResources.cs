@@ -16,8 +16,8 @@ internal static class ProductSurfaceResources
     public const string McpPath = "/mcp";
     public const int McpHttpPort = 5000;
 
-    // Stable host ports so Google/Salesforce OAuth redirect URIs need registering only once.
-    // Must match DigitalBrain.Aspire.Hosting.LocalDevelopmentProductSurface.
+    // Stable host port so Google/Salesforce OAuth redirect URIs need registering only once.
+    // This product owns the number; the packable hosting packages take it as a parameter.
     public const int UiHttpPort = 5080;
     public const string LocalDevelopmentOAuthCallbackUri = "http://localhost:5080/oauth/callback";
 }

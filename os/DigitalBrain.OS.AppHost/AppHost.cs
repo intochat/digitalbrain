@@ -24,7 +24,9 @@ using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
+var brain = builder
+    .AddDigitalBrain(ProductSurfaceResources.Brain)
+    .WithLocalDevelopmentOAuthCallback(new Uri(ProductSurfaceResources.LocalDevelopmentOAuthCallbackUri));
 
 brain.AddModule<AIModule>(ai =>
 {
@@ -36,7 +38,7 @@ brain.AddModule<ChatModule>();
 brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
 brain.AddModule<AssistantModule>();
 brain.AddModule<ShellModule>(shell => shell
-    .WithUiEdge()
+    .WithUiEdge(ui => ui.HttpPort = ProductSurfaceResources.UiHttpPort)
     //.WithHeadlessHost() // pure-Dart host; swap with window for headless-only dev
     //.WithWebHost() // deploy UX: flutter run -d chrome under shell/; local default stays window
     .WithWindowHost()

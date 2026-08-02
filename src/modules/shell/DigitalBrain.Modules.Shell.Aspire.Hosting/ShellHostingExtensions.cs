@@ -115,9 +115,9 @@ public static class ShellHostingExtensions
                 .AddProject(resourceName, projectPath)
                 .WithReference(brain.AsClient())
                 .WithHttpEndpoint(
-                    port: LocalDevelopmentProductSurface.UiHttpPort,
+                    port: options.HttpPort,
                     name: UiEdgeEndpointName,
-                    isProxied: false)
+                    isProxied: options.HttpPort is null)
                 .WithHttpHealthCheck(UiEdgeHealthPath)
                 .WithEnvironment(OwnerEnvironmentVariable, owner);
         }

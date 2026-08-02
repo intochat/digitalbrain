@@ -34,6 +34,23 @@ public static class DigitalBrainHostingExtensions
         return brain;
     }
 
+    public static DigitalBrainBuilder WithLocalDevelopmentOAuthCallback(
+        this DigitalBrainBuilder brain,
+        Uri callbackUri)
+    {
+        ArgumentNullException.ThrowIfNull(brain);
+        ArgumentNullException.ThrowIfNull(callbackUri);
+        if (!callbackUri.IsAbsoluteUri)
+        {
+            throw new ArgumentException(
+                "The local-development OAuth callback must be an absolute URI.",
+                nameof(callbackUri));
+        }
+
+        brain.UseLocalDevelopmentOAuthCallback(callbackUri.AbsoluteUri);
+        return brain;
+    }
+
     public static DigitalBrainBuilder AddModule<TModule>(this DigitalBrainBuilder brain)
         where TModule : class, IModule, new()
         => brain.AddModule<TModule>(static _ => { });

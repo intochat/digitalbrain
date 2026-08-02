@@ -16,6 +16,7 @@ public sealed class DigitalBrainBuilder
     private readonly List<IResource> _startupDependencies = [];
     private readonly Dictionary<Type, object> _states = [];
     private IResourceBuilder<ParameterResource>? _stateProtectionKey;
+    private string? _localDevelopmentOAuthCallbackUri;
 
     internal DigitalBrainBuilder(
         IDistributedApplicationBuilder builder,
@@ -44,6 +45,19 @@ public sealed class DigitalBrainBuilder
     internal IReadOnlyList<IResource> StartupDependencies => _startupDependencies;
 
     internal IResourceBuilder<ParameterResource>? StateProtectionKey => _stateProtectionKey;
+
+    internal string? LocalDevelopmentOAuthCallbackUri => _localDevelopmentOAuthCallbackUri;
+
+    internal void UseLocalDevelopmentOAuthCallback(string callbackUri)
+    {
+        if (_localDevelopmentOAuthCallbackUri is not null)
+        {
+            throw new InvalidOperationException(
+                $"A local-development OAuth callback is already configured on brain '{Name}'. Configure it exactly once.");
+        }
+
+        _localDevelopmentOAuthCallbackUri = callbackUri;
+    }
 
     internal IDistributedApplicationBuilder GetApplicationBuilder() => _builder;
 

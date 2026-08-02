@@ -1,3 +1,4 @@
+using System.Reflection;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
@@ -11,6 +12,8 @@ namespace DigitalBrain.Tests.Hosting;
 
 public sealed class McpProviderParameterHonesty
 {
+    private const string ProductCallbackUri = "http://localhost:5080/oauth/callback";
+
     private static readonly string[] ForbiddenCredentialPlaceholders =
     [
         "local-dev",
@@ -19,15 +22,17 @@ public sealed class McpProviderParameterHonesty
     ];
 
     [Fact(DisplayName =
-        "run-mode MCP credentials stay required while OAuth callback defaults to fixed UI product URL")]
-    public async Task RunModeCredentialsRequiredAndCallbackDefaultsToFixedUiPort()
+        "run-mode MCP credentials stay required while OAuth callback defaults to the product-supplied URL")]
+    public async Task RunModeCredentialsRequiredAndCallbackDefaultsToProductSuppliedUrl()
     {
         var builder = DistributedApplication.CreateBuilder();
         Assert.True(
             builder.ExecutionContext.IsRunMode,
             "CreateBuilder() must exercise the run-mode parameter path.");
 
-        var brain = builder.AddDigitalBrain("brain");
+        var brain = builder
+            .AddDigitalBrain("brain")
+            .WithLocalDevelopmentOAuthCallback(new Uri(ProductCallbackUri));
         brain.AddModule<GoogleModule>(google => google.WithGmail());
         brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 
@@ -53,10 +58,10 @@ public sealed class McpProviderParameterHonesty
         Assert.True(parameters.ContainsKey("google-redirect-uri"));
         Assert.True(parameters.ContainsKey("salesforce-redirect-uri"));
         Assert.Equal(
-            LocalDevelopmentProductSurface.LocalDevelopmentOAuthCallbackUri,
+            ProductCallbackUri,
             await ResolveDefaultOrValue(parameters["google-redirect-uri"]).ConfigureAwait(true));
         Assert.Equal(
-            LocalDevelopmentProductSurface.LocalDevelopmentOAuthCallbackUri,
+            ProductCallbackUri,
             await ResolveDefaultOrValue(parameters["salesforce-redirect-uri"]).ConfigureAwait(true));
 
         Assert.False(
@@ -69,34 +74,98 @@ public sealed class McpProviderParameterHonesty
         Assert.NotNull(parameters["google-client-id"].Default);
     }
 
-    [Fact(DisplayName = "UI edge binds the stable local OAuth callback host port")]
-    public void UiEdgeBindsStableLocalPort()
+    [Fact(DisplayName = "without a product-supplied callback the run-mode redirect parameter has no default")]
+    public async Task RedirectUriHasNoDefaultWhenTheProductSuppliesNoCallback()
     {
-        Assert.Equal(5080, LocalDevelopmentProductSurface.UiHttpPort);
-        Assert.Equal(
-            "http://localhost:5080/oauth/callback",
-            LocalDevelopmentProductSurface.LocalDevelopmentOAuthCallbackUri);
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddDigitalBrain("brain");
+        brain.AddModule<GoogleModule>(google => google.WithGmail());
+
+        var redirect = Assert.Single(
+            builder.Resources.OfType<ParameterResource>(),
+            parameter => parameter.Name == "google-redirect-uri");
+
+        Assert.Null(await ResolveDefaultOrValue(redirect).ConfigureAwait(true));
+    }
+
+    [Fact(DisplayName = "no packable hosting package bakes a local product URL; the AppHost owns the stable port")]
+    public void ProductCompositionOwnsTheLocalCallbackSurface()
+    {
+        var constants = HostingPackageConstants().ToArray();
+        Assert.NotEmpty(constants);
+
+        var baked = constants
+            .Where(constant => constant.Value.Contains("localhost", StringComparison.OrdinalIgnoreCase))
+            .Select(constant => $"{constant.Owner} = {constant.Value}")
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(baked);
+
+        var productSurface = RepositoryFile("os", "DigitalBrain.OS.AppHost", "ProductSurfaceResources.cs");
+        Assert.Contains(ProductCallbackUri, productSurface, StringComparison.Ordinal);
+        Assert.Contains("UiHttpPort = 5080", productSurface, StringComparison.Ordinal);
     }
 
     [Fact(DisplayName = "product AppHost declares UserSecretsId so dashboard can save parameter secrets")]
     public void ProductAppHostDeclaresUserSecretsId()
     {
-        var csproj = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "..", "..", "..", "..", "..",
-            "os", "DigitalBrain.OS.AppHost", "DigitalBrain.OS.AppHost.csproj"));
-        if (!File.Exists(csproj))
-        {
-            csproj = Path.GetFullPath(Path.Combine(
-                AppContext.BaseDirectory,
-                "..", "..", "..", "..", "..", "..",
-                "os", "DigitalBrain.OS.AppHost", "DigitalBrain.OS.AppHost.csproj"));
-        }
-
-        Assert.True(File.Exists(csproj), $"AppHost csproj not found near test base '{AppContext.BaseDirectory}'.");
-        var text = File.ReadAllText(csproj);
+        var text = RepositoryFile("os", "DigitalBrain.OS.AppHost", "DigitalBrain.OS.AppHost.csproj");
         Assert.Contains("<UserSecretsId>", text, StringComparison.Ordinal);
         Assert.Contains("digitalbrain-os-apphost-", text, StringComparison.Ordinal);
+    }
+
+    private static IEnumerable<(string Owner, string Value)> HostingPackageConstants()
+        => ShippedHostingAssemblies()
+            .SelectMany(assembly => assembly.GetExportedTypes())
+            .SelectMany(type => type.GetFields(
+                BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            .Where(field => field is { IsLiteral: true } && field.FieldType == typeof(string))
+            .Select(field => (
+                Owner: $"{field.DeclaringType!.FullName}.{field.Name}",
+                Value: field.GetRawConstantValue() as string ?? string.Empty));
+
+    private static IEnumerable<Assembly> ShippedHostingAssemblies()
+    {
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Queue<Assembly>([typeof(McpProviderParameterHonesty).Assembly]);
+
+        while (pending.Count > 0)
+        {
+            foreach (var reference in pending.Dequeue().GetReferencedAssemblies())
+            {
+                if (!visited.Add(reference.Name!))
+                {
+                    continue;
+                }
+
+                var assembly = Assembly.Load(reference);
+                pending.Enqueue(assembly);
+
+                if (reference.Name!.StartsWith("DigitalBrain.", StringComparison.Ordinal)
+                    && reference.Name.Contains(".Aspire.Hosting", StringComparison.Ordinal))
+                {
+                    yield return assembly;
+                }
+            }
+        }
+    }
+
+    private static string RepositoryFile(params string[] segments)
+    {
+        string[] climbs = ["..\\..\\..\\..\\..", "..\\..\\..\\..\\..\\.."];
+        foreach (var climb in climbs)
+        {
+            var candidate = Path.GetFullPath(
+                Path.Combine([AppContext.BaseDirectory, climb, .. segments]));
+            if (File.Exists(candidate))
+            {
+                return File.ReadAllText(candidate);
+            }
+        }
+
+        throw new FileNotFoundException(
+            $"'{string.Join('/', segments)}' was not found above test base '{AppContext.BaseDirectory}'.");
     }
 
     private static async Task AssertCredentialHasNoFakeDefault(ParameterResource parameter)
@@ -114,10 +183,7 @@ public sealed class McpProviderParameterHonesty
                 }
 
                 Assert.False(
-                    string.Equals(
-                        defaultValue,
-                        LocalDevelopmentProductSurface.LocalDevelopmentOAuthCallbackUri,
-                        StringComparison.Ordinal),
+                    string.Equals(defaultValue, ProductCallbackUri, StringComparison.Ordinal),
                     $"Credential parameter '{parameter.Name}' must not default to the OAuth callback URL.");
             }
             catch (MissingParameterValueException)
