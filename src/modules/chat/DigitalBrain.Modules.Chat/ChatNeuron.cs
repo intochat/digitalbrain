@@ -18,24 +18,21 @@ internal sealed class ChatNeuron :
     IEmit<AssistantResponded>
 {
     private const string AssistantName = "assistant";
-    private const string CommandOrderName = "chat.command-order";
-    private const string CommandsName = "chat.commands";
+    private const string CommandLogName = "chat.command-log";
     private const string TranscriptName = "chat.transcript";
     private const int RememberedCommands = 64;
     private const int RetainedTurns = 64;
 
-    private readonly IDurableList<Guid> _commandOrder;
-    private readonly IDurableDictionary<Guid, byte[]> _commands;
+    private readonly IDurableList<byte[]> _commandLog;
     private readonly IDurableList<byte[]> _transcript;
-    private readonly Serializer<string> _texts;
+    private readonly Serializer<OwnerCommand> _commands;
     private readonly Serializer<ChatTurn> _turns;
 
     public ChatNeuron()
     {
-        _commandOrder = ServiceProvider.GetRequiredKeyedService<IDurableList<Guid>>(CommandOrderName);
-        _commands = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(CommandsName);
+        _commandLog = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(CommandLogName);
         _transcript = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(TranscriptName);
-        _texts = ServiceProvider.GetRequiredService<Serializer<string>>();
+        _commands = ServiceProvider.GetRequiredService<Serializer<OwnerCommand>>();
         _turns = ServiceProvider.GetRequiredService<Serializer<ChatTurn>>();
     }
 
@@ -98,21 +95,24 @@ internal sealed class ChatNeuron :
                 nameof(message));
         }
 
-        if (!_commands.TryGetValue(message.CommandId.Value, out var serialized))
+        for (var remembered = _commandLog.Count - 1; remembered >= 0; remembered--)
         {
-            return true;
+            var command = _commands.Deserialize(_commandLog[remembered]);
+            if (command.CommandId != message.CommandId.Value)
+            {
+                continue;
+            }
+
+            if (!string.Equals(command.Text, message.Text, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "A chat command id cannot be reused with different text.");
+            }
+
+            return false;
         }
 
-        if (!string.Equals(
-                _texts.Deserialize(serialized),
-                message.Text,
-                StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                "A chat command id cannot be reused with different text.");
-        }
-
-        return false;
+        return true;
     }
 
     private Task RememberOwnerTurnAsync(SendMessage message)
@@ -124,24 +124,24 @@ internal sealed class ChatNeuron :
     }
 
     private void Remember(CommandId commandId, string text)
-    {
-        _commands[commandId.Value] = _texts.SerializeToArray(text);
-        _commandOrder.Add(commandId.Value);
-
-        while (_commandOrder.Count > RememberedCommands)
-        {
-            _commands.Remove(_commandOrder[0]);
-            _commandOrder.RemoveAt(0);
-        }
-    }
+        => Append(
+            _commandLog,
+            _commands.SerializeToArray(new OwnerCommand(commandId.Value, text)),
+            RememberedCommands);
 
     private void Remember(ChatTurn turn)
-    {
-        _transcript.Add(_turns.SerializeToArray(turn));
+        => Append(_transcript, _turns.SerializeToArray(turn), RetainedTurns);
 
-        while (_transcript.Count > RetainedTurns)
+    private static void Append(IDurableList<byte[]> entries, byte[] entry, int retained)
+    {
+        entries.Add(entry);
+
+        while (entries.Count > retained)
         {
-            _transcript.RemoveAt(0);
+            entries.RemoveAt(0);
         }
     }
+
+    [GenerateSerializer]
+    internal sealed record OwnerCommand([property: Id(0)] Guid CommandId, [property: Id(1)] string Text);
 }

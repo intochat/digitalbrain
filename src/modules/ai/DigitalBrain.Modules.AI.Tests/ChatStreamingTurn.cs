@@ -65,8 +65,14 @@ public sealed class ChatStreamingTurn(ChatFixture fixture)
     private const string ChatName = "streaming-turn";
     private const string AbandonedChatName = "abandoned-streaming-turn";
     private const string SlowChatName = "slow-answering-turn";
+    private const string WindowedChatName = "windowed-transcript-turn";
+    private const string AgedCommandChatName = "aged-command-turn";
     private const string Prompt = "how does streaming reach the transcript?";
     private const int StreamingTimeout = 180_000;
+    private const int RetainedTurns = 64;
+    private const int SendsPastTheTranscriptWindow = 35;
+    private const int OldestSendStillInTranscript =
+        SendsPastTheTranscriptWindow - (RetainedTurns / 2) + 1;
 
     private static readonly Assembly ChatVocabulary = typeof(UserMessaged).Assembly;
     private static readonly TimeSpan ProgressBudget = TimeSpan.FromSeconds(30);
@@ -206,6 +212,73 @@ public sealed class ChatStreamingTurn(ChatFixture fixture)
                     ChatStreamingAssistant.Opening + Prompt + ChatStreamingAssistant.Closing),
                 turn));
     }
+
+    [Fact(Timeout = StreamingTimeout, DisplayName =
+        "the transcript keeps the newest 64 turns and drops the oldest whole turns first")]
+    public async Task TranscriptKeepsTheNewestSixtyFourTurns()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        ChatStreamingAssistant.Arm();
+        ChatStreamingAssistant.Release();
+
+        var chat = test.Client.GetGrainProxy<IChat>(WindowedChatName);
+
+        for (var send = 1; send <= SendsPastTheTranscriptWindow; send++)
+        {
+            await DrainAsync(chat.SendStreaming(new SendMessage(CommandId.New(), WindowPrompt(send)), cancellationToken));
+        }
+
+        var transcript = await chat.Read();
+
+        Assert.Equal(RetainedTurns, transcript.Turns.Count);
+        Assert.Equal(new ChatTurn(FromUser: true, WindowPrompt(OldestSendStillInTranscript)), transcript.Turns[0]);
+        Assert.Equal(AnswerTo(SendsPastTheTranscriptWindow), transcript.Turns[^1]);
+    }
+
+    [Fact(Timeout = StreamingTimeout, DisplayName =
+        "a command id stays remembered after its own turns have aged out of the transcript")]
+    public async Task CommandIdOutlivesItsOwnTranscriptTurns()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        ChatStreamingAssistant.Arm();
+        ChatStreamingAssistant.Release();
+
+        var chat = test.Client.GetGrainProxy<IChat>(AgedCommandChatName);
+        var first = CommandId.New();
+
+        await DrainAsync(chat.SendStreaming(new SendMessage(first, WindowPrompt(1)), cancellationToken));
+
+        for (var send = 2; send <= SendsPastTheTranscriptWindow; send++)
+        {
+            await DrainAsync(chat.SendStreaming(new SendMessage(CommandId.New(), WindowPrompt(send)), cancellationToken));
+        }
+
+        var aged = await chat.Read();
+
+        Assert.DoesNotContain(new ChatTurn(FromUser: true, WindowPrompt(1)), aged.Turns);
+
+        var replayed = new List<string>();
+
+        await foreach (var chunk in chat.SendStreaming(new SendMessage(first, WindowPrompt(1)), cancellationToken))
+        {
+            replayed.Add(chunk.Text);
+        }
+
+        Assert.Empty(replayed);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => DrainAsync(chat.SendStreaming(new SendMessage(first, "an aged id with contradicting text"), cancellationToken)));
+
+        Assert.Equal(aged.Turns, (await chat.Read()).Turns);
+    }
+
+    private static string WindowPrompt(int send) => $"windowed question {send}";
+
+    private static ChatTurn AnswerTo(int send)
+        => new(
+            FromUser: false,
+            ChatStreamingAssistant.Opening + WindowPrompt(send) + ChatStreamingAssistant.Closing);
 
     private static async Task DrainAsync(IAsyncEnumerable<ChatResponseUpdate> stream)
     {
