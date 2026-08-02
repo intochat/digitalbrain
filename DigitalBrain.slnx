@@ -39,7 +39,6 @@
     <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
     <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
     <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter.Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
-    <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter.Tests/DigitalBrain.Modules.Flutter.Tests.csproj" />
     <Project Path="src/modules/google/DigitalBrain.Modules.Google.Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
     <Project Path="src/modules/google/DigitalBrain.Modules.Google/DigitalBrain.Modules.Google.csproj" />
     <Project Path="src/modules/google/DigitalBrain.Modules.Google.Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />
