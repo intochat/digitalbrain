@@ -81,28 +81,38 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
 
         // Permanent refresh failure clears custody and re-parks once the access token is
         // considered expired under the silo's TimeProvider-backed Google IClock.
+        // Reset in `finally`: TokenHost is shared with every other class in
+        // GmailFakeHostTestGroup, and a poisoned RefreshStatusCode would leak past this test.
         IntegrationsGmailHosts.TokenHost.RefreshStatusCode = System.Net.HttpStatusCode.BadRequest;
         IntegrationsGmailHosts.TokenHost.RefreshError = new { error = "invalid_grant", error_description = "expired" };
-        await test.Clock.AdvanceAsync(TimeSpan.FromHours(2), cancellationToken);
+        try
+        {
+            await test.Clock.AdvanceAsync(TimeSpan.FromHours(2), cancellationToken);
 
-        var expiredCommand = CommandId.New();
-        var expiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
-        using var expiredHang = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        expiredHang.CancelAfter(TimeSpan.FromSeconds(15));
-        var expiredSend = test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
-            .SendAsync(
-                new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", expiredCommand),
-                expiredHang.Token);
+            var expiredCommand = CommandId.New();
+            var expiredWait = auth.Outgoing.NextAsync<AuthorizationRequired>(cancellationToken);
+            using var expiredHang = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            expiredHang.CancelAfter(TimeSpan.FromSeconds(15));
+            var expiredSend = test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+                .SendAsync(
+                    new GmailRequest($"Read Gmail message {IntegrationsFixture.SampleMessageId}", expiredCommand),
+                    expiredHang.Token);
 
-        var expired = (await expiredWait).Synapse;
-        Assert.Equal(expiredCommand, expired.CommandId);
-        Assert.NotEqual(seedRequired.State, expired.State);
-        var requiredFacts = await auth.Outgoing.ReadAsync<AuthorizationRequired>(afterSequence: 0, cancellationToken);
-        Assert.Equal(2, requiredFacts.Count);
-        Assert.Contains(requiredFacts, observed => observed.Synapse == expired);
+            var expired = (await expiredWait).Synapse;
+            Assert.Equal(expiredCommand, expired.CommandId);
+            Assert.NotEqual(seedRequired.State, expired.State);
+            var requiredFacts = await auth.Outgoing.ReadAsync<AuthorizationRequired>(afterSequence: 0, cancellationToken);
+            Assert.Equal(2, requiredFacts.Count);
+            Assert.Contains(requiredFacts, observed => observed.Synapse == expired);
 
-        await expiredHang.CancelAsync();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => expiredSend);
+            await expiredHang.CancelAsync();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => expiredSend);
+        }
+        finally
+        {
+            IntegrationsGmailHosts.TokenHost.RefreshStatusCode = System.Net.HttpStatusCode.OK;
+            IntegrationsGmailHosts.TokenHost.RefreshError = null;
+        }
     }
 
     [Fact(DisplayName =
