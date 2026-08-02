@@ -13,11 +13,11 @@
 #   Google Gmail OAuth (config root DigitalBrain:Google:Gmail)
 #     DigitalBrain__Google__Gmail__ClientId
 #     DigitalBrain__Google__Gmail__ClientSecret
-#     DigitalBrain__Google__Gmail__RedirectUri     # UI base + /oauth/mcp/callback
+#     DigitalBrain__Google__Gmail__RedirectUri     # UI base + /oauth/callback
 #
 #   Salesforce OAuth (config root DigitalBrain:Salesforce; no client secret required)
 #     DigitalBrain__Salesforce__ClientId
-#     DigitalBrain__Salesforce__RedirectUri        # UI base + /oauth/mcp/callback
+#     DigitalBrain__Salesforce__RedirectUri        # UI base + /oauth/callback
 #
 #   Models (L2)
 #     DigitalBrain__AI__Ollama__Endpoint           # e.g. http://host.docker.internal:11434

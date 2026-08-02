@@ -18,7 +18,7 @@
 #     DigitalBrain__Modules__0=DigitalBrain.AI.AIModule
 #     … (see digitalbrain image header for full product list)
 #
-#   OAuth callbacks land on this edge at /oauth/mcp/callback — register that URI on
+#   OAuth callbacks land on this edge at /oauth/callback — register that URI on
 #   Google/Salesforce apps. Provider client id/secret live on the silo (digitalbrain),
 #   not on this image.
 #

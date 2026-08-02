@@ -42,9 +42,9 @@ services:
       # --- Key Vault / secret injection surface (empty here on purpose) ---
       # DigitalBrain__Google__Gmail__ClientId:
       # DigitalBrain__Google__Gmail__ClientSecret:
-      # DigitalBrain__Google__Gmail__RedirectUri: http://localhost:5080/oauth/mcp/callback
+      # DigitalBrain__Google__Gmail__RedirectUri: http://localhost:5080/oauth/callback
       # DigitalBrain__Salesforce__ClientId:
-      # DigitalBrain__Salesforce__RedirectUri: http://localhost:5080/oauth/mcp/callback
+      # DigitalBrain__Salesforce__RedirectUri: http://localhost:5080/oauth/callback
       # DigitalBrain__AI__Ollama__Endpoint: http://host.docker.internal:11434
       # DigitalBrain__AI__OpenAI__ApiKey:
       # DigitalBrain__AI__OpenAI__Endpoint:
