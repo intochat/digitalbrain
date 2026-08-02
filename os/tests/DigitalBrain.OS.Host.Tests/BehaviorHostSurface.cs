@@ -5,7 +5,6 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
-using DigitalBrain.Behaviors.Runtime.Artifacts;
 using DigitalBrain.Security;
 using DigitalBrain.Tasks;
 using DigitalBrain.Testing;

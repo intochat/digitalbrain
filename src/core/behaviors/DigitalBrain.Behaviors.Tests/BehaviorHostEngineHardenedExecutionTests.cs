@@ -2,7 +2,6 @@ using System.Text;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
-using DigitalBrain.Behaviors.Runtime.Artifacts;
 using DigitalBrain.Tasks;
 using Xunit;
 

@@ -1,9 +1,8 @@
-namespace DigitalBrain.Behaviors.Runtime.Artifacts;
+namespace DigitalBrain.Behaviors.Artifacts;
 
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
-using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
 
 internal static class CanonicalArtifactReader

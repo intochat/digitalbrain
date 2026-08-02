@@ -1,9 +1,8 @@
-namespace DigitalBrain.Behaviors.Runtime.Artifacts;
+namespace DigitalBrain.Behaviors.Artifacts;
 
 using System.Buffers;
 using System.Text;
 using System.Text.Json;
-using DigitalBrain.Behaviors.Artifacts;
 
 internal static class CanonicalJson
 {
