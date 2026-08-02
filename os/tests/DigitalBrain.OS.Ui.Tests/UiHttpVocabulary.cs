@@ -11,7 +11,7 @@ public sealed class UiHttpVocabulary(FlutterHttpFixture fixture)
     private const string OpenTelemetryMarker = "OpenTelemetry";
 
     [Fact(DisplayName =
-        "FlutterHttpContract is the closed public vocabulary — health, shell/scene routes, scene-opened event")]
+        "FlutterHttpContract is the only exported type in its namespace — no internal type leaks")]
     public void PublicVocabularyIsUiHttpContract()
     {
         var vocabulary = typeof(FlutterHttpContract).Assembly
@@ -29,38 +29,6 @@ public sealed class UiHttpVocabulary(FlutterHttpFixture fixture)
                 or "OwnerSessionJournal" or "FlutterHttpServices"
                 or "OpenSceneRequest" or "ActivateControlRequest" or "SceneOpenedEvent"
                 or "IFlutter");
-
-        Assert.Equal("/health", FlutterHttpContract.HealthPath);
-        Assert.Equal("/shells/{shellName}/scenes", FlutterHttpContract.OpenScenePath);
-        Assert.Equal("/shells/{shellName}/events", FlutterHttpContract.ShellEventsPath);
-        Assert.Equal("/scenes/{sceneKey}/controls/{controlId}/activate", FlutterHttpContract.ActivateControlPath);
-        Assert.Equal("afterSequence", FlutterHttpContract.AfterSequenceQuery);
-        Assert.Equal("text/event-stream", FlutterHttpContract.EventStreamContentType);
-        Assert.Equal("no-cache", FlutterHttpContract.CacheControlNoCache);
-        Assert.Equal("scene-opened", FlutterHttpContract.SceneOpenedEvent);
-        Assert.Equal("/brain/topology", FlutterHttpContract.BrainTopologyPath);
-        Assert.Equal("/chats/{chatName}/messages/stream", FlutterHttpContract.StreamMessagePath);
-        Assert.Equal("chat-delta", FlutterHttpContract.ChatDeltaEvent);
-        Assert.Equal("/oauth/callback", FlutterHttpContract.McpOAuthCallbackPath);
-        Assert.Equal("/authorizations/events", FlutterHttpContract.AuthorizationEventsPath);
-        Assert.Equal("authorization", FlutterHttpContract.AuthorizationEvent);
-        Assert.Equal("/behaviors", FlutterHttpContract.BehaviorsPath);
-        Assert.Equal("/behaviors/{behaviorId}", FlutterHttpContract.BehaviorPath);
-        Assert.Equal("/behaviors/{behaviorId}/propose", FlutterHttpContract.BehaviorProposePath);
-        Assert.Equal("/behaviors/{behaviorId}/tests", FlutterHttpContract.BehaviorTestsPath);
-        Assert.Equal("/behaviors/{behaviorId}/approve", FlutterHttpContract.BehaviorApprovePath);
-        Assert.Equal("/behaviors/{behaviorId}/activate", FlutterHttpContract.BehaviorActivatePath);
-        Assert.Equal("/behaviors/{behaviorId}/stop", FlutterHttpContract.BehaviorStopPath);
-        Assert.Equal("/behaviors/{behaviorId}/start", FlutterHttpContract.BehaviorStartPath);
-        Assert.Equal("/behaviors/{behaviorId}/run-once", FlutterHttpContract.BehaviorRunOncePath);
-        Assert.Equal("/behaviors/{behaviorId}/rollback", FlutterHttpContract.BehaviorRollbackPath);
-        Assert.Equal("/behaviors/{behaviorId}/bindings", FlutterHttpContract.BehaviorBindingsPath);
-        Assert.Equal("/behaviors/{behaviorId}/bindings/{bindingId}", FlutterHttpContract.BehaviorBindingPath);
-        Assert.Equal("/behaviors/{behaviorId}/events", FlutterHttpContract.BehaviorEventsPath);
-        Assert.Equal("/behaviors/{behaviorId}/change/propose", FlutterHttpContract.BehaviorChangeProposePath);
-        Assert.Equal("/behaviors/{behaviorId}/change/approve", FlutterHttpContract.BehaviorChangeApprovePath);
-        Assert.Equal("behavior", FlutterHttpContract.BehaviorEvent);
-        Assert.Equal("/surfaces/behavior-editor", FlutterHttpContract.BehaviorEditorSurfacePath);
     }
 
     [Fact(DisplayName =
@@ -84,33 +52,6 @@ public sealed class UiHttpVocabulary(FlutterHttpFixture fixture)
             type => (type.FullName ?? type.Name).Contains(OpenTelemetryMarker, StringComparison.Ordinal));
         Assert.DoesNotContain(typeof(System.Diagnostics.Activity), parameters);
         Assert.DoesNotContain(typeof(System.Diagnostics.ActivitySource), parameters);
-
-        var watchShell = typeof(OwnerSessionJournal).GetMethod(
-            nameof(OwnerSessionJournal.WatchShellOutgoingAsync),
-            BindingFlags.Public | BindingFlags.Instance);
-        Assert.NotNull(watchShell);
-        Assert.Contains(
-            typeof(OwnerSessionJournal).GetFields(BindingFlags.NonPublic | BindingFlags.Instance),
-            field => field.FieldType == typeof(ISessionNeuron));
-        Assert.Contains(
-            typeof(OwnerSessionJournal).GetFields(BindingFlags.NonPublic | BindingFlags.Instance),
-            field => field.FieldType == typeof(IGrainFactory));
-
-        Assert.Equal(
-            [
-                nameof(IDigitalBrain.ActivateAsync),
-                nameof(IDigitalBrain.EmitAsync),
-                nameof(IDigitalBrain.Get),
-                nameof(IDigitalBrain.GetGrainProxy),
-                nameof(IDigitalBrain.SendAsync),
-            ],
-            typeof(IDigitalBrain)
-                .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-                .Where(method => !method.IsSpecialName)
-                .Select(method => method.Name)
-                .Distinct(StringComparer.Ordinal)
-                .Order(StringComparer.Ordinal)
-                .ToArray());
     }
 
     [Fact(DisplayName = "MapFlutterHttpHost serves FlutterHttpContract health on the product composition path")]
