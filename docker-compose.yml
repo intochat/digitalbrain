@@ -66,6 +66,7 @@ services:
       DigitalBrain__Modules__6: DigitalBrain.Salesforce.SalesforceModule
       DigitalBrain__Modules__7: DigitalBrain.Behaviors.BehaviorsModule
       DigitalBrain__Modules__8: DigitalBrain.Tasks.TasksModule
+      DigitalBrain__Modules__9: DigitalBrain.Time.TimeModule
     depends_on:
       - azurite
     extra_hosts:
@@ -91,6 +92,7 @@ services:
       DigitalBrain__Modules__6: DigitalBrain.Salesforce.SalesforceModule
       DigitalBrain__Modules__7: DigitalBrain.Behaviors.BehaviorsModule
       DigitalBrain__Modules__8: DigitalBrain.Tasks.TasksModule
+      DigitalBrain__Modules__9: DigitalBrain.Time.TimeModule
     depends_on:
       - azurite
       - digitalbrain
