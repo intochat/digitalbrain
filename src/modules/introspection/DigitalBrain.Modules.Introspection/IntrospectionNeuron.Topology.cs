@@ -1,0 +1,81 @@
+using DigitalBrain.Abstractions;
+using DigitalBrain.Kernel;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace DigitalBrain.Introspection;
+
+internal sealed partial class IntrospectionNeuron
+{
+    private const string ModulesConfigurationSection = "DigitalBrain:Modules";
+    private const char IdentityPartSeparator = '/';
+
+    private async Task<TopologyRead> ReadTopologyAsync(CommandId commandId, CancellationToken cancellationToken)
+    {
+        var statistics = await GrainFactory
+            .GetGrain<IManagementGrain>(0)
+            .GetDetailedGrainStatistics()
+            .WaitAsync(cancellationToken);
+
+        var ownerPrefix = $"{Id.Owner.Value}{IdentityPartSeparator}";
+        var ownerStatistics = statistics
+            .Where(statistic => statistic.GrainId.Key.ToString()!
+                .StartsWith(ownerPrefix, StringComparison.Ordinal))
+            .ToArray();
+        var placements = ownerStatistics
+            .Select(static statistic => statistic.SiloAddress)
+            .Distinct()
+            .OrderBy(static address => address.ToString(), StringComparer.Ordinal)
+            .Select(static (address, index) => (Address: address, Label: $"cluster-{index + 1}"))
+            .ToDictionary(static placement => placement.Address, static placement => placement.Label);
+
+        return new TopologyRead(
+            commandId,
+            ComposedModuleIds(),
+            [
+                .. ownerStatistics
+                    .Select(statistic =>
+                    {
+                        var grainType = statistic.GrainId.Type.ToString()!;
+                        var identity = statistic.GrainId.Key.ToString()!;
+                        return new TopologyNeuron(
+                            $"{grainType}:{identity}",
+                            grainType,
+                            identity,
+                            placements[statistic.SiloAddress]);
+                    })
+                    .OrderBy(static neuron => neuron.GrainType, StringComparer.Ordinal)
+                    .ThenBy(static neuron => neuron.Identity, StringComparer.Ordinal),
+            ],
+            TimeProvider.GetUtcNow());
+    }
+
+    private IReadOnlyList<string> ComposedModuleIds()
+    {
+        if (ServiceProvider.GetService<ActiveCapabilityCatalog>() is { Modules.Count: > 0 } catalog)
+        {
+            return
+            [
+                .. catalog.Modules
+                    .Select(static module => module.ModuleId.Value)
+                    .OrderBy(static id => id, StringComparer.Ordinal),
+            ];
+        }
+
+        if (ServiceProvider.GetService<IConfiguration>() is not { } configuration)
+        {
+            return [];
+        }
+
+        return
+        [
+            .. configuration
+                .GetSection(ModulesConfigurationSection)
+                .GetChildren()
+                .Select(static section => section.Value)
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .Select(static value => value!)
+                .OrderBy(static id => id, StringComparer.Ordinal),
+        ];
+    }
+}

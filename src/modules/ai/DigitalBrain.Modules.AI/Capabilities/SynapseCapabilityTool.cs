@@ -204,6 +204,10 @@ public static class SynapseCapabilityTool
 
     private sealed class DirectedSynapseFunction : AIFunction
     {
+        private const long BeyondJournalEnd = long.MaxValue;
+        private static readonly TimeSpan ResponsePoll = TimeSpan.FromMilliseconds(25);
+        private static readonly TimeSpan ResponseWait = TimeSpan.FromSeconds(30);
+
         private readonly ValidatedCapability _capability;
         private readonly IGrainFactory _grains;
         private readonly OwnerId _owner;
@@ -247,10 +251,54 @@ public static class SynapseCapabilityTool
             cancellationToken.ThrowIfCancellationRequested();
             var request = BindModelArguments(_requestType, _capability.ContractId, arguments);
             var brain = DigitalBrainClient.Connect(_grains, _owner.Value);
-            var response = await brain
-                .SendRequestAsync(_target, request, _responseType, cancellationToken)
-                .ConfigureAwait(false);
+            await brain.ActivateAsync(cancellationToken).ConfigureAwait(false);
+            var response = await AwaitDirectedResponseAsync(request, cancellationToken).ConfigureAwait(false);
             return JsonSerializer.Serialize(response, _responseType, SerializerOptions);
+        }
+
+        // A model tool runs inside the agent neuron's turn. IDigitalBrain.SendRequestAsync awaits a
+        // grain observer callback, and Orleans dispatches that callback onto the activation that
+        // created the reference — the very turn that is blocked on this tool. Polling the owner
+        // session's incoming journal reads the same directed reply without any callback into an
+        // occupied activation.
+        private async Task<Synapse> AwaitDirectedResponseAsync(Synapse request, CancellationToken cancellationToken)
+        {
+            var sessionId = ISessionNeuron.ForOwner(_owner);
+            var session = _grains.GetGrain<ISessionNeuron>(sessionId.ToGrainId());
+            var opened = await session
+                .ReadNeuronJournal(sessionId, JournalKind.Incoming, BeyondJournalEnd)
+                .ConfigureAwait(false);
+            var cursor = opened.ResumeSequence;
+
+            var delivery = await session.Fire(_target, request).ConfigureAwait(false);
+            var abandonAfter = DateTimeOffset.UtcNow + ResponseWait;
+
+            while (true)
+            {
+                var read = await session
+                    .ReadNeuronJournal(sessionId, JournalKind.Incoming, cursor)
+                    .ConfigureAwait(false);
+
+                foreach (var journaled in read.Delta)
+                {
+                    if (journaled.CorrelationId == delivery.CorrelationId
+                        && _responseType.IsInstanceOfType(journaled.Synapse))
+                    {
+                        return journaled.Synapse;
+                    }
+                }
+
+                cursor = read.ResumeSequence;
+
+                if (DateTimeOffset.UtcNow >= abandonAfter)
+                {
+                    throw new TimeoutException(
+                        $"No '{_responseType.Name}' reply from '{_target}' arrived for correlation "
+                        + $"'{delivery.CorrelationId}' within {ResponseWait.TotalSeconds} seconds.");
+                }
+
+                await Task.Delay(ResponsePoll, cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 }
