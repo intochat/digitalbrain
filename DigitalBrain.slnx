@@ -16,6 +16,7 @@
     <Project Path="src/core/aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
     <Project Path="src/core/aspire/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
     <Project Path="src/core/kernel/DigitalBrain.SourceGeneration/DigitalBrain.SourceGeneration.csproj" />
+    <Project Path="src/core/kernel/DigitalBrain.SourceGeneration.Tests/DigitalBrain.SourceGeneration.Tests.csproj" />
     <Project Path="src/core/security/DigitalBrain.Security/DigitalBrain.Security.csproj" />
     <Project Path="src/core/mcp/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
     <Project Path="src/core/mcp/DigitalBrain.Mcp.Testing/DigitalBrain.Mcp.Testing.csproj" />
