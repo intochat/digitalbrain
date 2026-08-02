@@ -8,7 +8,6 @@ public sealed class ShellUiEdgeOptions
 
     public string? ProjectPath { get; set; }
 
-    // Null lets Aspire proxy the edge on an assigned port; a value pins the host port the
-    // product's OAuth callback is registered against, and the edge then listens on it directly.
+    // Null leaves the edge behind the Aspire proxy; a value binds that host port directly.
     public int? HttpPort { get; set; }
 }

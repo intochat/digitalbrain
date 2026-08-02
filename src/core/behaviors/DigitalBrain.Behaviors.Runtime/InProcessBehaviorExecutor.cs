@@ -1,4 +1,3 @@
-
 namespace DigitalBrain.Behaviors.Runtime;
 
 internal sealed class InProcessBehaviorExecutor : IBehaviorExecutor

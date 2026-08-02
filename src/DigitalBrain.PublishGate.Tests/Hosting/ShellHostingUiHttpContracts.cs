@@ -54,5 +54,40 @@ public sealed class ShellHostingUiHttpContracts
             ui.Annotations.OfType<WaitAnnotation>(),
             wait => wait.WaitType == WaitType.WaitUntilHealthy
                 && ReferenceEquals(wait.Resource, silo.Resource));
+
+        Assert.True(
+            UiHttpEndpoint(ui).IsProxied,
+            "Without a product-chosen port the edge stays behind the Aspire proxy.");
     }
+
+    [Fact(DisplayName = "a product-chosen UI port binds that host port directly instead of an Aspire proxy")]
+    public void ProductChosenPortBindsDirectly()
+    {
+        const int ProductPort = 5080;
+
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddDigitalBrain("brain");
+
+        brain.AddModule<ShellModule>(flutter => flutter.WithUiEdge(options =>
+        {
+            options.ProjectPath = ShellHostingProjectionSupport.UIProjectPath;
+            options.HttpPort = ProductPort;
+        }));
+
+        var ui = Assert.Single(
+            builder.Resources.OfType<ProjectResource>(),
+            resource => resource.Name == ShellHostingExtensions.DefaultUIResourceName);
+        var http = UiHttpEndpoint(ui);
+
+        Assert.Equal(ProductPort, http.Port);
+        Assert.False(http.IsProxied);
+    }
+
+    private static EndpointAnnotation UiHttpEndpoint(ProjectResource ui)
+        => Assert.Single(
+            ui.Annotations.OfType<EndpointAnnotation>(),
+            endpoint => string.Equals(
+                endpoint.Name,
+                ShellHostingExtensions.UiEdgeEndpointName,
+                StringComparison.Ordinal));
 }
