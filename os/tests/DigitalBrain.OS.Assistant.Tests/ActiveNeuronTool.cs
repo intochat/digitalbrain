@@ -4,7 +4,7 @@ using DigitalBrain.OS.AgentTools;
 using DigitalBrain.Testing;
 using Xunit;
 
-namespace DigitalBrain.OS.Behaviors.Tests;
+namespace DigitalBrain.OS.Assistant.Tests;
 
 public sealed class ActiveNeuronTool(OSBehaviorsFixture fixture)
 {

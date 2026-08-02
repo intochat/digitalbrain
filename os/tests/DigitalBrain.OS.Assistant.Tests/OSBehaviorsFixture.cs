@@ -1,10 +1,10 @@
 using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Chat;
-using DigitalBrain.OS;
+using DigitalBrain.OS.Assistant;
 using DigitalBrain.Testing;
 
-namespace DigitalBrain.OS.Behaviors.Tests;
+namespace DigitalBrain.OS.Assistant.Tests;
 
 public sealed class OSBehaviorsFixture : DigitalBrainFixture
 {
@@ -13,7 +13,7 @@ public sealed class OSBehaviorsFixture : DigitalBrainFixture
         ArgumentNullException.ThrowIfNull(brain);
         brain.AddModule<ChatModule>();
         brain.AddModule<AIModule>();
-        brain.AddModule<OSBehaviorsModule>();
+        brain.AddModule<AssistantModule>();
         brain.ConfigureScriptedChat(
             typeof(Gemma4),
             typeof(Llama32),

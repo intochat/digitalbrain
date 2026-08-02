@@ -5,7 +5,7 @@ using DigitalBrain.Testing;
 using Microsoft.Extensions.AI;
 using Xunit;
 
-namespace DigitalBrain.OS.Behaviors.Tests;
+namespace DigitalBrain.OS.Assistant.Tests;
 
 public sealed class AssistantModelTeam(OSBehaviorsFixture fixture)
 {

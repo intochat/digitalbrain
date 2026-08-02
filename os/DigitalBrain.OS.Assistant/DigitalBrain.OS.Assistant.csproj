@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>false</IsPackable>
-    <Description>Operating-system behaviour programs. Behaviour-shaped and composed at build time; the install rail does not exist yet.</Description>
-    <RootNamespace>DigitalBrain.OS</RootNamespace>
+    <Description>The IAssistant agent, composed into the product silo at build time.</Description>
+    <RootNamespace>DigitalBrain.OS.Assistant</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812;CA2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>

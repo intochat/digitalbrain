@@ -5,7 +5,7 @@ using DigitalBrain.AI.Ollama;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.OS;
+namespace DigitalBrain.OS.Assistant;
 
 internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient chatClient)
     : Agent(chatClient), IAssistant
