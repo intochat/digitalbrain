@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 #
 # Product image: digitalbrain-ui
-#   - OS.UiEdge HTTP/SSE edge: chat, OAuth MCP callback, user actions, behavior APIs, static web
+#   - OS.UiEdge HTTP/SSE edge: chat, OAuth callback, user actions, behavior APIs, static web
 #
 # Build (repo root):
 #   docker build -f os/DigitalBrain.OS.UiEdge/Dockerfile -t digitalbrain-ui .
