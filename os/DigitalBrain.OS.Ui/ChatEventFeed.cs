@@ -1,6 +1,4 @@
-using System.Globalization;
 using System.Net.ServerSentEvents;
-using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 
@@ -8,67 +6,42 @@ namespace DigitalBrain.Flutter.Http;
 
 internal static class ChatEventFeed
 {
-    public static async IAsyncEnumerable<SseItem<ChatTurnEvent>> WatchChatTurnsAsync(
+    public static IAsyncEnumerable<SseItem<ChatTurnEvent>> WatchChatTurnsAsync(
         OwnerSessionJournal sessionJournal,
         string chatName,
         long afterSequence,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(sessionJournal);
-        ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
-        ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-        await foreach (var batch in sessionJournal.WatchChatOutgoingAsync(chatName, afterSequence, cancellationToken))
-        {
-            foreach (var turn in ProjectTurns(batch))
-            {
-                yield return new SseItem<ChatTurnEvent>(turn, FlutterHttpContract.ChatTurnEvent)
-                {
-                    EventId = turn.Sequence.ToString(CultureInfo.InvariantCulture),
-                };
-            }
-        }
+        return JournalProjection.WatchAsync(
+            token => sessionJournal.WatchChatOutgoingAsync(chatName, afterSequence, token),
+            FlutterHttpContract.ChatTurnEvent,
+            ProjectTurn,
+            cancellationToken);
     }
 
-    private static IEnumerable<ChatTurnEvent> ProjectTurns(JournalRead batch)
+    private static ChatTurnEvent? ProjectTurn(SynapseDelivery delivery)
     {
-        ArgumentNullException.ThrowIfNull(batch);
+        ChatTurnEvent Turn(bool fromUser, string text, CommandId command, string synapseName, NeuronId chat)
+            => new(
+                delivery.Sequence,
+                fromUser,
+                text,
+                command.ToString(),
+                synapseName,
+                chat.ToString(),
+                delivery.Caller.ToString(),
+                delivery.CorrelationId.ToString(),
+                delivery.Timestamp);
 
-        if (batch.ResetSnapshot is not null)
+        return delivery.Synapse switch
         {
-            yield break;
-        }
-
-        foreach (var delivery in batch.Delta)
-        {
-            switch (delivery.Synapse)
-            {
-                case UserMessaged messaged:
-                    yield return new ChatTurnEvent(
-                        delivery.Sequence,
-                        FromUser: true,
-                        messaged.Text,
-                        messaged.CommandId.ToString(),
-                        nameof(UserMessaged),
-                        messaged.Chat.ToString(),
-                        delivery.Caller.ToString(),
-                        delivery.CorrelationId.ToString(),
-                        delivery.Timestamp);
-                    break;
-
-                case AssistantResponded responded:
-                    yield return new ChatTurnEvent(
-                        delivery.Sequence,
-                        FromUser: false,
-                        responded.Text,
-                        responded.CommandId.ToString(),
-                        nameof(AssistantResponded),
-                        responded.Chat.ToString(),
-                        delivery.Caller.ToString(),
-                        delivery.CorrelationId.ToString(),
-                        delivery.Timestamp);
-                    break;
-            }
-        }
+            UserMessaged messaged =>
+                Turn(true, messaged.Text, messaged.CommandId, nameof(UserMessaged), messaged.Chat),
+            AssistantResponded responded =>
+                Turn(false, responded.Text, responded.CommandId, nameof(AssistantResponded), responded.Chat),
+            _ => null,
+        };
     }
 }
