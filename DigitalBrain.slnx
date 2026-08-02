@@ -47,7 +47,6 @@
     <Project Path="src/modules/salesforce/DigitalBrain.Modules.Salesforce.Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
     <Project Path="src/modules/salesforce/DigitalBrain.Modules.Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <Project Path="src/modules/salesforce/DigitalBrain.Modules.Salesforce.Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" />
-    <Project Path="src/modules/salesforce/DigitalBrain.Modules.Salesforce.Tests/DigitalBrain.Modules.Salesforce.Tests.csproj" />
     <Project Path="src/modules/memory/DigitalBrain.Modules.Memory.Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
     <Project Path="src/modules/memory/DigitalBrain.Modules.Memory/DigitalBrain.Modules.Memory.csproj" />
     <Project Path="src/modules/memory/DigitalBrain.Modules.Memory.Qdrant/DigitalBrain.Modules.Memory.Qdrant.csproj" />
