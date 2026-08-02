@@ -14,5 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\DigitalBrain.OS.AppHost\DigitalBrain.OS.AppHost.csproj"
                       ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\DigitalBrain.OS.Ui\DigitalBrain.OS.Ui.csproj" />
+    <ProjectReference Include="..\..\..\src\modules\flutter\DigitalBrain.Modules.Flutter.Aspire.Hosting\DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>
