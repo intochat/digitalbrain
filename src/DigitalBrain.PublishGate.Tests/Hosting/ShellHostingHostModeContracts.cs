@@ -7,7 +7,7 @@ using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
 
-public sealed class FlutterHostingHostModeContracts
+public sealed class ShellHostingHostModeContracts
 {
     [Fact(DisplayName =
         "WithWindowHost projects flutter run under shell/ with exclusive edge env")]
@@ -15,16 +15,16 @@ public sealed class FlutterHostingHostModeContracts
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
-        await FlutterHostingProjectionSupport.AssertShellDesktopLayoutAsync(
-            FlutterHostingProjectionSupport.FlutterShellDirectory,
+        await ShellHostingProjectionSupport.AssertShellDesktopLayoutAsync(
+            ShellHostingProjectionSupport.FlutterShellDirectory,
             TestContext.Current.CancellationToken).ConfigureAwait(true);
 
         const string pinnedFlutterCommand = "flutter";
         brain.AddModule<ShellModule>(flutter => flutter
-            .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+            .WithUiEdge(options => options.ProjectPath = ShellHostingProjectionSupport.UIProjectPath)
             .WithWindowHost(options =>
             {
-                options.WorkingDirectory = FlutterHostingProjectionSupport.FlutterClientDirectory;
+                options.WorkingDirectory = ShellHostingProjectionSupport.FlutterClientDirectory;
                 options.FlutterCommand = pinnedFlutterCommand;
             }));
 
@@ -39,14 +39,14 @@ public sealed class FlutterHostingHostModeContracts
 
         Assert.Equal(pinnedFlutterCommand, host.Command, StringComparer.OrdinalIgnoreCase);
         Assert.Equal(
-            Path.GetFullPath(FlutterHostingProjectionSupport.FlutterShellDirectory),
+            Path.GetFullPath(ShellHostingProjectionSupport.FlutterShellDirectory),
             Path.GetFullPath(host.WorkingDirectory),
             StringComparer.OrdinalIgnoreCase);
-        var args = await FlutterHostingProjectionSupport.ResolvedArgsOf(host).ConfigureAwait(true);
+        var args = await ShellHostingProjectionSupport.ResolvedArgsOf(host).ConfigureAwait(true);
         Assert.Equal(["run", "-d", ShellHostingExtensions.DefaultDeviceTarget], args);
 
-        var environment = await FlutterHostingProjectionSupport.EnvironmentOf(host).ConfigureAwait(true);
-        FlutterHostingProjectionSupport.AssertExclusiveFlutterHostEnvironment(
+        var environment = await ShellHostingProjectionSupport.EnvironmentOf(host).ConfigureAwait(true);
+        ShellHostingProjectionSupport.AssertExclusiveFlutterHostEnvironment(
             environment.Keys.ToHashSet(StringComparer.Ordinal));
         Assert.Equal(
             ShellHostingExtensions.DefaultShellName,
@@ -55,7 +55,7 @@ public sealed class FlutterHostingHostModeContracts
         var ui = Assert.Single(
             builder.Resources,
             resource => resource.Name == ShellHostingExtensions.DefaultUIResourceName);
-        FlutterHostingProjectionSupport.AssertUIHasNamedHttpEndpoint(ui);
+        ShellHostingProjectionSupport.AssertUIHasNamedHttpEndpoint(ui);
         Assert.Contains(
             host.Annotations.OfType<WaitAnnotation>(),
             wait => wait.WaitType == WaitType.WaitUntilHealthy
@@ -68,16 +68,16 @@ public sealed class FlutterHostingHostModeContracts
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
-        await FlutterHostingProjectionSupport.AssertPureDartClientLayoutAsync(
-            FlutterHostingProjectionSupport.FlutterClientDirectory,
+        await ShellHostingProjectionSupport.AssertPureDartClientLayoutAsync(
+            ShellHostingProjectionSupport.FlutterClientDirectory,
             TestContext.Current.CancellationToken).ConfigureAwait(true);
 
         const string pinnedDartCommand = "dart";
         brain.AddModule<ShellModule>(flutter => flutter
-            .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+            .WithUiEdge(options => options.ProjectPath = ShellHostingProjectionSupport.UIProjectPath)
             .WithHeadlessHost(options =>
             {
-                options.WorkingDirectory = FlutterHostingProjectionSupport.FlutterClientDirectory;
+                options.WorkingDirectory = ShellHostingProjectionSupport.FlutterClientDirectory;
                 options.DartCommand = pinnedDartCommand;
             }));
 
@@ -92,17 +92,17 @@ public sealed class FlutterHostingHostModeContracts
 
         Assert.Equal(pinnedDartCommand, host.Command, StringComparer.OrdinalIgnoreCase);
         Assert.Equal(
-            Path.GetFullPath(FlutterHostingProjectionSupport.FlutterClientDirectory),
+            Path.GetFullPath(ShellHostingProjectionSupport.FlutterClientDirectory),
             Path.GetFullPath(host.WorkingDirectory),
             StringComparer.OrdinalIgnoreCase);
-        var args = await FlutterHostingProjectionSupport.ResolvedArgsOf(host).ConfigureAwait(true);
+        var args = await ShellHostingProjectionSupport.ResolvedArgsOf(host).ConfigureAwait(true);
         Assert.Equal(["run", ShellHostingExtensions.HeadlessHostEntry], args);
         Assert.DoesNotContain(
             args,
             arg => arg is "-d" || arg == ShellHostingExtensions.DefaultDeviceTarget);
 
-        var environment = await FlutterHostingProjectionSupport.EnvironmentOf(host).ConfigureAwait(true);
-        FlutterHostingProjectionSupport.AssertExclusiveFlutterHostEnvironment(
+        var environment = await ShellHostingProjectionSupport.EnvironmentOf(host).ConfigureAwait(true);
+        ShellHostingProjectionSupport.AssertExclusiveFlutterHostEnvironment(
             environment.Keys.ToHashSet(StringComparer.Ordinal));
         Assert.Equal(
             ShellHostingExtensions.DefaultShellName,
@@ -129,11 +129,11 @@ public sealed class FlutterHostingHostModeContracts
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 brain.AddModule<ShellModule>(flutter => flutter
-                    .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+                    .WithUiEdge(options => options.ProjectPath = ShellHostingProjectionSupport.UIProjectPath)
                     .WithWindowHost(options => options.WorkingDirectory = headlessOnly.FullName)));
 
             Assert.Contains(nameof(ShellHostingExtensions.WithHeadlessHost), exception.Message, StringComparison.Ordinal);
-            FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);
+            ShellHostingProjectionSupport.AssertNoFlutterHost(builder);
         }
         finally
         {
@@ -156,7 +156,7 @@ public sealed class FlutterHostingHostModeContracts
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 brain.AddModule<ShellModule>(flutter => flutter
-                    .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+                    .WithUiEdge(options => options.ProjectPath = ShellHostingProjectionSupport.UIProjectPath)
                     .WithHeadlessHost(options =>
                         options.WorkingDirectory = emptyPackage.FullName)));
 
@@ -164,7 +164,7 @@ public sealed class FlutterHostingHostModeContracts
                 ShellHostingExtensions.HeadlessHostEntry,
                 exception.Message,
                 StringComparison.Ordinal);
-            FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);
+            ShellHostingProjectionSupport.AssertNoFlutterHost(builder);
         }
         finally
         {
@@ -184,10 +184,10 @@ public sealed class FlutterHostingHostModeContracts
 
         _ = Assert.Throws<InvalidOperationException>(() =>
             brain.AddModule<ShellModule>(flutter => flutter
-                .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+                .WithUiEdge(options => options.ProjectPath = ShellHostingProjectionSupport.UIProjectPath)
                 .WithWindowHost(options => options.WorkingDirectory = missing)));
 
-        FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);
+        ShellHostingProjectionSupport.AssertNoFlutterHost(builder);
     }
 
     [Fact(DisplayName =
@@ -196,16 +196,16 @@ public sealed class FlutterHostingHostModeContracts
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
-        await FlutterHostingProjectionSupport.AssertShellWebLayoutAsync(
-            FlutterHostingProjectionSupport.FlutterShellDirectory,
+        await ShellHostingProjectionSupport.AssertShellWebLayoutAsync(
+            ShellHostingProjectionSupport.FlutterShellDirectory,
             TestContext.Current.CancellationToken).ConfigureAwait(true);
 
         const string pinnedFlutterCommand = "flutter";
         brain.AddModule<ShellModule>(flutter => flutter
-            .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+            .WithUiEdge(options => options.ProjectPath = ShellHostingProjectionSupport.UIProjectPath)
             .WithWebHost(options =>
             {
-                options.WorkingDirectory = FlutterHostingProjectionSupport.FlutterClientDirectory;
+                options.WorkingDirectory = ShellHostingProjectionSupport.FlutterClientDirectory;
                 options.FlutterCommand = pinnedFlutterCommand;
             }));
 
@@ -220,10 +220,10 @@ public sealed class FlutterHostingHostModeContracts
 
         Assert.Equal(pinnedFlutterCommand, host.Command, StringComparer.OrdinalIgnoreCase);
         Assert.Equal(
-            Path.GetFullPath(FlutterHostingProjectionSupport.FlutterShellDirectory),
+            Path.GetFullPath(ShellHostingProjectionSupport.FlutterShellDirectory),
             Path.GetFullPath(host.WorkingDirectory),
             StringComparer.OrdinalIgnoreCase);
-        var args = await FlutterHostingProjectionSupport.ResolvedArgsOf(host).ConfigureAwait(true);
+        var args = await ShellHostingProjectionSupport.ResolvedArgsOf(host).ConfigureAwait(true);
         Assert.Equal(
             ["run", "-d", ShellHostingExtensions.DefaultWebDeviceTarget],
             args.Take(3).ToArray());
@@ -237,7 +237,7 @@ public sealed class FlutterHostingHostModeContracts
             StringComparer.Ordinal);
 
         // UI base is an endpoint ReferenceExpression (resolved by DCP at run); still a dart-define carrier.
-        var rawArgs = await FlutterHostingProjectionSupport.RawArgsOf(host).ConfigureAwait(true);
+        var rawArgs = await ShellHostingProjectionSupport.RawArgsOf(host).ConfigureAwait(true);
         Assert.Contains(
             rawArgs,
             arg => arg is ReferenceExpression expression
@@ -245,8 +245,8 @@ public sealed class FlutterHostingHostModeContracts
                     ShellHostingExtensions.UIBaseEnvironmentVariable,
                     StringComparison.Ordinal));
 
-        var environment = await FlutterHostingProjectionSupport.EnvironmentOf(host).ConfigureAwait(true);
-        FlutterHostingProjectionSupport.AssertExclusiveFlutterHostEnvironment(
+        var environment = await ShellHostingProjectionSupport.EnvironmentOf(host).ConfigureAwait(true);
+        ShellHostingProjectionSupport.AssertExclusiveFlutterHostEnvironment(
             environment.Keys.ToHashSet(StringComparer.Ordinal));
     }
 
@@ -269,11 +269,11 @@ public sealed class FlutterHostingHostModeContracts
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 brain.AddModule<ShellModule>(flutter => flutter
-                    .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
+                    .WithUiEdge(options => options.ProjectPath = ShellHostingProjectionSupport.UIProjectPath)
                     .WithWebHost(options => options.WorkingDirectory = windowOnly.FullName)));
 
             Assert.Contains(nameof(ShellHostingExtensions.WithWindowHost), exception.Message, StringComparison.Ordinal);
-            FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);
+            ShellHostingProjectionSupport.AssertNoFlutterHost(builder);
         }
         finally
         {

@@ -6,7 +6,7 @@ using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
 
-public sealed class FlutterHostingSelectionContracts
+public sealed class ShellHostingSelectionContracts
 {
     [Fact(DisplayName =
         "omit ShellModule → runtime graph has no digitalbrain-ui / digitalbrain-flutter")]
@@ -20,7 +20,7 @@ public sealed class FlutterHostingSelectionContracts
             .WithHttpEndpoint(name: ShellHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
-        FlutterHostingProjectionSupport.AssertNoOSSurfaceResources(builder);
+        ShellHostingProjectionSupport.AssertNoOSSurfaceResources(builder);
     }
 
     [Fact(DisplayName =
@@ -36,7 +36,7 @@ public sealed class FlutterHostingSelectionContracts
             .WithHttpEndpoint(name: ShellHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
-        var siloEnvironment = await FlutterHostingProjectionSupport
+        var siloEnvironment = await ShellHostingProjectionSupport
             .EnvironmentOf(silo.Resource)
             .ConfigureAwait(true);
         Assert.Contains(
@@ -47,6 +47,6 @@ public sealed class FlutterHostingSelectionContracts
                     ShellModule.Id.Value,
                     StringComparison.Ordinal));
 
-        FlutterHostingProjectionSupport.AssertNoOSSurfaceResources(builder);
+        ShellHostingProjectionSupport.AssertNoOSSurfaceResources(builder);
     }
 }

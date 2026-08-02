@@ -17,7 +17,7 @@ public sealed class HostingProjectionContracts
 {
     private static readonly string[] SiloOnlyEnvironmentKeys =
     [
-        FlutterHostingProjectionSupport.JournalConnectionEnvironmentKey,
+        ShellHostingProjectionSupport.JournalConnectionEnvironmentKey,
         ConfigurationEnvironment(DigitalBrainHostingExtensions.StateProtectionKeyConfigurationKey),
         ConfigurationEnvironment("DigitalBrain:AI:Ollama:Endpoint"),
         ConfigurationEnvironment("DigitalBrain:Google:Gmail:ClientId"),
@@ -48,10 +48,10 @@ public sealed class HostingProjectionContracts
             .WithHttpEndpoint(name: ShellHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain.AsClient());
 
-        var siloEnvironment = await FlutterHostingProjectionSupport
+        var siloEnvironment = await ShellHostingProjectionSupport
             .EnvironmentKeysOf(silo.Resource)
             .ConfigureAwait(true);
-        var clientEnvironment = await FlutterHostingProjectionSupport
+        var clientEnvironment = await ShellHostingProjectionSupport
             .EnvironmentOf(client.Resource)
             .ConfigureAwait(true);
         var clientEnvironmentKeys = clientEnvironment.Keys.ToHashSet(StringComparer.Ordinal);
@@ -75,7 +75,7 @@ public sealed class HostingProjectionContracts
                 ?.ToString());
         Assert.Equal(
             bool.TrueString,
-            (await FlutterHostingProjectionSupport.EnvironmentOf(silo.Resource).ConfigureAwait(true))[
+            (await ShellHostingProjectionSupport.EnvironmentOf(silo.Resource).ConfigureAwait(true))[
                 "DigitalBrain__AI__Telemetry__EnableSensitiveData"]
                 ?.ToString());
         Assert.DoesNotContain(
@@ -92,7 +92,7 @@ public sealed class HostingProjectionContracts
             client.Resource.Annotations.OfType<WaitAnnotation>(),
             wait => wait.WaitType == WaitType.WaitUntilHealthy);
 
-        FlutterHostingProjectionSupport.AssertNoOSSurfaceResources(builder);
+        ShellHostingProjectionSupport.AssertNoOSSurfaceResources(builder);
     }
 
     private static string ConfigurationEnvironment(string configurationKey)

@@ -10,7 +10,7 @@ using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
 
-public sealed class FlutterHostingUiHttpContracts
+public sealed class ShellHostingUiHttpContracts
 {
     [Fact(DisplayName =
         "WithUiEdge projects " + ShellHostingExtensions.DefaultUIResourceName
@@ -22,7 +22,7 @@ public sealed class FlutterHostingUiHttpContracts
 
         brain.AddModule<ShellModule>(flutter => flutter.WithUiEdge(options =>
         {
-            options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath;
+            options.ProjectPath = ShellHostingProjectionSupport.UIProjectPath;
             options.Owner = "ui-owner";
         }));
         brain.AddModule<AIModule>(ai => ai.WithLlm<Gemma4>());
@@ -36,18 +36,18 @@ public sealed class FlutterHostingUiHttpContracts
             builder.Resources.OfType<ProjectResource>(),
             resource => resource.Name == ShellHostingExtensions.DefaultUIResourceName);
 
-        FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);
-        FlutterHostingProjectionSupport.AssertUIHasNamedHttpEndpoint(ui);
+        ShellHostingProjectionSupport.AssertNoFlutterHost(builder);
+        ShellHostingProjectionSupport.AssertUIHasNamedHttpEndpoint(ui);
 
-        var environment = await FlutterHostingProjectionSupport.EnvironmentOf(ui).ConfigureAwait(true);
-        FlutterHostingProjectionSupport.AssertClientSafeUIProductEnvironment(
+        var environment = await ShellHostingProjectionSupport.EnvironmentOf(ui).ConfigureAwait(true);
+        ShellHostingProjectionSupport.AssertClientSafeUIProductEnvironment(
             environment,
             [ShellModule.Id.Value, AIModule.Id.Value]);
         Assert.Equal(
             "ui-owner",
             environment[ShellHostingExtensions.OwnerEnvironmentVariable]?.ToString());
         Assert.DoesNotContain(
-            FlutterHostingProjectionSupport.JournalConnectionEnvironmentKey,
+            ShellHostingProjectionSupport.JournalConnectionEnvironmentKey,
             environment.Keys);
 
         Assert.Contains(

@@ -6,7 +6,7 @@ using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
 
-internal static class FlutterHostingProjectionSupport
+internal static class ShellHostingProjectionSupport
 {
     public const string JournalConnectionEnvironmentKey =
         "ConnectionStrings__" + DigitalBrainHostingExtensions.JournalConnectionName;
