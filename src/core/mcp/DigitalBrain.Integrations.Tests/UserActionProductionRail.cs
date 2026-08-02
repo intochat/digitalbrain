@@ -19,6 +19,7 @@ using Xunit;
 
 namespace DigitalBrain.Integrations.Tests;
 
+[Collection(GmailFakeHostTestGroup.Name)]
 public sealed class UserActionProductionRail(UserActionProductionRailFixture fixture)
 {
     private const string BrokerCredential = "user-action-production-rail-credential";

@@ -9,6 +9,7 @@ using Xunit;
 
 namespace DigitalBrain.Integrations.Tests;
 
+[Collection(GmailFakeHostTestGroup.Name)]
 public sealed class UserActionTaskBoundary(AuthorizationRailFixture fixture)
 {
     [Fact(DisplayName =

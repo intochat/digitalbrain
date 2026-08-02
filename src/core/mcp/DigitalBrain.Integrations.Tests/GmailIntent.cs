@@ -6,6 +6,7 @@ using Xunit;
 
 namespace DigitalBrain.Integrations.Tests;
 
+[Collection(GmailFakeHostTestGroup.Name)]
 public sealed class GmailIntent(IntegrationsFixture fixture)
 {
     [Fact(DisplayName = "IGmail is a marker INeuron with no declared operation members")]

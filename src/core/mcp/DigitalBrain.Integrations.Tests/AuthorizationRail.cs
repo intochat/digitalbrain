@@ -8,6 +8,7 @@ using Xunit;
 
 namespace DigitalBrain.Integrations.Tests;
 
+[Collection(GmailFakeHostTestGroup.Name)]
 public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
 {
     [Fact(DisplayName =

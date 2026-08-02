@@ -4,6 +4,7 @@ using Xunit;
 
 namespace DigitalBrain.Integrations.Tests;
 
+[Collection(GmailFakeHostTestGroup.Name)]
 public sealed class GmailOps(IntegrationsFixture fixture)
 {
     [Fact(DisplayName = "GmailSearchRequest returns bounded headers without a model call")]
@@ -11,6 +12,7 @@ public sealed class GmailOps(IntegrationsFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        IntegrationsGmailHosts.GmailHost.Clear();
         GmailHelpers.CatalogSampleMessage(test);
         await GmailHelpers.SeedAuthorizationAsync(test, cancellationToken: cancellationToken);
 

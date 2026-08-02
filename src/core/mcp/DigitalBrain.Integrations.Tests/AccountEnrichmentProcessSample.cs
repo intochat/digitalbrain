@@ -8,6 +8,7 @@ using Xunit;
 
 namespace DigitalBrain.Integrations.Tests;
 
+[Collection(GmailFakeHostTestGroup.Name)]
 public sealed class AccountEnrichmentProcessSample(IntegrationsFixture fixture)
 {
     [Fact(DisplayName =
