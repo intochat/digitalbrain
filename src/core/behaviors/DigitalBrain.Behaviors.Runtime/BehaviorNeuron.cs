@@ -1,13 +1,12 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
-using DigitalBrain.Behaviors.Runtime.Artifacts;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 [GrainType("behaviorneuron")]
 internal sealed partial class BehaviorNeuron :
@@ -18,7 +17,7 @@ internal sealed partial class BehaviorNeuron :
     private const string StateName = "behaviors.behavior";
     private readonly IDurableValue<byte[]> _state;
     private readonly Serializer<BehaviorData> _states;
-    private readonly IBehaviorCompiler _compiler;
+    private readonly BehaviorCompiler _compiler;
     private readonly IBehaviorBddGate _bddGate;
     private readonly IBehaviorExecutor _executor;
     private readonly IBehaviorArtifactTrust _artifactTrust;
@@ -28,7 +27,7 @@ internal sealed partial class BehaviorNeuron :
     {
         _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
         _states = ServiceProvider.GetRequiredService<Serializer<BehaviorData>>();
-        _compiler = ServiceProvider.GetRequiredService<IBehaviorCompiler>();
+        _compiler = ServiceProvider.GetRequiredService<BehaviorCompiler>();
         _bddGate = ServiceProvider.GetRequiredService<IBehaviorBddGate>();
         _executor = ServiceProvider.GetRequiredService<IBehaviorExecutor>();
         _artifactTrust = ServiceProvider.GetRequiredService<IBehaviorArtifactTrust>();

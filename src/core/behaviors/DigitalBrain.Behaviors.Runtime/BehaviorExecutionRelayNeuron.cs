@@ -4,7 +4,7 @@ using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 [GrainType(BehaviorExecutionRelay.GrainTypeName)]
 internal sealed class BehaviorExecutionRelayNeuron :

@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors.Host;
 using DigitalBrain.Tasks;
 using Xunit;
 

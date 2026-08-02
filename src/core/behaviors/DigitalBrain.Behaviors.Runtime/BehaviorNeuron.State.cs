@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 internal sealed partial class BehaviorNeuron
 {

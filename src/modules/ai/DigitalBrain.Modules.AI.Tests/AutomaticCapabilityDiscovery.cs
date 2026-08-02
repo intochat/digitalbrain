@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.Kernel;
-using Microsoft.Extensions.DependencyInjection;
+using DigitalBrain.Testing;
 using Xunit;
 
 namespace DigitalBrain.ModuleTests;
@@ -306,21 +306,6 @@ public sealed class AutomaticCapabilityDiscovery
                 "Capability probe module for discovery",
                 [],
                 [neuron]));
-    }
-
-    private sealed class ScriptedModule(ModuleId id, CapabilityManifest capabilities) : ICompiledModule
-    {
-        public ModuleId Id { get; } = id;
-
-        public CapabilityManifest Capabilities { get; } = capabilities;
-
-        public void PrepareSerialization(IServiceCollection services)
-        {
-        }
-
-        public void Activate(ISiloBuilder builder)
-        {
-        }
     }
 
     private sealed class ScriptedCandidateSearch(IReadOnlyList<CapabilityCandidate> candidates) : ICapabilityCandidateSearch

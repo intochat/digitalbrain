@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Mcp;
@@ -19,6 +20,7 @@ using Xunit;
 
 namespace DigitalBrain.Integrations.Tests;
 
+[Collection(GmailFakeHostTestGroup.Name)]
 public sealed class UserActionProductionRail(UserActionProductionRailFixture fixture)
 {
     private const string BrokerCredential = "user-action-production-rail-credential";
@@ -1330,7 +1332,7 @@ public sealed class UserActionProductionRail(UserActionProductionRailFixture fix
         builder.Services.AddRouting();
         builder.Services.AddSingleton(configuration);
         builder.Services.AddSingleton<IConfiguration>(configuration);
-        builder.Services.AddBehaviorBrokerAuthentication(configuration);
+        builder.Services.AddBehaviorBrokerAuthentication(configuration, builder.Environment);
         builder.Services.AddSingleton(dispatch);
         builder.Services.AddSingleton(payloads);
         builder.Services.AddSingleton<IBehaviorTaskOperationAccess, NoOpTaskOperations>();

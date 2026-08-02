@@ -5,7 +5,7 @@ using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Tasks;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Host;
 
 internal static class BehaviorProgramLoader
 {

@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
 using Xunit;
@@ -24,7 +25,7 @@ public sealed class MultiCaseInputUnionShipProof(BehaviorsFixture fixture)
         Assert.Contains("public sealed record GmailMessageReceived", program, StringComparison.Ordinal);
         Assert.Contains("public union ResearchCompanyRequest(ManualResearchRequest, GmailMessageReceived)", program, StringComparison.Ordinal);
 
-        var compile = new ContractOnlyBehaviorCompiler().Compile(
+        var compile = new BehaviorCompiler().Compile(
             program,
             new BehaviorId(BehaviorsFixture.SampleBehavior));
         Assert.True(compile.Succeeded, compile.Diagnostics);

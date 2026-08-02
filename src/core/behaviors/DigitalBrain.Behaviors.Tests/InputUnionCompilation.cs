@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Reflection;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Manifest;
+using DigitalBrain.Behaviors.Runtime;
 using Microsoft.CodeAnalysis;
 using Xunit;
 
@@ -200,7 +201,7 @@ public sealed class InputUnionCompilation
             }
             """);
 
-        var compile = new ContractOnlyBehaviorCompiler().Compile(source, new BehaviorId("com.digitalbrain.research-company"));
+        var compile = new BehaviorCompiler().Compile(source, new BehaviorId("com.digitalbrain.research-company"));
         Assert.True(compile.Succeeded, compile.Diagnostics);
         Assert.NotNull(compile.Contract);
         Assert.Equal("Preview", compile.Policy.LanguageVersion);
@@ -247,7 +248,7 @@ public sealed class InputUnionCompilation
         Assert.Contains("\"succeeded\":true", result.LoweringEvidenceJson, StringComparison.Ordinal);
         Assert.Contains("case.SampleTrigger", result.LoweringEvidenceJson, StringComparison.Ordinal);
 
-        var compile = new ContractOnlyBehaviorCompiler().Compile(source, new BehaviorId("com.digitalbrain.sample"));
+        var compile = new BehaviorCompiler().Compile(source, new BehaviorId("com.digitalbrain.sample"));
         Assert.True(compile.Succeeded, compile.Diagnostics);
         Assert.NotNull(compile.Contract);
         Assert.Equal(result.Contract.OneOfSchemaJson, compile.Contract!.OneOfSchemaJson);
@@ -285,7 +286,7 @@ public sealed class InputUnionCompilation
         Assert.False(result.Succeeded);
         Assert.Contains("logical input", result.Diagnostics, StringComparison.OrdinalIgnoreCase);
 
-        var compile = new ContractOnlyBehaviorCompiler().Compile(
+        var compile = new BehaviorCompiler().Compile(
             UnionProgram(
                 """
                 public sealed record SampleTrigger(string Label) : Synapse;
@@ -322,7 +323,7 @@ public sealed class InputUnionCompilation
         Assert.False(result.Succeeded);
         Assert.Contains("more than one distinct program trigger", result.Diagnostics, StringComparison.OrdinalIgnoreCase);
 
-        var compile = new ContractOnlyBehaviorCompiler().Compile(source, new BehaviorId("com.digitalbrain.two-triggers"));
+        var compile = new BehaviorCompiler().Compile(source, new BehaviorId("com.digitalbrain.two-triggers"));
         Assert.False(compile.Succeeded);
         Assert.Contains("more than one distinct program trigger", compile.Diagnostics, StringComparison.OrdinalIgnoreCase);
         Assert.Null(compile.Contract);

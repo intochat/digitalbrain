@@ -8,7 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.Memory.Contracts\DigitalBrain.Modules.Memory.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Modules.Memory.Qdrant\DigitalBrain.Modules.Memory.Qdrant.csproj" />
-    <ProjectReference Include="..\..\..\core\kernel\DigitalBrain\DigitalBrain.csproj" />
+    <ProjectReference Include="..\..\..\core\kernel\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
     <ProjectReference Include="..\..\..\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"

@@ -4,7 +4,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Tasks;
 using Orleans;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Host;
 
 internal sealed class HostBehaviorSynapseBroker : IBehaviorSynapseBroker
 {

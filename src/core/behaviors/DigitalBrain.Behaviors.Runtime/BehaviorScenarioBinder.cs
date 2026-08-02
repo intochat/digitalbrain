@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.Behaviors.Manifest;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 internal static class BehaviorScenarioBinder
 {

@@ -5,6 +5,7 @@ using Xunit;
 
 namespace DigitalBrain.Integrations.Tests;
 
+[Collection(GmailFakeHostTestGroup.Name)]
 public sealed class GmailReadMessage(IntegrationsFixture fixture)
 {
     [Fact(DisplayName =

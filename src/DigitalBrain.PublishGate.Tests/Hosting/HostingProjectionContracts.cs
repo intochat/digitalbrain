@@ -4,11 +4,11 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
+using DigitalBrain.Shell.Aspire.Hosting;
 using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
@@ -17,7 +17,7 @@ public sealed class HostingProjectionContracts
 {
     private static readonly string[] SiloOnlyEnvironmentKeys =
     [
-        FlutterHostingProjectionSupport.JournalConnectionEnvironmentKey,
+        ShellHostingProjectionSupport.JournalConnectionEnvironmentKey,
         ConfigurationEnvironment(DigitalBrainHostingExtensions.StateProtectionKeyConfigurationKey),
         ConfigurationEnvironment("DigitalBrain:AI:Ollama:Endpoint"),
         ConfigurationEnvironment("DigitalBrain:Google:Gmail:ClientId"),
@@ -40,18 +40,18 @@ public sealed class HostingProjectionContracts
 
         var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
+            .WithHttpEndpoint(name: ShellHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         var client = builder
             .AddContainer("client", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
+            .WithHttpEndpoint(name: ShellHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain.AsClient());
 
-        var siloEnvironment = await FlutterHostingProjectionSupport
+        var siloEnvironment = await ShellHostingProjectionSupport
             .EnvironmentKeysOf(silo.Resource)
             .ConfigureAwait(true);
-        var clientEnvironment = await FlutterHostingProjectionSupport
+        var clientEnvironment = await ShellHostingProjectionSupport
             .EnvironmentOf(client.Resource)
             .ConfigureAwait(true);
         var clientEnvironmentKeys = clientEnvironment.Keys.ToHashSet(StringComparer.Ordinal);
@@ -75,7 +75,7 @@ public sealed class HostingProjectionContracts
                 ?.ToString());
         Assert.Equal(
             bool.TrueString,
-            (await FlutterHostingProjectionSupport.EnvironmentOf(silo.Resource).ConfigureAwait(true))[
+            (await ShellHostingProjectionSupport.EnvironmentOf(silo.Resource).ConfigureAwait(true))[
                 "DigitalBrain__AI__Telemetry__EnableSensitiveData"]
                 ?.ToString());
         Assert.DoesNotContain(
@@ -92,7 +92,7 @@ public sealed class HostingProjectionContracts
             client.Resource.Annotations.OfType<WaitAnnotation>(),
             wait => wait.WaitType == WaitType.WaitUntilHealthy);
 
-        FlutterHostingProjectionSupport.AssertNoOSSurfaceResources(builder);
+        ShellHostingProjectionSupport.AssertNoOSSurfaceResources(builder);
     }
 
     private static string ConfigurationEnvironment(string configurationKey)

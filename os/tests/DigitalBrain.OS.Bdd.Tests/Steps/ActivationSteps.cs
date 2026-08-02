@@ -1,5 +1,5 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Flutter;
+using DigitalBrain.Shell;
 using Reqnroll;
 using Xunit;
 

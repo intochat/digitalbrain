@@ -13,7 +13,7 @@ public sealed class NorthboundMcpSurface(TestingAppHostFixture fixture)
     [Fact(
         Timeout = 300_000,
         DisplayName =
-            "Silo hosts northbound MCP at /mcp and answers initialize (folded from OS.McpHost)")]
+            "Silo hosts northbound MCP at /mcp and answers initialize (folded from OS.AgentTools)")]
     public async Task SiloHostsNorthboundMcpInitialize()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

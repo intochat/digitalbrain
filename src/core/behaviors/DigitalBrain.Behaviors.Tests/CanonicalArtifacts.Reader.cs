@@ -2,7 +2,6 @@ namespace DigitalBrain.Behaviors.Tests;
 
 using System.IO.Compression;
 using DigitalBrain.Behaviors.Artifacts;
-using DigitalBrain.Behaviors.Runtime.Artifacts;
 using Xunit;
 
 public sealed partial class CanonicalArtifacts

@@ -1,7 +1,7 @@
 using DigitalBrain.Behaviors.Manifest;
 using DigitalBrain.Kernel;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 internal static class BehaviorContractCompatibility
 {

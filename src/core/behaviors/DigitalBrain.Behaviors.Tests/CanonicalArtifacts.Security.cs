@@ -3,7 +3,6 @@ namespace DigitalBrain.Behaviors.Tests;
 using System;
 using System.Buffers.Binary;
 using DigitalBrain.Behaviors.Artifacts;
-using DigitalBrain.Behaviors.Runtime.Artifacts;
 using Xunit;
 
 public sealed partial class CanonicalArtifacts

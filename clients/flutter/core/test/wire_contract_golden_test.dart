@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 
 const _expectedWireManifest = <String, Object?>{
   'version': 1,
-  'namespace': 'DigitalBrain.Flutter',
+  'namespace': 'DigitalBrain.Shell',
   'types': [
     {
       'name': 'ControlActivated',
@@ -69,7 +69,7 @@ const _expectedWireManifest = <String, Object?>{
 
 void main() {
   test(
-    'Dart wire pin deep-equals Flutter.Contracts golden (dual golden equality)',
+    'Dart wire pin deep-equals Shell.Contracts golden (dual golden equality)',
     () {
       final goldenFile = _locateGolden();
       final actual = jsonDecode(goldenFile.readAsStringSync());
@@ -82,7 +82,7 @@ File _locateGolden() {
   var dir = Directory.current;
   for (var i = 0; i < 8; i++) {
     final candidate = File(
-      '${dir.path}/src/modules/flutter/DigitalBrain.Modules.Flutter.Contracts/flutter-wire-contracts.golden.json',
+      '${dir.path}/src/modules/shell/DigitalBrain.Modules.Shell.Contracts/flutter-wire-contracts.golden.json',
     );
     if (candidate.existsSync()) {
       return candidate;

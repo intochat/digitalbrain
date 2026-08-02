@@ -2,10 +2,9 @@ using System.Collections.Concurrent;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
-using DigitalBrain.Behaviors.Runtime.Artifacts;
 using DigitalBrain.Tasks;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Host;
 
 public sealed class BehaviorHostEngine : IBehaviorHostGateway
 {

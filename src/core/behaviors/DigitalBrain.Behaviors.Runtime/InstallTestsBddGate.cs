@@ -4,7 +4,7 @@ using System.Runtime.Loader;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Artifacts;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 internal sealed class InstallTestsBddGate : IBehaviorBddGate
 {

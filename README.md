@@ -35,10 +35,10 @@ The plan of record. Nothing is shipped unless it says Built.
 | Area | State |
 |---|---|
 | Neuron/synapse foundation, owner-scoped client, module activation, AppHost composition, testing path | **Built** |
-| Typed AI, Tasks, Google, Salesforce, Chat, Flutter, Quickstart families | **Built** |
+| Typed AI, Tasks, Google, Salesforce, Chat, Shell, Quickstart families | **Built** |
 | Memory / vector infrastructure (`IVectorMemory`, Qdrant hosting) | **Built** |
 | Automatic discovery — exact catalog + semantic projection (lab) | **Built** (product claim pending live E1) |
-| Flutter vertical — shell/scene vocabulary, UI HTTP/SSE edge (`WithUiEdge`/`WithHeadlessHost`/`WithWindowHost`/`WithWebHost`), headless Dart host, Windows + web chrome | **Built** (web deploy host; K1 six-view pixel parity on web still open) |
+| Shell vertical — shell/scene vocabulary, UI HTTP/SSE edge (`WithUiEdge`/`WithHeadlessHost`/`WithWindowHost`/`WithWebHost`), headless Dart host, Windows + web chrome | **Built** (web deploy host; K1 six-view pixel parity on web still open) |
 | Product shell — responsive Chat, content-safe Activity, live 3D-projected Brain topology, pulses and inspector | **Built** |
 | Behavior Studio surface (six views, host APIs) | **Built** |
 | NL → C# behavior authoring (C1 ladder) | Designed until C1 green |
@@ -48,7 +48,7 @@ The plan of record. Nothing is shipped unless it says Built.
 | Time — reminders, recurring interval/calendar scheduling, DST | Designed |
 | Multi-principal IdP edge, journal observation on `IDigitalBrain` | Designed |
 | Multi-model UI combine / Settings model switch | Designed |
-| Two Docker Hub product images (`digitalbrain`, `digitalbrain-ui`) | Designed |
+| Two Docker Hub product images (`digitalbrain`, `digitalbrain-ui`) | In progress — Dockerfiles and a local `docker-compose.yml` smoke exist; the UI image does not bundle the Flutter web build; no CI image build, no Docker Hub publish |
 | Behavior rail — proposal, compile, BDD gate, approval, activation, rollback, signed BehaviorHost deploy/execute (L1/L2) | **Built** |
 | Observability spine — host OpenTelemetry, structured logs, causal kernel spans, GenAI spans and metrics | **Built** |
 
@@ -64,8 +64,8 @@ One assumption remains load-bearing and unmeasured: **that a model can reliably 
 ```text
 src/       published packages: core/ (framework) and modules/ (IModule domains),
            plus the publish gate that polices them
-os/        the product: silo (OS.Host, northbound MCP folded in), Flutter UI edge
-           (OS.Ui), behavior worker, assistant neuron, AppHost
+os/        the product: silo (OS.Host, northbound MCP folded in), HTTP/SSE UI edge
+           (OS.UiEdge), behavior worker, assistant neuron, AppHost
 clients/   flutter/core (pure Dart edge) and flutter/shell (Material chrome)
 samples/   product-shaped compositions and process neurons (not packable product)
 tests/     fixtures/apphosts — shared L2 AppHost scaffolding
@@ -74,8 +74,8 @@ tests/     fixtures/apphosts — shared L2 AppHost scaffolding
 Southbound MCP transport lives in package `DigitalBrain.Mcp` (Salesforce and shared OAuth rail
 mechanics). Gmail no longer uses southbound MCP — it calls Gmail REST through `Google.Apis.Gmail.v1`
 with a reflected read-only planner catalog. Northbound agent tools live in library
-`DigitalBrain.OS.McpHost`, mapped on the silo host — not a separate product process. Older docs that
-say `DigitalBrain.Integrations.Mcp` mean the southbound package.
+`DigitalBrain.OS.AgentTools`, mapped on the silo host — not a separate product process. Older docs
+that say `DigitalBrain.Integrations.Mcp` mean the southbound package.
 
 Retired prototype generations live in git history — `git log --diff-filter=D --summary`, then
 `git show <sha>^:<path>`.

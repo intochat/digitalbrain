@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors.Host;
 using DigitalBrain.Testing;
 using Xunit;
 

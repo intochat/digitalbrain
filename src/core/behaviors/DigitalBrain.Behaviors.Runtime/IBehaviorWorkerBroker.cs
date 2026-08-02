@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Tasks;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 [ClientEntryPoint]
 internal interface IBehaviorWorkerBroker : IGrainWithStringKey

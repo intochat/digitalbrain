@@ -5,7 +5,7 @@ using DigitalBrain.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 internal interface IBehaviorProtectedPayloadGrain : IGrainWithStringKey
 {

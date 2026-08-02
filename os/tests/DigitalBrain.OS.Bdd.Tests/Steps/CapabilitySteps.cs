@@ -1,6 +1,6 @@
 using System.Reflection;
 using DigitalBrain.AI;
-using DigitalBrain.OS;
+using DigitalBrain.OS.Assistant;
 using Reqnroll;
 using Xunit;
 
@@ -14,7 +14,7 @@ public sealed class CapabilitySteps
     [Given("the product assistant type")]
     public void GivenTheProductAssistantType()
     {
-        _assistantType = typeof(OSBehaviorsModule).Assembly.GetType("DigitalBrain.OS.Assistant");
+        _assistantType = typeof(AssistantModule).Assembly.GetType("DigitalBrain.OS.Assistant.Assistant");
         Assert.NotNull(_assistantType);
     }
 
@@ -25,7 +25,7 @@ public sealed class CapabilitySteps
         Assert.True(typeof(Agent).IsAssignableFrom(_assistantType));
 
         var source = File.ReadAllText(
-            Path.Combine(RepoRoot(), "os", "DigitalBrain.OS.Behaviors", "Assistant.cs"));
+            Path.Combine(RepoRoot(), "os", "DigitalBrain.OS.Assistant", "Assistant.cs"));
 
         Assert.DoesNotContain("enrich_account_from_email", source, StringComparison.Ordinal);
         Assert.DoesNotContain("IGmail", source, StringComparison.Ordinal);

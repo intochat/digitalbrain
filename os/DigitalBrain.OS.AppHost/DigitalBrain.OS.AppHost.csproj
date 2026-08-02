@@ -9,8 +9,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\modules\ai\DigitalBrain.Modules.AI.Aspire.Hosting\DigitalBrain.Modules.AI.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\src\modules\chat\DigitalBrain.Modules.Chat\DigitalBrain.Modules.Chat.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\DigitalBrain.OS.Behaviors\DigitalBrain.OS.Behaviors.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\..\src\modules\flutter\DigitalBrain.Modules.Flutter.Aspire.Hosting\DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\DigitalBrain.OS.Assistant\DigitalBrain.OS.Assistant.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\src\modules\shell\DigitalBrain.Modules.Shell.Aspire.Hosting\DigitalBrain.Modules.Shell.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\src\modules\google\DigitalBrain.Modules.Google.Aspire.Hosting\DigitalBrain.Modules.Google.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\src\modules\salesforce\DigitalBrain.Modules.Salesforce.Aspire.Hosting\DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\src\modules\memory\DigitalBrain.Modules.Memory.Aspire.Hosting\DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
@@ -20,6 +20,7 @@
     <ProjectReference Include="..\..\src\core\behaviors\DigitalBrain.Behaviors.Runtime\DigitalBrain.Behaviors.Runtime.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\src\core\behaviors\DigitalBrain.Behaviors.Host\DigitalBrain.Behaviors.Host.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\..\src\modules\tasks\DigitalBrain.Modules.Tasks\DigitalBrain.Modules.Tasks.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\src\modules\time\DigitalBrain.Modules.Time\DigitalBrain.Modules.Time.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
   <PropertyGroup>
     <CodeGraphRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..'))</CodeGraphRoot>

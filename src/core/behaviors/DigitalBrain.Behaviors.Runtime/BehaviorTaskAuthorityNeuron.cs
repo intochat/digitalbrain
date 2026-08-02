@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 [GrainType(BehaviorTaskAuthority.GrainTypeName)]
 internal sealed class BehaviorTaskAuthorityNeuron : Neuron, IBehaviorTaskAuthority

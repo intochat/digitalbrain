@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 internal sealed class GrainBehaviorCapabilityResolver(IGrainFactory grains, OwnerId owner) : IBehaviorCapabilityResolver
 {

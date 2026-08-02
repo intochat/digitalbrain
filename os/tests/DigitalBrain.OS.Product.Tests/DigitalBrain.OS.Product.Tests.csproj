@@ -14,5 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\DigitalBrain.OS.AppHost\DigitalBrain.OS.AppHost.csproj"
                       ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\DigitalBrain.OS.UiEdge\DigitalBrain.OS.UiEdge.csproj" />
+    <ProjectReference Include="..\..\..\src\modules\shell\DigitalBrain.Modules.Shell.Aspire.Hosting\DigitalBrain.Modules.Shell.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

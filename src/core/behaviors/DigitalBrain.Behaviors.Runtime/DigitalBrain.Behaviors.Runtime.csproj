@@ -2,7 +2,6 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>DigitalBrain Behavior rail runtime: BehaviorNeuron, contract-only compiler, BDD gate, and execution seam.</Description>
-    <RootNamespace>DigitalBrain.Behaviors</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812;CA2007;NU1608</NoWarn>
   </PropertyGroup>
   <ItemGroup>
@@ -12,7 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
-    <ProjectReference Include="..\..\kernel\DigitalBrain\DigitalBrain.csproj" />
+    <ProjectReference Include="..\..\kernel\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
     <ProjectReference Include="..\..\security\DigitalBrain.Security\DigitalBrain.Security.csproj" />
     <ProjectReference Include="..\..\mcp\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
     <ProjectReference Include="..\..\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />

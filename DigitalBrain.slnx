@@ -8,7 +8,7 @@
     <Project Path="src/core/behaviors/DigitalBrain.Behaviors.Runtime/DigitalBrain.Behaviors.Runtime.csproj" />
     <Project Path="src/core/behaviors/DigitalBrain.Behaviors.Host/DigitalBrain.Behaviors.Host.csproj" />
     <Project Path="src/core/behaviors/DigitalBrain.Behaviors.Tests/DigitalBrain.Behaviors.Tests.csproj" />
-    <Project Path="src/core/kernel/DigitalBrain/DigitalBrain.csproj" />
+    <Project Path="src/core/kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
     <Project Path="src/core/kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <Project Path="src/core/testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <Project Path="src/core/testing/DigitalBrain.Testing.Tests/DigitalBrain.Testing.Tests.csproj" />
@@ -16,6 +16,7 @@
     <Project Path="src/core/aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
     <Project Path="src/core/aspire/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
     <Project Path="src/core/kernel/DigitalBrain.SourceGeneration/DigitalBrain.SourceGeneration.csproj" />
+    <Project Path="src/core/kernel/DigitalBrain.SourceGeneration.Tests/DigitalBrain.SourceGeneration.Tests.csproj" />
     <Project Path="src/core/security/DigitalBrain.Security/DigitalBrain.Security.csproj" />
     <Project Path="src/core/mcp/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
     <Project Path="src/core/mcp/DigitalBrain.Mcp.Testing/DigitalBrain.Mcp.Testing.csproj" />
@@ -35,19 +36,15 @@
     <Project Path="src/modules/time/DigitalBrain.Modules.Time.Tests/DigitalBrain.Modules.Time.Tests.csproj" />
     <Project Path="src/modules/chat/DigitalBrain.Modules.Chat.Contracts/DigitalBrain.Modules.Chat.Contracts.csproj" />
     <Project Path="src/modules/chat/DigitalBrain.Modules.Chat/DigitalBrain.Modules.Chat.csproj" />
-    <Project Path="src/modules/chat/DigitalBrain.Modules.Chat.Tests/DigitalBrain.Modules.Chat.Tests.csproj" />
-    <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
-    <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
-    <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter.Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
-    <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter.Tests/DigitalBrain.Modules.Flutter.Tests.csproj" />
+    <Project Path="src/modules/shell/DigitalBrain.Modules.Shell.Contracts/DigitalBrain.Modules.Shell.Contracts.csproj" />
+    <Project Path="src/modules/shell/DigitalBrain.Modules.Shell/DigitalBrain.Modules.Shell.csproj" />
+    <Project Path="src/modules/shell/DigitalBrain.Modules.Shell.Aspire.Hosting/DigitalBrain.Modules.Shell.Aspire.Hosting.csproj" />
     <Project Path="src/modules/google/DigitalBrain.Modules.Google.Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
     <Project Path="src/modules/google/DigitalBrain.Modules.Google/DigitalBrain.Modules.Google.csproj" />
     <Project Path="src/modules/google/DigitalBrain.Modules.Google.Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />
-    <Project Path="src/modules/google/DigitalBrain.Modules.Google.Tests/DigitalBrain.Modules.Google.Tests.csproj" />
     <Project Path="src/modules/salesforce/DigitalBrain.Modules.Salesforce.Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
     <Project Path="src/modules/salesforce/DigitalBrain.Modules.Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <Project Path="src/modules/salesforce/DigitalBrain.Modules.Salesforce.Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" />
-    <Project Path="src/modules/salesforce/DigitalBrain.Modules.Salesforce.Tests/DigitalBrain.Modules.Salesforce.Tests.csproj" />
     <Project Path="src/modules/memory/DigitalBrain.Modules.Memory.Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
     <Project Path="src/modules/memory/DigitalBrain.Modules.Memory/DigitalBrain.Modules.Memory.csproj" />
     <Project Path="src/modules/memory/DigitalBrain.Modules.Memory.Qdrant/DigitalBrain.Modules.Memory.Qdrant.csproj" />
@@ -57,18 +54,16 @@
   <Folder Name="/os/">
     <Project Path="os/DigitalBrain.OS.Host/DigitalBrain.OS.Host.csproj" />
     <Project Path="os/DigitalBrain.OS.BehaviorHost/DigitalBrain.OS.BehaviorHost.csproj" />
-    <Project Path="os/DigitalBrain.OS.McpHost/DigitalBrain.OS.McpHost.csproj" />
-    <Project Path="os/DigitalBrain.OS.Ui/DigitalBrain.OS.Ui.csproj" />
+    <Project Path="os/DigitalBrain.OS.AgentTools/DigitalBrain.OS.AgentTools.csproj" />
+    <Project Path="os/DigitalBrain.OS.UiEdge/DigitalBrain.OS.UiEdge.csproj" />
     <Project Path="os/DigitalBrain.OS.AppHost/DigitalBrain.OS.AppHost.csproj" />
-    <Project Path="os/DigitalBrain.OS.Behaviors/DigitalBrain.OS.Behaviors.csproj" />
+    <Project Path="os/DigitalBrain.OS.Assistant/DigitalBrain.OS.Assistant.csproj" />
   </Folder>
   <Folder Name="/os/tests/">
     <Project Path="os/tests/DigitalBrain.OS.Bdd.Tests/DigitalBrain.OS.Bdd.Tests.csproj" />
-    <Project Path="os/tests/DigitalBrain.OS.Behaviors.Tests/DigitalBrain.OS.Behaviors.Tests.csproj" />
-    <Project Path="os/tests/DigitalBrain.OS.Composition.Tests/DigitalBrain.OS.Composition.Tests.csproj" />
+    <Project Path="os/tests/DigitalBrain.OS.Assistant.Tests/DigitalBrain.OS.Assistant.Tests.csproj" />
     <Project Path="os/tests/DigitalBrain.OS.Host.Tests/DigitalBrain.OS.Host.Tests.csproj" />
-    <Project Path="os/tests/DigitalBrain.OS.McpHost.Tests/DigitalBrain.OS.McpHost.Tests.csproj" />
-    <Project Path="os/tests/DigitalBrain.OS.Ui.Tests/DigitalBrain.OS.Ui.Tests.csproj" />
+    <Project Path="os/tests/DigitalBrain.OS.UiEdge.Tests/DigitalBrain.OS.UiEdge.Tests.csproj" />
     <Project Path="os/tests/DigitalBrain.OS.Product.Tests/DigitalBrain.OS.Product.Tests.csproj" />
   </Folder>
   <Folder Name="/samples/">

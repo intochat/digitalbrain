@@ -33,7 +33,7 @@ internal static class McpProviderHosting
             module.AddProjection(projection);
         }
 
-        projection.Add(definition, application.Register(definition));
+        projection.Add(definition, application.Register(definition, module.Brain.LocalDevelopmentOAuthCallbackUri));
     }
 
     private static McpApplicationParameters GetOrAddApplicationParameters(IDistributedApplicationBuilder builder)
@@ -62,7 +62,9 @@ internal static class McpProviderHosting
             _builder = builder;
         }
 
-        internal McpProviderParameters Register(McpProviderHostingDefinition definition)
+        internal McpProviderParameters Register(
+            McpProviderHostingDefinition definition,
+            string? localDevelopmentCallbackUri)
         {
             Validate(definition);
 
@@ -78,6 +80,7 @@ internal static class McpProviderHosting
             }
 
             var localRun = _builder.ExecutionContext.IsRunMode;
+            var localCallback = localRun ? localDevelopmentCallbackUri : null;
             var created = new McpProviderParameters(
                 definition,
                 Parameter(
@@ -95,11 +98,20 @@ internal static class McpProviderHosting
                 Parameter(
                     $"{definition.ParameterPrefix}-redirect-uri",
                     secret: false,
-                    description: definition.RedirectUriDescription,
-                    localRun ? LocalDevelopmentProductSurface.LocalDevelopmentOAuthCallbackUri : null));
+                    description: RedirectUriDescription(definition, localCallback),
+                    localCallback));
             _providers.Add(definition.Key, created);
             return created;
         }
+
+        private static string RedirectUriDescription(
+            McpProviderHostingDefinition definition,
+            string? localCallbackUri)
+            => localCallbackUri is null
+                ? definition.RedirectUriDescription
+                : definition.RedirectUriDescription
+                + $" Local `aspire run` defaults this to `{localCallbackUri}` — the callback this product composition serves. "
+                + "Register that exact URI once, and override the parameter only if you host the callback elsewhere.";
 
         private IResourceBuilder<ParameterResource> Parameter(
             string name,

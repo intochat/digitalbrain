@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Tasks;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 // Process-local attempt CTS registry — never durable, never journaled.
 internal static class BehaviorAttemptCancellation

@@ -1,5 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Artifacts;
+using DigitalBrain.Behaviors.Host;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Security;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.Configuration;

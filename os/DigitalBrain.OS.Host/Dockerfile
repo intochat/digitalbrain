@@ -13,11 +13,11 @@
 #   Google Gmail OAuth (config root DigitalBrain:Google:Gmail)
 #     DigitalBrain__Google__Gmail__ClientId
 #     DigitalBrain__Google__Gmail__ClientSecret
-#     DigitalBrain__Google__Gmail__RedirectUri     # UI base + /oauth/mcp/callback
+#     DigitalBrain__Google__Gmail__RedirectUri     # UI base + /oauth/callback
 #
 #   Salesforce OAuth (config root DigitalBrain:Salesforce; no client secret required)
 #     DigitalBrain__Salesforce__ClientId
-#     DigitalBrain__Salesforce__RedirectUri        # UI base + /oauth/mcp/callback
+#     DigitalBrain__Salesforce__RedirectUri        # UI base + /oauth/callback
 #
 #   Models (L2)
 #     DigitalBrain__AI__Ollama__Endpoint           # e.g. http://host.docker.internal:11434
@@ -50,12 +50,13 @@
 #     DigitalBrain__Modules__0=DigitalBrain.AI.AIModule
 #     DigitalBrain__Modules__1=DigitalBrain.Chat.ChatModule
 #     DigitalBrain__Modules__2=DigitalBrain.Memory.MemoryModule
-#     DigitalBrain__Modules__3=DigitalBrain.OS.OSBehaviorsModule
-#     DigitalBrain__Modules__4=DigitalBrain.Flutter.FlutterModule
+#     DigitalBrain__Modules__3=DigitalBrain.OS.Assistant.AssistantModule
+#     DigitalBrain__Modules__4=DigitalBrain.Shell.ShellModule
 #     DigitalBrain__Modules__5=DigitalBrain.Google.GoogleModule
 #     DigitalBrain__Modules__6=DigitalBrain.Salesforce.SalesforceModule
-#     DigitalBrain__Modules__7=DigitalBrain.Behaviors.BehaviorsModule
+#     DigitalBrain__Modules__7=DigitalBrain.Behaviors.Runtime.BehaviorsModule
 #     DigitalBrain__Modules__8=DigitalBrain.Tasks.TasksModule
+#     DigitalBrain__Modules__9=DigitalBrain.Time.TimeModule
 #
 # Ports: 8080 silo HTTP (broker + health), 5000 northbound MCP (/mcp)
 

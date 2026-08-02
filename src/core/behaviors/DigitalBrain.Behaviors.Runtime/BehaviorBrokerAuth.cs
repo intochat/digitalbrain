@@ -5,8 +5,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 public static class BehaviorBrokerAuth
 {
@@ -15,12 +16,24 @@ public static class BehaviorBrokerAuth
 
     public static IServiceCollection AddBehaviorBrokerAuthentication(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
 
-        services.TryAddSingleton(new BehaviorBrokerCredentialGate(configuration[CredentialConfigurationKey]));
+        var credential = configuration[CredentialConfigurationKey];
+        if (string.IsNullOrWhiteSpace(credential) && !environment.IsDevelopment())
+        {
+            throw new InvalidOperationException(
+                $"Configuration '{CredentialConfigurationKey}' is required outside the Development environment " +
+                $"(current environment: '{environment.EnvironmentName}'); without it every request to the behavior " +
+                "broker rail would 401. Set it, or run with the Development environment if the broker rail is " +
+                "genuinely disabled.");
+        }
+
+        services.TryAddSingleton(new BehaviorBrokerCredentialGate(credential));
         return services;
     }
 

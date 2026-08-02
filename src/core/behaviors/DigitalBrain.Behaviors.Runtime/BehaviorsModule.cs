@@ -1,5 +1,5 @@
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 public sealed partial class BehaviorsModule : IModule;

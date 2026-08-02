@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors.Host;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
@@ -221,7 +223,7 @@ public sealed class BehaviorDispatchBrokerLifecycle(BehaviorDispatchFixture fixt
         builder.Services.AddRouting();
         builder.Services.AddSingleton(configuration);
         builder.Services.AddSingleton<IConfiguration>(configuration);
-        builder.Services.AddBehaviorBrokerAuthentication(configuration);
+        builder.Services.AddBehaviorBrokerAuthentication(configuration, builder.Environment);
         builder.Services.AddSingleton(dispatch);
         builder.Services.AddSingleton(operations);
         builder.Services.AddSingleton(payloads);

@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 [GrainType(UserActionCompletionBridge.GrainTypeName)]
 internal sealed class UserActionCompletionBridgeNeuron :

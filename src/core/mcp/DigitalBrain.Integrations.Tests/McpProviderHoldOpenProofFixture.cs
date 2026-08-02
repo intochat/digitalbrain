@@ -1,13 +1,13 @@
 using System.Net;
 using System.Net.Sockets;
 using DigitalBrain.AccountEnrichment;
-using DigitalBrain.Flutter;
-using DigitalBrain.Flutter.Http;
 using DigitalBrain.Google;
 using DigitalBrain.Mcp;
 using DigitalBrain.Mcp.Testing;
+using DigitalBrain.OS.UiEdge;
 using DigitalBrain.Salesforce;
 using DigitalBrain.ServiceDefaults;
+using DigitalBrain.Shell;
 using DigitalBrain.Testing;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.AI;
@@ -35,7 +35,7 @@ public sealed class McpProviderHoldOpenProofFixture : IAsyncLifetime
     internal Uri UiBaseAddress { get; private set; } = new("http://127.0.0.1/");
 
     internal Uri AppCallbackAddress
-        => new(UiBaseAddress, FlutterHttpContract.McpOAuthCallbackPath.TrimStart('/'));
+        => new(UiBaseAddress, UiEdgeContract.McpOAuthCallbackPath.TrimStart('/'));
 
     public async ValueTask InitializeAsync()
     {
@@ -143,7 +143,7 @@ public sealed class McpProviderHoldOpenProofFixture : IAsyncLifetime
         brain.AddModule<GoogleModule>();
         brain.AddModule<SalesforceModule>();
         brain.AddModule<EnrichmentModule>();
-        brain.AddModule<FlutterModule>();
+        brain.AddModule<ShellModule>();
         brain.AddModule<IntegrationsHarnessModule>();
         // Real HttpMcpClientSessionFactory — do not ConfigureMcpEdge / scripted factory.
         // Leave PublicSignInBase unset so the rail does not preflight-park; SDK hold-open OAuth

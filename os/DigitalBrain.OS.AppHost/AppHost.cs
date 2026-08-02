@@ -6,22 +6,27 @@ using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Behaviors;
+using DigitalBrain.Behaviors.Host;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Chat;
-using DigitalBrain.Flutter;
-using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
-using DigitalBrain.OS;
+using DigitalBrain.OS.Assistant;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
+using DigitalBrain.Shell;
+using DigitalBrain.Shell.Aspire.Hosting;
 using DigitalBrain.Tasks;
+using DigitalBrain.Time;
 using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
+var brain = builder
+    .AddDigitalBrain(ProductSurfaceResources.Brain)
+    .WithLocalDevelopmentOAuthCallback(new Uri(ProductSurfaceResources.LocalDevelopmentOAuthCallbackUri));
 
 brain.AddModule<AIModule>(ai =>
 {
@@ -31,9 +36,9 @@ brain.AddModule<AIModule>(ai =>
 });
 brain.AddModule<ChatModule>();
 brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
-brain.AddModule<OSBehaviorsModule>();
-brain.AddModule<FlutterModule>(flutter => flutter
-    .WithUiEdge()
+brain.AddModule<AssistantModule>();
+brain.AddModule<ShellModule>(shell => shell
+    .WithUiEdge(ui => ui.HttpPort = ProductSurfaceResources.UiHttpPort)
     //.WithHeadlessHost() // pure-Dart host; swap with window for headless-only dev
     //.WithWebHost() // deploy UX: flutter run -d chrome under shell/; local default stays window
     .WithWindowHost()
@@ -42,6 +47,7 @@ brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 brain.AddModule<BehaviorsModule>();
 brain.AddModule<TasksModule>();
+brain.AddModule<TimeModule>();
 
 var behaviorBrokerCredential = builder.ExecutionContext.IsRunMode
     ? builder.AddParameter(
@@ -64,8 +70,8 @@ var silo = builder.AddProject<Projects.DigitalBrain_OS_Host>(ProductSurfaceResou
         BehaviorBrokerContract.CredentialConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
         behaviorBrokerCredential)
     .WithEnvironment(
-        FlutterHostingExtensions.OwnerEnvironmentVariable,
-        FlutterHostingExtensions.DefaultOwner)
+        ShellHostingExtensions.OwnerEnvironmentVariable,
+        ShellHostingExtensions.DefaultOwner)
     .WithHttpEndpoint(
         port: ProductSurfaceResources.McpHttpPort,
         name: ProductSurfaceResources.McpHttpEndpointName,
@@ -90,8 +96,8 @@ var behaviorHost = builder.AddProject<Projects.DigitalBrain_OS_BehaviorHost>(Pro
     .WithHttpHealthCheck("/health")
     .WaitFor(silo)
     .WithEnvironment(
-        FlutterHostingExtensions.OwnerEnvironmentVariable,
-        FlutterHostingExtensions.DefaultOwner);
+        ShellHostingExtensions.OwnerEnvironmentVariable,
+        ShellHostingExtensions.DefaultOwner);
 
 silo.WithReference(behaviorHost)
     .WithEnvironment(

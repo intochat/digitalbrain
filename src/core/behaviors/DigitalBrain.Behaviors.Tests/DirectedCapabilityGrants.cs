@@ -4,7 +4,7 @@ using System.Reflection;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
-using DigitalBrain.Behaviors.Runtime.Artifacts;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
@@ -386,7 +386,7 @@ public sealed class DirectedCapabilityGrants
     }
 
     private static BehaviorCompileResult Compile(string program, ActiveCapabilityCatalog? catalog = null)
-        => new ContractOnlyBehaviorCompiler(catalog ?? ActiveCatalog())
+        => new BehaviorCompiler(catalog ?? ActiveCatalog())
             .Compile(program, new BehaviorId("com.digitalbrain.grants"));
 
     private static BehaviorArtifactEnvelope CreateProposalEnvelope(

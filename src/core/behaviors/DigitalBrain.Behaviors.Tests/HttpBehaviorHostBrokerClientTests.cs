@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors.Host;
 using DigitalBrain.Security;
 using DigitalBrain.Tasks;
 using Microsoft.Extensions.Configuration;

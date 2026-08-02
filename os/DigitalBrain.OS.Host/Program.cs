@@ -1,7 +1,8 @@
 using DigitalBrain.Aspire;
 using DigitalBrain.Behaviors;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Kernel;
-using DigitalBrain.OS.McpHost;
+using DigitalBrain.OS.AgentTools;
 using DigitalBrain.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,7 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddKeyedAzureTableServiceClient("brain-clustering");
 builder.AddKeyedAzureTableServiceClient("brain-reminders");
-builder.Services.AddBehaviorBrokerAuthentication(builder.Configuration);
+builder.Services.AddBehaviorBrokerAuthentication(builder.Configuration, builder.Environment);
 builder.UseOrleans(silo => silo
     .AddDigitalBrain()
     .AddDigitalBrainJournalStorage(builder.Configuration));
@@ -23,5 +24,5 @@ app.MapBehaviorProtectedPayloadBroker();
 app.MapBehaviorProtectedTriggerBroker();
 app.MapBehaviorTaskOperationBroker();
 app.MapBehaviorDispatchBroker();
-app.MapMcpHost();
+app.MapAgentToolEndpoints();
 app.Run();

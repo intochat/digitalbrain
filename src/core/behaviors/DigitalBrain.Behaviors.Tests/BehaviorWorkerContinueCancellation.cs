@@ -51,7 +51,7 @@ public sealed class BehaviorWorkerContinueCancellation
     public void DurableOutboxDeliverCallSitesMustPassCancellationToken()
     {
         var root = FindRepositoryRoot();
-        var outboxPath = Path.Combine(root, "src", "core", "kernel", "DigitalBrain", "Neuron", "Neuron.Outbox.cs");
+        var outboxPath = Path.Combine(root, "src", "core", "kernel", "DigitalBrain.Kernel", "Neuron", "Neuron.Outbox.cs");
         Assert.True(File.Exists(outboxPath), $"Missing Neuron.Outbox at {outboxPath}");
         var outbox = File.ReadAllText(outboxPath);
 

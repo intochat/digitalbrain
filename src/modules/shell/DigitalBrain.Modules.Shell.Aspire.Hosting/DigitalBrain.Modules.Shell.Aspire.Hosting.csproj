@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Aspire AppHost integration that composes the DigitalBrain OS surface when ShellModule is selected.</Description>
+    <RootNamespace>DigitalBrain.Shell.Aspire.Hosting</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Modules.Shell\DigitalBrain.Modules.Shell.csproj" />
+    <ProjectReference Include="..\..\..\..\src\core\aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
+  </ItemGroup>
+</Project>

@@ -7,6 +7,7 @@ using Xunit;
 
 namespace DigitalBrain.Integrations.Tests;
 
+[Collection(GmailFakeHostTestGroup.Name)]
 public sealed class AccountEnrichmentBehaviorRail(IntegrationsFixture fixture)
 {
     [Fact(DisplayName =

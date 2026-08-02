@@ -1,8 +1,7 @@
-namespace DigitalBrain.Behaviors.Runtime.Artifacts;
+namespace DigitalBrain.Behaviors.Artifacts;
 
 using System.Buffers.Binary;
 using System.Text;
-using DigitalBrain.Behaviors.Artifacts;
 
 internal static class CanonicalZip
 {

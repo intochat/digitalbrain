@@ -1,8 +1,9 @@
 using System.Text;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Artifacts;
+using DigitalBrain.Behaviors.Host;
 using DigitalBrain.Behaviors.Manifest;
-using DigitalBrain.Behaviors.Runtime.Artifacts;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Tasks;
 using Xunit;
 
@@ -205,7 +206,7 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
         string program,
         IReadOnlyList<BehaviorCapabilityGrant> grants)
     {
-        var compile = new ContractOnlyBehaviorCompiler().Compile(program, Behavior);
+        var compile = new BehaviorCompiler().Compile(program, Behavior);
         Assert.True(compile.Succeeded, compile.Diagnostics);
         Assert.NotNull(compile.Contract);
 

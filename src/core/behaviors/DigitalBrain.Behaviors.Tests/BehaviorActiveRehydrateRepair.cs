@@ -1,3 +1,4 @@
+using DigitalBrain.Behaviors.Runtime;
 using Xunit;
 
 namespace DigitalBrain.Behaviors.Tests;

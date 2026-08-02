@@ -29,7 +29,7 @@ internal sealed class IntegrationDriver :
 
 public sealed partial class IntegrationsHarnessModule : IModule
 {
-    // OS.Ui (and other product assemblies) load AI grain contracts into the AppDomain even when
+    // OS.UiEdge (and other product assemblies) load AI grain contracts into the AppDomain even when
     // AIModule is not selected. Register the JSON codecs those grain methods require.
     static partial void ConfigureSerialization(IServiceCollection services)
         => services.AddSerializer(
