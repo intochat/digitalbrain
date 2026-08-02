@@ -24,6 +24,19 @@ public sealed partial class MemoryModule : IModule
         }
         else
         {
+            var connectionName = ResolveQdrantConnectionName(builder.Configuration);
+            var qdrantConnectionString = builder.Configuration.GetConnectionString(connectionName)
+                ?? builder.Configuration[$"ConnectionStrings:{connectionName}"];
+            if (!string.IsNullOrWhiteSpace(qdrantConnectionString))
+            {
+                throw new InvalidOperationException(
+                    $"Connection string '{connectionName}' is configured but '{ProviderConfigurationKey}' is " +
+                    (string.IsNullOrWhiteSpace(provider) ? "unset" : $"'{provider}', not '{QdrantProviderName}'") +
+                    $"; memory would silently fall back to an in-memory store and lose data on restart. Set " +
+                    $"'{ProviderConfigurationKey}' to '{QdrantProviderName}' to use it, or remove connection " +
+                    $"string '{connectionName}' to genuinely opt into in-memory storage.");
+            }
+
             builder.Services.TryAddSingleton<IVectorMemoryStore, InMemoryVectorMemoryStore>();
         }
 
@@ -33,15 +46,18 @@ public sealed partial class MemoryModule : IModule
                 services.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>()));
     }
 
+    private static string ResolveQdrantConnectionName(Microsoft.Extensions.Configuration.IConfiguration configuration)
+    {
+        var connectionName = configuration[QdrantVectorMemoryRegistration.ConnectionNameConfigurationKey];
+        return string.IsNullOrWhiteSpace(connectionName)
+            ? QdrantVectorMemoryRegistration.DefaultConnectionName
+            : connectionName;
+    }
+
     private static QdrantClient CreateQdrantClient(IServiceProvider services)
     {
         var configuration = services.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
-        var connectionName = configuration[QdrantVectorMemoryRegistration.ConnectionNameConfigurationKey];
-        if (string.IsNullOrWhiteSpace(connectionName))
-        {
-            connectionName = QdrantVectorMemoryRegistration.DefaultConnectionName;
-        }
-
+        var connectionName = ResolveQdrantConnectionName(configuration);
         var connectionString = configuration.GetConnectionString(connectionName)
             ?? configuration[$"ConnectionStrings:{connectionName}"]
             ?? throw new InvalidOperationException(
