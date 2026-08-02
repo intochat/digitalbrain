@@ -1,27 +1,27 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DigitalBrain.AI;
 
-public sealed class CapabilityRouter
+public sealed partial class CapabilityRouter
 {
     public const int DefaultLimit = 8;
 
     private readonly ExactCapabilityValidator _validator;
     private readonly ICapabilityCandidateSearch? _search;
+    private readonly ILogger _logger;
 
-    public CapabilityRouter(ActiveCapabilityCatalog catalog, ICapabilityCandidateSearch? search = null)
+    public CapabilityRouter(
+        ActiveCapabilityCatalog catalog,
+        ICapabilityCandidateSearch? search = null,
+        ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         _validator = new ExactCapabilityValidator(catalog);
         _search = search;
-    }
-
-    public CapabilityRouter(ExactCapabilityValidator validator, ICapabilityCandidateSearch? search = null)
-    {
-        ArgumentNullException.ThrowIfNull(validator);
-        _validator = validator;
-        _search = search;
+        _logger = logger ?? NullLogger.Instance;
     }
 
     public async Task<IReadOnlyList<ValidatedCapability>> SelectAsync(
@@ -42,29 +42,14 @@ public sealed class CapabilityRouter
                 candidates = await _search.SearchAsync(owner, prompt, limit, cancellationToken)
                     .ConfigureAwait(false);
             }
-            catch (OperationCanceledException)
+            catch (Exception failure) when (failure
+                is InvalidOperationException
+                or ArgumentException
+                or TimeoutException
+                or IOException
+                or HttpRequestException)
             {
-                throw;
-            }
-            catch (InvalidOperationException)
-            {
-                candidates = [];
-            }
-            catch (ArgumentException)
-            {
-                candidates = [];
-            }
-            catch (TimeoutException)
-            {
-                candidates = [];
-            }
-            catch (IOException)
-            {
-                candidates = [];
-            }
-            catch (HttpRequestException)
-            {
-                candidates = [];
+                LogSearchUnavailable(_logger, failure, owner.Value);
             }
         }
 
@@ -76,4 +61,9 @@ public sealed class CapabilityRouter
 
         return _validator.ResolveExactTerms(prompt, limit);
     }
+
+    [LoggerMessage(
+        LogLevel.Warning,
+        "Capability candidate search is unavailable for owner {Owner}; falling back to exact catalog terms only.")]
+    private static partial void LogSearchUnavailable(ILogger logger, Exception failure, string owner);
 }

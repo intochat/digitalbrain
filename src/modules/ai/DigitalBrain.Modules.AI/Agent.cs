@@ -3,6 +3,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.AI;
 
@@ -120,7 +121,10 @@ public abstract class Agent : Neuron, IAgent
         var typeMap = ServiceProvider.GetService<ActiveModuleContractTypeMap>();
         var search = ServiceProvider.GetService<ICapabilityCandidateSearch>()
             ?? new VectorMemoryCapabilitySearch(GrainFactory);
-        var router = new CapabilityRouter(catalog, search);
+        var router = new CapabilityRouter(
+            catalog,
+            search,
+            ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger<CapabilityRouter>());
         var prompt = LatestOwnerText(messages);
         if (string.IsNullOrWhiteSpace(prompt))
         {
