@@ -1,11 +1,11 @@
 using System.Text;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Artifacts;
+using DigitalBrain.Behaviors.Host;
 using DigitalBrain.Behaviors.Manifest;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Tasks;
 using Xunit;
-using DigitalBrain.Behaviors.Runtime;
-using DigitalBrain.Behaviors.Host;
 
 namespace DigitalBrain.Behaviors.Tests;
 

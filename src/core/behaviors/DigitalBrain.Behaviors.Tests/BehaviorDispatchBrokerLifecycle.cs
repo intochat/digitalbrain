@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors.Host;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
@@ -11,8 +13,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
-using DigitalBrain.Behaviors.Runtime;
-using DigitalBrain.Behaviors.Host;
 
 namespace DigitalBrain.Behaviors.Tests;
 

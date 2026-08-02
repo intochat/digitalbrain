@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Net.Sockets;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
 using Microsoft.AspNetCore.Builder;
@@ -9,7 +10,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
-using DigitalBrain.Behaviors.Runtime;
 
 namespace DigitalBrain.Behaviors.Tests;
 

@@ -1,6 +1,6 @@
 using DigitalBrain.Behaviors.Manifest;
-using Xunit;
 using DigitalBrain.Behaviors.Runtime;
+using Xunit;
 
 namespace DigitalBrain.Behaviors.Tests;
 

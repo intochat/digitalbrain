@@ -1,6 +1,6 @@
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
-using DigitalBrain.Behaviors.Runtime;
 
 namespace DigitalBrain.Behaviors.Tests;
 

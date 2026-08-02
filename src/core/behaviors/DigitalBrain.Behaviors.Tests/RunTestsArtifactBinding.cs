@@ -1,10 +1,10 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Artifacts;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
-using DigitalBrain.Behaviors.Runtime;
 
 namespace DigitalBrain.Behaviors.Tests;
 

@@ -1,9 +1,9 @@
 using DigitalBrain.Aspire;
 using DigitalBrain.Behaviors;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Kernel;
 using DigitalBrain.OS.AgentTools;
 using DigitalBrain.ServiceDefaults;
-using DigitalBrain.Behaviors.Runtime;
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -5,13 +5,13 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Security;
 using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
-using DigitalBrain.Behaviors.Runtime;
 
 namespace DigitalBrain.HostTests;
 

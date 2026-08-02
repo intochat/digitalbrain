@@ -6,6 +6,8 @@ using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Behaviors;
+using DigitalBrain.Behaviors.Host;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Chat;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
@@ -19,8 +21,6 @@ using DigitalBrain.Shell.Aspire.Hosting;
 using DigitalBrain.Tasks;
 using DigitalBrain.Time;
 using Microsoft.Extensions.Hosting;
-using DigitalBrain.Behaviors.Runtime;
-using DigitalBrain.Behaviors.Host;
 
 var builder = DistributedApplication.CreateBuilder(args);
 

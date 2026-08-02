@@ -2,9 +2,9 @@ using System.Collections.Immutable;
 using System.Reflection;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Manifest;
+using DigitalBrain.Behaviors.Runtime;
 using Microsoft.CodeAnalysis;
 using Xunit;
-using DigitalBrain.Behaviors.Runtime;
 
 namespace DigitalBrain.Behaviors.Tests;
 
