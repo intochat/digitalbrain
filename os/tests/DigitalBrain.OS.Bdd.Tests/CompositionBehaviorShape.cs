@@ -1,8 +1,9 @@
 using System.Reflection;
 using DigitalBrain.Client;
+using DigitalBrain.Compositions;
 using Xunit;
 
-namespace DigitalBrain.Compositions.Tests;
+namespace DigitalBrain.OS.Bdd.Tests;
 
 public sealed class CompositionBehaviorShape
 {

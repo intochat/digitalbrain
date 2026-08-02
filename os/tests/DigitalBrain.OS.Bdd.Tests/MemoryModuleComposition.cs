@@ -6,7 +6,7 @@ using DigitalBrain.Memory.Aspire.Hosting;
 using DigitalBrain.Memory.Qdrant;
 using Xunit;
 
-namespace DigitalBrain.Compositions.Tests;
+namespace DigitalBrain.OS.Bdd.Tests;
 
 public sealed class MemoryModuleComposition
 {

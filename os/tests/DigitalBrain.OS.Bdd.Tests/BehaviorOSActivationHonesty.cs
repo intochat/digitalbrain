@@ -1,9 +1,10 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
+using DigitalBrain.Compositions;
 using DigitalBrain.Flutter;
 using Xunit;
 
-namespace DigitalBrain.Compositions.Tests;
+namespace DigitalBrain.OS.Bdd.Tests;
 
 public sealed class BehaviorOSActivationHonesty
 {

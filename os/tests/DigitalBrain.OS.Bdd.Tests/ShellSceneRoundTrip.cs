@@ -2,9 +2,9 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Flutter;
 using Xunit;
 
-namespace DigitalBrain.Compositions.Tests;
+namespace DigitalBrain.OS.Bdd.Tests;
 
-public sealed class ShellSceneRoundTrip(CompositionsFixture fixture)
+public sealed class ShellSceneRoundTrip
 {
     private const string ShellName = "desk";
     private const string HomeSceneKey = "home";
@@ -16,7 +16,7 @@ public sealed class ShellSceneRoundTrip(CompositionsFixture fixture)
     public async Task OpenJournalsSceneOpenedOnTheShell()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        await using var test = await OSCluster.Fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(ShellName);
         var command = new OpenScene(CommandId.New(), HomeSceneKey, HomeSceneTitle);
 
@@ -34,7 +34,7 @@ public sealed class ShellSceneRoundTrip(CompositionsFixture fixture)
     public async Task ControlActivatedIsJournaledOnTheScene()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        await using var test = await OSCluster.Fixture.CreateBrainAsync(cancellationToken);
         var scene = test.Neuron<IScene>(HomeSceneKey);
         var activation = new ControlActivated(HomeSceneKey, PrimaryControlId, SubmitIntent);
 
@@ -51,7 +51,7 @@ public sealed class ShellSceneRoundTrip(CompositionsFixture fixture)
     public async Task OpenDoesNotJournalCapabilityFacts()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        await using var test = await OSCluster.Fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(ShellName);
 
         await shell.Reference.Open(new OpenScene(CommandId.New(), HomeSceneKey, HomeSceneTitle));
@@ -72,7 +72,7 @@ public sealed class ShellSceneRoundTrip(CompositionsFixture fixture)
     public async Task OpenRejectsBlankSceneKeyAndTitle()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        await using var test = await OSCluster.Fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(ShellName);
         var commandId = CommandId.New();
 

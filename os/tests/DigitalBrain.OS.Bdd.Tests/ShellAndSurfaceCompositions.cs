@@ -1,11 +1,12 @@
+using DigitalBrain.Compositions;
 using DigitalBrain.Flutter;
 using DigitalBrain.Testing;
 using DigitalBrain.Time;
 using Xunit;
 
-namespace DigitalBrain.Compositions.Tests;
+namespace DigitalBrain.OS.Bdd.Tests;
 
-public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
+public sealed class ShellAndSurfaceCompositions
 {
     private const string ShellName = "desk";
     private const string CountdownName = "timer";
@@ -21,7 +22,7 @@ public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
     public async Task OpenHomeCompositionJournalsSceneOpened()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        await using var test = await OSCluster.Fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(ShellName);
 
         await new OpenHome().RunAsync(test.Client, ShellName, cancellationToken);
@@ -35,7 +36,7 @@ public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
     public async Task NavigateShellJournalsMultipleScenes()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        await using var test = await OSCluster.Fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(ShellName);
 
         await new NavigateShell().RunAsync(
@@ -58,7 +59,7 @@ public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
     public async Task CountdownSurfaceComposesFlutterShellWithCountdown()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        await using var test = await OSCluster.Fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(ShellName);
         var countdown = test.Neuron<ICountdown>(CountdownName);
 
@@ -83,7 +84,7 @@ public sealed class ShellAndSurfaceCompositions(CompositionsFixture fixture)
     public async Task AiPaneSurfaceOpensSceneAndResponds()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        await using var test = await OSCluster.Fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(ShellName);
         test.Chat().Reply(PaneReply);
 
