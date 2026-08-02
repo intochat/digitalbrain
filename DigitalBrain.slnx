@@ -36,7 +36,6 @@
     <Project Path="src/modules/time/DigitalBrain.Modules.Time.Tests/DigitalBrain.Modules.Time.Tests.csproj" />
     <Project Path="src/modules/chat/DigitalBrain.Modules.Chat.Contracts/DigitalBrain.Modules.Chat.Contracts.csproj" />
     <Project Path="src/modules/chat/DigitalBrain.Modules.Chat/DigitalBrain.Modules.Chat.csproj" />
-    <Project Path="src/modules/chat/DigitalBrain.Modules.Chat.Tests/DigitalBrain.Modules.Chat.Tests.csproj" />
     <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
     <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
     <Project Path="src/modules/flutter/DigitalBrain.Modules.Flutter.Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />

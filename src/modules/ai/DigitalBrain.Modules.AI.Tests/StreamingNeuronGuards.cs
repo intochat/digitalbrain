@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Xunit;
 
-namespace DigitalBrain.Chat.Tests;
+namespace DigitalBrain.ModuleTests;
 
 public sealed class StreamingNeuronGuards
 {

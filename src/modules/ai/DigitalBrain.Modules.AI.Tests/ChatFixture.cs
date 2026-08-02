@@ -1,7 +1,8 @@
 using DigitalBrain.AI;
+using DigitalBrain.Chat;
 using DigitalBrain.Testing;
 
-namespace DigitalBrain.Chat.Tests;
+namespace DigitalBrain.ModuleTests;
 
 public sealed class ChatFixture : DigitalBrainFixture
 {

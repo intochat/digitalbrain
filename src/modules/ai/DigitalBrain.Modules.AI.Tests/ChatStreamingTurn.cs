@@ -2,11 +2,12 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
+using DigitalBrain.Chat;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.AI;
 using Xunit;
 
-namespace DigitalBrain.Chat.Tests;
+namespace DigitalBrain.ModuleTests;
 
 [GrainType("assistant")]
 public sealed class ChatStreamingAssistant : Neuron, IAssistant
