@@ -13,7 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
-    <ProjectReference Include="..\DigitalBrain\DigitalBrain.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
     <ProjectReference Include="..\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" />
   </ItemGroup>
   <ItemGroup>

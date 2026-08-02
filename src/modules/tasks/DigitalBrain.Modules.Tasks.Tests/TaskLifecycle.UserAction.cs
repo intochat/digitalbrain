@@ -591,7 +591,7 @@ public sealed partial class TaskLifecycle
                 "src",
                 "core",
                 "kernel",
-                "DigitalBrain",
+                "DigitalBrain.Kernel",
                 "Neuron",
                 "Neuron.Outbox.cs");
             Assert.True(File.Exists(outboxPath), $"Missing Neuron.Outbox at {outboxPath}");

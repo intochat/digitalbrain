@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("DigitalBrain")]
+[assembly: InternalsVisibleTo("DigitalBrain.Kernel")]
 [assembly: InternalsVisibleTo("DigitalBrain.Behaviors.Runtime")]
 [assembly: InternalsVisibleTo("DigitalBrain.Behaviors.Tests")]
 [assembly: InternalsVisibleTo("DigitalBrain.Modules.Tasks.Tests")]

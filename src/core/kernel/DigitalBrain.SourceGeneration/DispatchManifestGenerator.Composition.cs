@@ -37,7 +37,7 @@ public sealed partial class DispatchManifestGenerator
         var definesModule = TypesIn(compilation.Assembly.GlobalNamespace)
             .Any(type => type.AllInterfaces.Any(contract =>
                 SymbolEqualityComparer.Default.Equals(contract, moduleContract)));
-        var emit = compilation.AssemblyName != "DigitalBrain"
+        var emit = compilation.AssemblyName != "DigitalBrain.Kernel"
             && !definesModule
             && siloBuilder is not null
             && compilation.GetTypeByMetadataName(DigitalBrainRuntime) is not null;
