@@ -13,7 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\DigitalBrain.OS.Behaviors\DigitalBrain.OS.Behaviors.csproj" />
-    <ProjectReference Include="..\..\DigitalBrain.OS.McpHost\DigitalBrain.OS.McpHost.csproj" />
+    <ProjectReference Include="..\..\DigitalBrain.OS.AgentTools\DigitalBrain.OS.AgentTools.csproj" />
     <ProjectReference Include="..\..\..\src\modules\chat\DigitalBrain.Modules.Chat\DigitalBrain.Modules.Chat.csproj" />
     <ProjectReference Include="..\..\..\src\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
   </ItemGroup>

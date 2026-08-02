@@ -1,6 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Chat;
-using DigitalBrain.OS.McpHost;
+using DigitalBrain.OS.AgentTools;
 using DigitalBrain.Testing;
 using Xunit;
 

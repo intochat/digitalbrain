@@ -74,8 +74,8 @@ tests/     fixtures/apphosts — shared L2 AppHost scaffolding
 Southbound MCP transport lives in package `DigitalBrain.Mcp` (Salesforce and shared OAuth rail
 mechanics). Gmail no longer uses southbound MCP — it calls Gmail REST through `Google.Apis.Gmail.v1`
 with a reflected read-only planner catalog. Northbound agent tools live in library
-`DigitalBrain.OS.McpHost`, mapped on the silo host — not a separate product process. Older docs that
-say `DigitalBrain.Integrations.Mcp` mean the southbound package.
+`DigitalBrain.OS.AgentTools`, mapped on the silo host — not a separate product process. Older docs
+that say `DigitalBrain.Integrations.Mcp` mean the southbound package.
 
 Retired prototype generations live in git history — `git log --diff-filter=D --summary`, then
 `git show <sha>^:<path>`.

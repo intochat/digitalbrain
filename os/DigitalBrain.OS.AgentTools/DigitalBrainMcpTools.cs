@@ -6,7 +6,7 @@ using DigitalBrain.Client;
 using DigitalBrain.Mcp;
 using ModelContextProtocol.Server;
 
-namespace DigitalBrain.OS.McpHost;
+namespace DigitalBrain.OS.AgentTools;
 
 [McpServerToolType]
 [SuppressMessage(
@@ -18,7 +18,7 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
     private const int DefaultTimeoutSeconds = 300;
     private const int MaximumTimeoutSeconds = 300;
 
-    [McpServerTool(Name = McpHost.SendChatMessageToolName)]
+    [McpServerTool(Name = AgentToolEndpoints.SendChatMessageToolName)]
     [Description(
         "Send a message through the owner's DigitalBrain conversation and wait for the assistant "
         + "response journaled under this command id. This is the same durable chat path used by the product UI.")]

@@ -1,4 +1,4 @@
-namespace DigitalBrain.OS.McpHost;
+namespace DigitalBrain.OS.AgentTools;
 
 internal sealed record NeuronJournalPage(
     string Neuron,

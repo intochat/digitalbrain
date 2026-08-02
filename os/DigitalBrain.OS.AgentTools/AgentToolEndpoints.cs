@@ -2,9 +2,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Server;
 
-namespace DigitalBrain.OS.McpHost;
+namespace DigitalBrain.OS.AgentTools;
 
-internal static class McpHost
+internal static class AgentToolEndpoints
 {
     public const string EndpointPath = "/mcp";
     public const string SendChatMessageToolName = "send_chat_message";
@@ -30,7 +30,7 @@ internal static class McpHost
         return services;
     }
 
-    public static WebApplication MapMcpHost(this WebApplication app)
+    public static WebApplication MapAgentToolEndpoints(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
 

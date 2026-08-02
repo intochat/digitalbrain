@@ -1,7 +1,7 @@
 using DigitalBrain.Aspire;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Kernel;
-using DigitalBrain.OS.McpHost;
+using DigitalBrain.OS.AgentTools;
 using DigitalBrain.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,5 +23,5 @@ app.MapBehaviorProtectedPayloadBroker();
 app.MapBehaviorProtectedTriggerBroker();
 app.MapBehaviorTaskOperationBroker();
 app.MapBehaviorDispatchBroker();
-app.MapMcpHost();
+app.MapAgentToolEndpoints();
 app.Run();

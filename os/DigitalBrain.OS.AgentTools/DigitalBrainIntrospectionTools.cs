@@ -5,7 +5,7 @@ using DigitalBrain.Chat;
 using DigitalBrain.Client;
 using ModelContextProtocol.Server;
 
-namespace DigitalBrain.OS.McpHost;
+namespace DigitalBrain.OS.AgentTools;
 
 [McpServerToolType]
 [SuppressMessage(
@@ -14,7 +14,7 @@ namespace DigitalBrain.OS.McpHost;
     Justification = "Constructed by the MCP server DI container via WithTools<DigitalBrainIntrospectionTools>().")]
 internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain, IGrainFactory grains)
 {
-    [McpServerTool(Name = McpHost.ListActiveNeuronsToolName)]
+    [McpServerTool(Name = AgentToolEndpoints.ListActiveNeuronsToolName)]
     [Description("List the neurons currently activated in the cluster, with their grain type and identity.")]
     public async Task<IReadOnlyList<ActiveNeuron>> ListActiveNeuronsAsync()
     {
@@ -35,7 +35,7 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain, IGrain
         ];
     }
 
-    [McpServerTool(Name = McpHost.ReadNeuronJournalToolName)]
+    [McpServerTool(Name = AgentToolEndpoints.ReadNeuronJournalToolName)]
     [Description(
         "Read a neuron's durable synapse journal. Returns the causal facts the kernel committed, "
         + "never argument or payload content.")]
@@ -70,7 +70,7 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain, IGrain
             ]);
     }
 
-    [McpServerTool(Name = McpHost.ReadChatTranscriptToolName)]
+    [McpServerTool(Name = AgentToolEndpoints.ReadChatTranscriptToolName)]
     [Description("Read the durable transcript of a conversation as the owner would see it.")]
     public async Task<ChatTranscriptPage> ReadChatTranscriptAsync(
         [Description("Conversation name, for example 'main'")] string chatName = "main")

@@ -5,7 +5,7 @@ using DigitalBrain.Behaviors;
 using DigitalBrain.Client;
 using ModelContextProtocol.Server;
 
-namespace DigitalBrain.OS.McpHost;
+namespace DigitalBrain.OS.AgentTools;
 
 [McpServerToolType]
 [SuppressMessage(
@@ -14,7 +14,7 @@ namespace DigitalBrain.OS.McpHost;
     Justification = "Constructed by the MCP server DI container via WithTools<DigitalBrainBehaviorTools>().")]
 internal sealed class DigitalBrainBehaviorTools(IDigitalBrain brain, IGrainFactory grains)
 {
-    [McpServerTool(Name = McpHost.ReadBehaviorToolName)]
+    [McpServerTool(Name = AgentToolEndpoints.ReadBehaviorToolName)]
     [Description("Read the durable behavior revision snapshot for an owner-scoped behavior id.")]
     public Task<BehaviorSnapshot> ReadBehaviorAsync(
         [Description("Behavior id, for example 'com.digitalbrain.account-enrichment'")] string behaviorId)
@@ -23,7 +23,7 @@ internal sealed class DigitalBrainBehaviorTools(IDigitalBrain brain, IGrainFacto
         return brain.GetGrainProxy<IBehaviorNeuron>(behaviorId).Read();
     }
 
-    [McpServerTool(Name = McpHost.ProposeBehaviorRevisionToolName)]
+    [McpServerTool(Name = AgentToolEndpoints.ProposeBehaviorRevisionToolName)]
     [Description(
         "Propose a behavior revision with C# source and a .feature BDD spec. Compiles the proposal "
         + "without mutating the active revision and journals the artifact hash or compile failure.")]
@@ -55,7 +55,7 @@ internal sealed class DigitalBrainBehaviorTools(IDigitalBrain brain, IGrainFacto
             string.IsNullOrWhiteSpace(description) ? behaviorId : description));
     }
 
-    [McpServerTool(Name = McpHost.RunBehaviorTestsToolName)]
+    [McpServerTool(Name = AgentToolEndpoints.RunBehaviorTestsToolName)]
     [Description("Run the BDD install gate against a proposed behavior artifact hash.")]
     public Task<BehaviorSnapshot> RunBehaviorTestsAsync(
         [Description("Behavior id")] string behaviorId,
@@ -75,7 +75,7 @@ internal sealed class DigitalBrainBehaviorTools(IDigitalBrain brain, IGrainFacto
             new RunBehaviorTests(new CommandId(commandIdentity), artifactHash));
     }
 
-    [McpServerTool(Name = McpHost.ApproveBehaviorRevisionToolName)]
+    [McpServerTool(Name = AgentToolEndpoints.ApproveBehaviorRevisionToolName)]
     [Description(
         "Approve a proposed behavior revision bound to an artifact hash. Requires a prior session "
         + "delivery of BehaviorRevisionApproval evidence and a green BDD gate.")]
