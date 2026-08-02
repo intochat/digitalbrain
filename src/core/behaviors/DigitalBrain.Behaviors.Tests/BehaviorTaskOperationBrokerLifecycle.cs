@@ -267,7 +267,7 @@ public sealed class BehaviorTaskOperationBrokerLifecycle(BehaviorsFixture fixtur
         builder.Services.AddRouting();
         builder.Services.AddSingleton(configuration);
         builder.Services.AddSingleton<IConfiguration>(configuration);
-        builder.Services.AddBehaviorBrokerAuthentication(configuration);
+        builder.Services.AddBehaviorBrokerAuthentication(configuration, builder.Environment);
         builder.Services.AddSingleton(access);
         var app = builder.Build();
         app.UseRouting();

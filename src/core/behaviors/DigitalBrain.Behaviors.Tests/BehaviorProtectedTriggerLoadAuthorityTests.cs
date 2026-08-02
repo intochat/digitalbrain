@@ -249,7 +249,7 @@ public sealed class BehaviorProtectedTriggerLoadAuthorityTests(BehaviorDispatchF
         builder.Services.AddRouting();
         builder.Services.AddSingleton(configuration);
         builder.Services.AddSingleton<IConfiguration>(configuration);
-        builder.Services.AddBehaviorBrokerAuthentication(configuration);
+        builder.Services.AddBehaviorBrokerAuthentication(configuration, builder.Environment);
         builder.Services.AddSingleton<IGrainFactory>(brain.Cluster.Client);
         builder.Services.AddSingleton<IBehaviorProtectedTriggerAccess>(
             new GrainBehaviorProtectedTriggerAccess(brain.Cluster.Client));

@@ -577,12 +577,13 @@ public sealed class BehaviorProtectedPayloadBrokerEndpointsTests
         var builder = WebApplication.CreateEmptyBuilder(new WebApplicationOptions
         {
             ApplicationName = typeof(BehaviorProtectedPayloadBrokerEndpointsTests).Assembly.FullName,
+            EnvironmentName = Environments.Development,
         });
         builder.WebHost.UseKestrel(options => options.Listen(IPAddress.Loopback, port));
         builder.Services.AddRouting();
         builder.Services.AddSingleton(configuration);
         builder.Services.AddSingleton<IConfiguration>(configuration);
-        builder.Services.AddBehaviorBrokerAuthentication(configuration);
+        builder.Services.AddBehaviorBrokerAuthentication(configuration, builder.Environment);
         builder.Services.AddSingleton(access);
         var app = builder.Build();
         app.UseRouting();

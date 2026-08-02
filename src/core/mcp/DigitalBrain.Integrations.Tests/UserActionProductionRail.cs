@@ -1330,7 +1330,7 @@ public sealed class UserActionProductionRail(UserActionProductionRailFixture fix
         builder.Services.AddRouting();
         builder.Services.AddSingleton(configuration);
         builder.Services.AddSingleton<IConfiguration>(configuration);
-        builder.Services.AddBehaviorBrokerAuthentication(configuration);
+        builder.Services.AddBehaviorBrokerAuthentication(configuration, builder.Environment);
         builder.Services.AddSingleton(dispatch);
         builder.Services.AddSingleton(payloads);
         builder.Services.AddSingleton<IBehaviorTaskOperationAccess, NoOpTaskOperations>();

@@ -221,7 +221,7 @@ public sealed class BehaviorDispatchBrokerLifecycle(BehaviorDispatchFixture fixt
         builder.Services.AddRouting();
         builder.Services.AddSingleton(configuration);
         builder.Services.AddSingleton<IConfiguration>(configuration);
-        builder.Services.AddBehaviorBrokerAuthentication(configuration);
+        builder.Services.AddBehaviorBrokerAuthentication(configuration, builder.Environment);
         builder.Services.AddSingleton(dispatch);
         builder.Services.AddSingleton(operations);
         builder.Services.AddSingleton(payloads);

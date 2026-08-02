@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Xunit;
 
 namespace DigitalBrain.Behaviors.Tests;
@@ -296,12 +297,13 @@ public sealed class BehaviorTaskOperationBrokerEndpointsTests
         var builder = WebApplication.CreateEmptyBuilder(new WebApplicationOptions
         {
             ApplicationName = typeof(BehaviorTaskOperationBrokerEndpointsTests).Assembly.FullName,
+            EnvironmentName = Environments.Development,
         });
         builder.WebHost.UseKestrel(options => options.Listen(IPAddress.Loopback, port));
         builder.Services.AddRouting();
         builder.Services.AddSingleton(configuration);
         builder.Services.AddSingleton<IConfiguration>(configuration);
-        builder.Services.AddBehaviorBrokerAuthentication(configuration);
+        builder.Services.AddBehaviorBrokerAuthentication(configuration, builder.Environment);
         builder.Services.AddSingleton(access);
         var app = builder.Build();
         app.UseRouting();
