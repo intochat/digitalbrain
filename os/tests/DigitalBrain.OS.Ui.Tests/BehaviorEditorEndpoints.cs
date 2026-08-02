@@ -16,8 +16,8 @@ public sealed class BehaviorEditorEndpoints(FlutterHttpFixture fixture)
     };
 
     [Fact(DisplayName =
-        "GET /behaviors/{id} returns AccountEnrichment seed source and Empty status through the rail")]
-    public async Task ReadReturnsSeededAccountEnrichmentDocument()
+        "GET /behaviors/{id} projects Empty status and blank editor fields for a behavior with no revisions")]
+    public async Task ReadReturnsEmptyDocumentForUninstalledBehavior()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
@@ -34,11 +34,10 @@ public sealed class BehaviorEditorEndpoints(FlutterHttpFixture fixture)
         Assert.Equal(nameof(BehaviorRevisionStatus.Empty), document.Status);
         Assert.Equal(nameof(BehaviorRunState.Idle), document.RunState);
         Assert.False(document.ActivationGateOpen);
-        Assert.Contains("AccountEnrichmentProgram", document.ProgramSource, StringComparison.Ordinal);
-        Assert.Contains("Feature: account enrichment", document.FeatureText, StringComparison.Ordinal);
-        Assert.Equal(AccountEnrichmentEditorSeed.FeatureName, document.FeatureName);
-        Assert.Contains(document.Scenarios, scenario => scenario.Title.Contains("enrich", StringComparison.OrdinalIgnoreCase));
-        Assert.Equal(AccountEnrichmentEditorSeed.DisplayName, document.DisplayName);
+        Assert.Empty(document.ProgramSource);
+        Assert.Empty(document.FeatureText);
+        Assert.Equal("install", document.FeatureName);
+        Assert.Equal(FlutterHttpContract.AccountEnrichmentBehaviorId, document.DisplayName);
     }
 
     [Fact(DisplayName =
@@ -55,11 +54,11 @@ public sealed class BehaviorEditorEndpoints(FlutterHttpFixture fixture)
         using var response = await http.PostAsJsonAsync(
             ProposePath(FlutterHttpContract.AccountEnrichmentBehaviorId),
             new ProposeBehaviorRequest(
-                AccountEnrichmentEditorSeed.ProgramSource,
-                AccountEnrichmentEditorSeed.FeatureText,
-                AccountEnrichmentEditorSeed.FeatureName,
-                AccountEnrichmentEditorSeed.DisplayName,
-                AccountEnrichmentEditorSeed.Description),
+                AccountEnrichmentTestProgram.ProgramSource,
+                AccountEnrichmentTestProgram.FeatureText,
+                AccountEnrichmentTestProgram.FeatureName,
+                AccountEnrichmentTestProgram.DisplayName,
+                AccountEnrichmentTestProgram.Description),
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -133,11 +132,11 @@ public sealed class BehaviorEditorEndpoints(FlutterHttpFixture fixture)
         using var response = await http.PostAsJsonAsync(
             ProposePath(FlutterHttpContract.AccountEnrichmentBehaviorId),
             new ProposeBehaviorRequest(
-                AccountEnrichmentEditorSeed.ProgramSource,
-                AccountEnrichmentEditorSeed.FeatureText,
-                AccountEnrichmentEditorSeed.FeatureName,
-                AccountEnrichmentEditorSeed.DisplayName,
-                AccountEnrichmentEditorSeed.Description),
+                AccountEnrichmentTestProgram.ProgramSource,
+                AccountEnrichmentTestProgram.FeatureText,
+                AccountEnrichmentTestProgram.FeatureName,
+                AccountEnrichmentTestProgram.DisplayName,
+                AccountEnrichmentTestProgram.Description),
             cancellationToken);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<BehaviorEditorDocument>(Json, cancellationToken))!;

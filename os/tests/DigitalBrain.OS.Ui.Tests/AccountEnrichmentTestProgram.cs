@@ -1,6 +1,6 @@
-namespace DigitalBrain.Flutter.Http;
+namespace DigitalBrain.Flutter.Http.Tests;
 
-internal static class AccountEnrichmentEditorSeed
+internal static class AccountEnrichmentTestProgram
 {
     public const string FeatureName = "account-enrichment";
 

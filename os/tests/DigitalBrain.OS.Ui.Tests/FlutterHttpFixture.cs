@@ -51,7 +51,7 @@ public sealed class FlutterHttpFixture : DigitalBrainFixture
         builder.Services.AddFlutterHttpServices();
         // L1 UI host has no live model: inject a fixed author so scenario approval still proposes.
         builder.Services.AddSingleton<IBehaviorAuthor>(_ => new BehaviorAuthor(
-            static (_, _) => Task.FromResult(AccountEnrichmentEditorSeed.ProgramSource)));
+            static (_, _) => Task.FromResult(AccountEnrichmentTestProgram.ProgramSource)));
         configureServices?.Invoke(builder.Services);
 
         var app = builder.Build();

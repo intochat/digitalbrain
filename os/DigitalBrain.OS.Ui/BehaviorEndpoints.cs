@@ -99,7 +99,7 @@ internal static class BehaviorEndpoints
                 }
 
                 var featureName = string.IsNullOrWhiteSpace(request.FeatureName)
-                    ? AccountEnrichmentEditorSeed.FeatureName
+                    ? "install"
                     : request.FeatureName.Trim();
                 var displayName = string.IsNullOrWhiteSpace(request.DisplayName)
                     ? behaviorId
@@ -419,9 +419,7 @@ internal static class BehaviorEndpoints
                         behaviorId,
                         proposal.RequestText,
                         current.FeatureText,
-                        string.IsNullOrWhiteSpace(current.ProgramSource)
-                            ? AccountEnrichmentEditorSeed.ProgramSource
-                            : current.ProgramSource,
+                        current.ProgramSource,
                         current.DisplayName,
                         proposal.ProposedFeatureName),
                     new BehaviorScenarioProposal(
@@ -455,10 +453,7 @@ internal static class BehaviorEndpoints
         IGrainFactory grains,
         CancellationToken cancellationToken)
     {
-        var ids = new HashSet<string>(StringComparer.Ordinal)
-        {
-            FlutterHttpContract.AccountEnrichmentBehaviorId,
-        };
+        var ids = new HashSet<string>(StringComparer.Ordinal);
 
         var statistics = await grains.GetGrain<IManagementGrain>(0).GetDetailedGrainStatistics();
         cancellationToken.ThrowIfCancellationRequested();
@@ -524,25 +519,20 @@ internal static class BehaviorEndpoints
         ArgumentException.ThrowIfNullOrWhiteSpace(behaviorId);
         ArgumentNullException.ThrowIfNull(snapshot);
 
-        var seeded = string.Equals(
-            behaviorId,
-            FlutterHttpContract.AccountEnrichmentBehaviorId,
-            StringComparison.Ordinal);
-
         var programSource = string.IsNullOrWhiteSpace(snapshot.ProgramSource)
-            ? seeded ? AccountEnrichmentEditorSeed.ProgramSource : string.Empty
+            ? string.Empty
             : snapshot.ProgramSource;
         var featureName = string.IsNullOrWhiteSpace(snapshot.FeatureName)
-            ? seeded ? AccountEnrichmentEditorSeed.FeatureName : "install"
+            ? "install"
             : snapshot.FeatureName;
         var featureText = string.IsNullOrWhiteSpace(snapshot.FeatureText)
-            ? seeded ? AccountEnrichmentEditorSeed.FeatureText : string.Empty
+            ? string.Empty
             : snapshot.FeatureText;
         var displayName = string.IsNullOrWhiteSpace(snapshot.DisplayName)
-            ? seeded ? AccountEnrichmentEditorSeed.DisplayName : behaviorId
+            ? behaviorId
             : snapshot.DisplayName;
         var description = string.IsNullOrWhiteSpace(snapshot.Description)
-            ? seeded ? AccountEnrichmentEditorSeed.Description : behaviorId
+            ? behaviorId
             : snapshot.Description;
         var overview = string.IsNullOrWhiteSpace(snapshot.Overview)
             ? description

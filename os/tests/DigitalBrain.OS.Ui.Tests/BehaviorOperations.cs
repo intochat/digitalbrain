@@ -85,7 +85,7 @@ public sealed class BehaviorOperations(FlutterHttpFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var generatedProgram = AccountEnrichmentEditorSeed.ProgramSource.Replace(
+        var generatedProgram = AccountEnrichmentTestProgram.ProgramSource.Replace(
             "AccountEnrichmentProgram",
             "AccountEnrichmentProgramAuthored",
             StringComparison.Ordinal);
@@ -181,11 +181,11 @@ public sealed class BehaviorOperations(FlutterHttpFixture fixture)
         using var propose = await http.PostAsJsonAsync(
             Path(FlutterHttpContract.BehaviorProposePath),
             new ProposeBehaviorRequest(
-                AccountEnrichmentEditorSeed.ProgramSource,
-                AccountEnrichmentEditorSeed.FeatureText,
-                AccountEnrichmentEditorSeed.FeatureName,
-                AccountEnrichmentEditorSeed.DisplayName,
-                AccountEnrichmentEditorSeed.Description),
+                AccountEnrichmentTestProgram.ProgramSource,
+                AccountEnrichmentTestProgram.FeatureText,
+                AccountEnrichmentTestProgram.FeatureName,
+                AccountEnrichmentTestProgram.DisplayName,
+                AccountEnrichmentTestProgram.Description),
             cancellationToken);
         propose.EnsureSuccessStatusCode();
         var proposed = (await propose.Content.ReadFromJsonAsync<BehaviorEditorDocument>(Json, cancellationToken))!;

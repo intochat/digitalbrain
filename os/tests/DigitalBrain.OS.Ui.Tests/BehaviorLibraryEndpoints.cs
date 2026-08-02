@@ -13,13 +13,15 @@ public sealed class BehaviorLibraryEndpoints(FlutterHttpFixture fixture)
         PropertyNameCaseInsensitive = true,
     };
 
-    [Fact(DisplayName = "GET /behaviors lists the seeded AccountEnrichment draft for the owner")]
-    public async Task ListIncludesSeededAccountEnrichment()
+    [Fact(DisplayName = "GET /behaviors lists a proposed behavior with its authored overview and scenarios")]
+    public async Task ListIncludesProposedBehavior()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         await using var app = await FlutterHttpFixture.StartUiHttpAsync(test, cancellationToken);
         using var http = CreateClient(app);
+
+        await ProposeAsync(http, cancellationToken);
 
         var library = await http.GetFromJsonAsync<BehaviorLibraryDocument>(
             FlutterHttpContract.BehaviorsPath,
@@ -30,10 +32,10 @@ public sealed class BehaviorLibraryEndpoints(FlutterHttpFixture fixture)
         var item = Assert.Single(
             library.Items,
             entry => entry.BehaviorId == FlutterHttpContract.AccountEnrichmentBehaviorId);
-        Assert.Equal(AccountEnrichmentEditorSeed.DisplayName, item.DisplayName);
-        Assert.Equal(nameof(BehaviorRevisionStatus.Empty), item.Status);
+        Assert.Equal(AccountEnrichmentTestProgram.DisplayName, item.DisplayName);
+        Assert.Equal(nameof(BehaviorRevisionStatus.Proposed), item.Status);
         Assert.Equal(nameof(BehaviorRunState.Idle), item.RunState);
-        Assert.Equal("draft", item.Health);
+        Assert.Equal("pending", item.Health);
         Assert.False(string.IsNullOrWhiteSpace(item.Overview));
         Assert.NotEmpty(item.ScenarioTitles);
     }
@@ -46,6 +48,8 @@ public sealed class BehaviorLibraryEndpoints(FlutterHttpFixture fixture)
         await using var app = await FlutterHttpFixture.StartUiHttpAsync(test, cancellationToken);
         using var http = CreateClient(app);
 
+        await ProposeAsync(http, cancellationToken);
+
         var document = await http.GetFromJsonAsync<BehaviorEditorDocument>(
             Path(FlutterHttpContract.BehaviorPath),
             Json,
@@ -57,8 +61,24 @@ public sealed class BehaviorLibraryEndpoints(FlutterHttpFixture fixture)
         Assert.NotEmpty(document.Overview);
         Assert.NotEmpty(document.Scenarios);
         Assert.Empty(document.Bindings);
-        Assert.Empty(document.Revisions);
+        var revision = Assert.Single(document.Revisions);
+        Assert.Equal(nameof(BehaviorRevisionStatus.Proposed), revision.Status);
+        Assert.False(revision.IsActive);
         Assert.Equal(0, document.ActiveTaskCount);
+    }
+
+    private static async Task ProposeAsync(HttpClient http, CancellationToken cancellationToken)
+    {
+        using var response = await http.PostAsJsonAsync(
+            Path(FlutterHttpContract.BehaviorProposePath),
+            new ProposeBehaviorRequest(
+                AccountEnrichmentTestProgram.ProgramSource,
+                AccountEnrichmentTestProgram.FeatureText,
+                AccountEnrichmentTestProgram.FeatureName,
+                AccountEnrichmentTestProgram.DisplayName,
+                AccountEnrichmentTestProgram.Description),
+            cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     private static HttpClient CreateClient(WebApplication app)
