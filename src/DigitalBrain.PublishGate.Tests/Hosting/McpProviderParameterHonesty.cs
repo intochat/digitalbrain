@@ -1,4 +1,3 @@
-using System.Reflection;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
@@ -88,23 +87,27 @@ public sealed class McpProviderParameterHonesty
         Assert.Null(await ResolveDefaultOrValue(redirect).ConfigureAwait(true));
     }
 
-    [Fact(DisplayName = "no packable hosting package bakes a local product URL; the AppHost owns the stable port")]
+    [Fact(DisplayName =
+        "no source under a packable *.Aspire.Hosting package writes localhost or a product host-port literal, "
+        + "whatever its accessibility or shape; a bare 5000 or 5080 there is a leak even if it was meant as a timeout")]
     public void ProductCompositionOwnsTheLocalCallbackSurface()
     {
-        var constants = HostingPackageConstants().ToArray();
-        Assert.NotEmpty(constants);
-
-        var baked = constants
-            .Where(constant => constant.Value.Contains("localhost", StringComparison.OrdinalIgnoreCase))
-            .Select(constant => $"{constant.Owner} = {constant.Value}")
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(baked);
-
         var productSurface = RepositoryFile("os", "DigitalBrain.OS.AppHost", "ProductSurfaceResources.cs");
         Assert.Contains(ProductCallbackUri, productSurface, StringComparison.Ordinal);
         Assert.Contains("UiHttpPort = 5080", productSurface, StringComparison.Ordinal);
+
+        var productHostPorts = ProductHostPorts(productSurface);
+        Assert.Equal(["5000", "5080"], productHostPorts);
+
+        var sources = PackableHostingSources().ToArray();
+        Assert.NotEmpty(sources);
+
+        var leaks = sources
+            .SelectMany(source => LeakingLines(source, productHostPorts))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(leaks);
     }
 
     [Fact(DisplayName = "product AppHost declares UserSecretsId so dashboard can save parameter secrets")]
@@ -115,57 +118,76 @@ public sealed class McpProviderParameterHonesty
         Assert.Contains("digitalbrain-os-apphost-", text, StringComparison.Ordinal);
     }
 
-    private static IEnumerable<(string Owner, string Value)> HostingPackageConstants()
-        => ShippedHostingAssemblies()
-            .SelectMany(assembly => assembly.GetExportedTypes())
-            .SelectMany(type => type.GetFields(
-                BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly))
-            .Where(field => field is { IsLiteral: true } && field.FieldType == typeof(string))
-            .Select(field => (
-                Owner: $"{field.DeclaringType!.FullName}.{field.Name}",
-                Value: field.GetRawConstantValue() as string ?? string.Empty));
+    private static IReadOnlyList<string> ProductHostPorts(string productSurfaceSource)
+        => [.. productSurfaceSource
+            .Split('\n')
+            .Select(line => line.Trim())
+            .Where(line => line.StartsWith("public const int ", StringComparison.Ordinal)
+                && line.Contains("Port = ", StringComparison.Ordinal))
+            .Select(line => line[(line.IndexOf("Port = ", StringComparison.Ordinal) + 7)..].TrimEnd(';'))
+            .Order(StringComparer.Ordinal)];
 
-    private static IEnumerable<Assembly> ShippedHostingAssemblies()
+    private static IEnumerable<string> PackableHostingSources()
     {
-        var visited = new HashSet<string>(StringComparer.Ordinal);
-        var pending = new Queue<Assembly>([typeof(McpProviderParameterHonesty).Assembly]);
+        var separator = Path.DirectorySeparatorChar;
+        return Directory
+            .EnumerateDirectories(
+                Path.Combine(RepositoryRoot(), "src"),
+                "*.Aspire.Hosting",
+                SearchOption.AllDirectories)
+            .SelectMany(package => Directory.EnumerateFiles(package, "*.cs", SearchOption.AllDirectories))
+            .Where(source => !source.Contains($"{separator}obj{separator}", StringComparison.Ordinal)
+                && !source.Contains($"{separator}bin{separator}", StringComparison.Ordinal));
+    }
 
-        while (pending.Count > 0)
+    private static IEnumerable<string> LeakingLines(string source, IReadOnlyList<string> productHostPorts)
+    {
+        var lines = File.ReadAllLines(source);
+        for (var index = 0; index < lines.Length; index++)
         {
-            foreach (var reference in pending.Dequeue().GetReferencedAssemblies())
+            var line = lines[index];
+            if (line.Contains("localhost", StringComparison.OrdinalIgnoreCase)
+                || productHostPorts.Any(port => WritesNumber(line, port)))
             {
-                if (!visited.Add(reference.Name!))
-                {
-                    continue;
-                }
-
-                var assembly = Assembly.Load(reference);
-                pending.Enqueue(assembly);
-
-                if (reference.Name!.StartsWith("DigitalBrain.", StringComparison.Ordinal)
-                    && reference.Name.Contains(".Aspire.Hosting", StringComparison.Ordinal))
-                {
-                    yield return assembly;
-                }
+                yield return $"{source}({index + 1}): {line.Trim()}";
             }
         }
     }
 
-    private static string RepositoryFile(params string[] segments)
+    private static bool WritesNumber(string line, string number)
     {
-        string[] climbs = ["..\\..\\..\\..\\..", "..\\..\\..\\..\\..\\.."];
-        foreach (var climb in climbs)
+        for (var at = line.IndexOf(number, StringComparison.Ordinal);
+            at >= 0;
+            at = line.IndexOf(number, at + 1, StringComparison.Ordinal))
         {
-            var candidate = Path.GetFullPath(
-                Path.Combine([AppContext.BaseDirectory, climb, .. segments]));
-            if (File.Exists(candidate))
+            var end = at + number.Length;
+            if ((at == 0 || !char.IsAsciiDigit(line[at - 1]))
+                && (end == line.Length || !char.IsAsciiDigit(line[end])))
             {
-                return File.ReadAllText(candidate);
+                return true;
             }
         }
 
-        throw new FileNotFoundException(
-            $"'{string.Join('/', segments)}' was not found above test base '{AppContext.BaseDirectory}'.");
+        return false;
+    }
+
+    private static string RepositoryFile(params string[] segments)
+        => File.ReadAllText(Path.Combine([RepositoryRoot(), .. segments]));
+
+    private static string RepositoryRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
+            directory is not null;
+            directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx")))
+            {
+                return directory.FullName;
+            }
+        }
+
+        throw new DirectoryNotFoundException(
+            $"No DigitalBrain.slnx above test base '{AppContext.BaseDirectory}'.");
     }
 
     private static async Task AssertCredentialHasNoFakeDefault(ParameterResource parameter)
