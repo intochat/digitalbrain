@@ -188,3 +188,9 @@ Add only what you have reproduced.
   assembly, and every L2 `DistributedApplication` start fails with "The Aspire orchestration
   component is not installed at …\tools\dcp". Set `$env:OS='Windows_NT'` before any build from such
   a shell; the bad path is baked at build time, so rebuild after fixing the env.
+- **`dotnet test … --nologo` silently breaks the whole MTP gate.** The `dotnet test` integration
+  forwards `--nologo` to the test host, which rejects it as an unknown option and exits 5 before the
+  handshake. Symptom: *every* test project reports `Zero tests ran` / `Handshake failures` / `Exit
+  code: 5` in ~100 ms — indistinguishable at a glance from a catastrophic breakage. Diagnosed via
+  `TESTINGPLATFORM_DIAGNOSTIC=1`, which logged the forwarded `--nologo --server dotnettestcli
+  --dotnet-test-pipe …`. Drop `--nologo` from `dotnet test` — it is harmless on `dotnet build`.

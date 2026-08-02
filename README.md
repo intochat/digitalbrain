@@ -48,7 +48,7 @@ The plan of record. Nothing is shipped unless it says Built.
 | Time — reminders, recurring interval/calendar scheduling, DST | Designed |
 | Multi-principal IdP edge, journal observation on `IDigitalBrain` | Designed |
 | Multi-model UI combine / Settings model switch | Designed |
-| Two Docker Hub product images (`digitalbrain`, `digitalbrain-ui`) | Designed |
+| Two Docker Hub product images (`digitalbrain`, `digitalbrain-ui`) | In progress — Dockerfiles and a local `docker-compose.yml` smoke exist; the UI image does not bundle the Flutter web build; no CI image build, no Docker Hub publish |
 | Behavior rail — proposal, compile, BDD gate, approval, activation, rollback, signed BehaviorHost deploy/execute (L1/L2) | **Built** |
 | Observability spine — host OpenTelemetry, structured logs, causal kernel spans, GenAI spans and metrics | **Built** |
 
