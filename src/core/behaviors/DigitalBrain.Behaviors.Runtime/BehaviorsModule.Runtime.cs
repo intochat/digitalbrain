@@ -20,7 +20,7 @@ public sealed partial class BehaviorsModule
             new ContractOnlyBehaviorCompiler(provider.GetRequiredService<DigitalBrain.Kernel.ActiveCapabilityCatalog>()));
         builder.Services.AddSingleton<IBehaviorBddGate, InstallTestsBddGate>();
         builder.Services.TryAddSingleton<IBehaviorArtifactTrust>(static provider =>
-            new SiloBehaviorArtifactTrust(provider.GetRequiredService<IDurablePayloadProtector>()));
+            new BehaviorArtifactTrust(provider.GetRequiredService<IDurablePayloadProtector>()));
         builder.Services.TryAddSingleton<IBehaviorProtectedPayloadAccess, GrainBehaviorProtectedPayloadAccess>();
         builder.Services.TryAddSingleton<IBehaviorProtectedTriggerAccess, GrainBehaviorProtectedTriggerAccess>();
         builder.Services.TryAddSingleton<IBehaviorTaskOperationAccess, GrainBehaviorTaskOperationAccess>();
