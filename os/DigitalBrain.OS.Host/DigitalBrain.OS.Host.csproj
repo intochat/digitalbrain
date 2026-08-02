@@ -11,7 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\modules\ai\DigitalBrain.Modules.AI\DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="..\..\src\modules\chat\DigitalBrain.Modules.Chat\DigitalBrain.Modules.Chat.csproj" />
-    <ProjectReference Include="..\DigitalBrain.OS.Behaviors\DigitalBrain.OS.Behaviors.csproj" />
+    <ProjectReference Include="..\DigitalBrain.OS.Assistant\DigitalBrain.OS.Assistant.csproj" />
     <ProjectReference Include="..\DigitalBrain.OS.AgentTools\DigitalBrain.OS.AgentTools.csproj" />
     <ProjectReference Include="..\..\src\core\behaviors\DigitalBrain.Behaviors.Runtime\DigitalBrain.Behaviors.Runtime.csproj" />
     <ProjectReference Include="..\..\src\modules\tasks\DigitalBrain.Modules.Tasks\DigitalBrain.Modules.Tasks.csproj" />

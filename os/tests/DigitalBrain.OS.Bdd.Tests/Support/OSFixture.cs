@@ -2,7 +2,7 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Chat;
 using DigitalBrain.Memory;
-using DigitalBrain.OS;
+using DigitalBrain.OS.Assistant;
 using DigitalBrain.Shell;
 using DigitalBrain.Testing;
 using DigitalBrain.Time;
@@ -21,7 +21,7 @@ public sealed class OSFixture : DigitalBrainFixture
         brain.AddModule<AIModule>();
         brain.AddModule<MemoryModule>();
         brain.AddModule<TimeModule>();
-        brain.AddModule<OSBehaviorsModule>();
+        brain.AddModule<AssistantModule>();
         brain.ConfigureScriptedChat(typeof(Gemma4), typeof(Llama32));
         brain.ConfigureServiceEdge(
             static services => services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>, ScriptedEmbeddingGenerator>(),

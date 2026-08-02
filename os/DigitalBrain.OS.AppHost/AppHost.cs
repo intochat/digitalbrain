@@ -11,7 +11,7 @@ using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
-using DigitalBrain.OS;
+using DigitalBrain.OS.Assistant;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
 using DigitalBrain.Shell;
@@ -32,7 +32,7 @@ brain.AddModule<AIModule>(ai =>
 });
 brain.AddModule<ChatModule>();
 brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
-brain.AddModule<OSBehaviorsModule>();
+brain.AddModule<AssistantModule>();
 brain.AddModule<ShellModule>(shell => shell
     .WithUiEdge()
     //.WithHeadlessHost() // pure-Dart host; swap with window for headless-only dev
