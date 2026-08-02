@@ -101,7 +101,7 @@ public static class ShellHostingExtensions
             {
                 throw new InvalidOperationException(
                     $"UI HTTP project was not found at '{projectPath}'. " +
-                    $"Pass {nameof(ShellUiEdgeOptions)}.{nameof(ShellUiEdgeOptions.ProjectPath)}, or place DigitalBrain.OS.Ui under os/.");
+                    $"Pass {nameof(ShellUiEdgeOptions)}.{nameof(ShellUiEdgeOptions.ProjectPath)}, or place DigitalBrain.OS.UiEdge under os/.");
             }
 
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
@@ -199,8 +199,8 @@ public static class ShellHostingExtensions
 
             string[] candidates =
             [
-                Path.Combine(appHostDirectory, "..", "DigitalBrain.OS.Ui", "DigitalBrain.OS.Ui.csproj"),
-                Path.Combine(appHostDirectory, "..", "..", "os", "DigitalBrain.OS.Ui", "DigitalBrain.OS.Ui.csproj"),
+                Path.Combine(appHostDirectory, "..", "DigitalBrain.OS.UiEdge", "DigitalBrain.OS.UiEdge.csproj"),
+                Path.Combine(appHostDirectory, "..", "..", "os", "DigitalBrain.OS.UiEdge", "DigitalBrain.OS.UiEdge.csproj"),
             ];
 
             foreach (var candidate in candidates)

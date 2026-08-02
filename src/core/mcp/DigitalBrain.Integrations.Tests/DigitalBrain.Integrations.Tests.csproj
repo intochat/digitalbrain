@@ -19,7 +19,7 @@
     <ProjectReference Include="..\..\..\modules\salesforce\DigitalBrain.Modules.Salesforce\DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="..\..\..\..\samples/DigitalBrain.AccountEnrichment\DigitalBrain.AccountEnrichment.csproj" />
     <ProjectReference Include="..\..\..\modules\shell\DigitalBrain.Modules.Shell\DigitalBrain.Modules.Shell.csproj" />
-    <ProjectReference Include="..\..\..\..\os\DigitalBrain.OS.Ui\DigitalBrain.OS.Ui.csproj" />
+    <ProjectReference Include="..\..\..\..\os\DigitalBrain.OS.UiEdge\DigitalBrain.OS.UiEdge.csproj" />
     <ProjectReference Include="..\..\aspire\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
     <ProjectReference Include="..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
     <ProjectReference Include="..\DigitalBrain.Mcp.Testing\DigitalBrain.Mcp.Testing.csproj" />

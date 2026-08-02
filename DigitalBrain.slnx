@@ -55,7 +55,7 @@
     <Project Path="os/DigitalBrain.OS.Host/DigitalBrain.OS.Host.csproj" />
     <Project Path="os/DigitalBrain.OS.BehaviorHost/DigitalBrain.OS.BehaviorHost.csproj" />
     <Project Path="os/DigitalBrain.OS.McpHost/DigitalBrain.OS.McpHost.csproj" />
-    <Project Path="os/DigitalBrain.OS.Ui/DigitalBrain.OS.Ui.csproj" />
+    <Project Path="os/DigitalBrain.OS.UiEdge/DigitalBrain.OS.UiEdge.csproj" />
     <Project Path="os/DigitalBrain.OS.AppHost/DigitalBrain.OS.AppHost.csproj" />
     <Project Path="os/DigitalBrain.OS.Behaviors/DigitalBrain.OS.Behaviors.csproj" />
   </Folder>
@@ -63,7 +63,7 @@
     <Project Path="os/tests/DigitalBrain.OS.Bdd.Tests/DigitalBrain.OS.Bdd.Tests.csproj" />
     <Project Path="os/tests/DigitalBrain.OS.Behaviors.Tests/DigitalBrain.OS.Behaviors.Tests.csproj" />
     <Project Path="os/tests/DigitalBrain.OS.Host.Tests/DigitalBrain.OS.Host.Tests.csproj" />
-    <Project Path="os/tests/DigitalBrain.OS.Ui.Tests/DigitalBrain.OS.Ui.Tests.csproj" />
+    <Project Path="os/tests/DigitalBrain.OS.UiEdge.Tests/DigitalBrain.OS.UiEdge.Tests.csproj" />
     <Project Path="os/tests/DigitalBrain.OS.Product.Tests/DigitalBrain.OS.Product.Tests.csproj" />
   </Folder>
   <Folder Name="/samples/">

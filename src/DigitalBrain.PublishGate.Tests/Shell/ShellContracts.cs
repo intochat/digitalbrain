@@ -36,7 +36,7 @@ public sealed class ShellContracts
             ],
             vocabulary);
 
-        Assert.Null(contracts.GetType($"DigitalBrain.Flutter.Http.{nameof(IShell)}"));
+        Assert.Null(contracts.GetType($"DigitalBrain.OS.UiEdge.{nameof(IShell)}"));
         Assert.Null(contracts.GetType($"{ShellNamespace}.IFlutter"));
         Assert.DoesNotContain(
             contracts.GetExportedTypes().Concat(typeof(ShellModule).Assembly.GetExportedTypes()),

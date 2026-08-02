@@ -64,8 +64,8 @@ One assumption remains load-bearing and unmeasured: **that a model can reliably 
 ```text
 src/       published packages: core/ (framework) and modules/ (IModule domains),
            plus the publish gate that polices them
-os/        the product: silo (OS.Host, northbound MCP folded in), Flutter UI edge
-           (OS.Ui), behavior worker, assistant neuron, AppHost
+os/        the product: silo (OS.Host, northbound MCP folded in), HTTP/SSE UI edge
+           (OS.UiEdge), behavior worker, assistant neuron, AppHost
 clients/   flutter/core (pure Dart edge) and flutter/shell (Material chrome)
 samples/   product-shaped compositions and process neurons (not packable product)
 tests/     fixtures/apphosts — shared L2 AppHost scaffolding

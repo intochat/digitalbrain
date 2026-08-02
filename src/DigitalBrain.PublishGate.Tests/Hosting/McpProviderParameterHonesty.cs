@@ -69,8 +69,8 @@ public sealed class McpProviderParameterHonesty
         Assert.NotNull(parameters["google-client-id"].Default);
     }
 
-    [Fact(DisplayName = "Flutter UI edge binds the stable local OAuth callback host port")]
-    public void FlutterUiEdgeBindsStableLocalPort()
+    [Fact(DisplayName = "UI edge binds the stable local OAuth callback host port")]
+    public void UiEdgeBindsStableLocalPort()
     {
         Assert.Equal(5080, LocalDevelopmentProductSurface.UiHttpPort);
         Assert.Equal(

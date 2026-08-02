@@ -13,8 +13,8 @@ internal static class ShellHostingProjectionSupport
 
     public static string UIProjectPath => RepositoryAssets.Path(
         "os",
-        "DigitalBrain.OS.Ui",
-        "DigitalBrain.OS.Ui.csproj");
+        "DigitalBrain.OS.UiEdge",
+        "DigitalBrain.OS.UiEdge.csproj");
 
     public static string FlutterClientDirectory => RepositoryAssets.Path("clients", "flutter", "core");
 

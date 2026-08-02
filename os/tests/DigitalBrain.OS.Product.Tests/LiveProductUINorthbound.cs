@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using DigitalBrain.Flutter.Http;
+using DigitalBrain.OS.UiEdge;
 using DigitalBrain.Shell.Aspire.Hosting;
 using Xunit;
 
@@ -36,24 +36,24 @@ public sealed class LiveProductUINorthbound
             Timeout = TimeSpan.FromSeconds(30),
         };
 
-        using (var health = await http.GetAsync(new Uri(FlutterHttpContract.HealthPath, UriKind.Relative), cancellationToken))
+        using (var health = await http.GetAsync(new Uri(UiEdgeContract.HealthPath, UriKind.Relative), cancellationToken))
         {
             Assert.True(
                 health.IsSuccessStatusCode,
-                $"Product {ShellHostingExtensions.DefaultUIResourceName} {FlutterHttpContract.HealthPath} not OK at {baseAddress}. Start: aspire start --project os/DigitalBrain.OS.AppHost. Status={(int)health.StatusCode}. Override with {ShellHostingExtensions.UIBaseEnvironmentVariable}.");
+                $"Product {ShellHostingExtensions.DefaultUIResourceName} {UiEdgeContract.HealthPath} not OK at {baseAddress}. Start: aspire start --project os/DigitalBrain.OS.AppHost. Status={(int)health.StatusCode}. Override with {ShellHostingExtensions.UIBaseEnvironmentVariable}.");
         }
 
-        var shellEventsPath = FlutterHttpContract.ShellEventsPath.Replace("{shellName}", shellName, StringComparison.Ordinal)
-            + $"?{FlutterHttpContract.AfterSequenceQuery}=0";
+        var shellEventsPath = UiEdgeContract.ShellEventsPath.Replace("{shellName}", shellName, StringComparison.Ordinal)
+            + $"?{UiEdgeContract.AfterSequenceQuery}=0";
         using var streamRequest = new HttpRequestMessage(HttpMethod.Get, shellEventsPath);
         using var streamResponse = await http.SendAsync(streamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
-        Assert.Equal(FlutterHttpContract.EventStreamContentType, streamResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(UiEdgeContract.EventStreamContentType, streamResponse.Content.Headers.ContentType?.MediaType);
 
         await using var body = await streamResponse.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(body);
 
-        var openScenePath = FlutterHttpContract.OpenScenePath.Replace("{shellName}", shellName, StringComparison.Ordinal);
+        var openScenePath = UiEdgeContract.OpenScenePath.Replace("{shellName}", shellName, StringComparison.Ordinal);
         using var openResponse = await http.PostAsJsonAsync(openScenePath, new { sceneKey, title }, cancellationToken);
         Assert.Equal(HttpStatusCode.Accepted, openResponse.StatusCode);
 
@@ -119,7 +119,7 @@ public sealed class LiveProductUINorthbound
             eventName = null;
             dataLine = null;
 
-            if (name is not null && !string.Equals(name, FlutterHttpContract.SceneOpenedEvent, StringComparison.Ordinal))
+            if (name is not null && !string.Equals(name, UiEdgeContract.SceneOpenedEvent, StringComparison.Ordinal))
             {
                 continue;
             }

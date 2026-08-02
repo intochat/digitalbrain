@@ -1,10 +1,10 @@
 using System.Net;
 using System.Net.Sockets;
 using DigitalBrain.AccountEnrichment;
-using DigitalBrain.Flutter.Http;
 using DigitalBrain.Google;
 using DigitalBrain.Mcp;
 using DigitalBrain.Mcp.Testing;
+using DigitalBrain.OS.UiEdge;
 using DigitalBrain.Salesforce;
 using DigitalBrain.ServiceDefaults;
 using DigitalBrain.Shell;
@@ -35,7 +35,7 @@ public sealed class McpProviderHoldOpenProofFixture : IAsyncLifetime
     internal Uri UiBaseAddress { get; private set; } = new("http://127.0.0.1/");
 
     internal Uri AppCallbackAddress
-        => new(UiBaseAddress, FlutterHttpContract.McpOAuthCallbackPath.TrimStart('/'));
+        => new(UiBaseAddress, UiEdgeContract.McpOAuthCallbackPath.TrimStart('/'));
 
     public async ValueTask InitializeAsync()
     {
