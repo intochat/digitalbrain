@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
+using DigitalBrain.Testing;
 using DigitalBrain.TestingTests.Harness;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DigitalBrain.TestingTests;
@@ -160,19 +160,4 @@ public sealed class ActiveCapabilityCatalogTests
 
     private static CapabilityManifest Manifest(string moduleId, params NeuronCapabilityDescriptor[] neurons)
         => new(new ModuleId(moduleId), "1.0.0", moduleId, [], neurons);
-
-    private sealed class ScriptedModule(ModuleId id, CapabilityManifest capabilities) : ICompiledModule
-    {
-        public ModuleId Id { get; } = id;
-
-        public CapabilityManifest Capabilities { get; } = capabilities;
-
-        public void PrepareSerialization(IServiceCollection services)
-        {
-        }
-
-        public void Activate(ISiloBuilder builder)
-        {
-        }
-    }
 }
