@@ -27,8 +27,7 @@ public sealed class UiHttpVocabulary(UiEdgeFixture fixture)
             typeof(UiEdgeContract).Assembly.GetExportedTypes(),
             type => type.Name is "ShellEventFeed" or "UiEdgeHost" or "UiEdgeEndpoints"
                 or "OwnerSessionJournal" or "UiEdgeServices"
-                or "OpenSceneRequest" or "ActivateControlRequest" or "SceneOpenedEvent"
-                or "IShell");
+                or "OpenSceneRequest" or "ActivateControlRequest" or "SceneOpenedEvent");
     }
 
     [Fact(DisplayName =
