@@ -17,6 +17,7 @@ using DigitalBrain.OS;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
 using DigitalBrain.Tasks;
+using DigitalBrain.Time;
 using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -42,6 +43,7 @@ brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 brain.AddModule<BehaviorsModule>();
 brain.AddModule<TasksModule>();
+brain.AddModule<TimeModule>();
 
 var behaviorBrokerCredential = builder.ExecutionContext.IsRunMode
     ? builder.AddParameter(

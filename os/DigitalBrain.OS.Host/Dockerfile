@@ -56,6 +56,7 @@
 #     DigitalBrain__Modules__6=DigitalBrain.Salesforce.SalesforceModule
 #     DigitalBrain__Modules__7=DigitalBrain.Behaviors.BehaviorsModule
 #     DigitalBrain__Modules__8=DigitalBrain.Tasks.TasksModule
+#     DigitalBrain__Modules__9=DigitalBrain.Time.TimeModule
 #
 # Ports: 8080 silo HTTP (broker + health), 5000 northbound MCP (/mcp)
 
