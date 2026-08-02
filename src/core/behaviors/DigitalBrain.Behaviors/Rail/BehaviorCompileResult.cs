@@ -1,12 +1,6 @@
 namespace DigitalBrain.Behaviors;
 
-using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Manifest;
-
-public interface IBehaviorCompiler
-{
-    BehaviorCompileResult Compile(string programSource, BehaviorId behavior);
-}
 
 public sealed record BehaviorCompileResult(
     bool Succeeded,

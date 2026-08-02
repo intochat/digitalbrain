@@ -250,7 +250,7 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         var trust = provider.GetRequiredService<IBehaviorArtifactTrust>();
 
         var behavior = new BehaviorId("com.digitalbrain.sample");
-        var compiler = new ContractOnlyBehaviorCompiler();
+        var compiler = new BehaviorCompiler();
         var compile = compiler.Compile(GreenProgram, behavior);
         Assert.True(compile.Succeeded, compile.Diagnostics);
         Assert.NotNull(compile.Contract);

@@ -17,7 +17,7 @@ internal sealed partial class BehaviorNeuron :
     private const string StateName = "behaviors.behavior";
     private readonly IDurableValue<byte[]> _state;
     private readonly Serializer<BehaviorData> _states;
-    private readonly IBehaviorCompiler _compiler;
+    private readonly BehaviorCompiler _compiler;
     private readonly IBehaviorBddGate _bddGate;
     private readonly IBehaviorExecutor _executor;
     private readonly IBehaviorArtifactTrust _artifactTrust;
@@ -27,7 +27,7 @@ internal sealed partial class BehaviorNeuron :
     {
         _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
         _states = ServiceProvider.GetRequiredService<Serializer<BehaviorData>>();
-        _compiler = ServiceProvider.GetRequiredService<IBehaviorCompiler>();
+        _compiler = ServiceProvider.GetRequiredService<BehaviorCompiler>();
         _bddGate = ServiceProvider.GetRequiredService<IBehaviorBddGate>();
         _executor = ServiceProvider.GetRequiredService<IBehaviorExecutor>();
         _artifactTrust = ServiceProvider.GetRequiredService<IBehaviorArtifactTrust>();

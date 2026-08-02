@@ -10,7 +10,7 @@ public sealed class CompilerSmoke
     [Fact(DisplayName = "compiler smoke")]
     public void CompilesGreenProgram()
     {
-        var compiler = new ContractOnlyBehaviorCompiler();
+        var compiler = new BehaviorCompiler();
         var result = compiler.Compile(RailPrograms.GreenProgram(), new BehaviorId("com.digitalbrain.sample"));
         Assert.True(result.Succeeded, result.Diagnostics);
         Assert.Equal("contract-only-v1", result.Policy.PolicyId);

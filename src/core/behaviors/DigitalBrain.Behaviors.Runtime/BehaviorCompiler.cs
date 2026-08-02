@@ -10,7 +10,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace DigitalBrain.Behaviors.Runtime;
 
-internal sealed class ContractOnlyBehaviorCompiler : IBehaviorCompiler
+internal sealed class BehaviorCompiler
 {
     private static readonly ImmutableArray<string> ForbiddenTypeNames =
     [
@@ -26,12 +26,7 @@ internal sealed class ContractOnlyBehaviorCompiler : IBehaviorCompiler
     private readonly ImmutableArray<MetadataReference> _references = BuildReferences();
     private readonly ActiveCapabilityCatalog? _catalog;
 
-    public ContractOnlyBehaviorCompiler()
-        : this(catalog: null)
-    {
-    }
-
-    public ContractOnlyBehaviorCompiler(ActiveCapabilityCatalog? catalog)
+    public BehaviorCompiler(ActiveCapabilityCatalog? catalog = null)
     {
         _catalog = catalog;
     }

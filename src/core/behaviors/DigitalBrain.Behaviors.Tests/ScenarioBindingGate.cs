@@ -235,7 +235,7 @@ public sealed class ScenarioBindingGate
             }
             """;
 
-        var compile = new ContractOnlyBehaviorCompiler().Compile(program, new BehaviorId("com.digitalbrain.sample"));
+        var compile = new BehaviorCompiler().Compile(program, new BehaviorId("com.digitalbrain.sample"));
         Assert.True(compile.Succeeded, compile.Diagnostics);
 
         var scenarios = BehaviorScenarioBinder.DeriveScenarios(feature);

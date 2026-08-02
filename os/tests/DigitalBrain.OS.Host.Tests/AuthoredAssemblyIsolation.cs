@@ -243,7 +243,7 @@ public sealed class AuthoredAssemblyIsolation(TestingAppHostFixture fixture)
 
     private static CompiledMarker CompileMarker()
     {
-        var compiler = new ContractOnlyBehaviorCompiler();
+        var compiler = new BehaviorCompiler();
         var compile = compiler.Compile(MarkerProgram, new BehaviorId("com.digitalbrain.isolation"));
         Assert.True(compile.Succeeded, compile.Diagnostics);
         var digest = BehaviorArtifactDigest.Compute(compile.AssemblyBytes.Span).Value;
@@ -268,7 +268,7 @@ public sealed class AuthoredAssemblyIsolation(TestingAppHostFixture fixture)
         var trust = provider.GetRequiredService<IBehaviorArtifactTrust>();
 
         var behavior = new BehaviorId("com.digitalbrain.isolation");
-        var compiler = new ContractOnlyBehaviorCompiler();
+        var compiler = new BehaviorCompiler();
         var compile = compiler.Compile(MarkerProgram, behavior);
         Assert.True(compile.Succeeded, compile.Diagnostics);
         Assert.NotNull(compile.Contract);

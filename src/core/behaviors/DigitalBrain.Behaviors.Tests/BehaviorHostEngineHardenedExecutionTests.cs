@@ -206,7 +206,7 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
         string program,
         IReadOnlyList<BehaviorCapabilityGrant> grants)
     {
-        var compile = new ContractOnlyBehaviorCompiler().Compile(program, Behavior);
+        var compile = new BehaviorCompiler().Compile(program, Behavior);
         Assert.True(compile.Succeeded, compile.Diagnostics);
         Assert.NotNull(compile.Contract);
 

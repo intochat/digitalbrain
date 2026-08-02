@@ -386,7 +386,7 @@ public sealed class DirectedCapabilityGrants
     }
 
     private static BehaviorCompileResult Compile(string program, ActiveCapabilityCatalog? catalog = null)
-        => new ContractOnlyBehaviorCompiler(catalog ?? ActiveCatalog())
+        => new BehaviorCompiler(catalog ?? ActiveCatalog())
             .Compile(program, new BehaviorId("com.digitalbrain.grants"));
 
     private static BehaviorArtifactEnvelope CreateProposalEnvelope(

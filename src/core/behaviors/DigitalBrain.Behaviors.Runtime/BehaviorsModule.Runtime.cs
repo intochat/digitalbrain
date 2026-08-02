@@ -16,8 +16,8 @@ public sealed partial class BehaviorsModule
     static partial void ConfigureRuntime(ISiloBuilder builder)
     {
         DurablePayloadProtectionHosting.Configure(builder.Services, builder.Configuration);
-        builder.Services.AddSingleton<IBehaviorCompiler>(static provider =>
-            new ContractOnlyBehaviorCompiler(provider.GetRequiredService<DigitalBrain.Kernel.ActiveCapabilityCatalog>()));
+        builder.Services.AddSingleton(static provider =>
+            new BehaviorCompiler(provider.GetRequiredService<DigitalBrain.Kernel.ActiveCapabilityCatalog>()));
         builder.Services.AddSingleton<IBehaviorBddGate, InstallTestsBddGate>();
         builder.Services.TryAddSingleton<IBehaviorArtifactTrust>(static provider =>
             new BehaviorArtifactTrust(provider.GetRequiredService<IDurablePayloadProtector>()));
