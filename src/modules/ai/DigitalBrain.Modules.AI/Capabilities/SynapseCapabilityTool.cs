@@ -18,7 +18,7 @@ public static class SynapseCapabilityTool
         PropertyNameCaseInsensitive = true,
     };
 
-    public static CapabilityTool Materialize(
+    public static AIFunction Materialize(
         ValidatedCapability capability,
         IGrainFactory grains,
         OwnerId owner,
@@ -54,14 +54,13 @@ public static class SynapseCapabilityTool
         }
 
         var target = new NeuronId(grainType, owner, capability.DefaultInstanceName);
-        var function = new DirectedSynapseFunction(
+        return new DirectedSynapseFunction(
             capability,
             grains,
             owner,
             target,
             requestType,
             responseType);
-        return CapabilityTool.FromFunction(function);
     }
 
     public static string ModelSchemaFor(string jsonSchema)
@@ -135,7 +134,7 @@ public static class SynapseCapabilityTool
         return synapse;
     }
 
-    private static CapabilityTool MaterializeBehavior(
+    private static AIFunction MaterializeBehavior(
         ValidatedCapability capability,
         IGrainFactory grains,
         OwnerId owner)
@@ -178,11 +177,10 @@ public static class SynapseCapabilityTool
             return result.Outcome ?? "behavior executed";
         }
 
-        var function = AIFunctionFactory.Create(
+        return AIFunctionFactory.Create(
             InvokeAsync,
             capability.ToolName,
             description);
-        return CapabilityTool.FromFunction(function);
     }
 
     private static bool TryGetResponseType(Type requestType, out Type? responseType)

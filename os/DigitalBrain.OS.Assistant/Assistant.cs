@@ -36,7 +36,7 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         is unavailable, report that limitation.
         """;
 
-    protected override IReadOnlyList<CapabilityTool> AdditionalToolsFor(IReadOnlyList<ChatMessage> messages)
+    protected override IReadOnlyList<AIFunction> AdditionalToolsFor(IReadOnlyList<ChatMessage> messages)
     {
         ArgumentNullException.ThrowIfNull(messages);
 
