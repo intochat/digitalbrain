@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Salesforce;
@@ -18,6 +19,7 @@ public sealed record SalesforceRequest : RequestSynapse<SalesforceResponse>
     {
     }
 
+    [JsonConstructor]
     public SalesforceRequest(
         string intent,
         CommandId commandId,

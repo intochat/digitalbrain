@@ -1,9 +1,12 @@
+using System.Text.Json.Serialization;
+
 namespace DigitalBrain.Abstractions;
 
 [GenerateSerializer]
 [Alias("db.command-id")]
 public readonly record struct CommandId
 {
+    [JsonConstructor]
     public CommandId(Guid value)
     {
         if (value == Guid.Empty)

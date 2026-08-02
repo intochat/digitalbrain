@@ -10,6 +10,8 @@ namespace DigitalBrain.AI;
 
 public static class SynapseCapabilityTool
 {
+    private const string CommandIdProperty = "commandId";
+
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -60,6 +62,77 @@ public static class SynapseCapabilityTool
             requestType,
             responseType);
         return CapabilityTool.FromFunction(function);
+    }
+
+    public static string ModelSchemaFor(string jsonSchema)
+    {
+        var node = JsonNode.Parse(CapabilitySchema.NormalizeForToolProviders(jsonSchema))
+            ?? throw new InvalidOperationException("Capability JSON schema parsed to null.");
+        if (node is JsonObject schema)
+        {
+            if (schema["properties"] is JsonObject properties)
+            {
+                properties.Remove(CommandIdProperty);
+            }
+
+            if (schema["required"] is JsonArray required)
+            {
+                for (var index = required.Count - 1; index >= 0; index--)
+                {
+                    if (required[index] is JsonValue value
+                        && value.TryGetValue<string>(out var name)
+                        && string.Equals(name, CommandIdProperty, StringComparison.Ordinal))
+                    {
+                        required.RemoveAt(index);
+                    }
+                }
+
+                if (required.Count == 0)
+                {
+                    schema.Remove("required");
+                }
+            }
+        }
+
+        return node.ToJsonString();
+    }
+
+    public static Synapse BindModelArguments(
+        Type requestType,
+        string contractId,
+        IEnumerable<KeyValuePair<string, object?>> arguments)
+    {
+        ArgumentNullException.ThrowIfNull(requestType);
+        ArgumentException.ThrowIfNullOrWhiteSpace(contractId);
+        ArgumentNullException.ThrowIfNull(arguments);
+
+        var node = new JsonObject();
+        foreach (var (key, value) in arguments)
+        {
+            node[key] = value switch
+            {
+                null => null,
+                JsonElement element => JsonNode.Parse(element.GetRawText()),
+                JsonNode jsonNode => jsonNode,
+                _ => JsonSerializer.SerializeToNode(value, SerializerOptions),
+            };
+        }
+
+        if (requestType.GetProperty(nameof(CommandId))?.PropertyType == typeof(CommandId))
+        {
+            node[CommandIdProperty] = new JsonObject { ["value"] = CommandId.New().Value };
+        }
+
+        var request = JsonSerializer.Deserialize(node, requestType, SerializerOptions)
+            ?? throw new InvalidOperationException(
+                $"Model arguments could not be bound to '{contractId}'.");
+        if (request is not Synapse synapse)
+        {
+            throw new InvalidOperationException(
+                $"Bound request for '{contractId}' is not a Synapse.");
+        }
+
+        return synapse;
     }
 
     private static CapabilityTool MaterializeBehavior(
@@ -155,8 +228,7 @@ public static class SynapseCapabilityTool
             _target = target;
             _requestType = requestType;
             _responseType = responseType;
-            using var document = JsonDocument.Parse(
-                CapabilitySchema.NormalizeForToolProviders(capability.JsonSchema));
+            using var document = JsonDocument.Parse(ModelSchemaFor(capability.JsonSchema));
             _schema = document.RootElement.Clone();
         }
 
@@ -175,38 +247,12 @@ public static class SynapseCapabilityTool
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var request = DeserializeRequest(arguments);
+            var request = BindModelArguments(_requestType, _capability.ContractId, arguments);
             var brain = DigitalBrainClient.Connect(_grains, _owner.Value);
             var response = await brain
                 .SendRequestAsync(_target, request, _responseType, cancellationToken)
                 .ConfigureAwait(false);
             return JsonSerializer.Serialize(response, _responseType, SerializerOptions);
-        }
-
-        private Synapse DeserializeRequest(AIFunctionArguments arguments)
-        {
-            var node = new JsonObject();
-            foreach (var (key, value) in arguments)
-            {
-                node[key] = value switch
-                {
-                    null => null,
-                    JsonElement element => JsonNode.Parse(element.GetRawText()),
-                    JsonNode jsonNode => jsonNode,
-                    _ => JsonSerializer.SerializeToNode(value, SerializerOptions),
-                };
-            }
-
-            var request = JsonSerializer.Deserialize(node, _requestType, SerializerOptions)
-                ?? throw new InvalidOperationException(
-                    $"Model arguments could not be bound to '{_capability.ContractId}'.");
-            if (request is not Synapse synapse)
-            {
-                throw new InvalidOperationException(
-                    $"Bound request for '{_capability.ContractId}' is not a Synapse.");
-            }
-
-            return synapse;
         }
     }
 }

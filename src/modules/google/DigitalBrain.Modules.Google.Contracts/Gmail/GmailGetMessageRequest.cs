@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Google;
@@ -13,6 +14,7 @@ public sealed record GmailGetMessageRequest : RequestSynapse<GmailGetMessageResp
     {
     }
 
+    [JsonConstructor]
     public GmailGetMessageRequest(string messageId, CommandId commandId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(messageId);

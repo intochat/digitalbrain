@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Google;
@@ -46,6 +47,12 @@ public sealed record GmailSearchRequest : RequestSynapse<GmailSearchResponse>
         Query = query.Trim();
         MaxResults = maxResults;
         CommandId = commandId;
+    }
+
+    [JsonConstructor]
+    private GmailSearchRequest(string query, CommandId commandId, int maxResults = DefaultMaxResults)
+        : this(query, maxResults, commandId)
+    {
     }
 
     [Id(0)]
