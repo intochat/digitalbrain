@@ -19,7 +19,7 @@ internal sealed partial class IntrospectionNeuron :
         ArgumentNullException.ThrowIfNull(synapse);
 
         var subject = SubjectOf(synapse.NeuronType, synapse.NeuronName);
-        if (RefusalFor(subject) is { } refusal)
+        if (await RefusalForAsync(subject, cancellationToken) is { } refusal)
         {
             await ReplyAsync(
                 JournalTallied.Refused(synapse.CommandId, subject, synapse.Direction, refusal),
@@ -56,7 +56,7 @@ internal sealed partial class IntrospectionNeuron :
         ArgumentNullException.ThrowIfNull(synapse);
 
         var subject = SubjectOf(synapse.NeuronType, synapse.NeuronName);
-        if (RefusalFor(subject) is { } refusal)
+        if (await RefusalForAsync(subject, cancellationToken) is { } refusal)
         {
             await ReplyAsync(
                 JournalPageRead.Refused(synapse.CommandId, subject, synapse.Direction, refusal),
@@ -77,23 +77,30 @@ internal sealed partial class IntrospectionNeuron :
             return;
         }
 
+        JournaledFact[] entries =
+        [
+            .. read.Delta
+                .Take(synapse.MaxEntries)
+                .Select(delivery => new JournaledFact(
+                    delivery.Sequence,
+                    delivery.Synapse.GetType().Name,
+                    delivery.Caller.ToString(),
+                    delivery.CorrelationId.ToString(),
+                    delivery.Timestamp)),
+        ];
+
+        // A truncated page must resume at the last entry it actually handed over, never at the
+        // journal end, or the caller's next request silently steps over everything it dropped.
+        var truncated = read.Delta.Count > entries.Length;
+
         await ReplyAsync(
             new JournalPageRead(
                 synapse.CommandId,
                 subject,
                 synapse.Direction,
-                read.ResumeSequence,
+                truncated ? entries[^1].Sequence : read.ResumeSequence,
                 read.ResetSnapshot is not null,
-                [
-                    .. read.Delta
-                        .Take(synapse.MaxEntries)
-                        .Select(delivery => new JournaledFact(
-                            delivery.Sequence,
-                            delivery.Synapse.GetType().Name,
-                            delivery.Caller.ToString(),
-                            delivery.CorrelationId.ToString(),
-                            delivery.Timestamp)),
-                ]),
+                entries),
             cancellationToken);
     }
 

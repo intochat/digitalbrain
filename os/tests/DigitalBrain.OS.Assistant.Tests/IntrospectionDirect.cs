@@ -56,6 +56,92 @@ public sealed class IntrospectionDirect(OSBehaviorsFixture fixture)
         Assert.All(page.Entries, entry => Assert.NotEqual(0, entry.Sequence));
     }
 
+    [Fact(Timeout = RequestTimeout, DisplayName =
+        "paging a journal in slices resumes at the last entry handed over, so no fact is stepped over")]
+    public async Task TruncatedPageResumesAtItsLastEntry()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        const string chatName = "direct-paging";
+        const int sliceSize = 2;
+
+        foreach (var message in new[] { "one", "two", "three" })
+        {
+            test.Chat().Reply($"Noted: {message}");
+            await test.Client.GetGrainProxy<IChat>(chatName).Send(new SendMessage(CommandId.New(), message));
+        }
+
+        var whole = await ReadPageAsync(test, chatName, afterSequence: 0, ReadJournalRequest.MaximumMaxEntries, cancellationToken);
+        Assert.Null(whole.Error);
+        Assert.True(
+            whole.Entries.Count > sliceSize,
+            $"The journal holds {whole.Entries.Count} entries, so a page of {sliceSize} would not truncate.");
+
+        var paged = new List<long>();
+        long cursor = 0;
+        for (var slice = 0; slice < whole.Entries.Count + 1; slice++)
+        {
+            var page = await ReadPageAsync(test, chatName, cursor, sliceSize, cancellationToken);
+            Assert.Null(page.Error);
+            if (page.Entries.Count == 0)
+            {
+                break;
+            }
+
+            paged.AddRange(page.Entries.Select(static entry => entry.Sequence));
+            Assert.Equal(page.Entries[^1].Sequence, page.ResumeSequence);
+            cursor = page.ResumeSequence;
+        }
+
+        Assert.Equal(whole.Entries.Select(static entry => entry.Sequence), paged);
+    }
+
+    [Fact(Timeout = RequestTimeout, DisplayName =
+        "an unknown neuron type is refused as a typed reply, not thrown into the outbox")]
+    public async Task UnknownNeuronTypeIsRefusedWithoutOutboxChurn()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var introspection = test.Neuron<IIntrospection>();
+
+        var tallied = await test.Client.Get<IIntrospection>()
+            .SendAsync(new TallyJournalRequest("banana", "main"), cancellationToken);
+
+        Assert.NotNull(tallied.Error);
+        Assert.Contains("No neuron of type 'banana'", tallied.Error, StringComparison.Ordinal);
+        Assert.Empty(tallied.Tallies);
+
+        var delivered = await introspection.Incoming.ReadAsync<TallyJournalRequest>(
+            cancellationToken: cancellationToken);
+        Assert.Single(delivered);
+    }
+
+    [Fact(Timeout = RequestTimeout, DisplayName =
+        "an unknown neuron name is refused without activating the neuron that was asked about")]
+    public async Task UnknownNeuronNameIsRefusedWithoutActivatingIt()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        const string ghost = "never-opened";
+
+        test.Chat().Reply("Noted.");
+        await test.Client.GetGrainProxy<IChat>("direct-ghost").Send(new SendMessage(CommandId.New(), "hello"));
+
+        var tallied = await test.Client.Get<IIntrospection>()
+            .SendAsync(new TallyJournalRequest("chat", ghost), cancellationToken);
+
+        Assert.NotNull(tallied.Error);
+        Assert.Contains("never activates a neuron", tallied.Error, StringComparison.Ordinal);
+
+        var topology = await test.Client.Get<IIntrospection>()
+            .SendAsync(new ReadTopologyRequest(), cancellationToken);
+
+        Assert.Null(topology.Error);
+        Assert.DoesNotContain(
+            topology.Neurons,
+            neuron => neuron.Identity.EndsWith($"/{ghost}", StringComparison.Ordinal));
+    }
+
     [Fact(DisplayName = "a journal page request refuses a page size outside the bounds the description advertises")]
     public void JournalPageSizeIsBounded()
     {
@@ -81,5 +167,26 @@ public sealed class IntrospectionDirect(OSBehaviorsFixture fixture)
             "sideways",
             CommandId.New()));
         Assert.Contains("incoming", unrecognised.Message, StringComparison.Ordinal);
+
+        var unaddressable = Assert.Throws<ArgumentException>(
+            () => new TallyJournalRequest("chat", "other-owner/main"));
+        Assert.Contains("not addressable", unaddressable.Message, StringComparison.Ordinal);
+        Assert.Throws<ArgumentException>(() => new ReadJournalRequest("chat neuron", "main"));
     }
+
+    private static Task<JournalPageRead> ReadPageAsync(
+        TestBrain test,
+        string chatName,
+        long afterSequence,
+        int maxEntries,
+        CancellationToken cancellationToken)
+        => test.Client.Get<IIntrospection>().SendAsync(
+            new ReadJournalRequest(
+                "chat",
+                chatName,
+                JournalDirection.Outgoing,
+                afterSequence,
+                maxEntries,
+                CommandId.New()),
+            cancellationToken);
 }

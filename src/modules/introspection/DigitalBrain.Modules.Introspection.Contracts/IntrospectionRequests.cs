@@ -4,11 +4,35 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Introspection;
 
+// NeuronId rejects separators and whitespace by throwing. A model-supplied identity must fail here,
+// while it is still a request-validation error, rather than inside a handler where the throw becomes
+// an undeliverable synapse the outbox retries for its whole horizon.
+internal static class IntrospectionIdentity
+{
+    private const char GrainKeySeparator = '/';
+
+    internal static string Validated(string value, string parameterName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
+
+        var trimmed = value.Trim();
+        if (trimmed.Contains(GrainKeySeparator, StringComparison.Ordinal) || trimmed.Any(char.IsWhiteSpace))
+        {
+            throw new ArgumentException(
+                $"A neuron identity part cannot contain '{GrainKeySeparator}' or whitespace; "
+                + $"'{value}' is not addressable.",
+                parameterName);
+        }
+
+        return trimmed;
+    }
+}
+
 [GenerateSerializer]
 [Alias("introspection.tally-journal-request")]
 [Description(
-    "Tally an owner neuron journal: how many synapses of each kind the kernel recorded, "
-    + "for example how many chat messages the owner has sent")]
+    "Counts journaled synapses by synapse kinds for one neuron of the owning identity, "
+    + "answering how often a conversation recorded owner messages")]
 public sealed record TallyJournalRequest : RequestSynapse<JournalTallied>
 {
     public TallyJournalRequest(string neuronType, string neuronName)
@@ -18,15 +42,13 @@ public sealed record TallyJournalRequest : RequestSynapse<JournalTallied>
 
     public TallyJournalRequest(string neuronType, string neuronName, string direction, CommandId commandId)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(neuronType);
-        ArgumentException.ThrowIfNullOrWhiteSpace(neuronName);
         if (commandId.Value == Guid.Empty)
         {
             throw new ArgumentException("The command id cannot be empty.", nameof(commandId));
         }
 
-        NeuronType = neuronType.Trim();
-        NeuronName = neuronName.Trim();
+        NeuronType = IntrospectionIdentity.Validated(neuronType, nameof(neuronType));
+        NeuronName = IntrospectionIdentity.Validated(neuronName, nameof(neuronName));
         Direction = JournalDirection.Validated(direction, nameof(direction));
         CommandId = commandId;
     }
@@ -63,8 +85,8 @@ public sealed record TallyJournalRequest : RequestSynapse<JournalTallied>
 [GenerateSerializer]
 [Alias("introspection.read-journal-request")]
 [Description(
-    "Read a page of causal facts out of an owner neuron journal; entries carry the synapse "
-    + "kind and its lineage, never argument or payload content")]
+    "Returns journaled causal facts for one neuron of the owning identity, bounded by cursor "
+    + "and limit; entries record synapse kinds and lineage, excluding argument and payload values")]
 public sealed record ReadJournalRequest : RequestSynapse<JournalPageRead>
 {
     public const int DefaultMaxEntries = 50;
@@ -84,8 +106,6 @@ public sealed record ReadJournalRequest : RequestSynapse<JournalPageRead>
         int maxEntries,
         CommandId commandId)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(neuronType);
-        ArgumentException.ThrowIfNullOrWhiteSpace(neuronName);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
         if (maxEntries is < MinimumMaxEntries or > MaximumMaxEntries)
         {
@@ -100,8 +120,8 @@ public sealed record ReadJournalRequest : RequestSynapse<JournalPageRead>
             throw new ArgumentException("The command id cannot be empty.", nameof(commandId));
         }
 
-        NeuronType = neuronType.Trim();
-        NeuronName = neuronName.Trim();
+        NeuronType = IntrospectionIdentity.Validated(neuronType, nameof(neuronType));
+        NeuronName = IntrospectionIdentity.Validated(neuronName, nameof(neuronName));
         Direction = JournalDirection.Validated(direction, nameof(direction));
         AfterSequence = afterSequence;
         MaxEntries = maxEntries;
@@ -150,8 +170,8 @@ public sealed record ReadJournalRequest : RequestSynapse<JournalPageRead>
 [GenerateSerializer]
 [Alias("introspection.read-topology-request")]
 [Description(
-    "Report the brain's own topology: the modules the deployment composed and the owner neurons "
-    + "that are currently activated")]
+    "Reports the runtime topology of the owning identity: modules the deployment composed and "
+    + "neurons currently activated")]
 public sealed record ReadTopologyRequest : RequestSynapse<TopologyRead>
 {
     public ReadTopologyRequest()

@@ -92,13 +92,14 @@ public sealed class IntrospectionCapabilityTurn(OSBehaviorsFixture fixture)
     }
 
     [Fact(Timeout = TurnTimeout, DisplayName =
-        "tallying the conversation that is still asking is answered as occupied, bounded, never hanging the turn")]
+        "a capability that takes seconds still completes the tool call; the conversation asking about itself is answered as occupied, never hanging the turn")]
     public async Task TallyingTheConversationInFlightIsBounded()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var introspection = test.Neuron<IIntrospection>();
         const string askingChat = "asking-about-itself";
+        var started = DateTimeOffset.UtcNow;
 
         test.Chat().ReplyWithCapabilityCall(
             TallyTool,
@@ -115,10 +116,17 @@ public sealed class IntrospectionCapabilityTurn(OSBehaviorsFixture fixture)
             "use introspection.tally-journal-request on this very conversation"));
 
         var tallied = await introspection.Outgoing.NextAsync<JournalTallied>(cancellationToken);
+        var elapsed = DateTimeOffset.UtcNow - started;
 
         Assert.NotNull(tallied.Synapse.Error);
         Assert.Contains("did not answer within", tallied.Synapse.Error, StringComparison.Ordinal);
         Assert.Empty(tallied.Synapse.Tallies);
+
+        // The handler held the turn for its whole occupied-subject bound, far longer than the tool's
+        // poll interval, and the tool still delivered the reply — a slow capability is not a failed one.
+        Assert.True(
+            elapsed >= TimeSpan.FromSeconds(5),
+            $"The turn finished in {elapsed}, so the slow-capability path was never exercised.");
     }
 
     [Fact(Timeout = TurnTimeout, DisplayName =

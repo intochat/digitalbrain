@@ -10,7 +10,7 @@ internal sealed partial class IntrospectionNeuron
     private const string ModulesConfigurationSection = "DigitalBrain:Modules";
     private const char IdentityPartSeparator = '/';
 
-    private async Task<TopologyRead> ReadTopologyAsync(CommandId commandId, CancellationToken cancellationToken)
+    private async Task<ActivatedNeuron[]> ActivatedOwnerNeuronsAsync(CancellationToken cancellationToken)
     {
         var statistics = await GrainFactory
             .GetGrain<IManagementGrain>(0)
@@ -18,12 +18,24 @@ internal sealed partial class IntrospectionNeuron
             .WaitAsync(cancellationToken);
 
         var ownerPrefix = $"{Id.Owner.Value}{IdentityPartSeparator}";
-        var ownerStatistics = statistics
-            .Where(statistic => statistic.GrainId.Key.ToString()!
-                .StartsWith(ownerPrefix, StringComparison.Ordinal))
-            .ToArray();
+
+        return
+        [
+            .. statistics
+                .Where(statistic => statistic.GrainId.Key.ToString()!
+                    .StartsWith(ownerPrefix, StringComparison.Ordinal))
+                .Select(static statistic => new ActivatedNeuron(
+                    statistic.GrainId.Type.ToString()!,
+                    statistic.GrainId.Key.ToString()!,
+                    statistic.SiloAddress)),
+        ];
+    }
+
+    private async Task<TopologyRead> ReadTopologyAsync(CommandId commandId, CancellationToken cancellationToken)
+    {
+        var ownerStatistics = await ActivatedOwnerNeuronsAsync(cancellationToken);
         var placements = ownerStatistics
-            .Select(static statistic => statistic.SiloAddress)
+            .Select(static neuron => neuron.Silo)
             .Distinct()
             .OrderBy(static address => address.ToString(), StringComparer.Ordinal)
             .Select(static (address, index) => (Address: address, Label: $"cluster-{index + 1}"))
@@ -34,21 +46,18 @@ internal sealed partial class IntrospectionNeuron
             ComposedModuleIds(),
             [
                 .. ownerStatistics
-                    .Select(statistic =>
-                    {
-                        var grainType = statistic.GrainId.Type.ToString()!;
-                        var identity = statistic.GrainId.Key.ToString()!;
-                        return new TopologyNeuron(
-                            $"{grainType}:{identity}",
-                            grainType,
-                            identity,
-                            placements[statistic.SiloAddress]);
-                    })
+                    .Select(neuron => new TopologyNeuron(
+                        $"{neuron.Type}:{neuron.GrainKey}",
+                        neuron.Type,
+                        neuron.GrainKey,
+                        placements[neuron.Silo]))
                     .OrderBy(static neuron => neuron.GrainType, StringComparer.Ordinal)
                     .ThenBy(static neuron => neuron.Identity, StringComparer.Ordinal),
             ],
             TimeProvider.GetUtcNow());
     }
+
+    private sealed record ActivatedNeuron(string Type, string GrainKey, SiloAddress Silo);
 
     private IReadOnlyList<string> ComposedModuleIds()
     {

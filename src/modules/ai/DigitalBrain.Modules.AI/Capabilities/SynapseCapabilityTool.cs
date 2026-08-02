@@ -202,11 +202,30 @@ public static class SynapseCapabilityTool
         return false;
     }
 
+    // A capability that outlives one outbox delivery attempt is not a failed capability: the outbox
+    // keeps retrying it for DeliveryPolicy.RetryHorizon. Giving up after a single attempt would tell
+    // the model the request failed while its side effect is still in flight, so the tool waits
+    // several attempts, and when it does give up it says the request may still complete and names
+    // the correlation the journals can be searched by.
+    internal static readonly TimeSpan ToolResponseWait = DeliveryPolicy.DeliveryAttemptTimeout * 3;
+
+    internal static string ResponseTimeoutMessage(
+        NeuronId target,
+        Type responseType,
+        CorrelationId correlation,
+        TimeSpan waited)
+    {
+        ArgumentNullException.ThrowIfNull(responseType);
+
+        return $"No '{responseType.Name}' reply from '{target}' arrived within {waited.TotalSeconds} seconds. "
+            + "The request is committed and may still complete; read the journals for correlation "
+            + $"'{correlation}' to find its outcome before sending it again.";
+    }
+
     private sealed class DirectedSynapseFunction : AIFunction
     {
         private const long BeyondJournalEnd = long.MaxValue;
         private static readonly TimeSpan ResponsePoll = TimeSpan.FromMilliseconds(25);
-        private static readonly TimeSpan ResponseWait = TimeSpan.FromSeconds(30);
 
         private readonly ValidatedCapability _capability;
         private readonly IGrainFactory _grains;
@@ -271,13 +290,21 @@ public static class SynapseCapabilityTool
             var cursor = opened.ResumeSequence;
 
             var delivery = await session.Fire(_target, request).ConfigureAwait(false);
-            var abandonAfter = DateTimeOffset.UtcNow + ResponseWait;
+            var abandonAfter = DateTimeOffset.UtcNow + ToolResponseWait;
 
             while (true)
             {
                 var read = await session
                     .ReadNeuronJournal(sessionId, JournalKind.Incoming, cursor)
                     .ConfigureAwait(false);
+
+                if (read.ResetSnapshot is not null)
+                {
+                    throw new InvalidOperationException(
+                        $"Journal compaction for '{sessionId}' {JournalKind.Incoming} after {cursor}; "
+                        + $"the '{_responseType.Name}' reply from '{_target}' for correlation "
+                        + $"'{delivery.CorrelationId}' can no longer be read back.");
+                }
 
                 foreach (var journaled in read.Delta)
                 {
@@ -293,8 +320,7 @@ public static class SynapseCapabilityTool
                 if (DateTimeOffset.UtcNow >= abandonAfter)
                 {
                     throw new TimeoutException(
-                        $"No '{_responseType.Name}' reply from '{_target}' arrived for correlation "
-                        + $"'{delivery.CorrelationId}' within {ResponseWait.TotalSeconds} seconds.");
+                        ResponseTimeoutMessage(_target, _responseType, delivery.CorrelationId, ToolResponseWait));
                 }
 
                 await Task.Delay(ResponsePoll, cancellationToken).ConfigureAwait(false);

@@ -71,10 +71,47 @@ public sealed class IntrospectionCapabilityCatalog
         Assert.Equal(NeuronContractId, capability.NeuronContractId);
         Assert.Equal(ValidatedCapability.ToolNameFor(TallyContractId, 1), capability.ToolName);
         Assert.Equal(IntrospectionModule.Id.Value, capability.ModuleId);
-        Assert.Contains("chat messages the owner has sent", capability.Description, StringComparison.Ordinal);
+        Assert.Contains("Counts journaled synapses", capability.Description, StringComparison.Ordinal);
         Assert.DoesNotContain(
             "commandId",
             SynapseCapabilityTool.ModelSchemaFor(capability.JsonSchema),
             StringComparison.Ordinal);
+    }
+
+    [Theory(DisplayName =
+        "a mundane prompt offers no introspection tool through the exact-term fallback")]
+    [InlineData("hello there")]
+    [InlineData("what is the weather like today")]
+    [InlineData("compare Gemma and Llama on this")]
+    [InlineData("thanks, that is all for now")]
+    [InlineData("summarise the document I gave you")]
+    public async Task MundanePromptsOfferNoIntrospectionTool(string prompt)
+    {
+        var catalog = ActiveCapabilityCatalog.Create(ProductModuleComposition.ProductModules());
+        var router = new CapabilityRouter(catalog);
+
+        var selected = await router.SelectAsync(
+            new Abstractions.OwnerId("owner-a"),
+            prompt,
+            TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain(
+            selected,
+            capability => capability.ContractId.StartsWith("introspection.", StringComparison.Ordinal));
+    }
+
+    [Fact(DisplayName =
+        "an owner asking about journalled volume still reaches the tally tool through the exact-term fallback")]
+    public async Task AJournalQuestionStillReachesTheTallyTool()
+    {
+        var catalog = ActiveCapabilityCatalog.Create([new IntrospectionModule()]);
+        var router = new CapabilityRouter(catalog);
+
+        var selected = await router.SelectAsync(
+            new Abstractions.OwnerId("owner-a"),
+            "how often has a conversation recorded owner messages?",
+            TestContext.Current.CancellationToken);
+
+        Assert.Contains(selected, capability => capability.ContractId == TallyContractId);
     }
 }

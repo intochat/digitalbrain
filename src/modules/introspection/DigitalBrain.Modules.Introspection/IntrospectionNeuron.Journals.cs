@@ -13,7 +13,7 @@ internal sealed partial class IntrospectionNeuron
 
     private static readonly TimeSpan OccupiedSubjectTimeout = TimeSpan.FromSeconds(OccupiedSubjectSeconds);
 
-    private string? RefusalFor(NeuronId subject)
+    private async Task<string?> RefusalForAsync(NeuronId subject, CancellationToken cancellationToken)
     {
         if (subject == Id)
         {
@@ -25,6 +25,27 @@ internal sealed partial class IntrospectionNeuron
             return $"Neuron '{subject}' is the session that delivers every capability request, so it is "
                 + "mid-turn while this request runs; reading it would deadlock the turn. Ask for the "
                 + "neuron that produced the facts instead.";
+        }
+
+        // Resolving against activated neurons before touching GrainFactory keeps two failures out of
+        // the kernel: an unknown grain type would throw out of the handler and leave the outbox
+        // retrying for its whole horizon, and an unknown name would silently activate a fresh grain
+        // just by being asked about.
+        var activated = await ActivatedOwnerNeuronsAsync(cancellationToken);
+
+        if (!activated.Any(neuron => string.Equals(neuron.Type, subject.Type, StringComparison.OrdinalIgnoreCase)))
+        {
+            return $"No neuron of type '{subject.Type}' is activated for this owner. Ask "
+                + "introspection.read-topology-request for the neuron types that are running.";
+        }
+
+        if (!activated.Any(neuron =>
+            string.Equals(neuron.Type, subject.Type, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(neuron.GrainKey, subject.GrainKey, StringComparison.Ordinal)))
+        {
+            return $"No neuron '{subject}' is activated. Introspection never activates a neuron in "
+                + "order to look at it; ask introspection.read-topology-request for the neurons that "
+                + "are running.";
         }
 
         return null;
