@@ -4,11 +4,11 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
+using DigitalBrain.Shell.Aspire.Hosting;
 using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
@@ -40,12 +40,12 @@ public sealed class HostingProjectionContracts
 
         var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
+            .WithHttpEndpoint(name: ShellHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         var client = builder
             .AddContainer("client", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
+            .WithHttpEndpoint(name: ShellHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain.AsClient());
 
         var siloEnvironment = await FlutterHostingProjectionSupport

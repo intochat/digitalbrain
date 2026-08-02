@@ -1,10 +1,10 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.AccountEnrichment;
 using DigitalBrain.Behaviors;
-using DigitalBrain.Flutter;
 using DigitalBrain.Google;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Mcp.Testing;
+using DigitalBrain.Shell;
 using DigitalBrain.Testing;
 
 namespace DigitalBrain.Integrations.Tests;
@@ -48,7 +48,7 @@ public sealed class IntegrationsFixture : DigitalBrainFixture
         brain.AddModule<GoogleModule>();
         brain.AddModule<SalesforceModule>();
         brain.AddModule<EnrichmentModule>();
-        brain.AddModule<FlutterModule>();
+        brain.AddModule<ShellModule>();
         brain.AddModule<IntegrationsHarnessModule>();
         IntegrationsGmailHosts.ResetRuntimeState();
         IntegrationsGmailHosts.ApplyConfiguration(brain);

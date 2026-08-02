@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using DigitalBrain.Compositions;
-using DigitalBrain.Flutter;
+using DigitalBrain.Shell;
 using Xunit;
 
 namespace DigitalBrain.OS.Bdd.Tests;

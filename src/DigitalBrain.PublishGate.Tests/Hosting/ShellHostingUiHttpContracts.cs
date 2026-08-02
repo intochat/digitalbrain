@@ -4,8 +4,8 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Flutter;
-using DigitalBrain.Flutter.Aspire.Hosting;
+using DigitalBrain.Shell;
+using DigitalBrain.Shell.Aspire.Hosting;
 using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
@@ -13,14 +13,14 @@ namespace DigitalBrain.Tests.Hosting;
 public sealed class FlutterHostingUiHttpContracts
 {
     [Fact(DisplayName =
-        "WithUiEdge projects " + FlutterHostingExtensions.DefaultUIResourceName
+        "WithUiEdge projects " + ShellHostingExtensions.DefaultUIResourceName
         + " as a client with late-bound module topology and no silo secrets")]
     public async Task WithUiEdgeProjectsLateBoundModuleTopologyWithoutSiloSecrets()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
 
-        brain.AddModule<FlutterModule>(flutter => flutter.WithUiEdge(options =>
+        brain.AddModule<ShellModule>(flutter => flutter.WithUiEdge(options =>
         {
             options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath;
             options.Owner = "ui-owner";
@@ -29,12 +29,12 @@ public sealed class FlutterHostingUiHttpContracts
 
         var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
+            .WithHttpEndpoint(name: ShellHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         var ui = Assert.Single(
             builder.Resources.OfType<ProjectResource>(),
-            resource => resource.Name == FlutterHostingExtensions.DefaultUIResourceName);
+            resource => resource.Name == ShellHostingExtensions.DefaultUIResourceName);
 
         FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);
         FlutterHostingProjectionSupport.AssertUIHasNamedHttpEndpoint(ui);
@@ -42,10 +42,10 @@ public sealed class FlutterHostingUiHttpContracts
         var environment = await FlutterHostingProjectionSupport.EnvironmentOf(ui).ConfigureAwait(true);
         FlutterHostingProjectionSupport.AssertClientSafeUIProductEnvironment(
             environment,
-            [FlutterModule.Id.Value, AIModule.Id.Value]);
+            [ShellModule.Id.Value, AIModule.Id.Value]);
         Assert.Equal(
             "ui-owner",
-            environment[FlutterHostingExtensions.OwnerEnvironmentVariable]?.ToString());
+            environment[ShellHostingExtensions.OwnerEnvironmentVariable]?.ToString());
         Assert.DoesNotContain(
             FlutterHostingProjectionSupport.JournalConnectionEnvironmentKey,
             environment.Keys);

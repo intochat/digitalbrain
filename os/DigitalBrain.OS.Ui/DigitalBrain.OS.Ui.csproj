@@ -10,7 +10,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\modules\chat\DigitalBrain.Modules.Chat.Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\modules\flutter\DigitalBrain.Modules.Flutter.Contracts\DigitalBrain.Modules.Flutter.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\modules\shell\DigitalBrain.Modules.Shell.Contracts\DigitalBrain.Modules.Shell.Contracts.csproj" />
     <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\src\core\behaviors\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />

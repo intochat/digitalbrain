@@ -4,8 +4,8 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
-using DigitalBrain.Flutter;
 using DigitalBrain.Mcp;
+using DigitalBrain.Shell;
 
 namespace DigitalBrain.Flutter.Http;
 

@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Flutter;
+namespace DigitalBrain.Shell;
 
 [GenerateSerializer]
 [Alias("flutter.open-scene")]

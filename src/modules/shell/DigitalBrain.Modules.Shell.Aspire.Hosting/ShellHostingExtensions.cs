@@ -2,9 +2,9 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
 
-namespace DigitalBrain.Flutter.Aspire.Hosting;
+namespace DigitalBrain.Shell.Aspire.Hosting;
 
-public static class FlutterHostingExtensions
+public static class ShellHostingExtensions
 {
     public const string DefaultUIResourceName = "digitalbrain-ui";
     public const string DefaultFlutterResourceName = "digitalbrain-flutter";
@@ -24,35 +24,35 @@ public static class FlutterHostingExtensions
     public const string UiEdgeEndpointName = "http";
     public const string UiEdgeHealthPath = "/health";
 
-    public static DigitalBrainModuleBuilder<FlutterModule> WithUiEdge(
-        this DigitalBrainModuleBuilder<FlutterModule> module,
-        Action<FlutterUiEdgeOptions>? configure = null)
+    public static DigitalBrainModuleBuilder<ShellModule> WithUiEdge(
+        this DigitalBrainModuleBuilder<ShellModule> module,
+        Action<ShellUiEdgeOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(module);
 
-        var options = new FlutterUiEdgeOptions();
+        var options = new ShellUiEdgeOptions();
         configure?.Invoke(options);
         GetOrCreateState(module).EnsureUiEdge(options);
         return module;
     }
 
-    public static DigitalBrainModuleBuilder<FlutterModule> WithHeadlessHost(
-        this DigitalBrainModuleBuilder<FlutterModule> module,
+    public static DigitalBrainModuleBuilder<ShellModule> WithHeadlessHost(
+        this DigitalBrainModuleBuilder<ShellModule> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Headless, configure);
 
-    public static DigitalBrainModuleBuilder<FlutterModule> WithWindowHost(
-        this DigitalBrainModuleBuilder<FlutterModule> module,
+    public static DigitalBrainModuleBuilder<ShellModule> WithWindowHost(
+        this DigitalBrainModuleBuilder<ShellModule> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Window, configure);
 
-    public static DigitalBrainModuleBuilder<FlutterModule> WithWebHost(
-        this DigitalBrainModuleBuilder<FlutterModule> module,
+    public static DigitalBrainModuleBuilder<ShellModule> WithWebHost(
+        this DigitalBrainModuleBuilder<ShellModule> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Web, configure);
 
-    private static DigitalBrainModuleBuilder<FlutterModule> ConfigureFlutterHost(
-        DigitalBrainModuleBuilder<FlutterModule> module,
+    private static DigitalBrainModuleBuilder<ShellModule> ConfigureFlutterHost(
+        DigitalBrainModuleBuilder<ShellModule> module,
         FlutterHostKind kind,
         Action<FlutterHostOptions>? configure)
     {
@@ -69,10 +69,10 @@ public static class FlutterHostingExtensions
         return module;
     }
 
-    private static FlutterHostingState GetOrCreateState(DigitalBrainModuleBuilder<FlutterModule> module)
+    private static ShellHostingState GetOrCreateState(DigitalBrainModuleBuilder<ShellModule> module)
     {
         var state = module.Brain.GetOrAddState(
-            static brain => new FlutterHostingState(brain),
+            static brain => new ShellHostingState(brain),
             out var added);
         if (added)
         {
@@ -82,12 +82,12 @@ public static class FlutterHostingExtensions
         return state;
     }
 
-    private sealed class FlutterHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
+    private sealed class ShellHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
     {
         private IResourceBuilder<ProjectResource>? _ui;
         private IResourceBuilder<ExecutableResource>? _flutterHost;
 
-        internal void EnsureUiEdge(FlutterUiEdgeOptions options)
+        internal void EnsureUiEdge(ShellUiEdgeOptions options)
         {
             if (_ui is not null)
             {
@@ -100,8 +100,8 @@ public static class FlutterHostingExtensions
             if (!File.Exists(projectPath))
             {
                 throw new InvalidOperationException(
-                    $"Flutter UI HTTP project was not found at '{projectPath}'. " +
-                    $"Pass {nameof(FlutterUiEdgeOptions)}.{nameof(FlutterUiEdgeOptions.ProjectPath)}, or place DigitalBrain.OS.Ui under os/.");
+                    $"UI HTTP project was not found at '{projectPath}'. " +
+                    $"Pass {nameof(ShellUiEdgeOptions)}.{nameof(ShellUiEdgeOptions.ProjectPath)}, or place DigitalBrain.OS.Ui under os/.");
             }
 
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
@@ -133,7 +133,7 @@ public static class FlutterHostingExtensions
 
             if (_ui is null)
             {
-                EnsureUiEdge(new FlutterUiEdgeOptions());
+                EnsureUiEdge(new ShellUiEdgeOptions());
             }
 
             var appHost = brain.GetApplicationBuilder();

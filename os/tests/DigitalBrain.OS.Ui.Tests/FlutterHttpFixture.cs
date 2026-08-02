@@ -1,9 +1,9 @@
 using DigitalBrain.AI;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Chat;
-using DigitalBrain.Flutter;
-using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.ServiceDefaults;
+using DigitalBrain.Shell;
+using DigitalBrain.Shell.Aspire.Hosting;
 using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
 
@@ -11,11 +11,11 @@ namespace DigitalBrain.Flutter.Http.Tests;
 
 public sealed class FlutterHttpFixture : DigitalBrainFixture
 {
-    public const string DefaultShellName = FlutterHostingExtensions.DefaultShellName;
+    public const string DefaultShellName = ShellHostingExtensions.DefaultShellName;
 
-    public const string DefaultUIResourceName = FlutterHostingExtensions.DefaultUIResourceName;
+    public const string DefaultUIResourceName = ShellHostingExtensions.DefaultUIResourceName;
 
-    public const string UIBaseEnvironmentVariable = FlutterHostingExtensions.UIBaseEnvironmentVariable;
+    public const string UIBaseEnvironmentVariable = ShellHostingExtensions.UIBaseEnvironmentVariable;
 
     public static Uri ResolveProductUIBaseAddress()
     {
@@ -41,7 +41,7 @@ public sealed class FlutterHttpFixture : DigitalBrainFixture
         builder.Configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
-                ["DigitalBrain:Modules:0"] = FlutterModule.Id.Value,
+                ["DigitalBrain:Modules:0"] = ShellModule.Id.Value,
                 ["DigitalBrain:Modules:1"] = ChatModule.Id.Value,
                 ["DigitalBrain:Modules:2"] = BehaviorsModule.Id.Value,
                 ["DigitalBrain:Modules:3"] = TasksModule.Id.Value,
@@ -68,7 +68,7 @@ public sealed class FlutterHttpFixture : DigitalBrainFixture
     protected override void Configure(DigitalBrainTestBuilder brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
-        brain.AddModule<FlutterModule>();
+        brain.AddModule<ShellModule>();
         brain.AddModule<ChatModule>();
         brain.AddModule<AIModule>();
         brain.AddModule<BehaviorsModule>();

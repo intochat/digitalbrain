@@ -16,8 +16,8 @@
     <ProjectReference Include="..\modules\ai\DigitalBrain.Modules.AI.Aspire.Hosting\DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
     <ProjectReference Include="..\modules\tasks\DigitalBrain.Modules.Tasks\DigitalBrain.Modules.Tasks.csproj" />
     <ProjectReference Include="..\modules\time\DigitalBrain.Modules.Time\DigitalBrain.Modules.Time.csproj" />
-    <ProjectReference Include="..\modules\flutter\DigitalBrain.Modules.Flutter\DigitalBrain.Modules.Flutter.csproj" />
-    <ProjectReference Include="..\modules\flutter\DigitalBrain.Modules.Flutter.Aspire.Hosting\DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
+    <ProjectReference Include="..\modules\shell\DigitalBrain.Modules.Shell\DigitalBrain.Modules.Shell.csproj" />
+    <ProjectReference Include="..\modules\shell\DigitalBrain.Modules.Shell.Aspire.Hosting\DigitalBrain.Modules.Shell.Aspire.Hosting.csproj" />
     <ProjectReference Include="..\modules\google\DigitalBrain.Modules.Google.Aspire.Hosting\DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />
     <ProjectReference Include="..\modules\salesforce\DigitalBrain.Modules.Salesforce.Aspire.Hosting\DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" />
     <ProjectReference Include="..\modules\memory\DigitalBrain.Modules.Memory.Contracts\DigitalBrain.Modules.Memory.Contracts.csproj" />

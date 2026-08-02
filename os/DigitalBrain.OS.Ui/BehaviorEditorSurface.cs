@@ -1,7 +1,7 @@
 using System.Text;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
-using DigitalBrain.Flutter;
+using DigitalBrain.Shell;
 
 namespace DigitalBrain.Flutter.Http;
 

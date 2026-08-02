@@ -1,7 +1,7 @@
 using Aspire.Hosting;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Flutter;
-using DigitalBrain.Flutter.Aspire.Hosting;
+using DigitalBrain.Shell;
+using DigitalBrain.Shell.Aspire.Hosting;
 using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
@@ -9,7 +9,7 @@ namespace DigitalBrain.Tests.Hosting;
 public sealed class FlutterHostingSelectionContracts
 {
     [Fact(DisplayName =
-        "omit FlutterModule → runtime graph has no digitalbrain-ui / digitalbrain-flutter")]
+        "omit ShellModule → runtime graph has no digitalbrain-ui / digitalbrain-flutter")]
     public void OmitFlutterModuleProjectsNoOSSurfaceResources()
     {
         var builder = DistributedApplication.CreateBuilder();
@@ -17,23 +17,23 @@ public sealed class FlutterHostingSelectionContracts
 
         _ = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
+            .WithHttpEndpoint(name: ShellHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         FlutterHostingProjectionSupport.AssertNoOSSurfaceResources(builder);
     }
 
     [Fact(DisplayName =
-        "FlutterModule without With* is vocabulary-only: silo lists module, runtime graph has no OS surface")]
+        "ShellModule without With* is vocabulary-only: silo lists module, runtime graph has no OS surface")]
     public async Task VocabularyOnlySelectionDoesNotStartOSSurface()
     {
         var builder = DistributedApplication.CreateBuilder();
         var brain = builder.AddDigitalBrain("brain");
-        brain.AddModule<FlutterModule>();
+        brain.AddModule<ShellModule>();
 
         var silo = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
+            .WithHttpEndpoint(name: ShellHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         var siloEnvironment = await FlutterHostingProjectionSupport
@@ -44,7 +44,7 @@ public sealed class FlutterHostingSelectionContracts
             entry => entry.Key.StartsWith("DigitalBrain__Modules__", StringComparison.Ordinal)
                 && string.Equals(
                     entry.Value?.ToString(),
-                    FlutterModule.Id.Value,
+                    ShellModule.Id.Value,
                     StringComparison.Ordinal));
 
         FlutterHostingProjectionSupport.AssertNoOSSurfaceResources(builder);

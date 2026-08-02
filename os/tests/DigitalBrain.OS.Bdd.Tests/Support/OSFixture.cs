@@ -1,9 +1,9 @@
 using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Chat;
-using DigitalBrain.Flutter;
 using DigitalBrain.Memory;
 using DigitalBrain.OS;
+using DigitalBrain.Shell;
 using DigitalBrain.Testing;
 using DigitalBrain.Time;
 using Microsoft.Extensions.AI;
@@ -16,7 +16,7 @@ public sealed class OSFixture : DigitalBrainFixture
     protected override void Configure(DigitalBrainTestBuilder brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
-        brain.AddModule<FlutterModule>();
+        brain.AddModule<ShellModule>();
         brain.AddModule<ChatModule>();
         brain.AddModule<AIModule>();
         brain.AddModule<MemoryModule>();

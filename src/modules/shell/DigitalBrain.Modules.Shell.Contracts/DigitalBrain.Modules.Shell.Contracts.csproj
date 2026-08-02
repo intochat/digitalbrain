@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Flutter module contracts: shell and scene neurons plus UI fact vocabulary.</Description>
-    <RootNamespace>DigitalBrain.Flutter</RootNamespace>
+    <Description>Shell module contracts: shell and scene neurons plus UI fact vocabulary.</Description>
+    <RootNamespace>DigitalBrain.Shell</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />

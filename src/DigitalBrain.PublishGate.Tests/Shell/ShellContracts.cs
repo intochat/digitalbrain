@@ -1,27 +1,27 @@
 using System.Reflection;
 using System.Text.Json.Nodes;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Flutter;
-using DigitalBrain.Flutter.Aspire.Hosting;
+using DigitalBrain.Shell;
+using DigitalBrain.Shell.Aspire.Hosting;
 using Xunit;
 
-namespace DigitalBrain.Tests.Flutter;
+namespace DigitalBrain.Tests.Shell;
 
-public sealed class FlutterContracts
+public sealed class ShellContracts
 {
-    private static readonly string FlutterNamespace =
+    private static readonly string ShellNamespace =
         typeof(IShell).Namespace
         ?? throw new InvalidOperationException($"{nameof(IShell)} has no namespace.");
 
     [Fact(DisplayName =
-        "Flutter.Contracts public vocabulary is first-five surface only — no IFlutter god")]
+        "Shell.Contracts public vocabulary is first-five surface only — no IFlutter god")]
     public void PublicVocabularyIsFirstVerticalSurfaceOnly()
     {
         var contracts = typeof(IShell).Assembly;
 
         var vocabulary = contracts
             .GetExportedTypes()
-            .Where(type => type.Namespace == FlutterNamespace)
+            .Where(type => type.Namespace == ShellNamespace)
             .Select(type => type.Name)
             .Order(StringComparer.Ordinal)
             .ToArray();
@@ -37,9 +37,9 @@ public sealed class FlutterContracts
             vocabulary);
 
         Assert.Null(contracts.GetType($"DigitalBrain.Flutter.Http.{nameof(IShell)}"));
-        Assert.Null(contracts.GetType($"{FlutterNamespace}.IFlutter"));
+        Assert.Null(contracts.GetType($"{ShellNamespace}.IFlutter"));
         Assert.DoesNotContain(
-            contracts.GetExportedTypes().Concat(typeof(FlutterModule).Assembly.GetExportedTypes()),
+            contracts.GetExportedTypes().Concat(typeof(ShellModule).Assembly.GetExportedTypes()),
             type => type.Name is "IFlutter" or "Flutter" or "IUIRoot" or "IUIGateway" or "AutoHost");
     }
 
@@ -76,8 +76,8 @@ public sealed class FlutterContracts
         var goldenPath = RepositoryAssets.Path(
             "src",
             "modules",
-            "flutter",
-            "DigitalBrain.Modules.Flutter.Contracts",
+            "shell",
+            "DigitalBrain.Modules.Shell.Contracts",
             "flutter-wire-contracts.golden.json");
 
         Assert.True(File.Exists(goldenPath), $"the Dart-facing golden is missing at {goldenPath}");
@@ -87,27 +87,27 @@ public sealed class FlutterContracts
     }
 
     [Fact(DisplayName =
-        "Flutter runtime public surface is FlutterModule only — ShellNeuron/SceneNeuron stay internal")]
+        "Shell runtime public surface is ShellModule only — ShellNeuron/SceneNeuron stay internal")]
     public void RuntimePublicSurfaceIsModuleMarkerOnly()
     {
-        var exported = typeof(FlutterModule).Assembly
+        var exported = typeof(ShellModule).Assembly
             .GetExportedTypes()
             .Select(type => type.Name)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal([nameof(FlutterModule)], exported);
+        Assert.Equal([nameof(ShellModule)], exported);
         Assert.DoesNotContain(
-            typeof(FlutterModule).Assembly.GetExportedTypes(),
+            typeof(ShellModule).Assembly.GetExportedTypes(),
             type => type.Name is "ShellNeuron" or "SceneNeuron" or "IFlutter" or "IUIGateway");
     }
 
     [Fact(DisplayName =
-        "Flutter.Aspire.Hosting public surface is projection API only — WithHeadlessHost/WithWindowHost/WithWebHost, no marker types")]
+        "Shell.Aspire.Hosting public surface is projection API only — WithHeadlessHost/WithWindowHost/WithWebHost, no marker types")]
     public void HostingPublicSurfaceIsProjectionApiOnly()
     {
-        var hostingNamespace = typeof(FlutterHostingExtensions).Namespace;
-        var exported = typeof(FlutterHostingExtensions).Assembly
+        var hostingNamespace = typeof(ShellHostingExtensions).Namespace;
+        var exported = typeof(ShellHostingExtensions).Assembly
             .GetExportedTypes()
             .Where(type => type.Namespace == hostingNamespace)
             .Select(type => type.Name)
@@ -117,13 +117,13 @@ public sealed class FlutterContracts
         Assert.Equal(
             [
                 nameof(FlutterHostOptions),
-                nameof(FlutterHostingExtensions),
-                nameof(FlutterUiEdgeOptions),
+                nameof(ShellHostingExtensions),
+                nameof(ShellUiEdgeOptions),
             ],
             exported);
 
         Assert.DoesNotContain(
-            typeof(FlutterHostingExtensions).Assembly.GetExportedTypes(),
+            typeof(ShellHostingExtensions).Assembly.GetExportedTypes(),
             type => type.Name is "AutoHost" or "DesktopHost" or "HeadlessHost"
                 or "FlutterHostLaunch" or "FlutterHostKind" or "IFlutter");
     }
@@ -132,7 +132,7 @@ public sealed class FlutterContracts
     {
         var types = assembly
             .GetExportedTypes()
-            .Where(type => type.Namespace == FlutterNamespace)
+            .Where(type => type.Namespace == ShellNamespace)
             .OrderBy(type => type.Name, StringComparer.Ordinal)
             .Select(DescribeType)
             .ToArray();
@@ -140,7 +140,7 @@ public sealed class FlutterContracts
         return new JsonObject
         {
             ["version"] = 1,
-            ["namespace"] = FlutterNamespace,
+            ["namespace"] = ShellNamespace,
             ["types"] = new JsonArray(types.Select(node => (JsonNode)node).ToArray()),
         };
     }

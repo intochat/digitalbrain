@@ -1,8 +1,8 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Flutter;
+namespace DigitalBrain.Shell;
 
 [Alias("flutter.scene")]
-[Description("Flutter scene neuron")]
+[Description("Shell scene neuron")]
 public partial interface IScene : INeuron;

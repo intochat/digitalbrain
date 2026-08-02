@@ -4,10 +4,10 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
-using DigitalBrain.Flutter;
 using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
+using DigitalBrain.Shell;
 using DigitalBrain.Tasks;
 using DigitalBrain.Time;
 using Xunit;
@@ -127,7 +127,7 @@ public sealed class CapabilityToolBinding
         ICompiledModule[] modules =
         [
             new AIModule(),
-            new FlutterModule(),
+            new ShellModule(),
             new GoogleModule(),
             new SalesforceModule(),
             new TasksModule(),

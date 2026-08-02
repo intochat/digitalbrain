@@ -1,7 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Flutter.Aspire.Hosting;
+using DigitalBrain.Shell.Aspire.Hosting;
 using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
@@ -29,12 +29,12 @@ internal static class FlutterHostingProjectionSupport
             File.Exists(Path.Combine(shellDirectory, "lib", "main.dart")),
             "shell Windows chrome requires lib/main.dart (WithWindowHost uses clients/flutter/shell).");
         Assert.True(
-            Directory.Exists(Path.Combine(shellDirectory, FlutterHostingExtensions.DefaultDeviceTarget)),
+            Directory.Exists(Path.Combine(shellDirectory, ShellHostingExtensions.DefaultDeviceTarget)),
             "shell Windows chrome requires windows/ (WithWindowHost uses clients/flutter/shell).");
         Assert.False(
             File.Exists(Path.Combine(
                 shellDirectory,
-                FlutterHostingExtensions.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar))),
+                ShellHostingExtensions.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar))),
             "shell is window/web chrome — headless entry stays on pure-Dart core.");
         var pubspec = await File.ReadAllTextAsync(
             Path.Combine(shellDirectory, "pubspec.yaml"),
@@ -46,12 +46,12 @@ internal static class FlutterHostingProjectionSupport
     {
         await AssertShellDesktopLayoutAsync(shellDirectory, cancellationToken).ConfigureAwait(true);
         Assert.True(
-            Directory.Exists(Path.Combine(shellDirectory, FlutterHostingExtensions.WebPlatformDirectoryName)),
+            Directory.Exists(Path.Combine(shellDirectory, ShellHostingExtensions.WebPlatformDirectoryName)),
             "shell web host requires web/ (WithWebHost uses clients/flutter/shell).");
         Assert.True(
             File.Exists(Path.Combine(
                 shellDirectory,
-                FlutterHostingExtensions.WebPlatformDirectoryName,
+                ShellHostingExtensions.WebPlatformDirectoryName,
                 "index.html")),
             "shell web host requires web/index.html.");
     }
@@ -64,13 +64,13 @@ internal static class FlutterHostingProjectionSupport
         Assert.True(
             File.Exists(Path.Combine(
                 clientDirectory,
-                FlutterHostingExtensions.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar))),
-            $"pure-Dart package hosts {FlutterHostingExtensions.HeadlessHostEntry}.");
+                ShellHostingExtensions.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar))),
+            $"pure-Dart package hosts {ShellHostingExtensions.HeadlessHostEntry}.");
         Assert.False(
             File.Exists(Path.Combine(clientDirectory, "lib", "main.dart")),
             "desktop entry lives in clients/flutter/shell — core must not claim lib/main.dart.");
         Assert.False(
-            Directory.Exists(Path.Combine(clientDirectory, FlutterHostingExtensions.DefaultDeviceTarget)),
+            Directory.Exists(Path.Combine(clientDirectory, ShellHostingExtensions.DefaultDeviceTarget)),
             "desktop runner lives in clients/flutter/shell — core must not claim windows/.");
         var pubspec = await File.ReadAllTextAsync(
             Path.Combine(clientDirectory, "pubspec.yaml"),
@@ -81,8 +81,8 @@ internal static class FlutterHostingProjectionSupport
     public static void AssertNoOSSurfaceResources(IDistributedApplicationBuilder builder)
     {
         var surface = builder.Resources
-            .Where(static resource => resource.Name is FlutterHostingExtensions.DefaultUIResourceName
-                or FlutterHostingExtensions.DefaultFlutterResourceName)
+            .Where(static resource => resource.Name is ShellHostingExtensions.DefaultUIResourceName
+                or ShellHostingExtensions.DefaultFlutterResourceName)
             .Select(static resource => $"{resource.GetType().Name}:{resource.Name}")
             .ToArray();
         Assert.True(
@@ -94,7 +94,7 @@ internal static class FlutterHostingProjectionSupport
     {
         Assert.DoesNotContain(
             builder.Resources,
-            resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
+            resource => resource.Name == ShellHostingExtensions.DefaultFlutterResourceName);
     }
 
     public static void AssertUIHasNamedHttpEndpoint(IResource ui)
@@ -103,9 +103,9 @@ internal static class FlutterHostingProjectionSupport
             ui.Annotations.OfType<EndpointAnnotation>(),
             endpoint => string.Equals(
                 endpoint.Name,
-                FlutterHostingExtensions.UiEdgeEndpointName,
+                ShellHostingExtensions.UiEdgeEndpointName,
                 StringComparison.Ordinal));
-        Assert.Equal(FlutterHostingExtensions.UiEdgeEndpointName, http.UriScheme, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(ShellHostingExtensions.UiEdgeEndpointName, http.UriScheme, StringComparer.OrdinalIgnoreCase);
     }
 
     public static void AssertExclusiveFlutterHostEnvironment(HashSet<string> environment)
@@ -113,9 +113,9 @@ internal static class FlutterHostingProjectionSupport
         Assert.Equal(
             new HashSet<string>(StringComparer.Ordinal)
             {
-                FlutterHostingExtensions.UIBaseEnvironmentVariable,
-                FlutterHostingExtensions.ShellEnvironmentVariable,
-                FlutterHostingExtensions.ChatEnvironmentVariable,
+                ShellHostingExtensions.UIBaseEnvironmentVariable,
+                ShellHostingExtensions.ShellEnvironmentVariable,
+                ShellHostingExtensions.ChatEnvironmentVariable,
             },
             environment);
     }
@@ -133,7 +133,7 @@ internal static class FlutterHostingProjectionSupport
 
         var expected = new HashSet<string>(StringComparer.Ordinal)
         {
-            FlutterHostingExtensions.OwnerEnvironmentVariable,
+            ShellHostingExtensions.OwnerEnvironmentVariable,
         };
         for (var index = 0; index < modules.Count; index++)
         {

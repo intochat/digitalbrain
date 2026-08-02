@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "namespace": "DigitalBrain.Flutter",
+  "namespace": "DigitalBrain.Shell",
   "types": [
     {
       "name": "ControlActivated",

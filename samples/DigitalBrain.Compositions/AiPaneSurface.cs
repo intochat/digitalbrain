@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Client;
-using DigitalBrain.Flutter;
+using DigitalBrain.Shell;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Compositions;

@@ -1,6 +1,6 @@
 using System.Net.ServerSentEvents;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Flutter;
+using DigitalBrain.Shell;
 
 namespace DigitalBrain.Flutter.Http;
 

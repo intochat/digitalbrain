@@ -1,11 +1,11 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Flutter;
+namespace DigitalBrain.Shell;
 
 [GenerateSerializer]
 [Alias("flutter.control-activated")]
-[Description("A Flutter control was activated")]
+[Description("A shell control was activated")]
 public sealed record ControlActivated(
     [property: Id(0)] string SceneKey,
     [property: Id(1)] string ControlId,

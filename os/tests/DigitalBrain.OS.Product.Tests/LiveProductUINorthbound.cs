@@ -2,8 +2,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Flutter.Http;
+using DigitalBrain.Shell.Aspire.Hosting;
 using Xunit;
 
 namespace DigitalBrain.ProductTests;
@@ -40,7 +40,7 @@ public sealed class LiveProductUINorthbound
         {
             Assert.True(
                 health.IsSuccessStatusCode,
-                $"Product {FlutterHostingExtensions.DefaultUIResourceName} {FlutterHttpContract.HealthPath} not OK at {baseAddress}. Start: aspire start --project os/DigitalBrain.OS.AppHost. Status={(int)health.StatusCode}. Override with {FlutterHostingExtensions.UIBaseEnvironmentVariable}.");
+                $"Product {ShellHostingExtensions.DefaultUIResourceName} {FlutterHttpContract.HealthPath} not OK at {baseAddress}. Start: aspire start --project os/DigitalBrain.OS.AppHost. Status={(int)health.StatusCode}. Override with {ShellHostingExtensions.UIBaseEnvironmentVariable}.");
         }
 
         var shellEventsPath = FlutterHttpContract.ShellEventsPath.Replace("{shellName}", shellName, StringComparison.Ordinal)
@@ -68,7 +68,7 @@ public sealed class LiveProductUINorthbound
 
     private static Uri ResolveProductUIBaseAddress()
     {
-        var configured = Environment.GetEnvironmentVariable(FlutterHostingExtensions.UIBaseEnvironmentVariable);
+        var configured = Environment.GetEnvironmentVariable(ShellHostingExtensions.UIBaseEnvironmentVariable);
         return string.IsNullOrWhiteSpace(configured)
             ? DefaultUIBaseAddress
             : new Uri(configured.TrimEnd('/') + "/");

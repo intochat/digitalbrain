@@ -7,8 +7,6 @@ using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Chat;
-using DigitalBrain.Flutter;
-using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.Memory;
@@ -16,6 +14,8 @@ using DigitalBrain.Memory.Aspire.Hosting;
 using DigitalBrain.OS;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
+using DigitalBrain.Shell;
+using DigitalBrain.Shell.Aspire.Hosting;
 using DigitalBrain.Tasks;
 using DigitalBrain.Time;
 using Microsoft.Extensions.Hosting;
@@ -33,7 +33,7 @@ brain.AddModule<AIModule>(ai =>
 brain.AddModule<ChatModule>();
 brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
 brain.AddModule<OSBehaviorsModule>();
-brain.AddModule<FlutterModule>(flutter => flutter
+brain.AddModule<ShellModule>(shell => shell
     .WithUiEdge()
     //.WithHeadlessHost() // pure-Dart host; swap with window for headless-only dev
     //.WithWebHost() // deploy UX: flutter run -d chrome under shell/; local default stays window
@@ -66,8 +66,8 @@ var silo = builder.AddProject<Projects.DigitalBrain_OS_Host>(ProductSurfaceResou
         BehaviorBrokerContract.CredentialConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
         behaviorBrokerCredential)
     .WithEnvironment(
-        FlutterHostingExtensions.OwnerEnvironmentVariable,
-        FlutterHostingExtensions.DefaultOwner)
+        ShellHostingExtensions.OwnerEnvironmentVariable,
+        ShellHostingExtensions.DefaultOwner)
     .WithHttpEndpoint(
         port: ProductSurfaceResources.McpHttpPort,
         name: ProductSurfaceResources.McpHttpEndpointName,
@@ -92,8 +92,8 @@ var behaviorHost = builder.AddProject<Projects.DigitalBrain_OS_BehaviorHost>(Pro
     .WithHttpHealthCheck("/health")
     .WaitFor(silo)
     .WithEnvironment(
-        FlutterHostingExtensions.OwnerEnvironmentVariable,
-        FlutterHostingExtensions.DefaultOwner);
+        ShellHostingExtensions.OwnerEnvironmentVariable,
+        ShellHostingExtensions.DefaultOwner);
 
 silo.WithReference(behaviorHost)
     .WithEnvironment(

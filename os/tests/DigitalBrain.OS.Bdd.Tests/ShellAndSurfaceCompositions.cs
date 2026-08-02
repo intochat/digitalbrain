@@ -1,5 +1,5 @@
 using DigitalBrain.Compositions;
-using DigitalBrain.Flutter;
+using DigitalBrain.Shell;
 using DigitalBrain.Testing;
 using DigitalBrain.Time;
 using Xunit;

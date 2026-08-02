@@ -1,6 +1,6 @@
 using System.Reflection;
-using DigitalBrain.Flutter;
 using DigitalBrain.Kernel;
+using DigitalBrain.Shell;
 using Xunit;
 
 namespace DigitalBrain.Tests.Contracts;

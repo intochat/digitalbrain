@@ -1,4 +1,4 @@
-using DigitalBrain.Flutter.Aspire.Hosting;
+using DigitalBrain.Shell.Aspire.Hosting;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 

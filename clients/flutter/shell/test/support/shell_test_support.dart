@@ -25,7 +25,7 @@ BrainTopologySnapshot shellTopology() => BrainTopologySnapshot(
   modules: const [
     BrainModule(id: 'DigitalBrain.Chat.ChatModule'),
     BrainModule(id: 'DigitalBrain.AI.AIModule'),
-    BrainModule(id: 'DigitalBrain.Flutter.FlutterModule'),
+    BrainModule(id: 'DigitalBrain.Shell.ShellModule'),
     BrainModule(id: 'DigitalBrain.Google.GoogleModule'),
     BrainModule(id: 'DigitalBrain.OS.OSBehaviorsModule'),
     BrainModule(id: 'DigitalBrain.Salesforce.SalesforceModule'),

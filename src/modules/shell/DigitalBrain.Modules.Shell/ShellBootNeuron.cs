@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 
-namespace DigitalBrain.Flutter;
+namespace DigitalBrain.Shell;
 
 [GrainType("shell-boot")]
 internal sealed class ShellBootNeuron :

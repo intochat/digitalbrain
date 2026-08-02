@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
-using DigitalBrain.Flutter;
+using DigitalBrain.Shell;
 using Xunit;
 
 namespace DigitalBrain.Flutter.Http.Tests;

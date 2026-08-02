@@ -18,7 +18,7 @@
     <ProjectReference Include="..\..\..\modules\salesforce\DigitalBrain.Modules.Salesforce.Contracts\DigitalBrain.Modules.Salesforce.Contracts.csproj" />
     <ProjectReference Include="..\..\..\modules\salesforce\DigitalBrain.Modules.Salesforce\DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="..\..\..\..\samples/DigitalBrain.AccountEnrichment\DigitalBrain.AccountEnrichment.csproj" />
-    <ProjectReference Include="..\..\..\modules\flutter\DigitalBrain.Modules.Flutter\DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="..\..\..\modules\shell\DigitalBrain.Modules.Shell\DigitalBrain.Modules.Shell.csproj" />
     <ProjectReference Include="..\..\..\..\os\DigitalBrain.OS.Ui\DigitalBrain.OS.Ui.csproj" />
     <ProjectReference Include="..\..\aspire\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
     <ProjectReference Include="..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />

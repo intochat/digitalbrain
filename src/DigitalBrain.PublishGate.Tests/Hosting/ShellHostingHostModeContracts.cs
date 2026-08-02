@@ -1,8 +1,8 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Flutter;
-using DigitalBrain.Flutter.Aspire.Hosting;
+using DigitalBrain.Shell;
+using DigitalBrain.Shell.Aspire.Hosting;
 using Xunit;
 
 namespace DigitalBrain.Tests.Hosting;
@@ -20,7 +20,7 @@ public sealed class FlutterHostingHostModeContracts
             TestContext.Current.CancellationToken).ConfigureAwait(true);
 
         const string pinnedFlutterCommand = "flutter";
-        brain.AddModule<FlutterModule>(flutter => flutter
+        brain.AddModule<ShellModule>(flutter => flutter
             .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
             .WithWindowHost(options =>
             {
@@ -30,12 +30,12 @@ public sealed class FlutterHostingHostModeContracts
 
         _ = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
+            .WithHttpEndpoint(name: ShellHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         var host = Assert.Single(
             builder.Resources.OfType<ExecutableResource>(),
-            resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
+            resource => resource.Name == ShellHostingExtensions.DefaultFlutterResourceName);
 
         Assert.Equal(pinnedFlutterCommand, host.Command, StringComparer.OrdinalIgnoreCase);
         Assert.Equal(
@@ -43,18 +43,18 @@ public sealed class FlutterHostingHostModeContracts
             Path.GetFullPath(host.WorkingDirectory),
             StringComparer.OrdinalIgnoreCase);
         var args = await FlutterHostingProjectionSupport.ResolvedArgsOf(host).ConfigureAwait(true);
-        Assert.Equal(["run", "-d", FlutterHostingExtensions.DefaultDeviceTarget], args);
+        Assert.Equal(["run", "-d", ShellHostingExtensions.DefaultDeviceTarget], args);
 
         var environment = await FlutterHostingProjectionSupport.EnvironmentOf(host).ConfigureAwait(true);
         FlutterHostingProjectionSupport.AssertExclusiveFlutterHostEnvironment(
             environment.Keys.ToHashSet(StringComparer.Ordinal));
         Assert.Equal(
-            FlutterHostingExtensions.DefaultShellName,
-            environment[FlutterHostingExtensions.ShellEnvironmentVariable]?.ToString());
+            ShellHostingExtensions.DefaultShellName,
+            environment[ShellHostingExtensions.ShellEnvironmentVariable]?.ToString());
 
         var ui = Assert.Single(
             builder.Resources,
-            resource => resource.Name == FlutterHostingExtensions.DefaultUIResourceName);
+            resource => resource.Name == ShellHostingExtensions.DefaultUIResourceName);
         FlutterHostingProjectionSupport.AssertUIHasNamedHttpEndpoint(ui);
         Assert.Contains(
             host.Annotations.OfType<WaitAnnotation>(),
@@ -73,7 +73,7 @@ public sealed class FlutterHostingHostModeContracts
             TestContext.Current.CancellationToken).ConfigureAwait(true);
 
         const string pinnedDartCommand = "dart";
-        brain.AddModule<FlutterModule>(flutter => flutter
+        brain.AddModule<ShellModule>(flutter => flutter
             .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
             .WithHeadlessHost(options =>
             {
@@ -83,12 +83,12 @@ public sealed class FlutterHostingHostModeContracts
 
         _ = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
+            .WithHttpEndpoint(name: ShellHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         var host = Assert.Single(
             builder.Resources.OfType<ExecutableResource>(),
-            resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
+            resource => resource.Name == ShellHostingExtensions.DefaultFlutterResourceName);
 
         Assert.Equal(pinnedDartCommand, host.Command, StringComparer.OrdinalIgnoreCase);
         Assert.Equal(
@@ -96,17 +96,17 @@ public sealed class FlutterHostingHostModeContracts
             Path.GetFullPath(host.WorkingDirectory),
             StringComparer.OrdinalIgnoreCase);
         var args = await FlutterHostingProjectionSupport.ResolvedArgsOf(host).ConfigureAwait(true);
-        Assert.Equal(["run", FlutterHostingExtensions.HeadlessHostEntry], args);
+        Assert.Equal(["run", ShellHostingExtensions.HeadlessHostEntry], args);
         Assert.DoesNotContain(
             args,
-            arg => arg is "-d" || arg == FlutterHostingExtensions.DefaultDeviceTarget);
+            arg => arg is "-d" || arg == ShellHostingExtensions.DefaultDeviceTarget);
 
         var environment = await FlutterHostingProjectionSupport.EnvironmentOf(host).ConfigureAwait(true);
         FlutterHostingProjectionSupport.AssertExclusiveFlutterHostEnvironment(
             environment.Keys.ToHashSet(StringComparer.Ordinal));
         Assert.Equal(
-            FlutterHostingExtensions.DefaultShellName,
-            environment[FlutterHostingExtensions.ShellEnvironmentVariable]?.ToString());
+            ShellHostingExtensions.DefaultShellName,
+            environment[ShellHostingExtensions.ShellEnvironmentVariable]?.ToString());
     }
 
     [Fact(DisplayName =
@@ -123,16 +123,16 @@ public sealed class FlutterHostingHostModeContracts
                 "name: headless_only\n");
             var headlessEntry = Path.Combine(
                 headlessOnly.FullName,
-                FlutterHostingExtensions.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar));
+                ShellHostingExtensions.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(headlessEntry)!);
             File.WriteAllText(headlessEntry, "void main() {}\n");
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
-                brain.AddModule<FlutterModule>(flutter => flutter
+                brain.AddModule<ShellModule>(flutter => flutter
                     .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
                     .WithWindowHost(options => options.WorkingDirectory = headlessOnly.FullName)));
 
-            Assert.Contains(nameof(FlutterHostingExtensions.WithHeadlessHost), exception.Message, StringComparison.Ordinal);
+            Assert.Contains(nameof(ShellHostingExtensions.WithHeadlessHost), exception.Message, StringComparison.Ordinal);
             FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);
         }
         finally
@@ -155,13 +155,13 @@ public sealed class FlutterHostingHostModeContracts
                 "name: empty\n");
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
-                brain.AddModule<FlutterModule>(flutter => flutter
+                brain.AddModule<ShellModule>(flutter => flutter
                     .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
                     .WithHeadlessHost(options =>
                         options.WorkingDirectory = emptyPackage.FullName)));
 
             Assert.Contains(
-                FlutterHostingExtensions.HeadlessHostEntry,
+                ShellHostingExtensions.HeadlessHostEntry,
                 exception.Message,
                 StringComparison.Ordinal);
             FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);
@@ -183,7 +183,7 @@ public sealed class FlutterHostingHostModeContracts
             "digitalbrain-missing-flutter-" + Guid.NewGuid().ToString("N"));
 
         _ = Assert.Throws<InvalidOperationException>(() =>
-            brain.AddModule<FlutterModule>(flutter => flutter
+            brain.AddModule<ShellModule>(flutter => flutter
                 .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
                 .WithWindowHost(options => options.WorkingDirectory = missing)));
 
@@ -201,7 +201,7 @@ public sealed class FlutterHostingHostModeContracts
             TestContext.Current.CancellationToken).ConfigureAwait(true);
 
         const string pinnedFlutterCommand = "flutter";
-        brain.AddModule<FlutterModule>(flutter => flutter
+        brain.AddModule<ShellModule>(flutter => flutter
             .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
             .WithWebHost(options =>
             {
@@ -211,12 +211,12 @@ public sealed class FlutterHostingHostModeContracts
 
         _ = builder
             .AddContainer("silo", "mcr.microsoft.com/dotnet/runtime")
-            .WithHttpEndpoint(name: FlutterHostingExtensions.UiEdgeEndpointName)
+            .WithHttpEndpoint(name: ShellHostingExtensions.UiEdgeEndpointName)
             .WithReference(brain);
 
         var host = Assert.Single(
             builder.Resources.OfType<ExecutableResource>(),
-            resource => resource.Name == FlutterHostingExtensions.DefaultFlutterResourceName);
+            resource => resource.Name == ShellHostingExtensions.DefaultFlutterResourceName);
 
         Assert.Equal(pinnedFlutterCommand, host.Command, StringComparer.OrdinalIgnoreCase);
         Assert.Equal(
@@ -225,14 +225,14 @@ public sealed class FlutterHostingHostModeContracts
             StringComparer.OrdinalIgnoreCase);
         var args = await FlutterHostingProjectionSupport.ResolvedArgsOf(host).ConfigureAwait(true);
         Assert.Equal(
-            ["run", "-d", FlutterHostingExtensions.DefaultWebDeviceTarget],
+            ["run", "-d", ShellHostingExtensions.DefaultWebDeviceTarget],
             args.Take(3).ToArray());
         Assert.Contains(
-            $"--dart-define={FlutterHostingExtensions.ShellEnvironmentVariable}={FlutterHostingExtensions.DefaultShellName}",
+            $"--dart-define={ShellHostingExtensions.ShellEnvironmentVariable}={ShellHostingExtensions.DefaultShellName}",
             args,
             StringComparer.Ordinal);
         Assert.Contains(
-            $"--dart-define={FlutterHostingExtensions.ChatEnvironmentVariable}={FlutterHostingExtensions.DefaultChatName}",
+            $"--dart-define={ShellHostingExtensions.ChatEnvironmentVariable}={ShellHostingExtensions.DefaultChatName}",
             args,
             StringComparer.Ordinal);
 
@@ -242,7 +242,7 @@ public sealed class FlutterHostingHostModeContracts
             rawArgs,
             arg => arg is ReferenceExpression expression
                 && expression.ValueExpression.Contains(
-                    FlutterHostingExtensions.UIBaseEnvironmentVariable,
+                    ShellHostingExtensions.UIBaseEnvironmentVariable,
                     StringComparison.Ordinal));
 
         var environment = await FlutterHostingProjectionSupport.EnvironmentOf(host).ConfigureAwait(true);
@@ -265,14 +265,14 @@ public sealed class FlutterHostingHostModeContracts
             Directory.CreateDirectory(Path.Combine(windowOnly.FullName, "lib"));
             File.WriteAllText(Path.Combine(windowOnly.FullName, "lib", "main.dart"), "void main() {}\n");
             Directory.CreateDirectory(
-                Path.Combine(windowOnly.FullName, FlutterHostingExtensions.DefaultDeviceTarget));
+                Path.Combine(windowOnly.FullName, ShellHostingExtensions.DefaultDeviceTarget));
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
-                brain.AddModule<FlutterModule>(flutter => flutter
+                brain.AddModule<ShellModule>(flutter => flutter
                     .WithUiEdge(options => options.ProjectPath = FlutterHostingProjectionSupport.UIProjectPath)
                     .WithWebHost(options => options.WorkingDirectory = windowOnly.FullName)));
 
-            Assert.Contains(nameof(FlutterHostingExtensions.WithWindowHost), exception.Message, StringComparison.Ordinal);
+            Assert.Contains(nameof(ShellHostingExtensions.WithWindowHost), exception.Message, StringComparison.Ordinal);
             FlutterHostingProjectionSupport.AssertNoFlutterHost(builder);
         }
         finally

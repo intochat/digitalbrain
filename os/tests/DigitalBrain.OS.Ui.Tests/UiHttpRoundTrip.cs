@@ -1,7 +1,7 @@
 using System.Net;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
-using DigitalBrain.Flutter;
+using DigitalBrain.Shell;
 using Xunit;
 
 namespace DigitalBrain.Flutter.Http.Tests;
@@ -148,7 +148,7 @@ public sealed class UiHttpRoundTrip(FlutterHttpFixture fixture)
         var topology = await http.GetFromJsonAsync<BrainTopologySnapshot>(FlutterHttpContract.BrainTopologyPath, cancellationToken);
 
         Assert.NotNull(topology);
-        Assert.Contains(topology.Modules, module => module.Id == FlutterModule.Id.Value);
+        Assert.Contains(topology.Modules, module => module.Id == ShellModule.Id.Value);
         Assert.Contains(topology.Modules, module => module.Id == ChatModule.Id.Value);
         Assert.Contains(topology.Neurons, neuron => neuron.Id == shell.Id.ToString());
         Assert.All(topology.Neurons, neuron => Assert.StartsWith("cluster-", neuron.Placement, StringComparison.Ordinal));

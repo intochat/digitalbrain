@@ -1,11 +1,11 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Flutter;
+namespace DigitalBrain.Shell;
 
 [ClientEntryPoint]
 [Alias("flutter.shell")]
-[Description("Flutter shell neuron")]
+[Description("Shell neuron")]
 public partial interface IShell : INeuron
 {
     [Alias(nameof(Open))]

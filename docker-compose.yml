@@ -61,7 +61,7 @@ services:
       DigitalBrain__Modules__1: DigitalBrain.Chat.ChatModule
       DigitalBrain__Modules__2: DigitalBrain.Memory.MemoryModule
       DigitalBrain__Modules__3: DigitalBrain.OS.OSBehaviorsModule
-      DigitalBrain__Modules__4: DigitalBrain.Flutter.FlutterModule
+      DigitalBrain__Modules__4: DigitalBrain.Shell.ShellModule
       DigitalBrain__Modules__5: DigitalBrain.Google.GoogleModule
       DigitalBrain__Modules__6: DigitalBrain.Salesforce.SalesforceModule
       DigitalBrain__Modules__7: DigitalBrain.Behaviors.BehaviorsModule
@@ -87,7 +87,7 @@ services:
       DigitalBrain__Modules__1: DigitalBrain.Chat.ChatModule
       DigitalBrain__Modules__2: DigitalBrain.Memory.MemoryModule
       DigitalBrain__Modules__3: DigitalBrain.OS.OSBehaviorsModule
-      DigitalBrain__Modules__4: DigitalBrain.Flutter.FlutterModule
+      DigitalBrain__Modules__4: DigitalBrain.Shell.ShellModule
       DigitalBrain__Modules__5: DigitalBrain.Google.GoogleModule
       DigitalBrain__Modules__6: DigitalBrain.Salesforce.SalesforceModule
       DigitalBrain__Modules__7: DigitalBrain.Behaviors.BehaviorsModule
