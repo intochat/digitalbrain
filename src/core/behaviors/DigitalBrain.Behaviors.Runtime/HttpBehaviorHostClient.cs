@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Tasks;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 internal sealed class HttpBehaviorHostClient(HttpClient http) : IBehaviorHostGateway
 {

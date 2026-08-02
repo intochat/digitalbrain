@@ -6,6 +6,7 @@ using DigitalBrain.Shell;
 using DigitalBrain.Shell.Aspire.Hosting;
 using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
+using DigitalBrain.Behaviors.Runtime;
 
 namespace DigitalBrain.OS.UiEdge.Tests;
 

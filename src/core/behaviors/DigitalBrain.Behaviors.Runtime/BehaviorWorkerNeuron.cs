@@ -5,7 +5,7 @@ using DigitalBrain.Mcp;
 using DigitalBrain.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 [GrainType("worker")]
 internal sealed class BehaviorWorkerNeuron :

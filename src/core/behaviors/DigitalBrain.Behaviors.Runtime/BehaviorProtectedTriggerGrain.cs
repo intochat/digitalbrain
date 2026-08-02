@@ -3,7 +3,7 @@ using DigitalBrain.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 internal interface IBehaviorProtectedTriggerGrain : IGrainWithStringKey
 {

@@ -1,6 +1,7 @@
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Tasks;
+using DigitalBrain.Behaviors.Runtime;
 
 // Mirrors product packaging Option A: silo and behavior-host are separate project processes.
 const string Silo = "silo";

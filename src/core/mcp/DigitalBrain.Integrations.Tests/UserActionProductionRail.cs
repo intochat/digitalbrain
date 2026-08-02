@@ -16,6 +16,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
+using DigitalBrain.Behaviors.Runtime;
 
 namespace DigitalBrain.Integrations.Tests;
 

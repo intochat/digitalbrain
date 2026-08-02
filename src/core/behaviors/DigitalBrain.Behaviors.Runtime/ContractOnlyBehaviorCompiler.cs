@@ -8,7 +8,7 @@ using DigitalBrain.Kernel;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 internal sealed class ContractOnlyBehaviorCompiler : IBehaviorCompiler
 {

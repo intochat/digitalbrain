@@ -5,7 +5,7 @@ using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Behaviors;
+namespace DigitalBrain.Behaviors.Runtime;
 
 internal sealed partial class BehaviorNeuron
 {

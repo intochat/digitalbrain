@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using DigitalBrain.Behaviors.Runtime;
 
 namespace DigitalBrain.Behaviors.Tests;
 

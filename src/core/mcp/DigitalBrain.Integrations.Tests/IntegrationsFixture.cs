@@ -6,6 +6,7 @@ using DigitalBrain.Salesforce;
 using DigitalBrain.Mcp.Testing;
 using DigitalBrain.Shell;
 using DigitalBrain.Testing;
+using DigitalBrain.Behaviors.Runtime;
 
 namespace DigitalBrain.Integrations.Tests;
 

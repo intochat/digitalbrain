@@ -4,6 +4,7 @@ using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
 using DigitalBrain.Tasks;
 using Xunit;
+using DigitalBrain.Behaviors.Runtime;
 
 namespace DigitalBrain.Behaviors.Tests;
 

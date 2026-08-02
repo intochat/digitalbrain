@@ -4,6 +4,7 @@ using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using DigitalBrain.Behaviors.Runtime;
 
 namespace DigitalBrain.Behaviors.Tests;
 

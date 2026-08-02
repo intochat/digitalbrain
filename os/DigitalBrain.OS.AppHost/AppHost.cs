@@ -19,6 +19,7 @@ using DigitalBrain.Shell.Aspire.Hosting;
 using DigitalBrain.Tasks;
 using DigitalBrain.Time;
 using Microsoft.Extensions.Hosting;
+using DigitalBrain.Behaviors.Runtime;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
