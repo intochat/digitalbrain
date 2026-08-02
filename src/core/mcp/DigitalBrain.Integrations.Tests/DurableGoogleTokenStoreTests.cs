@@ -5,7 +5,7 @@ using Google.Apis.Auth.OAuth2.Responses;
 using Orleans.Journaling;
 using Xunit;
 
-namespace DigitalBrain.Google.Tests.Auth;
+namespace DigitalBrain.Integrations.Tests;
 
 public sealed class DurableGoogleTokenStoreTests
 {
@@ -13,7 +13,7 @@ public sealed class DurableGoogleTokenStoreTests
     private const string RefreshToken = "1//refresh-token-secret-value";
 
     [Fact(DisplayName = "Purpose string is google/oauth/{connection}/{durableIdentity}")]
-    public void Purpose_uses_google_oauth_scheme()
+    public void PurposeUsesGoogleOAuthScheme()
     {
         Assert.Equal(
             "google/oauth/reader@example.com/owner/gmail/reader",
@@ -21,7 +21,7 @@ public sealed class DurableGoogleTokenStoreTests
     }
 
     [Fact(DisplayName = "StoreAsync protects TokenResponse so durable bytes never contain raw tokens")]
-    public async Task StoreAsync_protects_token_bytes_at_rest()
+    public async Task StoreAsyncProtectsTokenBytesAtRest()
     {
         var state = new TestDurableValue<byte[]>([]);
         var protector = new ScramblingProtector();
@@ -55,7 +55,7 @@ public sealed class DurableGoogleTokenStoreTests
     }
 
     [Fact(DisplayName = "StoreAsync rolls back durable state when commit fails")]
-    public async Task StoreAsync_rolls_back_when_commit_fails()
+    public async Task StoreAsyncRollsBackWhenCommitFails()
     {
         var state = new TestDurableValue<byte[]>([]);
         var commits = 0;
@@ -93,7 +93,7 @@ public sealed class DurableGoogleTokenStoreTests
     }
 
     [Fact(DisplayName = "DeleteAsync and ClearAsync remove protected entries with commit rollback")]
-    public async Task Delete_and_clear_round_trip()
+    public async Task DeleteAndClearRoundTrip()
     {
         var state = new TestDurableValue<byte[]>([]);
         var store = new DurableGoogleTokenStore(

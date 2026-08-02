@@ -1,12 +1,12 @@
 using DigitalBrain.Google;
 using Xunit;
 
-namespace DigitalBrain.Google.Tests.Gmail;
+namespace DigitalBrain.Integrations.Tests;
 
 public sealed class SdkCatalogAdmissionTests
 {
     [Fact(DisplayName = "Allowlist admits exactly the five read-only Gmail tool names")]
-    public void Allowlist_admits_exactly_five_read_only_tools()
+    public void AllowlistAdmitsExactlyFiveReadOnlyTools()
     {
         Assert.Equal(
             [
@@ -21,7 +21,7 @@ public sealed class SdkCatalogAdmissionTests
     }
 
     [Fact(DisplayName = "Structural walk of the SDK resource surface never admits mutating verbs")]
-    public void Sdk_surface_mutating_verbs_are_never_on_the_allowlist()
+    public void SdkSurfaceMutatingVerbsAreNeverOnTheAllowlist()
     {
         var surface = SdkCatalogAdmission.EnumerateSdkResourceMethods();
         Assert.NotEmpty(surface);
@@ -52,7 +52,7 @@ public sealed class SdkCatalogAdmissionTests
     }
 
     [Fact(DisplayName = "Built catalog tools have non-empty descriptions and hard-cap maxResults at 10")]
-    public void Built_catalog_has_descriptions_and_maxResults_cap()
+    public void BuiltCatalogHasDescriptionsAndMaxResultsCap()
     {
         using var service = new global::Google.Apis.Gmail.v1.GmailService(
             new global::Google.Apis.Services.BaseClientService.Initializer

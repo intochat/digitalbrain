@@ -8,7 +8,7 @@ using Google.Apis.Util;
 using Orleans.Journaling;
 using Xunit;
 
-namespace DigitalBrain.Google.Tests.Auth;
+namespace DigitalBrain.Integrations.Tests;
 
 public sealed class GoogleSignInTests
 {
@@ -21,7 +21,7 @@ public sealed class GoogleSignInTests
     private const string RotatedAccessToken = "ya29.rotated-access-token-value";
 
     [Fact(DisplayName = "BuildAuthorizeUrl uses GoogleAuthorizationCodeFlow with offline access and state")]
-    public void BuildAuthorizeUrl_includes_offline_state_scopes_and_client()
+    public void BuildAuthorizeUrlIncludesOfflineStateScopesAndClient()
     {
         var url = GoogleSignIn.BuildAuthorizeUrl(
             ClientId,
@@ -40,7 +40,7 @@ public sealed class GoogleSignInTests
     }
 
     [Fact(DisplayName = "ExchangeAsync stores TokenResponse into IDataStore")]
-    public async Task ExchangeAsync_stores_token_in_data_store()
+    public async Task ExchangeAsyncStoresTokenInDataStore()
     {
         await using var tokenHost = await FakeGoogleTokenHost.StartAsync();
         var state = new TestDurableValue<byte[]>([]);
@@ -72,7 +72,7 @@ public sealed class GoogleSignInTests
     }
 
     [Fact(DisplayName = "Stale TokenResponse auto-refreshes on use and re-stores")]
-    public async Task Stale_token_auto_refreshes_on_use()
+    public async Task StaleTokenAutoRefreshesOnUse()
     {
         await using var tokenHost = await FakeGoogleTokenHost.StartAsync();
         var state = new TestDurableValue<byte[]>([]);
@@ -118,7 +118,7 @@ public sealed class GoogleSignInTests
     }
 
     [Fact(DisplayName = "Refresh response without refresh_token preserves the old refresh token in the store")]
-    public async Task Refresh_without_refresh_token_preserves_old()
+    public async Task RefreshWithoutRefreshTokenPreservesOld()
     {
         await using var tokenHost = await FakeGoogleTokenHost.StartAsync();
         var store = new DurableGoogleTokenStore(
@@ -159,7 +159,7 @@ public sealed class GoogleSignInTests
     }
 
     [Fact(DisplayName = "Token error response surfaces as TokenResponseException and stores nothing")]
-    public async Task Error_response_surfaces_typed_failure_and_stores_nothing()
+    public async Task ErrorResponseSurfacesTypedFailureAndStoresNothing()
     {
         await using var tokenHost = await FakeGoogleTokenHost.StartAsync();
         var state = new TestDurableValue<byte[]>([]);
@@ -187,7 +187,7 @@ public sealed class GoogleSignInTests
     }
 
     [Fact(DisplayName = "CreateServiceAsync builds GmailService with ApplicationName DigitalBrain")]
-    public async Task CreateServiceAsync_builds_gmail_service()
+    public async Task CreateServiceAsyncBuildsGmailService()
     {
         var store = new DurableGoogleTokenStore(
             new TestDurableValue<byte[]>([]),

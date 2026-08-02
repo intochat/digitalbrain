@@ -2,7 +2,7 @@ using DigitalBrain.Google.Auth;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
-namespace DigitalBrain.Google.Tests.Auth;
+namespace DigitalBrain.Integrations.Tests;
 
 public sealed class GoogleOAuthOptionsTests
 {
@@ -10,7 +10,7 @@ public sealed class GoogleOAuthOptionsTests
     [InlineData("ClientId", "local-dev")]
     [InlineData("ClientSecret", "local-dev-secret")]
     [InlineData("RedirectUri", "http://localhost/oauth/callback")]
-    public void Create_rejects_known_placeholders(string field, string placeholder)
+    public void CreateRejectsKnownPlaceholders(string field, string placeholder)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -31,7 +31,7 @@ public sealed class GoogleOAuthOptionsTests
     }
 
     [Fact(DisplayName = "Google OAuth options read ClientId ClientSecret RedirectUri under DigitalBrain:Google:Gmail")]
-    public void Read_returns_projected_config_keys()
+    public void ReadReturnsProjectedConfigKeys()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>

@@ -2,13 +2,13 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Google;
 using Xunit;
 
-namespace DigitalBrain.Google.Tests;
+namespace DigitalBrain.Integrations.Tests;
 
 public sealed class GmailOpContracts
 {
     [Fact(DisplayName =
         "GmailSearchRequest trims Query, defaults MaxResults to 10, and rejects empty query or out-of-range MaxResults")]
-    public void SearchRequest_validates_query_and_max_results_bounds()
+    public void SearchRequestValidatesQueryAndMaxResultsBounds()
     {
         var commandId = CommandId.New();
         var request = new GmailSearchRequest("  from:me  ", maxResults: 3, commandId);
@@ -34,7 +34,7 @@ public sealed class GmailOpContracts
 
     [Fact(DisplayName =
         "GmailSearchResponse Succeeded is true only when Error is null; empty headers are allowed")]
-    public void SearchResponse_succeeded_tracks_error_null()
+    public void SearchResponseSucceededTracksErrorNull()
     {
         var commandId = CommandId.New();
         var header = new GmailMessageHeader("id-1", "Subject", "sender@example.com");
@@ -54,7 +54,7 @@ public sealed class GmailOpContracts
 
     [Fact(DisplayName =
         "GmailGetMessageRequest requires non-empty MessageId and CommandId")]
-    public void GetMessageRequest_validates_message_id_and_command_id()
+    public void GetMessageRequestValidatesMessageIdAndCommandId()
     {
         var commandId = CommandId.New();
         var request = new GmailGetMessageRequest("  msg-42  ", commandId);
@@ -73,7 +73,7 @@ public sealed class GmailOpContracts
 
     [Fact(DisplayName =
         "GmailGetMessageResponse carries optional GmailMessage and Succeeded when Error is null")]
-    public void GetMessageResponse_succeeded_tracks_error_null()
+    public void GetMessageResponseSucceededTracksErrorNull()
     {
         var commandId = CommandId.New();
         var message = new GmailMessage("id", "subject", "sender", "body");
