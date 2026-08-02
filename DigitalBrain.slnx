@@ -68,7 +68,6 @@
     <Project Path="os/tests/DigitalBrain.OS.Behaviors.Tests/DigitalBrain.OS.Behaviors.Tests.csproj" />
     <Project Path="os/tests/DigitalBrain.OS.Composition.Tests/DigitalBrain.OS.Composition.Tests.csproj" />
     <Project Path="os/tests/DigitalBrain.OS.Host.Tests/DigitalBrain.OS.Host.Tests.csproj" />
-    <Project Path="os/tests/DigitalBrain.OS.McpHost.Tests/DigitalBrain.OS.McpHost.Tests.csproj" />
     <Project Path="os/tests/DigitalBrain.OS.Ui.Tests/DigitalBrain.OS.Ui.Tests.csproj" />
     <Project Path="os/tests/DigitalBrain.OS.Product.Tests/DigitalBrain.OS.Product.Tests.csproj" />
   </Folder>

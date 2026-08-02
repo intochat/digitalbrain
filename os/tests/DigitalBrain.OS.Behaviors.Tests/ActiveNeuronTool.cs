@@ -1,11 +1,12 @@
 using System.Text.Json;
 using DigitalBrain.Chat;
+using DigitalBrain.OS.McpHost;
 using DigitalBrain.Testing;
 using Xunit;
 
-namespace DigitalBrain.OS.McpHost.Tests;
+namespace DigitalBrain.OS.Behaviors.Tests;
 
-public sealed class ActiveNeuronTool(OSMcpFixture fixture)
+public sealed class ActiveNeuronTool(OSBehaviorsFixture fixture)
 {
     [Fact(DisplayName = "list_active_neurons is owner scoped and exposes no silo address")]
     public async Task ListActiveNeuronsIsOwnerScopedAndRedacted()

@@ -1,11 +1,12 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
+using DigitalBrain.OS.McpHost;
 using DigitalBrain.Testing;
 using Xunit;
 
-namespace DigitalBrain.OS.McpHost.Tests;
+namespace DigitalBrain.OS.Behaviors.Tests;
 
-public sealed class ChatProductTool(OSMcpFixture fixture)
+public sealed class ChatProductTool(OSBehaviorsFixture fixture)
 {
     private const int TestTimeout = 60_000;
 
