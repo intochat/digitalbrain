@@ -50,6 +50,9 @@ internal sealed class DigitalBrainMcpTools(IDigitalBrain brain, IGrainFactory gr
         var session = grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(brain.Owner).ToGrainId());
         var command = new CommandId(commandIdentity);
 
+        // Activate owner brain first so DigitalBrainActivated boots capability projection
+        // (semantic discovery) before the assistant turn resolves catalog tools.
+        await brain.ActivateAsync(cancellationToken);
         await brain.GetGrainProxy<IChat>(chatName).Send(new SendMessage(command, text));
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

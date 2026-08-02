@@ -34,7 +34,7 @@ public sealed class BehaviorHostLifecycle(HostBehaviorsFixture fixture)
             "SampleTrigger",
             """{"Label":"signed"}"""));
         Assert.True(executed.Succeeded, executed.Outcome);
-        Assert.Equal("host-ok:signed", executed.Outcome);
+        Assert.Equal(BehaviorExecutionCodes.Succeeded, executed.Outcome);
 
         var unsigned = await ProposeAndTestAsync(behavior, RailPrograms.GreenProgram("unsigned-path"));
         var unsignedApproval = Approval(test, CommandId.New(), unsigned.ProposedArtifactHash!);
@@ -84,7 +84,7 @@ public sealed class BehaviorHostLifecycle(HostBehaviorsFixture fixture)
             "SampleTrigger",
             """{"Label":"run"}"""));
         Assert.True(executed.Succeeded, executed.Outcome);
-        Assert.Equal("v2:run", executed.Outcome);
+        Assert.Equal(BehaviorExecutionCodes.Succeeded, executed.Outcome);
 
         var rolled = await behavior.Reference.Rollback(new RollbackBehaviorRevision(CommandId.New()));
         Assert.Equal(firstHash, rolled.ActiveArtifactHash);
@@ -94,7 +94,7 @@ public sealed class BehaviorHostLifecycle(HostBehaviorsFixture fixture)
             "SampleTrigger",
             """{"Label":"restored"}"""));
         Assert.True(afterRollback.Succeeded, afterRollback.Outcome);
-        Assert.Equal("v1:restored", afterRollback.Outcome);
+        Assert.Equal(BehaviorExecutionCodes.Succeeded, afterRollback.Outcome);
         Assert.Equal(firstHash, afterRollback.ArtifactHash);
     }
 

@@ -2,6 +2,8 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+// Shared fixtures for shell widget tests.
+
 ChatTurnEvent shellTurn(
   int sequence,
   bool fromUser,
@@ -54,4 +56,57 @@ Future<void> prepareShellSurface(WidgetTester tester) async {
 
 Future<void> drainShellTimers(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 400));
+}
+
+BehaviorDocument shellBehaviorDocument({
+  String runState = 'Running',
+  bool gate = true,
+  bool withPrior = false,
+}) {
+  return BehaviorDocument(
+    behaviorId: 'com.digitalbrain.account-enrichment',
+    status: 'Active',
+    runState: runState,
+    activationGateOpen: gate,
+    proposedArtifactHash: 'proposed-hash',
+    activeArtifactHash: 'active-hash-12345678',
+    priorArtifactHash: withPrior ? 'prior-hash-12345678' : null,
+    lastCompileFailure: null,
+    testsPassed: true,
+    isApproved: true,
+    lastExecutionOutcome: null,
+    programSource: 'public sealed class AccountEnrichmentProgram {}',
+    featureName: 'account-enrichment',
+    featureText:
+        'Feature: account enrichment\n  Scenario: enrich account from email\n',
+    displayName: 'Account enrichment',
+    description: 'Enrich a Salesforce account from a Gmail message.',
+    overview: 'Account enrichment: enrich account from email',
+    activeSignatureHex: 'AABBCC',
+    activeTaskCount: 0,
+    scenarios: const [
+      BehaviorScenario(
+        scenarioId: 'scenario.enrich-account-from-email',
+        title: 'enrich account from email',
+        bindingKey: 'bind.enrich-account-from-email',
+      ),
+    ],
+    bindings: const [],
+    revisions: [
+      const BehaviorRevision(
+        role: 'active',
+        artifactHash: 'active-hash-12345678',
+        signatureHex: 'AABBCC',
+        status: 'Active',
+        isActive: true,
+      ),
+      if (withPrior)
+        const BehaviorRevision(
+          role: 'prior',
+          artifactHash: 'prior-hash-12345678',
+          status: 'superseded',
+          isActive: false,
+        ),
+    ],
+  );
 }

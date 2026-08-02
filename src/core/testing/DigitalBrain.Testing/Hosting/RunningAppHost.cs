@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
@@ -18,6 +19,7 @@ public sealed class RunningAppHost : IAsyncDisposable
     private readonly HashSet<string> _resourceNames;
     private readonly Dictionary<string, HostedResource> _resources =
         new(StringComparer.Ordinal);
+    private readonly ConcurrentBag<HttpClient> _httpClients = [];
     private readonly object _sync = new();
     private int _disposed;
 
@@ -78,6 +80,7 @@ public sealed class RunningAppHost : IAsyncDisposable
         using var cleanup = new CancellationTokenSource(_cleanupTimeout);
         var failures = new List<Exception>();
 
+        DisposeHttpClients(failures);
         await AttemptAsync(
             () => _application.StopAsync(cleanup.Token),
             failures,
@@ -98,7 +101,9 @@ public sealed class RunningAppHost : IAsyncDisposable
     internal HttpClient CreateHttpClient(string resourceName)
     {
         ThrowIfDisposed();
-        return _application.CreateHttpClient(resourceName);
+        var client = _application.CreateHttpClient(resourceName);
+        _httpClients.Add(client);
+        return client;
     }
 
     internal async Task WaitUntilHealthyAsync(
@@ -110,6 +115,25 @@ public sealed class RunningAppHost : IAsyncDisposable
         await _application.ResourceNotifications.WaitForResourceHealthyAsync(
             resourceName,
             operation.Token);
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Graph cleanup attempts every terminal stage and preserves all failures.")]
+    private void DisposeHttpClients(List<Exception> failures)
+    {
+        while (_httpClients.TryTake(out var client))
+        {
+            try
+            {
+                client.Dispose();
+            }
+            catch (Exception failure)
+            {
+                failures.Add(failure);
+            }
+        }
     }
 
     private static CancellationTokenSource Linked(

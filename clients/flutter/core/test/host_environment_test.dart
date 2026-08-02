@@ -42,7 +42,7 @@ void main() {
     expect(raw, 'http://localhost:5100');
   });
 
-  test('requireUiBaseUri parses process env and rejects missing base', () {
+  test('requireUiBaseUri parses process env and rejects missing base on VM', () {
     final uri = DigitalBrainHostEnv.requireUiBaseUri(
       fromDefine: '',
       processEnvironment: {
@@ -53,6 +53,7 @@ void main() {
     expect(uri.host, 'localhost');
     expect(uri.port, 5100);
 
+    // Pure-Dart VM host has no browser same-origin fallback.
     expect(
       () => DigitalBrainHostEnv.requireUiBaseUri(
         fromDefine: '',

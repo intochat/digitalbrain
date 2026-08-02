@@ -26,9 +26,10 @@ public abstract partial class Neuron
         ScheduleDrain();
     }
 
-    public async Task Deliver(SynapseDelivery delivery)
+    public async Task Deliver(SynapseDelivery delivery, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(delivery);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (HasAlreadyHandled(delivery))
         {
@@ -43,6 +44,7 @@ public abstract partial class Neuron
 
         _handling = delivery;
         _handlingDepth = DeliveryPolicy.InboundDepth();
+        _turnCancellation = cancellationToken;
 
         var previousCheckpoint = _turnCheckpoint;
         _turnCheckpoint = new(_outbox.Count, _handled.Count, InboundCommitted: false, _incoming.Checkpoint(), _outgoing.Checkpoint());
@@ -52,12 +54,12 @@ public abstract partial class Neuron
 
         try
         {
-            await DispatchAsync(Snapshot(delivery.Synapse));
+            await DispatchAsync(Snapshot(delivery.Synapse), cancellationToken);
 
             FlushOutgoing();
             StageInboundCause();
 
-            await CommitAsync(CancellationToken.None);
+            await CommitAsync(cancellationToken);
             AdvanceTurnCheckpoint();
 
             await NotifyWatchersAsync();
@@ -88,6 +90,7 @@ public abstract partial class Neuron
             _turnRollbacks.Clear();
             _handling = null;
             _handlingDepth = 0;
+            _turnCancellation = default;
             _turnCheckpoint = previousCheckpoint;
         }
 

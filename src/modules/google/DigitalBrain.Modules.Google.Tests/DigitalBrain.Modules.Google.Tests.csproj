@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);CA2007;CA1515;CA1812;CA1822;CA1707;CA1859;IDE0011;xUnit2029;ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Microsoft.AspNetCore.Builder" />
+    <Using Include="Microsoft.AspNetCore.Hosting" />
+    <Using Include="Microsoft.AspNetCore.Http" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Modules.Google.Contracts\DigitalBrain.Modules.Google.Contracts.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Modules.Google\DigitalBrain.Modules.Google.csproj" />
+    <ProjectReference Include="..\..\..\core\mcp\DigitalBrain.Mcp.Testing\DigitalBrain.Mcp.Testing.csproj" />
+    <ProjectReference Include="..\..\..\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="..\..\..\core\security\DigitalBrain.Security\DigitalBrain.Security.csproj" />
+  </ItemGroup>
+</Project>

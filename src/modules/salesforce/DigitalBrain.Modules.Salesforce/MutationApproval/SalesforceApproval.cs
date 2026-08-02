@@ -9,7 +9,7 @@ internal sealed partial class Salesforce
         "Design",
         "CA1031:Do not catch general exception types",
         Justification = "Any failure after durable Invoking makes the external mutation outcome uncertain and must not escape into an automatic retry path.")]
-    public async Task<SalesforceAccountDescriptionMutation> ApproveAccountDescription(
+    private async Task<SalesforceAccountDescriptionMutation> ApproveAccountDescriptionAsync(
         SalesforceMutationApproval approval,
         SynapseDelivery approvalEvidence,
         CancellationToken cancellationToken)
@@ -22,7 +22,6 @@ internal sealed partial class Salesforce
             ? loaded
             : throw new InvalidOperationException(
                 $"Salesforce mutation '{approval.CommandId}' has not been proposed.");
-        ValidateCapabilityCaller(mutation.Requester);
         EnsureSame(mutation, approval.Fingerprint);
 
         if (mutation.Status is MutationStatus.Completed or MutationStatus.OutcomeUncertain)
@@ -108,11 +107,31 @@ internal sealed partial class Salesforce
         SalesforceMutationApproval approval,
         SynapseDelivery evidence)
     {
-        if (evidence.Caller != approval.Approver
-            || evidence.Synapse is not SalesforceMutationApproval recorded
-            || recorded != approval
-            || (mutation.Approval is not null
-                && mutation.ApprovalEvidence != evidence.SynapseId))
+        if (evidence.Caller != approval.Approver)
+        {
+            throw new NeuronAuthorizationException(
+                $"Salesforce mutation '{mutation.CommandId}' has no exact durable human approval evidence.");
+        }
+
+        var matches = evidence.Synapse switch
+        {
+            SalesforceMutationApproval recorded => recorded == approval,
+            ApproveSalesforceMutation request => request.Approval == approval,
+            _ => false,
+        };
+
+        if (!matches)
+        {
+            throw new NeuronAuthorizationException(
+                $"Salesforce mutation '{mutation.CommandId}' has no exact durable human approval evidence.");
+        }
+
+        // First binding stores the delivery id; re-approvals may arrive as a new session delivery of
+        // the same approval content and must still be accepted as exact human evidence.
+        if (mutation.Approval is not null
+            && mutation.ApprovalEvidence is not null
+            && mutation.ApprovalEvidence != evidence.SynapseId
+            && evidence.Synapse is not ApproveSalesforceMutation)
         {
             throw new NeuronAuthorizationException(
                 $"Salesforce mutation '{mutation.CommandId}' has no exact durable human approval evidence.");

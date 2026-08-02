@@ -1,6 +1,6 @@
-using DigitalBrain.Mcp.Testing;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Google;
+using DigitalBrain.Mcp.Testing;
 using Xunit;
 
 namespace DigitalBrain.Integrations.Tests;
@@ -8,21 +8,14 @@ namespace DigitalBrain.Integrations.Tests;
 public sealed class GmailReadMessage(IntegrationsFixture fixture)
 {
     [Fact(DisplayName =
-        "IGmail.ReadMessage returns GmailMessage vocabulary on the scripted edge")]
+        "GmailRequest returns GmailMessage vocabulary on the scripted edge")]
     public async Task ReadMessageReturnsGmailMessageVocabulary()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Mcp().Catalog(
-            IntegrationsFixture.GmailServerKey,
-            AdmittedMcpTools.GmailGetMessage(
-                id: IntegrationsFixture.SampleMessageId,
-                subject: IntegrationsFixture.SampleSubject,
-                sender: IntegrationsFixture.SampleSender,
-                plaintextBody: IntegrationsFixture.SampleBody));
 
-        var driver = test.Neuron<IIntegrationDriver>("gmail-driver");
-        var message = await driver.Reference.ReadGmailMessage(
+        var response = await GmailHelpers.SendReadIntentAsync(
+            test,
             CommandId.New(),
             IntegrationsFixture.SampleGmailAccount,
             IntegrationsFixture.SampleMessageId,
@@ -34,128 +27,130 @@ public sealed class GmailReadMessage(IntegrationsFixture fixture)
                 IntegrationsFixture.SampleSubject,
                 IntegrationsFixture.SampleSender,
                 IntegrationsFixture.SampleBody),
-            message);
+            Assert.Single(response.Messages));
     }
 
     [Fact(DisplayName =
-        "IGmail.ReadMessage fails closed when the scripted edge is not admitted")]
+        "GmailRequest fails closed when Gmail provider returns an error")]
     public async Task ReadMessageFailsClosedWhenEdgeIsNotAdmitted()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Mcp().Catalog(IntegrationsFixture.GmailServerKey, AdmittedMcpTools.GmailGetMessageWithIncompatibleAnnotations());
+        const string messageId = "msg-provider-error-1";
+        IntegrationsGmailHosts.GmailHost.SeedMessage(
+            messageId,
+            IntegrationsFixture.SampleSubject,
+            IntegrationsFixture.SampleSender,
+            IntegrationsFixture.SampleBody);
+        IntegrationsGmailHosts.GmailHost.SetGetStatus(messageId, System.Net.HttpStatusCode.ServiceUnavailable);
+        await GmailHelpers.SeedAuthorizationAsync(test, cancellationToken: cancellationToken);
+        GmailHelpers.ScriptReadSampleMessage(test, messageId);
 
-        var driver = test.Neuron<IIntegrationDriver>("gmail-refuse");
-        var failure = await Assert.ThrowsAnyAsync<Exception>(() =>
-            driver.Reference.ReadGmailMessage(
-                CommandId.New(),
-                IntegrationsFixture.SampleGmailAccount,
-                IntegrationsFixture.SampleMessageId,
-                cancellationToken));
+        var response = await test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(new GmailRequest($"Read Gmail message {messageId}"), cancellationToken);
 
-        Assert.Contains("incompatible with the admitted", failure.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Gmail", failure.Message, StringComparison.Ordinal);
+        Assert.False(response.Succeeded);
+        Assert.Contains("Gmail", response.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("error", response.Error, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact(DisplayName =
-        "IGmail.ReadMessage rejects a Gmail response for a different requested message")]
+        "GmailRequest rejects a Gmail response for a different requested message")]
     public async Task ReadMessageRejectsMismatchedResponseId()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Mcp().Catalog(
-            IntegrationsFixture.GmailServerKey,
-            AdmittedMcpTools.GmailGetMessage(
-                id: "msg-different",
-                subject: IntegrationsFixture.SampleSubject,
-                sender: IntegrationsFixture.SampleSender,
-                plaintextBody: IntegrationsFixture.SampleBody));
+        const string messageId = "msg-mismatch-request-1";
+        IntegrationsGmailHosts.GmailHost.SeedMessage(
+            messageId,
+            IntegrationsFixture.SampleSubject,
+            IntegrationsFixture.SampleSender,
+            IntegrationsFixture.SampleBody,
+            responseId: "msg-different");
+        await GmailHelpers.SeedAuthorizationAsync(test, cancellationToken: cancellationToken);
+        GmailHelpers.ScriptReadSampleMessage(test, messageId);
 
-        var driver = test.Neuron<IIntegrationDriver>("gmail-mismatch");
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            driver.Reference.ReadGmailMessage(
-                CommandId.New(),
-                IntegrationsFixture.SampleGmailAccount,
-                IntegrationsFixture.SampleMessageId,
-                cancellationToken));
+        var response = await test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(new GmailRequest($"Read Gmail message {messageId}"), cancellationToken);
 
+        Assert.False(response.Succeeded);
         Assert.Equal(
-            "Gmail get_message returned id 'msg-different' for requested message 'msg-enrich-1'.",
-            failure.Message);
+            $"Gmail get_message returned id 'msg-different' for requested message '{messageId}'.",
+            response.Error);
     }
 
     [Fact(DisplayName =
-        "IGmail.ReadMessage rejects a Gmail response that omits its message identifier")]
+        "GmailRequest rejects a Gmail response that omits its message identifier")]
     public async Task ReadMessageRejectsMissingResponseId()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Mcp().Catalog(
-            IntegrationsFixture.GmailServerKey,
-            AdmittedMcpTools.GmailGetMessageWithPayload(new
-            {
-                subject = IntegrationsFixture.SampleSubject,
-                sender = IntegrationsFixture.SampleSender,
-                plaintextBody = IntegrationsFixture.SampleBody,
-            }));
+        const string messageId = "msg-missing-id-1";
+        IntegrationsGmailHosts.GmailHost.SeedMessageMissingId(
+            messageId,
+            IntegrationsFixture.SampleSubject,
+            IntegrationsFixture.SampleSender,
+            IntegrationsFixture.SampleBody);
+        await GmailHelpers.SeedAuthorizationAsync(test, cancellationToken: cancellationToken);
+        GmailHelpers.ScriptReadSampleMessage(test, messageId);
 
-        var driver = test.Neuron<IIntegrationDriver>("gmail-missing-id");
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            driver.Reference.ReadGmailMessage(
-                CommandId.New(),
-                IntegrationsFixture.SampleGmailAccount,
-                IntegrationsFixture.SampleMessageId,
-                cancellationToken));
+        var response = await test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(new GmailRequest($"Read Gmail message {messageId}"), cancellationToken);
 
-        Assert.Equal("Gmail get_message returned no id.", failure.Message);
+        Assert.False(response.Succeeded);
+        Assert.Equal("Gmail get_message returned no id.", response.Error);
     }
 
     [Fact(DisplayName =
-        "IGmail.ReadMessage returns the requested Gmail message when its subject and body are empty")]
+        "GmailRequest returns the requested Gmail message when its subject and body are empty")]
     public async Task ReadMessageAllowsEmptySubjectAndBody()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Mcp().Catalog(
-            IntegrationsFixture.GmailServerKey,
-            AdmittedMcpTools.GmailGetMessage(
-                id: IntegrationsFixture.SampleMessageId,
-                subject: string.Empty,
-                sender: IntegrationsFixture.SampleSender,
-                plaintextBody: string.Empty));
+        const string messageId = "msg-empty-body-1";
+        IntegrationsGmailHosts.GmailHost.SeedMessage(
+            messageId,
+            subject: string.Empty,
+            sender: IntegrationsFixture.SampleSender,
+            plaintextBody: string.Empty);
+        await GmailHelpers.SeedAuthorizationAsync(test, cancellationToken: cancellationToken);
+        GmailHelpers.ScriptReadSampleMessage(test, messageId);
 
-        var driver = test.Neuron<IIntegrationDriver>("gmail-empty-content");
-        var message = await driver.Reference.ReadGmailMessage(
-            CommandId.New(),
-            IntegrationsFixture.SampleGmailAccount,
-            IntegrationsFixture.SampleMessageId,
-            cancellationToken);
+        var response = await test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(
+                new GmailRequest($"Read Gmail message {messageId}", CommandId.New()),
+                cancellationToken);
 
         Assert.Equal(
             new GmailMessage(
-                IntegrationsFixture.SampleMessageId,
+                messageId,
                 string.Empty,
                 IntegrationsFixture.SampleSender,
                 string.Empty),
-            message);
+            Assert.Single(response.Messages));
     }
 
     [Fact(DisplayName =
-        "IGmail.ReadMessage rejects an admitted Gmail MCP tool error")]
+        "GmailRequest rejects a Gmail provider error as a typed response")]
     public async Task ReadMessageRejectsToolError()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        test.Mcp().Catalog(IntegrationsFixture.GmailServerKey, AdmittedMcpTools.GmailGetMessageWithToolError());
+        const string messageId = "msg-tool-error-1";
+        IntegrationsGmailHosts.GmailHost.SeedMessage(
+            messageId,
+            IntegrationsFixture.SampleSubject,
+            IntegrationsFixture.SampleSender,
+            IntegrationsFixture.SampleBody);
+        IntegrationsGmailHosts.GmailHost.SetGetStatus(messageId, System.Net.HttpStatusCode.InternalServerError);
+        await GmailHelpers.SeedAuthorizationAsync(test, cancellationToken: cancellationToken);
+        GmailHelpers.ScriptReadSampleMessage(test, messageId);
 
-        var driver = test.Neuron<IIntegrationDriver>("gmail-tool-error");
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            driver.Reference.ReadGmailMessage(
-                CommandId.New(),
-                IntegrationsFixture.SampleGmailAccount,
-                IntegrationsFixture.SampleMessageId,
-                cancellationToken));
+        var response = await test.Client.Get<IGmail>(IntegrationsFixture.SampleGmailAccount)
+            .SendAsync(new GmailRequest($"Read Gmail message {messageId}"), cancellationToken);
 
-        Assert.Equal("DigitalBrain Gmail MCP tool 'get_message' reported an error.", failure.Message);
+        Assert.False(response.Succeeded);
+        Assert.Contains("Gmail", response.Error, StringComparison.Ordinal);
+        Assert.Contains("error", response.Error, StringComparison.OrdinalIgnoreCase);
     }
 }

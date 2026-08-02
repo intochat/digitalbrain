@@ -6,12 +6,17 @@ internal interface IProtectedPayloadStore
 {
     ValueTask<ProtectedPayloadReference> StoreAsync(
         OwnerId owner,
+        NeuronId task,
+        Guid attempt,
         ReadOnlyMemory<byte> plaintext,
         TimeSpan lifetime,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        Guid stableEntryId = default);
 
     ValueTask<ReadOnlyMemory<byte>> LoadAsync(
         OwnerId owner,
+        NeuronId task,
+        Guid attempt,
         ProtectedPayloadReference reference,
         CancellationToken cancellationToken);
 }

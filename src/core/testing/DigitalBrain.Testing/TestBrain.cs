@@ -168,14 +168,22 @@ public sealed class TestBrain : IAsyncDisposable
         }
     }
 
-    internal JournalFaultHandle ArmJournalFault(NeuronId target, string message)
+    internal JournalFaultHandle ArmJournalFault(
+        NeuronId target,
+        string message,
+        int allowCommitsBeforeFault = 0,
+        bool stickyUntilDisarm = false)
     {
         lock (_faultGate)
         {
             try
             {
                 ObjectDisposedException.ThrowIf(Volatile.Read(ref _release) is null, this);
-                var registration = Cluster.ArmJournalFault(target, message);
+                var registration = Cluster.ArmJournalFault(
+                    target,
+                    message,
+                    allowCommitsBeforeFault,
+                    stickyUntilDisarm);
                 var handle = new JournalFaultHandle(registration, RetireJournalFault, _diagnostics);
                 _faults.Add(handle);
                 return handle;
@@ -184,6 +192,19 @@ public sealed class TestBrain : IAsyncDisposable
             {
                 throw _diagnostics.CaptureFailure("fault.arm", failure);
             }
+        }
+    }
+
+    internal Task<bool> HasOutboxWakeupAsync(NeuronId neuron)
+    {
+        try
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _release) is null, this);
+            return Cluster.HasOutboxWakeupAsync(neuron);
+        }
+        catch (Exception failure) when (failure is not BrainTestFailureException)
+        {
+            throw _diagnostics.CaptureFailure("outbox.wakeup", failure);
         }
     }
 

@@ -22,8 +22,14 @@ internal static class McpAuthorizationAmbient
     }
 }
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Design",
+    "CA1001:Types that own disposable fields should be disposable",
+    Justification = "OpenLifetime is cancel-only for the hold-open attempt lifetime; aborted rather than disposed mid-flight under Task.Run.")]
 internal sealed class McpAuthorizationAmbientState
 {
+    private readonly CancellationTokenSource _openLifetime = new();
+
     internal McpAuthorizationAmbientState(
         CommandId commandId,
         string serverKey,
@@ -40,8 +46,8 @@ internal sealed class McpAuthorizationAmbientState
             TaskCreationOptions.RunContinuationsAsynchronously);
         BeginCompleted = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        CodeReady = new TaskCompletionSource<McpAuthorizationCodeResult?>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
+        // Terminal = no code will arrive (deny, cancel, abandon). Releases WhenAny in McpRuntime.
+        Terminal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     internal CommandId CommandId { get; }
@@ -51,7 +57,26 @@ internal sealed class McpAuthorizationAmbientState
     internal IGrainFactory Grains { get; }
     internal TaskCompletionSource<McpAuthorizationSignIn> SignInReady { get; }
     internal TaskCompletionSource BeginCompleted { get; }
-    internal TaskCompletionSource<McpAuthorizationCodeResult?> CodeReady { get; }
+    internal TaskCompletionSource Terminal { get; }
+    internal CancellationToken OpenCancellation => _openLifetime.Token;
+
+    internal void AbortOpen()
+    {
+        Terminal.TrySetResult();
+        BeginCompleted.TrySetResult();
+        CancelOpen();
+    }
+
+    internal void CancelOpen()
+    {
+        try
+        {
+            _openLifetime.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
 }
 
 internal sealed record McpAuthorizationSignIn(Uri SignInUrl, string State);

@@ -8,7 +8,7 @@ internal static class LiveProductAspire
 {
     internal static readonly TimeSpan CommandTimeout = TimeSpan.FromMinutes(10);
     internal const string AppHostPath = "os/DigitalBrain.OS.AppHost/DigitalBrain.OS.AppHost.csproj";
-    internal const string McpResource = "digitalbrain-mcp";
+    internal const string McpResource = "silo";
     private const string ResourceWaitSeconds = "600";
 
     internal static async Task RunScenarioAsync(

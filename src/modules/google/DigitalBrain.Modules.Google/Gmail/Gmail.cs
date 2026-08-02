@@ -1,132 +1,330 @@
-using System.Text.Json;
+using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Mcp;
+using DigitalBrain.Google.Auth;
 using DigitalBrain.Kernel;
+using DigitalBrain.Mcp;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
 namespace DigitalBrain.Google;
 
-internal sealed partial class Gmail : Neuron, IGmail
+internal sealed partial class Gmail :
+    Neuron,
+    IGmail,
+    IHandle<GmailRequest>,
+    IHandle<GmailSearchRequest>,
+    IHandle<GmailGetMessageRequest>,
+    IEmit<GmailResponse>,
+    IEmit<GmailSearchResponse>,
+    IEmit<GmailGetMessageResponse>
 {
-    private const string GetMessageName = "get_message";
     private const string TokensName = "google.gmail.oauth";
-    private const string ConfigurationRoot = "DigitalBrain:Google:Gmail";
-    private static readonly McpServerDefinition DefaultServer = new(
-        "google.gmail",
-        "DigitalBrain Gmail",
-        new Uri("https://gmailmcp.googleapis.com/mcp/v1"),
-        ConfigurationRoot,
-        ["https://www.googleapis.com/auth/gmail.readonly"]);
-    private readonly McpRuntime _runtime;
     private readonly IDurableValue<byte[]> _tokenState;
+    private readonly IDurableDictionary<Guid, string> _pendingAuthStates;
     private readonly string _durableIdentity;
-    private readonly McpServerDefinition _server;
+    private readonly string _userKey;
+    private GoogleSignIn? _signIn;
+    private GmailProvider? _provider;
 
-    public Gmail(McpRuntime runtime)
+    public Gmail()
     {
-        _runtime = runtime;
         _tokenState = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(TokensName);
+        _pendingAuthStates = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, string>>(
+            GmailAuthRail.PendingStatesName);
         _durableIdentity = Id.ToString();
-        _server = ResolveServer(ServiceProvider.GetRequiredService<IConfiguration>());
+        _userKey = Id.Name;
     }
 
-    public async Task<GmailMessage> ReadMessage(
-        CommandId commandId,
-        string messageId,
-        CancellationToken cancellationToken)
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Planner/provider failures become a typed GmailResponse so directed request/reply does not retry forever.")]
+    public async Task HandleAsync(GmailRequest synapse, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(messageId);
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        await McpAuthorizationRail.EnsureAuthorizedAsync(
+        try
+        {
+            var provider = await EnsureReadyAsync(synapse.CommandId, cancellationToken);
+            var chat = ServiceProvider.GetRequiredService<IChatClient>();
+            var catalog = SdkCatalogAdmission.Build(provider.Service);
+            if (catalog.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    $"{GmailAuthRail.ServerDisplayName} catalog has no admitted read-only tools.");
+            }
+
+            var messages = await GmailPlanner.PlanAsync(
+                chat,
+                catalog,
+                synapse.Intent,
+                cancellationToken);
+
+            await ReplyAsync(
+                new GmailResponse(synapse.CommandId, synapse.Intent, messages),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (McpAuthorizationRequiredException)
+        {
+            throw;
+        }
+        catch (Exception failure)
+        {
+            await ReplyAsync(
+                new GmailResponse(
+                    synapse.CommandId,
+                    synapse.Intent,
+                    [],
+                    failure.Message),
+                cancellationToken);
+        }
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Typed op failures become a typed response so directed request/reply does not retry forever.")]
+    public async Task HandleAsync(GmailSearchRequest synapse, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            var provider = await EnsureReadyAsync(synapse.CommandId, cancellationToken);
+            var headers = await provider.SearchAsync(
+                synapse.Query,
+                synapse.MaxResults,
+                cancellationToken);
+            await ReplyAsync(
+                new GmailSearchResponse(synapse.CommandId, headers),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (McpAuthorizationRequiredException)
+        {
+            throw;
+        }
+        catch (Exception failure)
+        {
+            await ReplyAsync(
+                new GmailSearchResponse(synapse.CommandId, [], failure.Message),
+                cancellationToken);
+        }
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Typed op failures become a typed response so directed request/reply does not retry forever.")]
+    public async Task HandleAsync(GmailGetMessageRequest synapse, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            var provider = await EnsureReadyAsync(synapse.CommandId, cancellationToken);
+            var message = await provider.GetMessageAsync(synapse.MessageId, cancellationToken);
+            await ReplyAsync(
+                new GmailGetMessageResponse(synapse.CommandId, message),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (McpAuthorizationRequiredException)
+        {
+            throw;
+        }
+        catch (Exception failure)
+        {
+            await ReplyAsync(
+                new GmailGetMessageResponse(synapse.CommandId, null, failure.Message),
+                cancellationToken);
+        }
+    }
+
+    private async Task<GmailProvider> EnsureReadyAsync(CommandId commandId, CancellationToken cancellationToken)
+    {
+        await GmailAuthRail.EnsureAuthorizedAsync(
             GrainFactory,
             Id.Owner,
             ServiceProvider,
-            TimeProvider,
             commandId,
-            _server,
             _tokenState,
+            _pendingAuthStates,
             () => WriteStateAsync(),
             _durableIdentity,
-            cancellationToken);
+            _userKey,
+            cancellationToken,
+            TimeProvider);
 
-        return await _runtime.RunAsync(
-            _server,
-            _tokenState,
-            () => WriteStateAsync(),
-            _durableIdentity,
-            commandId,
-            Id.Owner,
-            GrainFactory,
-            async (client, callbackCancellation) =>
+        if (_provider is not null)
+        {
+            try
             {
-                var tools = await client.ListToolsAsync(cancellationToken: callbackCancellation);
-                var tool = AdmitGetMessage(tools);
-                var result = await tool.CallAsync(
-                    new Dictionary<string, object?>(StringComparer.Ordinal)
-                    {
-                        ["messageId"] = messageId,
-                        ["messageFormat"] = "FULL_CONTENT",
-                    },
-                    cancellationToken: callbackCancellation);
-                var content = McpRuntime.RequireStructuredContent(result, _server, GetMessageName);
-                var responseId = Required(content, "id");
-
-                if (!string.Equals(messageId, responseId, StringComparison.Ordinal))
+                if (_provider.Service.HttpClientInitializer is global::Google.Apis.Auth.OAuth2.UserCredential cached)
                 {
-                    throw new InvalidOperationException(
-                        $"Gmail get_message returned id '{responseId}' for requested message '{messageId}'.");
+                    _ = await cached.GetAccessTokenForRequestAsync(cancellationToken: cancellationToken);
                 }
 
-                return new GmailMessage(
-                    responseId,
-                    RequiredContent(content, "subject"),
-                    Required(content, "sender"),
-                    RequiredContent(content, "plaintextBody"));
-            },
-            cancellationToken);
-    }
+                return _provider;
+            }
+            catch (global::Google.Apis.Auth.OAuth2.Responses.TokenResponseException)
+            {
+                _provider = null;
+                if (_signIn is not null)
+                {
+                    await _signIn.DisposeAsync();
+                    _signIn = null;
+                }
 
-    private static McpServerDefinition ResolveServer(IConfiguration configuration)
-    {
-        var endpoint = configuration[$"{ConfigurationRoot}:{McpRuntimeHosting.EndpointConfigurationSuffix}"];
-        if (string.IsNullOrWhiteSpace(endpoint))
-        {
-            return DefaultServer;
+                var store = new DigitalBrain.Google.Auth.DurableGoogleTokenStore(
+                    _tokenState,
+                    () => WriteStateAsync(),
+                    ServiceProvider.GetRequiredService<DigitalBrain.Security.IDurablePayloadProtector>(),
+                    DigitalBrain.Google.Auth.DurableGoogleTokenStore.Purpose(
+                        GmailAuthRail.ServerKey,
+                        _durableIdentity));
+                await store.DeleteAsync<global::Google.Apis.Auth.OAuth2.Responses.TokenResponse>(_userKey);
+                await GmailAuthRail.EnsureAuthorizedAsync(
+                    GrainFactory,
+                    Id.Owner,
+                    ServiceProvider,
+                    commandId,
+                    _tokenState,
+                    _pendingAuthStates,
+                    () => WriteStateAsync(),
+                    _durableIdentity,
+                    _userKey,
+            cancellationToken,
+            TimeProvider);
+                throw new InvalidOperationException("Gmail authorization recovery did not park after token failure.");
+            }
         }
 
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
+        if (_signIn is not null)
+        {
+            await _signIn.DisposeAsync();
+            _signIn = null;
+        }
+
+        try
+        {
+            _signIn = await GmailAuthRail.CreateSignInAsync(
+                ServiceProvider,
+                _tokenState,
+                () => WriteStateAsync(),
+                _durableIdentity,
+                cancellationToken,
+                TimeProvider);
+
+            var configuration = ServiceProvider.GetRequiredService<IConfiguration>();
+            var baseUri = ResolveBaseUri(configuration);
+            var service = await _signIn.CreateServiceAsync(_userKey, cancellationToken, baseUri);
+            try
+            {
+                // Force credential materialization so permanent refresh failures re-park.
+                if (service.HttpClientInitializer is global::Google.Apis.Auth.OAuth2.UserCredential credential)
+                {
+                    _ = await credential.GetAccessTokenForRequestAsync(cancellationToken: cancellationToken);
+                }
+
+                _provider = new GmailProvider(service);
+                service = null;
+                return _provider;
+            }
+            finally
+            {
+                service?.Dispose();
+            }
+        }
+        catch (global::Google.Apis.Auth.OAuth2.Responses.TokenResponseException)
+        {
+            if (_signIn is not null)
+            {
+                await _signIn.DisposeAsync();
+                _signIn = null;
+            }
+
+            _provider = null;
+            var store = new DigitalBrain.Google.Auth.DurableGoogleTokenStore(
+                _tokenState,
+                () => WriteStateAsync(),
+                ServiceProvider.GetRequiredService<DigitalBrain.Security.IDurablePayloadProtector>(),
+                DigitalBrain.Google.Auth.DurableGoogleTokenStore.Purpose(
+                    GmailAuthRail.ServerKey,
+                    _durableIdentity));
+            await store.DeleteAsync<global::Google.Apis.Auth.OAuth2.Responses.TokenResponse>(_userKey);
+            await GmailAuthRail.EnsureAuthorizedAsync(
+                GrainFactory,
+                Id.Owner,
+                ServiceProvider,
+                commandId,
+                _tokenState,
+                _pendingAuthStates,
+                () => WriteStateAsync(),
+                _durableIdentity,
+                _userKey,
+            cancellationToken,
+            TimeProvider);
+            throw new InvalidOperationException("Gmail authorization recovery did not park after token failure.");
+        }
+    }
+
+    private static string? ResolveBaseUri(IConfiguration configuration)
+    {
+        var baseUri = configuration[$"{GoogleOAuthOptions.ConfigurationRoot}:BaseUri"];
+        if (string.IsNullOrWhiteSpace(baseUri))
+        {
+            baseUri = configuration[$"{GoogleOAuthOptions.ConfigurationRoot}:Endpoint"];
+        }
+
+        if (string.IsNullOrWhiteSpace(baseUri))
+        {
+            return null;
+        }
+
+        if (!Uri.TryCreate(baseUri, UriKind.Absolute, out var uri)
+            || !string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                $"{ConfigurationRoot}:{McpRuntimeHosting.EndpointConfigurationSuffix} must be an absolute URI.");
+                $"{GoogleOAuthOptions.ConfigurationRoot}:BaseUri must be an absolute http(s) URI.");
         }
 
-        return DefaultServer.WithEndpoint(uri);
+        if (!IsLoopbackOrHttps(uri))
+        {
+            throw new InvalidOperationException(
+                $"{GoogleOAuthOptions.ConfigurationRoot}:BaseUri overrides are limited to loopback http or any https endpoint.");
+        }
+
+        return uri.AbsoluteUri;
     }
 
-    private static string Required(JsonElement content, string property)
+    private static bool IsLoopbackOrHttps(Uri uri)
     {
-        if (content.TryGetProperty(property, out var value)
-            && value.ValueKind == JsonValueKind.String
-            && !string.IsNullOrWhiteSpace(value.GetString()))
+        if (string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
         {
-            return value.GetString()!;
+            return true;
         }
 
-        throw new InvalidOperationException($"Gmail get_message returned no {property}.");
-    }
-
-    private static string RequiredContent(JsonElement content, string property)
-    {
-        if (content.TryGetProperty(property, out var value)
-            && value.ValueKind == JsonValueKind.String
-            && value.GetString() is { } text
-            && (text.Length == 0 || !string.IsNullOrWhiteSpace(text)))
-        {
-            return text;
-        }
-
-        throw new InvalidOperationException($"Gmail get_message returned no {property}.");
+        return string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            && (uri.IsLoopback
+                || string.Equals(uri.Host, "127.0.0.1", StringComparison.Ordinal)
+                || string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(uri.Host, "[::1]", StringComparison.Ordinal));
     }
 }

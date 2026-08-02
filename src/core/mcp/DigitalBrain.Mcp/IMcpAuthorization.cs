@@ -11,6 +11,11 @@ public partial interface IMcpAuthorization : INeuron
     [Alias(nameof(Begin))]
     Task<AuthorizationRequired> Begin(BeginMcpAuthorization request, CancellationToken cancellationToken = default);
 
+    [Alias(nameof(BindCompletionTarget))]
+    Task BindCompletionTarget(
+        BindMcpAuthorizationCompletionTarget request,
+        CancellationToken cancellationToken = default);
+
     [Alias(nameof(DeliverCallback))]
     Task<McpAuthorizationCallbackDelivery> DeliverCallback(
         DeliverMcpAuthorizationCallback delivery,

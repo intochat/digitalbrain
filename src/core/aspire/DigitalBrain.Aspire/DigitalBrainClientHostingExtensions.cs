@@ -40,11 +40,45 @@ public static class DigitalBrainClientHostingExtensions
             configure?.Invoke(client);
         });
 
-        builder.Services.AddSingleton<IDigitalBrain>(
-            services => DigitalBrainClient.Connect(services.GetRequiredService<IGrainFactory>(), owner));
-        builder.Services.AddHostedService<DigitalBrainActivationHostedService>();
-
+        builder.Services.AddDigitalBrainOwner(
+            builder.Configuration,
+            owner,
+            activateOnStart: true);
         return builder;
+    }
+
+    public static IHostApplicationBuilder AddDigitalBrainOwner(
+        this IHostApplicationBuilder builder,
+        string? owner = null,
+        bool activateOnStart = true)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.Services.AddDigitalBrainOwner(builder.Configuration, owner, activateOnStart);
+        return builder;
+    }
+
+    public static IServiceCollection AddDigitalBrainOwner(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        string? owner = null,
+        bool activateOnStart = true)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var resolvedOwner = string.IsNullOrWhiteSpace(owner)
+            ? ResolveOwner(configuration)
+            : owner!;
+        services.AddSingleton<IDigitalBrain>(
+            serviceProvider => DigitalBrainClient.Connect(
+                serviceProvider.GetRequiredService<IGrainFactory>(),
+                resolvedOwner));
+        if (activateOnStart)
+        {
+            services.AddHostedService<DigitalBrainActivationHostedService>();
+        }
+
+        return services;
     }
 }
 

@@ -10,7 +10,7 @@ public sealed class TasksVocabulary
         typeof(ITask).Namespace
         ?? throw new InvalidOperationException($"{nameof(ITask)} has no namespace.");
 
-    [Fact(DisplayName = "Tasks.Contracts public vocabulary is task/worker/attempt only — never AI or schedule types")]
+    [Fact(DisplayName = "Tasks.Contracts public vocabulary is task/worker/attempt/activation/operation surface — never AI or schedule types")]
     public void PublicVocabularyIsTaskWorkerAndAttemptSurfaceOnly()
     {
         var contracts = typeof(ITask).Assembly;
@@ -36,23 +36,39 @@ public sealed class TasksVocabulary
                 nameof(AttemptRequest),
                 nameof(AttemptSucceeded),
                 nameof(AttemptWaiting),
+                nameof(BehaviorTaskActivation),
                 nameof(BlockerId),
                 nameof(CancelTask),
+                nameof(CompleteUserAction),
+                nameof(DenyUserAction),
                 nameof(DependencyPending),
                 nameof(FactReference),
                 nameof(Failure),
                 nameof(Goal),
                 nameof(ITask),
+                nameof(IUserActionCustody),
                 nameof(IWorker),
                 nameof(InputRequired),
+                nameof(IssuedUserAction),
                 nameof(OutcomeUncertain),
+                nameof(PrepareTaskOperation),
+                nameof(ReadTaskOperation),
+                nameof(ReadTaskOperationResult),
                 nameof(Result),
                 nameof(RetryScheduled),
                 nameof(StartTask),
                 nameof(TaskBlocker),
+                nameof(TaskOperationEdge),
+                nameof(TaskOperationPhase),
+                nameof(TaskOperationSnapshot),
                 nameof(TaskPolicy),
                 nameof(TaskSnapshot),
                 nameof(TaskState),
+                nameof(TransitionTaskOperation),
+                nameof(UserActionDenied),
+                nameof(UserActionParkReady),
+                nameof(UserActionPending),
+                nameof(UserActionRequired),
             ],
             vocabulary);
 
@@ -60,6 +76,17 @@ public sealed class TasksVocabulary
         Assert.Null(contracts.GetType($"{TasksNamespace}.ICountdown"));
         Assert.Null(contracts.GetType($"{TasksNamespace}.ILLM"));
         Assert.Null(contracts.GetType($"{TasksNamespace}.IBehavior"));
+        Assert.DoesNotContain(
+            contracts.GetExportedTypes(),
+            type => type.Name is "RelayWorkerAccept"
+                or "RelayWorkerContinue"
+                or "RelayWorkerCancel"
+                or "DispatchWorkerAccept"
+                or "DispatchWorkerContinue"
+                or "DispatchWorkerCancel"
+                or "WorkerDispatchRelay"
+                || type.Name.Contains("DispatchWorker", StringComparison.Ordinal)
+                || type.Name.Contains("RelayWorker", StringComparison.Ordinal));
     }
 
     [Fact(DisplayName = "ITask methods are unsuffixed, aliased, and return TaskSnapshot")]

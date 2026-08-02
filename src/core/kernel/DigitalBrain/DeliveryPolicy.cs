@@ -10,6 +10,10 @@ internal static class DeliveryPolicy
 
     internal static readonly TimeSpan RetryHorizon = TimeSpan.FromMinutes(30);
 
+    // Finite bound for a single outbox Deliver attempt so reminder-driven drains always pass a
+    // cancelable lifecycle token that can actually fire (not merely CanBeCanceled forever).
+    internal static readonly TimeSpan DeliveryAttemptTimeout = TimeSpan.FromSeconds(30);
+
     internal static int InboundDepth() => RequestContext.Get(DepthKey) is int depth ? depth : 0;
 
     internal static void CarryDepth(int depth) => RequestContext.Set(DepthKey, depth);

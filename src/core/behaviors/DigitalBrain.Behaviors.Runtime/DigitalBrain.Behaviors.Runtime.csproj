@@ -6,13 +6,15 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812;CA2007;NU1608</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" ExcludeAssets="analyzers" />
-    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Orleans.Journaling" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
     <ProjectReference Include="..\..\kernel\DigitalBrain\DigitalBrain.csproj" />
     <ProjectReference Include="..\..\security\DigitalBrain.Security\DigitalBrain.Security.csproj" />
+    <ProjectReference Include="..\..\mcp\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
     <ProjectReference Include="..\..\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
     <ProjectReference Include="..\..\..\modules\tasks\DigitalBrain.Modules.Tasks.Contracts\DigitalBrain.Modules.Tasks.Contracts.csproj" />
   </ItemGroup>

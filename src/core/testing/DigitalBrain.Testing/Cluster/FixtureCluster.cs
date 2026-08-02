@@ -68,13 +68,29 @@ internal sealed class FixtureCluster : IAsyncDisposable
             ?? throw new InvalidOperationException(
                 "The DigitalBrain fixture cluster is not running.");
 
+    internal IServiceProvider ClientServices
+        => (_cluster?.Client as IClusterClient)?.ServiceProvider
+            ?? throw new InvalidOperationException(
+                "The DigitalBrain fixture cluster client services are not available.");
+
     internal TestEdgeRegistry Edges => _edges;
 
-    internal JournalFaultRegistration ArmJournalFault(NeuronId target, string message)
-        => _journalStorage.ArmFault(target, message);
+    internal JournalFaultRegistration ArmJournalFault(
+        NeuronId target,
+        string message,
+        int allowCommitsBeforeFault = 0,
+        bool stickyUntilDisarm = false)
+        => _journalStorage.ArmFault(target, message, allowCommitsBeforeFault, stickyUntilDisarm);
 
     internal bool DisarmJournalFault(JournalFaultRegistration registration)
         => _journalStorage.DisarmFault(registration);
+
+    internal async Task<bool> HasOutboxWakeupAsync(NeuronId neuron)
+    {
+        var grainId = GrainId.Create(OutboxWakeup.GrainTypeName, neuron.ToString());
+        var entry = await _reminderTable.ReadRow(grainId, OutboxWakeup.ReminderName);
+        return entry is not null;
+    }
 
     internal async Task<(TestClock Clock, long EdgeGeneration)> PrepareMethodAsync(string scope, BrainTestDiagnostics diagnostics)
     {
@@ -173,6 +189,13 @@ internal sealed class FixtureCluster : IAsyncDisposable
             {
                 module.PrepareSerialization(client.Services);
             }
+
+            var selected = _modules
+                .OrderBy(module => module.Id.Value, StringComparer.Ordinal)
+                .ToArray();
+            var capabilities = ActiveCapabilityCatalog.Create(selected);
+            client.Services.AddSingleton(capabilities);
+            client.Services.AddSingleton(ActiveModuleContractTypeMap.Create(selected, capabilities));
 
             var clientResponseTimeout = _responseTimeout ?? SaturatedMachineResponseTimeout;
             client.Services.Configure<ClientMessagingOptions>(

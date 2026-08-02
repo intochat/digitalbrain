@@ -21,14 +21,14 @@ const _expectedWireManifest = <String, Object?>{
     {
       'name': 'IScene',
       'kind': 'interface',
-      'alias': 'DigitalBrain.Flutter.IScene',
+      'alias': 'flutter.scene',
       'properties': <Object?>[],
       'methods': <Object?>[],
     },
     {
       'name': 'IShell',
       'kind': 'interface',
-      'alias': 'DigitalBrain.Flutter.IShell',
+      'alias': 'flutter.shell',
       'properties': <Object?>[],
       'methods': [
         {

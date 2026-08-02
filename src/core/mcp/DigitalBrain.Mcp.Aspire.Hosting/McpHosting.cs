@@ -25,7 +25,7 @@ internal static class McpProviderHosting
 
         var application = GetOrAddApplicationParameters(module.Brain.GetApplicationBuilder());
         var projection = module.Brain.GetOrAddState(
-            brain => new McpBrainProjection(brain, application.AuthorizationMode),
+            static brain => new McpBrainProjection(brain),
             out var added);
         if (added)
         {
@@ -60,15 +60,7 @@ internal static class McpProviderHosting
         internal McpApplicationParameters(IDistributedApplicationBuilder builder)
         {
             _builder = builder;
-            AuthorizationMode = (_builder.ExecutionContext.IsRunMode
-                    ? _builder.AddParameter("mcp-authorization-mode", "LocalLoopbackDevelopment")
-                    : _builder.AddParameter("mcp-authorization-mode"))
-                .WithDescription(
-                    "MCP authorization execution mode. Use `LocalLoopbackDevelopment` only for a local silo; every other value disables interactive authorization.",
-                    enableMarkdown: true);
         }
-
-        internal IResourceBuilder<ParameterResource> AuthorizationMode { get; }
 
         internal McpProviderParameters Register(McpProviderHostingDefinition definition)
         {
@@ -90,37 +82,45 @@ internal static class McpProviderHosting
                 definition,
                 Parameter(
                     $"{definition.ParameterPrefix}-client-id",
-                    localValue: "local-dev",
                     secret: false,
                     description: definition.ClientIdDescription,
-                    localRun),
+                    localValue: null),
                 definition.ClientSecretDescription is { } clientSecretDescription
                     ? Parameter(
                         $"{definition.ParameterPrefix}-client-secret",
-                        localValue: "local-dev-secret",
                         secret: true,
                         description: clientSecretDescription,
-                        localRun)
+                        localValue: null)
                     : null,
                 Parameter(
                     $"{definition.ParameterPrefix}-redirect-uri",
-                    localValue: "http://localhost/oauth/callback",
                     secret: false,
                     description: definition.RedirectUriDescription,
-                    localRun));
+                    localRun ? LocalDevelopmentProductSurface.LocalDevelopmentOAuthCallbackUri : null));
             _providers.Add(definition.Key, created);
             return created;
         }
 
         private IResourceBuilder<ParameterResource> Parameter(
             string name,
-            string localValue,
             bool secret,
             string description,
-            bool localRun)
+            string? localValue)
         {
-            var resource = localRun
-                ? _builder.AddParameter(name, localValue, secret: secret)
+            // persist: true enables Aspire dashboard "Save to user secrets" (requires AppHost UserSecretsId).
+            // Run-mode redirect defaults use ConstantParameterDefault; operator secrets do not.
+            var resource = _builder.ExecutionContext.IsRunMode
+                ? localValue is null
+                    ? _builder.AddParameter(
+                        name,
+                        new OperatorSuppliedParameterDefault(name),
+                        secret: secret,
+                        persist: true)
+                    : _builder.AddParameter(
+                        name,
+                        new ConstantParameterDefault(localValue),
+                        secret: secret,
+                        persist: true)
                 : _builder.AddParameter(name, secret: secret);
 
             return resource.WithDescription(description, enableMarkdown: true);
@@ -132,12 +132,10 @@ internal static class McpProviderHosting
         private readonly DigitalBrainBuilder _brain;
         private readonly Dictionary<string, McpProviderParameters> _providers =
             new(StringComparer.Ordinal);
-        private readonly IResourceBuilder<ParameterResource> _authorizationMode;
 
-        internal McpBrainProjection(DigitalBrainBuilder brain, IResourceBuilder<ParameterResource> authorizationMode)
+        internal McpBrainProjection(DigitalBrainBuilder brain)
         {
             _brain = brain;
-            _authorizationMode = authorizationMode;
         }
 
         internal void Add(McpProviderHostingDefinition definition, McpProviderParameters parameters)
@@ -154,8 +152,6 @@ internal static class McpProviderHosting
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
             ArgumentNullException.ThrowIfNull(builder);
-
-            builder.WithEnvironment("DigitalBrain__Integrations__Mcp__AuthorizationMode", _authorizationMode);
 
             foreach (var provider in _providers.Values)
             {

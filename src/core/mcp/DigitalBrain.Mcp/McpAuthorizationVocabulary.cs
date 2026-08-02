@@ -12,6 +12,12 @@ public sealed record BeginMcpAuthorization(
     [property: Id(4)] string State);
 
 [GenerateSerializer]
+[Alias("db.mcp.bind-authorization-completion-target")]
+public sealed record BindMcpAuthorizationCompletionTarget(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] NeuronId CompletionTarget);
+
+[GenerateSerializer]
 [Alias("db.mcp.deliver-authorization-callback")]
 public sealed record DeliverMcpAuthorizationCallback(
     [property: Id(0)] string State,

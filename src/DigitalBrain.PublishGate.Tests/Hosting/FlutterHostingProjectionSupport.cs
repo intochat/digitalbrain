@@ -35,11 +35,25 @@ internal static class FlutterHostingProjectionSupport
             File.Exists(Path.Combine(
                 shellDirectory,
                 FlutterHostingExtensions.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar))),
-            "shell is window-only — headless entry stays on pure-Dart core.");
+            "shell is window/web chrome — headless entry stays on pure-Dart core.");
         var pubspec = await File.ReadAllTextAsync(
             Path.Combine(shellDirectory, "pubspec.yaml"),
             cancellationToken).ConfigureAwait(true);
         Assert.Contains("sdk: flutter", pubspec, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static async Task AssertShellWebLayoutAsync(string shellDirectory, CancellationToken cancellationToken = default)
+    {
+        await AssertShellDesktopLayoutAsync(shellDirectory, cancellationToken).ConfigureAwait(true);
+        Assert.True(
+            Directory.Exists(Path.Combine(shellDirectory, FlutterHostingExtensions.WebPlatformDirectoryName)),
+            "shell web host requires web/ (WithWebHost uses clients/flutter/shell).");
+        Assert.True(
+            File.Exists(Path.Combine(
+                shellDirectory,
+                FlutterHostingExtensions.WebPlatformDirectoryName,
+                "index.html")),
+            "shell web host requires web/index.html.");
     }
 
     public static async Task AssertPureDartClientLayoutAsync(string clientDirectory, CancellationToken cancellationToken = default)
@@ -159,6 +173,12 @@ internal static class FlutterHostingProjectionSupport
 
     public static async Task<List<string>> ResolvedArgsOf(ExecutableResource resource)
     {
+        var args = await RawArgsOf(resource).ConfigureAwait(true);
+        return args.Select(static arg => arg?.ToString() ?? string.Empty).ToList();
+    }
+
+    public static async Task<List<object>> RawArgsOf(ExecutableResource resource)
+    {
         var args = new List<object>();
         var context = new CommandLineArgsCallbackContext(args, resource, CancellationToken.None);
         foreach (var annotation in resource.Annotations.OfType<CommandLineArgsCallbackAnnotation>())
@@ -166,6 +186,6 @@ internal static class FlutterHostingProjectionSupport
             await annotation.Callback(context).ConfigureAwait(true);
         }
 
-        return args.Select(static arg => arg?.ToString() ?? string.Empty).ToList();
+        return args;
     }
 }

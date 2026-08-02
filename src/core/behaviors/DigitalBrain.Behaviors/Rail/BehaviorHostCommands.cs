@@ -29,4 +29,5 @@ public sealed record BehaviorHostExecuteCommand(
     string TriggerTypeName,
     ProtectedPayloadReference TriggerPayload,
     IReadOnlyList<BehaviorCapabilityEdge> Capabilities,
-    DateTimeOffset UtcNow);
+    DateTimeOffset UtcNow,
+    NeuronId Worker = default);

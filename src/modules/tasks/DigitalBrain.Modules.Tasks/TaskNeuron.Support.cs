@@ -133,4 +133,7 @@ internal sealed partial class TaskNeuron
 
     private static bool IsTerminal(TaskState state)
         => state is TaskState.Succeeded or TaskState.Failed or TaskState.Cancelled;
+
+    private static bool IsOutcomeUncertain(TaskData data)
+        => data.State == TaskState.Waiting && data.Blocker is OutcomeUncertain;
 }

@@ -2,6 +2,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.AccountEnrichment;
 using DigitalBrain.Flutter;
 using DigitalBrain.Mcp.Testing;
+using DigitalBrain.Salesforce;
 using DigitalBrain.Testing;
 using Xunit;
 
@@ -50,17 +51,13 @@ public sealed class AccountEnrichmentProcessSample(IntegrationsFixture fixture)
     private static async Task<AccountEnriched> RunEnrichmentToCompletionAsync(TestBrain test, CancellationToken cancellationToken)
     {
         var expectedDescription = IntegrationsFixture.SampleEnrichmentDescription;
-        test.Mcp().Catalog(
-            IntegrationsFixture.GmailServerKey,
-            AdmittedMcpTools.GmailGetMessage(
-                id: IntegrationsFixture.SampleMessageId,
-                subject: IntegrationsFixture.SampleSubject,
-                sender: IntegrationsFixture.SampleSender,
-                plaintextBody: IntegrationsFixture.SampleBody));
+        GmailHelpers.CatalogSampleMessage(test);
+        await GmailHelpers.SeedAuthorizationAsync(test, cancellationToken: cancellationToken);
         test.Mcp().Catalog(
             IntegrationsFixture.SalesforceServerKey,
             AdmittedMcpTools.SalesforceUpdateAccount(),
             AdmittedMcpTools.SalesforceSoqlQuery(IntegrationsFixture.SampleAccountId, expectedDescription));
+        GmailHelpers.ScriptReadSampleMessage(test);
 
         var enrichment = test.Neuron<IAccountEnrichment>("enricher");
         var commandId = CommandId.New();
@@ -81,6 +78,10 @@ public sealed class AccountEnrichmentProcessSample(IntegrationsFixture fixture)
 
         var approval = IntegrationsFixture.Approval(test, commandId, proposed.Fingerprint);
         var completedWait = enrichment.Outgoing.NextAsync<AccountEnriched>(cancellationToken);
+
+        var approved = await SalesforceHelpers.ApproveAsync(test, approval, cancellationToken);
+        Assert.True(approved.Succeeded);
+        Assert.Equal(SalesforceMutationState.Completed, approved.Mutation!.State);
 
         await test.Client.SendAsync(enrichment.Id, approval, cancellationToken);
         return (await completedWait).Synapse;

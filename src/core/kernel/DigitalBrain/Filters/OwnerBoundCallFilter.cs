@@ -10,6 +10,8 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        using var callerContext = GrainCallerContext.Enter(context.SourceId);
+
         if (IsReminderCall(context))
         {
             if (IsTrustedReminderProvider(context.SourceId))

@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Tasks;
 
 namespace DigitalBrain.Behaviors;
 
@@ -19,21 +20,7 @@ internal static class BehaviorProgramLoader
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var loadContext = new AssemblyLoadContext(
-            $"behavior-host-{request.Metadata.Execution.Value:N}",
-            isCollectible: true);
-        loadContext.Resolving += static (_, name) =>
-        {
-            try
-            {
-                return AssemblyLoadContext.Default.LoadFromAssemblyName(name);
-            }
-            catch (Exception)
-            {
-                return null;
-            }
-        };
-
+        var loadContext = CreateCollectibleContext(request.Metadata.Execution);
         try
         {
             using var stream = new MemoryStream(request.ArtifactBytes.ToArray());
@@ -48,9 +35,7 @@ internal static class BehaviorProgramLoader
 
             if (programType is null)
             {
-                return new BehaviorExecutionOutcome(
-                    false,
-                    "Compiled artifact has no public IBehaviorProgram<> implementation.");
+                return new BehaviorExecutionOutcome(false, BehaviorExecutionCodes.ContractMismatch);
             }
 
             var programInterface = programType.GetInterfaces()
@@ -61,14 +46,11 @@ internal static class BehaviorProgramLoader
             if (!string.Equals(triggerType.FullName, request.TriggerTypeName, StringComparison.Ordinal)
                 && !string.Equals(triggerType.Name, request.TriggerTypeName, StringComparison.Ordinal))
             {
-                return new BehaviorExecutionOutcome(
-                    false,
-                    $"Trigger type '{request.TriggerTypeName}' does not match program trigger '{triggerType.FullName}'.");
+                return new BehaviorExecutionOutcome(false, BehaviorExecutionCodes.ContractMismatch);
             }
 
             var trigger = JsonSerializer.Deserialize(request.TriggerJson, triggerType)
-                ?? throw new InvalidOperationException(
-                    $"Trigger JSON could not deserialize to '{triggerType.FullName}'.");
+                ?? throw new InvalidOperationException(BehaviorExecutionCodes.ContractMismatch);
 
             var program = Activator.CreateInstance(programType)!;
             using var attempt = cancellationToken.CanBeCanceled
@@ -80,16 +62,20 @@ internal static class BehaviorProgramLoader
                 request.Time,
                 attempt.Token);
             var execute = programInterface.GetMethod(nameof(IBehaviorProgram<Synapse>.ExecuteAsync))
-                ?? throw new InvalidOperationException("IBehaviorProgram.ExecuteAsync was not found.");
+                ?? throw new InvalidOperationException(BehaviorExecutionCodes.ContractMismatch);
             var task = (ValueTask)execute.Invoke(program, [trigger, context, attempt.Token])!;
             await task.ConfigureAwait(false);
 
-            var outcome = context.LastOutcome ?? "executed";
-            return new BehaviorExecutionOutcome(true, outcome);
+            return new BehaviorExecutionOutcome(true, BehaviorExecutionCodes.Succeeded);
+        }
+        catch (OperationCanceledException)
+        {
+            return new BehaviorExecutionOutcome(false, BehaviorExecutionCodes.Cancelled);
         }
         catch (Exception exception)
         {
-            return new BehaviorExecutionOutcome(false, exception.GetBaseException().Message);
+            _ = exception;
+            return new BehaviorExecutionOutcome(false, BehaviorExecutionCodes.Exception);
         }
         finally
         {
@@ -123,14 +109,11 @@ internal static class BehaviorProgramLoader
             if (!string.Equals(triggerType.FullName, request.TriggerTypeName, StringComparison.Ordinal)
                 && !string.Equals(triggerType.Name, request.TriggerTypeName, StringComparison.Ordinal))
             {
-                return new BehaviorExecutionOutcome(
-                    false,
-                    $"Trigger type '{request.TriggerTypeName}' does not match program trigger '{triggerType.FullName}'.");
+                return new BehaviorExecutionOutcome(false, BehaviorExecutionCodes.ContractMismatch);
             }
 
             var trigger = JsonSerializer.Deserialize(triggerJson.Span, triggerType)
-                ?? throw new InvalidOperationException(
-                    $"Trigger JSON could not deserialize to '{triggerType.FullName}'.");
+                ?? throw new InvalidOperationException(BehaviorExecutionCodes.ContractMismatch);
 
             using var attempt = cancellationToken.CanBeCanceled
                 ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
@@ -138,8 +121,7 @@ internal static class BehaviorProgramLoader
 
             var triggerWrapperType = typeof(BehaviorTrigger<>).MakeGenericType(triggerType);
             var triggerWrapper = Activator.CreateInstance(triggerWrapperType, trigger, attempt.Token)
-                ?? throw new InvalidOperationException(
-                    $"BehaviorTrigger<{triggerType.Name}> could not be constructed.");
+                ?? throw new InvalidOperationException(BehaviorExecutionCodes.ContractMismatch);
 
             var create = brainType.GetMethod(
                     nameof(BehaviorBrain<Synapse>.Create),
@@ -147,11 +129,9 @@ internal static class BehaviorProgramLoader
                     binder: null,
                     types: [triggerWrapperType, typeof(IBehaviorSynapseBroker)],
                     modifiers: null)
-                ?? throw new InvalidOperationException(
-                    $"BehaviorBrain<{triggerType.Name}>.Create was not found.");
+                ?? throw new InvalidOperationException(BehaviorExecutionCodes.ContractMismatch);
             brain = create.Invoke(null, [triggerWrapper, broker])
-                ?? throw new InvalidOperationException(
-                    $"BehaviorBrain<{triggerType.Name}>.Create returned null.");
+                ?? throw new InvalidOperationException(BehaviorExecutionCodes.ContractMismatch);
 
             var result = entry.Invoke(null, [brain]);
             await AwaitEntryResultAsync(result, entry.ReturnType).ConfigureAwait(false);
@@ -162,10 +142,26 @@ internal static class BehaviorProgramLoader
                 brain = null;
             }
 
-            return new BehaviorExecutionOutcome(true, "executed");
+            return new BehaviorExecutionOutcome(true, BehaviorExecutionCodes.Succeeded);
+        }
+        catch (OperationCanceledException)
+        {
+            if (brain is IAsyncDisposable cancelledDisposable)
+            {
+                try
+                {
+                    await cancelledDisposable.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                }
+            }
+
+            return new BehaviorExecutionOutcome(false, BehaviorExecutionCodes.Cancelled);
         }
         catch (Exception exception)
         {
+            var userAction = UnwrapUserActionRequired(exception);
             if (brain is IAsyncDisposable asyncDisposable)
             {
                 try
@@ -177,12 +173,34 @@ internal static class BehaviorProgramLoader
                 }
             }
 
-            return new BehaviorExecutionOutcome(false, exception.GetBaseException().Message);
+            if (userAction is not null)
+            {
+                return new BehaviorExecutionOutcome(
+                    false,
+                    BehaviorExecutionCodes.UserActionRequired,
+                    BehaviorUserActionSurface.FromRequirement(userAction));
+            }
+
+            return new BehaviorExecutionOutcome(false, BehaviorExecutionCodes.Exception);
         }
         finally
         {
             loadContext.Unload();
         }
+    }
+
+    private static UserActionRequired? UnwrapUserActionRequired(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is BehaviorUserActionRequiredException userAction
+                && userAction.Requirement is { } requirement)
+            {
+                return requirement;
+            }
+        }
+
+        return null;
     }
 
     private static AssemblyLoadContext CreateCollectibleContext(BehaviorExecutionId execution)

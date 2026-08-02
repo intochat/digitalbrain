@@ -1,4 +1,5 @@
 using DigitalBrain.Security;
+using DigitalBrain.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
@@ -20,11 +21,29 @@ public sealed partial class BehaviorsModule
         builder.Services.AddSingleton<IBehaviorBddGate, InstallTestsBddGate>();
         builder.Services.TryAddSingleton<IBehaviorArtifactTrust>(static provider =>
             new SiloBehaviorArtifactTrust(provider.GetRequiredService<IDurablePayloadProtector>()));
+        builder.Services.TryAddSingleton<IBehaviorProtectedPayloadAccess, GrainBehaviorProtectedPayloadAccess>();
+        builder.Services.TryAddSingleton<IBehaviorProtectedTriggerAccess, GrainBehaviorProtectedTriggerAccess>();
+        builder.Services.TryAddSingleton<IBehaviorTaskOperationAccess, GrainBehaviorTaskOperationAccess>();
+        builder.Services.TryAddSingleton<IBehaviorCapabilityDispatchAccess, GrainBehaviorCapabilityDispatchAccess>();
+        builder.Services.TryAddSingleton<IUserActionCustody>(static provider =>
+        {
+            var time = provider.GetKeyedService<TimeProvider>(DigitalBrain.Kernel.NeuronTime.ServiceKey)
+                ?? provider.GetService<TimeProvider>()
+                ?? TimeProvider.System;
+            return new GrainUserActionCustody(
+                provider.GetRequiredService<IBehaviorProtectedPayloadAccess>(),
+                time);
+        });
 
         var executor = builder.Configuration[ExecutorConfigurationKey];
-        if (string.Equals(executor, HostExecutorName, StringComparison.OrdinalIgnoreCase))
+        var baseAddress = builder.Configuration[HostBaseAddressConfigurationKey];
+        var useHost =
+            string.Equals(executor, HostExecutorName, StringComparison.OrdinalIgnoreCase)
+            || (!string.IsNullOrWhiteSpace(baseAddress)
+                && !string.Equals(executor, InProcessExecutorName, StringComparison.OrdinalIgnoreCase));
+
+        if (useHost)
         {
-            var baseAddress = builder.Configuration[HostBaseAddressConfigurationKey];
             if (!string.IsNullOrWhiteSpace(baseAddress))
             {
                 builder.Services.AddHttpClient<IBehaviorHostGateway, HttpBehaviorHostClient>(client =>
@@ -37,6 +56,7 @@ public sealed partial class BehaviorsModule
             return;
         }
 
+        // Closed residual only: never loads authored assemblies in the silo process.
         builder.Services.AddSingleton<IBehaviorExecutor, InProcessBehaviorExecutor>();
     }
 }

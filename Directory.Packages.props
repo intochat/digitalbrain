@@ -3,6 +3,8 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="Google.Apis.Auth" Version="1.75.0" />
+    <PackageVersion Include="Google.Apis.Gmail.v1" Version="1.74.0.4162" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.6.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.0.0" />
     <PackageVersion Include="ModelContextProtocol.Core" Version="2.0.0" />
@@ -17,8 +19,12 @@
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.5.0-preview.1.26376.5" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.5.0-preview.1.26376.5" />
     <PackageVersion Include="Aspire.Hosting.OpenAI" Version="13.5.0-preview.1.26376.5" />
+    <PackageVersion Include="Aspire.Hosting.Qdrant" Version="13.5.0-preview.1.26376.5" />
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.5.0-preview.1.26376.5" />
     <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.5.0-preview.1.26376.5" />
+    <PackageVersion Include="Qdrant.Client" Version="1.18.1" />
+    <PackageVersion Include="Testcontainers" Version="4.13.0" />
+
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.4.1-beta.687" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="11.0.0-preview.6.26359.118" />
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.8.3" />

@@ -11,10 +11,15 @@
     </PackageReference>
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Qdrant.Client" />
+    <PackageReference Include="Testcontainers" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.Memory.Contracts\DigitalBrain.Modules.Memory.Contracts.csproj" />
     <ProjectReference Include="..\DigitalBrain.Modules.Memory\DigitalBrain.Modules.Memory.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Modules.Memory.Qdrant\DigitalBrain.Modules.Memory.Qdrant.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Modules.Memory.Aspire.Hosting\DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" />
     <ProjectReference Include="..\..\..\core\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="..\..\..\..\samples\DigitalBrain.VectorMemory\DigitalBrain.VectorMemory.csproj" />
   </ItemGroup>
 </Project>

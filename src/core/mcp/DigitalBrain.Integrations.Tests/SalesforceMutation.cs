@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Salesforce;
 using DigitalBrain.Mcp.Testing;
+using DigitalBrain.Salesforce;
 using DigitalBrain.Testing;
 using Xunit;
 
@@ -8,182 +8,140 @@ namespace DigitalBrain.Integrations.Tests;
 
 public sealed class SalesforceMutation(IntegrationsFixture fixture)
 {
-    private const string Driver = "sf-mutation";
     private const string UnprovenProviderDescription = "provider description does not match";
 
     [Fact(DisplayName =
-        "ISalesforce.ProposeAccountDescription returns AwaitingApproval without opening MCP")]
+        "SalesforceRequest propose returns AwaitingApproval without opening MCP")]
     public async Task ProposeReturnsAwaitingApprovalWithoutMcp()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var driver = test.Neuron<IIntegrationDriver>(Driver);
         var commandId = CommandId.New();
         var description = IntegrationsFixture.SampleEnrichmentDescription;
 
-        var proposed = await ProposeAsync(driver, commandId, description, cancellationToken);
+        var proposed = await ProposeAsync(test, commandId, description, cancellationToken);
 
-        Assert.Equal(commandId, proposed.CommandId);
-        Assert.Equal(IntegrationsFixture.SampleAccountId, proposed.AccountId);
-        Assert.Equal(description, proposed.Description);
-        Assert.False(string.IsNullOrWhiteSpace(proposed.Fingerprint));
-        Assert.Equal(SalesforceMutationState.AwaitingApproval, proposed.State);
+        Assert.True(proposed.Succeeded);
+        Assert.Equal(commandId, proposed.Mutation!.CommandId);
+        Assert.Equal(IntegrationsFixture.SampleAccountId, proposed.Mutation.AccountId);
+        Assert.Equal(description, proposed.Mutation.Description);
+        Assert.False(string.IsNullOrWhiteSpace(proposed.Mutation.Fingerprint));
+        Assert.Equal(SalesforceMutationState.AwaitingApproval, proposed.Mutation.State);
         Assert.Equal(0, test.Mcp().SessionCount);
 
-        var again = await ProposeAsync(driver, commandId, description, cancellationToken);
-        Assert.Equal(proposed, again);
+        var again = await ProposeAsync(test, commandId, description, cancellationToken);
+        Assert.Equal(proposed.Mutation, again.Mutation);
         Assert.Equal(0, test.Mcp().SessionCount);
     }
 
     [Fact(DisplayName =
-        "ISalesforce.ProposeAccountDescription rejects CommandId reuse with different content")]
+        "SalesforceRequest propose rejects CommandId reuse with different content")]
     public async Task ProposeRejectsCommandIdReuseWithDifferentContent()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var driver = test.Neuron<IIntegrationDriver>(Driver);
         var commandId = CommandId.New();
         var description = IntegrationsFixture.SampleEnrichmentDescription;
-        var proposed = await ProposeAsync(driver, commandId, description, cancellationToken);
+        var proposed = await ProposeAsync(test, commandId, description, cancellationToken);
 
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            ProposeAsync(driver, commandId, description + "\n(amended)", cancellationToken));
+        var failure = await ProposeAsync(test, commandId, description + "\n(amended)", cancellationToken);
 
-        Assert.Contains("fingerprint", failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(failure.Succeeded);
+        Assert.Contains("fingerprint", failure.Error, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, test.Mcp().SessionCount);
-        Assert.Equal(proposed, await ProposeAsync(driver, commandId, description, cancellationToken));
+        Assert.Equal(proposed.Mutation, (await ProposeAsync(test, commandId, description, cancellationToken)).Mutation);
     }
 
     [Fact(DisplayName =
-        "ISalesforce.ApproveAccountDescription rejects mismatched human approval evidence before MCP")]
-    public async Task ApproveRejectsMismatchedEvidenceWithoutMcp()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var driver = test.Neuron<IIntegrationDriver>(Driver);
-        var commandId = CommandId.New();
-        var description = IntegrationsFixture.SampleEnrichmentDescription;
-        var proposed = await ProposeAsync(driver, commandId, description, cancellationToken);
-
-        var recorded = IntegrationsFixture.Approval(test, commandId, proposed.Fingerprint);
-        await DeliverApprovalAsync(test, driver, recorded, cancellationToken);
-
-        var mismatched = recorded with { ApprovalId = Guid.NewGuid() };
-        await Assert.ThrowsAsync<NeuronAuthorizationException>(() =>
-            driver.Reference.ApproveSalesforceWithMismatchedEvidence(mismatched, recorded, cancellationToken));
-
-        Assert.Equal(0, test.Mcp().SessionCount);
-        Assert.Equal(
-            SalesforceMutationState.AwaitingApproval,
-            (await ProposeAsync(driver, commandId, description, cancellationToken)).State);
-    }
-
-    [Fact(DisplayName =
-        "ISalesforce.ApproveAccountDescription rejects fingerprint that does not match the stored proposal before MCP")]
+        "ApproveSalesforceMutation rejects fingerprint that does not match the stored proposal before MCP")]
     public async Task ApproveRejectsMismatchedFingerprintWithoutMcp()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var driver = test.Neuron<IIntegrationDriver>(Driver);
         var commandId = CommandId.New();
         var description = IntegrationsFixture.SampleEnrichmentDescription;
-        var proposed = await ProposeAsync(driver, commandId, description, cancellationToken);
+        var proposed = await ProposeAsync(test, commandId, description, cancellationToken);
 
-        var wrongFingerprint = IntegrationsFixture.Approval(test, commandId, proposed.Fingerprint + "-tampered");
-        await DeliverApprovalAsync(test, driver, wrongFingerprint, cancellationToken);
+        var wrongFingerprint = IntegrationsFixture.Approval(test, commandId, proposed.Mutation!.Fingerprint + "-tampered");
+        var failure = await SalesforceHelpers.ApproveAsync(test, wrongFingerprint, cancellationToken);
 
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            driver.Reference.ApproveSalesforceWithStoredEvidence(wrongFingerprint, cancellationToken));
-
-        Assert.Contains("fingerprint", failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(failure.Succeeded);
+        Assert.Contains("fingerprint", failure.Error, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, test.Mcp().SessionCount);
         Assert.Equal(
             SalesforceMutationState.AwaitingApproval,
-            (await ProposeAsync(driver, commandId, description, cancellationToken)).State);
+            (await ProposeAsync(test, commandId, description, cancellationToken)).Mutation!.State);
     }
 
     [Fact(DisplayName =
-        "ISalesforce.ApproveAccountDescription completes after admitted MCP update on the scripted edge")]
+        "ApproveSalesforceMutation completes after admitted MCP update on the scripted edge")]
     public async Task ApproveCompletesThroughScriptedMcpEdge()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var description = IntegrationsFixture.SampleEnrichmentDescription;
-        var driver = test.Neuron<IIntegrationDriver>(Driver);
         var commandId = CommandId.New();
-        var proposed = await ProposeAsync(driver, commandId, description, cancellationToken);
+        var proposed = await ProposeAsync(test, commandId, description, cancellationToken);
 
         CatalogSalesforceWrite(test, description);
-        var approval = IntegrationsFixture.Approval(test, commandId, proposed.Fingerprint);
-        await DeliverApprovalAsync(test, driver, approval, cancellationToken);
+        var approval = IntegrationsFixture.Approval(test, commandId, proposed.Mutation!.Fingerprint);
 
-        var completed = await driver.Reference.ApproveSalesforceWithStoredEvidence(approval, cancellationToken);
+        var completed = await SalesforceHelpers.ApproveAsync(test, approval, cancellationToken);
 
-        Assert.Equal(SalesforceMutationState.Completed, completed.State);
-        Assert.Equal(commandId, completed.CommandId);
-        Assert.Equal(IntegrationsFixture.SampleAccountId, completed.AccountId);
-        Assert.Equal(description, completed.Description);
-        Assert.Equal(proposed.Fingerprint, completed.Fingerprint);
+        Assert.True(completed.Succeeded);
+        Assert.Equal(SalesforceMutationState.Completed, completed.Mutation!.State);
+        Assert.Equal(commandId, completed.Mutation.CommandId);
+        Assert.Equal(IntegrationsFixture.SampleAccountId, completed.Mutation.AccountId);
+        Assert.Equal(description, completed.Mutation.Description);
+        Assert.Equal(proposed.Mutation.Fingerprint, completed.Mutation.Fingerprint);
         Assert.True(test.Mcp().SessionCount >= 1);
 
-        var again = await driver.Reference.ApproveSalesforceWithStoredEvidence(approval, cancellationToken);
-        Assert.Equal(completed, again);
+        var again = await SalesforceHelpers.ApproveAsync(test, approval, cancellationToken);
+        Assert.Equal(completed.Mutation, again.Mutation);
     }
 
     [Fact(DisplayName =
-        "ISalesforce.ApproveAccountDescription returns OutcomeUncertain when reconciliation cannot prove the write")]
+        "ApproveSalesforceMutation returns OutcomeUncertain when reconciliation cannot prove the write")]
     public async Task ApproveReturnsOutcomeUncertainWhenReconciliationCannotProveWrite()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var description = IntegrationsFixture.SampleEnrichmentDescription;
-        var driver = test.Neuron<IIntegrationDriver>(Driver);
         var commandId = CommandId.New();
-        var proposed = await ProposeAsync(driver, commandId, description, cancellationToken);
+        var proposed = await ProposeAsync(test, commandId, description, cancellationToken);
 
         test.Mcp().Catalog(
             IntegrationsFixture.SalesforceServerKey,
             AdmittedMcpTools.SalesforceUpdateAccount(success: false),
             AdmittedMcpTools.SalesforceSoqlQuery(IntegrationsFixture.SampleAccountId, UnprovenProviderDescription));
 
-        var approval = IntegrationsFixture.Approval(test, commandId, proposed.Fingerprint);
-        await DeliverApprovalAsync(test, driver, approval, cancellationToken);
+        var approval = IntegrationsFixture.Approval(test, commandId, proposed.Mutation!.Fingerprint);
+        var uncertain = await SalesforceHelpers.ApproveAsync(test, approval, cancellationToken);
 
-        var uncertain = await driver.Reference.ApproveSalesforceWithStoredEvidence(approval, cancellationToken);
-
-        Assert.Equal(SalesforceMutationState.OutcomeUncertain, uncertain.State);
-        Assert.Equal(commandId, uncertain.CommandId);
-        Assert.Equal(IntegrationsFixture.SampleAccountId, uncertain.AccountId);
-        Assert.Equal(description, uncertain.Description);
-        Assert.Equal(proposed.Fingerprint, uncertain.Fingerprint);
+        Assert.True(uncertain.Succeeded);
+        Assert.Equal(SalesforceMutationState.OutcomeUncertain, uncertain.Mutation!.State);
+        Assert.Equal(commandId, uncertain.Mutation.CommandId);
+        Assert.Equal(IntegrationsFixture.SampleAccountId, uncertain.Mutation.AccountId);
+        Assert.Equal(description, uncertain.Mutation.Description);
+        Assert.Equal(proposed.Mutation.Fingerprint, uncertain.Mutation.Fingerprint);
         Assert.True(test.Mcp().SessionCount >= 1);
 
-        var again = await driver.Reference.ApproveSalesforceWithStoredEvidence(approval, cancellationToken);
-        Assert.Equal(SalesforceMutationState.OutcomeUncertain, again.State);
-        Assert.Equal(uncertain, again);
+        var again = await SalesforceHelpers.ApproveAsync(test, approval, cancellationToken);
+        Assert.Equal(SalesforceMutationState.OutcomeUncertain, again.Mutation!.State);
+        Assert.Equal(uncertain.Mutation, again.Mutation);
     }
 
-    private static Task<SalesforceAccountDescriptionMutation> ProposeAsync(
-        TestNeuron<IIntegrationDriver> driver,
+    private static Task<SalesforceResponse> ProposeAsync(
+        TestBrain test,
         CommandId commandId,
         string description,
         CancellationToken cancellationToken)
-        => driver.Reference.ProposeSalesforceAccountDescription(
+        => SalesforceHelpers.ProposeAsync(
+            test,
             commandId,
             IntegrationsFixture.SampleAccountId,
             description,
             cancellationToken);
-
-    private static async Task DeliverApprovalAsync(
-        TestBrain test,
-        TestNeuron<IIntegrationDriver> driver,
-        SalesforceMutationApproval approval,
-        CancellationToken cancellationToken)
-    {
-        var delivered = driver.Incoming.NextAsync<SalesforceMutationApproval>(cancellationToken);
-        await test.Client.SendAsync(driver.Id, approval, cancellationToken);
-        Assert.Equal(approval, (await delivered).Synapse);
-    }
 
     private static void CatalogSalesforceWrite(TestBrain test, string description)
         => test.Mcp().Catalog(

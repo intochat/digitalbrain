@@ -8,6 +8,8 @@ namespace DigitalBrain.Behaviors;
 public static class BehaviorHostHosting
 {
     public const string BrokerBaseAddressConfigurationKey = "DigitalBrain:Behaviors:Broker:BaseAddress";
+    public const string BrokerCredentialConfigurationKey = BehaviorBrokerContract.CredentialConfigurationKey;
+    public const string BrokerCredentialHeaderName = BehaviorBrokerContract.CredentialHeaderName;
     public const string BrokerHttpClientName = "DigitalBrain.Behaviors.Broker";
 
     public static IServiceCollection AddBehaviorHostEngine(
@@ -30,9 +32,19 @@ public static class BehaviorHostHosting
                     $"Configuration '{BrokerBaseAddressConfigurationKey}' must be an absolute URI.");
             }
 
+            var brokerCredential = configuration[BrokerCredentialConfigurationKey];
+            if (string.IsNullOrWhiteSpace(brokerCredential))
+            {
+                throw new InvalidOperationException(
+                    $"Configuration '{BrokerCredentialConfigurationKey}' is required when the reverse broker base address is set.");
+            }
+
             services.AddHttpClient(BrokerHttpClientName, client =>
             {
                 client.BaseAddress = absoluteAddress;
+                client.DefaultRequestHeaders.TryAddWithoutValidation(
+                    BrokerCredentialHeaderName,
+                    brokerCredential);
             });
             services.TryAddSingleton<IBehaviorHostBrokerClientFactory, HttpBehaviorHostBrokerClientFactory>();
         }

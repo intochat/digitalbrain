@@ -13,10 +13,11 @@ internal sealed class HttpBehaviorHostBrokerClientFactory : IBehaviorHostBrokerC
         this.httpClientFactory = httpClientFactory;
     }
 
-    public IBehaviorHostBrokerClient Create(OwnerId owner, NeuronId task, AttemptId attempt)
+    public IBehaviorHostBrokerClient Create(OwnerId owner, NeuronId task, AttemptId attempt, NeuronId worker)
         => new HttpBehaviorHostBrokerClient(
             httpClientFactory.CreateClient(BehaviorHostHosting.BrokerHttpClientName),
             owner,
             task,
-            attempt);
+            attempt,
+            worker);
 }

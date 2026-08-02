@@ -32,9 +32,13 @@ public sealed class BehaviorEditorEndpoints(FlutterHttpFixture fixture)
         Assert.NotNull(document);
         Assert.Equal(FlutterHttpContract.AccountEnrichmentBehaviorId, document.BehaviorId);
         Assert.Equal(nameof(BehaviorRevisionStatus.Empty), document.Status);
+        Assert.Equal(nameof(BehaviorRunState.Idle), document.RunState);
+        Assert.False(document.ActivationGateOpen);
         Assert.Contains("AccountEnrichmentProgram", document.ProgramSource, StringComparison.Ordinal);
         Assert.Contains("Feature: account enrichment", document.FeatureText, StringComparison.Ordinal);
         Assert.Equal(AccountEnrichmentEditorSeed.FeatureName, document.FeatureName);
+        Assert.Contains(document.Scenarios, scenario => scenario.Title.Contains("enrich", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(AccountEnrichmentEditorSeed.DisplayName, document.DisplayName);
     }
 
     [Fact(DisplayName =
@@ -64,6 +68,7 @@ public sealed class BehaviorEditorEndpoints(FlutterHttpFixture fixture)
         Assert.Equal(nameof(BehaviorRevisionStatus.Proposed), document.Status);
         Assert.False(string.IsNullOrWhiteSpace(document.ProposedArtifactHash));
         Assert.Null(document.ActiveArtifactHash);
+        Assert.Contains("AccountEnrichmentProgram", document.ProgramSource, StringComparison.Ordinal);
 
         var proposed = (await proposedWait).Synapse;
         Assert.Equal(document.ProposedArtifactHash, proposed.ArtifactHash);

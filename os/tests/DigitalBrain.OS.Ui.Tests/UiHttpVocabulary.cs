@@ -41,13 +41,25 @@ public sealed class UiHttpVocabulary(FlutterHttpFixture fixture)
         Assert.Equal("/brain/topology", FlutterHttpContract.BrainTopologyPath);
         Assert.Equal("/chats/{chatName}/messages/stream", FlutterHttpContract.StreamMessagePath);
         Assert.Equal("chat-delta", FlutterHttpContract.ChatDeltaEvent);
-        Assert.Equal("/oauth/mcp/callback", FlutterHttpContract.McpOAuthCallbackPath);
+        Assert.Equal("/oauth/callback", FlutterHttpContract.McpOAuthCallbackPath);
         Assert.Equal("/authorizations/events", FlutterHttpContract.AuthorizationEventsPath);
         Assert.Equal("authorization", FlutterHttpContract.AuthorizationEvent);
+        Assert.Equal("/behaviors", FlutterHttpContract.BehaviorsPath);
         Assert.Equal("/behaviors/{behaviorId}", FlutterHttpContract.BehaviorPath);
         Assert.Equal("/behaviors/{behaviorId}/propose", FlutterHttpContract.BehaviorProposePath);
         Assert.Equal("/behaviors/{behaviorId}/tests", FlutterHttpContract.BehaviorTestsPath);
         Assert.Equal("/behaviors/{behaviorId}/approve", FlutterHttpContract.BehaviorApprovePath);
+        Assert.Equal("/behaviors/{behaviorId}/activate", FlutterHttpContract.BehaviorActivatePath);
+        Assert.Equal("/behaviors/{behaviorId}/stop", FlutterHttpContract.BehaviorStopPath);
+        Assert.Equal("/behaviors/{behaviorId}/start", FlutterHttpContract.BehaviorStartPath);
+        Assert.Equal("/behaviors/{behaviorId}/run-once", FlutterHttpContract.BehaviorRunOncePath);
+        Assert.Equal("/behaviors/{behaviorId}/rollback", FlutterHttpContract.BehaviorRollbackPath);
+        Assert.Equal("/behaviors/{behaviorId}/bindings", FlutterHttpContract.BehaviorBindingsPath);
+        Assert.Equal("/behaviors/{behaviorId}/bindings/{bindingId}", FlutterHttpContract.BehaviorBindingPath);
+        Assert.Equal("/behaviors/{behaviorId}/events", FlutterHttpContract.BehaviorEventsPath);
+        Assert.Equal("/behaviors/{behaviorId}/change/propose", FlutterHttpContract.BehaviorChangeProposePath);
+        Assert.Equal("/behaviors/{behaviorId}/change/approve", FlutterHttpContract.BehaviorChangeApprovePath);
+        Assert.Equal("behavior", FlutterHttpContract.BehaviorEvent);
         Assert.Equal("/surfaces/behavior-editor", FlutterHttpContract.BehaviorEditorSurfacePath);
     }
 
@@ -112,5 +124,21 @@ public sealed class UiHttpVocabulary(FlutterHttpFixture fixture)
         using var health = await http.GetAsync(new Uri(FlutterHttpContract.HealthPath, UriKind.Relative), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, health.StatusCode);
+    }
+
+    [Fact(DisplayName = "legacy OAuth callback path /oauth/mcp/callback is no longer mapped")]
+    public async Task LegacyMcpOAuthCallbackPathIsNotMapped()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        await using var app = await FlutterHttpFixture.StartUiHttpAsync(test, cancellationToken);
+
+        using var http = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
+        using var legacy = await http.GetAsync(
+            new Uri("/oauth/mcp/callback?state=x&code=y", UriKind.Relative),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, legacy.StatusCode);
+        Assert.Equal("/oauth/callback", FlutterHttpContract.McpOAuthCallbackPath);
     }
 }

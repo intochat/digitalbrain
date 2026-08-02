@@ -4,9 +4,9 @@ namespace DigitalBrain.Memory;
 [Alias("memory.vector-namespace")]
 public readonly struct VectorMemoryNamespace : IEquatable<VectorMemoryNamespace>
 {
-    public static VectorMemoryNamespace Capabilities { get; } = new("capabilities");
+    public static VectorMemoryNamespace Capabilities { get; } = new("digitalbrain.capabilities");
 
-    public static VectorMemoryNamespace Behaviors { get; } = new("behaviors");
+    public static VectorMemoryNamespace Behaviors { get; } = new("digitalbrain.behaviors");
 
     public VectorMemoryNamespace(string value)
     {

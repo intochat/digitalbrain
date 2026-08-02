@@ -105,6 +105,28 @@ public sealed class ClockContracts(TestingFixture fixture)
         Assert.Equal(["reminder"], await probe.EventsAsync());
     }
 
+    [Fact(DisplayName =
+        "TestClock re-polls when a timer unregisters a still-due reminder mid-drain (outbox Disarm race)")]
+    public async Task ClockRepollsWhenTimerUnregistersDueReminderMidDrain()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var probe = test.Neuron<IClockProbe>("mid-drain-disarm").Reference;
+
+        // Timer due first; its callback unregisters the later reminder before the drain reaches it.
+        // Advance must complete without "reminder disappeared" — same TOCTOU outbox Arm/Disarm hits
+        // when a large AdvanceAsync catch-up fires grain timers that Disarm wakeups.
+        await probe.ScheduleAsync(
+            reminderDueSeconds: 2,
+            timerDueSeconds: 1,
+            reentrantTimer: false,
+            recurringTimer: false,
+            unregisterReminderOnTimer: true);
+        await test.Clock.AdvanceAsync(TimeSpan.FromSeconds(2), cancellationToken);
+
+        Assert.Equal(["timer"], await probe.EventsAsync());
+    }
+
     [Fact(DisplayName = "TestClock keeps its 1024-operation drain bound for recurring timers")]
     public async Task ClockRetainsDrainBound()
     {
@@ -124,7 +146,12 @@ public sealed class ClockContracts(TestingFixture fixture)
 [ClientEntryPoint]
 public partial interface IClockProbe : INeuron
 {
-    Task ScheduleAsync(int reminderDueSeconds, int timerDueSeconds, bool reentrantTimer, bool recurringTimer);
+    Task ScheduleAsync(
+        int reminderDueSeconds,
+        int timerDueSeconds,
+        bool reentrantTimer,
+        bool recurringTimer,
+        bool unregisterReminderOnTimer = false);
 
     Task CancelTimerAsync();
 
@@ -139,11 +166,18 @@ internal sealed class ClockProbe : Neuron, IClockProbe, IRemindable
     private IGrainReminder? _reminder;
     private ITimer? _timer;
     private bool _reentrantTimer;
+    private bool _unregisterReminderOnTimer;
 
-    public async Task ScheduleAsync(int reminderDueSeconds, int timerDueSeconds, bool reentrantTimer, bool recurringTimer)
+    public async Task ScheduleAsync(
+        int reminderDueSeconds,
+        int timerDueSeconds,
+        bool reentrantTimer,
+        bool recurringTimer,
+        bool unregisterReminderOnTimer = false)
     {
         _events.Clear();
         _reentrantTimer = reentrantTimer;
+        _unregisterReminderOnTimer = unregisterReminderOnTimer;
         _reminder = await this.RegisterOrUpdateReminder(
             ReminderName, TimeSpan.FromSeconds(reminderDueSeconds), TimeSpan.FromDays(1));
         _timer = TimeProvider.CreateTimer(
@@ -171,6 +205,13 @@ internal sealed class ClockProbe : Neuron, IClockProbe, IRemindable
     private void OnTimer()
     {
         _events.Add("timer");
+
+        if (_unregisterReminderOnTimer && _reminder is not null)
+        {
+            // Synchronous unregister models production outbox Disarm during drain catch-up.
+            this.UnregisterReminder(_reminder).GetAwaiter().GetResult();
+            _reminder = null;
+        }
 
         if (_reentrantTimer)
         {

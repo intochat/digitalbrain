@@ -69,12 +69,12 @@ internal sealed class HostBehaviorSynapseBroker : IBehaviorSynapseBroker
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var target = NeuronId.For<TNeuron>(metadata.Owner, name);
+        var target = new NeuronId(RequireAlias(typeof(TNeuron)), metadata.Owner, name);
         var requestAlias = RequireAlias(request.GetType());
         var responseAlias = RequireAlias(typeof(TResponse));
         var grant = SelectGrant(target, requestAlias, responseAlias);
 
-        var plaintext = JsonSerializer.SerializeToUtf8Bytes(request, request.GetType());
+        var plaintext = BehaviorPayloadJson.Serialize(request, request.GetType());
         var requestPayload = await client
             .StorePayloadAsync(metadata.Owner, task, attempt, plaintext, cancellationToken)
             .ConfigureAwait(false);
@@ -94,7 +94,7 @@ internal sealed class HostBehaviorSynapseBroker : IBehaviorSynapseBroker
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (operation.Phase != BehaviorOperationPhase.Completed)
+        if (operation.Phase != TaskOperationPhase.Completed)
         {
             throw new InvalidOperationException(
                 $"Capability operation ended in phase '{operation.Phase}'.");
@@ -112,7 +112,7 @@ internal sealed class HostBehaviorSynapseBroker : IBehaviorSynapseBroker
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var response = JsonSerializer.Deserialize<TResponse>(responseBytes.Span);
+        var response = BehaviorPayloadJson.Deserialize<TResponse>(responseBytes.Span);
         if (response is null)
         {
             throw new InvalidOperationException("Response payload deserialized to null.");

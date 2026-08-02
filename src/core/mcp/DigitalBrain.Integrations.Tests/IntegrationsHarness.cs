@@ -1,8 +1,9 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Google;
 using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace DigitalBrain.Integrations.Tests;
 
@@ -11,30 +12,6 @@ namespace DigitalBrain.Integrations.Tests;
 [Description("Integration harness driver neuron")]
 public partial interface IIntegrationDriver : INeuron
 {
-    [Alias(nameof(ReadGmailMessage))]
-    Task<GmailMessage> ReadGmailMessage(
-        CommandId commandId,
-        string account,
-        string messageId,
-        CancellationToken cancellationToken);
-
-    [Alias(nameof(ProposeSalesforceAccountDescription))]
-    Task<SalesforceAccountDescriptionMutation> ProposeSalesforceAccountDescription(
-        CommandId commandId,
-        string accountId,
-        string description,
-        CancellationToken cancellationToken);
-
-    [Alias(nameof(ApproveSalesforceWithStoredEvidence))]
-    Task<SalesforceAccountDescriptionMutation> ApproveSalesforceWithStoredEvidence(
-        SalesforceMutationApproval approval,
-        CancellationToken cancellationToken);
-
-    [Alias(nameof(ApproveSalesforceWithMismatchedEvidence))]
-    Task ApproveSalesforceWithMismatchedEvidence(
-        SalesforceMutationApproval approval,
-        SalesforceMutationApproval recordedEvidence,
-        CancellationToken cancellationToken);
 }
 
 internal sealed class IntegrationDriver :
@@ -48,62 +25,17 @@ internal sealed class IntegrationDriver :
         cancellationToken.ThrowIfCancellationRequested();
         return Task.CompletedTask;
     }
-
-    public Task<GmailMessage> ReadGmailMessage(
-        CommandId commandId,
-        string account,
-        string messageId,
-        CancellationToken cancellationToken)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(account);
-        ArgumentException.ThrowIfNullOrWhiteSpace(messageId);
-
-        return GrainFactory
-            .GetGrain<IGmail>(NeuronId.For<IGmail>(Id.Owner, account).ToGrainId())
-            .ReadMessage(commandId, messageId, cancellationToken);
-    }
-
-    public Task<SalesforceAccountDescriptionMutation> ProposeSalesforceAccountDescription(
-        CommandId commandId,
-        string accountId,
-        string description,
-        CancellationToken cancellationToken)
-        => Salesforce().ProposeAccountDescription(commandId, Id, accountId, description, cancellationToken);
-
-    public async Task<SalesforceAccountDescriptionMutation> ApproveSalesforceWithStoredEvidence(
-        SalesforceMutationApproval approval,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(approval);
-        var evidence = await ApprovalEvidenceAsync(approval);
-        return await Salesforce().ApproveAccountDescription(approval, evidence, cancellationToken);
-    }
-
-    public async Task ApproveSalesforceWithMismatchedEvidence(
-        SalesforceMutationApproval approval,
-        SalesforceMutationApproval recordedEvidence,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(approval);
-        ArgumentNullException.ThrowIfNull(recordedEvidence);
-        var evidence = await ApprovalEvidenceAsync(recordedEvidence);
-        _ = await Salesforce().ApproveAccountDescription(approval, evidence, cancellationToken);
-    }
-
-    private ISalesforce Salesforce()
-        => GrainFactory.GetGrain<ISalesforce>(
-            NeuronId.For<ISalesforce>(Id.Owner, IntegrationsFixture.SalesforceServerKey).ToGrainId());
-
-    private async Task<SynapseDelivery> ApprovalEvidenceAsync(SalesforceMutationApproval approval)
-    {
-        var incoming = await ReadJournal(JournalKind.Incoming, afterSequence: 0);
-        return incoming.Delta.FirstOrDefault(delivery =>
-                delivery.Caller == approval.Approver
-                && delivery.Synapse is SalesforceMutationApproval recorded
-                && recorded == approval)
-            ?? throw new InvalidOperationException(
-                $"Approval '{approval.ApprovalId}' has no durable human delivery evidence.");
-    }
 }
 
-public sealed partial class IntegrationsHarnessModule : IModule;
+public sealed partial class IntegrationsHarnessModule : IModule
+{
+    // OS.Ui (and other product assemblies) load AI grain contracts into the AppDomain even when
+    // AIModule is not selected. Register the JSON codecs those grain methods require.
+    static partial void ConfigureSerialization(IServiceCollection services)
+        => services.AddSerializer(
+            serializer => serializer.AddJsonSerializer(
+                static type => type == typeof(Microsoft.Extensions.AI.ChatMessage)
+                    || type == typeof(Microsoft.Extensions.AI.ChatResponse)
+                    || type == typeof(Microsoft.Extensions.AI.ChatResponseUpdate)
+                    || typeof(Microsoft.Extensions.AI.AIContent).IsAssignableFrom(type)));
+}

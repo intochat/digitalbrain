@@ -33,7 +33,10 @@ public abstract partial class Neuron
     async Task IOutboxDrain.Drain()
     {
         _wakeUpRegistered = true;
-        await DrainAsync(CancellationToken.None);
+        // Reminder/wakeup path has no caller token. Use a cancelable lifecycle source so every
+        // Deliver attempt can link a real abort signal; attempt timeout supplies the bound.
+        using var drainLifecycle = new CancellationTokenSource();
+        await DrainAsync(drainLifecycle.Token);
     }
 
     private IOutboxWakeup Wakeup()
@@ -110,7 +113,7 @@ public abstract partial class Neuron
                     continue;
                 }
 
-                if (await TryDeliverAsync(entry, receiver))
+                if (await TryDeliverAsync(entry, receiver, cancellationToken))
                 {
                     continue;
                 }
@@ -158,19 +161,30 @@ public abstract partial class Neuron
         "Design",
         "CA1031:Do not catch general exception types",
         Justification = "Any failure other than a permanent refusal keeps the receiver pending so the outbox redelivers it; letting it escape would abandon the delivery guarantee.")]
-    private async Task<bool> TryDeliverAsync(OutboxEntry entry, NeuronId receiver)
+    private async Task<bool> TryDeliverAsync(
+        OutboxEntry entry,
+        NeuronId receiver,
+        CancellationToken drainToken)
     {
         DeliveryPolicy.CarryDepth(entry.Depth);
+
+        // Every Deliver attempt gets a cancelable, bounded token. Link any real upstream drain
+        // token; always attach a finite attempt timeout so the token can actually cancel.
+        using var attemptCts = drainToken.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(drainToken)
+            : new CancellationTokenSource();
+        attemptCts.CancelAfter(DeliveryPolicy.DeliveryAttemptTimeout);
+        var attemptToken = attemptCts.Token;
 
         try
         {
             if (receiver == Id)
             {
-                await Deliver(entry.Delivery);
+                await Deliver(entry.Delivery, attemptToken);
             }
             else
             {
-                await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).Deliver(entry.Delivery);
+                await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).Deliver(entry.Delivery, attemptToken);
             }
 
             return true;
@@ -180,6 +194,11 @@ public abstract partial class Neuron
             Record("refused", entry.Delivery, receiver, refusal.Message);
 
             return true;
+        }
+        catch (OperationCanceledException) when (attemptToken.IsCancellationRequested)
+        {
+            // Cancelled/expired attempt: leave pending for retry; never remove or bypass retraction.
+            return false;
         }
         catch (Exception)
         {

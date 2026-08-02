@@ -21,6 +21,15 @@ internal sealed partial class TaskNeuron
     private void Stage(TaskData data)
         => _state.Value = _states.SerializeToArray(data);
 
+    private void StageForTurn(TaskData data)
+    {
+        var previous = _state.Value is { Length: > 0 } serialized
+            ? serialized.ToArray()
+            : [];
+        Stage(data);
+        EnlistTurnRollback(() => _state.Value = previous);
+    }
+
     private async Task SaveAsync(TaskData data)
     {
         Stage(data);

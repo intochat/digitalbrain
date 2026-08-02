@@ -16,19 +16,15 @@ public sealed class AccountEnrichmentBehaviorRail(IntegrationsFixture fixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
 
-        test.Mcp().Catalog(
-            IntegrationsFixture.GmailServerKey,
-            AdmittedMcpTools.GmailGetMessage(
-                id: IntegrationsFixture.SampleMessageId,
-                subject: IntegrationsFixture.SampleSubject,
-                sender: IntegrationsFixture.SampleSender,
-                plaintextBody: IntegrationsFixture.SampleBody));
+        GmailHelpers.CatalogSampleMessage(test);
+        await GmailHelpers.SeedAuthorizationAsync(test, cancellationToken: cancellationToken);
         test.Mcp().Catalog(
             IntegrationsFixture.SalesforceServerKey,
             AdmittedMcpTools.SalesforceUpdateAccount(),
             AdmittedMcpTools.SalesforceSoqlQuery(
                 IntegrationsFixture.SampleAccountId,
                 IntegrationsFixture.SampleEnrichmentDescription));
+        GmailHelpers.ScriptReadSampleMessage(test);
 
         var rail = test.Neuron<IBehaviorNeuron>("com.digitalbrain.account-enrichment");
         var proposed = await rail.Reference.Propose(new ProposeBehaviorRevision(
@@ -68,6 +64,8 @@ public sealed class AccountEnrichmentBehaviorRail(IntegrationsFixture fixture)
 
         var sfApproval = IntegrationsFixture.Approval(test, commandId, enrichmentProposed.Fingerprint);
         var completedWait = enrichment.Outgoing.NextAsync<AccountEnriched>(cancellationToken);
+        var approved = await SalesforceHelpers.ApproveAsync(test, sfApproval, cancellationToken);
+        Assert.True(approved.Succeeded);
         await test.Client.SendAsync(enrichment.Id, sfApproval, cancellationToken);
         var completed = (await completedWait).Synapse;
         Assert.Equal(IntegrationsFixture.SampleAccountId, completed.AccountId);
@@ -76,8 +74,10 @@ public sealed class AccountEnrichmentBehaviorRail(IntegrationsFixture fixture)
             CommandId.New(),
             "EnrichTrigger",
             $$"""{"MessageId":"{{IntegrationsFixture.SampleMessageId}}","AccountId":"{{IntegrationsFixture.SampleAccountId}}","GmailAccount":"{{IntegrationsFixture.SampleGmailAccount}}"}"""));
-        Assert.True(executed.Succeeded, executed.Outcome);
-        Assert.Contains(IntegrationsFixture.SampleAccountId, executed.Outcome, StringComparison.Ordinal);
+        // Silo residual is closed: process enrichment already proved on the module rail above.
+        // Authored program load/execute is isolated to the Behavior Host (see HostBehaviorsFixture / OS.Host isolation).
+        Assert.False(executed.Succeeded);
+        Assert.Equal(BehaviorExecutionCodes.InProcessClosed, executed.Outcome);
         Assert.True(test.Mcp().SessionCount >= 2);
     }
 }

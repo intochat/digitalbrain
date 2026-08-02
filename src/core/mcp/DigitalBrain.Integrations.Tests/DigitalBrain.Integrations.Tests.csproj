@@ -24,6 +24,8 @@
     <ProjectReference Include="..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
     <ProjectReference Include="..\DigitalBrain.Mcp.Testing\DigitalBrain.Mcp.Testing.csproj" />
     <ProjectReference Include="..\..\behaviors\DigitalBrain.Behaviors.Runtime\DigitalBrain.Behaviors.Runtime.csproj" />
+    <ProjectReference Include="..\..\behaviors\DigitalBrain.Behaviors.Host\DigitalBrain.Behaviors.Host.csproj" />
+    <ProjectReference Include="..\..\..\modules\tasks\DigitalBrain.Modules.Tasks\DigitalBrain.Modules.Tasks.csproj" />
     <ProjectReference Include="..\..\testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
     <ProjectReference Include="..\..\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>

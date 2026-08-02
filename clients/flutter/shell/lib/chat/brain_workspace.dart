@@ -4,7 +4,9 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../activity_screen.dart';
+import '../behaviors/behavior_workspace.dart';
 import '../brain_screen.dart';
+import '../user_actions/user_action_card.dart';
 import 'brain_chat_screen.dart';
 import 'chat_contracts.dart';
 import 'workspace_chrome.dart';
@@ -19,6 +21,8 @@ final class BrainWorkspace extends StatefulWidget {
     this.onSend,
     this.onStream,
     this.onOpenSignIn,
+    this.behaviorClient,
+    this.userActions = const [],
     this.statusMessage,
   });
 
@@ -29,6 +33,8 @@ final class BrainWorkspace extends StatefulWidget {
   final SendMessage? onSend;
   final StreamMessage? onStream;
   final OpenUrl? onOpenSignIn;
+  final BehaviorClient? behaviorClient;
+  final List<UserActionCardModel> userActions;
   final String? statusMessage;
 
   @override
@@ -180,12 +186,21 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
         onStream: widget.onStream,
         onOpenSignIn: widget.onOpenSignIn,
       ),
-      ActivityScreen(turns: _projectedTurns),
+      ActivityScreen(
+        turns: _projectedTurns,
+        userActions: widget.userActions,
+        onOpenUserAction: widget.onOpenSignIn,
+      ),
       BrainScreen(
         chatName: widget.chatName,
         turns: _projectedTurns,
         topology: _topology,
         statusMessage: _statusMessage,
+      ),
+      BehaviorWorkspace(
+        client: widget.behaviorClient,
+        userActions: widget.userActions,
+        onOpenUserAction: widget.onOpenSignIn,
       ),
     ];
 

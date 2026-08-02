@@ -8,3 +8,7 @@ typedef OpenUrl = Future<void> Function(Uri url);
 const ownerUserId = 'owner';
 const assistantUserId = 'assistant';
 const brainDestinationIndex = 2;
+const behaviorsDestinationIndex = 3;
+
+typedef LoadBehaviors = Future<BehaviorLibraryDocument> Function();
+typedef OpenBehavior = Future<BehaviorDocument> Function(String behaviorId);

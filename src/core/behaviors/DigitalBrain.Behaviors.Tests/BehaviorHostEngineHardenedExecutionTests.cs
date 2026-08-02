@@ -13,6 +13,7 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
     private static readonly OwnerId Owner = new("owner-hardened-host");
     private static readonly BehaviorId Behavior = new("com.digitalbrain.hardened-host");
     private static readonly NeuronId TaskNeuron = NeuronId.For<ITask>(Owner, "hardened-task");
+    private static readonly NeuronId WorkerNeuron = NeuronId.For<IWorker>(Owner, "hardened-worker");
     private static readonly AttemptId Attempt = new(Guid.Parse("11111111-2222-3333-4444-555555555555"));
     private static readonly BehaviorExecutionId Execution =
         new(Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"));
@@ -44,19 +45,25 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
                 TriggerTypeName,
                 triggerRef,
                 Capabilities: [],
-                DateTimeOffset.UtcNow),
+                DateTimeOffset.UtcNow,
+                WorkerNeuron),
             cancellationToken);
 
         Assert.True(outcome.Succeeded, outcome.Outcome);
+        Assert.Equal(BehaviorExecutionCodes.Succeeded, outcome.Outcome);
         Assert.Equal(1, factory.CreateCount);
         Assert.Equal(Owner, factory.BoundOwner);
         Assert.Equal(TaskNeuron, factory.BoundTask);
         Assert.Equal(Attempt, factory.BoundAttempt);
+        Assert.Equal(WorkerNeuron, factory.BoundWorker);
         Assert.Equal(1, factory.Client.LoadCount);
         Assert.Equal(triggerRef.Id, factory.Client.LastLoadReference!.Value.Id);
         Assert.Equal(Owner, factory.Client.LastLoadOwner);
         Assert.Equal(TaskNeuron, factory.Client.LastLoadTask);
         Assert.Equal(Attempt, factory.Client.LastLoadAttempt);
+        Assert.Equal(Behavior, factory.Client.LastLoadBehavior);
+        Assert.Equal(new BehaviorRevisionId(artifact.Digest.Value), factory.Client.LastLoadRevision);
+        Assert.Equal("case.HardenedNoOpTrigger", factory.Client.LastLoadCaseId);
     }
 
     [Fact(DisplayName = "result-bearing signed grant rejects command capabilities that are not the exact signed set before broker create")]
@@ -92,7 +99,8 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
                     TriggerTypeName,
                     triggerRef,
                     [wrongEdge],
-                    DateTimeOffset.UtcNow),
+                    DateTimeOffset.UtcNow,
+                    WorkerNeuron),
                 cancellationToken));
 
         Assert.False(string.IsNullOrWhiteSpace(exception.Message));
@@ -125,7 +133,8 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
                     TriggerTypeName,
                     triggerRef,
                     Capabilities: [],
-                    DateTimeOffset.UtcNow),
+                    DateTimeOffset.UtcNow,
+                    WorkerNeuron),
                 cancellationToken));
 
         Assert.False(string.IsNullOrWhiteSpace(exception.Message));
@@ -302,12 +311,15 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
 
         public AttemptId BoundAttempt { get; private set; }
 
-        public IBehaviorHostBrokerClient Create(OwnerId owner, NeuronId task, AttemptId attempt)
+        public NeuronId BoundWorker { get; private set; }
+
+        public IBehaviorHostBrokerClient Create(OwnerId owner, NeuronId task, AttemptId attempt, NeuronId worker)
         {
             CreateCount++;
             BoundOwner = owner;
             BoundTask = task;
             BoundAttempt = attempt;
+            BoundWorker = worker;
             return Client;
         }
     }
@@ -351,15 +363,42 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!payloads.TryGetValue(reference.Id, out var bytes))
+            {
+                throw new InvalidOperationException($"Unknown payload reference '{reference.Id}'.");
+            }
+
+            return ValueTask.FromResult<ReadOnlyMemory<byte>>(bytes);
+        }
+
+        public BehaviorId? LastLoadBehavior { get; private set; }
+
+        public BehaviorRevisionId? LastLoadRevision { get; private set; }
+
+        public string? LastLoadCaseId { get; private set; }
+
+        public ValueTask<ReadOnlyMemory<byte>> LoadTriggerAsync(
+            OwnerId owner,
+            NeuronId task,
+            BehaviorId behavior,
+            BehaviorRevisionId revision,
+            string caseId,
+            ProtectedPayloadReference reference,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             LoadCount++;
             LastLoadReference = reference;
             LastLoadOwner = owner;
             LastLoadTask = task;
-            LastLoadAttempt = attempt;
+            LastLoadAttempt = Attempt;
+            LastLoadBehavior = behavior;
+            LastLoadRevision = revision;
+            LastLoadCaseId = caseId;
 
             if (!payloads.TryGetValue(reference.Id, out var bytes))
             {
-                throw new InvalidOperationException($"Unknown payload reference '{reference.Id}'.");
+                throw new InvalidOperationException($"Unknown trigger reference '{reference.Id}'.");
             }
 
             return ValueTask.FromResult<ReadOnlyMemory<byte>>(bytes);

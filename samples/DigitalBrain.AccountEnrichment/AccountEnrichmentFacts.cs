@@ -31,8 +31,4 @@ public sealed record AccountEnriched(
     [property: Id(2)] string AccountId,
     [property: Id(3)] string Description) : Synapse;
 
-[GenerateSerializer]
-[Alias("db.account-enrichment.execute-approved")]
-[Description("Execute an approved account enrichment mutation")]
-internal sealed record ExecuteApprovedAccountEnrichment(
-    [property: Id(0)] DigitalBrain.Salesforce.SalesforceMutationApproval Approval) : Synapse;
+

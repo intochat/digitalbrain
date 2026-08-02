@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Tasks;
 
 namespace DigitalBrain.Behaviors;
 
@@ -82,7 +83,10 @@ internal sealed class HttpBehaviorHostClient(HttpClient http) : IBehaviorHostGat
                         edge.ResponseSynapseId,
                         edge.ResponseSchemaVersion))
                     .ToArray(),
-                command.UtcNow),
+                command.UtcNow,
+                command.Worker.Type,
+                command.Worker.Owner.Value,
+                command.Worker.Name),
             JsonOptions,
             cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
@@ -90,7 +94,54 @@ internal sealed class HttpBehaviorHostClient(HttpClient http) : IBehaviorHostGat
             .ReadFromJsonAsync<ExecuteResultBody>(JsonOptions, cancellationToken)
             .ConfigureAwait(false)
             ?? throw new BehaviorHostException("empty-execute-response");
-        return new BehaviorExecutionOutcome(body.Succeeded, body.Outcome);
+        BehaviorUserActionSurface? userAction = null;
+        if (!body.Succeeded
+            && string.Equals(body.Outcome, BehaviorExecutionCodes.UserActionRequired, StringComparison.Ordinal)
+            && body.UserAction is { } surface)
+        {
+            userAction = ParseUserActionSurface(surface);
+        }
+
+        return new BehaviorExecutionOutcome(body.Succeeded, body.Outcome, userAction);
+    }
+
+    private static BehaviorUserActionSurface ParseUserActionSurface(ExecuteUserActionBody surface)
+    {
+        if (string.IsNullOrWhiteSpace(surface.TaskType)
+            || string.IsNullOrWhiteSpace(surface.TaskOwner)
+            || string.IsNullOrWhiteSpace(surface.TaskName)
+            || string.IsNullOrWhiteSpace(surface.Attempt)
+            || string.IsNullOrWhiteSpace(surface.ModuleType)
+            || string.IsNullOrWhiteSpace(surface.ModuleOwner)
+            || string.IsNullOrWhiteSpace(surface.ModuleName)
+            || string.IsNullOrWhiteSpace(surface.ModuleId)
+            || string.IsNullOrWhiteSpace(surface.DisplayText)
+            || string.IsNullOrWhiteSpace(surface.ActionReferenceId)
+            || string.IsNullOrWhiteSpace(surface.ActionEpoch)
+            || string.IsNullOrWhiteSpace(surface.CompleterType)
+            || string.IsNullOrWhiteSpace(surface.CompleterOwner)
+            || string.IsNullOrWhiteSpace(surface.CompleterName)
+            || !Guid.TryParseExact(surface.Attempt, "N", out var attemptValue)
+            || attemptValue == Guid.Empty
+            || !Guid.TryParseExact(surface.ActionReferenceId, "N", out var referenceValue)
+            || referenceValue == Guid.Empty
+            || !Guid.TryParseExact(surface.ActionEpoch, "N", out var epochValue)
+            || epochValue == Guid.Empty)
+        {
+            throw new BehaviorHostException("invalid-user-action-response");
+        }
+
+        return new BehaviorUserActionSurface(
+            new NeuronId(surface.TaskType, new OwnerId(surface.TaskOwner), surface.TaskName),
+            new AttemptId(attemptValue),
+            new NeuronId(surface.ModuleType, new OwnerId(surface.ModuleOwner), surface.ModuleName),
+            surface.ModuleId,
+            surface.DisplayText,
+            new ProtectedPayloadReference(referenceValue, surface.ActionReferenceExpiresAt),
+            epochValue,
+            surface.ParkRevision,
+            surface.ExpiresAt,
+            new NeuronId(surface.CompleterType, new OwnerId(surface.CompleterOwner), surface.CompleterName));
     }
 
     public ValueTask<BehaviorExecutionOutcome> ExecuteLegacyAsync(
@@ -139,7 +190,10 @@ internal sealed class HttpBehaviorHostClient(HttpClient http) : IBehaviorHostGat
         string TriggerPayloadId,
         DateTimeOffset? TriggerPayloadExpiresAt,
         CapabilityEdgeBody[] Capabilities,
-        DateTimeOffset UtcNow);
+        DateTimeOffset UtcNow,
+        string WorkerType,
+        string WorkerOwner,
+        string WorkerName);
 
     private sealed record CapabilityEdgeBody(
         string TargetType,
@@ -150,5 +204,27 @@ internal sealed class HttpBehaviorHostClient(HttpClient http) : IBehaviorHostGat
         string ResponseId,
         int ResponseVersion);
 
-    private sealed record ExecuteResultBody(bool Succeeded, string Outcome);
+    private sealed record ExecuteResultBody(
+        bool Succeeded,
+        string Outcome,
+        ExecuteUserActionBody? UserAction = null);
+
+    private sealed record ExecuteUserActionBody(
+        string? TaskType,
+        string? TaskOwner,
+        string? TaskName,
+        string? Attempt,
+        string? ModuleType,
+        string? ModuleOwner,
+        string? ModuleName,
+        string? ModuleId,
+        string? DisplayText,
+        string? ActionReferenceId,
+        DateTimeOffset? ActionReferenceExpiresAt,
+        string? ActionEpoch,
+        long ParkRevision,
+        DateTimeOffset ExpiresAt,
+        string? CompleterType,
+        string? CompleterOwner,
+        string? CompleterName);
 }

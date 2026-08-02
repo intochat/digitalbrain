@@ -2,18 +2,27 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
 import 'brain_theme.dart';
+import 'user_actions/user_action_card.dart';
 
 final class ActivityScreen extends StatelessWidget {
-  const ActivityScreen({super.key, required this.turns});
+  const ActivityScreen({
+    super.key,
+    required this.turns,
+    this.userActions = const [],
+    this.onOpenUserAction,
+  });
 
   final List<ChatTurnEvent> turns;
+  final List<UserActionCardModel> userActions;
+  final ValueChanged<Uri>? onOpenUserAction;
 
   @override
   Widget build(BuildContext context) {
+    final empty = turns.isEmpty && userActions.isEmpty;
     return ColoredBox(
       key: const Key('activity_screen'),
       color: BrainPalette.surface,
-      child: turns.isEmpty
+      child: empty
           ? const _EmptyActivity()
           : Align(
               alignment: Alignment.topCenter,
@@ -26,6 +35,16 @@ final class ActivityScreen extends StatelessWidget {
                   ),
                   children: [
                     const _ActivityHeader(),
+                    if (userActions.isNotEmpty) ...[
+                      const SizedBox(height: 18),
+                      for (final action in userActions)
+                        UserActionCard(
+                          model: action,
+                          onAuthorize: onOpenUserAction == null
+                              ? null
+                              : () => onOpenUserAction!(action.actionUrl),
+                        ),
+                    ],
                     const SizedBox(height: 24),
                     for (final turn in turns.reversed)
                       _ActivityEntry(turn: turn),

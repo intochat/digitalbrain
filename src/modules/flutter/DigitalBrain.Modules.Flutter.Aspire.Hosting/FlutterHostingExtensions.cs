@@ -19,6 +19,8 @@ public static class FlutterHostingExtensions
     public const string DefaultChatName = "main";
     public const string DefaultOwner = "dev";
     public const string DefaultDeviceTarget = "windows";
+    public const string DefaultWebDeviceTarget = "chrome";
+    public const string WebPlatformDirectoryName = "web";
     public const string UiEdgeEndpointName = "http";
     public const string UiEdgeHealthPath = "/health";
 
@@ -44,6 +46,11 @@ public static class FlutterHostingExtensions
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Window, configure);
 
+    public static DigitalBrainModuleBuilder<FlutterModule> WithWebHost(
+        this DigitalBrainModuleBuilder<FlutterModule> module,
+        Action<FlutterHostOptions>? configure = null)
+        => ConfigureFlutterHost(module, FlutterHostKind.Web, configure);
+
     private static DigitalBrainModuleBuilder<FlutterModule> ConfigureFlutterHost(
         DigitalBrainModuleBuilder<FlutterModule> module,
         FlutterHostKind kind,
@@ -52,6 +59,11 @@ public static class FlutterHostingExtensions
         ArgumentNullException.ThrowIfNull(module);
 
         var options = new FlutterHostOptions();
+        if (kind == FlutterHostKind.Web)
+        {
+            options.DeviceTarget = DefaultWebDeviceTarget;
+        }
+
         configure?.Invoke(options);
         GetOrCreateState(module).EnsureFlutterHost(kind, options);
         return module;
@@ -102,7 +114,10 @@ public static class FlutterHostingExtensions
             _ui = appHost
                 .AddProject(resourceName, projectPath)
                 .WithReference(brain.AsClient())
-                .WithHttpEndpoint(name: UiEdgeEndpointName)
+                .WithHttpEndpoint(
+                    port: LocalDevelopmentProductSurface.UiHttpPort,
+                    name: UiEdgeEndpointName,
+                    isProxied: false)
                 .WithHttpHealthCheck(UiEdgeHealthPath)
                 .WithEnvironment(OwnerEnvironmentVariable, owner);
         }
@@ -112,7 +127,8 @@ public static class FlutterHostingExtensions
             if (_flutterHost is not null)
             {
                 throw new InvalidOperationException(
-                    $"Flutter host is already configured on brain '{brain.Name}'. Call {nameof(WithHeadlessHost)} or {nameof(WithWindowHost)} exactly once.");
+                    $"Flutter host is already configured on brain '{brain.Name}'. " +
+                    $"Call {nameof(WithHeadlessHost)}, {nameof(WithWindowHost)}, or {nameof(WithWebHost)} exactly once.");
             }
 
             if (_ui is null)
@@ -141,13 +157,25 @@ public static class FlutterHostingExtensions
                 ? DefaultChatName
                 : options.ChatName;
             var ui = _ui!;
+            var uiEndpoint = ui.GetEndpoint(UiEdgeEndpointName);
 
-            _flutterHost = appHost
+            var host = appHost
                 .AddExecutable(resourceName, launch.Command, launch.WorkingDirectory, launch.Args)
-                .WithEnvironment(UIBaseEnvironmentVariable, ui.GetEndpoint(UiEdgeEndpointName))
+                .WithEnvironment(UIBaseEnvironmentVariable, uiEndpoint)
                 .WithEnvironment(ShellEnvironmentVariable, shell)
                 .WithEnvironment(ChatEnvironmentVariable, chat)
                 .WaitFor(ui);
+
+            // Browser JS cannot read process env; bake the exclusive edge contract into dart-defines.
+            if (kind == FlutterHostKind.Web)
+            {
+                host.WithArgs(
+                    ReferenceExpression.Create($"--dart-define={UIBaseEnvironmentVariable}={uiEndpoint}"),
+                    $"--dart-define={ShellEnvironmentVariable}={shell}",
+                    $"--dart-define={ChatEnvironmentVariable}={chat}");
+            }
+
+            _flutterHost = host;
         }
 
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)

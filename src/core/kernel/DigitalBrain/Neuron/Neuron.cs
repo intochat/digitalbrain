@@ -31,6 +31,7 @@ public abstract partial class Neuron :
     private readonly Serializer<Synapse> _synapses;
     private SynapseDelivery? _handling;
     private int _handlingDepth;
+    private CancellationToken _turnCancellation;
     private TurnCheckpoint? _turnCheckpoint;
     private IGrainTimer? _draining;
     private bool _wakeUpRegistered;
@@ -51,5 +52,10 @@ public abstract partial class Neuron :
     public NeuronId Id => NeuronId.FromGrainKey(this.GetGrainId().Type.ToString()!, this.GetPrimaryKeyString());
 
     protected TimeProvider TimeProvider { get; }
+
+    protected NeuronId? CurrentDeliveryCaller => _handling?.Caller;
+
+    // Orleans request / turn cancellation captured at Deliver entry for handlers and grain re-entry.
+    protected CancellationToken TurnCancellationToken => _turnCancellation;
 
 }

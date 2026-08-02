@@ -55,18 +55,29 @@ public sealed class BehaviorOperationReplay
         var plaintext = Encoding.UTF8.GetBytes("trigger-payload");
         var lifetime = TimeSpan.FromMinutes(15);
 
-        var reference = await store.StoreAsync(OwnerA, plaintext, lifetime, cancellationToken);
+        var reference = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            plaintext,
+            lifetime,
+            cancellationToken);
 
         Assert.NotEqual(Guid.Empty, reference.Id);
         Assert.NotNull(reference.ExpiresAt);
         Assert.True(reference.ExpiresAt > time.GetUtcNow());
 
         var recovered = new DurableProtectedPayloadStore(state, Commit, new RecordingProtector(), OwnerA, time);
-        var restored = await recovered.LoadAsync(OwnerA, reference, cancellationToken);
+        var restored = await recovered.LoadAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            reference,
+            cancellationToken);
         Assert.Equal(plaintext, restored.ToArray());
     }
 
-    [Fact(DisplayName = "protected payload expires and refuses cross-owner access")]
+    [Fact(DisplayName = "protected payload expires and refuses cross-owner or wrong task/attempt access")]
     public async Task ProtectedPayloadExpiresAndRefusesCrossOwner()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -76,15 +87,303 @@ public sealed class BehaviorOperationReplay
         var store = new DurableProtectedPayloadStore(state, Commit, new RecordingProtector(), OwnerA, time);
         var plaintext = Encoding.UTF8.GetBytes("owner-scoped-secret");
 
-        var expired = await store.StoreAsync(OwnerA, plaintext, TimeSpan.FromMinutes(5), cancellationToken);
+        var expired = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            plaintext,
+            TimeSpan.FromMinutes(5),
+            cancellationToken);
         time.Advance(TimeSpan.FromMinutes(6));
         await Assert.ThrowsAsync<CryptographicException>(
-            () => store.LoadAsync(OwnerA, expired, cancellationToken).AsTask());
+            () => store.LoadAsync(OwnerA, TaskNeuron, Attempt.Value, expired, cancellationToken).AsTask());
 
         time.Advance(TimeSpan.FromHours(-1));
-        var live = await store.StoreAsync(OwnerA, plaintext, TimeSpan.FromHours(1), cancellationToken);
+        var live = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            plaintext,
+            TimeSpan.FromHours(1),
+            cancellationToken);
         await Assert.ThrowsAsync<CryptographicException>(
-            () => store.LoadAsync(OwnerB, live, cancellationToken).AsTask());
+            () => store.LoadAsync(OwnerB, TaskNeuron, Attempt.Value, live, cancellationToken).AsTask());
+
+        var otherTask = NeuronId.For<ITask>(OwnerA, "other-task");
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, otherTask, Attempt.Value, live, cancellationToken).AsTask());
+
+        var otherAttempt = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, TaskNeuron, otherAttempt, live, cancellationToken).AsTask());
+    }
+
+    [Fact(DisplayName = "ciphertext purpose is bound to owner/task/attempt and cannot be transplanted")]
+    public async Task CiphertextPurposeIsBoundToOwnerTaskAndAttempt()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var time = new AdjustableTimeProvider(DateTimeOffset.Parse("2026-07-31T12:00:00Z", CultureInfo.InvariantCulture));
+        var state = new TestDurableValue<byte[]>([]);
+        ValueTask Commit() => ValueTask.CompletedTask;
+        var store = new DurableProtectedPayloadStore(state, Commit, new PurposeAwareProtector(), OwnerA, time);
+        var plaintext = Encoding.UTF8.GetBytes("binding-secret");
+
+        var reference = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            plaintext,
+            TimeSpan.FromHours(1),
+            cancellationToken);
+
+        var restored = await store.LoadAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            reference,
+            cancellationToken);
+        Assert.Equal(plaintext, restored.ToArray());
+
+        var otherTask = NeuronId.For<ITask>(OwnerA, "transplant-task");
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, otherTask, Attempt.Value, reference, cancellationToken).AsTask());
+
+        var otherAttempt = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, TaskNeuron, otherAttempt, reference, cancellationToken).AsTask());
+
+        // Rewrite entry metadata so store-level checks pass; purpose-bound ciphertext must still fail.
+        RewriteStoredEntryIdentity(state, reference.Id, otherTask, Attempt.Value);
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, otherTask, Attempt.Value, reference, cancellationToken).AsTask());
+
+        RewriteStoredEntryIdentity(state, reference.Id, TaskNeuron, otherAttempt);
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, TaskNeuron, otherAttempt, reference, cancellationToken).AsTask());
+    }
+
+    private static void RewriteStoredEntryIdentity(
+        TestDurableValue<byte[]> state,
+        Guid id,
+        NeuronId task,
+        Guid attempt)
+    {
+        using var document = JsonDocument.Parse(state.Value);
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                if (!Guid.TryParse(property.Name, out var entryId) || entryId != id)
+                {
+                    property.WriteTo(writer);
+                    continue;
+                }
+
+                writer.WritePropertyName(property.Name);
+                writer.WriteStartObject();
+                foreach (var field in property.Value.EnumerateObject())
+                {
+                    if (field.NameEquals("taskType"))
+                    {
+                        writer.WriteString("taskType", task.Type);
+                    }
+                    else if (field.NameEquals("taskOwner"))
+                    {
+                        writer.WriteString("taskOwner", task.Owner.Value);
+                    }
+                    else if (field.NameEquals("taskName"))
+                    {
+                        writer.WriteString("taskName", task.Name);
+                    }
+                    else if (field.NameEquals("attempt"))
+                    {
+                        writer.WriteString("attempt", attempt);
+                    }
+                    else
+                    {
+                        field.WriteTo(writer);
+                    }
+                }
+
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndObject();
+        }
+
+        state.Value = stream.ToArray();
+    }
+
+    [Fact(DisplayName = "durable protected payload state holds ciphertext and expiry only, never plaintext")]
+    public async Task DurableStateHoldsCiphertextNotPlaintext()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var time = new AdjustableTimeProvider(DateTimeOffset.Parse("2026-07-31T12:00:00Z", CultureInfo.InvariantCulture));
+        var state = new TestDurableValue<byte[]>([]);
+        ValueTask Commit() => ValueTask.CompletedTask;
+        var store = new DurableProtectedPayloadStore(state, Commit, new XorProtector(), OwnerA, time);
+        var secret = "owner-scoped-secret-never-journaled"u8.ToArray();
+
+        await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            secret,
+            TimeSpan.FromHours(1),
+            cancellationToken);
+
+        Assert.NotNull(state.Value);
+        Assert.NotEmpty(state.Value);
+        var durable = Encoding.UTF8.GetString(state.Value);
+        Assert.DoesNotContain("owner-scoped-secret-never-journaled", durable, StringComparison.Ordinal);
+        Assert.DoesNotContain(Convert.ToBase64String(secret), durable, StringComparison.Ordinal);
+        Assert.Contains("expiresAt", durable, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("protectedPayload", durable, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact(DisplayName =
+        "stable-id store with same task/attempt but divergent plaintext permanently refuses — does not return old ciphertext or extend expiry")]
+    public async Task StableIdSameTaskAttemptDivergentPlaintextPermanentlyRefuses()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var time = new AdjustableTimeProvider(DateTimeOffset.Parse("2026-07-31T12:00:00Z", CultureInfo.InvariantCulture));
+        var state = new TestDurableValue<byte[]>([]);
+        ValueTask Commit() => ValueTask.CompletedTask;
+        var store = new DurableProtectedPayloadStore(state, Commit, new XorProtector(), OwnerA, time);
+        var stableId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        var firstPlaintext = "custody-material-v1"u8.ToArray();
+        var divergentPlaintext = "custody-material-v2-divergent"u8.ToArray();
+        var firstLifetime = TimeSpan.FromMinutes(30);
+
+        var first = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            firstPlaintext,
+            firstLifetime,
+            cancellationToken,
+            stableEntryId: stableId);
+        Assert.Equal(stableId, first.Id);
+        var firstExpiry = first.ExpiresAt;
+        Assert.NotNull(firstExpiry);
+
+        var loadedFirst = await store.LoadAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            first,
+            cancellationToken);
+        Assert.Equal(firstPlaintext, loadedFirst.ToArray());
+
+        // Same stable id + same task/attempt + different plaintext must permanently refuse.
+        // Must not return the prior reference/ciphertext or extend the prior expiry.
+        var divergent = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await store.StoreAsync(
+                OwnerA,
+                TaskNeuron,
+                Attempt.Value,
+                divergentPlaintext,
+                TimeSpan.FromHours(2),
+                cancellationToken,
+                stableEntryId: stableId));
+        Assert.Contains(stableId.ToString("N"), divergent.Message, StringComparison.OrdinalIgnoreCase);
+
+        var stillFirst = await store.LoadAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            first,
+            cancellationToken);
+        Assert.Equal(firstPlaintext, stillFirst.ToArray());
+        Assert.Equal(firstExpiry, first.ExpiresAt);
+
+        // Idempotent exact redelivery of the same plaintext still returns the original binding
+        // without extending expiry once content equality is enforced.
+        var sameMaterial = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            firstPlaintext,
+            TimeSpan.FromHours(2),
+            cancellationToken,
+            stableEntryId: stableId);
+        Assert.Equal(stableId, sameMaterial.Id);
+        Assert.Equal(firstExpiry, sameMaterial.ExpiresAt);
+
+        // Expired row: divergent plaintext under the same stable id is a permanent same-epoch
+        // alias refusal — no stale mismatched overwrite, no mint/extend of the expired row.
+        time.Advance(TimeSpan.FromMinutes(31));
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, TaskNeuron, Attempt.Value, first, cancellationToken).AsTask());
+
+        var persistedBeforeExpiredDivergent = state.Value?.ToArray() ?? [];
+        var expiredDivergent = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await store.StoreAsync(
+                OwnerA,
+                TaskNeuron,
+                Attempt.Value,
+                divergentPlaintext,
+                TimeSpan.FromMinutes(15),
+                cancellationToken,
+                stableEntryId: stableId));
+        Assert.Contains(stableId.ToString("N"), expiredDivergent.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(persistedBeforeExpiredDivergent, state.Value);
+        Assert.Equal(firstExpiry, first.ExpiresAt);
+
+        // Exact expired reissue is non-resurrecting: return the original expired reference/expiry
+        // (idempotent), do not mint/extend/overwrite; subsequent Load remains expired.
+        var persistedBeforeExactExpired = state.Value?.ToArray() ?? [];
+        var exactExpired = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            firstPlaintext,
+            TimeSpan.FromHours(2),
+            cancellationToken,
+            stableEntryId: stableId);
+        Assert.Equal(stableId, exactExpired.Id);
+        Assert.Equal(firstExpiry, exactExpired.ExpiresAt);
+        Assert.True(exactExpired.ExpiresAt <= time.GetUtcNow());
+        Assert.Equal(persistedBeforeExactExpired, state.Value);
+
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, TaskNeuron, Attempt.Value, first, cancellationToken).AsTask());
+        await Assert.ThrowsAsync<CryptographicException>(
+            () => store.LoadAsync(OwnerA, TaskNeuron, Attempt.Value, exactExpired, cancellationToken).AsTask());
+    }
+
+    [Fact(DisplayName = "protected payload store and load observe cancellation")]
+    public async Task ProtectedPayloadStoreAndLoadObserveCancellation()
+    {
+        var time = new AdjustableTimeProvider(DateTimeOffset.Parse("2026-07-31T12:00:00Z", CultureInfo.InvariantCulture));
+        var state = new TestDurableValue<byte[]>([]);
+        ValueTask Commit() => ValueTask.CompletedTask;
+        var store = new DurableProtectedPayloadStore(state, Commit, new RecordingProtector(), OwnerA, time);
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await store.StoreAsync(
+                OwnerA,
+                TaskNeuron,
+                Attempt.Value,
+                "x"u8.ToArray(),
+                TimeSpan.FromHours(1),
+                cancelled.Token));
+
+        var liveToken = TestContext.Current.CancellationToken;
+        var reference = await store.StoreAsync(
+            OwnerA,
+            TaskNeuron,
+            Attempt.Value,
+            "live"u8.ToArray(),
+            TimeSpan.FromHours(1),
+            liveToken);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await store.LoadAsync(OwnerA, TaskNeuron, Attempt.Value, reference, cancelled.Token));
     }
 
     [Fact(DisplayName = "ProtectedPayloadReference stays opaque: Id + ExpiresAt only")]
@@ -129,7 +428,7 @@ public sealed class BehaviorOperationReplay
             requestPayload: new ProtectedPayloadReference(Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(1)),
             cancellationToken);
 
-        Assert.Equal(BehaviorOperationPhase.Completed, first.Phase);
+        Assert.Equal(TaskOperationPhase.Completed, first.Phase);
         Assert.NotNull(first.ResponsePayload);
         Assert.Equal(1, provider.InvokeCount);
 
@@ -148,7 +447,7 @@ public sealed class BehaviorOperationReplay
 
         Assert.Equal(first.Identity, replay.Identity);
         Assert.Equal(first.ResponsePayload, replay.ResponsePayload);
-        Assert.Equal(BehaviorOperationPhase.Completed, replay.Phase);
+        Assert.Equal(TaskOperationPhase.Completed, replay.Phase);
         Assert.Equal(1, provider.InvokeCount);
     }
 
@@ -171,7 +470,7 @@ public sealed class BehaviorOperationReplay
             requestPayload: new ProtectedPayloadReference(Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(1)),
             cancellationToken);
 
-        Assert.Equal(BehaviorOperationPhase.Prepared, prepared.Phase);
+        Assert.Equal(TaskOperationPhase.Prepared, prepared.Phase);
         Assert.Equal(0, provider.InvokeCount);
 
         var clientB = new DurableTaskOperationClient(state, TaskNeuron, WorkerNeuron, Attempt);
@@ -179,7 +478,7 @@ public sealed class BehaviorOperationReplay
         var brokerB = new BehaviorOperationBroker(historyB, ExactGrant(), provider);
         var recovered = await brokerB.RecoverAsync(prepared.Identity, cancellationToken);
 
-        Assert.Equal(BehaviorOperationPhase.Completed, recovered.Phase);
+        Assert.Equal(TaskOperationPhase.Completed, recovered.Phase);
         Assert.Equal(1, provider.InvokeCount);
         Assert.NotNull(recovered.ResponsePayload);
     }
@@ -204,7 +503,7 @@ public sealed class BehaviorOperationReplay
             cancellationToken);
         var dispatched = await brokerA.MarkDispatchedAsync(prepared.Identity, cancellationToken);
 
-        Assert.Equal(BehaviorOperationPhase.Dispatched, dispatched.Phase);
+        Assert.Equal(TaskOperationPhase.Dispatched, dispatched.Phase);
         Assert.Equal(0, provider.InvokeCount);
 
         var clientB = new DurableTaskOperationClient(state, TaskNeuron, WorkerNeuron, Attempt);
@@ -212,7 +511,7 @@ public sealed class BehaviorOperationReplay
         var brokerB = new BehaviorOperationBroker(historyB, ExactGrant(), provider);
         var recovered = await brokerB.RecoverAsync(dispatched.Identity, cancellationToken);
 
-        Assert.Equal(BehaviorOperationPhase.Uncertain, recovered.Phase);
+        Assert.Equal(TaskOperationPhase.Uncertain, recovered.Phase);
         Assert.Equal(0, provider.InvokeCount);
         Assert.Null(recovered.ResponsePayload);
 
@@ -244,7 +543,7 @@ public sealed class BehaviorOperationReplay
             requestPayload: new ProtectedPayloadReference(Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(1)),
             cancellationToken);
 
-        Assert.Equal(BehaviorOperationPhase.Completed, result.Phase);
+        Assert.Equal(TaskOperationPhase.Completed, result.Phase);
         Assert.Equal(1, provider.InvokeCount);
         Assert.NotNull(result.ResponsePayload);
     }
@@ -334,6 +633,49 @@ public sealed class BehaviorOperationReplay
         public byte[] Protect(string purpose, ReadOnlySpan<byte> plaintext) => plaintext.ToArray();
 
         public byte[] Unprotect(string purpose, ReadOnlySpan<byte> protectedPayload) => protectedPayload.ToArray();
+    }
+
+    private sealed class XorProtector : IDurablePayloadProtector
+    {
+        public byte[] Protect(string purpose, ReadOnlySpan<byte> plaintext)
+        {
+            var protectedPayload = plaintext.ToArray();
+            for (var index = 0; index < protectedPayload.Length; index++)
+            {
+                protectedPayload[index] ^= 0x5A;
+            }
+
+            return protectedPayload;
+        }
+
+        public byte[] Unprotect(string purpose, ReadOnlySpan<byte> protectedPayload)
+            => Protect(purpose, protectedPayload);
+    }
+
+    private sealed class PurposeAwareProtector : IDurablePayloadProtector
+    {
+        public byte[] Protect(string purpose, ReadOnlySpan<byte> plaintext)
+        {
+            var purposeBytes = Encoding.UTF8.GetBytes(purpose);
+            var protectedPayload = new byte[purposeBytes.Length + 1 + plaintext.Length];
+            purposeBytes.CopyTo(protectedPayload, 0);
+            protectedPayload[purposeBytes.Length] = 0;
+            plaintext.CopyTo(protectedPayload.AsSpan(purposeBytes.Length + 1));
+            return protectedPayload;
+        }
+
+        public byte[] Unprotect(string purpose, ReadOnlySpan<byte> protectedPayload)
+        {
+            var purposeBytes = Encoding.UTF8.GetBytes(purpose);
+            if (protectedPayload.Length <= purposeBytes.Length + 1
+                || protectedPayload[purposeBytes.Length] != 0
+                || !protectedPayload[..purposeBytes.Length].SequenceEqual(purposeBytes))
+            {
+                throw new CryptographicException("Purpose mismatch.");
+            }
+
+            return protectedPayload[(purposeBytes.Length + 1)..].ToArray();
+        }
     }
 
     private sealed class AdjustableTimeProvider(DateTimeOffset start) : TimeProvider

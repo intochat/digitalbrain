@@ -12,7 +12,7 @@ public sealed class HostBehaviorSynapseBrokerTests
     private static readonly NeuronId TaskNeuron = NeuronId.For<ITask>(Owner, "host-broker-task");
     private static readonly AttemptId Attempt = new(Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"));
     private const string TargetInstance = "work";
-    private static readonly NeuronId TargetNeuron = NeuronId.For<IHostBrokerMarker>(Owner, TargetInstance);
+    private static readonly NeuronId TargetNeuron = new("test.host-broker.marker", Owner, TargetInstance);
 
     private const string RequestAlias = "test.host-broker.request";
     private const string ResponseAlias = "test.host-broker.response";
@@ -32,6 +32,7 @@ public sealed class HostBehaviorSynapseBrokerTests
             cancellationToken);
 
         Assert.Equal("hello-work:ok", response.Status);
+        Assert.Equal("ok", response.DetailCode);
         Assert.Equal(1, client.DispatchCount);
         Assert.NotNull(client.LastDispatchedEdge);
         Assert.Equal(TargetNeuron, client.LastDispatchedEdge!.Target);
@@ -41,6 +42,30 @@ public sealed class HostBehaviorSynapseBrokerTests
         Assert.Equal(ResponseSchemaVersion, client.LastDispatchedEdge.ResponseSchemaVersion);
         Assert.True(client.StoreCount >= 1);
         Assert.True(client.LoadCount >= 1);
+    }
+
+    [Fact(DisplayName = "Host response load uses shared payload JSON contract so non-default camelCase properties survive")]
+    public async Task HostResponseLoadPreservesCamelCasePropertiesViaSharedPayloadContract()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = new RecordingHostBrokerClient(serializeDispatchResponseAsCamelCaseOnly: true);
+        var broker = CreateBroker(client, ExactGrant());
+
+        var response = await broker.SendAsync<IHostBrokerMarker, HostBrokerResponse>(
+            TargetInstance,
+            new HostBrokerRequest("case-roundtrip"),
+            cancellationToken);
+
+        Assert.Equal("case-roundtrip:ok", response.Status);
+        Assert.Equal("ok", response.DetailCode);
+
+        var raw = Encoding.UTF8.GetString(client.LastResponseBytes!);
+        Assert.Contains("\"detailCode\"", raw, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"DetailCode\"", raw, StringComparison.Ordinal);
+
+        var withoutContract = JsonSerializer.Deserialize<HostBrokerResponse>(client.LastResponseBytes);
+        Assert.NotNull(withoutContract);
+        Assert.Null(withoutContract.DetailCode);
     }
 
     [Fact(DisplayName = "new broker instance replays completed Task result without redispatch")]
@@ -67,6 +92,47 @@ public sealed class HostBehaviorSynapseBrokerTests
         Assert.Equal(firstResponse, secondResponse);
         Assert.Equal("replay-me:ok", secondResponse.Status);
         Assert.Equal(1, client.DispatchCount);
+    }
+
+    [Fact(DisplayName = "grant built from catalog contract Alias (distinct from grain type) dispatches; wrong alias refuses before store")]
+    public async Task CatalogContractAliasDistinctFromGrainTypeDispatchesAndWrongAliasRefuses()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        // Mimic BehaviorHostEngine.DeriveResultBearingEdges: target type is contract alias, not grain type.
+        var grantFromSignedManifest = new BehaviorCapabilityEdge(
+            new NeuronId("test.host-broker.marker", Owner, TargetInstance),
+            RequestAlias,
+            RequestSchemaVersion,
+            ResponseAlias,
+            ResponseSchemaVersion);
+        var grainType = NeuronId.GrainTypeNameOf(typeof(IHostBrokerMarker));
+        Assert.NotEqual("test.host-broker.marker", grainType);
+
+        var client = new RecordingHostBrokerClient();
+        var broker = CreateBroker(client, grantFromSignedManifest);
+        var response = await broker.SendAsync<IHostBrokerMarker, HostBrokerResponse>(
+            TargetInstance,
+            new HostBrokerRequest("alias-ok"),
+            cancellationToken);
+        Assert.Equal("alias-ok:ok", response.Status);
+        Assert.Equal(1, client.DispatchCount);
+        Assert.True(client.StoreCount >= 1);
+
+        var wrongAliasClient = new RecordingHostBrokerClient();
+        var wrongAliasGrant = new BehaviorCapabilityEdge(
+            new NeuronId(grainType, Owner, TargetInstance),
+            RequestAlias,
+            RequestSchemaVersion,
+            ResponseAlias,
+            ResponseSchemaVersion);
+        var wrongAliasBroker = CreateBroker(wrongAliasClient, wrongAliasGrant);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            wrongAliasBroker.SendAsync<IHostBrokerMarker, HostBrokerResponse>(
+                TargetInstance,
+                new HostBrokerRequest("nope"),
+                cancellationToken));
+        Assert.Equal(0, wrongAliasClient.StoreCount);
+        Assert.Equal(0, wrongAliasClient.DispatchCount);
     }
 
     [Fact(DisplayName = "wrong target or alias is rejected before payload store or dispatch")]
@@ -153,12 +219,13 @@ public sealed class HostBehaviorSynapseBrokerTests
     internal sealed record HostBrokerRequest(string Prompt) : RequestSynapse<HostBrokerResponse>;
 
     [Alias(ResponseAlias)]
-    internal sealed record HostBrokerResponse(string Status) : Synapse;
+    internal sealed record HostBrokerResponse(string Status, string? DetailCode = null) : Synapse;
 
     [Alias("test.host-broker.one-way")]
     internal sealed record HostBrokerOneWay(string Note) : Synapse;
 
-    private sealed class RecordingHostBrokerClient : IBehaviorHostBrokerClient
+    private sealed class RecordingHostBrokerClient(bool serializeDispatchResponseAsCamelCaseOnly = false)
+        : IBehaviorHostBrokerClient
     {
         private readonly Dictionary<Guid, byte[]> payloads = new();
         private readonly Dictionary<(Guid Attempt, int Sequence), TaskOperationSnapshot> operations = new();
@@ -170,6 +237,8 @@ public sealed class HostBehaviorSynapseBrokerTests
         public int DispatchCount { get; private set; }
 
         public BehaviorCapabilityEdge? LastDispatchedEdge { get; private set; }
+
+        public byte[]? LastResponseBytes { get; private set; }
 
         public ValueTask<ProtectedPayloadReference> StorePayloadAsync(
             OwnerId owner,
@@ -211,6 +280,16 @@ public sealed class HostBehaviorSynapseBrokerTests
             LoadCount++;
             return ValueTask.FromResult<ReadOnlyMemory<byte>>(bytes);
         }
+
+        public ValueTask<ReadOnlyMemory<byte>> LoadTriggerAsync(
+            OwnerId owner,
+            NeuronId task,
+            BehaviorId behavior,
+            BehaviorRevisionId revision,
+            string caseId,
+            ProtectedPayloadReference reference,
+            CancellationToken cancellationToken)
+            => throw new NotSupportedException("Trigger load is not used by HostBehaviorSynapseBroker tests.");
 
         public ValueTask<TaskOperationSnapshot> PrepareAsync(
             PrepareTaskOperation command,
@@ -304,11 +383,14 @@ public sealed class HostBehaviorSynapseBrokerTests
                 throw new InvalidOperationException($"Unknown request payload '{requestPayload.Id}'.");
             }
 
-            var request = JsonSerializer.Deserialize<HostBrokerRequest>(requestBytes)
+            var request = BehaviorPayloadJson.Deserialize<HostBrokerRequest>(requestBytes)
                 ?? throw new InvalidOperationException("Request payload deserialized to null.");
 
-            var response = new HostBrokerResponse($"{request.Prompt}:ok");
-            var responseBytes = JsonSerializer.SerializeToUtf8Bytes(response);
+            var response = new HostBrokerResponse($"{request.Prompt}:ok", DetailCode: "ok");
+            var responseBytes = serializeDispatchResponseAsCamelCaseOnly
+                ? BehaviorPayloadJson.Serialize(response, typeof(HostBrokerResponse))
+                : BehaviorPayloadJson.Serialize(response, typeof(HostBrokerResponse));
+            LastResponseBytes = responseBytes;
             var responseId = Guid.NewGuid();
             payloads[responseId] = responseBytes;
 

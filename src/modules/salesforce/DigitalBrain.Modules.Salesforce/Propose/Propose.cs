@@ -4,7 +4,7 @@ namespace DigitalBrain.Salesforce;
 
 internal sealed partial class Salesforce
 {
-    public async Task<SalesforceAccountDescriptionMutation> ProposeAccountDescription(
+    private async Task<SalesforceAccountDescriptionMutation> ProposeAccountDescriptionAsync(
         CommandId commandId,
         NeuronId requester,
         string accountId,
@@ -13,7 +13,6 @@ internal sealed partial class Salesforce
     {
         cancellationToken.ThrowIfCancellationRequested();
         ValidateProposal(commandId, accountId, description);
-        ValidateCapabilityCaller(requester);
 
         var fingerprint = Fingerprint(accountId, description);
 

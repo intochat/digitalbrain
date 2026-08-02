@@ -1,3 +1,4 @@
+using System.Reflection;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Kernel;
@@ -18,6 +19,17 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
         }
 
         if (!CapabilityInvocation.IsRequest(context.InterfaceMethod))
+        {
+            await context.Invoke();
+
+            return;
+        }
+
+        // Northbound surfaces (MCP, HTTP) call ClientEntryPoint methods from outside a neuron.
+        // Orleans clients never register this filter; silo-hosted MCP does, so match Incoming's
+        // unattributed ClientEntryPoint allowance instead of requiring a capability-bearing caller.
+        if (context.SourceContext?.GrainInstance is not Neuron
+            && IsClientEntryPoint(context.InterfaceMethod))
         {
             await context.Invoke();
 
@@ -185,4 +197,7 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
             context.TargetId.Type.ToString()
                 ?? throw new InvalidOperationException("The capability target has no grain type."),
             context.TargetId.Key.ToString());
+
+    private static bool IsClientEntryPoint(MethodInfo? method)
+        => method?.DeclaringType?.GetCustomAttribute<ClientEntryPointAttribute>() is not null;
 }

@@ -310,16 +310,19 @@ internal sealed partial class BehaviorNeuron :
             PriorArtifactHash = prior,
             ActiveArtifactHash = command.ArtifactHash,
             ActiveArtifactBytes = data.ArtifactBytes,
-            ActiveAssemblyBytes = data.AssemblyBytes,
+            ActiveAssemblyBytes = null,
             ActiveArtifactSignature = data.ArtifactSignature,
             ActiveProgramSource = data.ProgramSource,
             PriorArtifactBytes = data.ActiveArtifactBytes,
-            PriorAssemblyBytes = data.ActiveAssemblyBytes,
+            PriorAssemblyBytes = null,
             PriorArtifactSignature = data.ActiveArtifactSignature,
             PriorProgramSource = data.ActiveProgramSource,
+            RunState = BehaviorRunState.Running,
+            ActivationGateOpen = true,
         };
         data = WithReceipt(data, command.CommandId, Snapshot(data));
         await SaveAsync(data);
+        PublishExactCapability(data);
         await EmitAsync(new BehaviorRevisionActivated(
             command.CommandId,
             behaviorId,
@@ -365,16 +368,17 @@ internal sealed partial class BehaviorNeuron :
             ActiveArtifactHash = restored,
             PriorArtifactHash = demoted,
             ActiveArtifactBytes = data.PriorArtifactBytes,
-            ActiveAssemblyBytes = data.PriorAssemblyBytes,
+            ActiveAssemblyBytes = null,
             ActiveArtifactSignature = data.PriorArtifactSignature,
             ActiveProgramSource = data.PriorProgramSource,
             PriorArtifactBytes = data.ActiveArtifactBytes,
-            PriorAssemblyBytes = data.ActiveAssemblyBytes,
+            PriorAssemblyBytes = null,
             PriorArtifactSignature = data.ActiveArtifactSignature,
             PriorProgramSource = data.ActiveProgramSource,
         };
         data = WithReceipt(data, command.CommandId, Snapshot(data));
         await SaveAsync(data);
+        PublishExactCapability(data);
         await EmitAsync(new BehaviorRevisionRolledBack(
             command.CommandId,
             behaviorId,
@@ -392,8 +396,7 @@ internal sealed partial class BehaviorNeuron :
 
         var data = LoadOrEmpty();
         if (data.ActiveArtifactHash is null
-            || data.ActiveArtifactBytes is null
-            || data.ActiveAssemblyBytes is null)
+            || data.ActiveArtifactBytes is null)
         {
             throw new InvalidOperationException($"Behavior '{Id}' has no active revision to execute.");
         }
@@ -407,7 +410,7 @@ internal sealed partial class BehaviorNeuron :
         var outcome = await _executor.ExecuteLegacyAsync(
             new LegacyBehaviorExecutionRequest(
                 metadata,
-                data.ActiveAssemblyBytes,
+                ReadOnlyMemory<byte>.Empty,
                 data.ActiveArtifactHash,
                 command.TriggerTypeName,
                 command.TriggerJson,
@@ -438,9 +441,10 @@ internal sealed partial class BehaviorNeuron :
         return Task.CompletedTask;
     }
 
-    Task INeuron.Deliver(SynapseDelivery delivery)
+    Task INeuron.Deliver(SynapseDelivery delivery, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(delivery);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (delivery.Synapse is BehaviorRevisionApproval approval
             && (delivery.Caller != approval.Approver
@@ -450,6 +454,6 @@ internal sealed partial class BehaviorNeuron :
             return Task.CompletedTask;
         }
 
-        return base.Deliver(delivery);
+        return base.Deliver(delivery, cancellationToken);
     }
 }

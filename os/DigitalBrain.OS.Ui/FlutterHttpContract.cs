@@ -34,11 +34,13 @@ public static class FlutterHttpContract
 
     public const string BrainTopologyPath = "/brain/topology";
 
-    public const string McpOAuthCallbackPath = "/oauth/mcp/callback";
+    public const string McpOAuthCallbackPath = "/oauth/callback";
 
     public const string AuthorizationEventsPath = "/authorizations/events";
 
     public const string AuthorizationEvent = "authorization";
+
+    public const string BehaviorsPath = "/behaviors";
 
     public const string BehaviorPath = "/behaviors/{behaviorId}";
 
@@ -47,6 +49,28 @@ public static class FlutterHttpContract
     public const string BehaviorTestsPath = "/behaviors/{behaviorId}/tests";
 
     public const string BehaviorApprovePath = "/behaviors/{behaviorId}/approve";
+
+    public const string BehaviorActivatePath = "/behaviors/{behaviorId}/activate";
+
+    public const string BehaviorStopPath = "/behaviors/{behaviorId}/stop";
+
+    public const string BehaviorStartPath = "/behaviors/{behaviorId}/start";
+
+    public const string BehaviorRunOncePath = "/behaviors/{behaviorId}/run-once";
+
+    public const string BehaviorRollbackPath = "/behaviors/{behaviorId}/rollback";
+
+    public const string BehaviorBindingsPath = "/behaviors/{behaviorId}/bindings";
+
+    public const string BehaviorBindingPath = "/behaviors/{behaviorId}/bindings/{bindingId}";
+
+    public const string BehaviorEventsPath = "/behaviors/{behaviorId}/events";
+
+    public const string BehaviorChangeProposePath = "/behaviors/{behaviorId}/change/propose";
+
+    public const string BehaviorChangeApprovePath = "/behaviors/{behaviorId}/change/approve";
+
+    public const string BehaviorEvent = "behavior";
 
     public const string BehaviorEditorSurfacePath = "/surfaces/behavior-editor";
 

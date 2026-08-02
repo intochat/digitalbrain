@@ -8,3 +8,5 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("DigitalBrain.Integrations.Tests")]
 [assembly: InternalsVisibleTo("DigitalBrain.OS.Ui.Tests")]
 [assembly: InternalsVisibleTo("DigitalBrain.OS.McpHost.Tests")]
+[assembly: InternalsVisibleTo("DigitalBrain.Behaviors.Runtime")]
+[assembly: InternalsVisibleTo("DigitalBrain.Behaviors.Tests")]
