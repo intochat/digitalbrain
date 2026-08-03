@@ -112,6 +112,16 @@ internal sealed partial class BehaviorNeuron
         // each emission resolving its own the moment no entry scope supplies one.
         var correlation = ResolveEmissionCorrelation();
 
+        if (command.HopsRemaining <= 0)
+        {
+            return await RefuseEmitAsync(
+                command,
+                data,
+                behaviorId,
+                correlation,
+                BehaviorFactEmission.HopBudgetExhausted);
+        }
+
         if (data.ActiveArtifactHash is null
             || data.ActiveArtifactBytes is null
             || !data.ActivationGateOpen

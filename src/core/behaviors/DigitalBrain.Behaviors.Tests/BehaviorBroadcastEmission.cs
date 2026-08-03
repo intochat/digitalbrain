@@ -59,6 +59,38 @@ public sealed class BehaviorBroadcastEmission(BroadcastSubscriptionFixture fixtu
         Assert.Empty(await subscriber.Incoming.ReadAsync<ProbeFactRaised>(cancellationToken: cancellationToken));
     }
 
+    [Fact(DisplayName = "an emission whose hop budget is spent is refused typed, with nothing delivered", Timeout = 120_000)]
+    public async Task ExhaustedHopBudgetIsRefusedWithoutDelivery()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var speaker = test.Neuron<IBehaviorNeuron>(EmittingBehavior);
+        var listener = test.Neuron<IBehaviorNeuron>(SubscribingBehavior);
+
+        await BehaviorInstall.ActivateAsync(test, speaker, BroadcastHarness.EmittingProgram());
+        await BehaviorInstall.ActivateAsync(test, listener, BroadcastHarness.SubscribingProgram());
+
+        var refusedWait = speaker.Outgoing.NextAsync<BehaviorFactEmitRefused>(cancellationToken);
+        var outcome = await speaker.Reference.EmitFact(new EmitBehaviorFact(
+            CommandId.New(),
+            BroadcastHarness.DeclaredFactContractId,
+            """{"label":"looped"}""")
+        {
+            HopsRemaining = 0,
+        });
+
+        var refused = await refusedWait;
+
+        Assert.Equal(BehaviorFactEmission.HopBudgetExhausted, outcome);
+        Assert.Equal(BehaviorFactEmission.HopBudgetExhausted, refused.Synapse.Reason);
+        Assert.Empty(await speaker.Outgoing.ReadAsync<ProbeFactRaised>(
+            afterSequence: 0,
+            cancellationToken));
+        Assert.Empty(await listener.Incoming.ReadAsync<ProbeFactRaised>(
+            afterSequence: 0,
+            cancellationToken));
+    }
+
     [Fact(DisplayName = "the same emit command applied twice speaks the fact once", Timeout = 120_000)]
     public async Task RepeatedEmitCommandSpeaksTheFactOnce()
     {

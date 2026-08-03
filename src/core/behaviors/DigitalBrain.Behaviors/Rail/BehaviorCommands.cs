@@ -180,4 +180,8 @@ public sealed record SetBehaviorBindingEnabled(
 public sealed record EmitBehaviorFact(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] string EmitAlias,
-    [property: Id(2)] string PayloadJson);
+    [property: Id(2)] string PayloadJson)
+{
+    [Id(3)]
+    public int HopsRemaining { get; init; } = BehaviorFactEmission.MaximumHops;
+}

@@ -25,6 +25,7 @@ internal interface IBehaviorCapabilityDispatchAccess
         BehaviorId behavior,
         string emitAlias,
         string factJson,
+        int? claimedHops,
         CancellationToken cancellationToken);
 }
 
@@ -135,6 +136,7 @@ internal sealed class GrainBehaviorCapabilityDispatchAccess : IBehaviorCapabilit
         BehaviorId behavior,
         string emitAlias,
         string factJson,
+        int? claimedHops,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(emitAlias);
@@ -161,9 +163,17 @@ internal sealed class GrainBehaviorCapabilityDispatchAccess : IBehaviorCapabilit
             .EmitFact(new EmitBehaviorFact(
                 EmitCommandId(task, attempt, emitAlias, factJson),
                 emitAlias,
-                factJson))
+                factJson)
+            {
+                HopsRemaining = ForwardedHops(claimedHops),
+            })
             .ConfigureAwait(false);
     }
+
+    // The host declares the budget it believes it inherited; it can only ever spend one, never
+    // widen one, so the claim is clamped to the ceiling and then charged for this hop.
+    internal static int ForwardedHops(int? claimedHops)
+        => Math.Min(claimedHops ?? BehaviorFactEmission.MaximumHops, BehaviorFactEmission.MaximumHops) - 1;
 
     // A fresh id per request made every retried POST a second emission. The request itself is
     // the identity, so the same request reaches EmitFact under the same command and receipts.

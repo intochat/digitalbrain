@@ -125,6 +125,7 @@ public static class BehaviorDispatchBrokerEndpoints
                     new BehaviorId(body.Behavior),
                     body.EmitAlias,
                     body.FactJson,
+                    body.Hops,
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -309,7 +310,8 @@ public static class BehaviorDispatchBrokerEndpoints
             or "behavior-activation-mismatch"
             or BehaviorFactEmission.UndeclaredAlias
             or BehaviorFactEmission.NotRunning
-            or BehaviorFactEmission.UnknownSynapse;
+            or BehaviorFactEmission.UnknownSynapse
+            or BehaviorFactEmission.HopBudgetExhausted;
 
     private static IResult Failure(string reason)
         => Results.Content(reason, "text/plain", statusCode: StatusCodes.Status400BadRequest);
@@ -337,6 +339,7 @@ public static class BehaviorDispatchBrokerEndpoints
         public string? Behavior { get; set; }
         public string? EmitAlias { get; set; }
         public string? FactJson { get; set; }
+        public int? Hops { get; set; }
     }
 
     internal sealed record EmitFactResponse(string Outcome);

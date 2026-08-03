@@ -76,4 +76,9 @@ public static class BehaviorFactEmission
     public const string UndeclaredAlias = "undeclared-broadcast-alias";
     public const string NotRunning = "behavior-not-running";
     public const string UnknownSynapse = "unknown-broadcast-synapse";
+    public const string HopBudgetExhausted = "emit-hop-budget-exhausted";
+
+    // Kernel delivery depth resets outside a delivery turn and the HTTP hop drops RequestContext,
+    // so an emission chain can only be bounded by a budget the command itself carries.
+    public const int MaximumHops = 8;
 }

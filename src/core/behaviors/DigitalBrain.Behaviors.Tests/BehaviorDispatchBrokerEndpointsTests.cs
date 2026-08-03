@@ -19,6 +19,19 @@ public sealed class BehaviorDispatchBrokerEndpointsTests
     private static readonly NeuronId BoundTask = NeuronId.For<ITask>(BoundOwner, "dispatch-broker-task");
     private static readonly AttemptId BoundAttempt = new(Guid.Parse("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
     private static readonly NeuronId CapabilityTarget = new("behaviors.dispatch-probe", BoundOwner, "probe");
+    [Fact(DisplayName = "a host spends a hop budget and can never widen one")]
+    public void ForwardedHopsClampsThenCharges()
+    {
+        Assert.Equal(
+            BehaviorFactEmission.MaximumHops - 1,
+            GrainBehaviorCapabilityDispatchAccess.ForwardedHops(null));
+        Assert.Equal(
+            BehaviorFactEmission.MaximumHops - 1,
+            GrainBehaviorCapabilityDispatchAccess.ForwardedHops(int.MaxValue));
+        Assert.Equal(2, GrainBehaviorCapabilityDispatchAccess.ForwardedHops(3));
+        Assert.True(GrainBehaviorCapabilityDispatchAccess.ForwardedHops(0) <= 0);
+    }
+
     [Fact(DisplayName = "an emit request is its own command identity, so a retried request cannot emit twice")]
     public void EmitCommandIdIsDerivedFromTheRequest()
     {
@@ -374,6 +387,8 @@ public sealed class BehaviorDispatchBrokerEndpointsTests
 
     public string EmitOutcome { get; set; } = BehaviorFactEmission.Emitted;
 
+    public int? EmittedClaimedHops { get; private set; }
+
     public ValueTask<string> EmitFactAsync(
         OwnerId owner,
         NeuronId task,
@@ -381,10 +396,12 @@ public sealed class BehaviorDispatchBrokerEndpointsTests
         BehaviorId behavior,
         string emitAlias,
         string factJson,
+        int? claimedHops,
         CancellationToken cancellationToken)
     {
         EmittedBehavior = behavior;
         EmittedAlias = emitAlias;
+        EmittedClaimedHops = claimedHops;
         return ValueTask.FromResult(EmitOutcome);
     }
 
