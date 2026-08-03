@@ -1,8 +1,10 @@
+using System.Globalization;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Introspection;
 using DigitalBrain.Testing;
+using Microsoft.Extensions.AI;
 using Xunit;
 
 namespace DigitalBrain.OS.Assistant.Tests;
@@ -12,6 +14,8 @@ public sealed class IntrospectionCapabilityTurn(OSBehaviorsFixture fixture)
     private const int TurnTimeout = 120_000;
     private const string AssistantName = "assistant";
     private const string HistoryChat = "history";
+    private const string SelfCountingChat = "self-counting";
+    private const int OwnerMessagesIncludingTheQuestion = 3;
     private const string FinalAnswer = "You have sent me two messages.";
     private const string UserMessagedType = "DigitalBrain.Chat.UserMessaged";
 
@@ -122,6 +126,64 @@ public sealed class IntrospectionCapabilityTurn(OSBehaviorsFixture fixture)
         // The chat journals UserMessaged before it hands the turn to the model, so the message that
         // asked the question is already counted when the answer is assembled.
         Assert.Equal(1, Recorded(tallied.Synapse, UserMessagedType));
+    }
+
+    [Fact(Timeout = TurnTimeout, DisplayName =
+        "asked how many messages the owner has sent, the brain tallies the conversation it is answering in and answers with that count")]
+    public async Task TheBrainAnswersHowManyMessagesTheOwnerHasSent()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var assistant = test.Neuron<IAssistant>(AssistantName);
+        var introspection = test.Neuron<IIntrospection>();
+        var chat = test.Neuron<IChat>(SelfCountingChat);
+
+        await SendOwnerMessagesAsync(test, SelfCountingChat, "first message", "second message");
+
+        // Watching before the question is sent: Watch is not an interleaving call, so it cannot be
+        // registered against the chat once the turn under test occupies it.
+        _ = await chat.Outgoing.NextAsync<AssistantResponded>(cancellationToken);
+        _ = await chat.Outgoing.NextAsync<AssistantResponded>(cancellationToken);
+
+        test.Chat().ReplyWithCapabilityCall(
+            TallyTool,
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["neuronType"] = "chat",
+                ["neuronName"] = SelfCountingChat,
+                ["direction"] = JournalDirection.Outgoing,
+            });
+        test.Chat().Reply($"You have sent me {OwnerMessagesIncludingTheQuestion} messages.");
+
+        var question = CommandId.New();
+        await test.Client.GetGrainProxy<IChat>(SelfCountingChat).Send(new SendMessage(
+            question,
+            "how many messages have I sent you?"));
+
+        var selected = await assistant.Outgoing.NextAsync<CapabilityToolSelected>(cancellationToken);
+        Assert.Equal(TallyTool, selected.Synapse.Tool);
+
+        var request = await introspection.Incoming.NextAsync<TallyJournalRequest>(cancellationToken);
+        var tallied = await introspection.Outgoing.NextAsync<JournalTallied>(cancellationToken);
+        Assert.Equal(request.CorrelationId, tallied.CorrelationId);
+        Assert.Null(tallied.Synapse.Error);
+        Assert.Equal(NeuronId.For<IChat>(test.Client.Owner, SelfCountingChat), tallied.Synapse.Subject);
+
+        // The chat journals UserMessaged before it hands the turn to the model, so the question
+        // itself is one of the messages the owner has sent.
+        var counted = Recorded(tallied.Synapse, UserMessagedType);
+        Assert.Equal(OwnerMessagesIncludingTheQuestion, counted);
+
+        var count = counted.ToString(CultureInfo.InvariantCulture);
+        Assert.Contains(
+            test.Chat().LastMessages.SelectMany(message => message.Contents).OfType<FunctionResultContent>(),
+            result => (result.Result?.ToString() ?? string.Empty) is var text
+                && text.Contains(UserMessagedType, StringComparison.Ordinal)
+                && text.Contains(count, StringComparison.Ordinal));
+
+        var answered = await chat.Outgoing.NextAsync<AssistantResponded>(cancellationToken);
+        Assert.Equal(question, answered.Synapse.CommandId);
+        Assert.Contains(count, answered.Synapse.Text, StringComparison.Ordinal);
     }
 
     [Fact(Timeout = TurnTimeout, DisplayName =
