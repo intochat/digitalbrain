@@ -16,6 +16,11 @@ internal sealed class CompileOnlyBehaviorSynapseBroker : IBehaviorSynapseBroker
             new InvalidOperationException(
                 "Behavior synapse delivery is supplied by the isolated worker broker."));
 
+    public Task EmitAsync(Synapse fact, CancellationToken cancellationToken)
+        => Task.FromException(
+            new InvalidOperationException(
+                "Behavior fact emission is supplied by the isolated worker broker."));
+
     public Task<TResponse> SendAsync<TNeuron, TResponse>(
         string name,
         RequestSynapse<TResponse> request,

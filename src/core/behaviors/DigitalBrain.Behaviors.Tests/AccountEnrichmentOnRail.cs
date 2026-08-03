@@ -12,7 +12,6 @@ public sealed class AccountEnrichmentOnRail(HostBehaviorsFixture fixture)
     public async Task AccountEnrichmentBehaviorRidesTheRail()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        BehaviorHostTestFaults.Reset();
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var rail = test.Neuron<IBehaviorNeuron>(BehaviorsFixture.AccountEnrichmentBehavior);
 

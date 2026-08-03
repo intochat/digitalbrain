@@ -11,6 +11,7 @@ using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Chat;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
+using DigitalBrain.Introspection;
 using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
 using DigitalBrain.OS.Assistant;
@@ -48,6 +49,7 @@ brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 brain.AddModule<BehaviorsModule>();
 brain.AddModule<TasksModule>();
 brain.AddModule<TimeModule>();
+brain.AddModule<IntrospectionModule>();
 
 var behaviorBrokerCredential = builder.ExecutionContext.IsRunMode
     ? builder.AddParameter(

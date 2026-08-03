@@ -1,30 +1,26 @@
+using System.Collections.Concurrent;
+
 namespace DigitalBrain.Behaviors.Host;
 
+// Armed per artifact hash, not globally. Suites run in parallel and several of them deploy, so a
+// one-shot global arm is consumed by whichever unrelated deploy reaches an engine first.
 internal static class BehaviorHostTestFaults
 {
-    private static int _refuseNextDeploy;
-    private static string _reason = "unsigned-artifact";
+    private static readonly ConcurrentDictionary<string, string> RefusedDeploys =
+        new(StringComparer.Ordinal);
 
-    public static void RefuseNextDeploy(string reason)
+    public static void RefuseDeployOf(string artifactHash, string reason)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(artifactHash);
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
-        _reason = reason;
-        Volatile.Write(ref _refuseNextDeploy, 1);
+        RefusedDeploys[artifactHash] = reason;
     }
 
-    public static void Reset()
+    internal static void ThrowIfArmed(string artifactHash)
     {
-        Volatile.Write(ref _refuseNextDeploy, 0);
-        _reason = "unsigned-artifact";
-    }
-
-    internal static void ThrowIfArmed()
-    {
-        if (Interlocked.Exchange(ref _refuseNextDeploy, 0) == 0)
+        if (RefusedDeploys.TryRemove(artifactHash, out var reason))
         {
-            return;
+            throw new BehaviorHostException(reason);
         }
-
-        throw new BehaviorHostException(_reason);
     }
 }

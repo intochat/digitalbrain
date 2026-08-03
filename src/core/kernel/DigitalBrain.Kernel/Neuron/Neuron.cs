@@ -26,6 +26,7 @@ public abstract partial class Neuron :
     private readonly HashSet<SynapseId> _remembered = [];
     private readonly ConcurrentDictionary<Guid, SynapseDelivery> _streamedCapabilityRequests = new();
     private readonly List<SynapseDelivery> _firedWhileHandling = [];
+    private readonly List<Guid> _evictedWhileHandling = [];
     private readonly List<Action> _turnRollbacks = [];
     private readonly Serializer<OutboxEntry> _entries;
     private readonly Serializer<Synapse> _synapses;
@@ -53,7 +54,17 @@ public abstract partial class Neuron :
 
     protected TimeProvider TimeProvider { get; }
 
+    // Per neuron rather than a constant so the eviction path — where the window is full and every
+    // Remember drops an entry as it adds one — is reachable without four thousand real deliveries.
+    internal virtual int RememberedDeliveryBound => RememberedDeliveries;
+
     protected NeuronId? CurrentDeliveryCaller => _handling?.Caller;
+
+    protected SynapseId? CurrentDeliverySynapseId => _handling?.SynapseId;
+
+    // How many hops the delivery being handled is from its origin. Set from the outbox entry the
+    // sender stamped, so it is the one counter that survives every hop a fact actually takes.
+    protected int CurrentDeliveryDepth => _handlingDepth;
 
     // Orleans request / turn cancellation captured at Deliver entry for handlers and grain re-entry.
     protected CancellationToken TurnCancellationToken => _turnCancellation;

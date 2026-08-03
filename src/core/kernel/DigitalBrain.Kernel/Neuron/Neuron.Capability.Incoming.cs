@@ -59,7 +59,7 @@ public abstract partial class Neuron
 
         _handling = delivery;
         _handlingDepth = DeliveryPolicy.InboundDepth();
-        _turnCheckpoint = new(_outbox.Count, _handled.Count, InboundCommitted: true, _incoming.Checkpoint(), _outgoing.Checkpoint());
+        _turnCheckpoint = new(_outbox.Count, InboundCommitted: true, _incoming.Checkpoint(), _outgoing.Checkpoint());
         _turnRollbacks.Clear();
 
         return turn;

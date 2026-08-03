@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.Google;
+using DigitalBrain.Introspection;
 using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Shell;
@@ -132,6 +133,7 @@ public sealed class CapabilityToolBinding
             new SalesforceModule(),
             new TasksModule(),
             new TimeModule(),
+            new IntrospectionModule(),
         ];
         var catalog = ActiveCapabilityCatalog.Create(modules);
         var map = ActiveModuleContractTypeMap.Create(modules, catalog);
@@ -159,6 +161,9 @@ public sealed class CapabilityToolBinding
         Assert.Contains(accepted, entry => entry.Item2 == typeof(GmailGetMessageRequest));
         Assert.Contains(accepted, entry => entry.Item2 == typeof(GmailRequest));
         Assert.Contains(accepted, entry => entry.Item2 == typeof(SalesforceRequest));
+        Assert.Contains(accepted, entry => entry.Item2 == typeof(TallyJournalRequest));
+        Assert.Contains(accepted, entry => entry.Item2 == typeof(ReadJournalRequest));
+        Assert.Contains(accepted, entry => entry.Item2 == typeof(ReadTopologyRequest));
         return accepted;
     }
 

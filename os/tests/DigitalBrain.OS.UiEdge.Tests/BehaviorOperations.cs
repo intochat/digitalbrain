@@ -1,11 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DigitalBrain.OS.UiEdge.Tests;
@@ -85,15 +86,7 @@ public sealed class BehaviorOperations(UiEdgeFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var generatedProgram = AccountEnrichmentTestProgram.ProgramSource.Replace(
-            "AccountEnrichmentProgram",
-            "AccountEnrichmentProgramAuthored",
-            StringComparison.Ordinal);
-        await using var app = await UiEdgeFixture.StartUiHttpAsync(
-            test,
-            cancellationToken,
-            services => services.AddSingleton<IBehaviorAuthor>(_ => new BehaviorAuthor(
-                (_, _) => Task.FromResult(generatedProgram))));
+        await using var app = await UiEdgeFixture.StartUiHttpAsync(test, cancellationToken);
         using var http = CreateClient(app);
 
         using var proposeResponse = await http.PostAsJsonAsync(
@@ -118,8 +111,107 @@ public sealed class BehaviorOperations(UiEdgeFixture fixture)
         Assert.NotNull(document);
         Assert.Equal(nameof(BehaviorRevisionStatus.Proposed), document.Status);
         Assert.Contains("also enrich phone numbers", document.FeatureText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("AccountEnrichmentProgramAuthored", document.ProgramSource, StringComparison.Ordinal);
+        Assert.Contains(
+            AccountEnrichmentTestProgram.AuthoredProgramTypeName,
+            document.ProgramSource,
+            StringComparison.Ordinal);
         Assert.DoesNotContain("public sealed class Program {}", document.ProgramSource, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName =
+        "a scenario proposal outlives both the UI edge that drafted it and the neuron activation that holds it")]
+    public async Task ProposalOutlivesTheEdgeThatDraftedIt()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+
+        BehaviorChangeProposalDocument proposal;
+        await using (var drafting = await UiEdgeFixture.StartUiHttpAsync(test, cancellationToken))
+        {
+            using var http = CreateClient(drafting);
+            using var response = await http.PostAsJsonAsync(
+                Path(UiEdgeContract.BehaviorChangeProposePath),
+                new BehaviorChangeProposeRequest("also enrich phone numbers"),
+                cancellationToken);
+            response.EnsureSuccessStatusCode();
+            proposal = (await response.Content.ReadFromJsonAsync<BehaviorChangeProposalDocument>(
+                Json,
+                cancellationToken))!;
+        }
+
+        // Both edges share this process, so surviving the edge alone would not distinguish durable
+        // state from a static field. Restarting the host that holds the authoring neuron drops the
+        // activation, so the approval below can only find the proposal by rehydrating it.
+        await test.Neuron<IBehaviorAuthoring>().RestartHostAsync(cancellationToken);
+
+        await using var approving = await UiEdgeFixture.StartUiHttpAsync(test, cancellationToken);
+        using var restarted = CreateClient(approving);
+        using var approve = await restarted.PostAsJsonAsync(
+            Path(UiEdgeContract.BehaviorChangeApprovePath),
+            new BehaviorScenarioApprovalRequest(proposal.ProposalId, Approved: true),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, approve.StatusCode);
+        var document = await approve.Content.ReadFromJsonAsync<BehaviorEditorDocument>(Json, cancellationToken);
+        Assert.NotNull(document);
+        Assert.Equal(nameof(BehaviorRevisionStatus.Proposed), document.Status);
+        Assert.Contains(
+            AccountEnrichmentTestProgram.AuthoredProgramTypeName,
+            document.ProgramSource,
+            StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "the UI edge assembly holds no static field of proposal state")]
+    public void TheEdgeHoldsNoStaticProposalState()
+    {
+        const BindingFlags Declared =
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+
+        var offenders = typeof(UiEdgeContract).Assembly
+            .GetTypes()
+            .Where(static type => !type.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false))
+            .SelectMany(type => type.GetFields(Declared).Select(field => (Owner: type, Field: field)))
+            .Where(static entry => CarriesProposalState(entry.Field.FieldType))
+            .Select(static entry => $"{entry.Owner.FullName}.{entry.Field.Name}")
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(offenders);
+    }
+
+    [Fact(DisplayName = "a rejected scenario proposal is forgotten, so approving it afterwards is not found")]
+    public async Task RejectionForgetsTheProposal()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        await using var app = await UiEdgeFixture.StartUiHttpAsync(test, cancellationToken);
+        using var http = CreateClient(app);
+
+        using var propose = await http.PostAsJsonAsync(
+            Path(UiEdgeContract.BehaviorChangeProposePath),
+            new BehaviorChangeProposeRequest("stop enriching dormant accounts"),
+            cancellationToken);
+        propose.EnsureSuccessStatusCode();
+        var proposal = (await propose.Content.ReadFromJsonAsync<BehaviorChangeProposalDocument>(
+            Json,
+            cancellationToken))!;
+
+        using var reject = await http.PostAsJsonAsync(
+            Path(UiEdgeContract.BehaviorChangeApprovePath),
+            new BehaviorScenarioApprovalRequest(proposal.ProposalId, Approved: false),
+            cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, reject.StatusCode);
+        var rejected = await reject.Content.ReadFromJsonAsync<BehaviorChangeProposalDocument>(
+            Json,
+            cancellationToken);
+        Assert.NotNull(rejected);
+        Assert.Equal("rejected", rejected.Status);
+
+        using var again = await http.PostAsJsonAsync(
+            Path(UiEdgeContract.BehaviorChangeApprovePath),
+            new BehaviorScenarioApprovalRequest(proposal.ProposalId, Approved: true),
+            cancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, again.StatusCode);
     }
 
     [Fact(DisplayName = "binding enable/disable flips Enabled without deleting the registered binding")]
@@ -173,6 +265,11 @@ public sealed class BehaviorOperations(UiEdgeFixture fixture)
         Assert.NotNull(enabled);
         Assert.True(Assert.Single(enabled.Bindings).Enabled);
     }
+
+    private static bool CarriesProposalState(Type type)
+        => type.Name.Contains("Proposal", StringComparison.Ordinal)
+            || type.Name.Contains("BehaviorChange", StringComparison.Ordinal)
+            || (type.IsGenericType && type.GetGenericArguments().Any(CarriesProposalState));
 
     private static async Task<BehaviorEditorDocument> InstallAsync(
         HttpClient http,

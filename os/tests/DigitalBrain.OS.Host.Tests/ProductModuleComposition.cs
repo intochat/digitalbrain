@@ -3,6 +3,8 @@ using DigitalBrain.AI;
 using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Chat;
 using DigitalBrain.Google;
+using DigitalBrain.Introspection;
+using DigitalBrain.Kernel;
 using DigitalBrain.Memory;
 using DigitalBrain.OS.Assistant;
 using DigitalBrain.Salesforce;
@@ -27,7 +29,13 @@ public sealed partial class ProductModuleComposition
         typeof(BehaviorsModule),
         typeof(TasksModule),
         typeof(TimeModule),
+        typeof(IntrospectionModule),
     ];
+
+    internal static ICompiledModule[] ProductModules()
+        => [.. ProductModuleTypes.Select(static type =>
+            (ICompiledModule)(Activator.CreateInstance(type)
+                ?? throw new InvalidOperationException($"{type} could not be constructed.")))];
 
     [Fact(DisplayName = "Product AppHost selects TimeModule alongside the rest of the product module list")]
     public void ProductAppHostComposesTimeModule()
@@ -53,6 +61,53 @@ public sealed partial class ProductModuleComposition
 
         Assert.Contains(timeProjectReference, appHostProject, StringComparison.Ordinal);
         Assert.Contains(timeProjectReference, siloProject, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "Product AppHost selects IntrospectionModule so the brain's own state is model-callable")]
+    public void ProductAppHostComposesIntrospectionModule()
+    {
+        var root = FindRepositoryRoot();
+        var appHost = File.ReadAllText(Path.Combine(root, "os", "DigitalBrain.OS.AppHost", "AppHost.cs"));
+
+        Assert.Contains("using DigitalBrain.Introspection;", appHost, StringComparison.Ordinal);
+        Assert.Contains("brain.AddModule<IntrospectionModule>();", appHost, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "Product AppHost and silo project reference DigitalBrain.Modules.Introspection, mirroring TimeModule")]
+    public void ProductAppHostAndSiloReferenceIntrospectionModule()
+    {
+        var root = FindRepositoryRoot();
+        var appHostProject = File.ReadAllText(
+            Path.Combine(root, "os", "DigitalBrain.OS.AppHost", "DigitalBrain.OS.AppHost.csproj"));
+        var siloProject = File.ReadAllText(
+            Path.Combine(root, "os", "DigitalBrain.OS.Host", "DigitalBrain.OS.Host.csproj"));
+
+        const string introspectionProjectReference =
+            @"src\modules\introspection\DigitalBrain.Modules.Introspection\DigitalBrain.Modules.Introspection.csproj";
+
+        Assert.Contains(introspectionProjectReference, appHostProject, StringComparison.Ordinal);
+        Assert.Contains(introspectionProjectReference, siloProject, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "every product module type appears in both docker-compose services, so a new module cannot ship uncomposed")]
+    public void DockerComposeCoversEveryProductModuleType()
+    {
+        var root = FindRepositoryRoot();
+        var compose = File.ReadAllText(Path.Combine(root, "docker-compose.yml"));
+
+        var moduleIdsByService = ParseModuleIdsByService(compose);
+
+        foreach (var type in ProductModuleTypes)
+        {
+            var moduleId = type.FullName ?? throw new InvalidOperationException($"{type} has no FullName.");
+
+            foreach (var (service, moduleIds) in moduleIdsByService)
+            {
+                Assert.True(
+                    moduleIds.Contains(moduleId, StringComparer.Ordinal),
+                    $"docker-compose.yml service '{service}' does not declare product module '{moduleId}'.");
+            }
+        }
     }
 
     [Fact(DisplayName = "docker-compose.yml module ids for digitalbrain and digitalbrain-ui match a real product module type's FullName")]

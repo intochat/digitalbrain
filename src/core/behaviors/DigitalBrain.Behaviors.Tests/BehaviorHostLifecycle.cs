@@ -16,7 +16,6 @@ public sealed class BehaviorHostLifecycle(HostBehaviorsFixture fixture)
     public async Task SignedLoadHappyPathAndRefuseTamperedOrUnsigned()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        BehaviorHostTestFaults.Reset();
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var behavior = test.Neuron<IBehaviorNeuron>(BehaviorsFixture.SampleBehavior);
 
@@ -43,7 +42,7 @@ public sealed class BehaviorHostLifecycle(HostBehaviorsFixture fixture)
         await DeliverApprovalAsync(test, behavior, unsignedApproval, cancellationToken);
         await behavior.Reference.Approve(unsignedApproval);
 
-        BehaviorHostTestFaults.RefuseNextDeploy("unsigned-artifact");
+        BehaviorHostTestFaults.RefuseDeployOf(unsigned.ProposedArtifactHash!, "unsigned-artifact");
         var unsignedRefuse = behavior.Outgoing.NextAsync<BehaviorRevisionDeployRefused>(cancellationToken);
         var unsignedFailure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await behavior.Reference.Activate(
@@ -56,7 +55,7 @@ public sealed class BehaviorHostLifecycle(HostBehaviorsFixture fixture)
         await DeliverApprovalAsync(test, behavior, tamperedApproval, cancellationToken);
         await behavior.Reference.Approve(tamperedApproval);
 
-        BehaviorHostTestFaults.RefuseNextDeploy("invalid-signature");
+        BehaviorHostTestFaults.RefuseDeployOf(tampered.ProposedArtifactHash!, "invalid-signature");
         var tamperRefuse = behavior.Outgoing.NextAsync<BehaviorRevisionDeployRefused>(cancellationToken);
         var tamperedFailure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await behavior.Reference.Activate(
@@ -71,7 +70,6 @@ public sealed class BehaviorHostLifecycle(HostBehaviorsFixture fixture)
     public async Task DeployActivateExecuteRollbackThroughHostSeam()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        BehaviorHostTestFaults.Reset();
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var behavior = test.Neuron<IBehaviorNeuron>(BehaviorsFixture.SampleBehavior);
 
@@ -183,7 +181,6 @@ public sealed class HostBehaviorsFixture : DigitalBrainFixture
     protected override void Configure(DigitalBrainTestBuilder brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
-        BehaviorHostTestFaults.Reset();
         brain.AddModule<BehaviorsModule>();
         brain.AddModule<InProcessBehaviorHostGatewayModule>();
         brain.Configure(BehaviorsModule.ExecutorConfigurationKey, BehaviorsModule.HostExecutorName);

@@ -2,6 +2,7 @@ using DigitalBrain.AI;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Chat;
+using DigitalBrain.Introspection;
 using DigitalBrain.ServiceDefaults;
 using DigitalBrain.Shell;
 using DigitalBrain.Shell.Aspire.Hosting;
@@ -39,20 +40,9 @@ public sealed class UiEdgeFixture : DigitalBrainFixture
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.AddServiceDefaults();
-        builder.Configuration.AddInMemoryCollection(
-            new Dictionary<string, string?>
-            {
-                ["DigitalBrain:Modules:0"] = ShellModule.Id.Value,
-                ["DigitalBrain:Modules:1"] = ChatModule.Id.Value,
-                ["DigitalBrain:Modules:2"] = BehaviorsModule.Id.Value,
-                ["DigitalBrain:Modules:3"] = TasksModule.Id.Value,
-            });
         builder.Services.AddSingleton(test.Client);
         builder.Services.AddSingleton<IGrainFactory>(test.Cluster.Client);
         builder.Services.AddUiEdgeServices();
-        // L1 UI host has no live model: inject a fixed author so scenario approval still proposes.
-        builder.Services.AddSingleton<IBehaviorAuthor>(_ => new BehaviorAuthor(
-            static (_, _) => Task.FromResult(AccountEnrichmentTestProgram.ProgramSource)));
         configureServices?.Invoke(builder.Services);
 
         var app = builder.Build();
@@ -74,5 +64,13 @@ public sealed class UiEdgeFixture : DigitalBrainFixture
         brain.AddModule<AIModule>();
         brain.AddModule<BehaviorsModule>();
         brain.AddModule<TasksModule>();
+        brain.AddModule<IntrospectionModule>();
+        // The L1 silo has no live model: the behavior author neuron resolves this scripted author
+        // instead of the Gemma4 rail, so scenario approval still generates a program.
+        brain.ConfigureServiceEdge(
+            static services => services.AddSingleton<IBehaviorAuthor>(_ => new BehaviorAuthor(
+                static (_, _) => Task.FromResult(AccountEnrichmentTestProgram.AuthoredProgramSource))),
+            new object(),
+            static _ => { });
     }
 }

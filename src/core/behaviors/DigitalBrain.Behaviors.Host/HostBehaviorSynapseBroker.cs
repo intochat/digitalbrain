@@ -14,13 +14,15 @@ internal sealed class HostBehaviorSynapseBroker : IBehaviorSynapseBroker
     private readonly BehaviorCapabilityEdge[] grants;
     private readonly IBehaviorHostBrokerClient client;
     private readonly BehaviorOperationBroker operations;
+    private readonly int hopsRemaining;
 
     public HostBehaviorSynapseBroker(
         BehaviorExecutionMetadata metadata,
         NeuronId task,
         AttemptId attempt,
         IEnumerable<BehaviorCapabilityEdge> grants,
-        IBehaviorHostBrokerClient client)
+        IBehaviorHostBrokerClient client,
+        int hopsRemaining = BehaviorFactEmission.MaximumHops)
     {
         ArgumentNullException.ThrowIfNull(metadata);
         ArgumentNullException.ThrowIfNull(grants);
@@ -46,6 +48,7 @@ internal sealed class HostBehaviorSynapseBroker : IBehaviorSynapseBroker
         this.attempt = attempt;
         this.grants = [.. grants];
         this.client = client;
+        this.hopsRemaining = hopsRemaining;
 
         var history = new TaskOwnedOperationHistory(task, attempt, client);
         operations = new BehaviorOperationBroker(history, this.grants, client);
@@ -56,6 +59,22 @@ internal sealed class HostBehaviorSynapseBroker : IBehaviorSynapseBroker
     {
         throw new NotSupportedException(
             "One-way send is not supported; BehaviorCapabilityEdge requires a result identity.");
+    }
+
+    public async Task EmitAsync(Synapse fact, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(fact);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // The host only asserts what it wants to say; the broker re-verifies the grant.
+        await client
+            .EmitFactAsync(
+                metadata.Behavior,
+                RequireAlias(fact.GetType()),
+                BehaviorPayloadJson.Serialize(fact, fact.GetType()),
+                hopsRemaining,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task<TResponse> SendAsync<TNeuron, TResponse>(

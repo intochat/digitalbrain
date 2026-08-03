@@ -27,5 +27,6 @@
     <ProjectReference Include="..\..\..\src\modules\google\DigitalBrain.Modules.Google\DigitalBrain.Modules.Google.csproj" />
     <ProjectReference Include="..\..\..\src\modules\salesforce\DigitalBrain.Modules.Salesforce\DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="..\..\..\src\modules\time\DigitalBrain.Modules.Time\DigitalBrain.Modules.Time.csproj" />
+    <ProjectReference Include="..\..\..\src\modules\introspection\DigitalBrain.Modules.Introspection\DigitalBrain.Modules.Introspection.csproj" />
   </ItemGroup>
 </Project>

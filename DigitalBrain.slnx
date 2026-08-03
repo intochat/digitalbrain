@@ -34,6 +34,8 @@
     <Project Path="src/modules/time/DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/modules/time/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" />
     <Project Path="src/modules/time/DigitalBrain.Modules.Time.Tests/DigitalBrain.Modules.Time.Tests.csproj" />
+    <Project Path="src/modules/introspection/DigitalBrain.Modules.Introspection.Contracts/DigitalBrain.Modules.Introspection.Contracts.csproj" />
+    <Project Path="src/modules/introspection/DigitalBrain.Modules.Introspection/DigitalBrain.Modules.Introspection.csproj" />
     <Project Path="src/modules/chat/DigitalBrain.Modules.Chat.Contracts/DigitalBrain.Modules.Chat.Contracts.csproj" />
     <Project Path="src/modules/chat/DigitalBrain.Modules.Chat/DigitalBrain.Modules.Chat.csproj" />
     <Project Path="src/modules/shell/DigitalBrain.Modules.Shell.Contracts/DigitalBrain.Modules.Shell.Contracts.csproj" />

@@ -283,7 +283,8 @@ public sealed class AuthoredAssemblyIsolation(TestingAppHostFixture fixture)
             compile.AssemblyBytes,
             compile.CompilerEvidenceJson,
             compile.Contract,
-            []);
+            [],
+            compile.EventAliases);
         var written = CanonicalArtifactWriter.Write(envelope);
         var signature = trust.Sign(written.Digest.Value);
 

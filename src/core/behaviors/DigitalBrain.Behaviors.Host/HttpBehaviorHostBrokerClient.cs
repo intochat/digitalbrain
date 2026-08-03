@@ -119,6 +119,63 @@ internal sealed class HttpBehaviorHostBrokerClient : IBehaviorHostBrokerClient
         return await ReadPayloadContentAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
+    public async ValueTask EmitFactAsync(
+        BehaviorId behavior,
+        string emitAlias,
+        ReadOnlyMemory<byte> factJson,
+        int hopsRemaining,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(emitAlias);
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClient
+                .PostAsJsonAsync(
+                    "v1/behaviors/broker/emit",
+                    new EmitFactRequestDto
+                    {
+                        Owner = owner.Value,
+                        TaskType = task.Type,
+                        TaskOwner = task.Owner.Value,
+                        TaskName = task.Name,
+                        Attempt = FormatGuid(attempt.Value),
+                        Behavior = behavior.Value,
+                        EmitAlias = emitAlias,
+                        FactJson = System.Text.Encoding.UTF8.GetString(factJson.Span),
+                        Hops = hopsRemaining,
+                    },
+                    JsonOptions,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw new BehaviorHostException("broker-http-failed", exception);
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            await ThrowForNonSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        }
+
+        response.Dispose();
+    }
+
+    private sealed class EmitFactRequestDto
+    {
+        public string? Owner { get; set; }
+        public string? TaskType { get; set; }
+        public string? TaskOwner { get; set; }
+        public string? TaskName { get; set; }
+        public string? Attempt { get; set; }
+        public string? Behavior { get; set; }
+        public string? EmitAlias { get; set; }
+        public string? FactJson { get; set; }
+        public int? Hops { get; set; }
+    }
+
     private static async Task<ReadOnlyMemory<byte>> ReadPayloadContentAsync(
         HttpResponseMessage response,
         CancellationToken cancellationToken)

@@ -79,6 +79,11 @@ public sealed record BehaviorActivationGoal : Goal
     [Id(6)]
     public IReadOnlyList<TaskOperationEdge> Capabilities { get; init; }
 
+    // Carried on the goal because it is the only thing that survives Task, Worker, relay and the
+    // HTTP hop into the host, where the broker turns it into the claim the silo then clamps.
+    [Id(7)]
+    public int HopsRemaining { get; init; } = BehaviorFactEmission.MaximumHops;
+
     public bool Equals(BehaviorActivationGoal? other)
     {
         if (other is null)
@@ -97,6 +102,7 @@ public sealed record BehaviorActivationGoal : Goal
             && string.Equals(CaseId, other.CaseId, StringComparison.Ordinal)
             && ProtectedPayload == other.ProtectedPayload
             && string.Equals(TriggerTypeName, other.TriggerTypeName, StringComparison.Ordinal)
+            && HopsRemaining == other.HopsRemaining
             && CapabilitiesEqual(Capabilities, other.Capabilities);
     }
 
@@ -109,6 +115,7 @@ public sealed record BehaviorActivationGoal : Goal
         hash.Add(CaseId, StringComparer.Ordinal);
         hash.Add(ProtectedPayload);
         hash.Add(TriggerTypeName, StringComparer.Ordinal);
+        hash.Add(HopsRemaining);
         foreach (var edge in Capabilities)
         {
             hash.Add(edge);
@@ -174,3 +181,14 @@ public sealed record SetBehaviorBindingEnabled(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] string BindingId,
     [property: Id(2)] bool Enabled);
+
+[GenerateSerializer]
+[Alias("db.behavior.emit-fact")]
+public sealed record EmitBehaviorFact(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] string EmitAlias,
+    [property: Id(2)] string PayloadJson)
+{
+    [Id(3)]
+    public int HopsRemaining { get; init; } = BehaviorFactEmission.MaximumHops;
+}

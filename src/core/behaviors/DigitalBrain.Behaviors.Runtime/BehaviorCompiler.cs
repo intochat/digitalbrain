@@ -81,6 +81,26 @@ internal sealed class BehaviorCompiler
             return Fail(diagnostics, contract: null, lowering);
         }
 
+        var eventAliases = BehaviorInputContractCompiler.DeriveEventAliases(programSource, _references, _catalog);
+        if (!eventAliases.Succeeded)
+        {
+            return Fail(eventAliases.Diagnostics, lowering.Contract, lowering);
+        }
+
+        if (eventAliases.EventAliases.Count > 0 && lowering.Contract.Cases.Count != 1)
+        {
+            return Fail(
+                "A behavior that subscribes to a broadcast fact must lower to exactly one input case.",
+                lowering.Contract,
+                lowering);
+        }
+
+        var emitAliases = BehaviorInputContractCompiler.DeriveBroadcastEmitAliases(programSource, _references, _catalog);
+        if (!emitAliases.Succeeded)
+        {
+            return Fail(emitAliases.Diagnostics, lowering.Contract, lowering);
+        }
+
         var grants = BehaviorInputContractCompiler.DeriveCapabilityGrants(programSource, _references, _catalog);
         if (!grants.Succeeded)
         {
@@ -103,10 +123,10 @@ internal sealed class BehaviorCompiler
                 return Fail(admission.Detail, lowering.Contract, lowering);
             }
 
-            return Succeed(assemblyBytes, lowering.Contract, lowering, admission.Grants);
+            return Succeed(assemblyBytes, lowering.Contract, lowering, admission.Grants, eventAliases.EventAliases, emitAliases.EventAliases);
         }
 
-        return Succeed(assemblyBytes, lowering.Contract, lowering, grants.Grants);
+        return Succeed(assemblyBytes, lowering.Contract, lowering, grants.Grants, eventAliases.EventAliases, emitAliases.EventAliases);
     }
 
     private static string? FindForbiddenUsage(CSharpCompilation compilation)
@@ -137,15 +157,19 @@ internal sealed class BehaviorCompiler
         byte[] assemblyBytes,
         BehaviorContractManifest contract,
         InputContractLoweringResult lowering,
-        IReadOnlyList<BehaviorCapabilityGrant> grants)
+        IReadOnlyList<BehaviorCapabilityGrant> grants,
+        IReadOnlyList<string> eventAliases,
+        IReadOnlyList<string> broadcastEmitAliases)
         => new(
             true,
             assemblyBytes,
             string.Empty,
-            Evidence(true, "ok", contract, lowering, grants),
+            Evidence(true, "ok", contract, lowering, grants, eventAliases, broadcastEmitAliases),
             contract,
             BehaviorInputContractCompiler.DefaultPolicy,
-            grants);
+            grants,
+            eventAliases,
+            broadcastEmitAliases.Count == 0 ? null : broadcastEmitAliases);
 
     private static BehaviorCompileResult Fail(
         string diagnostics,
@@ -155,17 +179,21 @@ internal sealed class BehaviorCompiler
             false,
             ReadOnlyMemory<byte>.Empty,
             diagnostics,
-            Evidence(false, diagnostics, contract, lowering, grants: null),
+            Evidence(false, diagnostics, contract, lowering, grants: null, eventAliases: null, broadcastEmitAliases: null),
             contract,
             BehaviorInputContractCompiler.DefaultPolicy,
-            Array.Empty<BehaviorCapabilityGrant>());
+            Array.Empty<BehaviorCapabilityGrant>(),
+            Array.Empty<string>(),
+            null);
 
     private static string Evidence(
         bool succeeded,
         string detail,
         BehaviorContractManifest? contract,
         InputContractLoweringResult? lowering,
-        IReadOnlyList<BehaviorCapabilityGrant>? grants)
+        IReadOnlyList<BehaviorCapabilityGrant>? grants,
+        IReadOnlyList<string>? eventAliases,
+        IReadOnlyList<string>? broadcastEmitAliases)
     {
         var policy = BehaviorInputContractCompiler.DefaultPolicy;
         return JsonSerializer.Serialize(new
@@ -207,6 +235,8 @@ internal sealed class BehaviorCompiler
                     targetInstancePolicy = grant.TargetInstancePolicy,
                     targetInstanceName = grant.TargetInstanceName,
                 }).ToArray(),
+            eventAliases = eventAliases ?? Array.Empty<string>(),
+            broadcastEmitAliases = broadcastEmitAliases ?? Array.Empty<string>(),
         });
     }
 

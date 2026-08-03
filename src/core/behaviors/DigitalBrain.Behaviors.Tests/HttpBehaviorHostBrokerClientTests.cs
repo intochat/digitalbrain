@@ -324,6 +324,32 @@ public sealed class HttpBehaviorHostBrokerClientTests
         });
     }
 
+    [Fact(DisplayName = "an emit request carries the attempt's hop budget across the wire so the silo can charge it")]
+    public async Task EmitFactCarriesTheHopBudgetAcrossTheWire()
+    {
+        using var handler = new RecordingHttpMessageHandler(static _ =>
+            JsonResponse(new { outcome = BehaviorFactEmission.Emitted }));
+
+        var factory = CreateFactory(handler);
+        var client = factory.Create(BoundOwner, BoundTask, BoundAttempt, BoundWorker);
+
+        await client.EmitFactAsync(
+            new BehaviorId("com.digitalbrain.speaker"),
+            "test.spoken-fact",
+            Encoding.UTF8.GetBytes("""{"Label":"carried"}"""),
+            hopsRemaining: 4,
+            CancellationToken.None);
+
+        var recorded = Assert.Single(handler.Requests);
+        Assert.EndsWith("/v1/behaviors/broker/emit", recorded.Uri.AbsolutePath, StringComparison.Ordinal);
+        using var document = JsonDocument.Parse(recorded.Body);
+        var root = document.RootElement;
+        AssertCommonIdentity(root);
+        Assert.Equal("com.digitalbrain.speaker", root.GetProperty("behavior").GetString());
+        Assert.Equal("test.spoken-fact", root.GetProperty("emitAlias").GetString());
+        Assert.Equal(4, root.GetProperty("hops").GetInt32());
+    }
+
     private static IBehaviorHostBrokerClientFactory CreateFactory(RecordingHttpMessageHandler handler)
     {
         var configuration = new ConfigurationBuilder()

@@ -18,7 +18,8 @@ internal sealed class HostedBehaviorExecutor(IBehaviorHostGateway host) : IBehav
                     request.TriggerPayload,
                     request.Capabilities,
                     request.UtcNow,
-                    request.Worker),
+                    request.Worker,
+                    request.HopsRemaining),
                 cancellationToken)
             .ConfigureAwait(false);
         return RejectBareUserActionCode(outcome);

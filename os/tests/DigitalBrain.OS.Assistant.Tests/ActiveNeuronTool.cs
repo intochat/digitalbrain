@@ -18,8 +18,8 @@ public sealed class ActiveNeuronTool(OSBehaviorsFixture fixture)
         await test.Client.GetGrainProxy<IChat>("mine").Read();
         await other.Client.GetGrainProxy<IChat>("theirs").Read();
 
-        var tools = new DigitalBrainIntrospectionTools(test.Client, test.Cluster.Client);
-        var neurons = await tools.ListActiveNeuronsAsync();
+        var tools = new DigitalBrainIntrospectionTools(test.Client);
+        var neurons = await tools.ListActiveNeuronsAsync(cancellationToken);
         var json = JsonSerializer.Serialize(neurons);
 
         Assert.Contains(

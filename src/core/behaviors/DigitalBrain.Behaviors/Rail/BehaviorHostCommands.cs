@@ -30,4 +30,5 @@ public sealed record BehaviorHostExecuteCommand(
     ProtectedPayloadReference TriggerPayload,
     IReadOnlyList<BehaviorCapabilityEdge> Capabilities,
     DateTimeOffset UtcNow,
-    NeuronId Worker = default);
+    NeuronId Worker = default,
+    int HopsRemaining = BehaviorFactEmission.MaximumHops);

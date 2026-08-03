@@ -7,7 +7,8 @@ internal sealed class ExecutorBehaviorContext(
     BehaviorExecutionMetadata execution,
     IBehaviorCapabilityResolver capabilities,
     TimeProvider time,
-    CancellationToken attemptCancellation) : IBehaviorContext
+    CancellationToken attemptCancellation,
+    IBehaviorSynapseBroker? facts = null) : IBehaviorContext
 {
     private readonly ConcurrentDictionary<string, object?> _state = new(StringComparer.Ordinal);
 
@@ -32,6 +33,17 @@ internal sealed class ExecutorBehaviorContext(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         return capabilities.Get<TContract>(name);
+    }
+
+    public async Task EmitAsync(Synapse fact, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(fact);
+        using var linked = BehaviorOperationCancellation.Link(AttemptCancellation, cancellationToken);
+        linked.Token.ThrowIfCancellationRequested();
+        await (facts ?? throw new InvalidOperationException(
+                "Behavior fact emission requires the isolated worker broker."))
+            .EmitAsync(fact, linked.Token)
+            .ConfigureAwait(false);
     }
 
     public ValueTask<T?> ReadStateAsync<T>(string key, CancellationToken cancellationToken = default)

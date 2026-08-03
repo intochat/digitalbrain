@@ -202,8 +202,31 @@ public static class SynapseCapabilityTool
         return false;
     }
 
+    // A capability that outlives one outbox delivery attempt is not a failed capability: the outbox
+    // keeps retrying it for DeliveryPolicy.RetryHorizon. Giving up after a single attempt would tell
+    // the model the request failed while its side effect is still in flight, so the tool waits
+    // several attempts, and when it does give up it says the request may still complete and names
+    // the correlation the journals can be searched by.
+    internal static readonly TimeSpan ToolResponseWait = DeliveryPolicy.DeliveryAttemptTimeout * 3;
+
+    internal static string ResponseTimeoutMessage(
+        NeuronId target,
+        Type responseType,
+        CorrelationId correlation,
+        TimeSpan waited)
+    {
+        ArgumentNullException.ThrowIfNull(responseType);
+
+        return $"No '{responseType.Name}' reply from '{target}' arrived within {waited.TotalSeconds} seconds. "
+            + "The request is committed and may still complete; read the journals for correlation "
+            + $"'{correlation}' to find its outcome before sending it again.";
+    }
+
     private sealed class DirectedSynapseFunction : AIFunction
     {
+        private const long BeyondJournalEnd = long.MaxValue;
+        private static readonly TimeSpan ResponsePoll = TimeSpan.FromMilliseconds(25);
+
         private readonly ValidatedCapability _capability;
         private readonly IGrainFactory _grains;
         private readonly OwnerId _owner;
@@ -247,10 +270,61 @@ public static class SynapseCapabilityTool
             cancellationToken.ThrowIfCancellationRequested();
             var request = BindModelArguments(_requestType, _capability.ContractId, arguments);
             var brain = DigitalBrainClient.Connect(_grains, _owner.Value);
-            var response = await brain
-                .SendRequestAsync(_target, request, _responseType, cancellationToken)
-                .ConfigureAwait(false);
+            await brain.ActivateAsync(cancellationToken).ConfigureAwait(false);
+            var response = await AwaitDirectedResponseAsync(request, cancellationToken).ConfigureAwait(false);
             return JsonSerializer.Serialize(response, _responseType, SerializerOptions);
+        }
+
+        // A model tool runs inside the agent neuron's turn. IDigitalBrain.SendRequestAsync awaits a
+        // grain observer callback, and Orleans dispatches that callback onto the activation that
+        // created the reference — the very turn that is blocked on this tool. Polling the owner
+        // session's incoming journal reads the same directed reply without any callback into an
+        // occupied activation.
+        private async Task<Synapse> AwaitDirectedResponseAsync(Synapse request, CancellationToken cancellationToken)
+        {
+            var sessionId = ISessionNeuron.ForOwner(_owner);
+            var session = _grains.GetGrain<ISessionNeuron>(sessionId.ToGrainId());
+            var opened = await session
+                .ReadNeuronJournal(sessionId, JournalKind.Incoming, BeyondJournalEnd)
+                .ConfigureAwait(false);
+            var cursor = opened.ResumeSequence;
+
+            var delivery = await session.Fire(_target, request).ConfigureAwait(false);
+            var abandonAfter = DateTimeOffset.UtcNow + ToolResponseWait;
+
+            while (true)
+            {
+                var read = await session
+                    .ReadNeuronJournal(sessionId, JournalKind.Incoming, cursor)
+                    .ConfigureAwait(false);
+
+                if (read.ResetSnapshot is not null)
+                {
+                    throw new InvalidOperationException(
+                        $"Journal compaction for '{sessionId}' {JournalKind.Incoming} after {cursor}; "
+                        + $"the '{_responseType.Name}' reply from '{_target}' for correlation "
+                        + $"'{delivery.CorrelationId}' can no longer be read back.");
+                }
+
+                foreach (var journaled in read.Delta)
+                {
+                    if (journaled.CorrelationId == delivery.CorrelationId
+                        && _responseType.IsInstanceOfType(journaled.Synapse))
+                    {
+                        return journaled.Synapse;
+                    }
+                }
+
+                cursor = read.ResumeSequence;
+
+                if (DateTimeOffset.UtcNow >= abandonAfter)
+                {
+                    throw new TimeoutException(
+                        ResponseTimeoutMessage(_target, _responseType, delivery.CorrelationId, ToolResponseWait));
+                }
+
+                await Task.Delay(ResponsePoll, cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 }

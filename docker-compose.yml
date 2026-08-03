@@ -67,6 +67,7 @@ services:
       DigitalBrain__Modules__7: DigitalBrain.Behaviors.Runtime.BehaviorsModule
       DigitalBrain__Modules__8: DigitalBrain.Tasks.TasksModule
       DigitalBrain__Modules__9: DigitalBrain.Time.TimeModule
+      DigitalBrain__Modules__10: DigitalBrain.Introspection.IntrospectionModule
     depends_on:
       - azurite
     extra_hosts:
@@ -93,6 +94,7 @@ services:
       DigitalBrain__Modules__7: DigitalBrain.Behaviors.Runtime.BehaviorsModule
       DigitalBrain__Modules__8: DigitalBrain.Tasks.TasksModule
       DigitalBrain__Modules__9: DigitalBrain.Time.TimeModule
+      DigitalBrain__Modules__10: DigitalBrain.Introspection.IntrospectionModule
     depends_on:
       - azurite
       - digitalbrain

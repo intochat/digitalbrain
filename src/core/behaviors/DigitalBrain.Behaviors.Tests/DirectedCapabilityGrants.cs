@@ -450,6 +450,12 @@ public sealed class DirectedCapabilityGrants
             {
                 args[index] = capabilityGrants;
             }
+            else if (typeof(IReadOnlyList<string>).IsAssignableFrom(parameter.ParameterType))
+            {
+                args[index] = parameter.Name is "broadcastEmitAliases"
+                    ? null
+                    : Array.Empty<string>();
+            }
             else if (parameter.ParameterType == typeof(string))
             {
                 args[index] = displayName;

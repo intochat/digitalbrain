@@ -86,7 +86,8 @@ internal sealed class HttpBehaviorHostClient(HttpClient http) : IBehaviorHostGat
                 command.UtcNow,
                 command.Worker.Type,
                 command.Worker.Owner.Value,
-                command.Worker.Name),
+                command.Worker.Name,
+                command.HopsRemaining),
             JsonOptions,
             cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
@@ -193,7 +194,8 @@ internal sealed class HttpBehaviorHostClient(HttpClient http) : IBehaviorHostGat
         DateTimeOffset UtcNow,
         string WorkerType,
         string WorkerOwner,
-        string WorkerName);
+        string WorkerName,
+        int Hops);
 
     private sealed record CapabilityEdgeBody(
         string TargetType,

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.Behaviors;
@@ -8,9 +7,6 @@ namespace DigitalBrain.OS.UiEdge;
 
 internal static class BehaviorEndpoints
 {
-    private static readonly ConcurrentDictionary<string, BehaviorChangeProposalDocument> PendingChanges =
-        new(StringComparer.Ordinal);
-
     public static IEndpointRouteBuilder MapBehaviors(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -343,13 +339,11 @@ internal static class BehaviorEndpoints
                 string behaviorId,
                 BehaviorChangeProposeRequest request,
                 IDigitalBrain brain,
-                IBehaviorAuthor author,
                 CancellationToken cancellationToken) =>
             {
                 ArgumentException.ThrowIfNullOrWhiteSpace(behaviorId);
                 ArgumentNullException.ThrowIfNull(request);
                 ArgumentNullException.ThrowIfNull(brain);
-                ArgumentNullException.ThrowIfNull(author);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 if (string.IsNullOrWhiteSpace(request.RequestText))
@@ -357,30 +351,13 @@ internal static class BehaviorEndpoints
                     return Results.BadRequest();
                 }
 
-                var current = ToDocument(
-                    behaviorId,
-                    await brain.GetGrainProxy<IBehaviorNeuron>(behaviorId).Read());
-                var featureName = string.IsNullOrWhiteSpace(current.FeatureName)
-                    ? "install"
-                    : current.FeatureName;
-                var authored = author.ProposeScenarios(new BehaviorChangeRequest(
-                    behaviorId,
-                    request.RequestText.Trim(),
-                    current.FeatureText,
-                    current.ProgramSource,
-                    current.DisplayName,
-                    featureName));
+                var proposed = await brain
+                    .GetGrainProxy<IBehaviorAuthoring>()
+                    .Propose(new ProposeBehaviorChangeRequest(behaviorId, request.RequestText));
 
-                var proposal = new BehaviorChangeProposalDocument(
-                    authored.ProposalId,
-                    behaviorId,
-                    request.RequestText.Trim(),
-                    authored.ProposedFeatureText,
-                    featureName,
-                    Status: "awaiting-scenario-approval",
-                    authored.DiffSummary);
-                PendingChanges[proposal.ProposalId] = proposal;
-                return Results.Ok(proposal);
+                return proposed.Proposal is { } proposal
+                    ? Results.Ok(ToProposalDocument(proposal))
+                    : Results.Problem(proposed.Error);
             });
 
         endpoints.MapPost(
@@ -389,64 +366,55 @@ internal static class BehaviorEndpoints
                 string behaviorId,
                 BehaviorScenarioApprovalRequest request,
                 IDigitalBrain brain,
-                IBehaviorAuthor author,
                 CancellationToken cancellationToken) =>
             {
                 ArgumentException.ThrowIfNullOrWhiteSpace(behaviorId);
                 ArgumentNullException.ThrowIfNull(request);
                 ArgumentNullException.ThrowIfNull(brain);
-                ArgumentNullException.ThrowIfNull(author);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (string.IsNullOrWhiteSpace(request.ProposalId)
-                    || !PendingChanges.TryGetValue(request.ProposalId, out var proposal)
-                    || !string.Equals(proposal.BehaviorId, behaviorId, StringComparison.Ordinal))
+                if (string.IsNullOrWhiteSpace(request.ProposalId))
                 {
                     return Results.NotFound();
                 }
 
-                if (!request.Approved)
+                var decision = await brain
+                    .GetGrainProxy<IBehaviorAuthoring>()
+                    .Approve(new ApproveBehaviorChange(
+                        CommandId.New(),
+                        behaviorId,
+                        request.ProposalId,
+                        request.Approved,
+                        request.FeatureText,
+                        request.FeatureName));
+
+                if (decision.Proposal is not { } proposal)
                 {
-                    PendingChanges.TryRemove(request.ProposalId, out _);
-                    return Results.Ok(proposal with { Status = "rejected" });
+                    return Results.NotFound();
                 }
 
-                var current = ToDocument(
+                if (!decision.Applied)
+                {
+                    return Results.Ok(ToProposalDocument(proposal));
+                }
+
+                return Results.Ok(ToDocument(
                     behaviorId,
-                    await brain.GetGrainProxy<IBehaviorNeuron>(behaviorId).Read());
-                var applied = await author.ApplyApprovedScenarios(
-                    new BehaviorChangeRequest(
-                        behaviorId,
-                        proposal.RequestText,
-                        current.FeatureText,
-                        current.ProgramSource,
-                        current.DisplayName,
-                        proposal.ProposedFeatureName),
-                    new BehaviorScenarioProposal(
-                        proposal.ProposalId,
-                        string.IsNullOrWhiteSpace(request.FeatureText)
-                            ? proposal.ProposedFeatureText
-                            : request.FeatureText!,
-                        proposal.DiffSummary ?? "approved scenario change"),
-                    cancellationToken);
-                var featureName = string.IsNullOrWhiteSpace(request.FeatureName)
-                    ? applied.FeatureName
-                    : request.FeatureName;
-
-                var snapshot = await brain.GetGrainProxy<IBehaviorNeuron>(behaviorId).Propose(
-                    new ProposeBehaviorRevision(
-                        CommandId.New(),
-                        applied.ProgramSource,
-                        new Dictionary<string, string>(StringComparer.Ordinal) { [featureName] = applied.FeatureText },
-                        current.DisplayName,
-                        current.Description));
-
-                PendingChanges.TryRemove(request.ProposalId, out _);
-                return Results.Ok(ToDocument(behaviorId, snapshot));
+                    await brain.GetGrainProxy<IBehaviorNeuron>(behaviorId).Read()));
             });
 
         return endpoints;
     }
+
+    private static BehaviorChangeProposalDocument ToProposalDocument(BehaviorChangeProposal proposal)
+        => new(
+            proposal.ProposalId,
+            proposal.BehaviorId,
+            proposal.RequestText,
+            proposal.ProposedFeatureText,
+            proposal.ProposedFeatureName,
+            proposal.Status,
+            proposal.DiffSummary);
 
     private static async Task<IReadOnlyList<string>> DiscoverBehaviorIdsAsync(
         IDigitalBrain brain,

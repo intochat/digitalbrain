@@ -57,6 +57,7 @@
 #     DigitalBrain__Modules__7=DigitalBrain.Behaviors.Runtime.BehaviorsModule
 #     DigitalBrain__Modules__8=DigitalBrain.Tasks.TasksModule
 #     DigitalBrain__Modules__9=DigitalBrain.Time.TimeModule
+#     DigitalBrain__Modules__10=DigitalBrain.Introspection.IntrospectionModule
 #
 # Ports: 8080 silo HTTP (broker + health), 5000 northbound MCP (/mcp)
 

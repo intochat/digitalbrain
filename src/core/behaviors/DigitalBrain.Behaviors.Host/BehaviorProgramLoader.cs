@@ -25,13 +25,7 @@ internal static class BehaviorProgramLoader
         {
             using var stream = new MemoryStream(request.ArtifactBytes.ToArray());
             var assembly = loadContext.LoadFromStream(stream);
-            var programType = assembly.GetExportedTypes()
-                .FirstOrDefault(type =>
-                    !type.IsAbstract
-                    && type.GetInterfaces().Any(contract =>
-                        contract.IsGenericType
-                        && contract.GetGenericTypeDefinition() == typeof(IBehaviorProgram<>))
-                    && type.GetConstructor(Type.EmptyTypes) is not null);
+            var programType = ResolveProgramType(assembly);
 
             if (programType is null)
             {
@@ -103,7 +97,16 @@ internal static class BehaviorProgramLoader
         {
             using var stream = new MemoryStream(request.ArtifactBytes.ToArray());
             var assembly = loadContext.LoadFromStream(stream);
-            var entry = ResolveSingleFileEntry(assembly);
+            if (TryResolveSingleFileEntry(assembly) is not { } entry)
+            {
+                return await ExecuteBoundProgramAsync(
+                    assembly,
+                    request,
+                    triggerJson,
+                    broker,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
             var brainType = entry.GetParameters()[0].ParameterType;
             var triggerType = brainType.GetGenericArguments()[0];
             if (!string.Equals(triggerType.FullName, request.TriggerTypeName, StringComparison.Ordinal)
@@ -112,7 +115,9 @@ internal static class BehaviorProgramLoader
                 return new BehaviorExecutionOutcome(false, BehaviorExecutionCodes.ContractMismatch);
             }
 
-            var trigger = JsonSerializer.Deserialize(triggerJson.Span, triggerType)
+            // The rail stores trigger payloads through BehaviorPayloadJson, so the entry must be
+            // handed its trigger through the same codec or every property binds to null.
+            var trigger = BehaviorPayloadJson.Deserialize(triggerJson.Span, triggerType)
                 ?? throw new InvalidOperationException(BehaviorExecutionCodes.ContractMismatch);
 
             using var attempt = cancellationToken.CanBeCanceled
@@ -231,7 +236,76 @@ internal static class BehaviorProgramLoader
         return loadContext;
     }
 
-    private static MethodInfo ResolveSingleFileEntry(Assembly assembly)
+    // An IBehaviorProgram artifact is the only shape whose subscription and emit grants the
+    // compiler can derive, so the bound attempt must be able to drive it with the same broker
+    // the single-file entry gets — that broker is what carries the attempt identity.
+    private static async ValueTask<BehaviorExecutionOutcome> ExecuteBoundProgramAsync(
+        Assembly assembly,
+        BehaviorExecutionRequest request,
+        ReadOnlyMemory<byte> triggerJson,
+        IBehaviorSynapseBroker broker,
+        CancellationToken cancellationToken)
+    {
+        if (ResolveProgramType(assembly) is not { } programType)
+        {
+            return new BehaviorExecutionOutcome(false, BehaviorExecutionCodes.ContractMismatch);
+        }
+
+        var programInterface = programType.GetInterfaces()
+            .First(contract =>
+                contract.IsGenericType
+                && contract.GetGenericTypeDefinition() == typeof(IBehaviorProgram<>));
+        var triggerType = programInterface.GetGenericArguments()[0];
+        if (!string.Equals(triggerType.FullName, request.TriggerTypeName, StringComparison.Ordinal)
+            && !string.Equals(triggerType.Name, request.TriggerTypeName, StringComparison.Ordinal))
+        {
+            return new BehaviorExecutionOutcome(false, BehaviorExecutionCodes.ContractMismatch);
+        }
+
+        // The rail stores trigger payloads through BehaviorPayloadJson, so the program must be
+        // handed its trigger through the same codec or every property binds to null.
+        var trigger = BehaviorPayloadJson.Deserialize(triggerJson.Span, triggerType)
+            ?? throw new InvalidOperationException(BehaviorExecutionCodes.ContractMismatch);
+
+        var program = Activator.CreateInstance(programType)!;
+        using var attempt = cancellationToken.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+            : new CancellationTokenSource();
+        var context = new HostBehaviorContext(
+            request.Metadata,
+            BrokerBoundCapabilities.Instance,
+            TimeProvider.System,
+            attempt.Token,
+            broker);
+        var execute = programInterface.GetMethod(nameof(IBehaviorProgram<Synapse>.ExecuteAsync))
+            ?? throw new InvalidOperationException(BehaviorExecutionCodes.ContractMismatch);
+        await ((ValueTask)execute.Invoke(program, [trigger, context, attempt.Token])!).ConfigureAwait(false);
+
+        return new BehaviorExecutionOutcome(true, BehaviorExecutionCodes.Succeeded);
+    }
+
+    private static Type? ResolveProgramType(Assembly assembly)
+        => assembly.GetExportedTypes()
+            .FirstOrDefault(type =>
+                !type.IsAbstract
+                && type.GetInterfaces().Any(contract =>
+                    contract.IsGenericType
+                    && contract.GetGenericTypeDefinition() == typeof(IBehaviorProgram<>))
+                && type.GetConstructor(Type.EmptyTypes) is not null);
+
+    // Directed edges are derived only from BehaviorBrain.Get, and the compiler rejects any
+    // context-rooted lookalike, so no compiled artifact can reach this resolver.
+    private sealed class BrokerBoundCapabilities : IBehaviorCapabilityResolver
+    {
+        public static BrokerBoundCapabilities Instance { get; } = new();
+
+        public TContract Get<TContract>(string name)
+            where TContract : class, INeuron
+            => throw new NotSupportedException(
+                "Directed capabilities on a bound attempt are reached through BehaviorBrain.Get.");
+    }
+
+    private static MethodInfo? TryResolveSingleFileEntry(Assembly assembly)
     {
         var candidates = assembly.GetExportedTypes()
             .SelectMany(static type => type.GetMethods(
@@ -252,8 +326,7 @@ internal static class BehaviorProgramLoader
 
         if (candidates.Length == 0)
         {
-            throw new InvalidOperationException(
-                "Compiled artifact has no public static RunAsync(BehaviorBrain<TTrigger>) entry.");
+            return null;
         }
 
         if (candidates.Length > 1)

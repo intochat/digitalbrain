@@ -27,6 +27,45 @@ public sealed class BehaviorDispatchBrokerEndpointsTests
         null);
     private const string ValidCredential = "unit-test-dispatch-broker-credential";
 
+    [Fact(DisplayName = "a host spends a hop budget and can never widen one")]
+    public void ForwardedHopsClampsThenCharges()
+    {
+        Assert.Equal(
+            BehaviorFactEmission.MaximumHops - 1,
+            GrainBehaviorCapabilityDispatchAccess.ForwardedHops(null));
+        Assert.Equal(
+            BehaviorFactEmission.MaximumHops - 1,
+            GrainBehaviorCapabilityDispatchAccess.ForwardedHops(int.MaxValue));
+        Assert.Equal(2, GrainBehaviorCapabilityDispatchAccess.ForwardedHops(3));
+        Assert.True(GrainBehaviorCapabilityDispatchAccess.ForwardedHops(0) <= 0);
+    }
+
+    [Fact(DisplayName = "an emit request is its own command identity, so a retried request cannot emit twice")]
+    public void EmitCommandIdIsDerivedFromTheRequest()
+    {
+        var alias = "behaviors.probe-fact-raised";
+        var factJson = """{"label":"once"}""";
+        var retried = GrainBehaviorCapabilityDispatchAccess.EmitCommandId(
+            BoundTask,
+            BoundAttempt,
+            alias,
+            factJson);
+
+        Assert.Equal(
+            retried,
+            GrainBehaviorCapabilityDispatchAccess.EmitCommandId(BoundTask, BoundAttempt, alias, factJson));
+        Assert.NotEqual(
+            retried,
+            GrainBehaviorCapabilityDispatchAccess.EmitCommandId(BoundTask, BoundAttempt, alias, """{"label":"twice"}"""));
+        Assert.NotEqual(
+            retried,
+            GrainBehaviorCapabilityDispatchAccess.EmitCommandId(
+                BoundTask,
+                new AttemptId(Guid.Parse("cccccccccccccccccccccccccccccccc")),
+                alias,
+                factJson));
+    }
+
     [Fact(DisplayName = "dispatch happy path returns only an opaque response reference and preserves exact edge fidelity")]
     public async Task HappyPathReturnsOnlyOpaqueResponseReferenceWithExactEdge()
     {
@@ -342,6 +381,30 @@ public sealed class BehaviorDispatchBrokerEndpointsTests
 
     private sealed class RecordingAccess : IBehaviorCapabilityDispatchAccess
     {
+        public BehaviorId EmittedBehavior { get; private set; }
+
+        public string? EmittedAlias { get; private set; }
+
+        public string EmitOutcome { get; set; } = BehaviorFactEmission.Emitted;
+
+        public int? EmittedClaimedHops { get; private set; }
+
+        public ValueTask<string> EmitFactAsync(
+            OwnerId owner,
+            NeuronId task,
+            AttemptId attempt,
+            BehaviorId behavior,
+            string emitAlias,
+            string factJson,
+            int? claimedHops,
+            CancellationToken cancellationToken)
+        {
+            EmittedBehavior = behavior;
+            EmittedAlias = emitAlias;
+            EmittedClaimedHops = claimedHops;
+            return ValueTask.FromResult(EmitOutcome);
+        }
+
         public int DispatchCalls { get; private set; }
         public OwnerId LastOwner { get; private set; }
         public NeuronId LastTask { get; private set; }

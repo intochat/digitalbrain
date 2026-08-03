@@ -24,7 +24,13 @@ public abstract partial class Neuron
         }
 
         ScheduleDrain();
+
+        await OnNeuronActivatedAsync(cancellationToken);
     }
+
+    // Runs on every activation once journals, outbox and drain are restored, so a neuron can
+    // repair state it publishes outside itself and cannot otherwise notice has diverged.
+    protected virtual Task OnNeuronActivatedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     public async Task Deliver(SynapseDelivery delivery, CancellationToken cancellationToken = default)
     {
@@ -47,9 +53,10 @@ public abstract partial class Neuron
         _turnCancellation = cancellationToken;
 
         var previousCheckpoint = _turnCheckpoint;
-        _turnCheckpoint = new(_outbox.Count, _handled.Count, InboundCommitted: false, _incoming.Checkpoint(), _outgoing.Checkpoint());
+        _turnCheckpoint = new(_outbox.Count, InboundCommitted: false, _incoming.Checkpoint(), _outgoing.Checkpoint());
 
         _firedWhileHandling.Clear();
+        _evictedWhileHandling.Clear();
         _turnRollbacks.Clear();
 
         try
@@ -72,9 +79,20 @@ public abstract partial class Neuron
                 ?? throw new InvalidOperationException("The handling turn lost its durable checkpoint.");
 
             Discard(_outbox, checkpoint.CommittedOutbox);
-            Discard(_handled, checkpoint.CommittedHandled);
-            _incoming.Restore(checkpoint.Incoming);
             _outgoing.Restore(checkpoint.Outgoing);
+
+            if (SettlesDelivery(failure))
+            {
+                // The failure is this delivery's answer, so the fact stays received and handled
+                // whether or not the turn got as far as journaling its cause.
+                StageInboundCause();
+            }
+            else
+            {
+                ForgetHandled(delivery);
+                _incoming.Restore(checkpoint.Incoming);
+            }
+
             RollbackTurnState();
 
             await CommitRetractionAsync();
@@ -87,6 +105,7 @@ public abstract partial class Neuron
         finally
         {
             _firedWhileHandling.Clear();
+            _evictedWhileHandling.Clear();
             _turnRollbacks.Clear();
             _handling = null;
             _handlingDepth = 0;

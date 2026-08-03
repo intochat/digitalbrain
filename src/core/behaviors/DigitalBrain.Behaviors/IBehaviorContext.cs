@@ -19,6 +19,8 @@ public interface IBehaviorContext
     TContract Get<TContract>(string name = "default")
         where TContract : class, INeuron;
 
+    Task EmitAsync(Synapse fact, CancellationToken cancellationToken = default);
+
     ValueTask<T?> ReadStateAsync<T>(string key, CancellationToken cancellationToken = default);
 
     void SetState<T>(string key, T value);
