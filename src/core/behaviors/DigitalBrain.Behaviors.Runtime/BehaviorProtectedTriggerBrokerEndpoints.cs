@@ -30,7 +30,7 @@ public static class BehaviorProtectedTriggerBrokerEndpoints
         try
         {
             var identity = RequireIdentity(body);
-            var reference = RequireReference(body.Reference);
+            var reference = BehaviorBrokerEndpointCommon.RequireReference(body.Reference);
 
             cancellationToken.ThrowIfCancellationRequested();
             await RequireActiveTaskAuthorityAsync(grains, identity, cancellationToken).ConfigureAwait(false);
@@ -49,7 +49,7 @@ public static class BehaviorProtectedTriggerBrokerEndpoints
 
             if (plaintext.IsEmpty)
             {
-                return Failure(BehaviorExecutionCodes.TriggerMissing);
+                return BehaviorBrokerEndpointCommon.Failure(BehaviorExecutionCodes.TriggerMissing);
             }
 
             return Results.Ok(new LoadTriggerResponse(Convert.ToBase64String(plaintext.Span)));
@@ -60,15 +60,15 @@ public static class BehaviorProtectedTriggerBrokerEndpoints
         }
         catch (ArgumentException exception)
         {
-            return Failure(MapArgumentReason(exception));
+            return BehaviorBrokerEndpointCommon.Failure(MapArgumentReason(exception));
         }
         catch (InvalidOperationException exception) when (IsStableReason(exception.Message))
         {
-            return Failure(BehaviorExecutionCodes.MapHostFailure(exception.Message));
+            return BehaviorBrokerEndpointCommon.Failure(BehaviorExecutionCodes.MapHostFailure(exception.Message));
         }
         catch (CryptographicException)
         {
-            return Failure(BehaviorExecutionCodes.TriggerMissing);
+            return BehaviorBrokerEndpointCommon.Failure(BehaviorExecutionCodes.TriggerMissing);
         }
     }
 
@@ -200,28 +200,6 @@ public static class BehaviorProtectedTriggerBrokerEndpoints
         }
     }
 
-    private static ProtectedPayloadReference RequireReference(ProtectedReferenceBody? body)
-    {
-        if (body is null || string.IsNullOrWhiteSpace(body.Id))
-        {
-            throw new ArgumentException(paramName: null, message: "invalid-protected-reference");
-        }
-
-        if (!Guid.TryParseExact(body.Id, "N", out var id) || id == Guid.Empty)
-        {
-            throw new ArgumentException(paramName: null, message: "invalid-protected-reference");
-        }
-
-        try
-        {
-            return new ProtectedPayloadReference(id, body.ExpiresAt);
-        }
-        catch (ArgumentException)
-        {
-            throw new ArgumentException(paramName: null, message: "invalid-protected-reference");
-        }
-    }
-
     private static string MapArgumentReason(ArgumentException exception)
     {
         if (IsStableReason(exception.Message))
@@ -249,9 +227,6 @@ public static class BehaviorProtectedTriggerBrokerEndpoints
             or "task-not-started"
             or "invalid-task-identity";
 
-    private static IResult Failure(string reason)
-        => Results.Content(reason, "text/plain", statusCode: StatusCodes.Status400BadRequest);
-
     private sealed record BoundTriggerIdentity(
         OwnerId Owner,
         NeuronId Task,
@@ -276,12 +251,6 @@ public static class BehaviorProtectedTriggerBrokerEndpoints
         public string? Revision { get; set; }
         public string? CaseId { get; set; }
         public ProtectedReferenceBody? Reference { get; set; }
-    }
-
-    internal sealed class ProtectedReferenceBody
-    {
-        public string? Id { get; set; }
-        public DateTimeOffset? ExpiresAt { get; set; }
     }
 
     internal sealed record LoadTriggerResponse(string ContentBase64);

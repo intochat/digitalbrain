@@ -5,11 +5,10 @@ namespace DigitalBrain.Behaviors.Tests;
 // Plan adjudication (Slice 3 Task 3 / final blockers finding 5):
 // Approved plan language does NOT forbid Behaviors.Runtime -> DigitalBrain.Mcp.
 //
-// docs/superpowers/plans/2026-07-30-digitalbrain-slice-3-tasks-behavior-runtime.md Task 3:
-//   Files: HostedBehaviorExecutor.cs AND DigitalBrain.Mcp/McpAuthorizationRail.cs
+// Slice 3 Task 3 plan (Files: HostedBehaviorExecutor.cs AND DigitalBrain.Mcp/McpAuthorizationRail.cs):
 //   "Implement the control synapse and map existing MCP authorization facts at the module boundary."
 //
-// docs/superpowers/plans/2026-07-30-digitalbrain-grok-orchestrated-implementation.md Architecture:
+// Grok-orchestrated implementation plan, Architecture:
 //   "provider modules own MCP/auth/account details"
 //
 // Review/orchestration constraints repeatedly require "MCP remains independent of Tasks" and

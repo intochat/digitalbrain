@@ -28,7 +28,7 @@ public static class BehaviorProtectedPayloadBrokerEndpoints
 
         try
         {
-            var identity = RequireIdentity(
+            var identity = BehaviorBrokerEndpointCommon.RequireIdentity(
                 body.Owner,
                 body.TaskType,
                 body.TaskOwner,
@@ -37,7 +37,7 @@ public static class BehaviorProtectedPayloadBrokerEndpoints
 
             if (string.IsNullOrWhiteSpace(body.ContentBase64))
             {
-                return Failure("empty-payload");
+                return BehaviorBrokerEndpointCommon.Failure("empty-payload");
             }
 
             byte[] plaintext;
@@ -47,12 +47,12 @@ public static class BehaviorProtectedPayloadBrokerEndpoints
             }
             catch (FormatException)
             {
-                return Failure("invalid-payload-content");
+                return BehaviorBrokerEndpointCommon.Failure("invalid-payload-content");
             }
 
             if (plaintext.Length == 0)
             {
-                return Failure("empty-payload");
+                return BehaviorBrokerEndpointCommon.Failure("empty-payload");
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -70,15 +70,15 @@ public static class BehaviorProtectedPayloadBrokerEndpoints
         }
         catch (ArgumentException exception)
         {
-            return Failure(MapArgumentReason(exception));
+            return BehaviorBrokerEndpointCommon.Failure(MapArgumentReason(exception));
         }
         catch (InvalidOperationException exception) when (IsStableReason(exception.Message))
         {
-            return Failure(exception.Message);
+            return BehaviorBrokerEndpointCommon.Failure(exception.Message);
         }
         catch (CryptographicException)
         {
-            return Failure("invalid-protected-reference");
+            return BehaviorBrokerEndpointCommon.Failure("invalid-protected-reference");
         }
     }
 
@@ -92,13 +92,13 @@ public static class BehaviorProtectedPayloadBrokerEndpoints
 
         try
         {
-            var identity = RequireIdentity(
+            var identity = BehaviorBrokerEndpointCommon.RequireIdentity(
                 body.Owner,
                 body.TaskType,
                 body.TaskOwner,
                 body.TaskName,
                 body.Attempt);
-            var reference = RequireReference(body.Reference);
+            var reference = BehaviorBrokerEndpointCommon.RequireReference(body.Reference);
 
             cancellationToken.ThrowIfCancellationRequested();
             var plaintext = await access
@@ -107,7 +107,7 @@ public static class BehaviorProtectedPayloadBrokerEndpoints
 
             if (plaintext.IsEmpty)
             {
-                return Failure("invalid-payload-content");
+                return BehaviorBrokerEndpointCommon.Failure("invalid-payload-content");
             }
 
             return Results.Ok(new LoadPayloadResponse(Convert.ToBase64String(plaintext.Span)));
@@ -118,96 +118,15 @@ public static class BehaviorProtectedPayloadBrokerEndpoints
         }
         catch (ArgumentException exception)
         {
-            return Failure(MapArgumentReason(exception));
+            return BehaviorBrokerEndpointCommon.Failure(MapArgumentReason(exception));
         }
         catch (InvalidOperationException exception) when (IsStableReason(exception.Message))
         {
-            return Failure(exception.Message);
+            return BehaviorBrokerEndpointCommon.Failure(exception.Message);
         }
         catch (CryptographicException)
         {
-            return Failure("invalid-protected-reference");
-        }
-    }
-
-    private static BoundIdentity RequireIdentity(
-        string? ownerValue,
-        string? taskType,
-        string? taskOwnerValue,
-        string? taskName,
-        string? attemptValue)
-    {
-        if (string.IsNullOrWhiteSpace(ownerValue))
-        {
-            throw new ArgumentException(paramName: null, message: "missing-owner");
-        }
-
-        if (string.IsNullOrWhiteSpace(taskOwnerValue))
-        {
-            throw new ArgumentException(paramName: null, message: "missing-task-owner");
-        }
-
-        OwnerId owner;
-        OwnerId taskOwner;
-        try
-        {
-            owner = new OwnerId(ownerValue);
-            taskOwner = new OwnerId(taskOwnerValue);
-        }
-        catch (ArgumentException)
-        {
-            throw new ArgumentException(paramName: null, message: "invalid-request");
-        }
-
-        if (owner != taskOwner)
-        {
-            throw new InvalidOperationException("owner-task-mismatch");
-        }
-
-        if (string.IsNullOrWhiteSpace(taskType)
-            || string.IsNullOrWhiteSpace(taskName)
-            || string.IsNullOrWhiteSpace(attemptValue))
-        {
-            throw new ArgumentException(paramName: null, message: "missing-task-identity");
-        }
-
-        if (!Guid.TryParseExact(attemptValue, "N", out var attemptGuid) || attemptGuid == Guid.Empty)
-        {
-            throw new ArgumentException(paramName: null, message: "invalid-attempt");
-        }
-
-        try
-        {
-            return new BoundIdentity(
-                owner,
-                new NeuronId(taskType, taskOwner, taskName),
-                new AttemptId(attemptGuid));
-        }
-        catch (ArgumentException)
-        {
-            throw new ArgumentException(paramName: null, message: "invalid-request");
-        }
-    }
-
-    private static ProtectedPayloadReference RequireReference(ProtectedReferenceBody? body)
-    {
-        if (body is null || string.IsNullOrWhiteSpace(body.Id))
-        {
-            throw new ArgumentException(paramName: null, message: "invalid-protected-reference");
-        }
-
-        if (!Guid.TryParseExact(body.Id, "N", out var id) || id == Guid.Empty)
-        {
-            throw new ArgumentException(paramName: null, message: "invalid-protected-reference");
-        }
-
-        try
-        {
-            return new ProtectedPayloadReference(id, body.ExpiresAt);
-        }
-        catch (ArgumentException)
-        {
-            throw new ArgumentException(paramName: null, message: "invalid-protected-reference");
+            return BehaviorBrokerEndpointCommon.Failure("invalid-protected-reference");
         }
     }
 
@@ -237,11 +156,6 @@ public static class BehaviorProtectedPayloadBrokerEndpoints
             or "invalid-protected-reference"
             or "invalid-request";
 
-    private static IResult Failure(string reason)
-        => Results.Content(reason, "text/plain", statusCode: StatusCodes.Status400BadRequest);
-
-    private sealed record BoundIdentity(OwnerId Owner, NeuronId Task, AttemptId Attempt);
-
     internal sealed class StorePayloadRequest
     {
         public string? Owner { get; set; }
@@ -261,14 +175,6 @@ public static class BehaviorProtectedPayloadBrokerEndpoints
         public string? Attempt { get; set; }
         public ProtectedReferenceBody? Reference { get; set; }
     }
-
-    internal sealed class ProtectedReferenceBody
-    {
-        public string? Id { get; set; }
-        public DateTimeOffset? ExpiresAt { get; set; }
-    }
-
-    internal sealed record ProtectedReferenceResponse(string Id, DateTimeOffset? ExpiresAt);
 
     internal sealed record LoadPayloadResponse(string ContentBase64);
 }

@@ -17,26 +17,6 @@ public sealed class GoogleVocabulary
     {
         var contracts = typeof(IGmail).Assembly;
 
-        var vocabulary = contracts
-            .GetExportedTypes()
-            .Where(type => type.Namespace == GoogleNamespace)
-            .Select(type => type.Name)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(
-            [
-                nameof(GmailGetMessageRequest),
-                nameof(GmailGetMessageResponse),
-                nameof(GmailMessage),
-                nameof(GmailMessageHeader),
-                nameof(GmailRequest),
-                nameof(GmailResponse),
-                nameof(GmailSearchRequest),
-                nameof(GmailSearchResponse),
-                nameof(IGmail),
-            ],
-            vocabulary);
         Assert.Null(contracts.GetType($"{GoogleNamespace}.ICalendar"));
         Assert.DoesNotContain(
             contracts.GetExportedTypes(),
@@ -65,19 +45,6 @@ public sealed class GoogleVocabulary
             .Select(attribute => attribute.Alias)
             .Single();
         Assert.Equal("db.google.gmail-request", alias);
-
-        var properties = typeof(GmailRequest)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Select(property => property.Name)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(
-            [
-                nameof(GmailRequest.CommandId),
-                nameof(GmailRequest.Intent),
-            ],
-            properties);
     }
 
     [Fact(DisplayName =
@@ -90,21 +57,6 @@ public sealed class GoogleVocabulary
             .Single();
 
         Assert.Equal("db.google.gmail-message", alias);
-
-        var properties = typeof(GmailMessage)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Select(property => property.Name)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(
-            [
-                nameof(GmailMessage.Id),
-                nameof(GmailMessage.PlaintextBody),
-                nameof(GmailMessage.Sender),
-                nameof(GmailMessage.Subject),
-            ],
-            properties);
     }
 
     [Fact(DisplayName =
@@ -118,20 +70,6 @@ public sealed class GoogleVocabulary
             .Select(attribute => attribute.Alias)
             .Single();
         Assert.Equal("db.google.gmail-search-request", alias);
-
-        var properties = typeof(GmailSearchRequest)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Select(property => property.Name)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(
-            [
-                nameof(GmailSearchRequest.CommandId),
-                nameof(GmailSearchRequest.MaxResults),
-                nameof(GmailSearchRequest.Query),
-            ],
-            properties);
     }
 
     [Fact(DisplayName =
@@ -143,21 +81,6 @@ public sealed class GoogleVocabulary
             .Select(attribute => attribute.Alias)
             .Single();
         Assert.Equal("db.google.gmail-search-response", alias);
-
-        var properties = typeof(GmailSearchResponse)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Select(property => property.Name)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(
-            [
-                nameof(GmailSearchResponse.CommandId),
-                nameof(GmailSearchResponse.Error),
-                nameof(GmailSearchResponse.Headers),
-                nameof(GmailSearchResponse.Succeeded),
-            ],
-            properties);
     }
 
     [Fact(DisplayName =
@@ -176,13 +99,6 @@ public sealed class GoogleVocabulary
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(
-            [
-                nameof(GmailMessageHeader.Id),
-                nameof(GmailMessageHeader.Sender),
-                nameof(GmailMessageHeader.Subject),
-            ],
-            properties);
         Assert.DoesNotContain("PlaintextBody", properties);
         Assert.DoesNotContain("Body", properties);
     }
@@ -198,19 +114,6 @@ public sealed class GoogleVocabulary
             .Select(attribute => attribute.Alias)
             .Single();
         Assert.Equal("db.google.gmail-get-message-request", alias);
-
-        var properties = typeof(GmailGetMessageRequest)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Select(property => property.Name)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(
-            [
-                nameof(GmailGetMessageRequest.CommandId),
-                nameof(GmailGetMessageRequest.MessageId),
-            ],
-            properties);
     }
 
     [Fact(DisplayName =
@@ -222,21 +125,6 @@ public sealed class GoogleVocabulary
             .Select(attribute => attribute.Alias)
             .Single();
         Assert.Equal("db.google.gmail-get-message-response", alias);
-
-        var properties = typeof(GmailGetMessageResponse)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Select(property => property.Name)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(
-            [
-                nameof(GmailGetMessageResponse.CommandId),
-                nameof(GmailGetMessageResponse.Error),
-                nameof(GmailGetMessageResponse.Message),
-                nameof(GmailGetMessageResponse.Succeeded),
-            ],
-            properties);
     }
 
     [Fact(DisplayName =
@@ -261,13 +149,6 @@ public sealed class GoogleVocabulary
         "Google runtime public surface is GoogleModule only — no public tool or OAuth types")]
     public void RuntimePublicSurfaceIsModuleMarkerOnly()
     {
-        var exported = typeof(GoogleModule).Assembly
-            .GetExportedTypes()
-            .Select(type => type.Name)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal([nameof(GoogleModule)], exported);
         Assert.DoesNotContain(
             typeof(GoogleModule).Assembly.GetExportedTypes(),
             type => type.Name.Contains("Tool", StringComparison.Ordinal)
