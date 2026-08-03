@@ -138,6 +138,45 @@ internal static class BroadcastHarness
             }
             """;
 
+    public static string SelfEmittingProgram()
+        => $$"""
+            using System.Collections.Generic;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DigitalBrain.Abstractions;
+            using DigitalBrain.Behaviors;
+            using Orleans;
+
+            [Alias("{{DeclaredFactContractId}}")]
+            public sealed record ProbeFactRaised(string Label) : Synapse;
+
+            public sealed class SelfEmittingProgram : IBehaviorProgram<ProbeFactRaised>
+            {
+                public async ValueTask ExecuteAsync(ProbeFactRaised trigger, IBehaviorContext context, CancellationToken cancellationToken)
+                {
+                    await context.EmitAsync(new ProbeFactRaised(trigger.Label), cancellationToken);
+                }
+            }
+
+            public sealed class SelfEmittingInstallTests : IBehaviorInstallTests
+            {
+                public ValueTask<BehaviorInstallTestReport> RunAsync(
+                    IBehaviorContext context,
+                    IReadOnlyDictionary<string, string> features,
+                    CancellationToken cancellationToken)
+                    => ValueTask.FromResult(BehaviorInstallTestReport.FromResults(
+                    [
+                        new BehaviorScenarioResult(
+                            "scenario.install-gate-passes",
+                            "install gate passes",
+                            "bind.install-gate-passes",
+                            true,
+                            "green"),
+                    ],
+                    "green"));
+            }
+            """;
+
     public static string EmittingProgram()
         => $$"""
             using System.Collections.Generic;

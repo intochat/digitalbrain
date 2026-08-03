@@ -14,7 +14,7 @@ internal sealed partial class BehaviorNeuron
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // A behavior that subscribes to a fact it emits itself would wake itself without bound.
+        // A behavior that declares the same fact on both sides would execute on its own emission.
         if (CurrentDeliveryCaller == Id)
         {
             return;

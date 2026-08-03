@@ -59,6 +59,31 @@ public sealed class BehaviorBroadcastEmission(BroadcastSubscriptionFixture fixtu
         Assert.Empty(await subscriber.Incoming.ReadAsync<ProbeFactRaised>(cancellationToken: cancellationToken));
     }
 
+    [Fact(DisplayName = "a behavior that both declares and speaks one fact is never woken by its own emission", Timeout = 120_000)]
+    public async Task SelfEmittedFactNeverExecutesTheEmittingBehavior()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var speaker = test.Neuron<IBehaviorNeuron>(EmittingBehavior);
+        var listener = test.Neuron<IBehaviorNeuron>(SubscribingBehavior);
+
+        // The speaker's trigger IS the fact it emits, so its manifest declares the alias on both sides.
+        var speaking = await BehaviorInstall.ActivateAsync(test, speaker, BroadcastHarness.SelfEmittingProgram());
+        await BehaviorInstall.ActivateAsync(test, listener, BroadcastHarness.SubscribingProgram());
+
+        var listenerWoke = listener.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
+        await speaker.Reference.EmitFact(new EmitBehaviorFact(
+            CommandId.New(),
+            BroadcastHarness.DeclaredFactContractId,
+            """{"label":"echo"}"""));
+
+        // The listener waking is the barrier: the fact reached every subscriber of that alias.
+        _ = await listenerWoke;
+
+        Assert.NotNull(speaking.ActiveArtifactHash);
+        Assert.Empty(await speaker.Outgoing.ReadAsync<BehaviorExecuted>(cancellationToken: cancellationToken));
+    }
+
     [Fact(DisplayName = "behavior B speaks a fact and behavior A wakes on it with B as the journaled cause", Timeout = 120_000)]
     public async Task BehaviorToBehaviorLoopClosesThroughTheVocabulary()
     {
