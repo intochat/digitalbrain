@@ -1,5 +1,4 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Introspection;
 
