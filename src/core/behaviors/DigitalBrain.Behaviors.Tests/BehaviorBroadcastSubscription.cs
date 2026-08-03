@@ -186,6 +186,37 @@ public sealed class BehaviorBroadcastSubscription(BroadcastSubscriptionFixture f
                 behavior, revision, "1", WakeCaseId, trigger, "ProbeFactRaised", [])));
     }
 
+    // The rail version of the same invariant. A wake starts its attempt through ITask.Start, which
+    // is a capability request, so the kernel commits the fact as this behavior's inbound cause
+    // before journaling it. The wake then emits BehaviorWokeOnFact, and a subscriber lookup that
+    // fails there retracts the whole turn. Nothing may be lost by that: the outbox redelivers the
+    // fact, the wake runs to the end, and the behavior stays awake for later broadcasts.
+    [Fact(DisplayName = "a wake turn retracted after starting its attempt is redelivered and the behavior keeps waking", Timeout = 120_000)]
+    public async Task ARetractedWakeIsRedeliveredAndTheBehaviorKeepsWaking()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var behavior = test.Neuron<IBehaviorNeuron>(SubscribingBehavior);
+        var emitter = test.Neuron<IBroadcastProbeEmitter>("probe");
+
+        await InstallAsync(test, behavior, BroadcastHarness.SubscribingProgram());
+
+        var retractedWake = behavior.Outgoing.NextAsync<BehaviorWokeOnFact>(cancellationToken);
+        WakeFactLookupFault.FailNextWakeLookup(test.Client.Owner);
+        await emitter.Reference.BroadcastDeclared("retracted");
+        var recovered = await retractedWake;
+
+        var laterWake = behavior.Outgoing.NextAsync<BehaviorWokeOnFact>(cancellationToken);
+        await emitter.Reference.BroadcastDeclared("after-retraction");
+        _ = await laterWake;
+
+        var heard = await behavior.Incoming.ReadAsync<ProbeFactRaised>(cancellationToken: cancellationToken);
+
+        // Two facts, two wakes, and the retracted turn's cause journaled exactly once.
+        Assert.Equal(["retracted", "after-retraction"], heard.Select(fact => fact.Synapse.Label));
+        Assert.Equal(heard[0].CorrelationId, recovered.CorrelationId);
+    }
+
     [Fact(DisplayName = "a subscriber lookup that never answers fails the emit loudly instead of dropping it", Timeout = 120_000)]
     public async Task StalledSubscriberLookupFailsTheEmitLoudly()
     {

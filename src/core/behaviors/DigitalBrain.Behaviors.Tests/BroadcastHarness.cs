@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Runtime;
@@ -66,6 +67,12 @@ internal sealed class StallingBroadcastSubscribers : IBroadcastSubscribers
         string eventAlias,
         CancellationToken cancellationToken)
     {
+        if (WakeFactLookupFault.ShouldFail(owner, eventAlias))
+        {
+            throw new TimeoutException(
+                $"Broadcast subscriber lookup for '{eventAlias}' did not answer within the registry bound.");
+        }
+
         if (string.Equals(eventAlias, BroadcastHarness.StalledFactContractId, StringComparison.Ordinal)
             || (string.Equals(eventAlias, BroadcastHarness.StalledOnceFactContractId, StringComparison.Ordinal)
                 && Interlocked.Exchange(ref _firstStallPending, 0) == 1))
@@ -75,6 +82,22 @@ internal sealed class StallingBroadcastSubscribers : IBroadcastSubscribers
 
         return await _registry.ReceiversFor(owner, eventAlias, cancellationToken);
     }
+}
+
+// The lookup a wake performs from inside the emitting neuron's turn is the one seam that can
+// retract that turn after ITask.Start has already committed a Task grain. Failing it once, scoped
+// to the arming owner, reproduces the retraction deterministically instead of waiting out the
+// five-second registry bound on a shared cluster.
+internal static class WakeFactLookupFault
+{
+    private static readonly string WakeAlias = SynapseAlias.Of(typeof(BehaviorWokeOnFact))!;
+    private static readonly ConcurrentDictionary<string, byte> ArmedOwners = new(StringComparer.Ordinal);
+
+    internal static void FailNextWakeLookup(OwnerId owner) => ArmedOwners[owner.Value] = 1;
+
+    internal static bool ShouldFail(OwnerId owner, string eventAlias)
+        => string.Equals(eventAlias, WakeAlias, StringComparison.Ordinal)
+        && ArmedOwners.TryRemove(owner.Value, out _);
 }
 
 [ClientEntryPoint]

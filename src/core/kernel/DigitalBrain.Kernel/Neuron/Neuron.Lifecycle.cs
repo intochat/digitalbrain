@@ -78,9 +78,20 @@ public abstract partial class Neuron
                 ?? throw new InvalidOperationException("The handling turn lost its durable checkpoint.");
 
             Discard(_outbox, checkpoint.CommittedOutbox);
-            Discard(_handled, checkpoint.CommittedHandled);
-            _incoming.Restore(checkpoint.Incoming);
             _outgoing.Restore(checkpoint.Outgoing);
+
+            if (SettlesDelivery(failure))
+            {
+                // The failure is this delivery's answer, so the fact stays received and handled
+                // whether or not the turn got as far as journaling its cause.
+                StageInboundCause();
+            }
+            else
+            {
+                Discard(_handled, checkpoint.CommittedHandled);
+                _incoming.Restore(checkpoint.Incoming);
+            }
+
             RollbackTurnState();
 
             await CommitRetractionAsync();

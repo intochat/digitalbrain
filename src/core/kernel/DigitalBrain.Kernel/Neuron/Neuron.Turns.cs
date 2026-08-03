@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Reflection;
 using DigitalBrain.Abstractions;
 using Orleans.Journaling;
 
@@ -5,8 +7,15 @@ namespace DigitalBrain.Kernel;
 
 public abstract partial class Neuron
 {
+    private static readonly ConcurrentDictionary<Type, bool> SettledFailureTypes = new();
+
     private bool HasAlreadyHandled(SynapseDelivery delivery)
         => _remembered.Contains(delivery.SynapseId);
+
+    private static bool SettlesDelivery(Exception failure)
+        => SettledFailureTypes.GetOrAdd(
+            failure.GetType(),
+            static type => type.GetCustomAttribute<SettledDeliveryFailureAttribute>() is not null);
 
     private void Remember(SynapseId delivered)
     {
@@ -58,6 +67,12 @@ public abstract partial class Neuron
         _turnCheckpoint = turn.PreviousCheckpoint;
     }
 
+    // A capability request commits mid-turn, so what that commit produced — the outgoing record and
+    // whatever the turn had already staged for the outbox — must survive a later retraction.
+    // The inbound cause and its handled mark must not: they are the turn's outcome, not the
+    // request's. Carrying them forward left a retracted turn with its delivery marked handled while
+    // no handler had finished, so the outbox's own redelivery was swallowed by the duplicate guard
+    // and the receiver went silently deaf to that synapse.
     private void AdvanceTurnCheckpoint()
     {
         if (_turnCheckpoint is { } checkpoint)
@@ -65,8 +80,6 @@ public abstract partial class Neuron
             _turnCheckpoint = checkpoint with
             {
                 CommittedOutbox = _outbox.Count,
-                CommittedHandled = _handled.Count,
-                Incoming = _incoming.Checkpoint(),
                 Outgoing = _outgoing.Checkpoint(),
             };
             _turnRollbacks.Clear();

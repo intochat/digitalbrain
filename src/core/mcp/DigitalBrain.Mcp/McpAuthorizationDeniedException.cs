@@ -1,7 +1,10 @@
+using DigitalBrain.Abstractions;
+
 namespace DigitalBrain.Mcp;
 
 [GenerateSerializer]
 [Alias("db.mcp.authorization-denied-exception")]
+[SettledDeliveryFailure]
 public sealed class McpAuthorizationDeniedException : Exception
 {
     public McpAuthorizationDeniedException()
