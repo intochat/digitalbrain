@@ -36,6 +36,42 @@ internal sealed class BroadcastProbeEmitterNeuron : Neuron, IBroadcastProbeEmitt
     public Task BroadcastUndeclared(string label) => EmitAsync(new ProbeFactUnwanted(label));
 }
 
+[ClientEntryPoint]
+[Alias(BroadcastHarness.ActivationEmitterContractId)]
+[Description("Harness neuron that emits a pair of facts from its own activation")]
+public partial interface IActivationPairEmitter : INeuron
+{
+    [Alias(nameof(Touch))]
+    Task Touch();
+}
+
+[GenerateSerializer]
+[Alias(BroadcastHarness.ActivationHeadContractId)]
+[Description("First fact of an activation-time emission pair")]
+public sealed record ProbeActivationHead : Synapse;
+
+[GenerateSerializer]
+[Alias(BroadcastHarness.ActivationTailContractId)]
+[Description("Second fact of an activation-time emission pair")]
+public sealed record ProbeActivationTail : Synapse;
+
+// Activation is the one reachable emission point with neither a delivery turn nor a client
+// entry scope, so it is where an unbound correlation is observable.
+[GrainType(BroadcastHarness.ActivationGrainTypeName)]
+internal sealed class ActivationPairEmitterNeuron : Neuron, IActivationPairEmitter
+{
+    protected override async Task OnNeuronActivatedAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var correlation = ResolveEmissionCorrelation();
+        await EmitAsync(new ProbeActivationHead(), correlation);
+        await EmitAsync(new ProbeActivationTail(), correlation);
+    }
+
+    public Task Touch() => Task.CompletedTask;
+}
+
 public sealed class BehaviorBroadcastHarnessModule : IModule, ICompiledModule
 {
     public static ModuleId Id { get; } = new(typeof(BehaviorBroadcastHarnessModule).FullName!);
@@ -67,6 +103,25 @@ public sealed class BehaviorBroadcastHarnessModule : IModule, ICompiledModule
                         CapabilitySchema.For(typeof(ProbeFactUnwanted)),
                         Array.Empty<string>()),
                 ]),
+            new NeuronCapabilityDescriptor(
+                BroadcastHarness.ActivationEmitterContractId,
+                "Harness neuron that emits a pair of facts from its own activation",
+                "default",
+                Array.Empty<SynapseCapabilityDescriptor>(),
+                [
+                    new SynapseCapabilityDescriptor(
+                        BroadcastHarness.ActivationHeadContractId,
+                        1,
+                        "First fact of an activation-time emission pair",
+                        CapabilitySchema.For(typeof(ProbeActivationHead)),
+                        Array.Empty<string>()),
+                    new SynapseCapabilityDescriptor(
+                        BroadcastHarness.ActivationTailContractId,
+                        1,
+                        "Second fact of an activation-time emission pair",
+                        CapabilitySchema.For(typeof(ProbeActivationTail)),
+                        Array.Empty<string>()),
+                ]),
         ]);
 
     CapabilityManifest ICompiledModule.Capabilities => Capabilities;
@@ -90,6 +145,10 @@ internal static class BroadcastHarness
     public const string DeclaredFactContractId = "behaviors.probe-fact-raised";
     public const string UndeclaredFactContractId = "behaviors.probe-fact-unwanted";
     public const string GrainTypeName = "broadcastprobeemitter";
+    public const string ActivationEmitterContractId = "behaviors.activation-pair-emitter";
+    public const string ActivationHeadContractId = "behaviors.probe-activation-head";
+    public const string ActivationTailContractId = "behaviors.probe-activation-tail";
+    public const string ActivationGrainTypeName = "activationpairemitter";
 
     public const string SubscribingFeature =
         """

@@ -12,14 +12,25 @@ public abstract partial class Neuron
         return FireAsync(synapse, [receiver]);
     }
 
-    protected async Task EmitAsync(Synapse synapse)
+    protected Task EmitAsync(Synapse synapse)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+
+        return EmitAsync(synapse, ResolveEmissionCorrelation());
+    }
+
+    // Outside a delivery turn and a client entry scope every emission would otherwise mint its
+    // own correlation, so anything that emits more than once per operation must bind them here.
+    protected CorrelationId ResolveEmissionCorrelation()
+        => _handling?.CorrelationId
+            ?? _clientEntryCorrelation
+            ?? CorrelationId.New();
+
+    protected async Task EmitAsync(Synapse synapse, CorrelationId correlation)
     {
         ArgumentNullException.ThrowIfNull(synapse);
 
         var synapseType = synapse.GetType().FullName!;
-        var correlation = _handling?.CorrelationId
-            ?? _clientEntryCorrelation
-            ?? CorrelationId.New();
         var catalog = ServiceProvider.GetRequiredService<BroadcastCatalog>();
 
         var receivers = catalog.HandlerGrainTypes(synapseType)

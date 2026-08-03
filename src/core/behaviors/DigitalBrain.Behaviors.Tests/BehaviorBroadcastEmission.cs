@@ -59,6 +59,49 @@ public sealed class BehaviorBroadcastEmission(BroadcastSubscriptionFixture fixtu
         Assert.Empty(await subscriber.Incoming.ReadAsync<ProbeFactRaised>(cancellationToken: cancellationToken));
     }
 
+    [Fact(DisplayName = "emissions with neither a delivery turn nor a client entry bind to one correlation", Timeout = 120_000)]
+    public async Task ActivationEmissionsShareOneBoundCorrelation()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var pair = test.Neuron<IActivationPairEmitter>("pair");
+
+        await pair.Reference.Touch();
+
+        var head = await pair.Outgoing.ReadAsync<ProbeActivationHead>(
+            afterSequence: 0,
+            cancellationToken);
+        var tail = await pair.Outgoing.ReadAsync<ProbeActivationTail>(
+            afterSequence: 0,
+            cancellationToken);
+
+        Assert.Single(head);
+        Assert.Single(tail);
+        Assert.Equal(head[0].CorrelationId, tail[0].CorrelationId);
+    }
+
+    [Fact(DisplayName = "an emission binds its fact and its audit record to one correlation", Timeout = 120_000)]
+    public async Task EmittedFactAndItsAuditShareOneCorrelation()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var emitter = test.Neuron<IBehaviorNeuron>(EmittingBehavior);
+
+        await BehaviorInstall.ActivateAsync(test, emitter, BroadcastHarness.EmittingProgram());
+
+        var emittedWait = emitter.Outgoing.NextAsync<BehaviorFactEmitted>(cancellationToken);
+        var factWait = emitter.Outgoing.NextAsync<ProbeFactRaised>(cancellationToken);
+        await emitter.Reference.EmitFact(new EmitBehaviorFact(
+            CommandId.New(),
+            BroadcastHarness.DeclaredFactContractId,
+            """{"label":"audited"}"""));
+
+        var audit = await emittedWait;
+        var fact = await factWait;
+
+        Assert.Equal(fact.CorrelationId, audit.CorrelationId);
+    }
+
     [Fact(DisplayName = "a behavior that both declares and speaks one fact is never woken by its own emission", Timeout = 120_000)]
     public async Task SelfEmittedFactNeverExecutesTheEmittingBehavior()
     {

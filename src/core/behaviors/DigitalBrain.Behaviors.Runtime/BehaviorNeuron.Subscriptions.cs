@@ -101,12 +101,16 @@ internal sealed partial class BehaviorNeuron
         var data = LoadOrEmpty();
         var behaviorId = BehaviorIdOfName();
 
+        // One correlation ties the spoken fact to its audit record and to any refusal, instead of
+        // each emission resolving its own the moment no entry scope supplies one.
+        var correlation = ResolveEmissionCorrelation();
+
         if (data.ActiveArtifactHash is null
             || data.ActiveArtifactBytes is null
             || !data.ActivationGateOpen
             || data.RunState is not BehaviorRunState.Running)
         {
-            return await RefuseEmitAsync(command, behaviorId, "behavior-not-running");
+            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.NotRunning);
         }
 
         // The signed manifest is the grant. Absent BroadcastEmitAliases means no emit rights.
@@ -114,30 +118,38 @@ internal sealed partial class BehaviorNeuron
         if (manifest.EntryPoints.BroadcastEmitAliases is not { } granted
             || !granted.Contains(command.EmitAlias, StringComparer.Ordinal))
         {
-            return await RefuseEmitAsync(command, behaviorId, "undeclared-broadcast-alias");
+            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.UndeclaredAlias);
         }
 
         if (!TryReifyFact(command.EmitAlias, command.PayloadJson, out var fact))
         {
-            return await RefuseEmitAsync(command, behaviorId, "unknown-broadcast-synapse");
+            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.UnknownSynapse);
         }
 
-        await EmitAsync(fact);
-        await EmitAsync(new BehaviorFactEmitted(
-            command.CommandId,
-            behaviorId,
-            data.ActiveArtifactHash,
-            command.EmitAlias));
+        await EmitAsync(fact, correlation);
+        await EmitAsync(
+            new BehaviorFactEmitted(
+                command.CommandId,
+                behaviorId,
+                data.ActiveArtifactHash,
+                command.EmitAlias),
+            correlation);
         return BehaviorFactEmission.Emitted;
     }
 
-    private async Task<string> RefuseEmitAsync(EmitBehaviorFact command, BehaviorId behaviorId, string reason)
+    private async Task<string> RefuseEmitAsync(
+        EmitBehaviorFact command,
+        BehaviorId behaviorId,
+        CorrelationId correlation,
+        string reason)
     {
-        await EmitAsync(new BehaviorFactEmitRefused(
-            command.CommandId,
-            behaviorId,
-            command.EmitAlias,
-            reason));
+        await EmitAsync(
+            new BehaviorFactEmitRefused(
+                command.CommandId,
+                behaviorId,
+                command.EmitAlias,
+                reason),
+            correlation);
         return reason;
     }
 
