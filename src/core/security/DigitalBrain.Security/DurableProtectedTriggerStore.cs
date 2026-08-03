@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
 using Orleans.Journaling;
@@ -63,10 +64,20 @@ internal sealed class DurableProtectedTriggerStore(
             throw new ArgumentOutOfRangeException(nameof(lifetime), lifetime, "Lifetime must produce a future expiry.");
         }
 
-        var id = Guid.NewGuid();
         var purpose = PurposeFor(storeOwner, task, behavior, revision, caseId);
-        var protectedBytes = protector.Protect(purpose, plaintext.Span);
+        var id = ReferenceIdFor(purpose);
         var entries = ReadEntries();
+
+        // The activation tuple is the identity, and the whole reference travels inside the Start
+        // payload the Task receipts. A retracted turn redelivers the same wake, so a fresh id — or
+        // a fresh expiry on the same id — makes the Task refuse its own receipted command for good
+        // and loses the wake. An entry that is still live is therefore returned unchanged.
+        if (entries.TryGetValue(id, out var live) && live.ExpiresAt > now)
+        {
+            return new ProtectedPayloadReference(id, live.ExpiresAt);
+        }
+
+        var protectedBytes = protector.Protect(purpose, plaintext.Span);
         entries[id] = new StoredEntry(
             expiresAt,
             protectedBytes,
@@ -151,6 +162,9 @@ internal sealed class DurableProtectedTriggerStore(
         var plaintext = protector.Unprotect(purpose, protectedPayload);
         return ValueTask.FromResult<ReadOnlyMemory<byte>>(plaintext);
     }
+
+    private static Guid ReferenceIdFor(string purpose)
+        => new(SHA256.HashData(Encoding.UTF8.GetBytes(purpose)).AsSpan(0, 16));
 
     internal static string PurposeFor(
         OwnerId boundOwner,

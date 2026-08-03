@@ -151,6 +151,67 @@ public sealed class BehaviorProtectedTriggerStoreTests
             cancellationToken).AsTask());
     }
 
+    [Fact(DisplayName = "storing one activation trigger twice returns the identical reference, so a redelivered wake carries the Start payload the task already receipted")]
+    public async Task StoringTheSameActivationTriggerTwiceReturnsTheIdenticalReference()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var state = new TestDurableValue<byte[]>(Array.Empty<byte>());
+        var time = new AdjustableTimeProvider(
+            DateTimeOffset.Parse("2026-07-31T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
+        var store = new DurableProtectedTriggerStore(
+            state,
+            static () => ValueTask.CompletedTask,
+            new RecordingPurposeProtector(),
+            Owner,
+            time);
+
+        var first = await store.StoreAsync(
+            Owner,
+            TaskNeuron,
+            Behavior,
+            Revision,
+            CaseId,
+            Plaintext,
+            TimeSpan.FromHours(1),
+            cancellationToken);
+
+        time.Advance(TimeSpan.FromMinutes(5));
+        var redelivered = await store.StoreAsync(
+            Owner,
+            TaskNeuron,
+            Behavior,
+            Revision,
+            CaseId,
+            Plaintext,
+            TimeSpan.FromHours(1),
+            cancellationToken);
+
+        // Both the id and the expiry, because the whole reference travels inside the Start payload
+        // the Task receipts, and TaskNeuron.Start refuses a receipted CommandId whose payload moved.
+        Assert.Equal(first, redelivered);
+
+        var otherActivation = await store.StoreAsync(
+            Owner,
+            NeuronId.For<ITask>(Owner, "other-trigger-task"),
+            Behavior,
+            Revision,
+            CaseId,
+            Plaintext,
+            TimeSpan.FromHours(1),
+            cancellationToken);
+        Assert.NotEqual(first.Id, otherActivation.Id);
+
+        var loaded = await store.LoadAsync(
+            Owner,
+            TaskNeuron,
+            Behavior,
+            Revision,
+            CaseId,
+            first,
+            cancellationToken);
+        Assert.Equal(Plaintext, loaded.ToArray());
+    }
+
     private sealed class RecordingPurposeProtector : IDurablePayloadProtector
     {
         public string LastPurpose { get; private set; } = "";
@@ -178,7 +239,11 @@ public sealed class BehaviorProtectedTriggerStoreTests
 
     private sealed class AdjustableTimeProvider(DateTimeOffset start) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow() => start;
+        private DateTimeOffset utcNow = start;
+
+        public override DateTimeOffset GetUtcNow() => utcNow;
+
+        public void Advance(TimeSpan delta) => utcNow += delta;
     }
 
     private sealed class TestDurableValue<T>(T value) : IDurableValue<T>

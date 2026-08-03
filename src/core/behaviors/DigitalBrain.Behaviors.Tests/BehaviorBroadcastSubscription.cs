@@ -11,6 +11,7 @@ namespace DigitalBrain.Behaviors.Tests;
 public sealed class BehaviorBroadcastSubscription(BroadcastSubscriptionFixture fixture)
 {
     private const string SubscribingBehavior = "com.digitalbrain.subscriber";
+    private const string WakeCaseId = "case.ProbeFactRaised";
 
     [Fact(DisplayName = "activated behavior declaring an event alias wakes on the module broadcast under one correlation", Timeout = 120_000)]
     public async Task DeclaredEventAliasWakesTheBehaviorOnBroadcast()
@@ -133,6 +134,56 @@ public sealed class BehaviorBroadcastSubscription(BroadcastSubscriptionFixture f
         var executedWait = behavior.Outgoing.NextAsync<BehaviorWokeOnFact>(cancellationToken);
         await emitter.Reference.BroadcastDeclared("after-rehydrate");
         _ = await executedWait;
+    }
+
+    // A wake turn that throws anywhere after ITask.Start returns is retracted, but the Task grain is
+    // not retracted with it. The outbox then redelivers the same fact, and the wake rebuilds its
+    // whole Start payload from scratch — trigger included. This drives that rebuild directly.
+    [Fact(DisplayName = "a wake redelivered after its turn was retracted rebuilds the identical Start payload and gets the task's receipt", Timeout = 120_000)]
+    public async Task ARedeliveredWakeRebuildsTheStartPayloadTheTaskAlreadyReceipted()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var owner = test.Client.Owner;
+        var behaviorId = new BehaviorId(SubscribingBehavior);
+        var revision = new BehaviorRevisionId(new string('a', 64));
+        var wake = CommandId.New();
+        var task = test.Neuron<ITask>($"wake-{wake.Value:N}");
+        var worker = NeuronId.For<IWorker>(owner, $"wake-{wake.Value:N}");
+        var triggers = test.Cluster.Client.GetGrain<IBehaviorProtectedTriggerGrain>(owner.Value);
+
+        var first = await StartWakeAsync(triggers, task, worker, owner, behaviorId, revision, wake, cancellationToken);
+        var redelivered = await StartWakeAsync(triggers, task, worker, owner, behaviorId, revision, wake, cancellationToken);
+
+        Assert.Equal(first.ActiveAttempt, redelivered.ActiveAttempt);
+        Assert.Equal(first.Revision, redelivered.Revision);
+    }
+
+    private static async Task<TaskSnapshot> StartWakeAsync(
+        IBehaviorProtectedTriggerGrain triggers,
+        TestNeuron<ITask> task,
+        NeuronId worker,
+        OwnerId owner,
+        BehaviorId behavior,
+        BehaviorRevisionId revision,
+        CommandId wake,
+        CancellationToken cancellationToken)
+    {
+        var trigger = await triggers.StoreAsync(
+            task.Id,
+            behavior,
+            revision,
+            WakeCaseId,
+            System.Text.Encoding.UTF8.GetBytes("""{"label":"redelivered"}"""),
+            cancellationToken);
+
+        return await task.Reference.Start(new StartTask(
+            wake,
+            new BehaviorActivationGoal(behavior, revision, "1", WakeCaseId, trigger, "ProbeFactRaised", []),
+            worker,
+            new TaskPolicy(1, TimeSpan.Zero, null),
+            Activation: new BehaviorTaskActivation(
+                behavior, revision, "1", WakeCaseId, trigger, "ProbeFactRaised", [])));
     }
 
     [Fact(DisplayName = "a subscriber lookup that never answers fails the emit loudly instead of dropping it", Timeout = 120_000)]
