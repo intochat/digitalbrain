@@ -1,4 +1,5 @@
 using DigitalBrain.AI;
+using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.AI;
 using Xunit;
@@ -24,6 +25,22 @@ public sealed class BehaviorAuthoring
                 => ValueTask.CompletedTask;
         }
         """;
+
+    [Fact(DisplayName =
+        "a drafting request gives up inside one outbox delivery attempt rather than throwing into the retry horizon")]
+    public void DraftingGivesUpInsideOneDeliveryAttempt()
+        => Assert.Equal(DeliveryPolicy.DeliveryAttemptTimeout, BehaviorAuthorNeuron.BehaviorReadBound);
+
+    [Fact(DisplayName = "a drafting request refuses an unaddressable behavior identity before it is delivered")]
+    public void DraftingRefusesAnUnaddressableBehaviorIdentity()
+    {
+        var unaddressable = Assert.Throws<ArgumentException>(
+            () => new ProposeBehaviorChangeRequest("other-owner/enrichment", "also enrich phone numbers"));
+        Assert.Contains("not addressable", unaddressable.Message, StringComparison.Ordinal);
+
+        Assert.Throws<ArgumentException>(
+            () => new ProposeBehaviorChangeRequest("enrichment", "   "));
+    }
 
     [Fact(DisplayName = "natural-language request returns a feature/scenario diff before source changes")]
     public void ProposeScenariosReturnsFeatureDiffWithoutCode()

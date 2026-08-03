@@ -17,6 +17,12 @@ internal sealed class BehaviorAuthorNeuron :
     IEmit<BehaviorChangeProposed>
 {
     internal const string ModelNeuronName = "behavior-author";
+
+    // Drafting is a handled request, so a behavior that never answers must not outlive one outbox
+    // delivery attempt: past that the retry of the request being served starts while this handler is
+    // still waiting, and the throw would be retried for the whole delivery horizon.
+    internal static readonly TimeSpan BehaviorReadBound = DeliveryPolicy.DeliveryAttemptTimeout;
+
     private const string StateName = "ai.behavior-authoring";
     private const string DefaultFeatureName = "install";
     private const int RetainedReceipts = 64;
@@ -110,9 +116,20 @@ internal sealed class BehaviorAuthorNeuron :
             return new BehaviorChangeProposed(request.CommandId, drafted);
         }
 
-        var current = Authored.Of(
-            request.BehaviorId,
-            await Behavior(request.BehaviorId).Read().WaitAsync(cancellationToken));
+        BehaviorSnapshot snapshot;
+        try
+        {
+            snapshot = await Behavior(request.BehaviorId).Read().WaitAsync(BehaviorReadBound, cancellationToken);
+        }
+        catch (TimeoutException)
+        {
+            return BehaviorChangeProposed.Refused(
+                request.CommandId,
+                $"Behavior '{request.BehaviorId}' did not answer within "
+                + $"{BehaviorReadBound.TotalSeconds} seconds, so there is nothing to draft a change against.");
+        }
+
+        var current = Authored.Of(request.BehaviorId, snapshot);
         var authored = Author().ProposeScenarios(new BehaviorChangeRequest(
             request.BehaviorId,
             request.RequestText,

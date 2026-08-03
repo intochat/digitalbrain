@@ -15,11 +15,20 @@ namespace DigitalBrain.OS.AgentTools;
     Justification = "Constructed by the MCP server DI container via WithTools<DigitalBrainIntrospectionTools>().")]
 internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain)
 {
+    // A directed request is fired, handled and replied through the outbox, so the answer can outlive
+    // a single delivery attempt. Waiting on the session journal watch is otherwise unbounded: without
+    // a deadline an introspection neuron that never answers hangs the MCP request forever.
+    private static readonly TimeSpan ReplyBound = TimeSpan.FromSeconds(90);
+
     [McpServerTool(Name = AgentToolEndpoints.ListActiveNeuronsToolName)]
     [Description("List the neurons currently activated in the cluster, with their grain type and identity.")]
-    public async Task<IReadOnlyList<ActiveNeuron>> ListActiveNeuronsAsync()
+    public async Task<IReadOnlyList<ActiveNeuron>> ListActiveNeuronsAsync(
+        CancellationToken cancellationToken = default)
     {
-        var topology = await brain.Get<IIntrospection>().SendAsync(new ReadTopologyRequest());
+        var topology = await BoundedAsync(
+            token => brain.Get<IIntrospection>().SendAsync(new ReadTopologyRequest(), token),
+            nameof(ReadTopologyRequest),
+            cancellationToken);
         if (topology.Error is { } refused)
         {
             throw new InvalidOperationException(refused);
@@ -36,15 +45,20 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain)
         [Description("Grain type of the neuron, for example 'chat' or 'shell'")] string grainType,
         [Description("Instance name of the neuron, for example 'main'")] string name,
         [Description("Journal direction: incoming or outgoing")] string kind = "outgoing",
-        [Description("Read entries after this sequence")] long afterSequence = 0)
+        [Description("Read entries after this sequence")] long afterSequence = 0,
+        CancellationToken cancellationToken = default)
     {
-        var page = await brain.Get<IIntrospection>().SendAsync(new ReadJournalRequest(
+        var request = new ReadJournalRequest(
             grainType,
             name,
             kind,
             afterSequence,
             ReadJournalRequest.MaximumMaxEntries,
-            CommandId.New()));
+            CommandId.New());
+        var page = await BoundedAsync(
+            token => brain.Get<IIntrospection>().SendAsync(request, token),
+            nameof(ReadJournalRequest),
+            cancellationToken);
         if (page.Error is { } refused)
         {
             throw new InvalidOperationException(refused);
@@ -79,5 +93,25 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain)
             [
                 .. transcript.Turns.Select(turn => new ChatTranscriptTurn(turn.FromUser ? "you" : "brain", turn.Text)),
             ]);
+    }
+
+    private static async Task<TResponse> BoundedAsync<TResponse>(
+        Func<CancellationToken, Task<TResponse>> request,
+        string requestName,
+        CancellationToken cancellationToken)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(ReplyBound);
+
+        try
+        {
+            return await request(deadline.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"The introspection neuron did not answer '{requestName}' within "
+                + $"{ReplyBound.TotalSeconds} seconds.");
+        }
     }
 }

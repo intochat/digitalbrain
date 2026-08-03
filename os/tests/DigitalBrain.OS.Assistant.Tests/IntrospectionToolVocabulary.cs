@@ -30,7 +30,7 @@ public sealed class IntrospectionToolVocabulary(OSBehaviorsFixture fixture)
         await test.Client.GetGrainProxy<IChat>(chatName).Read();
 
         var tools = new DigitalBrainIntrospectionTools(test.Client);
-        var neurons = await tools.ListActiveNeuronsAsync();
+        var neurons = await tools.ListActiveNeuronsAsync(cancellationToken);
 
         Assert.Contains(
             neurons,
@@ -51,7 +51,7 @@ public sealed class IntrospectionToolVocabulary(OSBehaviorsFixture fixture)
 
         var tools = new DigitalBrainIntrospectionTools(test.Client);
         var refused = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => tools.ReadNeuronJournalAsync("chat", ghost));
+            () => tools.ReadNeuronJournalAsync("chat", ghost, cancellationToken: cancellationToken));
 
         Assert.Contains("never activates a neuron", refused.Message, StringComparison.Ordinal);
 
@@ -74,7 +74,7 @@ public sealed class IntrospectionToolVocabulary(OSBehaviorsFixture fixture)
         await test.Client.GetGrainProxy<IChat>(chatName).Send(new SendMessage(CommandId.New(), "hello"));
 
         var tools = new DigitalBrainIntrospectionTools(test.Client);
-        var page = await tools.ReadNeuronJournalAsync("chat", chatName);
+        var page = await tools.ReadNeuronJournalAsync("chat", chatName, cancellationToken: cancellationToken);
 
         var read = await test.Client.Get<IIntrospection>()
             .SendAsync(new ReadJournalRequest("chat", chatName), cancellationToken);
