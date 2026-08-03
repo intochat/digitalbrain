@@ -129,7 +129,8 @@ internal sealed partial class BehaviorNeuron
         string compilerEvidenceJson,
         BehaviorContractManifest contract,
         IReadOnlyList<BehaviorCapabilityGrant> capabilityGrants,
-        IReadOnlyList<string> eventAliases)
+        IReadOnlyList<string> eventAliases,
+        IReadOnlyList<string>? broadcastEmitAliases = null)
     {
         ArgumentNullException.ThrowIfNull(contract);
         ArgumentNullException.ThrowIfNull(capabilityGrants);
@@ -152,7 +153,10 @@ internal sealed partial class BehaviorNeuron
                 description,
                 new BehaviorEntryPoints(
                     eventAliases,
-                    contract),
+                    contract)
+                {
+                    BroadcastEmitAliases = broadcastEmitAliases,
+                },
                 scenarios,
                 overview,
                 BehaviorInputContractCompiler.DefaultPolicy,

@@ -137,4 +137,45 @@ internal static class BroadcastHarness
                     "green"));
             }
             """;
+
+    public static string EmittingProgram()
+        => $$"""
+            using System.Collections.Generic;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DigitalBrain.Abstractions;
+            using DigitalBrain.Behaviors;
+            using Orleans;
+
+            public sealed record EmitTrigger(string Label) : Synapse;
+
+            [Alias("{{DeclaredFactContractId}}")]
+            public sealed record ProbeFactRaised(string Label) : Synapse;
+
+            public sealed class EmittingProgram : IBehaviorProgram<EmitTrigger>
+            {
+                public async ValueTask ExecuteAsync(EmitTrigger trigger, IBehaviorContext context, CancellationToken cancellationToken)
+                {
+                    await context.EmitAsync(new ProbeFactRaised(trigger.Label), cancellationToken);
+                }
+            }
+
+            public sealed class EmittingInstallTests : IBehaviorInstallTests
+            {
+                public ValueTask<BehaviorInstallTestReport> RunAsync(
+                    IBehaviorContext context,
+                    IReadOnlyDictionary<string, string> features,
+                    CancellationToken cancellationToken)
+                    => ValueTask.FromResult(BehaviorInstallTestReport.FromResults(
+                    [
+                        new BehaviorScenarioResult(
+                            "scenario.install-gate-passes",
+                            "install gate passes",
+                            "bind.install-gate-passes",
+                            true,
+                            "green"),
+                    ],
+                    "green"));
+            }
+            """;
 }

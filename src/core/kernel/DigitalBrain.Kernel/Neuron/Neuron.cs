@@ -55,6 +55,8 @@ public abstract partial class Neuron :
 
     protected NeuronId? CurrentDeliveryCaller => _handling?.Caller;
 
+    protected SynapseId? CurrentDeliverySynapseId => _handling?.SynapseId;
+
     // Orleans request / turn cancellation captured at Deliver entry for handlers and grain re-entry.
     protected CancellationToken TurnCancellationToken => _turnCancellation;
 

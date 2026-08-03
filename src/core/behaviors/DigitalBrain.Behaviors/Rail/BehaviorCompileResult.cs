@@ -10,4 +10,5 @@ public sealed record BehaviorCompileResult(
     BehaviorContractManifest? Contract,
     BehaviorCompilerPolicy Policy,
     IReadOnlyList<BehaviorCapabilityGrant> CapabilityGrants,
-    IReadOnlyList<string> EventAliases);
+    IReadOnlyList<string> EventAliases,
+    IReadOnlyList<string>? BroadcastEmitAliases);

@@ -3,6 +3,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
 using DigitalBrain.Kernel;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Behaviors.Runtime;
 
@@ -55,10 +56,101 @@ internal sealed partial class BehaviorNeuron
 
         await SaveAsync(data with { LastExecutionOutcome = outcome.Outcome });
         await EmitAsync(new BehaviorExecuted(
-            CommandId.New(),
+            WakeCommandId(behaviorId),
             behaviorId,
             data.ActiveArtifactHash,
             outcome.Outcome));
+    }
+
+    // A wake has no command, so the triggering delivery is its identity: replaying the same
+    // fact reproduces the same command id instead of minting a fresh one per attempt.
+    private CommandId WakeCommandId(BehaviorId behavior)
+    {
+        if (CurrentDeliverySynapseId is not { } delivery)
+        {
+            return CommandId.New();
+        }
+
+        var material = Encoding.UTF8.GetBytes($"{Id.Owner.Value}|{behavior.Value}|{delivery.Value}");
+        return new CommandId(new Guid(System.Security.Cryptography.SHA256.HashData(material).AsSpan(0, 16)));
+    }
+
+    public async Task EmitFact(EmitBehaviorFact command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ValidateCommand(command.CommandId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command.EmitAlias);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command.PayloadJson);
+
+        var data = LoadOrEmpty();
+        var behaviorId = BehaviorIdOfName();
+
+        if (data.ActiveArtifactHash is null
+            || data.ActiveArtifactBytes is null
+            || !data.ActivationGateOpen
+            || data.RunState is not BehaviorRunState.Running)
+        {
+            await RefuseEmitAsync(command, behaviorId, "behavior-not-running");
+            return;
+        }
+
+        // The signed manifest is the grant. Absent BroadcastEmitAliases means no emit rights.
+        var manifest = CanonicalArtifactReader.Read(data.ActiveArtifactBytes).Manifest;
+        if (manifest.EntryPoints.BroadcastEmitAliases is not { } granted
+            || !granted.Contains(command.EmitAlias, StringComparer.Ordinal))
+        {
+            await RefuseEmitAsync(command, behaviorId, "undeclared-broadcast-alias");
+            return;
+        }
+
+        if (!TryReifyFact(command.EmitAlias, command.PayloadJson, out var fact))
+        {
+            await RefuseEmitAsync(command, behaviorId, "unknown-broadcast-synapse");
+            return;
+        }
+
+        await EmitAsync(fact);
+        await EmitAsync(new BehaviorFactEmitted(
+            command.CommandId,
+            behaviorId,
+            data.ActiveArtifactHash,
+            command.EmitAlias));
+    }
+
+    private Task RefuseEmitAsync(EmitBehaviorFact command, BehaviorId behaviorId, string reason)
+        => EmitAsync(new BehaviorFactEmitRefused(
+            command.CommandId,
+            behaviorId,
+            command.EmitAlias,
+            reason));
+
+    private bool TryReifyFact(string emitAlias, string payloadJson, out Synapse fact)
+    {
+        fact = null!;
+        var catalog = ServiceProvider.GetService<ActiveCapabilityCatalog>();
+        var typeMap = ServiceProvider.GetService<ActiveModuleContractTypeMap>();
+        if (catalog is null || typeMap is null)
+        {
+            return false;
+        }
+
+        var declared = catalog.Modules
+            .SelectMany(static module => module.Neurons)
+            .SelectMany(static neuron => neuron.Emitted)
+            .Where(synapse => string.Equals(synapse.ContractId, emitAlias, StringComparison.Ordinal))
+            .Select(static synapse => synapse.SchemaVersion)
+            .Distinct()
+            .ToArray();
+
+        if (declared.Length != 1
+            || !typeMap.TryGetSynapseType(emitAlias, declared[0], out var type)
+            || type is null)
+        {
+            return false;
+        }
+
+        return BehaviorPayloadJson.Deserialize(Encoding.UTF8.GetBytes(payloadJson), type) is Synapse reified
+            && (fact = reified) is not null;
     }
 
     private static BehaviorContractCaseManifest? SubscribedCaseOf(BehaviorDefinitionManifest manifest)

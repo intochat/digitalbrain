@@ -174,3 +174,10 @@ public sealed record SetBehaviorBindingEnabled(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] string BindingId,
     [property: Id(2)] bool Enabled);
+
+[GenerateSerializer]
+[Alias("db.behavior.emit-fact")]
+public sealed record EmitBehaviorFact(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] string EmitAlias,
+    [property: Id(2)] string PayloadJson);

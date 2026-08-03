@@ -132,3 +132,19 @@ public sealed record BehaviorTaskCancelRequested(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] BehaviorId Behavior,
     [property: Id(2)] NeuronId Task) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.behavior.fact-emitted")]
+public sealed record BehaviorFactEmitted(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] BehaviorId Behavior,
+    [property: Id(2)] string ArtifactHash,
+    [property: Id(3)] string EmitAlias) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.behavior.fact-emit-refused")]
+public sealed record BehaviorFactEmitRefused(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] BehaviorId Behavior,
+    [property: Id(2)] string AttemptedAlias,
+    [property: Id(3)] string Reason) : Synapse;

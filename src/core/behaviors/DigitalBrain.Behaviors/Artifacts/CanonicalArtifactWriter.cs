@@ -108,6 +108,9 @@ internal static class CanonicalArtifactWriter
             EntryPoints = manifest.EntryPoints with
             {
                 EventAliases = manifest.EntryPoints.EventAliases.Order(StringComparer.Ordinal).ToArray(),
+                BroadcastEmitAliases = manifest.EntryPoints.BroadcastEmitAliases is { } emitAliases
+                    ? emitAliases.Order(StringComparer.Ordinal).ToArray()
+                    : null,
                 Contract = contract,
             },
             Scenarios = manifest.Scenarios
@@ -231,8 +234,13 @@ internal static class CanonicalArtifactWriter
             }
 
             manifest.Behavior.EnsureValid();
+            var emitAliases = manifest.EntryPoints.BroadcastEmitAliases;
             if (manifest.EntryPoints.EventAliases.Any(string.IsNullOrWhiteSpace)
                 || manifest.EntryPoints.EventAliases.Distinct(StringComparer.Ordinal).Count() != manifest.EntryPoints.EventAliases.Count
+                || (emitAliases is not null
+                    && (emitAliases.Count == 0
+                        || emitAliases.Any(string.IsNullOrWhiteSpace)
+                        || emitAliases.Distinct(StringComparer.Ordinal).Count() != emitAliases.Count))
                 || manifest.Scenarios.Select(scenario => scenario.ScenarioId).Distinct(StringComparer.Ordinal).Count() != manifest.Scenarios.Count
                 || manifest.CapabilityGrants.Any(grant => !IsDirectedCapabilityGrant(grant))
                 || manifest.ResourceLimits.CpuMilliseconds <= 0 || manifest.ResourceLimits.MemoryBytes <= 0 || manifest.ResourceLimits.WallClockMilliseconds <= 0)

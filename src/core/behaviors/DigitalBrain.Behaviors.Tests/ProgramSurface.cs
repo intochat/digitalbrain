@@ -38,7 +38,7 @@ public sealed class ProgramSurface
             type == typeof(IServiceProvider)
             || type.FullName is "Orleans.IGrainFactory" or "System.Net.Http.HttpClient");
         Assert.Equal(
-            ["DeterministicCommandId", "Get", "ReadStateAsync", "SetState"],
+            ["DeterministicCommandId", "EmitAsync", "Get", "ReadStateAsync", "SetState"],
             typeof(IBehaviorContext).GetMethods()
                 .Where(method => !method.IsSpecialName)
                 .Select(method => method.Name)
@@ -281,6 +281,14 @@ internal interface ISdkGmail : INeuron;
 
 internal sealed class ControllableBehaviorSynapseBroker : IBehaviorSynapseBroker
 {
+    public List<Synapse> EmittedFacts { get; } = [];
+
+    public Task EmitAsync(Synapse fact, CancellationToken cancellationToken)
+    {
+        EmittedFacts.Add(fact);
+        return Task.CompletedTask;
+    }
+
     private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private Synapse? _response;

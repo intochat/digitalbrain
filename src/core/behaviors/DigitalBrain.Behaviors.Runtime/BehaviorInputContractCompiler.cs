@@ -21,6 +21,7 @@ internal static class BehaviorInputContractCompiler
     private const string BehaviorNeuronReferenceMetadataName = "DigitalBrain.Behaviors.BehaviorNeuronReference`1";
     private const string RequestSynapseMetadataName = "DigitalBrain.Abstractions.RequestSynapse`1";
     private const string AliasAttributeMetadataName = "Orleans.AliasAttribute";
+    private const string BehaviorContextMetadataName = "DigitalBrain.Behaviors.IBehaviorContext";
     private const string DefaultInstanceName = "default";
     private const string DefaultInstancePolicy = "default";
     private const string NamedInstancePolicy = "named";
@@ -180,6 +181,81 @@ internal static class BehaviorInputContractCompiler
                 .Any(synapse => string.Equals(synapse.ContractId, alias, StringComparison.Ordinal));
 
         return EventAliasDerivationResult.Ok(broadcast ? [alias] : []);
+    }
+
+    public static EventAliasDerivationResult DeriveBroadcastEmitAliases(
+        string programSource,
+        ImmutableArray<MetadataReference> references,
+        ActiveCapabilityCatalog? catalog)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(programSource);
+
+        var tree = CSharpSyntaxTree.ParseText(
+            programSource,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            path: "Behavior.cs",
+            encoding: Encoding.UTF8);
+
+        var compilation = CSharpCompilation.Create(
+            assemblyName: "Behavior.EmitAliases",
+            syntaxTrees: [tree],
+            references: references,
+            options: new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary,
+                    optimizationLevel: OptimizationLevel.Release,
+                    deterministic: true,
+                    nullableContextOptions: NullableContextOptions.Enable)
+                .WithMetadataImportOptions(MetadataImportOptions.All));
+
+        var model = compilation.GetSemanticModel(tree);
+        var root = tree.GetCompilationUnitRoot();
+        var contextDefinition = compilation.GetTypeByMetadataName(BehaviorContextMetadataName);
+        var aliasAttribute = compilation.GetTypeByMetadataName(AliasAttributeMetadataName);
+        if (contextDefinition is null)
+        {
+            return EventAliasDerivationResult.Ok([]);
+        }
+
+        var aliases = new SortedSet<string>(StringComparer.Ordinal);
+        var errors = new List<string>();
+
+        foreach (var node in root.DescendantNodes())
+        {
+            if (model.GetOperation(node) is not IInvocationOperation invocation
+                || !string.Equals(invocation.TargetMethod?.Name, "EmitAsync", StringComparison.Ordinal)
+                || !SymbolEqualityComparer.Default.Equals(
+                    invocation.TargetMethod?.ContainingType?.OriginalDefinition,
+                    contextDefinition))
+            {
+                continue;
+            }
+
+            if (invocation.Arguments.Length < 1
+                || !TryResolveNamedType(invocation.Arguments[0].Value, out var factType)
+                || factType is null
+                || !TryContractId(factType, aliasAttribute, out var alias))
+            {
+                errors.Add(
+                    "IBehaviorContext.EmitAsync requires a resolvable fact type carrying a stable Orleans Alias.");
+                continue;
+            }
+
+            if (catalog is null
+                || !catalog.Modules
+                    .SelectMany(static module => module.Neurons)
+                    .SelectMany(static neuron => neuron.Emitted)
+                    .Any(synapse => string.Equals(synapse.ContractId, alias, StringComparison.Ordinal)))
+            {
+                errors.Add($"Behavior emits '{alias}', which no active module declares as a broadcast fact.");
+                continue;
+            }
+
+            _ = aliases.Add(alias);
+        }
+
+        return errors.Count > 0
+            ? EventAliasDerivationResult.Fail(string.Join(Environment.NewLine, errors.Distinct(StringComparer.Ordinal)))
+            : EventAliasDerivationResult.Ok([.. aliases]);
     }
 
     private static bool IsBehaviorNeuronSendAsync(IMethodSymbol? method, INamedTypeSymbol neuronReferenceDefinition)

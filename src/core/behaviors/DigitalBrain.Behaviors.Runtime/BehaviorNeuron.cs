@@ -92,7 +92,8 @@ internal sealed partial class BehaviorNeuron :
             compile.CompilerEvidenceJson,
             compile.Contract,
             compile.CapabilityGrants,
-            compile.EventAliases);
+            compile.EventAliases,
+            compile.BroadcastEmitAliases);
 
         var written = CanonicalArtifactWriter.Write(envelope);
         var hash = written.Digest.Value;

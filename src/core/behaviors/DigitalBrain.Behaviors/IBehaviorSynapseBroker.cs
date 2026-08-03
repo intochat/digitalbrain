@@ -7,6 +7,8 @@ internal interface IBehaviorSynapseBroker
     Task SendAsync<TNeuron>(string name, Synapse synapse, CancellationToken cancellationToken)
         where TNeuron : INeuron;
 
+    Task EmitAsync(Synapse fact, CancellationToken cancellationToken);
+
     Task<TResponse> SendAsync<TNeuron, TResponse>(
         string name,
         RequestSynapse<TResponse> request,
