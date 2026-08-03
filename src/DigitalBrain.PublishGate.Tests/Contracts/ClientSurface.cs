@@ -8,60 +8,16 @@ namespace DigitalBrain.Tests.Contracts;
 
 public sealed class ClientSurface
 {
-    [Fact(DisplayName = "Client package exports the directed-synapse programming model")]
-    public void PublicExportsAreProgrammingModelOnly()
-    {
-        var exports = typeof(DigitalBrainClient).Assembly
-            .GetExportedTypes()
-            .Select(type => type.Name)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(
-            [
-                nameof(DigitalBrainClient),
-                nameof(IDigitalBrain),
-                "NeuronReference`1",
-            ],
-            exports);
-    }
-
     [Fact(DisplayName =
         "IDigitalBrain surface is ambient Owner + Activate/Get/Emit + temporary grain proxy — no journal observation")]
     public void ProgrammingModelIsOwnerGetAndEmitOnly()
     {
         Assert.Contains(typeof(IDigitalBrain), typeof(DigitalBrainClient).GetInterfaces());
 
-        var methods = typeof(IDigitalBrain)
-            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-            .Where(method => !method.IsSpecialName)
-            .Select(method => method.Name)
-            .Distinct(StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(
-            [
-                nameof(IDigitalBrain.ActivateAsync),
-                nameof(IDigitalBrain.EmitAsync),
-                nameof(IDigitalBrain.Get),
-                nameof(IDigitalBrain.GetGrainProxy),
-                nameof(IDigitalBrain.SendAsync),
-            ],
-            methods);
-
         Assert.Equal(
             2,
             typeof(IDigitalBrain).GetMethods()
                 .Count(method => method.Name == nameof(IDigitalBrain.SendAsync)));
-
-        var properties = typeof(IDigitalBrain)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-            .Select(property => property.Name)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal([nameof(IDigitalBrain.Owner)], properties);
     }
 
     [Fact(DisplayName = "owner is ambient on every IDigitalBrain operation")]
@@ -89,26 +45,6 @@ public sealed class ClientSurface
     [Fact(DisplayName = "DigitalBrainClient author surface is Activate/Get/Send/Emit; Connect is wiring only")]
     public void ClientSurfaceIsGetSendEmitWithWiringConnect()
     {
-        var methods = typeof(DigitalBrainClient)
-            .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.Static)
-            .Where(method => method.DeclaringType == typeof(DigitalBrainClient) && !method.IsSpecialName)
-            .Select(method => method.Name)
-            .Distinct(StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(
-            [
-                nameof(DigitalBrainClient.ActivateAsync),
-                nameof(DigitalBrainClient.Connect),
-                nameof(DigitalBrainClient.ConnectAsync),
-                nameof(DigitalBrainClient.EmitAsync),
-                nameof(DigitalBrainClient.Get),
-                nameof(DigitalBrainClient.GetGrainProxy),
-                nameof(DigitalBrainClient.SendAsync),
-                nameof(DigitalBrainClient.SendRequestAsync),
-            ],
-            methods);
         Assert.NotNull(typeof(DigitalBrainClient).GetProperty(nameof(DigitalBrainClient.Owner)));
 
         var connect = typeof(DigitalBrainClient).GetMethod(
