@@ -13,6 +13,12 @@ internal sealed partial class BehaviorNeuron
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
 
+        // A behavior that subscribes to a fact it emits itself would wake itself without bound.
+        if (CurrentDeliveryCaller == Id)
+        {
+            return;
+        }
+
         var data = LoadOrEmpty();
         if (data.ActiveArtifactHash is null
             || data.ActiveArtifactBytes is null
