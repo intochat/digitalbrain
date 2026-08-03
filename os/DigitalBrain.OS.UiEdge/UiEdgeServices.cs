@@ -18,7 +18,6 @@ internal static class UiEdgeServices
             OwnerSessionJournal.Open(
                 services.GetRequiredService<IGrainFactory>(),
                 services.GetRequiredService<IDigitalBrain>().Owner));
-        services.TryAddSingleton<BrainTopologyReader>();
         services.TryAddSingleton<IBehaviorAuthor>(static services =>
         {
             var unkeyed = services.GetService<IChatClient>();
