@@ -1,0 +1,245 @@
+using DigitalBrain.Abstractions;
+using DigitalBrain.AI.Ollama;
+using DigitalBrain.Behaviors;
+using DigitalBrain.Kernel;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Journaling;
+using Orleans.Serialization;
+
+namespace DigitalBrain.AI;
+
+[GrainType("behaviorauthoring")]
+internal sealed class BehaviorAuthorNeuron :
+    Neuron,
+    IBehaviorAuthoring,
+    IHandle<ProposeBehaviorChangeRequest>,
+    IEmit<BehaviorChangeProposed>
+{
+    internal const string ModelNeuronName = "behavior-author";
+    private const string StateName = "ai.behavior-authoring";
+    private const string DefaultFeatureName = "install";
+    private const int RetainedReceipts = 64;
+
+    private readonly IDurableValue<byte[]> _state;
+    private readonly Serializer<AuthoringData> _states;
+
+    public BehaviorAuthorNeuron()
+    {
+        _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
+        _states = ServiceProvider.GetRequiredService<Serializer<AuthoringData>>();
+    }
+
+    public Task<BehaviorChangeProposed> Propose(ProposeBehaviorChangeRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return ProposeAsync(request, TurnCancellationToken);
+    }
+
+    public async Task HandleAsync(ProposeBehaviorChangeRequest synapse, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        await ReplyAsync(await ProposeAsync(synapse, cancellationToken), cancellationToken);
+    }
+
+    public async Task<BehaviorChangeDecision> Approve(ApproveBehaviorChange command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var data = LoadOrEmpty();
+        if (data.Decisions.TryGetValue(command.CommandId.Value, out var settled))
+        {
+            return settled;
+        }
+
+        if (!data.Proposals.TryGetValue(command.ProposalId, out var proposal)
+            || !string.Equals(proposal.BehaviorId, command.BehaviorId, StringComparison.Ordinal))
+        {
+            return BehaviorChangeDecision.Unknown;
+        }
+
+        if (!command.Approved)
+        {
+            return await SettleAsync(
+                data,
+                command,
+                new BehaviorChangeDecision(proposal with { Status = BehaviorChangeStatus.Rejected }, Applied: false));
+        }
+
+        var behavior = Behavior(command.BehaviorId);
+        var current = Authored.Of(command.BehaviorId, await behavior.Read());
+        var applied = await Author().ApplyApprovedScenarios(
+            new BehaviorChangeRequest(
+                command.BehaviorId,
+                proposal.RequestText,
+                current.FeatureText,
+                current.ProgramSource,
+                current.DisplayName,
+                proposal.ProposedFeatureName),
+            new BehaviorScenarioProposal(
+                proposal.ProposalId,
+                string.IsNullOrWhiteSpace(command.FeatureText)
+                    ? proposal.ProposedFeatureText
+                    : command.FeatureText,
+                proposal.DiffSummary ?? "approved scenario change"),
+            TurnCancellationToken);
+
+        var featureName = string.IsNullOrWhiteSpace(command.FeatureName)
+            ? applied.FeatureName
+            : command.FeatureName;
+
+        // The approval's own command id carries into the revision so a repeated approval lands on
+        // the behavior neuron's receipt instead of proposing the same source twice.
+        await behavior.Propose(new ProposeBehaviorRevision(
+            command.CommandId,
+            applied.ProgramSource,
+            new Dictionary<string, string>(StringComparer.Ordinal) { [featureName] = applied.FeatureText },
+            current.DisplayName,
+            current.Description));
+
+        return await SettleAsync(data, command, new BehaviorChangeDecision(proposal, Applied: true));
+    }
+
+    private async Task<BehaviorChangeProposed> ProposeAsync(
+        ProposeBehaviorChangeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var data = LoadOrEmpty();
+        if (data.Drafts.TryGetValue(request.CommandId.Value, out var drafted))
+        {
+            return new BehaviorChangeProposed(request.CommandId, drafted);
+        }
+
+        var current = Authored.Of(
+            request.BehaviorId,
+            await Behavior(request.BehaviorId).Read().WaitAsync(cancellationToken));
+        var authored = Author().ProposeScenarios(new BehaviorChangeRequest(
+            request.BehaviorId,
+            request.RequestText,
+            current.FeatureText,
+            current.ProgramSource,
+            current.DisplayName,
+            current.FeatureName));
+
+        var proposal = new BehaviorChangeProposal(
+            authored.ProposalId,
+            request.BehaviorId,
+            request.RequestText,
+            authored.ProposedFeatureText,
+            current.FeatureName,
+            BehaviorChangeStatus.AwaitingScenarioApproval,
+            authored.DiffSummary);
+
+        var drafts = Bounded(data.Drafts, request.CommandId.Value, proposal);
+        var proposals = new Dictionary<string, BehaviorChangeProposal>(data.Proposals, StringComparer.Ordinal)
+        {
+            [proposal.ProposalId] = proposal,
+        };
+
+        await SaveAsync(data with { Drafts = drafts, Proposals = proposals });
+        return new BehaviorChangeProposed(request.CommandId, proposal);
+    }
+
+    private async Task<BehaviorChangeDecision> SettleAsync(
+        AuthoringData data,
+        ApproveBehaviorChange command,
+        BehaviorChangeDecision decision)
+    {
+        var proposals = new Dictionary<string, BehaviorChangeProposal>(data.Proposals, StringComparer.Ordinal);
+        proposals.Remove(command.ProposalId);
+
+        await SaveAsync(data with
+        {
+            Proposals = proposals,
+            Decisions = Bounded(data.Decisions, command.CommandId.Value, decision),
+        });
+        return decision;
+    }
+
+    private IBehaviorNeuron Behavior(string behaviorId)
+        => GrainFactory.GetGrain<IBehaviorNeuron>(
+            NeuronId.For<IBehaviorNeuron>(Id.Owner, behaviorId).ToGrainId());
+
+    // The model call rides the AI rail rather than an injected IChatClient, so the authoring turn is
+    // journaled like any other model call and no non-LLM neuron takes a chat client.
+    private IBehaviorAuthor Author()
+        => ServiceProvider.GetService<IBehaviorAuthor>()
+            ?? new BehaviorAuthor(async (messages, cancellationToken) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var response = await GrainFactory
+                    .GetGrain<IGemma4>(NeuronId.For<IGemma4>(Id.Owner, ModelNeuronName).ToGrainId())
+                    .Respond([.. messages]);
+                return response.Text ?? string.Empty;
+            });
+
+    private AuthoringData LoadOrEmpty()
+        => _state.Value is { Length: > 0 } serialized
+            ? _states.Deserialize(serialized)
+            : AuthoringData.Empty;
+
+    private async Task SaveAsync(AuthoringData data)
+    {
+        var previous = _state.Value is { Length: > 0 } serialized ? serialized.ToArray() : [];
+        _state.Value = _states.SerializeToArray(data);
+        try
+        {
+            await WriteStateAsync();
+        }
+        catch
+        {
+            _state.Value = previous;
+            throw;
+        }
+    }
+
+    private static Dictionary<Guid, TReceipt> Bounded<TReceipt>(
+        IReadOnlyDictionary<Guid, TReceipt> receipts,
+        Guid commandId,
+        TReceipt receipt)
+    {
+        var bounded = new Dictionary<Guid, TReceipt>(receipts) { [commandId] = receipt };
+        while (bounded.Count > RetainedReceipts)
+        {
+            bounded.Remove(bounded.Keys.First());
+        }
+
+        return bounded;
+    }
+
+    private sealed record Authored(
+        string FeatureName,
+        string FeatureText,
+        string ProgramSource,
+        string DisplayName,
+        string Description)
+    {
+        public static Authored Of(string behaviorId, BehaviorSnapshot snapshot)
+        {
+            ArgumentNullException.ThrowIfNull(snapshot);
+
+            return new(
+                string.IsNullOrWhiteSpace(snapshot.FeatureName) ? DefaultFeatureName : snapshot.FeatureName,
+                string.IsNullOrWhiteSpace(snapshot.FeatureText) ? string.Empty : snapshot.FeatureText,
+                string.IsNullOrWhiteSpace(snapshot.ProgramSource) ? string.Empty : snapshot.ProgramSource,
+                string.IsNullOrWhiteSpace(snapshot.DisplayName) ? behaviorId : snapshot.DisplayName,
+                string.IsNullOrWhiteSpace(snapshot.Description) ? behaviorId : snapshot.Description);
+        }
+    }
+
+    [GenerateSerializer]
+    internal sealed record AuthoringData
+    {
+        public static AuthoringData Empty { get; } = new();
+
+        [Id(0)]
+        public Dictionary<string, BehaviorChangeProposal> Proposals { get; init; } =
+            new(StringComparer.Ordinal);
+
+        [Id(1)]
+        public Dictionary<Guid, BehaviorChangeProposal> Drafts { get; init; } = [];
+
+        [Id(2)]
+        public Dictionary<Guid, BehaviorChangeDecision> Decisions { get; init; } = [];
+    }
+}

@@ -48,6 +48,13 @@ internal static class AccountEnrichmentTestProgram
         }
         """;
 
+    public const string AuthoredProgramTypeName = "AccountEnrichmentProgramAuthored";
+
+    public static string AuthoredProgramSource { get; } = ProgramSource.Replace(
+        "AccountEnrichmentProgram",
+        AuthoredProgramTypeName,
+        StringComparison.Ordinal);
+
     public static string FeatureText { get; } =
         """
         Feature: account enrichment

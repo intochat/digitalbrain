@@ -43,9 +43,6 @@ public sealed class UiEdgeFixture : DigitalBrainFixture
         builder.Services.AddSingleton(test.Client);
         builder.Services.AddSingleton<IGrainFactory>(test.Cluster.Client);
         builder.Services.AddUiEdgeServices();
-        // L1 UI host has no live model: inject a fixed author so scenario approval still proposes.
-        builder.Services.AddSingleton<IBehaviorAuthor>(_ => new BehaviorAuthor(
-            static (_, _) => Task.FromResult(AccountEnrichmentTestProgram.ProgramSource)));
         configureServices?.Invoke(builder.Services);
 
         var app = builder.Build();
@@ -68,5 +65,12 @@ public sealed class UiEdgeFixture : DigitalBrainFixture
         brain.AddModule<BehaviorsModule>();
         brain.AddModule<TasksModule>();
         brain.AddModule<IntrospectionModule>();
+        // The L1 silo has no live model: the behavior author neuron resolves this scripted author
+        // instead of the Gemma4 rail, so scenario approval still generates a program.
+        brain.ConfigureServiceEdge(
+            static services => services.AddSingleton<IBehaviorAuthor>(_ => new BehaviorAuthor(
+                static (_, _) => Task.FromResult(AccountEnrichmentTestProgram.AuthoredProgramSource))),
+            new object(),
+            static _ => { });
     }
 }

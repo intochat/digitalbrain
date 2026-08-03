@@ -15,7 +15,6 @@
     <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\src\core\behaviors\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
-    <ProjectReference Include="..\..\src\modules\ai\DigitalBrain.Modules.AI\DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="..\..\src\modules\ai\DigitalBrain.Modules.AI.Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
     <ProjectReference Include="..\..\src\core\mcp\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
