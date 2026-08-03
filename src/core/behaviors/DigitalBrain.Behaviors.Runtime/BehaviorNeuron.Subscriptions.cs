@@ -143,7 +143,12 @@ internal sealed partial class BehaviorNeuron
             return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.UnknownSynapse);
         }
 
-        await SaveAsync(WithEmitReceipt(data, command.CommandId, BehaviorFactEmission.Emitted));
+        // The receipt is written only once the fact is durably spoken. EmitFact runs with no
+        // delivery turn, so there is no checkpoint to roll a failed emission back: a receipt
+        // written first survives a throw from the subscriber lookup and answers every retry
+        // "emitted" for a fact that was never spoken. Ordered this way the failure mode is a
+        // duplicate on a crash between the emission and the receipt, which the rail already
+        // tolerates, instead of silent loss under a claim that it succeeded.
         await EmitAsync(fact, correlation);
         await EmitAsync(
             new BehaviorFactEmitted(
@@ -152,6 +157,7 @@ internal sealed partial class BehaviorNeuron
                 data.ActiveArtifactHash,
                 command.EmitAlias),
             correlation);
+        await SaveAsync(WithEmitReceipt(data, command.CommandId, BehaviorFactEmission.Emitted));
         return BehaviorFactEmission.Emitted;
     }
 

@@ -19,6 +19,14 @@ public sealed class BehaviorDispatchBrokerEndpointsTests
     private static readonly NeuronId BoundTask = NeuronId.For<ITask>(BoundOwner, "dispatch-broker-task");
     private static readonly AttemptId BoundAttempt = new(Guid.Parse("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
     private static readonly NeuronId CapabilityTarget = new("behaviors.dispatch-probe", BoundOwner, "probe");
+    private static readonly ProtectedPayloadReference RequestRef = new(
+        Guid.Parse("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+        new DateTimeOffset(2026, 7, 31, 12, 0, 0, TimeSpan.Zero));
+    private static readonly ProtectedPayloadReference ResponseRef = new(
+        Guid.Parse("cccccccccccccccccccccccccccccccc"),
+        null);
+    private const string ValidCredential = "unit-test-dispatch-broker-credential";
+
     [Fact(DisplayName = "a host spends a hop budget and can never widen one")]
     public void ForwardedHopsClampsThenCharges()
     {
@@ -57,14 +65,6 @@ public sealed class BehaviorDispatchBrokerEndpointsTests
                 alias,
                 factJson));
     }
-
-    private static readonly ProtectedPayloadReference RequestRef = new(
-        Guid.Parse("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
-        new DateTimeOffset(2026, 7, 31, 12, 0, 0, TimeSpan.Zero));
-    private static readonly ProtectedPayloadReference ResponseRef = new(
-        Guid.Parse("cccccccccccccccccccccccccccccccc"),
-        null);
-    private const string ValidCredential = "unit-test-dispatch-broker-credential";
 
     [Fact(DisplayName = "dispatch happy path returns only an opaque response reference and preserves exact edge fidelity")]
     public async Task HappyPathReturnsOnlyOpaqueResponseReferenceWithExactEdge()
@@ -381,29 +381,29 @@ public sealed class BehaviorDispatchBrokerEndpointsTests
 
     private sealed class RecordingAccess : IBehaviorCapabilityDispatchAccess
     {
-    public BehaviorId EmittedBehavior { get; private set; }
+        public BehaviorId EmittedBehavior { get; private set; }
 
-    public string? EmittedAlias { get; private set; }
+        public string? EmittedAlias { get; private set; }
 
-    public string EmitOutcome { get; set; } = BehaviorFactEmission.Emitted;
+        public string EmitOutcome { get; set; } = BehaviorFactEmission.Emitted;
 
-    public int? EmittedClaimedHops { get; private set; }
+        public int? EmittedClaimedHops { get; private set; }
 
-    public ValueTask<string> EmitFactAsync(
-        OwnerId owner,
-        NeuronId task,
-        AttemptId attempt,
-        BehaviorId behavior,
-        string emitAlias,
-        string factJson,
-        int? claimedHops,
-        CancellationToken cancellationToken)
-    {
-        EmittedBehavior = behavior;
-        EmittedAlias = emitAlias;
-        EmittedClaimedHops = claimedHops;
-        return ValueTask.FromResult(EmitOutcome);
-    }
+        public ValueTask<string> EmitFactAsync(
+            OwnerId owner,
+            NeuronId task,
+            AttemptId attempt,
+            BehaviorId behavior,
+            string emitAlias,
+            string factJson,
+            int? claimedHops,
+            CancellationToken cancellationToken)
+        {
+            EmittedBehavior = behavior;
+            EmittedAlias = emitAlias;
+            EmittedClaimedHops = claimedHops;
+            return ValueTask.FromResult(EmitOutcome);
+        }
 
         public int DispatchCalls { get; private set; }
         public OwnerId LastOwner { get; private set; }

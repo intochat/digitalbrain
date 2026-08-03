@@ -37,6 +37,11 @@ public sealed record ProbeFactUnwanted([property: Id(0)] string Label) : Synapse
 [Description("Broadcast fact whose subscriber lookup never answers")]
 public sealed record ProbeFactStalled([property: Id(0)] string Label) : Synapse;
 
+[GenerateSerializer]
+[Alias(BroadcastHarness.StalledOnceFactContractId)]
+[Description("Broadcast fact whose subscriber lookup stalls once and then answers")]
+public sealed record ProbeFactStalledOnce([property: Id(0)] string Label) : Synapse;
+
 [GrainType(BroadcastHarness.GrainTypeName)]
 internal sealed class BroadcastProbeEmitterNeuron : Neuron, IBroadcastProbeEmitter
 {
@@ -47,10 +52,12 @@ internal sealed class BroadcastProbeEmitterNeuron : Neuron, IBroadcastProbeEmitt
     public Task BroadcastStalled(string label) => EmitAsync(new ProbeFactStalled(label));
 }
 
-// Delegates every alias to the real registry lookup except the one the bound is proven against.
+// Delegates every alias to the real registry lookup except the two the bound is proven against:
+// one that never answers, and one that stalls its first lookup and answers normally after.
 internal sealed class StallingBroadcastSubscribers : IBroadcastSubscribers
 {
     private readonly BehaviorBroadcastSubscribers _registry;
+    private int _firstStallPending = 1;
 
     public StallingBroadcastSubscribers(IGrainFactory grains) => _registry = new(grains);
 
@@ -59,7 +66,9 @@ internal sealed class StallingBroadcastSubscribers : IBroadcastSubscribers
         string eventAlias,
         CancellationToken cancellationToken)
     {
-        if (string.Equals(eventAlias, BroadcastHarness.StalledFactContractId, StringComparison.Ordinal))
+        if (string.Equals(eventAlias, BroadcastHarness.StalledFactContractId, StringComparison.Ordinal)
+            || (string.Equals(eventAlias, BroadcastHarness.StalledOnceFactContractId, StringComparison.Ordinal)
+                && Interlocked.Exchange(ref _firstStallPending, 0) == 1))
         {
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
         }
@@ -140,6 +149,12 @@ public sealed class BehaviorBroadcastHarnessModule : IModule, ICompiledModule
                         "Broadcast fact whose subscriber lookup never answers",
                         CapabilitySchema.For(typeof(ProbeFactStalled)),
                         Array.Empty<string>()),
+                    new SynapseCapabilityDescriptor(
+                        BroadcastHarness.StalledOnceFactContractId,
+                        1,
+                        "Broadcast fact whose subscriber lookup stalls once and then answers",
+                        CapabilitySchema.For(typeof(ProbeFactStalledOnce)),
+                        Array.Empty<string>()),
                 ]),
             new NeuronCapabilityDescriptor(
                 BroadcastHarness.ActivationEmitterContractId,
@@ -185,6 +200,7 @@ internal static class BroadcastHarness
     public const string DeclaredFactContractId = "behaviors.probe-fact-raised";
     public const string UndeclaredFactContractId = "behaviors.probe-fact-unwanted";
     public const string StalledFactContractId = "behaviors.probe-fact-stalled";
+    public const string StalledOnceFactContractId = "behaviors.probe-fact-stalled-once";
     public const string GrainTypeName = "broadcastprobeemitter";
     public const string ActivationEmitterContractId = "behaviors.activation-pair-emitter";
     public const string ActivationHeadContractId = "behaviors.probe-activation-head";
@@ -277,7 +293,7 @@ internal static class BroadcastHarness
             }
             """;
 
-    public static string EmittingProgram()
+    public static string EmittingProgram(string alias = DeclaredFactContractId)
         => $$"""
             using System.Collections.Generic;
             using System.Threading;
@@ -288,7 +304,7 @@ internal static class BroadcastHarness
 
             public sealed record EmitTrigger(string Label) : Synapse;
 
-            [Alias("{{DeclaredFactContractId}}")]
+            [Alias("{{alias}}")]
             public sealed record ProbeFactRaised(string Label) : Synapse;
 
             public sealed class EmittingProgram : IBehaviorProgram<EmitTrigger>

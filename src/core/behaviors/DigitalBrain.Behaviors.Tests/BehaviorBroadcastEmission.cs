@@ -91,6 +91,38 @@ public sealed class BehaviorBroadcastEmission(BroadcastSubscriptionFixture fixtu
             cancellationToken));
     }
 
+    [Fact(DisplayName = "an emission that fails leaves no receipt behind, so the retry actually speaks", Timeout = 120_000)]
+    public async Task FailedEmissionLeavesNoReceiptSoTheRetrySpeaks()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var speaker = test.Neuron<IBehaviorNeuron>(EmittingBehavior);
+
+        await BehaviorInstall.ActivateAsync(
+            test,
+            speaker,
+            BroadcastHarness.EmittingProgram(BroadcastHarness.StalledOnceFactContractId));
+
+        // The first subscriber lookup for this alias never answers, so EmitAsync throws before
+        // anything reaches the outbox — the exact window a receipt written first would falsify.
+        var command = new EmitBehaviorFact(
+            CommandId.New(),
+            BroadcastHarness.StalledOnceFactContractId,
+            """{"label":"unspoken"}""");
+        _ = await Assert.ThrowsAnyAsync<Exception>(() => speaker.Reference.EmitFact(command));
+
+        Assert.Empty(await speaker.Outgoing.ReadAsync<ProbeFactStalledOnce>(
+            afterSequence: 0,
+            cancellationToken));
+
+        var retried = await speaker.Reference.EmitFact(command);
+
+        Assert.Equal(BehaviorFactEmission.Emitted, retried);
+        Assert.Single(await speaker.Outgoing.ReadAsync<ProbeFactStalledOnce>(
+            afterSequence: 0,
+            cancellationToken));
+    }
+
     [Fact(DisplayName = "a refusal is not receipted, so the same command retried under a healthy condition speaks", Timeout = 120_000)]
     public async Task TransientRefusalDoesNotBlockALaterHealthyRetry()
     {
