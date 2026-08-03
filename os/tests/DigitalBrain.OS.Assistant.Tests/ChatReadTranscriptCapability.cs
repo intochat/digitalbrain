@@ -147,6 +147,56 @@ public sealed class ChatReadTranscriptCapability(OSBehaviorsFixture fixture)
         Assert.Equal(FinalAnswer, answered.Synapse.Text);
     }
 
+    [Fact(Timeout = 10_000, DisplayName =
+        "mid-turn the fixed broker's own conversation calling read-transcript contends with its own occupied turn at the delivery layer, unlike any other conversation making the identical call")]
+    public async Task DefaultConversationsOwnMidTurnCallContendsAtDelivery()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        const string otherAsker = "another-conversation-not-default";
+        const string readTarget = "some-other-conversation";
+
+        // Control: a DIFFERENT conversation making the identical call resolves promptly, because the
+        // delivery target for this capability - the fixed default instance - is a distinct, idle
+        // activation from the one asking.
+        test.Chat().ReplyWithCapabilityCall(
+            ReadTranscriptTool,
+            new Dictionary<string, object?>(StringComparer.Ordinal) { ["chatName"] = readTarget });
+        test.Chat().Reply(FinalAnswer);
+
+        var control = test.Client.GetGrainProxy<IChat>(otherAsker).Send(new SendMessage(
+            CommandId.New(), $"use chat.read-transcript-request on {readTarget}"));
+        await control.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+
+        // Dispatch for this capability always targets the fixed default instance, so when the
+        // ASKING conversation is that instance, the delivery this very call depends on has to queue
+        // behind the turn asking for it - before HandleAsync, before subject==Id/!=Id is even
+        // evaluated.
+        test.Chat().ReplyWithCapabilityCall(
+            ReadTranscriptTool,
+            new Dictionary<string, object?>(StringComparer.Ordinal) { ["chatName"] = readTarget });
+
+        var contended = test.Client.GetGrainProxy<IChat>(DefaultInstance).Send(new SendMessage(
+            CommandId.New(), $"use chat.read-transcript-request on {readTarget}"));
+
+        // A window a small fraction of the delivery attempt's own 30-second bound
+        // (DeliveryPolicy.DeliveryAttemptTimeout) is enough to observe the contended call still
+        // pending, given the control above already proves the identical call resolves near-instantly
+        // when it isn't contended. Waiting out the eventual resolution
+        // (SynapseCapabilityTool.ToolResponseWait, 90s) would only re-confirm bounds already read
+        // from DeliveryPolicy, at a much higher cost, for the same conclusion. Peeking chat/default's
+        // own journal to prove non-delivery directly is not a cheaper alternative: that read is
+        // itself routed through the owner session (INeuron.ReadJournal is not a client entry point),
+        // and session's own outbox-drain turn is what is actually blocked awaiting the very Deliver
+        // call this test is about - the peek would queue behind it too.
+        await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+
+        Assert.Contains(ReadTranscriptTool, test.Chat().LastTools);
+        Assert.False(
+            contended.IsCompleted,
+            "The default conversation's own mid-turn call should still be blocked on delivery contention, unlike the control call above.");
+    }
+
     [Fact(DisplayName =
         "a read-transcript request refuses a turn cap outside the bounds the description advertises, and an unaddressable conversation name")]
     public void ReadTranscriptRequestValidatesItsArguments()
