@@ -91,6 +91,38 @@ public sealed class BehaviorBroadcastEmission(BroadcastSubscriptionFixture fixtu
             cancellationToken));
     }
 
+    [Fact(DisplayName = "a refusal is not receipted, so the same command retried under a healthy condition speaks", Timeout = 120_000)]
+    public async Task TransientRefusalDoesNotBlockALaterHealthyRetry()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var speaker = test.Neuron<IBehaviorNeuron>(EmittingBehavior);
+
+        await BehaviorInstall.ActivateAsync(test, speaker, BroadcastHarness.EmittingProgram());
+
+        // The hop budget is not part of the command identity, so receipting its refusal would
+        // answer every later retry of the same request from a condition that no longer holds.
+        var commandId = CommandId.New();
+        var refused = await speaker.Reference.EmitFact(new EmitBehaviorFact(
+            commandId,
+            BroadcastHarness.DeclaredFactContractId,
+            """{"label":"retried"}""")
+        {
+            HopsRemaining = 0,
+        });
+
+        var emitted = await speaker.Reference.EmitFact(new EmitBehaviorFact(
+            commandId,
+            BroadcastHarness.DeclaredFactContractId,
+            """{"label":"retried"}"""));
+
+        Assert.Equal(BehaviorFactEmission.HopBudgetExhausted, refused);
+        Assert.Equal(BehaviorFactEmission.Emitted, emitted);
+        Assert.Single(await speaker.Outgoing.ReadAsync<ProbeFactRaised>(
+            afterSequence: 0,
+            cancellationToken));
+    }
+
     [Fact(DisplayName = "the same emit command applied twice speaks the fact once", Timeout = 120_000)]
     public async Task RepeatedEmitCommandSpeaksTheFactOnce()
     {

@@ -103,6 +103,7 @@ internal sealed partial class BehaviorNeuron
 
         // A retried request must not speak the fact twice; the receipt is the only thing that
         // can tell a retry apart from a fresh command once the transport has handed it over.
+        // Only a spoken fact is receipted — see RefuseEmitAsync for why refusals are not.
         if (data.EmitReceipts.TryGetValue(command.CommandId.Value, out var receipted))
         {
             return receipted;
@@ -116,7 +117,6 @@ internal sealed partial class BehaviorNeuron
         {
             return await RefuseEmitAsync(
                 command,
-                data,
                 behaviorId,
                 correlation,
                 BehaviorFactEmission.HopBudgetExhausted);
@@ -127,7 +127,7 @@ internal sealed partial class BehaviorNeuron
             || !data.ActivationGateOpen
             || data.RunState is not BehaviorRunState.Running)
         {
-            return await RefuseEmitAsync(command, data, behaviorId, correlation, BehaviorFactEmission.NotRunning);
+            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.NotRunning);
         }
 
         // The signed manifest is the grant. Absent BroadcastEmitAliases means no emit rights.
@@ -135,12 +135,12 @@ internal sealed partial class BehaviorNeuron
         if (manifest.EntryPoints.BroadcastEmitAliases is not { } granted
             || !granted.Contains(command.EmitAlias, StringComparer.Ordinal))
         {
-            return await RefuseEmitAsync(command, data, behaviorId, correlation, BehaviorFactEmission.UndeclaredAlias);
+            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.UndeclaredAlias);
         }
 
         if (!TryReifyFact(command.EmitAlias, command.PayloadJson, out var fact))
         {
-            return await RefuseEmitAsync(command, data, behaviorId, correlation, BehaviorFactEmission.UnknownSynapse);
+            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.UnknownSynapse);
         }
 
         await SaveAsync(WithEmitReceipt(data, command.CommandId, BehaviorFactEmission.Emitted));
@@ -155,14 +155,19 @@ internal sealed partial class BehaviorNeuron
         return BehaviorFactEmission.Emitted;
     }
 
+    // No refusal is receipted, because none of the four reasons is terminal for a request the
+    // command identity can distinguish. The hop budget is not part of that identity at all; the
+    // run state changes; the granted aliases change with the active revision; and the reifiable
+    // synapses change with the deployed module set. Receipting any of them answers a later,
+    // healthy retry from a condition that has since gone away. A refusal spoke nothing, so
+    // re-evaluating it costs at worst a repeated journal record and can never suppress a
+    // legitimate emission — only a spoken fact is terminal, and only that is receipted.
     private async Task<string> RefuseEmitAsync(
         EmitBehaviorFact command,
-        BehaviorData data,
         BehaviorId behaviorId,
         CorrelationId correlation,
         string reason)
     {
-        await SaveAsync(WithEmitReceipt(data, command.CommandId, reason));
         await EmitAsync(
             new BehaviorFactEmitRefused(
                 command.CommandId,
