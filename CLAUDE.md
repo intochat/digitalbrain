@@ -194,3 +194,12 @@ Add only what you have reproduced.
   code: 5` in ~100 ms — indistinguishable at a glance from a catastrophic breakage. Diagnosed via
   `TESTINGPLATFORM_DIAGNOSTIC=1`, which logged the forwarded `--nologo --server dotnettestcli
   --dotnet-test-pipe …`. Drop `--nologo` from `dotnet test` — it is harmless on `dotnet build`.
+- **Gemma4 can reason its way past its own context window without ever answering.** Told directly
+  to call a specific capability tool, it deliberated over which `neuronType`/`neuronName` to pass,
+  never emitted a function call or text, and hit `finishReason: length` at a fixed 4096-token
+  input+output budget — `inputTokenCount:1179, outputTokenCount:2917, totalTokenCount:4096`. The
+  chat journal shows the turn completing (`UserMessaged` → `CapabilityRequested` →
+  `CapabilityCompleted`) with no `AssistantResponded`: the owner gets silence, not an error. Live-
+  reproduced via `POST /chats/{chatName}/messages/stream` against a real `aspire run`, lane
+  1-self-awareness task 6. Keep prompts asking for a specific tool call short; a verbose or
+  qualifying prompt gives a small model room to reason itself out of budget before acting.
