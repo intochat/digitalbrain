@@ -119,13 +119,7 @@ internal sealed partial class BehaviorNeuron
                 new TaskPolicy(1, TimeSpan.Zero, null),
                 Activation: activation));
 
-        var tracked = new List<NeuronId>(data.ActiveTaskIds);
-        if (!tracked.Contains(task))
-        {
-            tracked.Add(task);
-        }
-
-        await SaveAsync(data with { ActiveTaskIds = tracked });
+        await SaveAsync(data with { ActiveTaskIds = TrackWakeTask(data.ActiveTaskIds, task) });
         await EmitAsync(new BehaviorWokeOnFact(
             command,
             behaviorId,
@@ -133,6 +127,29 @@ internal sealed partial class BehaviorNeuron
             task,
             snapshot.ActiveAttempt ?? default));
     }
+
+    // Every wake starts its own one-shot attempt, so tracking them without a bound would grow
+    // durable state forever and make StopRun read one Task grain per fact ever heard. StopRun
+    // prunes settled entries; this bound keeps the newest window between stops, and an evicted
+    // attempt is one StopRun no longer cancels rather than one that keeps running unnoticed.
+    private static List<NeuronId> TrackWakeTask(IReadOnlyList<NeuronId> tracked, NeuronId task)
+    {
+        var next = new List<NeuronId>(tracked);
+        if (next.Contains(task))
+        {
+            return next;
+        }
+
+        next.Add(task);
+        while (next.Count > TrackedWakeTasks)
+        {
+            next.RemoveAt(0);
+        }
+
+        return next;
+    }
+
+    private const int TrackedWakeTasks = 64;
 
     // The delivery's own hop count is the budget it has already spent, so a woken program starts
     // from what is left rather than from a fresh ceiling.
