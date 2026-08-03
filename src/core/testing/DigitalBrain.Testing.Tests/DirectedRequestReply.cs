@@ -6,6 +6,20 @@ namespace DigitalBrain.TestingTests;
 
 public sealed class DirectedRequestReply(TestingFixture fixture)
 {
+    [Fact(DisplayName = "a neuron can send a directed request and await the reply from inside its own turn")]
+    public async Task DirectedRequestRepliesInsideGrainTurn()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var echo = test.Neuron<IEcho>(TestingScenario.Echo);
+
+        var text = await test.Client.GetGrainProxy<IRelay>("relay").RelayEcho(echo.Id.Name, "in-grain ping");
+
+        Assert.Equal("in-grain ping", text);
+        var request = await echo.Incoming.NextAsync<EchoRequest>(cancellationToken);
+        Assert.Equal(ISessionNeuron.ForOwner(test.Client.Owner), request.Caller);
+    }
+
     [Fact(DisplayName = "ReplyAsync targets the request caller with the original correlation")]
     public async Task ReplyTargetsCallerWithOriginalCorrelation()
     {

@@ -1,5 +1,7 @@
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Client;
 using DigitalBrain.Kernel;
 
 namespace DigitalBrain.TestingTests.Harness;
@@ -37,6 +39,35 @@ internal sealed class Echo :
 
     public Task Redeliver(SynapseDelivery delivery)
         => Deliver(delivery);
+}
+
+[ClientEntryPoint]
+[Alias("harness.relay")]
+[Description("Relays a directed request from inside its own grain turn")]
+public partial interface IRelay : INeuron
+{
+    [Alias(nameof(RelayEcho))]
+    Task<string> RelayEcho(string echoName, string text);
+}
+
+internal sealed class Relay : Neuron, IRelay
+{
+    [SuppressMessage(
+        "Usage",
+        "CA1849:Call async methods when in an async method",
+        Justification = "DigitalBrainClient.Connect is the in-silo factory; ConnectAsync is the behavior-worker surface.")]
+    public async Task<string> RelayEcho(string echoName, string text)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(echoName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+
+        var brain = DigitalBrainClient.Connect(GrainFactory, Id.Owner.Value);
+        var response = await brain.SendRequestAsync(
+            NeuronId.For<IEcho>(Id.Owner, echoName),
+            new EchoRequest(text),
+            typeof(EchoResponse));
+        return ((EchoResponse)response).Text;
+    }
 }
 
 [ClientEntryPoint]

@@ -7,6 +7,8 @@ namespace DigitalBrain.Client;
 
 public sealed class DigitalBrainClient : IDigitalBrain
 {
+    private static readonly TimeSpan ResponsePollInterval = TimeSpan.FromMilliseconds(100);
+
     private readonly IGrainFactory _grains;
 
     private DigitalBrainClient(IGrainFactory grains, OwnerId owner)
@@ -137,24 +139,32 @@ public sealed class DigitalBrainClient : IDigitalBrain
 
         var sessionId = ISessionNeuron.ForOwner(Owner);
         var session = Session();
-        var cursor = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, afterSequence: 0);
-        var observer = new ChannelJournalObserver(JournalKind.Incoming);
-        var reference = _grains.CreateObjectReference<IJournalObserver>(observer);
+        var cursor = (await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, afterSequence: 0))
+            .ResumeSequence;
 
-        try
-        {
-            await session.WatchNeuron(sessionId, JournalKind.Incoming, cursor.ResumeSequence, reference);
+        var delivery = await SendValidatedAsync(receiver, request, cancellationToken);
 
-            var delivery = await SendValidatedAsync(receiver, request, cancellationToken);
-            return await WaitForResponseAsync(
-                observer,
-                delivery.CorrelationId,
-                responseType,
-                cancellationToken);
-        }
-        finally
+        while (true)
         {
-            await TeardownWatchAsync(session, sessionId, reference, observer);
+            var read = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, cursor);
+            foreach (var candidate in read.Delta)
+            {
+                if (candidate.CorrelationId == delivery.CorrelationId
+                    && responseType.IsInstanceOfType(candidate.Synapse))
+                {
+                    return candidate.Synapse;
+                }
+            }
+
+            if (read.ResetSnapshot is not null)
+            {
+                throw new InvalidOperationException(
+                    $"The session journal compacted past sequence {cursor} before a "
+                    + $"'{responseType.Name}' response arrived for correlation '{delivery.CorrelationId}'.");
+            }
+
+            cursor = read.ResumeSequence;
+            await Task.Delay(ResponsePollInterval, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -172,56 +182,6 @@ public sealed class DigitalBrainClient : IDigitalBrain
         cancellationToken.ThrowIfCancellationRequested();
         await ActivateAsync(cancellationToken);
         return await Session().Fire(receiver, synapse);
-    }
-
-    private static async Task<Synapse> WaitForResponseAsync(
-        ChannelJournalObserver observer,
-        CorrelationId correlation,
-        Type responseType,
-        CancellationToken cancellationToken)
-    {
-        await foreach (var page in observer.Reads.ReadAllAsync(cancellationToken))
-        {
-            foreach (var delivery in page.Delta)
-            {
-                if (delivery.CorrelationId == correlation
-                    && responseType.IsInstanceOfType(delivery.Synapse))
-                {
-                    return delivery.Synapse;
-                }
-            }
-        }
-
-        throw new InvalidOperationException(
-            $"The session journal watch ended before a '{responseType.Name}' response arrived for correlation '{correlation}'.");
-    }
-
-    [SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "Watch teardown must not mask the awaited response or its failure.")]
-    private static async Task TeardownWatchAsync(
-        ISessionNeuron session,
-        NeuronId sessionId,
-        IJournalObserver reference,
-        ChannelJournalObserver observer)
-    {
-        try
-        {
-            await session.UnwatchNeuron(sessionId, reference);
-        }
-        catch (Exception)
-        {
-        }
-
-        try
-        {
-            // Orleans object references are released by the factory when the client drops them.
-        }
-        finally
-        {
-            observer.Complete();
-        }
     }
 
     private static void RequireDomainNeuronContract(Type neuronType)
