@@ -1,0 +1,149 @@
+using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors.Runtime;
+using DigitalBrain.Tasks;
+using DigitalBrain.Testing;
+using Xunit;
+
+namespace DigitalBrain.Behaviors.Tests;
+
+public sealed class BehaviorBroadcastSubscription(BroadcastSubscriptionFixture fixture)
+{
+    private const string SubscribingBehavior = "com.digitalbrain.subscriber";
+
+    [Fact(DisplayName = "activated behavior declaring an event alias wakes on the module broadcast under one correlation", Timeout = 120_000)]
+    public async Task DeclaredEventAliasWakesTheBehaviorOnBroadcast()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var behavior = test.Neuron<IBehaviorNeuron>(SubscribingBehavior);
+        var emitter = test.Neuron<IBroadcastProbeEmitter>("probe");
+
+        var active = await InstallAsync(test, behavior, BroadcastHarness.SubscribingProgram());
+        Assert.Equal(BehaviorRevisionStatus.Active, active.Status);
+
+        var executedWait = behavior.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
+        await emitter.Reference.BroadcastDeclared("hello");
+
+        var executed = await executedWait;
+        var woken = await behavior.Incoming.NextAsync<ProbeFactRaised>(cancellationToken);
+
+        Assert.Equal(active.ActiveArtifactHash, executed.Synapse.ArtifactHash);
+        Assert.Equal("hello", woken.Synapse.Label);
+        Assert.Equal(emitter.Id, woken.Caller);
+        Assert.Equal(woken.CorrelationId, executed.CorrelationId);
+    }
+
+    [Fact(DisplayName = "a broadcast the manifest does not declare never reaches the behavior", Timeout = 120_000)]
+    public async Task UndeclaredBroadcastNeverReachesTheBehavior()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var behavior = test.Neuron<IBehaviorNeuron>(SubscribingBehavior);
+        var emitter = test.Neuron<IBroadcastProbeEmitter>("probe");
+
+        await InstallAsync(test, behavior, BroadcastHarness.SubscribingProgram());
+
+        var executedWait = behavior.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
+        await emitter.Reference.BroadcastUndeclared("ignored");
+        await emitter.Reference.BroadcastDeclared("observed");
+        _ = await executedWait;
+
+        var unwanted = await behavior.Incoming.ReadAsync<ProbeFactUnwanted>(
+            cancellationToken: cancellationToken);
+        var declared = await behavior.Incoming.ReadAsync<ProbeFactRaised>(
+            cancellationToken: cancellationToken);
+
+        Assert.Empty(unwanted);
+        Assert.Single(declared);
+        Assert.Equal("observed", declared[0].Synapse.Label);
+    }
+
+    [Fact(DisplayName = "stopping a behavior unregisters its subscriptions; restarting restores them", Timeout = 120_000)]
+    public async Task StoppingUnregistersSubscriptionsAndStartingRestoresThem()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var behavior = test.Neuron<IBehaviorNeuron>(SubscribingBehavior);
+        var emitter = test.Neuron<IBroadcastProbeEmitter>("probe");
+
+        await InstallAsync(test, behavior, BroadcastHarness.SubscribingProgram());
+        await behavior.Reference.StopRun(new StopBehavior(CommandId.New()));
+
+        await emitter.Reference.BroadcastDeclared("while-stopped");
+        await behavior.Reference.StartRun(new StartBehavior(CommandId.New()));
+
+        var executedWait = behavior.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
+        await emitter.Reference.BroadcastDeclared("after-restart");
+        _ = await executedWait;
+
+        var delivered = await behavior.Incoming.ReadAsync<ProbeFactRaised>(
+            cancellationToken: cancellationToken);
+
+        Assert.Single(delivered);
+        Assert.Equal("after-restart", delivered[0].Synapse.Label);
+    }
+
+    [Fact(DisplayName = "a trigger alias the active catalog never broadcasts grants no subscription", Timeout = 120_000)]
+    public async Task TriggerAliasOutsideTheCatalogGrantsNoSubscription()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var subscriber = test.Neuron<IBehaviorNeuron>(SubscribingBehavior);
+        var outsider = test.Neuron<IBehaviorNeuron>("com.digitalbrain.outsider");
+        var emitter = test.Neuron<IBroadcastProbeEmitter>("probe");
+
+        await InstallAsync(test, subscriber, BroadcastHarness.SubscribingProgram());
+        await InstallAsync(test, outsider, BroadcastHarness.SubscribingProgram("behaviors.no-such-fact"));
+
+        var executedWait = subscriber.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
+        await emitter.Reference.BroadcastDeclared("only-subscriber");
+        _ = await executedWait;
+
+        Assert.Empty(await outsider.Incoming.ReadAsync<ProbeFactRaised>(cancellationToken: cancellationToken));
+    }
+
+    private static async Task<BehaviorSnapshot> InstallAsync(
+        TestBrain test,
+        TestNeuron<IBehaviorNeuron> behavior,
+        string program)
+    {
+        var proposed = await behavior.Reference.Propose(new ProposeBehaviorRevision(
+            CommandId.New(),
+            program,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["install"] = BroadcastHarness.SubscribingFeature,
+            },
+            "Subscriber",
+            "Subscribing behavior"));
+        Assert.Equal(BehaviorRevisionStatus.Proposed, proposed.Status);
+
+        await behavior.Reference.RunTests(new RunBehaviorTests(CommandId.New(), proposed.ProposedArtifactHash!));
+
+        var approval = new BehaviorRevisionApproval(
+            Guid.NewGuid(),
+            CommandId.New(),
+            proposed.ProposedArtifactHash!,
+            ISessionNeuron.ForOwner(test.Client.Owner),
+            test.Clock.UtcNow);
+        var deliveryWait = behavior.Incoming.NextAsync<BehaviorRevisionApproval>(
+            TestContext.Current.CancellationToken);
+        await test.Client.SendAsync(behavior.Id, approval, TestContext.Current.CancellationToken);
+        _ = await deliveryWait;
+        await behavior.Reference.Approve(approval);
+
+        return await behavior.Reference.Activate(
+            new ActivateBehaviorRevision(CommandId.New(), proposed.ProposedArtifactHash!));
+    }
+}
+
+public sealed class BroadcastSubscriptionFixture : DigitalBrainFixture
+{
+    protected override void Configure(DigitalBrainTestBuilder brain)
+    {
+        ArgumentNullException.ThrowIfNull(brain);
+        brain.AddModule<BehaviorsModule>();
+        brain.AddModule<TasksModule>();
+        brain.AddModule<BehaviorBroadcastHarnessModule>();
+    }
+}

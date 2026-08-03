@@ -137,6 +137,51 @@ internal static class BehaviorInputContractCompiler
         return CapabilityGrantDerivationResult.Ok(ordered);
     }
 
+    public static EventAliasDerivationResult DeriveEventAliases(
+        string programSource,
+        ImmutableArray<MetadataReference> references,
+        ActiveCapabilityCatalog? catalog)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(programSource);
+
+        var tree = CSharpSyntaxTree.ParseText(
+            programSource,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            path: "Behavior.cs",
+            encoding: Encoding.UTF8);
+
+        var compilation = CSharpCompilation.Create(
+            assemblyName: "Behavior.EventAliases",
+            syntaxTrees: [tree],
+            references: references,
+            options: new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary,
+                    optimizationLevel: OptimizationLevel.Release,
+                    deterministic: true,
+                    nullableContextOptions: NullableContextOptions.Enable)
+                .WithMetadataImportOptions(MetadataImportOptions.All));
+
+        var model = compilation.GetSemanticModel(tree);
+        var root = tree.GetCompilationUnitRoot();
+        var aliasAttribute = compilation.GetTypeByMetadataName(AliasAttributeMetadataName);
+        var triggers = FindDistinctProgramTriggers(root, model, compilation);
+
+        if (triggers.Length != 1 || !TryContractId(triggers[0], aliasAttribute, out var alias))
+        {
+            return EventAliasDerivationResult.Ok([]);
+        }
+
+        // An alias is contract identity first: it grants a subscription only when the active
+        // catalog says some module actually broadcasts that fact.
+        var broadcast = catalog is not null
+            && catalog.Modules
+                .SelectMany(static module => module.Neurons)
+                .SelectMany(static neuron => neuron.Emitted)
+                .Any(synapse => string.Equals(synapse.ContractId, alias, StringComparison.Ordinal));
+
+        return EventAliasDerivationResult.Ok(broadcast ? [alias] : []);
+    }
+
     private static bool IsBehaviorNeuronSendAsync(IMethodSymbol? method, INamedTypeSymbol neuronReferenceDefinition)
     {
         if (method is null
@@ -1276,6 +1321,18 @@ internal static class BehaviorInputContractCompiler
         string Name,
         IReadOnlyList<TypeSyntax> Cases,
         bool HasDefaultOrNullCase);
+}
+
+internal sealed record EventAliasDerivationResult(
+    bool Succeeded,
+    string Diagnostics,
+    IReadOnlyList<string> EventAliases)
+{
+    public static EventAliasDerivationResult Ok(IReadOnlyList<string> eventAliases)
+        => new(true, string.Empty, eventAliases);
+
+    public static EventAliasDerivationResult Fail(string diagnostics)
+        => new(false, diagnostics, Array.Empty<string>());
 }
 
 internal sealed record CapabilityGrantDerivationResult(

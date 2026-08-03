@@ -223,7 +223,8 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
             compile.AssemblyBytes,
             compile.CompilerEvidenceJson,
             compile.Contract!,
-            grants);
+            grants,
+            compile.EventAliases);
 
         var written = CanonicalArtifactWriter.Write(envelope);
         return new CompiledArtifact(

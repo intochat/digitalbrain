@@ -25,6 +25,7 @@ public sealed partial class BehaviorsModule
         builder.Services.TryAddSingleton<IBehaviorProtectedTriggerAccess, GrainBehaviorProtectedTriggerAccess>();
         builder.Services.TryAddSingleton<IBehaviorTaskOperationAccess, GrainBehaviorTaskOperationAccess>();
         builder.Services.TryAddSingleton<IBehaviorCapabilityDispatchAccess, GrainBehaviorCapabilityDispatchAccess>();
+        builder.Services.TryAddSingleton<DigitalBrain.Kernel.IBroadcastSubscribers, BehaviorBroadcastSubscribers>();
         builder.Services.TryAddSingleton<IUserActionCustody>(static provider =>
         {
             var time = provider.GetKeyedService<TimeProvider>(DigitalBrain.Kernel.NeuronTime.ServiceKey)

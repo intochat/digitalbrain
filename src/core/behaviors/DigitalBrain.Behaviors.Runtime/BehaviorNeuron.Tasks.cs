@@ -214,6 +214,7 @@ internal sealed partial class BehaviorNeuron
             RunState = BehaviorRunState.Stopping,
         };
         await SaveAsync(data);
+        await PublishSubscriptionsAsync(data);
         await EmitAsync(new BehaviorActivationGateClosed(command.CommandId, behaviorId));
         await EmitAsync(new BehaviorStopping(command.CommandId, behaviorId));
 
@@ -300,6 +301,7 @@ internal sealed partial class BehaviorNeuron
         data = WithReceipt(data, command.CommandId, Snapshot(data));
         await SaveAsync(data);
         PublishExactCapability(data);
+        await PublishSubscriptionsAsync(data);
         await EmitAsync(new BehaviorStarted(command.CommandId, BehaviorIdOfName()));
         return Snapshot(data);
     }

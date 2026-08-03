@@ -128,10 +128,12 @@ internal sealed partial class BehaviorNeuron
         ReadOnlyMemory<byte> assemblyBytes,
         string compilerEvidenceJson,
         BehaviorContractManifest contract,
-        IReadOnlyList<BehaviorCapabilityGrant> capabilityGrants)
+        IReadOnlyList<BehaviorCapabilityGrant> capabilityGrants,
+        IReadOnlyList<string> eventAliases)
     {
         ArgumentNullException.ThrowIfNull(contract);
         ArgumentNullException.ThrowIfNull(capabilityGrants);
+        ArgumentNullException.ThrowIfNull(eventAliases);
         if (contract.Cases.Count == 0
             || string.IsNullOrWhiteSpace(contract.OneOfSchemaJson)
             || contract.OneOfSchemaJson.Contains("\"oneOf\":[]", StringComparison.Ordinal))
@@ -149,7 +151,7 @@ internal sealed partial class BehaviorNeuron
                 displayName,
                 description,
                 new BehaviorEntryPoints(
-                    [],
+                    eventAliases,
                     contract),
                 scenarios,
                 overview,

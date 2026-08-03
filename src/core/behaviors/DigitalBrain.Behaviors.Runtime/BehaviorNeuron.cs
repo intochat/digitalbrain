@@ -91,7 +91,8 @@ internal sealed partial class BehaviorNeuron :
             compile.AssemblyBytes,
             compile.CompilerEvidenceJson,
             compile.Contract,
-            compile.CapabilityGrants);
+            compile.CapabilityGrants,
+            compile.EventAliases);
 
         var written = CanonicalArtifactWriter.Write(envelope);
         var hash = written.Digest.Value;
@@ -322,6 +323,7 @@ internal sealed partial class BehaviorNeuron :
         data = WithReceipt(data, command.CommandId, Snapshot(data));
         await SaveAsync(data);
         PublishExactCapability(data);
+        await PublishSubscriptionsAsync(data);
         await EmitAsync(new BehaviorRevisionActivated(
             command.CommandId,
             behaviorId,
@@ -378,6 +380,7 @@ internal sealed partial class BehaviorNeuron :
         data = WithReceipt(data, command.CommandId, Snapshot(data));
         await SaveAsync(data);
         PublishExactCapability(data);
+        await PublishSubscriptionsAsync(data);
         await EmitAsync(new BehaviorRevisionRolledBack(
             command.CommandId,
             behaviorId,

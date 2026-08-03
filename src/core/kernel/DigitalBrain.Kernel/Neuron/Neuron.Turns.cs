@@ -33,7 +33,11 @@ public abstract partial class Neuron
     private Task DispatchAsync(Synapse synapse, CancellationToken cancellationToken)
         => SynapseDispatch.HandlersFor(GetType()).TryGetValue(synapse.GetType(), out var handler)
             ? handler(this, synapse, cancellationToken)
-            : Task.CompletedTask;
+            : OnUnboundSynapseAsync(synapse, cancellationToken);
+
+    // Runs inside the delivery turn, so anything emitted here inherits the delivery correlation.
+    protected virtual Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
+        => Task.CompletedTask;
 
     private void FlushOutgoing()
     {

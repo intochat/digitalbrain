@@ -24,9 +24,21 @@ public abstract partial class Neuron
 
         var receivers = catalog.HandlerGrainTypes(synapseType)
             .Select(grainType => NeuronId.BroadcastReceiver(grainType, Id.Owner, correlation))
+            .Concat(await SubscribedReceiversAsync(synapse))
             .ToArray();
 
         await FireAsync(synapse, receivers, correlation);
+    }
+
+    private async Task<IReadOnlyCollection<NeuronId>> SubscribedReceiversAsync(Synapse synapse)
+    {
+        var subscribers = ServiceProvider.GetService<IBroadcastSubscribers>();
+        if (subscribers is null || SynapseAlias.Of(synapse.GetType()) is not { } alias)
+        {
+            return [];
+        }
+
+        return await subscribers.ReceiversFor(Id.Owner, alias, CancellationToken.None);
     }
 
     private Task<SynapseDelivery> FireAsync(Synapse synapse, NeuronId[] receivers, CorrelationId? correlation = null)
