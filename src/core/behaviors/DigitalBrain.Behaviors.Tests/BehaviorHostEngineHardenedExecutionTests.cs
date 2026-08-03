@@ -4,7 +4,10 @@ using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Host;
 using DigitalBrain.Behaviors.Manifest;
 using DigitalBrain.Behaviors.Runtime;
+using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Hosting;
 using Xunit;
 
 namespace DigitalBrain.Behaviors.Tests;
@@ -143,6 +146,44 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
         Assert.Equal(0, factory.Client.LoadCount);
     }
 
+    [Fact(DisplayName = "a bound attempt drives an IBehaviorProgram artifact and its context.EmitAsync reaches the broker")]
+    public async Task BoundAttemptDrivesProgramInterfaceAndItsEmitReachesTheBroker()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var artifact = CompileCanonicalArtifact(
+            EmittingProgramInterfaceSource(),
+            grants: [],
+            FactCatalog());
+        var factory = new RecordingBrokerFactory();
+        var engine = new BehaviorHostEngine(new AcceptingTrust(), factory);
+
+        await DeployAndActivateAsync(engine, artifact, cancellationToken);
+
+        var triggerRef = new ProtectedPayloadReference(
+            Guid.Parse("cccccccc-dddd-eeee-ffff-000000000003"),
+            DateTimeOffset.UtcNow.AddHours(1));
+        factory.Client.Seed(triggerRef, Encoding.UTF8.GetBytes("""{"Label":"spoken"}"""));
+
+        var outcome = await engine.ExecuteAsync(
+            new BehaviorHostExecuteCommand(
+                Metadata(artifact.Digest.Value),
+                artifact.Digest.Value,
+                TaskNeuron,
+                Attempt,
+                "HardenedEmitTrigger",
+                triggerRef,
+                Capabilities: [],
+                DateTimeOffset.UtcNow,
+                WorkerNeuron),
+            cancellationToken);
+
+        Assert.True(outcome.Succeeded, outcome.Outcome);
+        var emission = Assert.Single(factory.Client.Emissions);
+        Assert.Equal(Behavior, emission.Behavior);
+        Assert.Equal(FactContractId, emission.Alias);
+        Assert.Contains("spoken", emission.FactJson, StringComparison.Ordinal);
+    }
+
     [Fact(DisplayName = "deploy rejects assembly bytes that differ from the canonical artifact embedded Behavior.dll")]
     public async Task DeployRejectsAssemblyBytesDifferingFromCanonicalEmbeddedBehaviorDll()
     {
@@ -204,9 +245,11 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
 
     private static CompiledArtifact CompileCanonicalArtifact(
         string program,
-        IReadOnlyList<BehaviorCapabilityGrant> grants)
+        IReadOnlyList<BehaviorCapabilityGrant> grants,
+        ActiveCapabilityCatalog? catalog = null)
     {
-        var compile = new BehaviorCompiler().Compile(program, Behavior);
+        var compile = (catalog is null ? new BehaviorCompiler() : new BehaviorCompiler(catalog))
+            .Compile(program, Behavior);
         Assert.True(compile.Succeeded, compile.Diagnostics);
         Assert.NotNull(compile.Contract);
 
@@ -224,7 +267,8 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
             compile.CompilerEvidenceJson,
             compile.Contract!,
             grants,
-            compile.EventAliases);
+            compile.EventAliases,
+            compile.BroadcastEmitAliases);
 
         var written = CanonicalArtifactWriter.Write(envelope);
         return new CompiledArtifact(
@@ -278,6 +322,75 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
             }
             """;
 
+    private const string FactContractId = "test.hardened-fact";
+
+    private static string EmittingProgramInterfaceSource()
+        => $$"""
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DigitalBrain.Abstractions;
+            using DigitalBrain.Behaviors;
+            using Orleans;
+
+            public sealed record HardenedEmitTrigger(string Label) : Synapse;
+
+            [Alias("{{FactContractId}}")]
+            public sealed record HardenedFact(string Label) : Synapse;
+
+            public sealed class HardenedEmittingProgram : IBehaviorProgram<HardenedEmitTrigger>
+            {
+                public async ValueTask ExecuteAsync(
+                    HardenedEmitTrigger trigger,
+                    IBehaviorContext context,
+                    CancellationToken cancellationToken)
+                {
+                    await context.EmitAsync(new HardenedFact(trigger.Label), cancellationToken);
+                }
+            }
+            """;
+
+    private static ActiveCapabilityCatalog FactCatalog()
+        => ActiveCapabilityCatalog.Create(
+        [
+            new FactCatalogModule(
+                new ModuleId("catalog.hardened-facts"),
+                new CapabilityManifest(
+                    new ModuleId("catalog.hardened-facts"),
+                    "1.0.0",
+                    "Hardened fact catalog",
+                    [],
+                    [
+                        new NeuronCapabilityDescriptor(
+                            "test.hardened-source",
+                            "Neuron that broadcasts the hardened fact",
+                            "default",
+                            [],
+                            [
+                                new SynapseCapabilityDescriptor(
+                                    FactContractId,
+                                    1,
+                                    "Hardened broadcast fact",
+                                    """{"type":"object","properties":{"Label":{"type":"string"}}}""",
+                                    []),
+                            ]),
+                    ])),
+        ]);
+
+    private sealed class FactCatalogModule(ModuleId id, CapabilityManifest capabilities) : ICompiledModule
+    {
+        public ModuleId Id { get; } = id;
+
+        public CapabilityManifest Capabilities { get; } = capabilities;
+
+        public void PrepareSerialization(IServiceCollection services)
+        {
+        }
+
+        public void Activate(ISiloBuilder builder)
+        {
+        }
+    }
+
     private sealed record CompiledArtifact(
         byte[] Bytes,
         BehaviorArtifactDigest Digest,
@@ -328,12 +441,18 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
 
     private sealed class RecordingBrokerClient : IBehaviorHostBrokerClient
     {
-    public ValueTask EmitFactAsync(
-        BehaviorId behavior,
-        string emitAlias,
-        ReadOnlyMemory<byte> factJson,
-        CancellationToken cancellationToken)
-        => ValueTask.CompletedTask;
+        public List<(BehaviorId Behavior, string Alias, string FactJson)> Emissions { get; } = [];
+
+        public ValueTask EmitFactAsync(
+            BehaviorId behavior,
+            string emitAlias,
+            ReadOnlyMemory<byte> factJson,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Emissions.Add((behavior, emitAlias, Encoding.UTF8.GetString(factJson.Span)));
+            return ValueTask.CompletedTask;
+        }
 
         private readonly Dictionary<Guid, byte[]> payloads = new();
 
