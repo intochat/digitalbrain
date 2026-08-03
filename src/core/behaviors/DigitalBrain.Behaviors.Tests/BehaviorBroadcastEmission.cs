@@ -59,6 +59,32 @@ public sealed class BehaviorBroadcastEmission(BroadcastSubscriptionFixture fixtu
         Assert.Empty(await subscriber.Incoming.ReadAsync<ProbeFactRaised>(cancellationToken: cancellationToken));
     }
 
+    [Fact(DisplayName = "the same emit command applied twice speaks the fact once", Timeout = 120_000)]
+    public async Task RepeatedEmitCommandSpeaksTheFactOnce()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var emitter = test.Neuron<IBehaviorNeuron>(EmittingBehavior);
+
+        await BehaviorInstall.ActivateAsync(test, emitter, BroadcastHarness.EmittingProgram());
+
+        var command = new EmitBehaviorFact(
+            CommandId.New(),
+            BroadcastHarness.DeclaredFactContractId,
+            """{"label":"once"}""");
+        var first = await emitter.Reference.EmitFact(command);
+        var second = await emitter.Reference.EmitFact(command);
+
+        Assert.Equal(BehaviorFactEmission.Emitted, first);
+        Assert.Equal(BehaviorFactEmission.Emitted, second);
+        Assert.Single(await emitter.Outgoing.ReadAsync<ProbeFactRaised>(
+            afterSequence: 0,
+            cancellationToken));
+        Assert.Single(await emitter.Outgoing.ReadAsync<BehaviorFactEmitted>(
+            afterSequence: 0,
+            cancellationToken));
+    }
+
     [Fact(DisplayName = "emissions with neither a delivery turn nor a client entry bind to one correlation", Timeout = 120_000)]
     public async Task ActivationEmissionsShareOneBoundCorrelation()
     {

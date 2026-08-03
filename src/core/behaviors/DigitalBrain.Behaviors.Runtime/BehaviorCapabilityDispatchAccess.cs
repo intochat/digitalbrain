@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
@@ -156,8 +158,24 @@ internal sealed class GrainBehaviorCapabilityDispatchAccess : IBehaviorCapabilit
         // The grant itself is re-verified against the signed manifest inside EmitFact.
         return await grains
             .GetGrain<IBehaviorNeuron>(new NeuronId("behaviorneuron", owner, behavior.Value).ToGrainId())
-            .EmitFact(new EmitBehaviorFact(CommandId.New(), emitAlias, factJson))
+            .EmitFact(new EmitBehaviorFact(
+                EmitCommandId(task, attempt, emitAlias, factJson),
+                emitAlias,
+                factJson))
             .ConfigureAwait(false);
+    }
+
+    // A fresh id per request made every retried POST a second emission. The request itself is
+    // the identity, so the same request reaches EmitFact under the same command and receipts.
+    internal static CommandId EmitCommandId(
+        NeuronId task,
+        AttemptId attempt,
+        string emitAlias,
+        string factJson)
+    {
+        var material = Encoding.UTF8.GetBytes(
+            $"{task}|{attempt.Value:N}|{emitAlias}|{factJson}");
+        return new CommandId(new Guid(SHA256.HashData(material).AsSpan(0, 16)));
     }
 
     private static ActiveModuleContractTypeMap ResolveTypeMap(IGrainFactory grains)

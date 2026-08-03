@@ -206,6 +206,20 @@ internal sealed partial class BehaviorNeuron
         return data with { Receipts = receipts };
     }
 
+    private static BehaviorData WithEmitReceipt(BehaviorData data, CommandId commandId, string outcome)
+    {
+        var receipts = new Dictionary<Guid, string>(data.EmitReceipts)
+        {
+            [commandId.Value] = outcome,
+        };
+        while (receipts.Count > 64)
+        {
+            receipts.Remove(receipts.Keys.First());
+        }
+
+        return data with { EmitReceipts = receipts };
+    }
+
     private async Task<SynapseDelivery> ApprovalEvidenceAsync(BehaviorRevisionApproval approval)
     {
         var incoming = await ReadJournal(JournalKind.Incoming, afterSequence: 0);
@@ -254,6 +268,7 @@ internal sealed partial class BehaviorNeuron
             ActiveTaskIds = [],
             RegisteredBindings = [],
             Receipts = new Dictionary<Guid, BehaviorSnapshot>(),
+            EmitReceipts = new Dictionary<Guid, string>(),
         };
 
         [Id(0)]
@@ -345,6 +360,10 @@ internal sealed partial class BehaviorNeuron
 
         [Id(29)]
         public List<BehaviorRegisteredBinding> RegisteredBindings { get; init; } = [];
+
+        // Receipts carries snapshots and cannot hold an emit outcome, so emissions get a sibling.
+        [Id(30)]
+        public Dictionary<Guid, string> EmitReceipts { get; init; } = [];
     }
 
     [GenerateSerializer]

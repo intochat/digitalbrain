@@ -19,6 +19,32 @@ public sealed class BehaviorDispatchBrokerEndpointsTests
     private static readonly NeuronId BoundTask = NeuronId.For<ITask>(BoundOwner, "dispatch-broker-task");
     private static readonly AttemptId BoundAttempt = new(Guid.Parse("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
     private static readonly NeuronId CapabilityTarget = new("behaviors.dispatch-probe", BoundOwner, "probe");
+    [Fact(DisplayName = "an emit request is its own command identity, so a retried request cannot emit twice")]
+    public void EmitCommandIdIsDerivedFromTheRequest()
+    {
+        var alias = "behaviors.probe-fact-raised";
+        var factJson = """{"label":"once"}""";
+        var retried = GrainBehaviorCapabilityDispatchAccess.EmitCommandId(
+            BoundTask,
+            BoundAttempt,
+            alias,
+            factJson);
+
+        Assert.Equal(
+            retried,
+            GrainBehaviorCapabilityDispatchAccess.EmitCommandId(BoundTask, BoundAttempt, alias, factJson));
+        Assert.NotEqual(
+            retried,
+            GrainBehaviorCapabilityDispatchAccess.EmitCommandId(BoundTask, BoundAttempt, alias, """{"label":"twice"}"""));
+        Assert.NotEqual(
+            retried,
+            GrainBehaviorCapabilityDispatchAccess.EmitCommandId(
+                BoundTask,
+                new AttemptId(Guid.Parse("cccccccccccccccccccccccccccccccc")),
+                alias,
+                factJson));
+    }
+
     private static readonly ProtectedPayloadReference RequestRef = new(
         Guid.Parse("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         new DateTimeOffset(2026, 7, 31, 12, 0, 0, TimeSpan.Zero));

@@ -101,6 +101,13 @@ internal sealed partial class BehaviorNeuron
         var data = LoadOrEmpty();
         var behaviorId = BehaviorIdOfName();
 
+        // A retried request must not speak the fact twice; the receipt is the only thing that
+        // can tell a retry apart from a fresh command once the transport has handed it over.
+        if (data.EmitReceipts.TryGetValue(command.CommandId.Value, out var receipted))
+        {
+            return receipted;
+        }
+
         // One correlation ties the spoken fact to its audit record and to any refusal, instead of
         // each emission resolving its own the moment no entry scope supplies one.
         var correlation = ResolveEmissionCorrelation();
@@ -110,7 +117,7 @@ internal sealed partial class BehaviorNeuron
             || !data.ActivationGateOpen
             || data.RunState is not BehaviorRunState.Running)
         {
-            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.NotRunning);
+            return await RefuseEmitAsync(command, data, behaviorId, correlation, BehaviorFactEmission.NotRunning);
         }
 
         // The signed manifest is the grant. Absent BroadcastEmitAliases means no emit rights.
@@ -118,14 +125,15 @@ internal sealed partial class BehaviorNeuron
         if (manifest.EntryPoints.BroadcastEmitAliases is not { } granted
             || !granted.Contains(command.EmitAlias, StringComparer.Ordinal))
         {
-            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.UndeclaredAlias);
+            return await RefuseEmitAsync(command, data, behaviorId, correlation, BehaviorFactEmission.UndeclaredAlias);
         }
 
         if (!TryReifyFact(command.EmitAlias, command.PayloadJson, out var fact))
         {
-            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.UnknownSynapse);
+            return await RefuseEmitAsync(command, data, behaviorId, correlation, BehaviorFactEmission.UnknownSynapse);
         }
 
+        await SaveAsync(WithEmitReceipt(data, command.CommandId, BehaviorFactEmission.Emitted));
         await EmitAsync(fact, correlation);
         await EmitAsync(
             new BehaviorFactEmitted(
@@ -139,10 +147,12 @@ internal sealed partial class BehaviorNeuron
 
     private async Task<string> RefuseEmitAsync(
         EmitBehaviorFact command,
+        BehaviorData data,
         BehaviorId behaviorId,
         CorrelationId correlation,
         string reason)
     {
+        await SaveAsync(WithEmitReceipt(data, command.CommandId, reason));
         await EmitAsync(
             new BehaviorFactEmitRefused(
                 command.CommandId,
