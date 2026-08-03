@@ -67,13 +67,23 @@ public abstract partial class Neuron
     // Emissions made outside a delivery turn start at depth zero, which is how a chain of them
     // restarts a budget the kernel believes it is counting. Stamping the depth explicitly lets a
     // caller that knows what caused the emission keep the count running across that gap.
+    //
+    // Borrowing _handlingDepth for the call rests on two Orleans scheduling properties. First,
+    // ReadJournal is the only [AlwaysInterleave] entry point a neuron has and it neither reads nor
+    // writes the depth, so the one call that can run inside another turn cannot observe the borrow.
+    // Second, RegisterGrainTimer drains take ordinary non-reentrant turns, so a drain cannot start
+    // while this one holds the grain. If either stops holding, the repair is to thread the depth
+    // through FireAsync rather than to borrow the field.
     protected async Task EmitAtDepthAsync(Synapse synapse, CorrelationId correlation, int deliveryDepth)
     {
         ArgumentNullException.ThrowIfNull(synapse);
-        ArgumentOutOfRangeException.ThrowIfNegative(deliveryDepth);
+
+        // FireAsync stamps _handlingDepth + 1, so the name is only true when the borrow is one less
+        // than the depth asked for. A spoken fact is a delivery, and the shallowest delivery is one.
+        ArgumentOutOfRangeException.ThrowIfLessThan(deliveryDepth, 1);
 
         var restored = _handlingDepth;
-        _handlingDepth = Math.Max(deliveryDepth - 1, 0);
+        _handlingDepth = deliveryDepth - 1;
         try
         {
             await EmitAsync(synapse, correlation);

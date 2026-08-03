@@ -410,6 +410,11 @@ internal sealed partial class BehaviorNeuron :
             new BehaviorRevisionId(data.ActiveArtifactHash),
             BehaviorExecutionId.New());
 
+        // Awaited inside this neuron's own turn, which is only safe because the legacy loader hands
+        // the program a HostBehaviorContext with no broker, so context.EmitAsync throws instead of
+        // calling back into EmitFact on this grain. Give that overload a broker and this call
+        // reintroduces the reentrancy deadlock the wake rail was built to remove: the wake path
+        // ends its turn at ITask.Start precisely so the program runs on another grain's turn.
         var outcome = await _executor.ExecuteLegacyAsync(
             new LegacyBehaviorExecutionRequest(
                 metadata,

@@ -232,10 +232,12 @@ internal sealed partial class BehaviorNeuron
         // tolerates, instead of silent loss under a claim that it succeeded.
         // The spoken fact carries the budget it was charged as its delivery depth, so the next
         // behavior woken by it inherits what is left instead of a fresh ceiling.
+        // A behavior emitting on a full budget has spent nothing, but the fact it speaks is still
+        // one delivery deep, so the floor is one rather than the zero the arithmetic gives.
         await EmitAtDepthAsync(
             fact,
             correlation,
-            BehaviorFactEmission.MaximumHops - command.HopsRemaining);
+            Math.Max(BehaviorFactEmission.MaximumHops - command.HopsRemaining, 1));
         await EmitAsync(
             new BehaviorFactEmitted(
                 command.CommandId,
