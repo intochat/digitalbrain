@@ -8,16 +8,10 @@ using Xunit;
 
 namespace DigitalBrain.Behaviors.Tests;
 
-// Excluded, not deleted. The harness works — a real compiled program woken by a fact was
-// observed running in the silo and speaking its declared fact through the real enforcement
-// chain, which is what surfaced the trigger-codec defect this commit fixes. What is not yet
-// deterministic is the harness: on a cold cluster the woken fact does not reach the behavior,
-// so these proofs stall instead of failing. Run with
-//   ./bin/Release/net11.0/DigitalBrain.Behaviors.Tests.exe -explicit only
-// and see the report for the state of the investigation.
 public sealed class AuthoredProgramEmission(AuthoredHostFixture fixture)
 {
     private const string SpeakingBehavior = "com.digitalbrain.speaking";
+    private const string HearingBehavior = "com.digitalbrain.hearing";
     private const string PingBehavior = "com.digitalbrain.ping-side";
     private const string PongBehavior = "com.digitalbrain.pong-side";
 
@@ -29,14 +23,14 @@ public sealed class AuthoredProgramEmission(AuthoredHostFixture fixture)
             AuthoredHostHarness.HeardFactContractId);
 
     [Fact(
-        Explicit = true,
         Timeout = 180_000,
-        DisplayName = "a real compiled program woken by a fact speaks its declared fact and a module IHandle subscriber receives it")]
-    public async Task AuthoredProgramSpeaksItsDeclaredFactToAModuleSubscriber()
+        DisplayName = "a real compiled program woken by a fact speaks its declared fact and the kernel delivers it to a subscriber")]
+    public async Task AuthoredProgramSpeaksItsDeclaredFactToASubscriber()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var speaker = test.Neuron<IBehaviorNeuron>(SpeakingBehavior);
+        var hearer = test.Neuron<IBehaviorNeuron>(HearingBehavior);
         var opener = test.Neuron<IAuthoredCycleOpener>("opener");
 
         var active = await AuthoredHostHarness.ActivateAsync(
@@ -46,8 +40,19 @@ public sealed class AuthoredProgramEmission(AuthoredHostFixture fixture)
             cancellationToken);
         Assert.Equal(BehaviorRevisionStatus.Active, active.Status);
 
+        await AuthoredHostHarness.ActivateAsync(
+            test,
+            hearer,
+            AuthoredHostHarness.RelayProgram(
+                "ProbeFactHeard",
+                AuthoredHostHarness.HeardFactContractId,
+                "ProbeCyclePong",
+                AuthoredHostHarness.PongFactContractId),
+            cancellationToken);
+
         var spokenWait = speaker.Outgoing.NextAsync<ProbeFactHeard>(cancellationToken);
         var auditWait = speaker.Outgoing.NextAsync<BehaviorFactEmitted>(cancellationToken);
+        var heardWait = hearer.Incoming.NextAsync<ProbeFactHeard>(cancellationToken);
         await opener.Reference.OpenCycle("authored");
 
         var spoken = await spokenWait;
@@ -58,10 +63,7 @@ public sealed class AuthoredProgramEmission(AuthoredHostFixture fixture)
         Assert.Equal(active.ActiveArtifactHash, audit.Synapse.ArtifactHash);
         Assert.Equal(spoken.CorrelationId, audit.CorrelationId);
 
-        // The module IHandle subscriber is a per-correlation broadcast receiver, so its identity
-        // is the correlation the authored emission carried.
-        var listener = test.Neuron<IProbeFactListener>(spoken.CorrelationId.Value.ToString("D"));
-        var heard = await listener.Incoming.NextAsync<ProbeFactHeard>(cancellationToken);
+        var heard = await heardWait;
 
         Assert.Equal("authored", heard.Synapse.Label);
         Assert.Equal(speaker.Id, heard.Caller);
@@ -69,7 +71,6 @@ public sealed class AuthoredProgramEmission(AuthoredHostFixture fixture)
     }
 
     [Fact(
-        Explicit = true,
         Timeout = 180_000,
         DisplayName = "an alias the signed manifest does not grant is refused across the broker with the typed reason")]
     public async Task UndeclaredAliasIsRefusedAcrossTheBrokerOnTheAttemptsOwnIdentity()
@@ -117,7 +118,6 @@ public sealed class AuthoredProgramEmission(AuthoredHostFixture fixture)
     }
 
     [Fact(
-        Explicit = true,
         Timeout = 300_000,
         DisplayName = "an authored A-to-B-to-A cycle terminates on the typed hop budget refusal instead of looping")]
     public async Task AuthoredCycleTerminatesOnTheHopBudgetRefusal()

@@ -38,7 +38,7 @@ public sealed class BehaviorHostEngine : IBehaviorHostGateway
             throw new BehaviorHostException("missing-artifact-bytes");
         }
 
-        BehaviorHostTestFaults.ThrowIfArmed();
+        BehaviorHostTestFaults.ThrowIfArmed(command.ArtifactHash);
 
         var computed = BehaviorArtifactDigest.Compute(command.ArtifactBytes.Span);
         if (!string.Equals(computed.Value, command.ArtifactHash, StringComparison.Ordinal))

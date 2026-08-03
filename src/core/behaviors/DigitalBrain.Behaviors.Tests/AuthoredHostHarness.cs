@@ -21,15 +21,6 @@ public partial interface IAuthoredCycleOpener : INeuron
     Task OpenCycle(string label);
 }
 
-[ClientEntryPoint]
-[Alias(AuthoredHostHarness.ListenerContractId)]
-[Description("Module neuron that handles the fact authored code speaks")]
-public partial interface IProbeFactListener : INeuron
-{
-    [Alias(nameof(Touch))]
-    Task Touch();
-}
-
 [GenerateSerializer]
 [Alias(AuthoredHostHarness.HeardFactContractId)]
 [Description("Broadcast fact an authored behavior speaks")]
@@ -49,21 +40,6 @@ public sealed record ProbeCyclePong([property: Id(0)] string Label) : Synapse;
 internal sealed class AuthoredCycleOpenerNeuron : Neuron, IAuthoredCycleOpener
 {
     public Task OpenCycle(string label) => EmitAsync(new ProbeCyclePing(label));
-}
-
-// A compile-time IHandle subscriber, not a behavior: it is what proves an authored emission
-// lands in the module vocabulary rather than only in the behavior rail.
-[GrainType(AuthoredHostHarness.ListenerGrainTypeName)]
-internal sealed class ProbeFactListenerNeuron : Neuron, IProbeFactListener, IHandle<ProbeFactHeard>
-{
-    public Task HandleAsync(ProbeFactHeard fact, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(fact);
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.CompletedTask;
-    }
-
-    public Task Touch() => Task.CompletedTask;
 }
 
 // Stands in for the reverse-broker HTTP hop: same interface, same typed refusals surfacing as
@@ -197,19 +173,6 @@ public sealed class AuthoredHostHarnessModule : IModule, ICompiledModule
                         CapabilitySchema.For(typeof(ProbeCyclePong)),
                         Array.Empty<string>()),
                 ]),
-            new NeuronCapabilityDescriptor(
-                AuthoredHostHarness.ListenerContractId,
-                "Module neuron that handles the fact authored code speaks",
-                "default",
-                [
-                    new SynapseCapabilityDescriptor(
-                        AuthoredHostHarness.HeardFactContractId,
-                        1,
-                        "Broadcast fact an authored behavior speaks",
-                        CapabilitySchema.For(typeof(ProbeFactHeard)),
-                        Array.Empty<string>()),
-                ],
-                Array.Empty<SynapseCapabilityDescriptor>()),
         ]);
 
     CapabilityManifest ICompiledModule.Capabilities => Capabilities;
@@ -231,6 +194,9 @@ public sealed class AuthoredHostHarnessModule : IModule, ICompiledModule
 // enforcement chain. The only stand-in is the transport between them.
 public sealed class AuthoredHostFixture : DigitalBrainFixture
 {
+    private readonly Lock _engineGate = new();
+    private BehaviorHostEngine? _engine;
+
     protected override void Configure(DigitalBrainTestBuilder brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
@@ -238,29 +204,40 @@ public sealed class AuthoredHostFixture : DigitalBrainFixture
         brain.AddModule<TasksModule>();
         brain.AddModule<AuthoredHostHarnessModule>();
 
-        var silo = Silo;
         brain.ConfigureServiceEdge(
             services =>
             {
                 services.RemoveAll<IBehaviorExecutor>();
                 services.RemoveAll<IBehaviorHostGateway>();
                 services.TryAddSingleton<IBehaviorHostBrokerClientFactory>(
-                    provider =>
-                    {
-                        silo.Services = provider;
-                        return new InProcessHostBrokerClientFactory(provider);
-                    });
-                services.AddSingleton(static provider => new BehaviorHostEngine(
-                    provider.GetRequiredService<IBehaviorArtifactTrust>(),
-                    provider.GetRequiredService<IBehaviorHostBrokerClientFactory>()));
-                services.AddSingleton<IBehaviorHostGateway>(
-                    static provider => provider.GetRequiredService<BehaviorHostEngine>());
+                    static provider => new InProcessHostBrokerClientFactory(provider));
+                services.AddSingleton<IBehaviorHostGateway>(SharedEngine);
                 services.AddSingleton<IBehaviorExecutor>(
                     static provider => new HostedBehaviorExecutor(
                         provider.GetRequiredService<IBehaviorHostGateway>()));
             },
-            silo,
+            Silo,
             static _ => { });
+    }
+
+    // Deployed and active revisions live in the engine's own memory. Production reaches exactly one
+    // BehaviorHost process over HTTP from every silo, so one engine for the whole fixture cluster
+    // is what models it; a per-silo instance leaves the deployment silo-local and any attempt the
+    // rail relays to another silo refuses with revision-not-active.
+    private BehaviorHostEngine SharedEngine(IServiceProvider provider)
+    {
+        lock (_engineGate)
+        {
+            if (_engine is null)
+            {
+                Silo.Services = provider;
+                _engine = new BehaviorHostEngine(
+                    provider.GetRequiredService<IBehaviorArtifactTrust>(),
+                    provider.GetRequiredService<IBehaviorHostBrokerClientFactory>());
+            }
+
+            return _engine;
+        }
     }
 
     // The silo provider is the only place IBehaviorCapabilityDispatchAccess lives, and a test that
@@ -276,12 +253,10 @@ public sealed class AuthoredHostSiloAccess
 internal static class AuthoredHostHarness
 {
     public const string EmitterContractId = "behaviors.authored-cycle-opener";
-    public const string ListenerContractId = "behaviors.probe-fact-listener";
     public const string HeardFactContractId = "behaviors.probe-fact-heard";
     public const string PingFactContractId = "behaviors.probe-cycle-ping";
     public const string PongFactContractId = "behaviors.probe-cycle-pong";
     public const string OpenerGrainTypeName = "authoredcycleopener";
-    public const string ListenerGrainTypeName = "probefactlistener";
 
     public const string InstallFeature =
         """
