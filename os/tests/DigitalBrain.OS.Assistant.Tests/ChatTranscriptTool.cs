@@ -24,7 +24,7 @@ public sealed class ChatTranscriptTool(OSBehaviorsFixture fixture)
         test.Chat().Reply("Noted: north star");
         await test.Client.GetGrainProxy<IChat>(chatName).Send(new SendMessage(CommandId.New(), "north star"));
 
-        var tools = new DigitalBrainIntrospectionTools(test.Client, test.Cluster.Client);
+        var tools = new DigitalBrainIntrospectionTools(test.Client);
         var page = await tools.ReadChatTranscriptAsync(chatName);
 
         var read = await test.Client.Get<IChat>()

@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
+using DigitalBrain.Introspection;
 using ModelContextProtocol.Server;
 
 namespace DigitalBrain.OS.AgentTools;
@@ -12,27 +13,19 @@ namespace DigitalBrain.OS.AgentTools;
     "Performance",
     "CA1812:Avoid uninstantiated internal classes",
     Justification = "Constructed by the MCP server DI container via WithTools<DigitalBrainIntrospectionTools>().")]
-internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain, IGrainFactory grains)
+internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain)
 {
     [McpServerTool(Name = AgentToolEndpoints.ListActiveNeuronsToolName)]
     [Description("List the neurons currently activated in the cluster, with their grain type and identity.")]
     public async Task<IReadOnlyList<ActiveNeuron>> ListActiveNeuronsAsync()
     {
-        var statistics = await grains
-            .GetGrain<IManagementGrain>(0)
-            .GetDetailedGrainStatistics();
+        var topology = await brain.Get<IIntrospection>().SendAsync(new ReadTopologyRequest());
+        if (topology.Error is { } refused)
+        {
+            throw new InvalidOperationException(refused);
+        }
 
-        return
-        [
-            .. statistics
-                .Where(statistic => statistic.GrainId.Key.ToString()!
-                    .StartsWith($"{brain.Owner.Value}/", StringComparison.Ordinal))
-                .Select(statistic => new ActiveNeuron(
-                    statistic.GrainId.Type.ToString()!,
-                    statistic.GrainId.Key.ToString()!))
-                .OrderBy(neuron => neuron.GrainType, StringComparer.Ordinal)
-                .ThenBy(neuron => neuron.Identity, StringComparer.Ordinal),
-        ];
+        return [.. topology.Neurons.Select(static neuron => new ActiveNeuron(neuron.GrainType, neuron.Identity))];
     }
 
     [McpServerTool(Name = AgentToolEndpoints.ReadNeuronJournalToolName)]
@@ -45,28 +38,30 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain, IGrain
         [Description("Journal direction: incoming or outgoing")] string kind = "outgoing",
         [Description("Read entries after this sequence")] long afterSequence = 0)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(grainType);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
-
-        var direction = Enum.Parse<JournalKind>(kind, ignoreCase: true);
-        var neuron = new NeuronId(grainType, brain.Owner, name);
-        var session = grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(brain.Owner).ToGrainId());
-
-        var read = await session.ReadNeuronJournal(neuron, direction, afterSequence);
+        var page = await brain.Get<IIntrospection>().SendAsync(new ReadJournalRequest(
+            grainType,
+            name,
+            kind,
+            afterSequence,
+            ReadJournalRequest.MaximumMaxEntries,
+            CommandId.New()));
+        if (page.Error is { } refused)
+        {
+            throw new InvalidOperationException(refused);
+        }
 
         return new NeuronJournalPage(
-            neuron.ToString(),
-            direction.ToString(),
-            read.ResumeSequence,
-            read.ResetSnapshot is not null,
+            page.Subject.ToString(),
+            JournalDirection.Parse(page.Direction).ToString(),
+            page.ResumeSequence,
+            page.Compacted,
             [
-                .. read.Delta.Select(delivery => new JournaledSynapse(
-                    delivery.Sequence,
-                    delivery.Synapse.GetType().Name,
-                    delivery.Caller.ToString(),
-                    delivery.CorrelationId.ToString(),
-                    delivery.Timestamp)),
+                .. page.Entries.Select(static entry => new JournaledSynapse(
+                    entry.Sequence,
+                    entry.Synapse,
+                    entry.Caller,
+                    entry.Correlation,
+                    entry.Timestamp)),
             ]);
     }
 
