@@ -1,3 +1,5 @@
+using System.Reflection;
+using DigitalBrain.Abstractions;
 using Orleans.Concurrency;
 
 namespace DigitalBrain.Kernel;
@@ -26,6 +28,7 @@ internal static class NeuronConcurrency
         var methods = neuronType
             .GetMethods()
             .Concat(neuronType.GetInterfaces().SelectMany(contract => contract.GetMethods()))
+            .Where(method => !IsKernelJournalRead(method))
             .ToArray();
 
         if (methods.Any(method => method.IsDefined(typeof(AlwaysInterleaveAttribute), inherit: true)))
@@ -39,7 +42,12 @@ internal static class NeuronConcurrency
         }
     }
 
+    private static bool IsKernelJournalRead(MethodInfo method)
+        => method.DeclaringType == typeof(INeuron)
+        && string.Equals(method.Name, nameof(INeuron.ReadJournal), StringComparison.Ordinal);
+
     private static void Refuse(Type neuronType, string attribute)
         => throw new InvalidOperationException(
-            $"{neuronType.Name} uses {attribute}, but neurons require serialized turns to preserve journal order and delivery lineage.");
+            $"{neuronType.Name} uses {attribute} outside {nameof(INeuron)}.{nameof(INeuron.ReadJournal)}, "
+            + "but neurons require serialized turns to preserve journal order and delivery lineage.");
 }
