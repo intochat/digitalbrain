@@ -123,6 +123,7 @@ internal sealed class HttpBehaviorHostBrokerClient : IBehaviorHostBrokerClient
         BehaviorId behavior,
         string emitAlias,
         ReadOnlyMemory<byte> factJson,
+        int hopsRemaining,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(emitAlias);
@@ -143,6 +144,7 @@ internal sealed class HttpBehaviorHostBrokerClient : IBehaviorHostBrokerClient
                         Behavior = behavior.Value,
                         EmitAlias = emitAlias,
                         FactJson = System.Text.Encoding.UTF8.GetString(factJson.Span),
+                        Hops = hopsRemaining,
                     },
                     JsonOptions,
                     cancellationToken)
@@ -171,6 +173,7 @@ internal sealed class HttpBehaviorHostBrokerClient : IBehaviorHostBrokerClient
         public string? Behavior { get; set; }
         public string? EmitAlias { get; set; }
         public string? FactJson { get; set; }
+        public int? Hops { get; set; }
     }
 
     private static async Task<ReadOnlyMemory<byte>> ReadPayloadContentAsync(

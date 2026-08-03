@@ -174,7 +174,8 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
                 triggerRef,
                 Capabilities: [],
                 DateTimeOffset.UtcNow,
-                WorkerNeuron),
+                WorkerNeuron,
+                HopsRemaining: 3),
             cancellationToken);
 
         Assert.True(outcome.Succeeded, outcome.Outcome);
@@ -182,6 +183,7 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
         Assert.Equal(Behavior, emission.Behavior);
         Assert.Equal(FactContractId, emission.Alias);
         Assert.Contains("spoken", emission.FactJson, StringComparison.Ordinal);
+        Assert.Equal(3, emission.Hops);
     }
 
     [Fact(DisplayName = "deploy rejects assembly bytes that differ from the canonical artifact embedded Behavior.dll")]
@@ -441,16 +443,21 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
 
     private sealed class RecordingBrokerClient : IBehaviorHostBrokerClient
     {
-        public List<(BehaviorId Behavior, string Alias, string FactJson)> Emissions { get; } = [];
+        public List<(BehaviorId Behavior, string Alias, string FactJson, int Hops)> Emissions { get; } = [];
 
         public ValueTask EmitFactAsync(
             BehaviorId behavior,
             string emitAlias,
             ReadOnlyMemory<byte> factJson,
+            int hopsRemaining,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Emissions.Add((behavior, emitAlias, Encoding.UTF8.GetString(factJson.Span)));
+            Emissions.Add((
+                behavior,
+                emitAlias,
+                Encoding.UTF8.GetString(factJson.Span),
+                hopsRemaining));
             return ValueTask.CompletedTask;
         }
 

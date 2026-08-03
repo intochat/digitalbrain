@@ -155,7 +155,8 @@ app.MapPost("/v1/behaviors/execute", async (
                         edge.ResponseVersion))
                     .ToArray(),
                 body.UtcNow,
-                new NeuronId(body.WorkerType, workerOwner, body.WorkerName)),
+                new NeuronId(body.WorkerType, workerOwner, body.WorkerName),
+                ClampHops(body.Hops)),
             cancellationToken);
         var code = outcome.Succeeded
             ? BehaviorExecutionCodes.Succeeded
@@ -195,6 +196,10 @@ app.MapPost("/v1/behaviors/execute", async (
 
 app.Run();
 
+// The silo owns the ceiling; a host that claims a wider budget only ever gets the ceiling.
+static int ClampHops(int? claimed)
+    => Math.Clamp(claimed ?? BehaviorFactEmission.MaximumHops, 0, BehaviorFactEmission.MaximumHops);
+
 static OwnerId RequireOwner(string? value, string reason)
 {
     if (string.IsNullOrWhiteSpace(value))
@@ -232,7 +237,8 @@ internal sealed record ExecuteRequest(
     DateTimeOffset UtcNow,
     string? WorkerType = null,
     string? WorkerOwner = null,
-    string? WorkerName = null);
+    string? WorkerName = null,
+    int? Hops = null);
 
 internal sealed record CapabilityEdgeRequest(
     string TargetType,

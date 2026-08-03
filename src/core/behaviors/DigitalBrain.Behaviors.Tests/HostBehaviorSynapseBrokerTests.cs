@@ -228,17 +228,22 @@ public sealed class HostBehaviorSynapseBrokerTests
     private sealed class RecordingHostBrokerClient(bool serializeDispatchResponseAsCamelCaseOnly = false)
         : IBehaviorHostBrokerClient
     {
-    public List<(BehaviorId Behavior, string Alias, string Json)> EmittedFacts { get; } = [];
+        public List<(BehaviorId Behavior, string Alias, string Json, int Hops)> EmittedFacts { get; } = [];
 
-    public ValueTask EmitFactAsync(
-        BehaviorId behavior,
-        string emitAlias,
-        ReadOnlyMemory<byte> factJson,
-        CancellationToken cancellationToken)
-    {
-        EmittedFacts.Add((behavior, emitAlias, System.Text.Encoding.UTF8.GetString(factJson.Span)));
-        return ValueTask.CompletedTask;
-    }
+        public ValueTask EmitFactAsync(
+            BehaviorId behavior,
+            string emitAlias,
+            ReadOnlyMemory<byte> factJson,
+            int hopsRemaining,
+            CancellationToken cancellationToken)
+        {
+            EmittedFacts.Add((
+                behavior,
+                emitAlias,
+                System.Text.Encoding.UTF8.GetString(factJson.Span),
+                hopsRemaining));
+            return ValueTask.CompletedTask;
+        }
 
         private readonly Dictionary<Guid, byte[]> payloads = new();
         private readonly Dictionary<(Guid Attempt, int Sequence), TaskOperationSnapshot> operations = new();

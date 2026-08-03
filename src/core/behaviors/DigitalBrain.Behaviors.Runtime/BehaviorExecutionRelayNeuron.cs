@@ -68,7 +68,8 @@ internal sealed class BehaviorExecutionRelayNeuron :
             goal.ProtectedPayload,
             ToCapabilityEdges(goal.Capabilities),
             envelope.UtcNow,
-            envelope.Worker);
+            envelope.Worker,
+            goal.HopsRemaining);
 
         BehaviorExecutionOutcome outcome;
         var cancelled = false;

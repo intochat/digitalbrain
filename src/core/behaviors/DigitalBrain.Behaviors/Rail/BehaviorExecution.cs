@@ -13,7 +13,8 @@ public sealed record BehaviorExecutionRequest(
     ProtectedPayloadReference TriggerPayload,
     IReadOnlyList<BehaviorCapabilityEdge> Capabilities,
     DateTimeOffset UtcNow,
-    NeuronId Worker = default);
+    NeuronId Worker = default,
+    int HopsRemaining = BehaviorFactEmission.MaximumHops);
 
 public sealed record LegacyBehaviorExecutionRequest(
     BehaviorExecutionMetadata Metadata,

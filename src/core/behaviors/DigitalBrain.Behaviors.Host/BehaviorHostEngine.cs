@@ -192,7 +192,8 @@ public sealed class BehaviorHostEngine : IBehaviorHostGateway
             command.Task,
             command.Attempt,
             signedEdges,
-            client);
+            client,
+            command.HopsRemaining);
 
         return await BehaviorProgramLoader.ExecuteAsync(
             new BehaviorExecutionRequest(
@@ -204,7 +205,9 @@ public sealed class BehaviorHostEngine : IBehaviorHostGateway
                 command.TriggerTypeName,
                 command.TriggerPayload,
                 signedEdges,
-                command.UtcNow),
+                command.UtcNow,
+                command.Worker,
+                command.HopsRemaining),
             triggerBytes,
             broker,
             cancellationToken).ConfigureAwait(false);

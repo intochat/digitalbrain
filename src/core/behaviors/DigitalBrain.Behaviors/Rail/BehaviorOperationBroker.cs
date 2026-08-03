@@ -46,6 +46,7 @@ internal interface IBehaviorHostBrokerClient : ITaskOperationClient, IBehaviorOp
         BehaviorId behavior,
         string emitAlias,
         ReadOnlyMemory<byte> factJson,
+        int hopsRemaining,
         CancellationToken cancellationToken);
 
     ValueTask<ReadOnlyMemory<byte>> LoadTriggerAsync(
