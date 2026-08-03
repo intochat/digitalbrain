@@ -22,7 +22,7 @@ internal sealed partial class BehaviorNeuron
             return;
         }
 
-        await PublishSubscriptionsAsync(data);
+        await PublishSubscriptionsAsync(data, cancellationToken);
     }
 
     protected override async Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
@@ -207,15 +207,18 @@ internal sealed partial class BehaviorNeuron
             ? manifest.EntryPoints.Contract.Cases[0]
             : null;
 
-    private async Task PublishSubscriptionsAsync(BehaviorData data)
+    private async Task PublishSubscriptionsAsync(BehaviorData data, CancellationToken cancellationToken)
     {
         var aliases = data is { ActivationGateOpen: true, RunState: BehaviorRunState.Running, ActiveArtifactBytes: not null }
             ? CanonicalArtifactReader.Read(data.ActiveArtifactBytes).Manifest.EntryPoints.EventAliases
             : [];
+        var registry = GrainFactory.GetGrain<IBehaviorSubscriptionRegistry>(
+            BehaviorSubscriptionRegistry.ForOwner(Id.Owner).ToGrainId());
 
-        await GrainFactory
-            .GetGrain<IBehaviorSubscriptionRegistry>(
-                BehaviorSubscriptionRegistry.ForOwner(Id.Owner).ToGrainId())
-            .Replace(Id.Name, aliases, CancellationToken.None);
+        await BehaviorSubscriptionRegistry.WithinBoundAsync(
+            token => registry.Replace(Id.Name, aliases, token),
+            nameof(IBehaviorSubscriptionRegistry.Replace),
+            DeliveryPolicy.SubscriptionRegistryTimeout,
+            cancellationToken);
     }
 }

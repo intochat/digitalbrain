@@ -151,6 +151,29 @@ public sealed class BehaviorBroadcastSubscription(BroadcastSubscriptionFixture f
             cancellationToken));
     }
 
+    [Fact(DisplayName = "a subscription publish that never answers fails loud instead of hanging activation")]
+    public async Task StalledSubscriptionPublishFailsLoud()
+    {
+        var failure = await Assert.ThrowsAsync<TimeoutException>(
+            () => BehaviorSubscriptionRegistry.WithinBoundAsync(
+                token => Task.Delay(Timeout.InfiniteTimeSpan, token),
+                nameof(IBehaviorSubscriptionRegistry.Replace),
+                TimeSpan.FromMilliseconds(50),
+                TestContext.Current.CancellationToken));
+
+        Assert.Contains(
+            nameof(IBehaviorSubscriptionRegistry.Replace),
+            failure.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "the publish bound is the same registry bound the lookup already carries")]
+    public void PublishAndLookupShareOneRegistryBound()
+    {
+        Assert.True(DeliveryPolicy.SubscriptionRegistryTimeout > TimeSpan.Zero);
+        Assert.True(DeliveryPolicy.SubscriptionRegistryTimeout < DeliveryPolicy.DeliveryAttemptTimeout);
+    }
+
     [Fact(DisplayName = "the subscription registry lookup interleaves and its write does not")]
     public void OnlyTheRegistryLookupInterleaves()
     {

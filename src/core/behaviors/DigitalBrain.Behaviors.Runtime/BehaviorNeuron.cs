@@ -324,7 +324,7 @@ internal sealed partial class BehaviorNeuron :
         data = WithReceipt(data, command.CommandId, Snapshot(data));
         await SaveAsync(data);
         PublishExactCapability(data);
-        await PublishSubscriptionsAsync(data);
+        await PublishSubscriptionsAsync(data, CancellationToken.None);
         await EmitAsync(new BehaviorRevisionActivated(
             command.CommandId,
             behaviorId,
@@ -381,7 +381,7 @@ internal sealed partial class BehaviorNeuron :
         data = WithReceipt(data, command.CommandId, Snapshot(data));
         await SaveAsync(data);
         PublishExactCapability(data);
-        await PublishSubscriptionsAsync(data);
+        await PublishSubscriptionsAsync(data, CancellationToken.None);
         await EmitAsync(new BehaviorRevisionRolledBack(
             command.CommandId,
             behaviorId,

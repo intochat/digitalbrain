@@ -25,6 +25,31 @@ internal static class BehaviorSubscriptionRegistry
     internal const string InstanceName = "registry";
 
     internal static NeuronId ForOwner(OwnerId owner) => new(GrainTypeName, owner, InstanceName);
+
+    // Replace is a serialized write on a grain every behavior in the owner contends for, so a
+    // stalled registry would otherwise hang activation itself. Bounded, and loud on expiry: an
+    // activation that proceeds unpublished is exactly the silently-deaf divergence this repairs.
+    internal static async Task WithinBoundAsync(
+        Func<CancellationToken, Task> registryCall,
+        string operation,
+        TimeSpan bound,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(registryCall);
+
+        using var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        bounded.CancelAfter(bound);
+
+        try
+        {
+            await registryCall(bounded.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"Behavior subscription registry did not complete '{operation}' within {bound}.");
+        }
+    }
 }
 
 [GrainType(BehaviorSubscriptionRegistry.GrainTypeName)]

@@ -49,7 +49,7 @@ public abstract partial class Neuron
             return [];
         }
 
-        using var bound = new CancellationTokenSource(DeliveryPolicy.SubscriberLookupTimeout);
+        using var bound = new CancellationTokenSource(DeliveryPolicy.SubscriptionRegistryTimeout);
         try
         {
             return await subscribers.ReceiversFor(Id.Owner, alias, bound.Token);
@@ -60,7 +60,7 @@ public abstract partial class Neuron
             // correct empty result and leaves every subscriber silently deaf. Failing loudly
             // retracts the emitting turn and leaves the outbox to retry it.
             throw new TimeoutException(
-                $"Broadcast subscriber lookup for '{alias}' did not answer within {DeliveryPolicy.SubscriberLookupTimeout}.");
+                $"Broadcast subscriber lookup for '{alias}' did not answer within {DeliveryPolicy.SubscriptionRegistryTimeout}.");
         }
     }
 
