@@ -22,10 +22,34 @@ public abstract partial class Neuron
         _handled.Add(delivered.Value);
         _remembered.Add(delivered);
 
-        while (_handled.Count > RememberedDeliveries)
+        while (_handled.Count > RememberedDeliveryBound)
         {
             _remembered.Remove(new SynapseId(_handled[0]));
+            _evictedWhileHandling.Add(_handled[0]);
             _handled.RemoveAt(0);
+        }
+    }
+
+    // The handled mark is set membership, not a suffix. Once the window is full Remember evicts as
+    // it adds, so the count a turn started at is reached again and truncating back to it retracts
+    // nothing — the delivery would stay marked handled while its turn was thrown away, and the
+    // outbox would swallow its own redelivery for good. A retraction has to name what this turn
+    // added and put back what adding it pushed out.
+    private void ForgetHandled(SynapseDelivery delivery)
+    {
+        for (var index = _handled.Count - 1; index >= 0; index--)
+        {
+            if (_handled[index] == delivery.SynapseId.Value)
+            {
+                _handled.RemoveAt(index);
+
+                break;
+            }
+        }
+
+        for (var index = _evictedWhileHandling.Count - 1; index >= 0; index--)
+        {
+            _handled.Insert(0, _evictedWhileHandling[index]);
         }
     }
 
@@ -68,11 +92,8 @@ public abstract partial class Neuron
     }
 
     // A capability request commits mid-turn, so what that commit produced — the outgoing record and
-    // whatever the turn had already staged for the outbox — must survive a later retraction.
-    // The inbound cause and its handled mark must not: they are the turn's outcome, not the
-    // request's. Carrying them forward left a retracted turn with its delivery marked handled while
-    // no handler had finished, so the outbox's own redelivery was swallowed by the duplicate guard
-    // and the receiver went silently deaf to that synapse.
+    // whatever the turn had already staged for the outbox — must survive a later retraction. The
+    // inbound cause must not: it is the turn's outcome, not the request's.
     private void AdvanceTurnCheckpoint()
     {
         if (_turnCheckpoint is { } checkpoint)
@@ -146,7 +167,6 @@ public abstract partial class Neuron
 
     internal readonly record struct TurnCheckpoint(
         int CommittedOutbox,
-        int CommittedHandled,
         bool InboundCommitted,
         NeuronFeedCheckpoint Incoming,
         NeuronFeedCheckpoint Outgoing);

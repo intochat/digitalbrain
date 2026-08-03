@@ -26,6 +26,7 @@ public abstract partial class Neuron :
     private readonly HashSet<SynapseId> _remembered = [];
     private readonly ConcurrentDictionary<Guid, SynapseDelivery> _streamedCapabilityRequests = new();
     private readonly List<SynapseDelivery> _firedWhileHandling = [];
+    private readonly List<Guid> _evictedWhileHandling = [];
     private readonly List<Action> _turnRollbacks = [];
     private readonly Serializer<OutboxEntry> _entries;
     private readonly Serializer<Synapse> _synapses;
@@ -52,6 +53,10 @@ public abstract partial class Neuron :
     public NeuronId Id => NeuronId.FromGrainKey(this.GetGrainId().Type.ToString()!, this.GetPrimaryKeyString());
 
     protected TimeProvider TimeProvider { get; }
+
+    // Per neuron rather than a constant so the eviction path — where the window is full and every
+    // Remember drops an entry as it adds one — is reachable without four thousand real deliveries.
+    internal virtual int RememberedDeliveryBound => RememberedDeliveries;
 
     protected NeuronId? CurrentDeliveryCaller => _handling?.Caller;
 

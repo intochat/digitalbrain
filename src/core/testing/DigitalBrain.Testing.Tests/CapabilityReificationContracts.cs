@@ -116,4 +116,75 @@ public sealed class CapabilityReificationContracts(TestingFixture fixture)
         Assert.Single(settledCauses);
         Assert.Equal(2, requests.Count);
     }
+
+    // The handled window is bounded, and once it is full Remember evicts as it adds — so the count
+    // a turn started at is reached again and a count-based retraction takes nothing back. Above that
+    // watermark a neuron would keep the mark, lose the cause, and go deaf to the synapse for good.
+    [Fact(DisplayName =
+        "a retracted turn is redelivered once the handled-delivery window is already full",
+        Timeout = 60_000)]
+    public async Task RetractionSurvivesTheHandledWindowWatermark()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var caller = test.Neuron<IWindowBoundCaller>("window-bound");
+
+        // One more than the bound, so the window is saturated and evicting before the turn under test.
+        for (var index = 0; index < 5; index++)
+        {
+            await test.Client.SendAsync<IWindowBoundCaller>(
+                caller.Id.Name,
+                new CapabilityPing(),
+                cancellationToken);
+            _ = await caller.Incoming.NextAsync<CapabilityPing>(cancellationToken);
+        }
+
+        await test.Client.SendAsync<IWindowBoundCaller>(
+            caller.Id.Name,
+            new CapabilityPingRetractedOnce(),
+            cancellationToken);
+
+        var settled = await caller.Outgoing.NextAsync<CapabilityRequested>(cancellationToken);
+        while (!string.Equals(settled.Synapse.Method, nameof(ICapabilityTarget.Settle), StringComparison.Ordinal))
+        {
+            settled = await caller.Outgoing.NextAsync<CapabilityRequested>(cancellationToken);
+        }
+
+        var causes = await caller.Incoming.ReadAsync<CapabilityPingRetractedOnce>(
+            cancellationToken: cancellationToken);
+
+        Assert.Single(causes);
+        Assert.Equal(causes[0].CorrelationId, settled.CorrelationId);
+    }
+
+    // NeuronAuthorizationException is consumed by the sender as a permanent refusal, so the receiver
+    // never sees this delivery again. Retracting its cause would erase the only record it arrived.
+    [Fact(DisplayName =
+        "a refused delivery keeps the record that it arrived and is never redelivered",
+        Timeout = 60_000)]
+    public async Task RefusedDeliveryKeepsItsInboundRecord()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var caller = test.Neuron<ICapabilityCaller>(TestingScenario.CapabilityCaller);
+
+        await test.Client.SendAsync<ICapabilityCaller>(
+            caller.Id.Name,
+            new CapabilityPingRefused(),
+            cancellationToken);
+        await test.Client.SendAsync<ICapabilityCaller>(
+            caller.Id.Name,
+            new CapabilityPing(),
+            cancellationToken);
+
+        _ = await caller.Incoming.NextAsync<CapabilityPing>(cancellationToken);
+
+        var refusedCauses = await caller.Incoming.ReadAsync<CapabilityPingRefused>(
+            cancellationToken: cancellationToken);
+        var requests = await caller.Outgoing.ReadAsync<CapabilityRequested>(
+            cancellationToken: cancellationToken);
+
+        Assert.Single(refusedCauses);
+        Assert.Equal(2, requests.Count);
+    }
 }

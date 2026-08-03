@@ -53,9 +53,10 @@ public abstract partial class Neuron
         _turnCancellation = cancellationToken;
 
         var previousCheckpoint = _turnCheckpoint;
-        _turnCheckpoint = new(_outbox.Count, _handled.Count, InboundCommitted: false, _incoming.Checkpoint(), _outgoing.Checkpoint());
+        _turnCheckpoint = new(_outbox.Count, InboundCommitted: false, _incoming.Checkpoint(), _outgoing.Checkpoint());
 
         _firedWhileHandling.Clear();
+        _evictedWhileHandling.Clear();
         _turnRollbacks.Clear();
 
         try
@@ -88,7 +89,7 @@ public abstract partial class Neuron
             }
             else
             {
-                Discard(_handled, checkpoint.CommittedHandled);
+                ForgetHandled(delivery);
                 _incoming.Restore(checkpoint.Incoming);
             }
 
@@ -104,6 +105,7 @@ public abstract partial class Neuron
         finally
         {
             _firedWhileHandling.Clear();
+            _evictedWhileHandling.Clear();
             _turnRollbacks.Clear();
             _handling = null;
             _handlingDepth = 0;
