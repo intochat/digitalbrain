@@ -4,7 +4,7 @@ using Xunit;
 
 namespace DigitalBrain.Time.Tests;
 
-public sealed class CountdownRecovery(TimeFixture fixture)
+public sealed class CountdownRecovery : CountdownTest
 {
     private static readonly TimeSpan OneHour = TimeSpan.FromHours(1);
     private static readonly TimeSpan TwoHours = TimeSpan.FromHours(2);
@@ -14,9 +14,9 @@ public sealed class CountdownRecovery(TimeFixture fixture)
         "Host restart before due still delivers CountdownElapsed exactly once")]
     public async Task RestartBeforeDueDeliversElapsedExactlyOnce()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination, started) = await TimeFixture.Schedule(test, OneHour);
+        var cancellationToken = Cancellation;
+        var test = await BrainAsync();
+        var (countdown, destination, started) = await ScheduleAsync(OneHour);
 
         await countdown.RestartHostAsync(cancellationToken);
         await test.Clock.AdvanceAsync(OneHour, cancellationToken);
@@ -28,9 +28,9 @@ public sealed class CountdownRecovery(TimeFixture fixture)
         "Failed CountdownElapsed commit recovers after host restart")]
     public async Task FailedElapsedCommitRecoversAfterHostRestart()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination, started) = await TimeFixture.Schedule(test, OneHour);
+        var cancellationToken = Cancellation;
+        var test = await BrainAsync();
+        var (countdown, destination, started) = await ScheduleAsync(OneHour);
 
         await AssertElapsedCommitFails(countdown, test, destination, cancellationToken);
         Assert.Equal(
@@ -49,9 +49,9 @@ public sealed class CountdownRecovery(TimeFixture fixture)
         "Failed CountdownElapsed commit recovers without a host restart")]
     public async Task FailedElapsedCommitRecoversWithoutHostRestart()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination, started) = await TimeFixture.Schedule(test, OneHour);
+        var cancellationToken = Cancellation;
+        var test = await BrainAsync();
+        var (countdown, destination, started) = await ScheduleAsync(OneHour);
 
         await AssertElapsedCommitFails(countdown, test, destination, cancellationToken);
 
@@ -64,9 +64,9 @@ public sealed class CountdownRecovery(TimeFixture fixture)
         "Late delivery beyond one reminder period marks CountdownElapsed as Recovered")]
     public async Task LateDeliveryMarksElapsedAsRecovered()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination, started) = await TimeFixture.Schedule(test, OneHour);
+        var cancellationToken = Cancellation;
+        var test = await BrainAsync();
+        var (countdown, destination, started) = await ScheduleAsync(OneHour);
         var lateBy = OneMinute + TimeSpan.FromSeconds(1);
 
         await test.Clock.AdvanceAsync(OneHour + lateBy, cancellationToken);
@@ -90,9 +90,9 @@ public sealed class CountdownRecovery(TimeFixture fixture)
         "Committed CountdownElapsed survives another host restart without duplication")]
     public async Task CommittedElapsedSurvivesAnotherHostRestartWithoutDuplication()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination, _) = await TimeFixture.Schedule(test, OneHour);
+        var cancellationToken = Cancellation;
+        var test = await BrainAsync();
+        var (countdown, destination, _) = await ScheduleAsync(OneHour);
 
         await test.Clock.AdvanceAsync(OneHour, cancellationToken);
         var first = await destination.Incoming.NextAsync<CountdownElapsed>(cancellationToken);
@@ -109,14 +109,14 @@ public sealed class CountdownRecovery(TimeFixture fixture)
         "Failed Start commit leaves Unscheduled and never delivers CountdownElapsed")]
     public async Task FailedStartCommitLeavesUnscheduledWithoutElapsed()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination) = TimeFixture.Pair(test);
-        await using var fault = countdown.FailNextJournalCommit(TimeFixture.StartStateCommitFailure);
+        var cancellationToken = Cancellation;
+        var test = await BrainAsync();
+        var (countdown, destination) = await PairAsync();
+        await using var fault = countdown.FailNextJournalCommit(StartStateCommitFailure);
 
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => TimeFixture.Start(countdown, destination, OneHour));
-        Assert.Equal(TimeFixture.StartStateCommitFailure, failure.Message);
+            () => StartAsync(countdown, destination, OneHour));
+        Assert.Equal(StartStateCommitFailure, failure.Message);
         Assert.Equal(
             CountdownStatus.Unscheduled,
             (await countdown.Reference.Read()).Status);
@@ -131,14 +131,14 @@ public sealed class CountdownRecovery(TimeFixture fixture)
         "Failed Reschedule commit keeps the committed schedule as authority")]
     public async Task FailedRescheduleCommitKeepsCommittedSchedule()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination, started) = await TimeFixture.Schedule(test, TwoHours);
-        await using var fault = countdown.FailNextJournalCommit(TimeFixture.RescheduleStateCommitFailure);
+        var cancellationToken = Cancellation;
+        var test = await BrainAsync();
+        var (countdown, destination, started) = await ScheduleAsync(TwoHours);
+        await using var fault = countdown.FailNextJournalCommit(RescheduleStateCommitFailure);
 
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(
             () => countdown.Reference.Reschedule(new RescheduleCountdown(CommandId.New(), started.Revision, OneHour)));
-        Assert.Equal(TimeFixture.RescheduleStateCommitFailure, failure.Message);
+        Assert.Equal(RescheduleStateCommitFailure, failure.Message);
         Assert.Equal(started, await countdown.Reference.Read());
 
         await test.Clock.AdvanceAsync(OneHour, cancellationToken);
@@ -153,15 +153,15 @@ public sealed class CountdownRecovery(TimeFixture fixture)
         "Failed Restart commit keeps Cancelled terminal without CountdownElapsed")]
     public async Task FailedRestartCommitKeepsCancelledWithoutElapsed()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination, started) = await TimeFixture.Schedule(test, TwoHours);
+        var cancellationToken = Cancellation;
+        var test = await BrainAsync();
+        var (countdown, destination, started) = await ScheduleAsync(TwoHours);
         var cancelled = await countdown.Reference.Cancel(new CancelCountdown(CommandId.New(), started.Revision));
-        await using var fault = countdown.FailNextJournalCommit(TimeFixture.RestartStateCommitFailure);
+        await using var fault = countdown.FailNextJournalCommit(RestartStateCommitFailure);
 
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(
             () => countdown.Reference.Restart(new RestartCountdown(CommandId.New(), OneHour)));
-        Assert.Equal(TimeFixture.RestartStateCommitFailure, failure.Message);
+        Assert.Equal(RestartStateCommitFailure, failure.Message);
         Assert.Equal(cancelled, await countdown.Reference.Read());
 
         await test.Clock.AdvanceAsync(OneHour, cancellationToken);
@@ -177,12 +177,12 @@ public sealed class CountdownRecovery(TimeFixture fixture)
         TestNeuron<ICountdown> destination,
         CancellationToken cancellationToken)
     {
-        await using var fault = countdown.FailNextJournalCommit(TimeFixture.OccurrenceCommitFailure);
+        await using var fault = countdown.FailNextJournalCommit(OccurrenceCommitFailure);
 
         var failure = await Assert.ThrowsAsync<BrainTestFailureException>(
             () => test.Clock.AdvanceAsync(OneHour, cancellationToken));
         Assert.Equal(
-            TimeFixture.OccurrenceCommitFailure,
+            OccurrenceCommitFailure,
             failure.InnerException?.Message);
         Assert.Empty(await destination.Incoming.ReadAsync<CountdownElapsed>(cancellationToken: cancellationToken));
     }

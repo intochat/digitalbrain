@@ -3,17 +3,17 @@ using Xunit;
 
 namespace DigitalBrain.Time.Tests;
 
-public sealed class ClientEntryPointCapability(TimeFixture fixture)
+public sealed class ClientEntryPointCapability : CountdownTest
 {
+
     [Fact(DisplayName =
         "ClientEntryPoint ICountdown.Start from an unattributed client does not journal capability facts")]
     public async Task ClientEntryPointStartDoesNotJournalCapabilityFacts()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination) = TimeFixture.Pair(test);
+        var cancellationToken = Cancellation;
+        var (countdown, destination) = await PairAsync();
 
-        var started = await TimeFixture.Start(countdown, destination, TimeSpan.FromHours(1));
+        var started = await StartAsync(countdown, destination, TimeSpan.FromHours(1));
 
         Assert.Equal(CountdownStatus.Scheduled, started.Status);
 

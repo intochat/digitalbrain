@@ -3,7 +3,7 @@ using Xunit;
 
 namespace DigitalBrain.Time.Tests;
 
-public sealed partial class CountdownLifecycle(TimeFixture fixture)
+public sealed partial class CountdownLifecycle : CountdownTest
 {
     private static readonly TimeSpan Hour = TimeSpan.FromHours(1);
     private static readonly TimeSpan TwoHours = TimeSpan.FromHours(2);
@@ -14,9 +14,8 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
         "Start from Unscheduled is idempotent under the same CommandId and rejects a second Start")]
     public async Task StartIsIdempotentAndAllowedOnlyFromUnscheduled()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination) = TimeFixture.Pair(test);
+        var test = await BrainAsync();
+        var (countdown, destination) = await PairAsync();
         var empty = await countdown.Reference.Read();
 
         Assert.Equal(CountdownStatus.Unscheduled, empty.Status);
@@ -45,9 +44,9 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
         "Reschedule requires the exact revision and invalidates the prior wakeup")]
     public async Task RescheduleUsesTheExactRevisionAndInvalidatesThePriorWakeup()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination, started) = await TimeFixture.Schedule(test, Hour);
+        var cancellationToken = Cancellation;
+        var test = await BrainAsync();
+        var (countdown, destination, started) = await ScheduleAsync(Hour);
 
         await test.Clock.AdvanceAsync(HalfHour, cancellationToken);
 
@@ -84,9 +83,9 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
         "Cancel requires the exact revision, is idempotent, and is terminal without emission")]
     public async Task CancelUsesTheExactRevisionAndIsTerminal()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination, started) = await TimeFixture.Schedule(test, Hour);
+        var cancellationToken = Cancellation;
+        var test = await BrainAsync();
+        var (countdown, destination, started) = await ScheduleAsync(Hour);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => countdown.Reference.Cancel(new CancelCountdown(CommandId.New(), ExpectedRevision: started.Revision + 1)));
@@ -115,9 +114,8 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
         "Restart after Cancel retains destination and starts a new generation")]
     public async Task RestartRetainsDestinationAndStartsANewGeneration()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination, started) = await TimeFixture.Schedule(test, Hour);
+        var test = await BrainAsync();
+        var (countdown, _, started) = await ScheduleAsync(Hour);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => countdown.Reference.Restart(new RestartCountdown(CommandId.New(), Hour)));
@@ -137,9 +135,9 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
     [Fact(DisplayName = "Restart is allowed after Elapsed and starts a new generation")]
     public async Task RestartIsAllowedAfterElapsed()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination, started) = await TimeFixture.Schedule(test, Hour);
+        var cancellationToken = Cancellation;
+        var test = await BrainAsync();
+        var (countdown, destination, started) = await ScheduleAsync(Hour);
 
         await test.Clock.AdvanceAsync(Hour, cancellationToken);
         _ = await destination.Incoming.NextAsync<CountdownElapsed>(cancellationToken);
@@ -155,9 +153,9 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
     [Fact(DisplayName = "Countdown emits CountdownElapsed exactly once at its due instant")]
     public async Task CountdownEmitsExactlyOnceAtItsDueInstant()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination, started) = await TimeFixture.Schedule(test, Hour);
+        var cancellationToken = Cancellation;
+        var test = await BrainAsync();
+        var (countdown, destination, started) = await ScheduleAsync(Hour);
 
         await test.Clock.AdvanceAsync(TimeSpan.FromMinutes(59), cancellationToken);
         Assert.Empty(await destination.Incoming.ReadAsync<CountdownElapsed>(cancellationToken: cancellationToken));
@@ -182,11 +180,9 @@ public sealed partial class CountdownLifecycle(TimeFixture fixture)
     [Fact(DisplayName = "Read returns the committed snapshot after a hosting silo restart")]
     public async Task ReadReturnsCommittedStateAfterHostingSiloRestart()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, _, started) = await TimeFixture.Schedule(test, Hour);
+        var (countdown, _, started) = await ScheduleAsync(Hour);
 
-        await countdown.RestartHostAsync(cancellationToken);
+        await countdown.RestartHostAsync(Cancellation);
 
         Assert.Equal(started, await countdown.Reference.Read());
     }

@@ -1,4 +1,4 @@
-using DigitalBrain.Time.Tests;
+using DigitalBrain.Testing;
 using Xunit;
 
-[assembly: AssemblyFixture(typeof(TimeFixture))]
+[assembly: AssemblyFixture(typeof(BrainTestClusters))]

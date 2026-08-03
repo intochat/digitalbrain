@@ -9,15 +9,13 @@ public sealed partial class CountdownLifecycle
         "Empty CommandId is rejected on Start, Reschedule, Cancel, and Restart")]
     public async Task EmptyCommandIdIsRejected()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination) = TimeFixture.Pair(test);
+        var (countdown, destination) = await PairAsync();
         var empty = default(CommandId);
 
         await Assert.ThrowsAsync<ArgumentException>(
             () => countdown.Reference.Start(new StartCountdown(empty, Hour, destination.Id)));
 
-        var started = await TimeFixture.Start(countdown, destination, Hour);
+        var started = await StartAsync(countdown, destination, Hour);
 
         await Assert.ThrowsAsync<ArgumentException>(
             () => countdown.Reference.Reschedule(new RescheduleCountdown(empty, started.Revision, Hour)));
@@ -36,9 +34,7 @@ public sealed partial class CountdownLifecycle
         "Duration must be positive and yield a due instant within the supported range")]
     public async Task DurationMustBePositiveAndWithinRange()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, destination) = TimeFixture.Pair(test);
+        var (countdown, destination) = await PairAsync();
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             () => countdown.Reference.Start(new StartCountdown(CommandId.New(), TimeSpan.Zero, destination.Id)));
@@ -47,7 +43,7 @@ public sealed partial class CountdownLifecycle
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             () => countdown.Reference.Start(new StartCountdown(CommandId.New(), TimeSpan.MaxValue, destination.Id)));
 
-        var started = await TimeFixture.Start(countdown, destination, Hour);
+        var started = await StartAsync(countdown, destination, Hour);
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             () => countdown.Reference.Reschedule(new RescheduleCountdown(CommandId.New(), started.Revision, TimeSpan.Zero)));
@@ -66,10 +62,9 @@ public sealed partial class CountdownLifecycle
         "Destination must belong to the same owner as the countdown")]
     public async Task DestinationMustBelongToTheCountdownOwner()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await fixture.CreateBrainAsync(cancellationToken);
-        var (countdown, _) = TimeFixture.Pair(test);
-        var foreign = test.Owner("foreign").Neuron<ICountdown>(TimeFixture.Destination);
+        var test = await BrainAsync();
+        var (countdown, _) = await PairAsync();
+        var foreign = test.Owner("foreign").Neuron<ICountdown>(Destination);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => countdown.Reference.Start(new StartCountdown(CommandId.New(), Hour, foreign.Id)));
