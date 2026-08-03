@@ -15,7 +15,9 @@ internal sealed class ChatNeuron :
     Neuron,
     IChat,
     IEmit<UserMessaged>,
-    IEmit<AssistantResponded>
+    IEmit<AssistantResponded>,
+    IHandle<ReadTranscriptRequest>,
+    IEmit<TranscriptRead>
 {
     private const string AssistantName = "assistant";
     private const string CommandLogName = "chat.command-log";
@@ -75,6 +77,35 @@ internal sealed class ChatNeuron :
     }
 
     public Task<ChatTranscript> Read() => Task.FromResult(new ChatTranscript(Turns()));
+
+    // Dispatch for this capability always addresses one fixed instance (the catalog's generated
+    // default), so a request naming that very instance answers locally - no grain call, and safe
+    // unconditionally, since a busy activation could not have accepted this delivery to begin with.
+    // A request naming a different conversation is a real directed call to that neuron's own
+    // activation: if that conversation is the very one whose turn is asking, the call waits behind a
+    // turn that cannot free up until this reply arrives. The owner session brokers every mid-turn
+    // capability call, so the delivery this handler sees is never attributed to the asking
+    // conversation - that hazard is real but not detectable here, and is left to the delivery
+    // timeout the outbox already enforces.
+    public async Task HandleAsync(ReadTranscriptRequest synapse, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+
+        var subject = NeuronId.For<IChat>(Id.Owner, synapse.ChatName);
+
+        var transcript = subject == Id
+            ? new ChatTranscript(Turns())
+            : await GrainFactory.GetGrain<IChat>(subject.ToGrainId()).Read().WaitAsync(cancellationToken);
+
+        await ReplyAsync(
+            new TranscriptRead(synapse.CommandId, subject, Trimmed(transcript, synapse.MaxTurns)),
+            cancellationToken);
+    }
+
+    private static ChatTranscript Trimmed(ChatTranscript transcript, int? maxTurns)
+        => maxTurns is not { } cap || transcript.Turns.Count <= cap
+            ? transcript
+            : new ChatTranscript([.. transcript.Turns.Skip(transcript.Turns.Count - cap)]);
 
     private IReadOnlyList<ChatTurn> Turns() => [.. _transcript.Select(_turns.Deserialize)];
 
