@@ -69,3 +69,11 @@ public static class BehaviorExecutionCodes
     public static bool IsInProcessClosed(string? outcome)
         => string.Equals(outcome, InProcessClosed, StringComparison.Ordinal);
 }
+
+public static class BehaviorFactEmission
+{
+    public const string Emitted = "emitted";
+    public const string UndeclaredAlias = "undeclared-broadcast-alias";
+    public const string NotRunning = "behavior-not-running";
+    public const string UnknownSynapse = "unknown-broadcast-synapse";
+}

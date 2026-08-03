@@ -42,5 +42,5 @@ public partial interface IBehaviorNeuron : INeuron
     Task<BehaviorExecutionResult> Execute(ExecuteBehaviorRevision command);
 
     [Alias(nameof(EmitFact))]
-    Task EmitFact(EmitBehaviorFact command);
+    Task<string> EmitFact(EmitBehaviorFact command);
 }

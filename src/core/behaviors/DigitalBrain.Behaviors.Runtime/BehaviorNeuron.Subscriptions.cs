@@ -75,7 +75,7 @@ internal sealed partial class BehaviorNeuron
         return new CommandId(new Guid(System.Security.Cryptography.SHA256.HashData(material).AsSpan(0, 16)));
     }
 
-    public async Task EmitFact(EmitBehaviorFact command)
+    public async Task<string> EmitFact(EmitBehaviorFact command)
     {
         ArgumentNullException.ThrowIfNull(command);
         ValidateCommand(command.CommandId);
@@ -90,8 +90,7 @@ internal sealed partial class BehaviorNeuron
             || !data.ActivationGateOpen
             || data.RunState is not BehaviorRunState.Running)
         {
-            await RefuseEmitAsync(command, behaviorId, "behavior-not-running");
-            return;
+            return await RefuseEmitAsync(command, behaviorId, "behavior-not-running");
         }
 
         // The signed manifest is the grant. Absent BroadcastEmitAliases means no emit rights.
@@ -99,14 +98,12 @@ internal sealed partial class BehaviorNeuron
         if (manifest.EntryPoints.BroadcastEmitAliases is not { } granted
             || !granted.Contains(command.EmitAlias, StringComparer.Ordinal))
         {
-            await RefuseEmitAsync(command, behaviorId, "undeclared-broadcast-alias");
-            return;
+            return await RefuseEmitAsync(command, behaviorId, "undeclared-broadcast-alias");
         }
 
         if (!TryReifyFact(command.EmitAlias, command.PayloadJson, out var fact))
         {
-            await RefuseEmitAsync(command, behaviorId, "unknown-broadcast-synapse");
-            return;
+            return await RefuseEmitAsync(command, behaviorId, "unknown-broadcast-synapse");
         }
 
         await EmitAsync(fact);
@@ -115,14 +112,18 @@ internal sealed partial class BehaviorNeuron
             behaviorId,
             data.ActiveArtifactHash,
             command.EmitAlias));
+        return BehaviorFactEmission.Emitted;
     }
 
-    private Task RefuseEmitAsync(EmitBehaviorFact command, BehaviorId behaviorId, string reason)
-        => EmitAsync(new BehaviorFactEmitRefused(
+    private async Task<string> RefuseEmitAsync(EmitBehaviorFact command, BehaviorId behaviorId, string reason)
+    {
+        await EmitAsync(new BehaviorFactEmitRefused(
             command.CommandId,
             behaviorId,
             command.EmitAlias,
             reason));
+        return reason;
+    }
 
     private bool TryReifyFact(string emitAlias, string payloadJson, out Synapse fact)
     {

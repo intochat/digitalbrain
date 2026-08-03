@@ -58,10 +58,19 @@ internal sealed class HostBehaviorSynapseBroker : IBehaviorSynapseBroker
             "One-way send is not supported; BehaviorCapabilityEdge requires a result identity.");
     }
 
-    public Task EmitAsync(Synapse fact, CancellationToken cancellationToken)
+    public async Task EmitAsync(Synapse fact, CancellationToken cancellationToken)
     {
-        throw new NotSupportedException(
-            "Out-of-process fact emission has no broker route yet; emit is authorized and performed on the behavior rail.");
+        ArgumentNullException.ThrowIfNull(fact);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // The host only asserts what it wants to say; the broker re-verifies the grant.
+        await client
+            .EmitFactAsync(
+                metadata.Behavior,
+                RequireAlias(fact.GetType()),
+                BehaviorPayloadJson.Serialize(fact, fact.GetType()),
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task<TResponse> SendAsync<TNeuron, TResponse>(

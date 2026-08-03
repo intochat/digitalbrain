@@ -342,6 +342,26 @@ public sealed class BehaviorDispatchBrokerEndpointsTests
 
     private sealed class RecordingAccess : IBehaviorCapabilityDispatchAccess
     {
+    public BehaviorId EmittedBehavior { get; private set; }
+
+    public string? EmittedAlias { get; private set; }
+
+    public string EmitOutcome { get; set; } = BehaviorFactEmission.Emitted;
+
+    public ValueTask<string> EmitFactAsync(
+        OwnerId owner,
+        NeuronId task,
+        AttemptId attempt,
+        BehaviorId behavior,
+        string emitAlias,
+        string factJson,
+        CancellationToken cancellationToken)
+    {
+        EmittedBehavior = behavior;
+        EmittedAlias = emitAlias;
+        return ValueTask.FromResult(EmitOutcome);
+    }
+
         public int DispatchCalls { get; private set; }
         public OwnerId LastOwner { get; private set; }
         public NeuronId LastTask { get; private set; }

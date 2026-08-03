@@ -42,6 +42,12 @@ internal interface IBehaviorHostBrokerClient : ITaskOperationClient, IBehaviorOp
         ProtectedPayloadReference reference,
         CancellationToken cancellationToken);
 
+    ValueTask EmitFactAsync(
+        BehaviorId behavior,
+        string emitAlias,
+        ReadOnlyMemory<byte> factJson,
+        CancellationToken cancellationToken);
+
     ValueTask<ReadOnlyMemory<byte>> LoadTriggerAsync(
         OwnerId owner,
         NeuronId task,

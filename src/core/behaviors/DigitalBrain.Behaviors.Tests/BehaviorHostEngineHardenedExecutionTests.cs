@@ -328,6 +328,13 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
 
     private sealed class RecordingBrokerClient : IBehaviorHostBrokerClient
     {
+    public ValueTask EmitFactAsync(
+        BehaviorId behavior,
+        string emitAlias,
+        ReadOnlyMemory<byte> factJson,
+        CancellationToken cancellationToken)
+        => ValueTask.CompletedTask;
+
         private readonly Dictionary<Guid, byte[]> payloads = new();
 
         public int LoadCount { get; private set; }

@@ -15,6 +15,15 @@ internal interface IBehaviorCapabilityDispatchAccess
         BehaviorCapabilityEdge edge,
         ProtectedPayloadReference requestPayload,
         CancellationToken cancellationToken);
+
+    ValueTask<string> EmitFactAsync(
+        OwnerId owner,
+        NeuronId task,
+        AttemptId attempt,
+        BehaviorId behavior,
+        string emitAlias,
+        string factJson,
+        CancellationToken cancellationToken);
 }
 
 internal sealed class GrainBehaviorCapabilityDispatchAccess : IBehaviorCapabilityDispatchAccess
@@ -115,6 +124,40 @@ internal sealed class GrainBehaviorCapabilityDispatchAccess : IBehaviorCapabilit
         {
             throw new InvalidOperationException("operation-timeout");
         }
+    }
+
+    public async ValueTask<string> EmitFactAsync(
+        OwnerId owner,
+        NeuronId task,
+        AttemptId attempt,
+        BehaviorId behavior,
+        string emitAlias,
+        string factJson,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(emitAlias);
+        ArgumentException.ThrowIfNullOrWhiteSpace(factJson);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        ValidateIdentity(owner, task, attempt);
+        behavior.EnsureValid();
+
+        // The host process is never trusted for identity: the task must exist, be owner-scoped
+        // and be on this exact attempt before its behavior is allowed to speak.
+        var snapshot = await ReadAndValidateTaskAsync(owner, task, attempt, cancellationToken)
+            .ConfigureAwait(false);
+        if (snapshot.Activation?.BehaviorId != behavior)
+        {
+            throw new NeuronAuthorizationException("behavior-activation-mismatch");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // The grant itself is re-verified against the signed manifest inside EmitFact.
+        return await grains
+            .GetGrain<IBehaviorNeuron>(new NeuronId("behaviorneuron", owner, behavior.Value).ToGrainId())
+            .EmitFact(new EmitBehaviorFact(CommandId.New(), emitAlias, factJson))
+            .ConfigureAwait(false);
     }
 
     private static ActiveModuleContractTypeMap ResolveTypeMap(IGrainFactory grains)

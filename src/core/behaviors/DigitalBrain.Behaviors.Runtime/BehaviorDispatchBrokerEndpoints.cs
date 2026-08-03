@@ -12,6 +12,7 @@ public static class BehaviorDispatchBrokerEndpoints
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         endpoints.MapPost("/v1/behaviors/broker/dispatch", DispatchAsync);
+        endpoints.MapPost("/v1/behaviors/broker/emit", EmitFactAsync);
         return endpoints;
     }
 
@@ -89,6 +90,63 @@ public static class BehaviorDispatchBrokerEndpoints
         catch (NeuronAuthorizationException)
         {
             return Failure("unauthorized-operation");
+        }
+    }
+
+    private static async Task<IResult> EmitFactAsync(
+        EmitFactRequest body,
+        IBehaviorCapabilityDispatchAccess access,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(access);
+
+        try
+        {
+            var identity = RequireIdentity(
+                body.Owner,
+                body.TaskType,
+                body.TaskOwner,
+                body.TaskName,
+                body.Attempt);
+
+            if (string.IsNullOrWhiteSpace(body.Behavior)
+                || string.IsNullOrWhiteSpace(body.EmitAlias)
+                || string.IsNullOrWhiteSpace(body.FactJson))
+            {
+                throw new ArgumentException(paramName: null, message: "invalid-request");
+            }
+
+            var outcome = await access
+                .EmitFactAsync(
+                    identity.Owner,
+                    identity.Task,
+                    identity.Attempt,
+                    new BehaviorId(body.Behavior),
+                    body.EmitAlias,
+                    body.FactJson,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return string.Equals(outcome, BehaviorFactEmission.Emitted, StringComparison.Ordinal)
+                ? Results.Ok(new EmitFactResponse(outcome))
+                : Failure(outcome);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (ArgumentException exception)
+        {
+            return Failure(MapArgumentReason(exception));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Failure(IsStableReason(exception.Message) ? exception.Message : "operation-failed");
+        }
+        catch (NeuronAuthorizationException exception)
+        {
+            return Failure(IsStableReason(exception.Message) ? exception.Message : "unauthorized-operation");
         }
     }
 
@@ -247,7 +305,11 @@ public static class BehaviorDispatchBrokerEndpoints
             or "invalid-payload-content"
             or "invalid-request-payload"
             or "empty-response-payload"
-            or "contract-type-map-unavailable";
+            or "contract-type-map-unavailable"
+            or "behavior-activation-mismatch"
+            or BehaviorFactEmission.UndeclaredAlias
+            or BehaviorFactEmission.NotRunning
+            or BehaviorFactEmission.UnknownSynapse;
 
     private static IResult Failure(string reason)
         => Results.Content(reason, "text/plain", statusCode: StatusCodes.Status400BadRequest);
@@ -264,6 +326,20 @@ public static class BehaviorDispatchBrokerEndpoints
         public EdgeBody? Edge { get; set; }
         public ProtectedReferenceBody? RequestPayload { get; set; }
     }
+
+    internal sealed class EmitFactRequest
+    {
+        public string? Owner { get; set; }
+        public string? TaskType { get; set; }
+        public string? TaskOwner { get; set; }
+        public string? TaskName { get; set; }
+        public string? Attempt { get; set; }
+        public string? Behavior { get; set; }
+        public string? EmitAlias { get; set; }
+        public string? FactJson { get; set; }
+    }
+
+    internal sealed record EmitFactResponse(string Outcome);
 
     internal sealed class EdgeBody
     {
