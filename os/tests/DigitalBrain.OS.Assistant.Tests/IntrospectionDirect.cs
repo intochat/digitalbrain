@@ -1,6 +1,8 @@
+using System.Globalization;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Introspection;
+using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
 using Xunit;
 
@@ -156,6 +158,17 @@ public sealed class IntrospectionDirect(OSBehaviorsFixture fixture)
         Assert.DoesNotContain(
             topology.Neurons,
             neuron => neuron.Identity.EndsWith($"/{ghost}", StringComparison.Ordinal));
+    }
+
+    [Fact(DisplayName =
+        "an introspection journal read gives up inside one outbox delivery attempt, not at the grain call's five-minute response timeout")]
+    public void JournalReadGivesUpInsideOneDeliveryAttempt()
+    {
+        Assert.Equal(DeliveryPolicy.DeliveryAttemptTimeout, IntrospectionNeuron.JournalReadBound);
+        Assert.True(
+            IntrospectionNeuron.JournalReadBound < TimeSpan.Parse(NeuronCallTimeouts.LongRunning, CultureInfo.InvariantCulture),
+            $"A read bound of {IntrospectionNeuron.JournalReadBound} gives up no sooner than the "
+            + $"{NeuronCallTimeouts.LongRunning} response timeout it exists to tighten.");
     }
 
     [Fact(DisplayName = "a journal page request refuses a page size outside the bounds the description advertises")]

@@ -8,9 +8,13 @@ public partial interface INeuron : IGrainWithStringKey
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
     Task Deliver(SynapseDelivery delivery, CancellationToken cancellationToken = default);
 
-    // The only interleaving surface a neuron has. Reading a feed neither yields nor writes, so it
-    // runs to completion inside one scheduler slot and cannot observe a half-applied turn; that is
-    // what lets a conversation be asked about itself while the turn asking is still open.
+    // The only interleaving surface a neuron has, and what lets a conversation be asked about itself
+    // while the turn asking is still open. Reading a feed neither yields nor writes, and appends and
+    // flushes are synchronous, so an interleaved read never sees a torn feed: entries, sequence and
+    // tallies always agree. It CAN see a turn that has been appended but not yet committed - the
+    // window between FlushOutgoing and the CommitAsync await - which a failed commit then discards by
+    // restoring the turn checkpoint. Closing that needs a committed watermark on the feed, not an
+    // attribute here.
     [ReadOnly]
     [AlwaysInterleave]
     [Alias(nameof(ReadJournal))]
