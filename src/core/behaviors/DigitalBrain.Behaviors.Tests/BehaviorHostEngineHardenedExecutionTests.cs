@@ -162,7 +162,11 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
         var triggerRef = new ProtectedPayloadReference(
             Guid.Parse("cccccccc-dddd-eeee-ffff-000000000003"),
             DateTimeOffset.UtcNow.AddHours(1));
-        factory.Client.Seed(triggerRef, Encoding.UTF8.GetBytes("""{"Label":"spoken"}"""));
+        // Seeded through the rail's own codec, which is camelCase: a program handed its trigger
+        // through raw JsonSerializer options binds every property to null instead.
+        factory.Client.Seed(
+            triggerRef,
+            BehaviorPayloadJson.Serialize(new HardenedTriggerShape("spoken"), typeof(HardenedTriggerShape)));
 
         var outcome = await engine.ExecuteAsync(
             new BehaviorHostExecuteCommand(
@@ -182,6 +186,7 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
         var emission = Assert.Single(factory.Client.Emissions);
         Assert.Equal(Behavior, emission.Behavior);
         Assert.Equal(FactContractId, emission.Alias);
+        // The label only survives if the trigger was decoded with the rail's codec.
         Assert.Contains("spoken", emission.FactJson, StringComparison.Ordinal);
         Assert.Equal(3, emission.Hops);
     }
@@ -325,6 +330,8 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
             """;
 
     private const string FactContractId = "test.hardened-fact";
+
+    private sealed record HardenedTriggerShape(string Label);
 
     private static string EmittingProgramInterfaceSource()
         => $$"""

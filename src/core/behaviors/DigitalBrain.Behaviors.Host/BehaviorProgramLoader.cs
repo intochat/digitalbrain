@@ -260,7 +260,9 @@ internal static class BehaviorProgramLoader
             return new BehaviorExecutionOutcome(false, BehaviorExecutionCodes.ContractMismatch);
         }
 
-        var trigger = JsonSerializer.Deserialize(triggerJson.Span, triggerType)
+        // The rail stores trigger payloads through BehaviorPayloadJson, so the program must be
+        // handed its trigger through the same codec or every property binds to null.
+        var trigger = BehaviorPayloadJson.Deserialize(triggerJson.Span, triggerType)
             ?? throw new InvalidOperationException(BehaviorExecutionCodes.ContractMismatch);
 
         var program = Activator.CreateInstance(programType)!;
