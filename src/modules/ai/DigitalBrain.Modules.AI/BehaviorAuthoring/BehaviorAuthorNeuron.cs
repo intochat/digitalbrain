@@ -25,7 +25,7 @@ internal sealed class BehaviorAuthorNeuron :
 
     private const string StateName = "ai.behavior-authoring";
     private const string DefaultFeatureName = "install";
-    private const int RetainedReceipts = 64;
+    internal const int RetainedEntries = 64;
 
     private readonly IDurableValue<byte[]> _state;
     private readonly Serializer<AuthoringData> _states;
@@ -53,12 +53,12 @@ internal sealed class BehaviorAuthorNeuron :
         ArgumentNullException.ThrowIfNull(command);
 
         var data = LoadOrEmpty();
-        if (data.Decisions.TryGetValue(command.CommandId.Value, out var settled))
+        if (data.Decisions.TryGet(command.CommandId.Value, out var settled))
         {
             return settled;
         }
 
-        if (!data.Proposals.TryGetValue(command.ProposalId, out var proposal)
+        if (!data.Proposals.TryGet(command.ProposalId, out var proposal)
             || !string.Equals(proposal.BehaviorId, command.BehaviorId, StringComparison.Ordinal))
         {
             return BehaviorChangeDecision.Unknown;
@@ -111,7 +111,7 @@ internal sealed class BehaviorAuthorNeuron :
         CancellationToken cancellationToken)
     {
         var data = LoadOrEmpty();
-        if (data.Drafts.TryGetValue(request.CommandId.Value, out var drafted))
+        if (data.Drafts.TryGet(request.CommandId.Value, out var drafted))
         {
             return new BehaviorChangeProposed(request.CommandId, drafted);
         }
@@ -147,13 +147,11 @@ internal sealed class BehaviorAuthorNeuron :
             BehaviorChangeStatus.AwaitingScenarioApproval,
             authored.DiffSummary);
 
-        var drafts = Bounded(data.Drafts, request.CommandId.Value, proposal);
-        var proposals = new Dictionary<string, BehaviorChangeProposal>(data.Proposals, StringComparer.Ordinal)
+        await SaveAsync(data with
         {
-            [proposal.ProposalId] = proposal,
-        };
-
-        await SaveAsync(data with { Drafts = drafts, Proposals = proposals });
+            Drafts = data.Drafts.With(request.CommandId.Value, proposal, RetainedEntries),
+            Proposals = data.Proposals.With(proposal.ProposalId, proposal, RetainedEntries),
+        });
         return new BehaviorChangeProposed(request.CommandId, proposal);
     }
 
@@ -162,13 +160,10 @@ internal sealed class BehaviorAuthorNeuron :
         ApproveBehaviorChange command,
         BehaviorChangeDecision decision)
     {
-        var proposals = new Dictionary<string, BehaviorChangeProposal>(data.Proposals, StringComparer.Ordinal);
-        proposals.Remove(command.ProposalId);
-
         await SaveAsync(data with
         {
-            Proposals = proposals,
-            Decisions = Bounded(data.Decisions, command.CommandId.Value, decision),
+            Proposals = data.Proposals.Without(command.ProposalId),
+            Decisions = data.Decisions.With(command.CommandId.Value, decision, RetainedEntries),
         });
         return decision;
     }
@@ -210,20 +205,6 @@ internal sealed class BehaviorAuthorNeuron :
         }
     }
 
-    private static Dictionary<Guid, TReceipt> Bounded<TReceipt>(
-        IReadOnlyDictionary<Guid, TReceipt> receipts,
-        Guid commandId,
-        TReceipt receipt)
-    {
-        var bounded = new Dictionary<Guid, TReceipt>(receipts) { [commandId] = receipt };
-        while (bounded.Count > RetainedReceipts)
-        {
-            bounded.Remove(bounded.Keys.First());
-        }
-
-        return bounded;
-    }
-
     private sealed record Authored(
         string FeatureName,
         string FeatureText,
@@ -244,19 +225,23 @@ internal sealed class BehaviorAuthorNeuron :
         }
     }
 
+    // Every map is bounded, Proposals included: drafting is the model-callable half of the approval
+    // boundary, so an unbounded proposal map would let a model grow durable owner state without
+    // limit, each entry carrying whole feature texts. Past the bound the oldest unsettled draft is
+    // dropped and has to be drafted again; a draft the owner never acted on is the cheapest thing to
+    // lose, and the alternative is refusing to draft at all once an attacker has filled the map.
     [GenerateSerializer]
     internal sealed record AuthoringData
     {
         public static AuthoringData Empty { get; } = new();
 
         [Id(0)]
-        public Dictionary<string, BehaviorChangeProposal> Proposals { get; init; } =
-            new(StringComparer.Ordinal);
+        public BoundedLedger<string, BehaviorChangeProposal> Proposals { get; init; } = new();
 
         [Id(1)]
-        public Dictionary<Guid, BehaviorChangeProposal> Drafts { get; init; } = [];
+        public BoundedLedger<Guid, BehaviorChangeProposal> Drafts { get; init; } = new();
 
         [Id(2)]
-        public Dictionary<Guid, BehaviorChangeDecision> Decisions { get; init; } = [];
+        public BoundedLedger<Guid, BehaviorChangeDecision> Decisions { get; init; } = new();
     }
 }

@@ -18,7 +18,7 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain)
     // A directed request is fired, handled and replied through the outbox, so the answer can outlive
     // a single delivery attempt. Waiting on the session journal watch is otherwise unbounded: without
     // a deadline an introspection neuron that never answers hangs the MCP request forever.
-    private static readonly TimeSpan ReplyBound = TimeSpan.FromSeconds(90);
+    internal static readonly TimeSpan ReplyBound = TimeSpan.FromSeconds(90);
 
     [McpServerTool(Name = AgentToolEndpoints.ListActiveNeuronsToolName)]
     [Description("List the neurons currently activated in the cluster, with their grain type and identity.")]

@@ -1,3 +1,4 @@
+using System.Globalization;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Introspection;
@@ -17,6 +18,18 @@ public sealed class IntrospectionToolVocabulary(OSBehaviorsFixture fixture)
         Assert.Equal("list_active_neurons", AgentToolEndpoints.ListActiveNeuronsToolName);
         Assert.Equal("read_neuron_journal", AgentToolEndpoints.ReadNeuronJournalToolName);
         Assert.Equal("read_chat_transcript", AgentToolEndpoints.ReadChatTranscriptToolName);
+    }
+
+    [Fact(DisplayName =
+        "the introspection tools give up well before the grain-call response timeout they exist to tighten")]
+    public void ToolWaitsAreBounded()
+    {
+        Assert.True(DigitalBrainIntrospectionTools.ReplyBound > TimeSpan.Zero);
+        Assert.True(
+            DigitalBrainIntrospectionTools.ReplyBound
+                < TimeSpan.Parse(NeuronCallTimeouts.LongRunning, CultureInfo.InvariantCulture),
+            $"A tool bound of {DigitalBrainIntrospectionTools.ReplyBound} gives up no sooner than the "
+            + $"{NeuronCallTimeouts.LongRunning} response timeout it exists to tighten.");
     }
 
     [Fact(Timeout = ToolTimeout, DisplayName =

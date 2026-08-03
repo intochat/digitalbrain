@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.AI;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Tasks;
 using Xunit;
@@ -116,7 +119,7 @@ public sealed class BehaviorOperations(UiEdgeFixture fixture)
     }
 
     [Fact(DisplayName =
-        "a scenario proposal outlives the UI edge process: a second edge instance approves the same proposal")]
+        "a scenario proposal outlives both the UI edge that drafted it and the neuron activation that holds it")]
     public async Task ProposalOutlivesTheEdgeThatDraftedIt()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -136,6 +139,11 @@ public sealed class BehaviorOperations(UiEdgeFixture fixture)
                 cancellationToken))!;
         }
 
+        // Both edges share this process, so surviving the edge alone would not distinguish durable
+        // state from a static field. Restarting the host that holds the authoring neuron drops the
+        // activation, so the approval below can only find the proposal by rehydrating it.
+        await test.Neuron<IBehaviorAuthoring>().RestartHostAsync(cancellationToken);
+
         await using var approving = await UiEdgeFixture.StartUiHttpAsync(test, cancellationToken);
         using var restarted = CreateClient(approving);
         using var approve = await restarted.PostAsJsonAsync(
@@ -151,6 +159,24 @@ public sealed class BehaviorOperations(UiEdgeFixture fixture)
             AccountEnrichmentTestProgram.AuthoredProgramTypeName,
             document.ProgramSource,
             StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "the UI edge assembly holds no static field of proposal state")]
+    public void TheEdgeHoldsNoStaticProposalState()
+    {
+        const BindingFlags Declared =
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+
+        var offenders = typeof(UiEdgeContract).Assembly
+            .GetTypes()
+            .Where(static type => !type.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false))
+            .SelectMany(type => type.GetFields(Declared).Select(field => (Owner: type, Field: field)))
+            .Where(static entry => CarriesProposalState(entry.Field.FieldType))
+            .Select(static entry => $"{entry.Owner.FullName}.{entry.Field.Name}")
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(offenders);
     }
 
     [Fact(DisplayName = "a rejected scenario proposal is forgotten, so approving it afterwards is not found")]
@@ -239,6 +265,11 @@ public sealed class BehaviorOperations(UiEdgeFixture fixture)
         Assert.NotNull(enabled);
         Assert.True(Assert.Single(enabled.Bindings).Enabled);
     }
+
+    private static bool CarriesProposalState(Type type)
+        => type.Name.Contains("Proposal", StringComparison.Ordinal)
+            || type.Name.Contains("BehaviorChange", StringComparison.Ordinal)
+            || (type.IsGenericType && type.GetGenericArguments().Any(CarriesProposalState));
 
     private static async Task<BehaviorEditorDocument> InstallAsync(
         HttpClient http,

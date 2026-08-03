@@ -1,3 +1,4 @@
+using System.Reflection;
 using DigitalBrain.AI;
 using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
@@ -40,6 +41,58 @@ public sealed class BehaviorAuthoring
 
         Assert.Throws<ArgumentException>(
             () => new ProposeBehaviorChangeRequest("enrichment", "   "));
+    }
+
+    [Fact(DisplayName =
+        "every durable authoring map is bounded, the model-callable drafting map included")]
+    public void EveryDurableAuthoringMapIsBounded()
+    {
+        var maps = typeof(BehaviorAuthorNeuron.AuthoringData)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+
+        Assert.NotEmpty(maps);
+        Assert.All(maps, map => Assert.Equal(
+            typeof(BoundedLedger<,>),
+            map.PropertyType.IsGenericType ? map.PropertyType.GetGenericTypeDefinition() : map.PropertyType));
+    }
+
+    [Fact(DisplayName =
+        "a bounded ledger evicts the oldest entry, and still does after an entry has been settled out of it")]
+    public void BoundedLedgerEvictsOldestFirst()
+    {
+        const int Bound = 4;
+        var ledger = new BoundedLedger<string, string>();
+        for (var entry = 0; entry < Bound; entry++)
+        {
+            ledger = ledger.With($"key-{entry}", $"value-{entry}", Bound);
+        }
+
+        // Frees a slot a Dictionary reuses out of insertion order, which is what makes "the first
+        // key" the wrong entry to evict from that point on.
+        ledger = ledger.Without("key-1");
+        ledger = ledger.With("key-4", "value-4", Bound);
+        ledger = ledger.With("key-5", "value-5", Bound);
+
+        Assert.Equal(["key-2", "key-3", "key-4", "key-5"], ledger.Order);
+        Assert.False(ledger.TryGet("key-0", out _));
+        Assert.True(ledger.TryGet("key-5", out var newest));
+        Assert.Equal("value-5", newest);
+    }
+
+    [Fact(DisplayName = "re-adding a key refreshes its place in the ledger instead of duplicating it")]
+    public void BoundedLedgerRefreshesRatherThanDuplicates()
+    {
+        const int Bound = 2;
+        var ledger = new BoundedLedger<string, string>()
+            .With("first", "one", Bound)
+            .With("second", "two", Bound)
+            .With("first", "one-again", Bound)
+            .With("third", "three", Bound);
+
+        Assert.Equal(["first", "third"], ledger.Order);
+        Assert.True(ledger.TryGet("first", out var refreshed));
+        Assert.Equal("one-again", refreshed);
+        Assert.False(ledger.TryGet("second", out _));
     }
 
     [Fact(DisplayName = "natural-language request returns a feature/scenario diff before source changes")]

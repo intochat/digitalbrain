@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Introspection;
 using DigitalBrain.Shell;
@@ -36,6 +38,20 @@ public sealed class BrainTopologyVocabulary(UiEdgeFixture fixture)
         Assert.All(
             served.Neurons,
             neuron => Assert.StartsWith("cluster-", neuron.Placement, StringComparison.Ordinal));
+    }
+
+    // A live stall would mean holding an HTTP request open for the whole bound; pinning the
+    // relationship the bound exists to establish is the proportionate proof.
+    [Fact(DisplayName =
+        "the topology route gives up well before the grain-call response timeout it exists to tighten")]
+    public void TheTopologyWaitIsBounded()
+    {
+        Assert.True(BrainEndpoints.TopologyReplyBound > TimeSpan.Zero);
+        Assert.True(
+            BrainEndpoints.TopologyReplyBound
+                < TimeSpan.Parse(NeuronCallTimeouts.LongRunning, CultureInfo.InvariantCulture),
+            $"A topology bound of {BrainEndpoints.TopologyReplyBound} gives up no sooner than the "
+            + $"{NeuronCallTimeouts.LongRunning} response timeout it exists to tighten.");
     }
 
     [Fact(DisplayName = "the UI edge assembly holds no topology reader of its own")]
