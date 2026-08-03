@@ -23,7 +23,7 @@ public sealed class BehaviorBroadcastSubscription(BroadcastSubscriptionFixture f
         var active = await InstallAsync(test, behavior, BroadcastHarness.SubscribingProgram());
         Assert.Equal(BehaviorRevisionStatus.Active, active.Status);
 
-        var executedWait = behavior.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
+        var executedWait = behavior.Outgoing.NextAsync<BehaviorWokeOnFact>(cancellationToken);
         await emitter.Reference.BroadcastDeclared("hello");
 
         var executed = await executedWait;
@@ -45,7 +45,7 @@ public sealed class BehaviorBroadcastSubscription(BroadcastSubscriptionFixture f
 
         await InstallAsync(test, behavior, BroadcastHarness.SubscribingProgram());
 
-        var executedWait = behavior.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
+        var executedWait = behavior.Outgoing.NextAsync<BehaviorWokeOnFact>(cancellationToken);
         await emitter.Reference.BroadcastUndeclared("ignored");
         await emitter.Reference.BroadcastDeclared("observed");
         _ = await executedWait;
@@ -74,7 +74,7 @@ public sealed class BehaviorBroadcastSubscription(BroadcastSubscriptionFixture f
         await emitter.Reference.BroadcastDeclared("while-stopped");
         await behavior.Reference.StartRun(new StartBehavior(CommandId.New()));
 
-        var executedWait = behavior.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
+        var executedWait = behavior.Outgoing.NextAsync<BehaviorWokeOnFact>(cancellationToken);
         await emitter.Reference.BroadcastDeclared("after-restart");
         _ = await executedWait;
 
@@ -97,7 +97,7 @@ public sealed class BehaviorBroadcastSubscription(BroadcastSubscriptionFixture f
         await InstallAsync(test, subscriber, BroadcastHarness.SubscribingProgram());
         await InstallAsync(test, outsider, BroadcastHarness.SubscribingProgram("behaviors.no-such-fact"));
 
-        var executedWait = subscriber.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
+        var executedWait = subscriber.Outgoing.NextAsync<BehaviorWokeOnFact>(cancellationToken);
         await emitter.Reference.BroadcastDeclared("only-subscriber");
         _ = await executedWait;
 
@@ -130,7 +130,7 @@ public sealed class BehaviorBroadcastSubscription(BroadcastSubscriptionFixture f
             [behavior.Id.Name],
             await registry.SubscribersOf(BroadcastHarness.DeclaredFactContractId, cancellationToken));
 
-        var executedWait = behavior.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
+        var executedWait = behavior.Outgoing.NextAsync<BehaviorWokeOnFact>(cancellationToken);
         await emitter.Reference.BroadcastDeclared("after-rehydrate");
         _ = await executedWait;
     }

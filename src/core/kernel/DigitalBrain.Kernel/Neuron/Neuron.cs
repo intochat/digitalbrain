@@ -57,6 +57,10 @@ public abstract partial class Neuron :
 
     protected SynapseId? CurrentDeliverySynapseId => _handling?.SynapseId;
 
+    // How many hops the delivery being handled is from its origin. Set from the outbox entry the
+    // sender stamped, so it is the one counter that survives every hop a fact actually takes.
+    protected int CurrentDeliveryDepth => _handlingDepth;
+
     // Orleans request / turn cancellation captured at Deliver entry for handlers and grain re-entry.
     protected CancellationToken TurnCancellationToken => _turnCancellation;
 

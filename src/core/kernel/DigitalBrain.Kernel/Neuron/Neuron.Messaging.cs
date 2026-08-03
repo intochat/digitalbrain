@@ -64,6 +64,26 @@ public abstract partial class Neuron
         }
     }
 
+    // Emissions made outside a delivery turn start at depth zero, which is how a chain of them
+    // restarts a budget the kernel believes it is counting. Stamping the depth explicitly lets a
+    // caller that knows what caused the emission keep the count running across that gap.
+    protected async Task EmitAtDepthAsync(Synapse synapse, CorrelationId correlation, int deliveryDepth)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentOutOfRangeException.ThrowIfNegative(deliveryDepth);
+
+        var restored = _handlingDepth;
+        _handlingDepth = Math.Max(deliveryDepth - 1, 0);
+        try
+        {
+            await EmitAsync(synapse, correlation);
+        }
+        finally
+        {
+            _handlingDepth = restored;
+        }
+    }
+
     private Task<SynapseDelivery> FireAsync(Synapse synapse, NeuronId[] receivers, CorrelationId? correlation = null)
         => FireAsync(synapse, receivers, _handling, correlation);
 

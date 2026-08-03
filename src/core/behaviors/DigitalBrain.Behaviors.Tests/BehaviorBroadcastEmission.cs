@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
 using Xunit;
 
@@ -236,7 +237,7 @@ public sealed class BehaviorBroadcastEmission(BroadcastSubscriptionFixture fixtu
         var speaking = await BehaviorInstall.ActivateAsync(test, speaker, BroadcastHarness.SelfEmittingProgram());
         await BehaviorInstall.ActivateAsync(test, listener, BroadcastHarness.SubscribingProgram());
 
-        var listenerWoke = listener.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
+        var listenerWoke = listener.Outgoing.NextAsync<BehaviorWokeOnFact>(cancellationToken);
         await speaker.Reference.EmitFact(new EmitBehaviorFact(
             CommandId.New(),
             BroadcastHarness.DeclaredFactContractId,
@@ -246,7 +247,70 @@ public sealed class BehaviorBroadcastEmission(BroadcastSubscriptionFixture fixtu
         _ = await listenerWoke;
 
         Assert.NotNull(speaking.ActiveArtifactHash);
-        Assert.Empty(await speaker.Outgoing.ReadAsync<BehaviorExecuted>(cancellationToken: cancellationToken));
+        Assert.Empty(await speaker.Outgoing.ReadAsync<BehaviorWokeOnFact>(cancellationToken: cancellationToken));
+    }
+
+    [Fact(DisplayName = "a wake starts a bound attempt whose activation identifies the woken behavior", Timeout = 120_000)]
+    public async Task AWakeStartsABoundAttemptCarryingTheBehaviorActivation()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var speaker = test.Neuron<IBehaviorNeuron>(EmittingBehavior);
+        var listener = test.Neuron<IBehaviorNeuron>(SubscribingBehavior);
+
+        await BehaviorInstall.ActivateAsync(test, speaker, BroadcastHarness.EmittingProgram());
+        var listening = await BehaviorInstall.ActivateAsync(test, listener, BroadcastHarness.SubscribingProgram());
+
+        var wokeWait = listener.Outgoing.NextAsync<BehaviorWokeOnFact>(cancellationToken);
+        await speaker.Reference.EmitFact(new EmitBehaviorFact(
+            CommandId.New(),
+            BroadcastHarness.DeclaredFactContractId,
+            """{"label":"bound"}"""));
+
+        var woke = await wokeWait;
+        Assert.NotEqual(default, woke.Synapse.Attempt);
+
+        var snapshot = await test.Cluster.Client
+            .GetGrain<ITask>(woke.Synapse.Task.ToGrainId())
+            .Read();
+
+        Assert.Equal(woke.Synapse.Attempt, snapshot.ActiveAttempt);
+        Assert.Equal(new BehaviorId(SubscribingBehavior), snapshot.Activation!.BehaviorId);
+        Assert.Equal(listening.ActiveArtifactHash, snapshot.Activation.Revision.Value);
+        var goal = Assert.IsType<BehaviorActivationGoal>(snapshot.Goal);
+        Assert.Equal(snapshot.Activation.CaseId, goal.CaseId);
+    }
+
+    [Fact(DisplayName = "the budget a spoken fact was charged is the budget the woken attempt inherits", Timeout = 120_000)]
+    public async Task TheWokenAttemptInheritsTheBudgetTheSpokenFactWasCharged()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var speaker = test.Neuron<IBehaviorNeuron>(EmittingBehavior);
+        var listener = test.Neuron<IBehaviorNeuron>(SubscribingBehavior);
+
+        await BehaviorInstall.ActivateAsync(test, speaker, BroadcastHarness.EmittingProgram());
+        await BehaviorInstall.ActivateAsync(test, listener, BroadcastHarness.SubscribingProgram());
+
+        var wokeWait = listener.Outgoing.NextAsync<BehaviorWokeOnFact>(cancellationToken);
+        await speaker.Reference.EmitFact(new EmitBehaviorFact(
+            CommandId.New(),
+            BroadcastHarness.DeclaredFactContractId,
+            """{"label":"charged"}""")
+        {
+            HopsRemaining = 3,
+        });
+
+        var woke = await wokeWait;
+        var snapshot = await test.Cluster.Client
+            .GetGrain<ITask>(woke.Synapse.Task.ToGrainId())
+            .Read();
+
+        // Without the fact carrying its charged budget as a delivery depth the woken attempt
+        // would start again at the ceiling, and an A-to-B-to-A chain would never terminate.
+        var goal = Assert.IsType<BehaviorActivationGoal>(snapshot.Goal);
+        Assert.Equal(3, goal.HopsRemaining);
+        Assert.True(goal.HopsRemaining < BehaviorFactEmission.MaximumHops);
     }
 
     [Fact(DisplayName = "behavior B speaks a fact and behavior A wakes on it with B as the journaled cause", Timeout = 120_000)]
@@ -260,7 +324,7 @@ public sealed class BehaviorBroadcastEmission(BroadcastSubscriptionFixture fixtu
         await BehaviorInstall.ActivateAsync(test, speaker, BroadcastHarness.EmittingProgram());
         var listening = await BehaviorInstall.ActivateAsync(test, listener, BroadcastHarness.SubscribingProgram());
 
-        var wokeWait = listener.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
+        var wokeWait = listener.Outgoing.NextAsync<BehaviorWokeOnFact>(cancellationToken);
         var emittedWait = speaker.Outgoing.NextAsync<ProbeFactRaised>(cancellationToken);
         await speaker.Reference.EmitFact(new EmitBehaviorFact(
             CommandId.New(),

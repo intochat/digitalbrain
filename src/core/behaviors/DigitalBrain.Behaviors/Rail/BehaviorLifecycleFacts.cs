@@ -148,3 +148,12 @@ public sealed record BehaviorFactEmitRefused(
     [property: Id(1)] BehaviorId Behavior,
     [property: Id(2)] string AttemptedAlias,
     [property: Id(3)] string Reason) : Synapse;
+
+[GenerateSerializer]
+[Alias("db.behavior.woke-on-fact")]
+public sealed record BehaviorWokeOnFact(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] BehaviorId Behavior,
+    [property: Id(2)] string ArtifactHash,
+    [property: Id(3)] NeuronId Task,
+    [property: Id(4)] DigitalBrain.Tasks.AttemptId Attempt) : Synapse;

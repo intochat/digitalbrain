@@ -3,6 +3,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Artifacts;
 using DigitalBrain.Behaviors.Manifest;
 using DigitalBrain.Kernel;
+using DigitalBrain.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Behaviors.Runtime;
@@ -54,29 +55,92 @@ internal sealed partial class BehaviorNeuron
             return;
         }
 
+        await DispatchWakeAsync(synapse, data, manifest, subscribedCase, cancellationToken);
+    }
+
+    // Running the program here would hold this neuron's turn across the host call, and the first
+    // thing authored code does with context.EmitAsync is call back into EmitFact on this same
+    // grain — a reentrancy deadlock. The wake therefore only starts the attempt: the task rail
+    // carries the execution on the Worker's and the relay's turns, long after this one ends, and
+    // it is also where the Task and Attempt identity the emit broker demands actually comes from.
+    private async Task DispatchWakeAsync(
+        Synapse fact,
+        BehaviorData data,
+        BehaviorDefinitionManifest manifest,
+        BehaviorContractCaseManifest subscribedCase,
+        CancellationToken cancellationToken)
+    {
         var behaviorId = BehaviorIdOfName();
-        var outcome = await _executor.ExecuteLegacyAsync(
-            new LegacyBehaviorExecutionRequest(
-                new BehaviorExecutionMetadata(
-                    Id.Owner,
-                    behaviorId,
-                    new BehaviorRevisionId(data.ActiveArtifactHash),
-                    BehaviorExecutionId.New()),
-                ReadOnlyMemory<byte>.Empty,
-                data.ActiveArtifactHash,
-                subscribedCase.CaseName,
-                Encoding.UTF8.GetString(BehaviorPayloadJson.Serialize(synapse, synapse.GetType())),
-                new GrainBehaviorCapabilityResolver(GrainFactory, Id.Owner),
-                TimeProvider),
+        var revision = new BehaviorRevisionId(data.ActiveArtifactHash!);
+        var command = WakeCommandId(behaviorId);
+        var attemptName = $"wake-{command.Value:N}";
+        var task = NeuronId.For<ITask>(Id.Owner, attemptName);
+        var worker = NeuronId.For<IWorker>(Id.Owner, attemptName);
+
+        var triggers = ServiceProvider.GetRequiredService<IBehaviorProtectedTriggerAccess>();
+        var trigger = await triggers.StoreAsync(
+            Id.Owner,
+            task,
+            behaviorId,
+            revision,
+            subscribedCase.CaseId,
+            BehaviorPayloadJson.Serialize(fact, fact.GetType()),
             cancellationToken);
 
-        await SaveAsync(data with { LastExecutionOutcome = outcome.Outcome });
-        await EmitAsync(new BehaviorExecuted(
-            WakeCommandId(behaviorId),
+        var capabilities = DeriveResultBearingEdges(Id.Owner, manifest.CapabilityGrants);
+        var contractVersion = manifest.EntryPoints.Contract.ContractMajorVersion
+            .ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var activation = new BehaviorTaskActivation(
             behaviorId,
-            data.ActiveArtifactHash,
-            outcome.Outcome));
+            revision,
+            contractVersion,
+            subscribedCase.CaseId,
+            trigger,
+            subscribedCase.CaseName,
+            capabilities);
+        var goal = new BehaviorActivationGoal(
+            behaviorId,
+            revision,
+            contractVersion,
+            subscribedCase.CaseId,
+            trigger,
+            subscribedCase.CaseName,
+            capabilities)
+        {
+            HopsRemaining = InheritedHops(),
+        };
+
+        var snapshot = await GrainFactory
+            .GetGrain<ITask>(task.ToGrainId())
+            .Start(new StartTask(
+                command,
+                goal,
+                worker,
+                new TaskPolicy(1, TimeSpan.Zero, null),
+                Activation: activation));
+
+        var tracked = new List<NeuronId>(data.ActiveTaskIds);
+        if (!tracked.Contains(task))
+        {
+            tracked.Add(task);
+        }
+
+        await SaveAsync(data with { ActiveTaskIds = tracked });
+        await EmitAsync(new BehaviorWokeOnFact(
+            command,
+            behaviorId,
+            data.ActiveArtifactHash!,
+            task,
+            snapshot.ActiveAttempt ?? default));
     }
+
+    // The delivery's own hop count is the budget it has already spent, so a woken program starts
+    // from what is left rather than from a fresh ceiling.
+    private int InheritedHops()
+        => Math.Clamp(
+            BehaviorFactEmission.MaximumHops - CurrentDeliveryDepth,
+            0,
+            BehaviorFactEmission.MaximumHops);
 
     // A wake has no command, so the triggering delivery is its identity: replaying the same
     // fact reproduces the same command id instead of minting a fresh one per attempt.
@@ -149,7 +213,12 @@ internal sealed partial class BehaviorNeuron
         // "emitted" for a fact that was never spoken. Ordered this way the failure mode is a
         // duplicate on a crash between the emission and the receipt, which the rail already
         // tolerates, instead of silent loss under a claim that it succeeded.
-        await EmitAsync(fact, correlation);
+        // The spoken fact carries the budget it was charged as its delivery depth, so the next
+        // behavior woken by it inherits what is left instead of a fresh ceiling.
+        await EmitAtDepthAsync(
+            fact,
+            correlation,
+            BehaviorFactEmission.MaximumHops - command.HopsRemaining);
         await EmitAsync(
             new BehaviorFactEmitted(
                 command.CommandId,
