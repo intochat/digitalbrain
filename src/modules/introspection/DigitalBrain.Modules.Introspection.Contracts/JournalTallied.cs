@@ -15,8 +15,6 @@ public sealed record JournalTallied(
     [property: Id(5)] IReadOnlyList<JournalTally> Tallies,
     [property: Id(6)] string? Error = null) : Synapse
 {
-    public bool Succeeded => Error is null;
-
     public static JournalTallied Refused(CommandId commandId, NeuronId subject, string direction, string reason)
         => new(commandId, subject, direction, TotalRecorded: 0, LastSequence: 0, [], reason);
 }

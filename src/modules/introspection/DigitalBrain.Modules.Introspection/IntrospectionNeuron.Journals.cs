@@ -12,8 +12,11 @@ internal sealed partial class IntrospectionNeuron
     // The read interleaves, so it no longer waits out the subject's turn - but a subject that never
     // answers must not outlive one outbox delivery attempt, or the retry of the request being served
     // starts while this handler is still waiting. INeuron.ReadJournal's own ResponseTimeout is five
-    // minutes, ten times that budget, so the bound has to be applied here.
-    internal static readonly TimeSpan JournalReadBound = DeliveryPolicy.DeliveryAttemptTimeout;
+    // minutes, ten times that budget, so the bound has to be applied here. The bound must also come
+    // in strictly under DeliveryAttemptTimeout: TryDeliverAsync arms the outer attempt deadline
+    // before this handler's turn starts, so a bound equal to it always loses that race and this
+    // catch would never see a TimeoutException.
+    internal static readonly TimeSpan JournalReadBound = DeliveryPolicy.InnerDeliveryReadBound;
 
     private async Task<string?> RefusalForAsync(NeuronId subject, CancellationToken cancellationToken)
     {

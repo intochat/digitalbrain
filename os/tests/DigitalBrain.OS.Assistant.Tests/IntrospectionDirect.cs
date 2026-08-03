@@ -154,7 +154,6 @@ public sealed class IntrospectionDirect(OSBehaviorsFixture fixture)
         var topology = await test.Client.Get<IIntrospection>()
             .SendAsync(new ReadTopologyRequest(), cancellationToken);
 
-        Assert.Null(topology.Error);
         Assert.DoesNotContain(
             topology.Neurons,
             neuron => neuron.Identity.EndsWith($"/{ghost}", StringComparison.Ordinal));
@@ -164,11 +163,41 @@ public sealed class IntrospectionDirect(OSBehaviorsFixture fixture)
         "an introspection journal read gives up inside one outbox delivery attempt, not at the grain call's five-minute response timeout")]
     public void JournalReadGivesUpInsideOneDeliveryAttempt()
     {
-        Assert.Equal(DeliveryPolicy.DeliveryAttemptTimeout, IntrospectionNeuron.JournalReadBound);
+        // Strictly less, not equal: TryDeliverAsync arms the outer attemptCts.CancelAfter
+        // (DeliveryAttemptTimeout) before Deliver even starts, so a bound equal to that outer
+        // deadline always loses the race to it - the read would see OperationCanceledException,
+        // never the TimeoutException this bound exists to surface as a typed refusal.
+        Assert.True(
+            IntrospectionNeuron.JournalReadBound < DeliveryPolicy.DeliveryAttemptTimeout,
+            $"A read bound of {IntrospectionNeuron.JournalReadBound} does not come in strictly under "
+            + $"the outer {DeliveryPolicy.DeliveryAttemptTimeout} delivery-attempt deadline armed "
+            + "before this handler's turn starts, so the timeout catch can never win that race.");
         Assert.True(
             IntrospectionNeuron.JournalReadBound < TimeSpan.Parse(NeuronCallTimeouts.LongRunning, CultureInfo.InvariantCulture),
             $"A read bound of {IntrospectionNeuron.JournalReadBound} gives up no sooner than the "
             + $"{NeuronCallTimeouts.LongRunning} response timeout it exists to tighten.");
+    }
+
+    [Fact(Timeout = RequestTimeout, DisplayName =
+        "a journal read bounded strictly under the outbox's outer delivery-attempt deadline reds a TimeoutException, not the deadline's bare cancellation")]
+    public async Task InnerReadBoundWinsTheRaceAgainstTheOuterDeliveryDeadline()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Mirrors Neuron.Outbox.TryDeliverAsync exactly: the outer attempt deadline is armed before
+        // the inner call ever starts. A subject that never answers must still surface as a
+        // TimeoutException from the inner WaitAsync, not as OperationCanceledException from the
+        // outer token - that distinction is what makes IntrospectionNeuron.TryReadAsync's typed
+        // refusal reachable at all.
+        using var outerAttempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        outerAttempt.CancelAfter(DeliveryPolicy.DeliveryAttemptTimeout);
+
+        var neverAnswers = new TaskCompletionSource<JournalRead>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await Assert.ThrowsAsync<TimeoutException>(
+            () => neverAnswers.Task.WaitAsync(IntrospectionNeuron.JournalReadBound, outerAttempt.Token));
+
+        Assert.False(outerAttempt.IsCancellationRequested);
     }
 
     [Fact(DisplayName = "a journal page request refuses a page size outside the bounds the description advertises")]

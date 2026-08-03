@@ -205,7 +205,6 @@ public sealed class IntrospectionCapabilityTurn(OSBehaviorsFixture fixture)
 
         var topology = await introspection.Outgoing.NextAsync<TopologyRead>(cancellationToken);
 
-        Assert.Null(topology.Synapse.Error);
         Assert.Contains(IntrospectionModule.Id.Value, topology.Synapse.Modules);
         Assert.Contains(ChatModule.Id.Value, topology.Synapse.Modules);
         Assert.Contains(topology.Synapse.Neurons, neuron => neuron.GrainType == "chat");

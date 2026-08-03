@@ -7,7 +7,7 @@ using Xunit;
 
 namespace DigitalBrain.ModuleTests;
 
-public sealed class BehaviorAuthoring
+public sealed class BehaviorAuthoring(BehaviorAuthoringFixture fixture)
 {
     private const string CurrentProgram = "public sealed class Program {}";
 
@@ -30,7 +30,43 @@ public sealed class BehaviorAuthoring
     [Fact(DisplayName =
         "a drafting request gives up inside one outbox delivery attempt rather than throwing into the retry horizon")]
     public void DraftingGivesUpInsideOneDeliveryAttempt()
-        => Assert.Equal(DeliveryPolicy.DeliveryAttemptTimeout, BehaviorAuthorNeuron.BehaviorReadBound);
+    {
+        // Strictly less, not equal: TryDeliverAsync arms the outer attemptCts.CancelAfter
+        // (DeliveryAttemptTimeout) before Deliver even starts, so a bound equal to that outer
+        // deadline always loses the race to it - ProposeAsync would see OperationCanceledException,
+        // never the TimeoutException its refusal branch exists to catch. This mechanism is proven
+        // reachable by IntrospectionDirect.InnerReadBoundWinsTheRaceAgainstTheOuterDeliveryDeadline,
+        // which races the identical DeliveryPolicy.InnerDeliveryReadBound this bound is drawn from.
+        Assert.True(
+            BehaviorAuthorNeuron.BehaviorReadBound < DeliveryPolicy.DeliveryAttemptTimeout,
+            $"A read bound of {BehaviorAuthorNeuron.BehaviorReadBound} does not come in strictly "
+            + $"under the outer {DeliveryPolicy.DeliveryAttemptTimeout} delivery-attempt deadline "
+            + "armed before this handler's turn starts, so the timeout catch can never win that race.");
+    }
+
+    [Fact(DisplayName =
+        "drafting resolves its author through the DI-fallback lambda when no IBehaviorAuthor is registered, without the fallback ever calling the model")]
+    public async Task ProposeResolvesTheAuthorFallbackWhenNoAuthorIsRegistered()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        const string behaviorId = "com.demo.fallback";
+        const string requestText = "also enrich phone numbers";
+
+        // BehaviorAuthoringFixture registers no IBehaviorAuthor, so BehaviorAuthorNeuron.Author()
+        // must resolve through its fallback lambda over IGemma4 to serve this request at all.
+        // Propose only calls BehaviorAuthor.ProposeScenarios, which never calls the model (see
+        // ApplyApprovedScenariosEmitsModelGeneratedProgram for the call that does), so this proves the
+        // fallback's construction and DI resolution compile and wire correctly without scripting Gemma4.
+        var proposed = await test.Client.GetGrainProxy<IBehaviorAuthoring>()
+            .Propose(new ProposeBehaviorChangeRequest(behaviorId, requestText));
+
+        Assert.True(proposed.Succeeded);
+        Assert.NotNull(proposed.Proposal);
+        Assert.Equal(behaviorId, proposed.Proposal.BehaviorId);
+        Assert.Equal(BehaviorChangeStatus.AwaitingScenarioApproval, proposed.Proposal.Status);
+        Assert.Contains($"Scenario: {requestText}", proposed.Proposal.ProposedFeatureText, StringComparison.Ordinal);
+    }
 
     [Fact(DisplayName = "a drafting request refuses an unaddressable behavior identity before it is delivered")]
     public void DraftingRefusesAnUnaddressableBehaviorIdentity()

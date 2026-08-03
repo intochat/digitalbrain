@@ -42,11 +42,6 @@ internal static class BrainEndpoints
                         statusCode: StatusCodes.Status504GatewayTimeout);
                 }
 
-                if (read.Error is { } refused)
-                {
-                    return Results.Problem(refused);
-                }
-
                 return Results.Ok(new BrainTopologySnapshot(
                     [.. read.Modules.Select(static module => new BrainModule(module))],
                     [

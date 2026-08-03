@@ -18,8 +18,4 @@ public sealed record TopologyRead(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] IReadOnlyList<string> Modules,
     [property: Id(2)] IReadOnlyList<TopologyNeuron> Neurons,
-    [property: Id(3)] DateTimeOffset ObservedAt,
-    [property: Id(4)] string? Error = null) : Synapse
-{
-    public bool Succeeded => Error is null;
-}
+    [property: Id(3)] DateTimeOffset ObservedAt) : Synapse;

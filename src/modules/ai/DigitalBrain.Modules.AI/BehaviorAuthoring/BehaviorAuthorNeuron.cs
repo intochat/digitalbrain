@@ -20,8 +20,11 @@ internal sealed class BehaviorAuthorNeuron :
 
     // Drafting is a handled request, so a behavior that never answers must not outlive one outbox
     // delivery attempt: past that the retry of the request being served starts while this handler is
-    // still waiting, and the throw would be retried for the whole delivery horizon.
-    internal static readonly TimeSpan BehaviorReadBound = DeliveryPolicy.DeliveryAttemptTimeout;
+    // still waiting, and the throw would be retried for the whole delivery horizon. The bound must
+    // also come in strictly under DeliveryAttemptTimeout: TryDeliverAsync arms the outer attempt
+    // deadline before this handler's turn starts, so a bound equal to it always loses that race and
+    // this catch would never see a TimeoutException.
+    internal static readonly TimeSpan BehaviorReadBound = DeliveryPolicy.InnerDeliveryReadBound;
 
     private const string StateName = "ai.behavior-authoring";
     private const string DefaultFeatureName = "install";
@@ -190,6 +193,9 @@ internal sealed class BehaviorAuthorNeuron :
             ? _states.Deserialize(serialized)
             : AuthoringData.Empty;
 
+    // Deliberately no EnlistTurnRollback here: ProposeAsync's idempotency (line 114's Drafts lookup
+    // by CommandId) depends on a committed draft surviving a later turn retraction, or a retried
+    // request would find the map empty again and draft a second, possibly different, proposal.
     private async Task SaveAsync(AuthoringData data)
     {
         var previous = _state.Value is { Length: > 0 } serialized ? serialized.ToArray() : [];

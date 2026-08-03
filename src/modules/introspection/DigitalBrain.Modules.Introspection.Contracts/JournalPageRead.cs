@@ -15,8 +15,6 @@ public sealed record JournalPageRead(
     [property: Id(5)] IReadOnlyList<JournaledFact> Entries,
     [property: Id(6)] string? Error = null) : Synapse
 {
-    public bool Succeeded => Error is null;
-
     public static JournalPageRead Refused(CommandId commandId, NeuronId subject, string direction, string reason)
         => new(commandId, subject, direction, ResumeSequence: 0, Compacted: false, [], reason);
 }

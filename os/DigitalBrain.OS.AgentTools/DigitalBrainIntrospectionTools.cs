@@ -29,10 +29,6 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain)
             token => brain.Get<IIntrospection>().SendAsync(new ReadTopologyRequest(), token),
             nameof(ReadTopologyRequest),
             cancellationToken);
-        if (topology.Error is { } refused)
-        {
-            throw new InvalidOperationException(refused);
-        }
 
         return [.. topology.Neurons.Select(static neuron => new ActiveNeuron(neuron.GrainType, neuron.Identity))];
     }
@@ -82,16 +78,20 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain)
     [McpServerTool(Name = AgentToolEndpoints.ReadChatTranscriptToolName)]
     [Description("Read the durable transcript of a conversation as the owner would see it.")]
     public async Task<ChatTranscriptPage> ReadChatTranscriptAsync(
-        [Description("Conversation name, for example 'main'")] string chatName = "main")
+        [Description("Conversation name, for example 'main'")] string chatName = "main",
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
 
-        var transcript = await brain.GetGrainProxy<IChat>(chatName).Read();
+        var read = await BoundedAsync(
+            token => brain.Get<IChat>().SendAsync(new ReadTranscriptRequest(chatName), token),
+            nameof(ReadTranscriptRequest),
+            cancellationToken);
 
         return new ChatTranscriptPage(
             chatName,
             [
-                .. transcript.Turns.Select(turn => new ChatTranscriptTurn(turn.FromUser ? "you" : "brain", turn.Text)),
+                .. read.Transcript.Turns.Select(turn => new ChatTranscriptTurn(turn.FromUser ? "you" : "brain", turn.Text)),
             ]);
     }
 
