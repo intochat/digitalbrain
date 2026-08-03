@@ -1,0 +1,20 @@
+bin/
+obj/
+/artifacts/
+TestResults/
+*.binlog
+*.user
+*.env
+.vs/
+logs/
+.codegraph/
+.digitalbrain/
+.agents/
+.superpowers/
+.worktrees/
+sources/
+node_modules/
+
+# Local MCP tool installs (Codex absolute launch)
+.config/codegraph-tool/
+.config/context7-tool/
