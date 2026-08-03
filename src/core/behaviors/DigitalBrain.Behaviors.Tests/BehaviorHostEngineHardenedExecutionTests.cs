@@ -191,6 +191,43 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
         Assert.Equal(3, emission.Hops);
     }
 
+    [Fact(DisplayName = "a bound attempt hands a single-file BehaviorBrain entry its trigger through the rail's own codec")]
+    public async Task SingleFileEntryIsHandedItsTriggerThroughTheRailCodec()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var artifact = CompileCanonicalArtifact(CodecSensitiveSingleFileProgram(), grants: []);
+        var factory = new RecordingBrokerFactory();
+        var engine = new BehaviorHostEngine(new AcceptingTrust(), factory);
+
+        await DeployAndActivateAsync(engine, artifact, cancellationToken);
+
+        var triggerRef = new ProtectedPayloadReference(
+            Guid.Parse("dddddddd-eeee-ffff-aaaa-000000000004"),
+            DateTimeOffset.UtcNow.AddHours(1));
+        // Every trigger the rail stores travels through BehaviorPayloadJson, which is camelCase.
+        factory.Client.Seed(
+            triggerRef,
+            BehaviorPayloadJson.Serialize(new HardenedTriggerShape("spoken"), typeof(HardenedTriggerShape)));
+
+        var outcome = await engine.ExecuteAsync(
+            new BehaviorHostExecuteCommand(
+                Metadata(artifact.Digest.Value),
+                artifact.Digest.Value,
+                TaskNeuron,
+                Attempt,
+                "HardenedCodecTrigger",
+                triggerRef,
+                Capabilities: [],
+                DateTimeOffset.UtcNow,
+                WorkerNeuron),
+            cancellationToken);
+
+        // The entry refuses any label but the seeded one, so a trigger decoded with raw
+        // JsonSerializer options arrives carrying null and the execution fails.
+        Assert.True(outcome.Succeeded, outcome.Outcome);
+        Assert.Equal(1, factory.Client.LoadCount);
+    }
+
     [Fact(DisplayName = "deploy rejects assembly bytes that differ from the canonical artifact embedded Behavior.dll")]
     public async Task DeployRejectsAssemblyBytesDifferingFromCanonicalEmbeddedBehaviorDll()
     {
@@ -326,6 +363,35 @@ public sealed class BehaviorHostEngineHardenedExecutionTests
             {
                 public static Task RunAsync(BehaviorBrain<HardenedNoOpTrigger> brain)
                     => Task.CompletedTask;
+            }
+            """;
+
+    private static string CodecSensitiveSingleFileProgram()
+        => """
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DigitalBrain.Abstractions;
+            using DigitalBrain.Behaviors;
+
+            public sealed record HardenedCodecTrigger(string Label) : Synapse;
+
+            public sealed class HardenedCodecProgram : IBehaviorProgram<HardenedCodecTrigger>
+            {
+                public ValueTask ExecuteAsync(
+                    HardenedCodecTrigger trigger,
+                    IBehaviorContext context,
+                    CancellationToken cancellationToken)
+                    => ValueTask.CompletedTask;
+            }
+
+            public static class BehaviorEntry
+            {
+                public static Task RunAsync(BehaviorBrain<HardenedCodecTrigger> brain)
+                    => brain.Trigger.Label == "spoken"
+                        ? Task.CompletedTask
+                        : Task.FromException(new InvalidOperationException(
+                            "trigger label was '" + (brain.Trigger.Label ?? "<null>") + "'"));
             }
             """;
 
