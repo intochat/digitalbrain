@@ -14,6 +14,9 @@ internal static class DeliveryPolicy
     // cancelable lifecycle token that can actually fire (not merely CanBeCanceled forever).
     internal static readonly TimeSpan DeliveryAttemptTimeout = TimeSpan.FromSeconds(30);
 
+    // Bound on the subscriber lookup every aliased broadcast performs inside the emitting turn.
+    internal static readonly TimeSpan SubscriberLookupTimeout = TimeSpan.FromSeconds(5);
+
     internal static int InboundDepth() => RequestContext.Get(DepthKey) is int depth ? depth : 0;
 
     internal static void CarryDepth(int depth) => RequestContext.Set(DepthKey, depth);

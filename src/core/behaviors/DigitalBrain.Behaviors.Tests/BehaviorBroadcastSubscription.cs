@@ -1,7 +1,9 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Runtime;
+using DigitalBrain.Kernel;
 using DigitalBrain.Tasks;
 using DigitalBrain.Testing;
+using Orleans.Concurrency;
 using Xunit;
 
 namespace DigitalBrain.Behaviors.Tests;
@@ -131,6 +133,45 @@ public sealed class BehaviorBroadcastSubscription(BroadcastSubscriptionFixture f
         var executedWait = behavior.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
         await emitter.Reference.BroadcastDeclared("after-rehydrate");
         _ = await executedWait;
+    }
+
+    [Fact(DisplayName = "a subscriber lookup that never answers fails the emit loudly instead of dropping it", Timeout = 120_000)]
+    public async Task StalledSubscriberLookupFailsTheEmitLoudly()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var emitter = test.Neuron<IBroadcastProbeEmitter>("probe");
+
+        var failure = await Assert.ThrowsAnyAsync<Exception>(
+            () => emitter.Reference.BroadcastStalled("unanswered"));
+
+        Assert.Contains(BroadcastHarness.StalledFactContractId, failure.Message, StringComparison.Ordinal);
+        Assert.Empty(await emitter.Outgoing.ReadAsync<ProbeFactStalled>(
+            afterSequence: 0,
+            cancellationToken));
+    }
+
+    [Fact(DisplayName = "the subscription registry lookup interleaves and its write does not")]
+    public void OnlyTheRegistryLookupInterleaves()
+    {
+        var lookup = typeof(IBehaviorSubscriptionRegistry)
+            .GetMethod(nameof(IBehaviorSubscriptionRegistry.SubscribersOf))!;
+        var write = typeof(IBehaviorSubscriptionRegistry)
+            .GetMethod(nameof(IBehaviorSubscriptionRegistry.Replace))!;
+
+        Assert.True(lookup.IsDefined(typeof(AlwaysInterleaveAttribute), inherit: true));
+        Assert.False(write.IsDefined(typeof(AlwaysInterleaveAttribute), inherit: true));
+    }
+
+    [Fact(DisplayName = "the interleaving registry is a plain durable grain, so the serialized-turn guard is untouched")]
+    public void TheInterleavingRegistryIsNotANeuron()
+    {
+        Assert.False(typeof(Neuron).IsAssignableFrom(typeof(BehaviorSubscriptionRegistryGrain)));
+
+        var refusal = Assert.Throws<InvalidOperationException>(
+            () => NeuronConcurrency.RequireSerializedTurns(typeof(BehaviorSubscriptionRegistryGrain)));
+
+        Assert.Contains(nameof(AlwaysInterleaveAttribute), refusal.Message, StringComparison.Ordinal);
     }
 
     private static async Task<BehaviorSnapshot> InstallAsync(

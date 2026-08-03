@@ -49,7 +49,19 @@ public abstract partial class Neuron
             return [];
         }
 
-        return await subscribers.ReceiversFor(Id.Owner, alias, CancellationToken.None);
+        using var bound = new CancellationTokenSource(DeliveryPolicy.SubscriberLookupTimeout);
+        try
+        {
+            return await subscribers.ReceiversFor(Id.Owner, alias, bound.Token);
+        }
+        catch (OperationCanceledException) when (bound.IsCancellationRequested)
+        {
+            // Failing closed would report "no subscribers", which is indistinguishable from a
+            // correct empty result and leaves every subscriber silently deaf. Failing loudly
+            // retracts the emitting turn and leaves the outbox to retry it.
+            throw new TimeoutException(
+                $"Broadcast subscriber lookup for '{alias}' did not answer within {DeliveryPolicy.SubscriberLookupTimeout}.");
+        }
     }
 
     private Task<SynapseDelivery> FireAsync(Synapse synapse, NeuronId[] receivers, CorrelationId? correlation = null)

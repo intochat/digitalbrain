@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Concurrency;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
@@ -11,6 +12,9 @@ internal interface IBehaviorSubscriptionRegistry : IGrainWithStringKey
     [Alias(nameof(Replace))]
     Task Replace(string behaviorName, IReadOnlyList<string> eventAliases, CancellationToken cancellationToken);
 
+    // Every owner-scoped broadcast reads this grain, so the read must not queue behind a
+    // behavior's activation write. It loads and looks up; it never mutates.
+    [AlwaysInterleave]
     [Alias(nameof(SubscribersOf))]
     Task<IReadOnlyList<string>> SubscribersOf(string eventAlias, CancellationToken cancellationToken);
 }

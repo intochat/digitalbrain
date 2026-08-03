@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
@@ -16,6 +17,9 @@ public partial interface IBroadcastProbeEmitter : INeuron
 
     [Alias(nameof(BroadcastUndeclared))]
     Task BroadcastUndeclared(string label);
+
+    [Alias(nameof(BroadcastStalled))]
+    Task BroadcastStalled(string label);
 }
 
 [GenerateSerializer]
@@ -28,12 +32,40 @@ public sealed record ProbeFactRaised([property: Id(0)] string Label) : Synapse;
 [Description("Broadcast fact no behavior subscribes to")]
 public sealed record ProbeFactUnwanted([property: Id(0)] string Label) : Synapse;
 
+[GenerateSerializer]
+[Alias(BroadcastHarness.StalledFactContractId)]
+[Description("Broadcast fact whose subscriber lookup never answers")]
+public sealed record ProbeFactStalled([property: Id(0)] string Label) : Synapse;
+
 [GrainType(BroadcastHarness.GrainTypeName)]
 internal sealed class BroadcastProbeEmitterNeuron : Neuron, IBroadcastProbeEmitter
 {
     public Task BroadcastDeclared(string label) => EmitAsync(new ProbeFactRaised(label));
 
     public Task BroadcastUndeclared(string label) => EmitAsync(new ProbeFactUnwanted(label));
+
+    public Task BroadcastStalled(string label) => EmitAsync(new ProbeFactStalled(label));
+}
+
+// Delegates every alias to the real registry lookup except the one the bound is proven against.
+internal sealed class StallingBroadcastSubscribers : IBroadcastSubscribers
+{
+    private readonly BehaviorBroadcastSubscribers _registry;
+
+    public StallingBroadcastSubscribers(IGrainFactory grains) => _registry = new(grains);
+
+    public async ValueTask<IReadOnlyCollection<NeuronId>> ReceiversFor(
+        OwnerId owner,
+        string eventAlias,
+        CancellationToken cancellationToken)
+    {
+        if (string.Equals(eventAlias, BroadcastHarness.StalledFactContractId, StringComparison.Ordinal))
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+
+        return await _registry.ReceiversFor(owner, eventAlias, cancellationToken);
+    }
 }
 
 [ClientEntryPoint]
@@ -102,6 +134,12 @@ public sealed class BehaviorBroadcastHarnessModule : IModule, ICompiledModule
                         "Broadcast fact no behavior subscribes to",
                         CapabilitySchema.For(typeof(ProbeFactUnwanted)),
                         Array.Empty<string>()),
+                    new SynapseCapabilityDescriptor(
+                        BroadcastHarness.StalledFactContractId,
+                        1,
+                        "Broadcast fact whose subscriber lookup never answers",
+                        CapabilitySchema.For(typeof(ProbeFactStalled)),
+                        Array.Empty<string>()),
                 ]),
             new NeuronCapabilityDescriptor(
                 BroadcastHarness.ActivationEmitterContractId,
@@ -136,6 +174,8 @@ public sealed class BehaviorBroadcastHarnessModule : IModule, ICompiledModule
         DigitalBrainSiloBuilderExtensions.AddBroadcastHandlers(
             builder,
             typeof(BehaviorBroadcastHarnessModule).Assembly);
+        builder.Services.AddSingleton<IBroadcastSubscribers>(static provider =>
+            new StallingBroadcastSubscribers(provider.GetRequiredService<IGrainFactory>()));
     }
 }
 
@@ -144,6 +184,7 @@ internal static class BroadcastHarness
     public const string EmitterContractId = "behaviors.broadcast-probe-emitter";
     public const string DeclaredFactContractId = "behaviors.probe-fact-raised";
     public const string UndeclaredFactContractId = "behaviors.probe-fact-unwanted";
+    public const string StalledFactContractId = "behaviors.probe-fact-stalled";
     public const string GrainTypeName = "broadcastprobeemitter";
     public const string ActivationEmitterContractId = "behaviors.activation-pair-emitter";
     public const string ActivationHeadContractId = "behaviors.probe-activation-head";
