@@ -9,6 +9,22 @@ namespace DigitalBrain.Behaviors.Runtime;
 
 internal sealed partial class BehaviorNeuron
 {
+    // Activation state is durable but the subscription registry is a separate grain, so a
+    // registry that lost or never received this behavior's aliases leaves it silently deaf.
+    // Republishing from the signed artifact on every activation repairs that divergence.
+    protected override async Task OnNeuronActivatedAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var data = LoadOrEmpty();
+        if (data.ActiveArtifactHash is null)
+        {
+            return;
+        }
+
+        await PublishSubscriptionsAsync(data);
+    }
+
     protected override async Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);

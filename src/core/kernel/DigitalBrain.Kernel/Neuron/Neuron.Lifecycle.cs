@@ -24,7 +24,13 @@ public abstract partial class Neuron
         }
 
         ScheduleDrain();
+
+        await OnNeuronActivatedAsync(cancellationToken);
     }
+
+    // Runs on every activation once journals, outbox and drain are restored, so a neuron can
+    // repair state it publishes outside itself and cannot otherwise notice has diverged.
+    protected virtual Task OnNeuronActivatedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     public async Task Deliver(SynapseDelivery delivery, CancellationToken cancellationToken = default)
     {

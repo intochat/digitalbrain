@@ -102,6 +102,37 @@ public sealed class BehaviorBroadcastSubscription(BroadcastSubscriptionFixture f
         Assert.Empty(await outsider.Incoming.ReadAsync<ProbeFactRaised>(cancellationToken: cancellationToken));
     }
 
+    [Fact(DisplayName = "a rehydrating behavior republishes its subscriptions over a diverged registry", Timeout = 120_000)]
+    public async Task RehydrateRepublishesSubscriptionsOverADivergedRegistry()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        var behavior = test.Neuron<IBehaviorNeuron>(SubscribingBehavior);
+        var emitter = test.Neuron<IBroadcastProbeEmitter>("probe");
+
+        await InstallAsync(test, behavior, BroadcastHarness.SubscribingProgram());
+
+        var registry = test.Cluster.Client.GetGrain<IBehaviorSubscriptionRegistry>(
+            BehaviorSubscriptionRegistry.ForOwner(test.Client.Owner).ToGrainId());
+        await registry.Replace(behavior.Id.Name, [], cancellationToken);
+        Assert.Empty(await registry.SubscribersOf(
+            BroadcastHarness.DeclaredFactContractId,
+            cancellationToken));
+
+        await behavior.RestartHostAsync(cancellationToken);
+
+        // Any call rehydrates the behavior, which is where the repair has to run.
+        _ = await behavior.Reference.Read();
+
+        Assert.Equal(
+            [behavior.Id.Name],
+            await registry.SubscribersOf(BroadcastHarness.DeclaredFactContractId, cancellationToken));
+
+        var executedWait = behavior.Outgoing.NextAsync<BehaviorExecuted>(cancellationToken);
+        await emitter.Reference.BroadcastDeclared("after-rehydrate");
+        _ = await executedWait;
+    }
+
     private static async Task<BehaviorSnapshot> InstallAsync(
         TestBrain test,
         TestNeuron<IBehaviorNeuron> behavior,
