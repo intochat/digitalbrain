@@ -63,8 +63,8 @@ public sealed class IntrospectionCapabilityTurn(OSBehaviorsFixture fixture)
     }
 
     [Fact(Timeout = TurnTimeout, DisplayName =
-        "tallying the owner session mid-turn is refused with the reentrancy reason instead of deadlocking the turn")]
-    public async Task TallyingTheOwnerSessionIsRefused()
+        "the owner session that carries every capability request can be tallied mid-turn")]
+    public async Task TallyingTheOwnerSessionMidTurnSucceeds()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
@@ -86,20 +86,19 @@ public sealed class IntrospectionCapabilityTurn(OSBehaviorsFixture fixture)
 
         var tallied = await introspection.Outgoing.NextAsync<JournalTallied>(cancellationToken);
 
-        Assert.NotNull(tallied.Synapse.Error);
-        Assert.Contains("deadlock", tallied.Synapse.Error, StringComparison.OrdinalIgnoreCase);
-        Assert.Empty(tallied.Synapse.Tallies);
+        Assert.Null(tallied.Synapse.Error);
+        Assert.Equal(ISessionNeuron.ForOwner(test.Client.Owner), tallied.Synapse.Subject);
+        Assert.True(tallied.Synapse.TotalRecorded > 0);
     }
 
     [Fact(Timeout = TurnTimeout, DisplayName =
-        "a capability that takes seconds still completes the tool call; the conversation asking about itself is answered as occupied, never hanging the turn")]
-    public async Task TallyingTheConversationInFlightIsBounded()
+        "the conversation asking the question tallies itself mid-turn, counting the message that opened the turn")]
+    public async Task TallyingTheConversationInFlightSucceeds()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var introspection = test.Neuron<IIntrospection>();
         const string askingChat = "asking-about-itself";
-        var started = DateTimeOffset.UtcNow;
 
         test.Chat().ReplyWithCapabilityCall(
             TallyTool,
@@ -116,17 +115,13 @@ public sealed class IntrospectionCapabilityTurn(OSBehaviorsFixture fixture)
             "use introspection.tally-journal-request on this very conversation"));
 
         var tallied = await introspection.Outgoing.NextAsync<JournalTallied>(cancellationToken);
-        var elapsed = DateTimeOffset.UtcNow - started;
 
-        Assert.NotNull(tallied.Synapse.Error);
-        Assert.Contains("did not answer within", tallied.Synapse.Error, StringComparison.Ordinal);
-        Assert.Empty(tallied.Synapse.Tallies);
+        Assert.Null(tallied.Synapse.Error);
+        Assert.Equal(NeuronId.For<IChat>(test.Client.Owner, askingChat), tallied.Synapse.Subject);
 
-        // The handler held the turn for its whole occupied-subject bound, far longer than the tool's
-        // poll interval, and the tool still delivered the reply — a slow capability is not a failed one.
-        Assert.True(
-            elapsed >= TimeSpan.FromSeconds(5),
-            $"The turn finished in {elapsed}, so the slow-capability path was never exercised.");
+        // The chat journals UserMessaged before it hands the turn to the model, so the message that
+        // asked the question is already counted when the answer is assembled.
+        Assert.Equal(1, Recorded(tallied.Synapse, UserMessagedType));
     }
 
     [Fact(Timeout = TurnTimeout, DisplayName =

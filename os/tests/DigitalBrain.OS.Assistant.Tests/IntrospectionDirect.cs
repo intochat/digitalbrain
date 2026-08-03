@@ -10,6 +10,8 @@ public sealed class IntrospectionDirect(OSBehaviorsFixture fixture)
 {
     private const int RequestTimeout = 60_000;
     private const string UserMessagedType = "DigitalBrain.Chat.UserMessaged";
+    private const string IntrospectionGrainType = "introspection";
+    private const string DefaultInstance = "default";
 
     [Fact(Timeout = RequestTimeout, DisplayName =
         "a directed tally request counts the owner's chat facts by synapse type")]
@@ -30,6 +32,20 @@ public sealed class IntrospectionDirect(OSBehaviorsFixture fixture)
         Assert.Contains(
             tallied.Tallies,
             tally => tally.SynapseType == UserMessagedType && tally.Recorded == 1);
+    }
+
+    [Fact(Timeout = RequestTimeout, DisplayName =
+        "introspection tallies its own journal while it is occupied handling the request that asked")]
+    public async Task IntrospectionTalliesItselfWhileHandlingTheRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+
+        var tallied = await test.Client.Get<IIntrospection>()
+            .SendAsync(new TallyJournalRequest(IntrospectionGrainType, DefaultInstance), cancellationToken);
+
+        Assert.Null(tallied.Error);
+        Assert.Equal(NeuronId.For<IIntrospection>(test.Client.Owner, DefaultInstance), tallied.Subject);
     }
 
     [Fact(Timeout = RequestTimeout, DisplayName =

@@ -27,15 +27,15 @@ internal sealed partial class IntrospectionNeuron :
             return;
         }
 
-        var (read, unavailable) = await TryReadAsync(subject, synapse.Kind, BeyondJournalEnd, cancellationToken);
-        if (read?.ResetSnapshot is not { } snapshot)
+        var read = await ReadAsync(subject, synapse.Kind, BeyondJournalEnd);
+        if (read.ResetSnapshot is not { } snapshot)
         {
             await ReplyAsync(
                 JournalTallied.Refused(
                     synapse.CommandId,
                     subject,
                     synapse.Direction,
-                    unavailable ?? $"Neuron '{subject}' returned no journal snapshot to tally."),
+                    $"Neuron '{subject}' returned no journal snapshot to tally."),
                 cancellationToken);
             return;
         }
@@ -64,18 +64,7 @@ internal sealed partial class IntrospectionNeuron :
             return;
         }
 
-        var (read, unavailable) = await TryReadAsync(
-            subject,
-            synapse.Kind,
-            synapse.AfterSequence,
-            cancellationToken);
-        if (read is null)
-        {
-            await ReplyAsync(
-                JournalPageRead.Refused(synapse.CommandId, subject, synapse.Direction, unavailable!),
-                cancellationToken);
-            return;
-        }
+        var read = await ReadAsync(subject, synapse.Kind, synapse.AfterSequence);
 
         JournaledFact[] entries =
         [
