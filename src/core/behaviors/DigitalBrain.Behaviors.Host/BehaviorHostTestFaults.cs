@@ -16,8 +16,6 @@ internal static class BehaviorHostTestFaults
         RefusedDeploys[artifactHash] = reason;
     }
 
-    public static void Reset() => RefusedDeploys.Clear();
-
     internal static void ThrowIfArmed(string artifactHash)
     {
         if (RefusedDeploys.TryRemove(artifactHash, out var reason))
