@@ -53,6 +53,8 @@ void main() {
     await drainShellTimers(tester);
     expect(find.byKey(const Key('windowing_screen')), findsOneWidget);
     expect(find.textContaining('Windowing demo'), findsOneWidget);
+    expect(find.text('BTC / USD'), findsWidgets);
+    expect(find.byKey(const Key('kit_time_chart')), findsOneWidget);
   });
 
   testWidgets('narrow windows use bottom navigation', (tester) async {

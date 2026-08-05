@@ -28,7 +28,15 @@ final class WindowPanel {
   final WindowPanelKind kind;
 }
 
-enum WindowPanelKind { clock, metrics, notes, activity, inspector, chart }
+enum WindowPanelKind {
+  clock,
+  metrics,
+  notes,
+  activity,
+  inspector,
+  chart,
+  timeChart,
+}
 
 IconData windowPanelIcon(WindowPanelKind kind) => switch (kind) {
   WindowPanelKind.clock => Icons.schedule_rounded,
@@ -37,6 +45,7 @@ IconData windowPanelIcon(WindowPanelKind kind) => switch (kind) {
   WindowPanelKind.activity => Icons.timeline_rounded,
   WindowPanelKind.inspector => Icons.search_rounded,
   WindowPanelKind.chart => Icons.bar_chart_rounded,
+  WindowPanelKind.timeChart => Icons.candlestick_chart_rounded,
 };
 
 Color windowPanelAccent(WindowPanelKind kind) => switch (kind) {
@@ -46,6 +55,7 @@ Color windowPanelAccent(WindowPanelKind kind) => switch (kind) {
   WindowPanelKind.activity => const Color(0xFFC49BFF),
   WindowPanelKind.inspector => const Color(0xFFE8C26A),
   WindowPanelKind.chart => const Color(0xFF5EC8E8),
+  WindowPanelKind.timeChart => const Color(0xFF0ECB81),
 };
 
 /// In-canvas window manager for the Windowing demo tab.
@@ -74,6 +84,7 @@ final class PanelManager extends ChangeNotifier {
       ('Analog clock', WindowPanelKind.clock),
       ('Live metrics', WindowPanelKind.metrics),
       ('Synapses chart', WindowPanelKind.chart),
+      ('BTC / USD', WindowPanelKind.timeChart),
       ('Scratch notes', WindowPanelKind.notes),
       ('Activity strip', WindowPanelKind.activity),
       ('Inspector', WindowPanelKind.inspector),
@@ -101,6 +112,7 @@ final class PanelManager extends ChangeNotifier {
       WindowPanelKind.activity => 'Activity strip',
       WindowPanelKind.inspector => 'Inspector',
       WindowPanelKind.chart => 'Synapses chart',
+      WindowPanelKind.timeChart => 'BTC / USD',
     };
     final id = 'demo-${DateTime.now().microsecondsSinceEpoch}';
     _panels.add(

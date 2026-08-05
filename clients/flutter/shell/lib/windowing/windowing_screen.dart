@@ -366,6 +366,10 @@ final class _PanelBody extends StatelessWidget {
       WindowPanelKind.activity => const _ActivityBody(),
       WindowPanelKind.inspector => const _InspectorBody(),
       WindowPanelKind.chart => const KitBarChart(height: 200),
+      WindowPanelKind.timeChart => const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: KitTimeChart(),
+        ),
     };
   }
 }
