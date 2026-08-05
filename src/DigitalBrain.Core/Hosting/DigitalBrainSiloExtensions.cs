@@ -9,10 +9,6 @@ using Orleans.Serialization;
 
 namespace DigitalBrain;
 
-// The hosting seam (§8): one call turns a silo into a brain. Everything the boot must
-// refuse — kind collisions, dead answerer claims, codec-unresolvable vocabulary, TState
-// contract breaches — fires HERE, before the silo ever forms. Catalog and codec are
-// per-silo DI instances, never static: test clusters compose independently.
 public static class DigitalBrainSiloExtensions
 {
     public static ISiloBuilder AddDigitalBrain(this ISiloBuilder silo, params Assembly[] moduleAssemblies)
@@ -21,10 +17,6 @@ public static class DigitalBrainSiloExtensions
         return silo.AddDigitalBrain(ModuleTypesOf(moduleAssemblies));
     }
 
-    // The explicit-type composition seam (§3: the catalog is built over "the composition's
-    // explicit neuron type set"): the assembly overload is host convenience over this one.
-    // DigitalBrain.Testing composes per-test-fixture module sets through it, so two
-    // compositions in one test assembly never bleed listeners into each other's catalogs.
     public static ISiloBuilder AddDigitalBrain(this ISiloBuilder silo, IEnumerable<Type> moduleTypes)
     {
         ArgumentNullException.ThrowIfNull(silo);
@@ -44,11 +36,8 @@ public static class DigitalBrainSiloExtensions
 
         silo.Services.AddSingleton(catalog);
         silo.Services.AddSingleton(codec);
-        silo.Services.AddScoped<NeuronJournal>();   // one per activation, beside its IDurable*
+        silo.Services.AddScoped<NeuronJournal>();
 
-        // The fingerprint is computed and registered now; logging announces it at silo
-        // start. The cluster-join refusal for a mismatched silo needs cluster machinery
-        // Core does not yet own — deferred, stated, never inherited silently.
         silo.Services.AddSingleton(new CatalogFingerprint(catalog.Fingerprint));
         silo.Services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, CatalogFingerprintAnnouncement>();
 
@@ -60,19 +49,11 @@ public static class DigitalBrainSiloExtensions
         silo.Services.TryAddSingleton<IJournalStorageProvider, VolatileJournalStorageProvider>();
         silo.UseJsonJournalFormat(JournalJsonContext.Default);
 
-        // The wire codec: module fact records, the envelope shapes and the public read
-        // shapes travel as JSON through the body codec's own options — journal = wire.
-        // Core's and the modules' assemblies register explicitly: the transport interface
-        // types must be in every host's type manifest, and ambient entry-assembly
-        // discovery is not a contract (proven live: a TestingHost silo refused
-        // Neuron+ISessionEntry as "not allowed" without this).
         silo.Services.AddSerializer(wire => ConfigureWire(wire, neuronTypes, codec));
 
         return silo;
     }
 
-    // The client half of the wire codec: a cluster client that reads journals or fires
-    // session calls needs the same JSON codec over the same vocabulary.
     public static IServiceCollection AddDigitalBrainWireCodec(
         this IServiceCollection services, params Assembly[] moduleAssemblies)
     {
@@ -98,12 +79,7 @@ public static class DigitalBrainSiloExtensions
             wire.AddAssembly(assembly);
         }
 
-        // Compound type aliases transmit Core's grain interfaces by bare CLR name (no
-        // assembly); the manifest-derived allowed-name set holds assembly-qualified keys
-        // and treats the nested name's components as unknown, so the resolved type must
-        // be vouched for by a type filter (proven live: "Type
-        // 'DigitalBrain.Neuron+ISessionEntry' is not allowed"). Core vouches for exactly
-        // its own wire interfaces — typed, no name-parsing semantics to drift.
+        // Nested Core grain interfaces travel by bare CLR name; vouch them via type filter.
         wire.Services.AddSingleton<ITypeFilter, CoreWireTypeFilter>();
 
         wire.AddJsonSerializer(IsWireContract, codec.Options);
@@ -130,7 +106,7 @@ public static class DigitalBrainSiloExtensions
             neuronTypes.Add(moduleType);
         }
 
-        neuronTypes.Add(typeof(Neuron.Session));   // the Core-owned "session" kind, reserved by presence
+        neuronTypes.Add(typeof(Neuron.Session));
         return [.. neuronTypes];
     }
 
@@ -156,10 +132,7 @@ public static class DigitalBrainSiloExtensions
             || type == typeof(JournalFact)
             || type == typeof(Delivery);
 
-    // The DI gatekeeper (§5): Orleans.Journaling registers IDurable* as open-generic keyed
-    // scoped services under AnyKey — un-wrappable per key (open generics take no factory) —
-    // but every durable structure announces itself to the activation's state manager, so
-    // the gate wraps THAT: a module-minted key fails activation loudly naming the rule.
+    // Open-generic IDurable* cannot be keyed-factory-wrapped; gate registration at the state manager.
     private static void GateDurableKeys(IServiceCollection services)
     {
         var stateManager = services.LastOrDefault(descriptor
@@ -187,8 +160,6 @@ public static class DigitalBrainSiloExtensions
         };
 }
 
-// The wire's own passport: exactly the Core grain interfaces, nothing else — everything a
-// module says travels as Synapse through the JSON wire codec, which vouches for itself.
 internal sealed class CoreWireTypeFilter : ITypeFilter
 {
     private static readonly HashSet<Type> CoreWireTypes =
@@ -200,9 +171,6 @@ internal sealed class CoreWireTypeFilter : ITypeFilter
     public bool? IsTypeAllowed(Type type) => CoreWireTypes.Contains(type) ? true : null;
 }
 
-// The running composition's identity: a hash of the sorted declaration rows. Silos whose
-// fingerprints differ must refuse to form one brain (§3) — the enforcement lands with
-// cluster machinery; the identity itself is minted and visible from day one.
 public sealed record CatalogFingerprint(string Value);
 
 internal sealed partial class CatalogFingerprintAnnouncement(
@@ -225,9 +193,6 @@ internal sealed partial class CatalogFingerprintAnnouncement(
     private static partial void LogCatalogFingerprint(ILogger logger, string catalogFingerprint);
 }
 
-// Wraps the per-activation state manager so every durable structure's self-registration
-// passes the Core-owned key gate; everything else delegates, including grain-lifecycle
-// participation — the wrapper must be invisible to the load/commit path it guards.
 internal sealed class GatedStateManager(IJournaledStateManager inner)
     : IJournaledStateManager, ILifecycleParticipant<IGrainLifecycle>
 {

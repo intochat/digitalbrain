@@ -117,7 +117,7 @@ public abstract partial class Neuron : Neuron.ITransport
                 entry.Seq,
                 entry.Entry,
                 entry.Kind,
-                entry.ToMetadata(Id),
+                entry.ToEnvelope(Id).Identity,
                 entry.Cause?.ToSynapseRef(),
                 entry.Answers?.ToSynapseRef(),
                 entry.To is { } to

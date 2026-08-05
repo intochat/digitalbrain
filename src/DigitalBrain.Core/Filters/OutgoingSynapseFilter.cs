@@ -1,9 +1,5 @@
 namespace DigitalBrain;
 
-// The sending edge of every proxied call (§5): a proxied self-call deadlocks under
-// serialized turns (proven) — converted here into a loud exception naming the rule; and
-// for the two delivery methods the sender's staged envelope becomes RequestContext headers
-// just before the wire call, so the receiver's incoming filter can consume it.
 internal sealed class OutgoingSynapseFilter : IOutgoingGrainCallFilter
 {
     public Task Invoke(IOutgoingGrainCallContext context)

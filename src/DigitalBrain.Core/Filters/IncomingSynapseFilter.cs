@@ -2,12 +2,6 @@ using System.Reflection;
 
 namespace DigitalBrain;
 
-// The receiving edge of every wire call into a neuron (§5): admit ONLY the Core transport
-// surface — anything else is a second wire into the grain and is refused loudly. For the
-// two delivery methods the filter consumes the envelope from RequestContext and hands it
-// to the receiver, whose transport method opens the turn with it; a delivery without an
-// envelope is a kernel bug, never a tolerable degradation. Non-neuron grains (the outbox
-// wakeup) pass through untouched.
 internal sealed class IncomingSynapseFilter : IIncomingGrainCallFilter
 {
     public Task Invoke(IIncomingGrainCallContext context)
@@ -46,10 +40,6 @@ internal sealed class IncomingSynapseFilter : IIncomingGrainCallFilter
             return false;
         }
 
-        // Orleans' own runtime interfaces (grain extensions such as request cancellation)
-        // are infrastructure under the whitelist, not a module wire; module-declared grain
-        // interfaces are already refused at activation (NeuronConcurrency), so this filter
-        // is the wire-side backstop of the same rule.
         return declared == typeof(Neuron.ITransport)
             || declared == typeof(Neuron.IDrainEntry)
             || declared == typeof(Neuron.ISessionEntry)

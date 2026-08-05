@@ -228,13 +228,8 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
         }
 
         var askEntry = journal.EntryAt(askRef.Sequence);
-        var questionType = askEntry is { Entry: JournalEntry.Said }
-            && catalog.TryGetFactType(askEntry.Kind, out var asked)
-                ? asked
-                : null;
-
-        if (questionType is null
-            || askEntry is null
+        if (askEntry is not { Entry: JournalEntry.Said }
+            || !catalog.TryGetFactType(askEntry.Kind, out var questionType)
             || !catalog.TryGetReplyType(questionType, out var replyType)
             || replyType != typeof(TFact))
         {
@@ -274,37 +269,20 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
         Synapse fact, DeliveryEnvelope envelope, Synapse? terminalOutcome, long? releasePin)
     {
         OpenTurn(fact, envelope);
-        var active = turn!;
         if (terminalOutcome is not null)
         {
-            active.Emissions.Add(StagedFor(terminalOutcome));
+            turn!.Emissions.Add(StagedFor(terminalOutcome));
         }
 
-        active.UnpinPosition = releasePin;
+        turn!.UnpinPosition = releasePin;
         await CommitTurnAsync(reply: null, openAskKind: null);
     }
 
     private async Task JournalUnhandledAsync(Synapse fact, DeliveryEnvelope envelope)
     {
         var factKind = catalog.KindOfFact(fact.GetType());
-        try
-        {
-            journal.AppendHeard(
-                factKind,
-                envelope.Timestamp,
-                SynapseRefEntry.From(new SynapseRef(envelope.Source, envelope.Sequence)),
-                envelope.Cause is { } cause ? SynapseRefEntry.From(cause) : null,
-                envelope.Answers is { } answers ? SynapseRefEntry.From(answers) : null,
-                codec.Encode(fact));
-            journal.SetWatermark(envelope.Source, envelope.Sequence, clock.GetUtcNow());
-        }
-        catch
-        {
-            Poison();
-            throw;
-        }
-
-        await CommitCoreBatchAsync(deliverable: false);
+        OpenTurn(fact, envelope);
+        await CommitTurnAsync(reply: null, openAskKind: null);
         throw new UnhandledFactException(factKind, Id);
     }
 
@@ -337,18 +315,7 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
     {
         var envelope = active.Envelope;
         var now = clock.GetUtcNow();
-        var heardFrom = SynapseRefEntry.From(new SynapseRef(envelope.Source, envelope.Sequence));
-        var heardCause = envelope.Cause is { } cause ? SynapseRefEntry.From(cause) : null;
-        var heardAnswers = envelope.Answers is { } answered ? SynapseRefEntry.From(answered) : null;
-
-        journal.AppendHeard(
-            catalog.KindOfFact(active.Fact.GetType()),
-            envelope.Timestamp,
-            heardFrom,
-            heardCause,
-            heardAnswers,
-            codec.Encode(active.Fact));
-
+        var (heardFrom, _) = AppendHeardFromEnvelope(active.Fact, envelope);
         var openAsks = journal.OpenAsksSnapshot();
         var deliverable = false;
 
@@ -418,28 +385,20 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
             }
 
             var listener = new NeuronId(listenerKind, Id.Name);
-            if (listener == Id)
+            if (listener != Id)
             {
-                continue;
-            }
-
-            if (routed.Add(listener))
-            {
-                receivers.Add(NeuronIdEntry.From(listener, NeuronIdEntry.Declared));
+                RouteTo(receivers, routed, listener, NeuronIdEntry.Declared);
             }
         }
 
         foreach (var target in connected)
         {
-            if (routed.Add(target))
-            {
-                receivers.Add(NeuronIdEntry.From(target, NeuronIdEntry.Connected));
-            }
+            RouteTo(receivers, routed, target, NeuronIdEntry.Connected);
         }
 
         if (staged.DirectedTo is { } directed)
         {
-            AddAskReceiver(receivers, routed, directed);
+            RouteTo(receivers, routed, directed, NeuronIdEntry.Ask);
         }
 
         SynapseRefEntry? answers = null;
@@ -447,11 +406,11 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
         if (replyTo is { } questionRef)
         {
             answers = questionRef;
-            AddAskReceiver(receivers, routed, new NeuronId(questionRef.Kind, questionRef.Name));
+            RouteTo(receivers, routed, new NeuronId(questionRef.Kind, questionRef.Name), NeuronIdEntry.Ask);
         }
         else if (staged.AskAnswererKind is { } answererKind)
         {
-            AddAskReceiver(receivers, routed, new NeuronId(answererKind, Id.Name));
+            RouteTo(receivers, routed, new NeuronId(answererKind, Id.Name), NeuronIdEntry.Ask);
         }
         else
         {
@@ -466,7 +425,7 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
                 }
 
                 answers = askedBy;
-                AddAskReceiver(receivers, routed, new NeuronId(askedBy.Kind, askedBy.Name));
+                RouteTo(receivers, routed, new NeuronId(askedBy.Kind, askedBy.Name), NeuronIdEntry.Ask);
                 journal.RemoveOpenAsk(questionKind);
                 openAsks.RemoveAt(index);
                 break;
@@ -495,16 +454,33 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
         return deliverable;
     }
 
-    private static void AddAskReceiver(List<NeuronIdEntry> receivers, HashSet<NeuronId> routed, NeuronId receiver)
+    private static void RouteTo(
+        List<NeuronIdEntry> receivers, HashSet<NeuronId> routed, NeuronId receiver, string via)
     {
         if (routed.Add(receiver))
         {
-            receivers.Add(NeuronIdEntry.From(receiver, NeuronIdEntry.Ask));
+            receivers.Add(NeuronIdEntry.From(receiver, via));
         }
     }
 
+    private (SynapseRefEntry From, long Position) AppendHeardFromEnvelope(Synapse fact, DeliveryEnvelope envelope)
+    {
+        var from = SynapseRefEntry.From(new SynapseRef(envelope.Source, envelope.Sequence));
+        var position = journal.AppendHeard(
+            catalog.KindOfFact(fact.GetType()),
+            envelope.Timestamp,
+            from,
+            envelope.Cause is { } cause ? SynapseRefEntry.From(cause) : null,
+            envelope.Answers is { } answers ? SynapseRefEntry.From(answers) : null,
+            codec.Encode(fact));
+        return (from, position);
+    }
+
     private StagedEmission StagedFor(Synapse fact)
-        => new(fact.GetType(), catalog.KindOfFact(fact.GetType()), codec.Encode(fact));
+    {
+        var factType = fact.GetType();
+        return new(factType, catalog.KindOfFact(factType), codec.Encode(fact));
+    }
 
     private protected virtual bool ContinuesAsks => true;
 

@@ -3,28 +3,13 @@ using System.Text.Json;
 
 namespace DigitalBrain;
 
-// The drain (§4 steps 10-11): serialized timer/reminder turns iterate the said entries in
-// (cursor, lastCommitted], ALWAYS rehydrating the fact from the journal bytes — first
-// delivery, redelivery and self-delivery ship the same bytes (journal = wire). Per-receiver
-// FIFO holds via blockedTargets with in-place progress rewrites (the v1 four legs:
-// serialized drains, sequential awaited attempts per receiver, rewrite-in-place never
-// re-append, blocked-stays-blocked). Exhaustion or terminal refusal journals DeliveryFailed
-// on this sender behind the abandonment barrier: the hole COMMITS before its receiver
-// unblocks, so a crash can never resurrect a retracted hole behind an advanced watermark.
-// A drain-commit failure poisons exactly like the turn commit — timers swallow exceptions,
-// so anything quieter would be silent divergence.
 public abstract partial class Neuron : Neuron.IDrainEntry
 {
-    // Volatile per-activation dispatch state: the unsettled-said index keeps the 50ms pass
-    // O(in-flight), the rehydration cache keeps decode at one per position across attempts.
     private readonly SortedSet<long> unsettled = [];
     private readonly Dictionary<long, RehydratedFact> rehydrated = [];
     private IGrainTimer? drainTimer;
     private bool wakeupArmed;
 
-    // The reminder wakeup's one entry back into the neuron: activation alone re-arms the
-    // schedule timers (OnActivateAsync → ResumeDispatchAsync); the call itself sweeps the
-    // horizons and drains the backlog.
     [Alias("db.drain")]
     internal interface IDrainEntry : IGrainWithStringKey
     {
@@ -35,14 +20,12 @@ public abstract partial class Neuron : Neuron.IDrainEntry
     async Task IDrainEntry.DrainAsync()
     {
         RefusePoisoned();
-        wakeupArmed = true;   // the reminder that carried this call exists (v1 semantics)
+        wakeupArmed = true;
         if (journal.PruneWatermarks(clock.GetUtcNow(), DeliveryPolicy.WatermarkRetention))
         {
             await CommitCoreBatchAsync(deliverable: false);
         }
 
-        // The reminder path has no caller token; a cancelable lifecycle source lets every
-        // attempt link a real abort signal — the attempt timeout supplies the bound.
         using var drainLifecycle = new CancellationTokenSource();
         await DrainOutboxAsync(drainLifecycle.Token);
     }
@@ -72,8 +55,6 @@ public abstract partial class Neuron : Neuron.IDrainEntry
 
     private partial void ScheduleDrain()
     {
-        // Outbox drain and ask-horizon expiry share this timer: pins must be swept while
-        // the activation is live, not only when unsettled said rows remain (AskExpired).
         if (drainTimer is not null || (unsettled.Count == 0 && !journal.HasAskPins))
         {
             return;
@@ -102,8 +83,6 @@ public abstract partial class Neuron : Neuron.IDrainEntry
         }
         catch
         {
-            // Anything escaping a pass after in-memory staging would otherwise ride the
-            // NEXT commit uncommitted-and-unowned; poison-and-reload is the only safe exit.
             Poison();
             throw;
         }
@@ -130,7 +109,7 @@ public abstract partial class Neuron : Neuron.IDrainEntry
 
             if (Array.TrueForAll(pending, receiver => blockedTargets.Contains(receiver.ToNeuronId())))
             {
-                continue;   // blocked stays blocked: FIFO to each receiver holds across positions
+                continue;
             }
 
             attempts++;
@@ -155,8 +134,6 @@ public abstract partial class Neuron : Neuron.IDrainEntry
 
                 if (receiverId != Id && !catalog.TryGetNeuronType(receiver.Kind, out _))
                 {
-                    // Fingerprint-matched silos share one catalog: a kind absent here is
-                    // absent everywhere — terminal on attempt 1, no horizon burn (§3).
                     refused.Add((receiver, $"neuron kind '{receiver.Kind}' is not in the running catalog"));
                     continue;
                 }
@@ -198,7 +175,6 @@ public abstract partial class Neuron : Neuron.IDrainEntry
 
                 SettleProgress(position, stillPending, attempts);
 
-                // The abandonment barrier: only a committed hole may be jumped.
                 await CommitCoreBatchAsync(deliverable);
                 dirty = false;
                 foreach (var (receiver, _) in refused)
@@ -285,8 +261,6 @@ public abstract partial class Neuron : Neuron.IDrainEntry
         }
     }
 
-    // Orleans surfaces a grain id whose kind no silo implements as a resolution failure;
-    // the catalog pre-check makes this a backstop, not the classifier of record.
     private static bool IsUnresolvableGrainKind(Exception failure)
     {
         for (Exception? cause = failure; cause is not null; cause = cause.InnerException)
@@ -328,8 +302,6 @@ public abstract partial class Neuron : Neuron.IDrainEntry
         journal.SetProgress(position, new DeliveryProgress([.. pending], attempts));
         if (pending.Count == 0)
         {
-            // Settled above the cursor keeps its empty row until the cursor passes it —
-            // that row is what tells the activation rebuild "done", never payload.
             unsettled.Remove(position);
             rehydrated.Remove(position);
         }
@@ -354,7 +326,6 @@ public abstract partial class Neuron : Neuron.IDrainEntry
         return true;
     }
 
-    // One scan from the cursor at activation (§4 step 11); commits maintain it after.
     private void RebuildUnsettledIndex()
     {
         unsettled.Clear();
@@ -380,9 +351,6 @@ public abstract partial class Neuron : Neuron.IDrainEntry
         }
     }
 
-    // The one Core commit path outside module turns: arm the wakeup BEFORE the write
-    // (§4 step 7), ONE WriteStateAsync, poison on any failure, then advance the committed
-    // marker, index the batch's deliverables and keep the fast timer running.
     private async Task CommitCoreBatchAsync(bool deliverable)
     {
         var before = journal.LastCommitted;

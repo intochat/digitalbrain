@@ -5,13 +5,6 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace DigitalBrain;
 
-// Core-owned serialization for everything a module says or keeps: fact bodies and TState
-// travel through these reflection options (camelCase, no module attributes, no module
-// contexts), so no module CLR type ever reaches the Orleans.Journaling surface. A
-// Synapse-typed polymorphic position (Button.OnTap, Schedule.Fact) renders as
-// {"kind": catalogKind, "body": {...}} recursively, both ways through the catalog's
-// factKind map; concretely-declared positions and top-level bodies stay bare — the
-// journal line already carries the kind.
 internal sealed class BodyCodec
 {
     private const string KindProperty = "kind";
@@ -40,9 +33,6 @@ internal sealed class BodyCodec
         };
     }
 
-    // The hosting seam reuses these exact options as the Orleans wire codec's JSON payload
-    // format, so a fact serializes identically in a journal line and on the wire — one
-    // shape, no dual-story serialization.
     internal JsonSerializerOptions Options { get; }
 
     internal JsonElement Encode(object value)
@@ -58,9 +48,8 @@ internal sealed class BodyCodec
     internal Synapse? DecodeFact(string kind, JsonElement body)
         => catalog.TryGetFactType(kind, out var factType)
             ? (Synapse?)JsonSerializer.Deserialize(body, factType, Options)
-            : null;   // journals outlive code: an unloaded kind reads as null, never throws
+            : null; // journals outlive code: unloaded kind → null, never throws
 
-    // Boot validation: a serialization defect never waits for the first emission.
     internal void ValidateVocabulary(Catalog vocabulary)
     {
         ArgumentNullException.ThrowIfNull(vocabulary);
@@ -131,8 +120,6 @@ internal sealed class BodyCodec
 
         if (typeof(Synapse).IsAssignableFrom(memberType))
         {
-            // Abstract synapse positions rehydrate through the kind/body wrapper; the
-            // concrete kinds behind them are cataloged facts, probed in their own right.
             if (!memberType.IsAbstract)
             {
                 ProbeShape(memberType, visited);
@@ -212,9 +199,7 @@ internal sealed class BodyCodec
 
     private sealed class SynapseConverterFactory(Catalog catalog) : JsonConverterFactory
     {
-        // Only abstract positions convert: the wrapper exists so decode can pick the
-        // runtime type. Concrete positions (top-level bodies, concretely-typed members)
-        // serialize bare, which is also what keeps this factory recursion-free.
+        // Abstract only — concrete positions serialize bare; keeps factory recursion-free.
         public override bool CanConvert(Type typeToConvert)
             => typeToConvert.IsAbstract && typeof(Synapse).IsAssignableFrom(typeToConvert);
 

@@ -2,15 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace DigitalBrain;
 
-// Time (§6): the Core-owned schedule table — written by the in-turn verbs and by the
-// remote Schedule/Unschedule facts (one mechanism) — re-arms grain timers at activation
-// with the reminder wakeup as the idle backstop. A tick runs the ORDINARY turn pipeline
-// via direct call as a self-sourced heard entry whose Cause is the schedule's journaled
-// ref; no watermark check applies because an in-activation direct call is exactly-once by
-// construction (the minted sequence is the heard entry's own position, always above the
-// self watermark). Core catches tick failures against the timer-swallowing constraint;
-// ScheduleFailureLimit consecutive failures journal ScheduleFailed and unschedule in a
-// Core-owned turn — terminal, journaled, never infinite silent retry.
 public abstract partial class Neuron
 {
     private readonly Dictionary<string, ArmedScheduleTimer> scheduleTimers = new(StringComparer.Ordinal);
@@ -45,7 +36,6 @@ public abstract partial class Neuron
             return false;
         });
 
-    // The remote fact answers to the same contract the Schedule verb enforces in-turn.
     private string? ScheduleRefusalOf(Schedule schedule)
     {
         var scheduledType = schedule.Fact.GetType();
@@ -63,9 +53,6 @@ public abstract partial class Neuron
         return schedule.Period > TimeSpan.Zero ? null : "the schedule period must be positive";
     }
 
-    // Called after every commit and at activation: the timers mirror the committed table.
-    // A re-scheduled kind carries a fresh Cause (its mutation's journal position), which is
-    // what re-arms the timer with the new cadence.
     private void SyncScheduleTimers()
     {
         var table = journal.ScheduleSnapshot();
@@ -116,7 +103,7 @@ public abstract partial class Neuron
 
         if (journal.ScheduleOf(factKind) is not { } entry)
         {
-            SyncScheduleTimers();   // unscheduled between arming and firing
+            SyncScheduleTimers();
             return;
         }
 
@@ -140,7 +127,7 @@ public abstract partial class Neuron
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return;   // deactivation, not a schedule failure
+            return;
         }
         catch (Exception exception) when (!poisoned)
         {
@@ -148,15 +135,8 @@ public abstract partial class Neuron
         }
 
         var now = clock.GetUtcNow();
-        if (failure is null)
-        {
-            journal.SetSchedule(factKind, entry with { NextDue = now + entry.Period, ConsecutiveFailures = 0 });
-            await CommitCoreBatchAsync(deliverable: false);
-            return;
-        }
-
-        var failures = entry.ConsecutiveFailures + 1;
-        if (failures < DeliveryPolicy.ScheduleFailureLimit)
+        var failures = failure is null ? 0 : entry.ConsecutiveFailures + 1;
+        if (failure is null || failures < DeliveryPolicy.ScheduleFailureLimit)
         {
             journal.SetSchedule(factKind, entry with { NextDue = now + entry.Period, ConsecutiveFailures = failures });
             await CommitCoreBatchAsync(deliverable: false);

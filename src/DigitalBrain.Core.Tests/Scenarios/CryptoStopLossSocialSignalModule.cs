@@ -1,3 +1,5 @@
+using DigitalBrain.Mocks;
+
 namespace DigitalBrain.Core.Tests.Scenarios;
 
 // Price stream tick — joins with armed social stop in journaled RiskPolicy state.

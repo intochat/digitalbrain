@@ -57,14 +57,7 @@ public abstract partial class Neuron
         try
         {
             var now = clock.GetUtcNow();
-            var heardFrom = SynapseRefEntry.From(new SynapseRef(envelope.Source, envelope.Sequence));
-            var heardPosition = journal.AppendHeard(
-                catalog.KindOfFact(fact.GetType()),
-                envelope.Timestamp,
-                heardFrom,
-                envelope.Cause is { } cause ? SynapseRefEntry.From(cause) : null,
-                envelope.Answers is { } answers ? SynapseRefEntry.From(answers) : null,
-                codec.Encode(fact));
+            var (heardFrom, heardPosition) = AppendHeardFromEnvelope(fact, envelope);
             deliverable = stageOutcome(heardFrom, heardPosition, now);
             journal.SetWatermark(envelope.Source, envelope.Sequence, now);
         }

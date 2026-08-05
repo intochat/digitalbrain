@@ -17,9 +17,6 @@ internal sealed record JournalEntry(
     internal const string Heard = "heard";
     internal const string Said = "said";
 
-    internal SynapseMetadata ToMetadata(NeuronId journalOwner)
-        => ToEnvelope(journalOwner).Identity;
-
     internal DeliveryEnvelope ToEnvelope(NeuronId journalOwner)
     {
         if (From is { } emission)

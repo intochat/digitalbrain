@@ -1,13 +1,8 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using DigitalBrain.Mocks;
 
 namespace DigitalBrain.Core.Tests.Scenarios;
-
-public sealed record XPostObserved(
-    string PostId,
-    string Account,
-    string Text,
-    DateTimeOffset CreatedAt) : Synapse;
 
 public sealed record MarketSignalClassified(
     string PostId,

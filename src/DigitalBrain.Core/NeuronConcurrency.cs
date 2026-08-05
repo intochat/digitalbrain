@@ -4,9 +4,6 @@ namespace DigitalBrain;
 
 internal static class NeuronConcurrency
 {
-    // Core-owned grain interfaces: the transport (and the key shapes it derives from) is
-    // the only wire into a neuron. Anything else IAddressable-derived on a neuron type is
-    // a second wire into the grain that bypasses the turn pipeline — refused.
     private static readonly HashSet<Type> CoreOwnedInterfaces =
     [
         typeof(Neuron.ITransport), typeof(Neuron.IDrainEntry), typeof(Neuron.ISessionEntry),

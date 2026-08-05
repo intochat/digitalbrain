@@ -182,11 +182,6 @@ internal sealed class Catalog
             : throw new InvalidOperationException(
                 $"{Describe(questionType)} has no answerer in the composition; only IAnswers questions carry a reply type.");
 
-    // Asker may continue when it declares INeuron for the question's reply type.
-    internal bool HasContinuation(string neuronKind, Type questionType)
-        => TryGetReplyType(questionType, out var replyType)
-        && ListenerKindsOf(replyType).Contains(neuronKind);
-
     internal bool ListensTo(string neuronKind, Type factType)
         => ListenerKindsOf(factType).Contains(neuronKind);
 

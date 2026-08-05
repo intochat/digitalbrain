@@ -6,19 +6,9 @@ using Orleans.Journaling;
 
 namespace DigitalBrain;
 
-// The per-neuron durable core (§7): the ONE journal (heard and said interleaved, position
-// IS the sequence, 1-based) plus every sidecar structure that commits with it in the one
-// WriteStateAsync batch. Resolved from the grain's keyed durable services in the
-// constructor; the owning Neuron is the only writer.
-//
-// Committed-only is a stated invariant, not an accident: Orleans.Journaling exposes
-// uncommitted in-memory mutations immediately, so every read path here (edge reads,
-// dispatch iteration, Answer reconstruction) is capped at the volatile lastCommitted
-// marker the Neuron advances via MarkCommitted after activation load and after each
-// successful WriteStateAsync. An entry a failed commit will retract is never served.
+// Committed-only: Orleans.Journaling surfaces uncommitted mutations; reads cap at lastCommitted.
 internal sealed class NeuronJournal
 {
-    // Envelope cost of a journal line beyond its body — a soft-target estimate, not wire truth.
     private const int EntryOverhead = 128;
 
     private const string JournalKey = "journal";
@@ -34,8 +24,6 @@ internal sealed class NeuronJournal
     private const string SaidTalliesKey = "tallies.said";
     private const string StateKey = "state";
 
-    // The complete Core-owned durable key set — the DI gatekeeper (§5) refuses any other
-    // key at activation: module state lives in TState, never in a module-minted IDurable*.
     internal static readonly FrozenSet<string> CoreKeys = new[]
     {
         JournalKey, SequenceKey, CursorKey, ProgressKey, AsksKey, OpenAsksKey,
@@ -55,8 +43,6 @@ internal sealed class NeuronJournal
     private readonly IDurableDictionary<string, long> saidTallies;
     private readonly IDurableValue<JsonElement> state;
 
-    // Public: the DI container instantiates only through public constructors, and this is
-    // a per-activation scoped service (registered by AddDigitalBrain, internal class).
     public NeuronJournal(IServiceProvider services)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -79,29 +65,22 @@ internal sealed class NeuronJournal
 
     internal long LastCommitted { get; private set; }
 
-    // Smallest unsettled said position; 0 until the first said entry exists. Survives
-    // compaction — everything below it is settled and therefore evictable.
     internal long Cursor
     {
         get => cursor.Value;
         set => cursor.Value = value;
     }
 
-    // Derived, not stored: appends move lastSeq and Count in step, compaction shrinks the
-    // head only — so positions stay stable across compaction without a second counter.
+    // Positions stable across compaction: head shrinks; lastSeq + Count imply earliest.
     internal long EarliestRetained
         => journal.Count == 0 ? lastSeq.Value + 1 : lastSeq.Value - journal.Count + 1;
 
-    // Raw TState slot as staged; reads must go through CommittedState instead.
     internal JsonElement State
     {
         get => state.Value;
         set => state.Value = value;
     }
 
-    // The committed-only read caches: staging mutates the live structures in memory before
-    // WriteStateAsync, and the interleaving read surface must never serve what a failed
-    // commit will retract — so reads serve these, advanced only by MarkCommitted.
     internal JsonElement CommittedState { get; private set; }
 
     internal IReadOnlyDictionary<string, IReadOnlyList<NeuronId>> CommittedConnections { get; private set; }
@@ -151,10 +130,6 @@ internal sealed class NeuronJournal
             : journal[(int)(position - earliest)];
     }
 
-    // v1 NeuronFeed.Read semantics, committed-only: a cursor inside the retained window
-    // reads the delta after it; one that fell off (or ran ahead) gets the reset snapshot
-    // to resynchronize from. The connections snapshot rides beside either answer so
-    // per-instance introspection never lies, before or after compaction.
     internal JournalRead Read(long afterPosition)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(afterPosition);
@@ -263,8 +238,6 @@ internal sealed class NeuronJournal
     internal IReadOnlyDictionary<string, ScheduleEntry> ScheduleSnapshot()
         => schedule.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
 
-    // The idle-wakeup conditions beside the unsettled outbox: pins must expire and
-    // schedules must tick even when no inbound traffic ever reactivates the neuron.
     internal bool HasAskPins => asks.Count > 0;
 
     internal bool HasSchedules => schedule.Count > 0;
@@ -275,8 +248,6 @@ internal sealed class NeuronJournal
 
     internal bool HasAskPin(long position) => asks.TryGetValue(Key(position), out _);
 
-    // The answerer-side table (§5): a null-returning question turn holds its ask durably
-    // open here, keyed by question kind — at most one per kind per answerer.
     internal SynapseRefEntry? OpenAskOf(string questionKind)
         => openAsks.TryGetValue(questionKind, out var ask) ? ask : null;
 
@@ -308,7 +279,7 @@ internal sealed class NeuronJournal
         return oldest;
     }
 
-    // Lazy per §7: absent = untouched, so the map holds strictly progress, never payload.
+    // Absent progress = untouched; map holds progress only, never payload.
     internal DeliveryProgress? ProgressOf(long position)
         => progress.TryGetValue(Key(position), out var partial) ? partial : null;
 
@@ -316,9 +287,7 @@ internal sealed class NeuronJournal
 
     internal bool ClearProgress(long position) => progress.Remove(Key(position));
 
-    // The floor is hard — nothing at or above min(cursor, oldest ask pin, floorLimit) ever
-    // evicts; the retained bounds are soft targets that only pull entries below it. Never
-    // v1 NeuronFeed.Compact's unconditional eviction.
+    // Floor is hard (cursor / oldest ask pin / floorLimit); retained bounds are soft only.
     internal void Compact(long floorLimit)
     {
         var floor = Math.Min(Math.Min(cursor.Value, OldestAskPin() ?? long.MaxValue), floorLimit);
@@ -354,9 +323,6 @@ internal sealed class NeuronJournal
     private static long PositionOf(string key) => long.Parse(key, CultureInfo.InvariantCulture);
 }
 
-// The committed-only read pair: Delta when afterPosition is still inside the retained
-// window, Reset when it fell off — totals and tallies outlive compaction, so a caller
-// resynchronizes without pretending the evicted entries never happened.
 internal sealed record JournalRead(
     long LastSeq,
     IReadOnlyList<JournalEntry> Delta,

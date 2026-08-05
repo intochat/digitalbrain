@@ -10,26 +10,19 @@ public sealed class SelfDeliveryFilterTests
     {
         var grainId = GrainId.Create("probe", "self");
         var source = new StubGrainContext(grainId);
-        var context = new StubOutgoingContext(source, grainId);
+        var self = new StubOutgoingContext(source, grainId);
+        var other = new StubOutgoingContext(source, GrainId.Create("probe", "other"));
         var filter = new OutgoingSynapseFilter();
 
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => filter.Invoke(context));
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => filter.Invoke(self));
 
         Assert.Contains("proxied self-call", failure.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("self-delivery", failure.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.False(context.Invoked);
-    }
+        Assert.False(self.Invoked);
 
-    [Fact(DisplayName = "An outgoing grain call to a different activation is not blocked by the self-delivery rule")]
-    public async Task ProxiedCallToOtherActivationProceeds()
-    {
-        var source = new StubGrainContext(GrainId.Create("probe", "caller"));
-        var context = new StubOutgoingContext(source, GrainId.Create("probe", "other"));
-        var filter = new OutgoingSynapseFilter();
-
-        await filter.Invoke(context);
-
-        Assert.True(context.Invoked);
+        // Same filter: a different activation is not blocked (positive half of the self-delivery rule).
+        await filter.Invoke(other);
+        Assert.True(other.Invoked);
     }
 
     private sealed class StubGrainContext(GrainId grainId) : IGrainContext

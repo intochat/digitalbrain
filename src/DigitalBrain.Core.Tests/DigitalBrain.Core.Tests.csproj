@@ -11,12 +11,6 @@
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Park only concurrent WIP that is not part of the S01/S03/S04 acceptance proofs. -->
-    <Compile Remove="NeuronConcurrencyTests.cs" />
-    <Compile Remove="_wip_park\**" />
-    <None Include="_wip_park\**" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Mocks\DigitalBrain.Mocks.csproj" />
     <ProjectReference Include="..\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
