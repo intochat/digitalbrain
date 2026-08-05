@@ -1,7 +1,6 @@
 namespace DigitalBrain.OS.UiEdge;
 
-// Default Account Enrichment projected when com.digitalbrain.account-enrichment
-// has no authored revision. Mirrors samples/DigitalBrain.AccountEnrichment.
+// Product default projected for com.digitalbrain.account-enrichment when no revision exists.
 internal static class AccountEnrichmentEditorSeed
 {
     public const string FeatureName = "account-enrichment";
@@ -23,31 +22,19 @@ internal static class AccountEnrichmentEditorSeed
             Then a human approval card is required before write
         """;
 
-    // Visualized in Behavior Studio Source; rail-compilable stub + Gmail/SF story.
     public static string ProgramSource { get; } =
         """
-        using System.Collections.Generic;
         using System.Threading;
         using System.Threading.Tasks;
+        using System.Collections.Generic;
         using DigitalBrain.Abstractions;
         using DigitalBrain.Behaviors;
-
-        // Product demo: Account enrichment (Gmail → Salesforce).
-        // Process-neuron reference: samples/DigitalBrain.AccountEnrichment
-        //   EnrichAccountFromEmail
-        //     → IGmail GmailRequest / GmailSearchRequest (read message)
-        //     → description = "Email from {From}: {Subject}\n{Body}"
-        //     → ISalesforce SalesforceRequest (propose Account Description)
-        //     → human SalesforceMutationApproval
-        //     → AccountEnriched
-        //
-        // This single-file program is what Behavior Studio shows and what the
-        // rail can compile. Live Gmail/SF SendAsync needs capability grants.
+        using DigitalBrain.Google;
+        using DigitalBrain.Salesforce;
 
         public sealed record EnrichAccountFromEmail(
             string MessageId,
-            string AccountId,
-            string GmailAccount) : Synapse;
+            string AccountId) : Synapse;
 
         public sealed class AccountEnrichmentProgram : IBehaviorProgram<EnrichAccountFromEmail>
         {
@@ -55,24 +42,43 @@ internal static class AccountEnrichmentEditorSeed
                 EnrichAccountFromEmail trigger,
                 IBehaviorContext context,
                 CancellationToken cancellationToken)
-            {
-                // Intended live path (when grants + Gmail/Salesforce connections are armed):
-                //   var gmail = context.Get<IGmail>(trigger.GmailAccount);
-                //   var mail = await gmail.SendAsync(new GmailRequest(
-                //       $"Read Gmail message {trigger.MessageId}",
-                //       context.DeterministicCommandId("gmail-read")));
-                //   var description = $"Email from {from}: {subject}\n{body}";
-                //   var sf = context.Get<ISalesforce>("salesforce");
-                //   await sf.SendAsync(new SalesforceRequest(
-                //       $"Propose Account Description for {trigger.AccountId}",
-                //       context.DeterministicCommandId("sf-propose"),
-                //       trigger.AccountId,
-                //       description));
+                => ValueTask.CompletedTask;
+        }
 
-                context.SetState(
-                    "outcome",
-                    $"enriched:{trigger.AccountId}:{trigger.MessageId}:{trigger.GmailAccount}");
-                return ValueTask.CompletedTask;
+        public static class BehaviorEntry
+        {
+            public static async Task RunAsync(BehaviorBrain<EnrichAccountFromEmail> brain)
+            {
+                var trigger = brain.Trigger;
+
+                var gmail = brain.Get<IGmail>("default");
+                var salesforce = brain.Get<ISalesforce>("salesforce");
+
+                var search = await gmail.SendAsync(new GmailSearchRequest("in:inbox", 1));
+                if (!search.Succeeded || search.Headers.Count == 0)
+                {
+                    return;
+                }
+
+                var messageId = string.IsNullOrWhiteSpace(trigger.MessageId)
+                    ? search.Headers[0].Id
+                    : trigger.MessageId;
+
+                var fetched = await gmail.SendAsync(new GmailGetMessageRequest(messageId));
+                if (!fetched.Succeeded || fetched.Message is null)
+                {
+                    return;
+                }
+
+                var mail = fetched.Message;
+                var description =
+                    $"Email from {mail.Sender}: {mail.Subject}\n{mail.PlaintextBody}";
+
+                await salesforce.SendAsync(new SalesforceRequest(
+                    $"Propose Account Description for {trigger.AccountId}",
+                    CommandId.New(),
+                    trigger.AccountId,
+                    description));
             }
         }
 

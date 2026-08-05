@@ -167,38 +167,62 @@ abstract final class BehaviorDemoFixtures {
     ],
   );
 
-  /// Compilable demo program (stub body). Comments describe the intended
-  /// Gmail → Salesforce path for demos; live wiring needs capability grants.
   static const accountEnrichmentProgramSource = r'''
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
+using DigitalBrain.Google;
+using DigitalBrain.Salesforce;
 
-// Intended demo path (when Gmail + Salesforce grants are armed):
-//   1) GmailSearchRequest("in:inbox", maxResults: 1)
-//   2) Build Account.Description from From / Subject / Body
-//   3) SalesforceRequest propose description for AccountId
-//   4) Human approves the Salesforce mutation card
-// This single-file program is a rail-friendly stub so propose/compile/activate
-// can run without live OAuth during demos.
-
-public sealed record EnrichFromLatestEmail(
-    string GmailAccount,
+public sealed record EnrichAccountFromEmail(
+    string MessageId,
     string AccountId) : Synapse;
 
-public sealed class AccountEnrichmentProgram : IBehaviorProgram<EnrichFromLatestEmail>
+public sealed class AccountEnrichmentProgram : IBehaviorProgram<EnrichAccountFromEmail>
 {
     public ValueTask ExecuteAsync(
-        EnrichFromLatestEmail trigger,
+        EnrichAccountFromEmail trigger,
         IBehaviorContext context,
         CancellationToken cancellationToken)
+        => ValueTask.CompletedTask;
+}
+
+public static class BehaviorEntry
+{
+    public static async Task RunAsync(BehaviorBrain<EnrichAccountFromEmail> brain)
     {
-        context.SetState(
-            "outcome",
-            $"demo-enrich:{trigger.GmailAccount}:{trigger.AccountId}:last-inbox");
-        return ValueTask.CompletedTask;
+        var trigger = brain.Trigger;
+
+        var gmail = brain.Get<IGmail>("default");
+        var salesforce = brain.Get<ISalesforce>("salesforce");
+
+        var search = await gmail.SendAsync(new GmailSearchRequest("in:inbox", 1));
+        if (!search.Succeeded || search.Headers.Count == 0)
+        {
+            return;
+        }
+
+        var messageId = string.IsNullOrWhiteSpace(trigger.MessageId)
+            ? search.Headers[0].Id
+            : trigger.MessageId;
+
+        var fetched = await gmail.SendAsync(new GmailGetMessageRequest(messageId));
+        if (!fetched.Succeeded || fetched.Message is null)
+        {
+            return;
+        }
+
+        var mail = fetched.Message;
+        var description =
+            $"Email from {mail.Sender}: {mail.Subject}\n{mail.PlaintextBody}";
+
+        await salesforce.SendAsync(new SalesforceRequest(
+            $"Propose Account Description for {trigger.AccountId}",
+            CommandId.New(),
+            trigger.AccountId,
+            description));
     }
 }
 
@@ -211,21 +235,21 @@ public sealed class AccountEnrichmentInstallTests : IBehaviorInstallTests
         => ValueTask.FromResult(BehaviorInstallTestReport.FromResults(
         [
             new BehaviorScenarioResult(
-                "scenario.enrich-account-from-last-email",
-                "enrich account from last email",
-                "bind.enrich-account-from-last-email",
+                "scenario.enrich-account-from-email",
+                "enrich account from email",
+                "bind.enrich-account-from-email",
                 true,
                 "account-enrichment"),
             new BehaviorScenarioResult(
-                "scenario.propose-salesforce-description",
-                "propose salesforce description",
-                "bind.propose-salesforce-description",
+                "scenario.read-gmail-then-propose-salesforce",
+                "read gmail then propose salesforce",
+                "bind.read-gmail-then-propose-salesforce",
                 true,
                 "account-enrichment"),
         ],
         "account-enrichment"));
 }
-''';
+'''
 
   static const accountEnrichmentFeatureText = '''
 Feature: account enrichment
