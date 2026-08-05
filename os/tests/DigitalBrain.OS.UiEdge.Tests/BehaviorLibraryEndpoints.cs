@@ -13,6 +13,30 @@ public sealed class BehaviorLibraryEndpoints(UiEdgeFixture fixture)
         PropertyNameCaseInsensitive = true,
     };
 
+    [Fact(DisplayName = "GET /behaviors always lists seeded Account Enrichment with display metadata")]
+    public async Task ListIncludesSeededAccountEnrichment()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var test = await fixture.CreateBrainAsync(cancellationToken);
+        await using var app = await UiEdgeFixture.StartUiHttpAsync(test, cancellationToken);
+        using var http = CreateClient(app);
+
+        var library = await http.GetFromJsonAsync<BehaviorLibraryDocument>(
+            UiEdgeContract.BehaviorsPath,
+            Json,
+            cancellationToken);
+
+        Assert.NotNull(library);
+        var item = Assert.Single(
+            library.Items,
+            entry => entry.BehaviorId == UiEdgeContract.AccountEnrichmentBehaviorId);
+        Assert.Equal(AccountEnrichmentTestProgram.DisplayName, item.DisplayName);
+        Assert.Equal(AccountEnrichmentTestProgram.Description, item.Description);
+        Assert.Equal(nameof(BehaviorRevisionStatus.Empty), item.Status);
+        Assert.Equal("draft", item.Health);
+        Assert.NotEmpty(item.ScenarioTitles);
+    }
+
     [Fact(DisplayName = "GET /behaviors lists a proposed behavior with its authored overview and scenarios")]
     public async Task ListIncludesProposedBehavior()
     {

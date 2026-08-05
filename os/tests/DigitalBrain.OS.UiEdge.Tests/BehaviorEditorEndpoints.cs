@@ -16,8 +16,8 @@ public sealed class BehaviorEditorEndpoints(UiEdgeFixture fixture)
     };
 
     [Fact(DisplayName =
-        "GET /behaviors/{id} projects Empty status and blank editor fields for a behavior with no revisions")]
-    public async Task ReadReturnsEmptyDocumentForUninstalledBehavior()
+        "GET /behaviors/{id} projects seeded Account Enrichment source when no revision is installed")]
+    public async Task ReadReturnsSeededAccountEnrichmentDocument()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
@@ -34,10 +34,14 @@ public sealed class BehaviorEditorEndpoints(UiEdgeFixture fixture)
         Assert.Equal(nameof(BehaviorRevisionStatus.Empty), document.Status);
         Assert.Equal(nameof(BehaviorRunState.Idle), document.RunState);
         Assert.False(document.ActivationGateOpen);
-        Assert.Empty(document.ProgramSource);
-        Assert.Empty(document.FeatureText);
-        Assert.Equal("install", document.FeatureName);
-        Assert.Equal(UiEdgeContract.AccountEnrichmentBehaviorId, document.DisplayName);
+        Assert.Contains("AccountEnrichmentProgram", document.ProgramSource, StringComparison.Ordinal);
+        Assert.Contains("Gmail", document.ProgramSource, StringComparison.Ordinal);
+        Assert.Contains("Salesforce", document.ProgramSource, StringComparison.Ordinal);
+        Assert.Equal(AccountEnrichmentTestProgram.FeatureName, document.FeatureName);
+        Assert.Equal(AccountEnrichmentTestProgram.DisplayName, document.DisplayName);
+        Assert.Equal(AccountEnrichmentTestProgram.Description, document.Description);
+        Assert.NotEmpty(document.FeatureText);
+        Assert.NotEmpty(document.Scenarios);
     }
 
     [Fact(DisplayName =
