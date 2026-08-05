@@ -9,8 +9,10 @@ its replacement lands here.
 
 - `src/DigitalBrain.Abstractions` — the programming model. Four dependency-free
   types: `Synapse` (the fact), `INeuron<in TSynapse>` (the actor, typed by what
-  it handles), `NeuronId` (the address), `SynapseMetadata` (the birth
-  certificate: source, sequence, timestamp). Namespace `DigitalBrain`.
+  it handles), `NeuronId` (the address), `SynapseMetadata` (the lineage:
+  source, sequence, timestamp). Namespace `DigitalBrain`.
+- `src/DigitalBrain.Core` — the runtime, growing consumer-first: `Neuron`, the
+  durable base every neuron inherits. Uncommitted, in review.
 
 ## Next
 

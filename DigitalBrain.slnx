@@ -1,3 +1,6 @@
 <Solution>
   <Project Path="src/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+  <Project Path="src/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+  <Project Path="src/DigitalBrain.Core.Tests/DigitalBrain.Core.Tests.csproj" />
+  <Project Path="src/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
 </Solution>

@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>DigitalBrain</RootNamespace>
+    <NoWarn>$(NoWarn);CA1308</NoWarn>
   </PropertyGroup>
 </Project>
