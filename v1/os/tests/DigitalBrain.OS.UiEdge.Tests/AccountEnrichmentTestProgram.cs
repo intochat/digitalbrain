@@ -6,7 +6,8 @@ internal static class AccountEnrichmentTestProgram
 
     public const string DisplayName = "Account enrichment";
 
-    public const string Description = "Enrich a Salesforce account from a Gmail message.";
+    public const string Description =
+        "Read Gmail, research the company online, propose Salesforce account fields.";
 
     public static string ProgramSource { get; } =
         """

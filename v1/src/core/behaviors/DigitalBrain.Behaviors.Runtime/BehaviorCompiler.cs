@@ -263,6 +263,8 @@ internal sealed class BehaviorCompiler
         Add(typeof(Orleans.AliasAttribute).Assembly);
         Add(typeof(Orleans.IGrain).Assembly);
         Add(typeof(System.ComponentModel.DescriptionAttribute).Assembly);
+        Add(typeof(DigitalBrain.Google.IGmail).Assembly);
+        Add(typeof(DigitalBrain.Salesforce.ISalesforce).Assembly);
         Add(Assembly.Load("System.Runtime"));
         Add(Assembly.Load("System.Collections"));
         Add(Assembly.Load("System.Linq"));

@@ -1,6 +1,8 @@
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/foundation.dart';
 
+import 'behavior_demo_fixtures.dart';
+
 enum BehaviorStudioView {
   library,
   overview,
@@ -11,7 +13,14 @@ enum BehaviorStudioView {
 }
 
 final class BehaviorStudioController extends ChangeNotifier {
-  BehaviorStudioController({this.client});
+  BehaviorStudioController({this.client}) {
+    if (client == null) {
+      library = BehaviorDemoFixtures.library;
+      showingDemoFixtures = true;
+      statusMessage =
+          'Demo fixtures — offline. Seed live grains: dart run bin/seed_demo_behaviors.dart';
+    }
+  }
 
   final BehaviorClient? client;
 
@@ -22,13 +31,17 @@ final class BehaviorStudioController extends ChangeNotifier {
   String? statusMessage;
   bool loading = false;
   String? lastRunOutcome;
+  bool showingDemoFixtures = false;
 
   bool get hasClient => client != null;
 
   Future<void> refreshLibrary() async {
     final edge = client;
     if (edge == null) {
-      library = const [];
+      library = BehaviorDemoFixtures.library;
+      showingDemoFixtures = true;
+      statusMessage =
+          'Demo fixtures — offline. Seed live grains: dart run bin/seed_demo_behaviors.dart';
       notifyListeners();
       return;
     }
@@ -38,9 +51,20 @@ final class BehaviorStudioController extends ChangeNotifier {
     notifyListeners();
     try {
       final document = await edge.listBehaviors();
-      library = document.items;
+      if (document.items.isEmpty) {
+        library = BehaviorDemoFixtures.library;
+        showingDemoFixtures = true;
+        statusMessage =
+            'Demo fixtures — edge has no behaviors yet. Seed: dart run bin/seed_demo_behaviors.dart';
+      } else {
+        library = document.items;
+        showingDemoFixtures = false;
+      }
     } on Object catch (error) {
-      statusMessage = '$error';
+      library = BehaviorDemoFixtures.library;
+      showingDemoFixtures = true;
+      statusMessage =
+          'Demo fixtures — edge error ($error). Seed live when UiEdge is up.';
     } finally {
       loading = false;
       notifyListeners();
@@ -49,7 +73,21 @@ final class BehaviorStudioController extends ChangeNotifier {
 
   Future<void> openBehavior(String behaviorId) async {
     final edge = client;
-    if (edge == null) {
+    final fixture = BehaviorDemoFixtures.documentFor(behaviorId);
+
+    if (edge == null || showingDemoFixtures) {
+      if (fixture == null) {
+        statusMessage = 'Unknown demo behavior: $behaviorId';
+        notifyListeners();
+        return;
+      }
+      selected = fixture;
+      view = BehaviorStudioView.overview;
+      pendingProposal = null;
+      lastRunOutcome = fixture.lastExecutionOutcome;
+      statusMessage =
+          'Demo document — mutations are local-only until seeded into DigitalBrain.';
+      notifyListeners();
       return;
     }
 
@@ -62,7 +100,15 @@ final class BehaviorStudioController extends ChangeNotifier {
       pendingProposal = null;
       lastRunOutcome = null;
     } on Object catch (error) {
-      statusMessage = '$error';
+      if (fixture != null) {
+        selected = fixture;
+        view = BehaviorStudioView.overview;
+        pendingProposal = null;
+        lastRunOutcome = fixture.lastExecutionOutcome;
+        statusMessage = 'Demo document — edge read failed: $error';
+      } else {
+        statusMessage = '$error';
+      }
     } finally {
       loading = false;
       notifyListeners();
@@ -88,7 +134,13 @@ final class BehaviorStudioController extends ChangeNotifier {
   Future<void> stopSelected() async {
     final edge = client;
     final current = selected;
-    if (edge == null || current == null) {
+    if (current == null) {
+      return;
+    }
+    if (edge == null || showingDemoFixtures) {
+      statusMessage =
+          'Demo fixture — Stop is live-only. Seed behaviors into DigitalBrain first.';
+      notifyListeners();
       return;
     }
 
@@ -109,7 +161,13 @@ final class BehaviorStudioController extends ChangeNotifier {
   Future<void> startSelected() async {
     final edge = client;
     final current = selected;
-    if (edge == null || current == null) {
+    if (current == null) {
+      return;
+    }
+    if (edge == null || showingDemoFixtures) {
+      statusMessage =
+          'Demo fixture — Start is live-only. Seed behaviors into DigitalBrain first.';
+      notifyListeners();
       return;
     }
 
@@ -127,13 +185,21 @@ final class BehaviorStudioController extends ChangeNotifier {
   }
 
   Future<void> runOnceSelected({
-    String triggerTypeName = 'EnrichTrigger',
+    String triggerTypeName = 'EnrichFromLatestEmail',
     String triggerJson =
-        '{"MessageId":"demo","AccountId":"demo","GmailAccount":"demo@example.com"}',
+        '{"GmailAccount":"default","AccountId":"001DEMO000000000"}',
   }) async {
     final edge = client;
     final current = selected;
-    if (edge == null || current == null) {
+    if (current == null) {
+      return;
+    }
+    if (edge == null || showingDemoFixtures) {
+      lastRunOutcome =
+          'demo-run-once: would execute $triggerTypeName with $triggerJson against the active revision';
+      statusMessage =
+          'Demo fixture — Run once is simulated. Seed for a real BehaviorHost attempt.';
+      notifyListeners();
       return;
     }
 

@@ -35,9 +35,9 @@ final class _BehaviorWorkspaceState extends State<BehaviorWorkspace> {
     super.initState();
     _controller = BehaviorStudioController(client: widget.client);
     _controller.addListener(_onChanged);
-    if (widget.client != null) {
-      _controller.refreshLibrary();
-    }
+    // Always refresh: offline → demo fixtures; empty edge → demo fixtures;
+    // live grains → edge library.
+    _controller.refreshLibrary();
   }
 
   @override
@@ -86,9 +86,11 @@ final class _BehaviorWorkspaceState extends State<BehaviorWorkspace> {
         return BehaviorLibraryView(
           items: _controller.library,
           loading: _controller.loading,
-          error: _controller.statusMessage,
-          onRefresh: _controller.hasClient ? _controller.refreshLibrary : null,
-          onOpen: _controller.hasClient ? _controller.openBehavior : null,
+          error: _controller.showingDemoFixtures
+              ? null
+              : _controller.statusMessage,
+          onRefresh: _controller.refreshLibrary,
+          onOpen: _controller.openBehavior,
         );
       case BehaviorStudioView.overview:
         return BehaviorOverviewView(

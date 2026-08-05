@@ -65,7 +65,8 @@ final class BehaviorLibraryView extends StatelessWidget {
                 _MessageCard(text: error!, tone: BrainPalette.signal)
               else if (items.isEmpty)
                 const _MessageCard(
-                  text: 'No behaviors yet. Seeded and published behaviors appear here.',
+                  text:
+                      'No behaviors yet. Demo fixtures appear when the edge is empty; seed live grains with dart run bin/seed_demo_behaviors.dart',
                   tone: BrainPalette.textMuted,
                 )
               else
