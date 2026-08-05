@@ -3,4 +3,6 @@
   <Project Path="src/DigitalBrain.Core/DigitalBrain.Core.csproj" />
   <Project Path="src/DigitalBrain.Core.Tests/DigitalBrain.Core.Tests.csproj" />
   <Project Path="src/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+  <Project Path="src/DigitalBrain.Mocks/DigitalBrain.Mocks.csproj" />
+  <Project Path="src/DigitalBrain.Mocks.Tests/DigitalBrain.Mocks.Tests.csproj" />
 </Solution>

@@ -5,20 +5,12 @@ using Orleans.Concurrency;
 
 namespace DigitalBrain;
 
-// The wire: the ONE grain interface into a neuron, plus the cached generic-method closers
-// (the ForwarderFor pattern) that the drain uses to invoke it — DeliverAsync for the
-// listener route, DeliverQuestionAsync for the answerer route. The envelope travels as
-// RequestContext headers: the drain stages it (StageOutboundDelivery), the outgoing filter
-// writes it just before the wire call, the incoming filter consumes it into the receiver
-// (AcceptEnvelope), and the delivery methods here hand it to the turn entry. Reads are the
-// sole interleaving surface and serve committed truth only.
 public abstract partial class Neuron : Neuron.ITransport
 {
     private static readonly ConcurrentDictionary<Type, Func<ITransport, Synapse, CancellationToken, Task>> WireDeliverers = new();
-    private static readonly ConcurrentDictionary<Type, Func<ITransport, Synapse, CancellationToken, Task>> WireQuestionDeliverers = new();
-    private static readonly ConcurrentDictionary<Type, Func<Neuron, Synapse, SynapseMetadata, CancellationToken, Task>> SelfDeliverers = new();
-    private static readonly ConcurrentDictionary<Type, Func<Neuron, Synapse, SynapseMetadata, CancellationToken, Task>> SelfQuestionDeliverers = new();
-    private static readonly ConcurrentDictionary<(Type Question, Type Reply), Func<Neuron, Synapse, Synapse, CancellationToken, Task>> ContinuationInvokers = new();
+    private static readonly ConcurrentDictionary<(Type Question, Type Reply), Func<ITransport, Synapse, CancellationToken, Task>> WireQuestionDeliverers = new();
+    private static readonly ConcurrentDictionary<Type, Func<Neuron, Synapse, DeliveryEnvelope, CancellationToken, Task>> SelfDeliverers = new();
+    private static readonly ConcurrentDictionary<(Type Question, Type Reply), Func<Neuron, Synapse, DeliveryEnvelope, CancellationToken, Task>> SelfQuestionDeliverers = new();
 
     [Alias("db.transport")]
     internal interface ITransport : IGrainWithStringKey
@@ -29,7 +21,7 @@ public abstract partial class Neuron : Neuron.ITransport
 
         [Alias("deliver-question")]
         Task DeliverQuestionAsync<TQuestion, TReply>(TQuestion question, CancellationToken cancellationToken)
-            where TQuestion : Synapse<TReply>
+            where TQuestion : Synapse
             where TReply : Synapse;
 
         [ReadOnly]
@@ -43,7 +35,6 @@ public abstract partial class Neuron : Neuron.ITransport
 
     internal static GrainId AddressOf(NeuronId id) => GrainId.Create(id.Kind, id.Name);
 
-    // The filters stage whitelists incoming calls; a delivery is the only turn-opening one.
     internal static bool IsDelivery(MethodInfo method)
     {
         ArgumentNullException.ThrowIfNull(method);
@@ -52,45 +43,45 @@ public abstract partial class Neuron : Neuron.ITransport
             && method.Name is nameof(ITransport.DeliverAsync) or nameof(ITransport.DeliverQuestionAsync);
     }
 
-    // Sender-side closers over the transport, one per fact type, cached forever: the drain
-    // closes DeliverAsync<TFact> for listener-routed receivers and
-    // DeliverQuestionAsync<TQ,TR> for the answerer route (TR extracted once per question).
     internal static Func<ITransport, Synapse, CancellationToken, Task> WireDelivererFor(Type factType)
         => WireDeliverers.GetOrAdd(factType, static closed
             => CloserFor<Func<ITransport, Synapse, CancellationToken, Task>>(nameof(SendFactAsync), closed));
 
-    internal static Func<ITransport, Synapse, CancellationToken, Task> WireQuestionDelivererFor(Type questionType)
-        => WireQuestionDeliverers.GetOrAdd(questionType, static closed
+    internal Func<ITransport, Synapse, CancellationToken, Task> WireQuestionDelivererFor(Type questionType)
+    {
+        var replyType = catalog.ReplyTypeOf(questionType);
+        return WireQuestionDeliverers.GetOrAdd((questionType, replyType), static closed
             => CloserFor<Func<ITransport, Synapse, CancellationToken, Task>>(
-                nameof(SendQuestionAsync), closed, Catalog.ReplyTypeOf(closed)));
+                nameof(SendQuestionAsync), closed.Question, closed.Reply));
+    }
 
-    // Self-delivery enters the same reception routine by direct method call — never the
-    // proxy (the proven self-call deadlock).
-    internal Task DeliverToSelfAsync(Synapse fact, SynapseMetadata metadata, bool asQuestion, CancellationToken cancellationToken)
+    internal Task DeliverToSelfAsync(Synapse fact, DeliveryEnvelope envelope, bool asQuestion, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
 
-        var deliverer = asQuestion
-            ? SelfQuestionDeliverers.GetOrAdd(fact.GetType(), static closed
-                => CloserFor<Func<Neuron, Synapse, SynapseMetadata, CancellationToken, Task>>(
-                    nameof(ForwardQuestionAsync), closed, Catalog.ReplyTypeOf(closed)))
-            : SelfDeliverers.GetOrAdd(fact.GetType(), static closed
-                => CloserFor<Func<Neuron, Synapse, SynapseMetadata, CancellationToken, Task>>(
-                    nameof(ForwardFactAsync), closed));
+        if (asQuestion)
+        {
+            var replyType = catalog.ReplyTypeOf(fact.GetType());
+            var deliverer = SelfQuestionDeliverers.GetOrAdd((fact.GetType(), replyType), static closed
+                => CloserFor<Func<Neuron, Synapse, DeliveryEnvelope, CancellationToken, Task>>(
+                    nameof(ForwardQuestionAsync), closed.Question, closed.Reply));
+            return deliverer(this, fact, envelope, cancellationToken);
+        }
 
-        return deliverer(this, fact, metadata, cancellationToken);
+        var factDeliverer = SelfDeliverers.GetOrAdd(fact.GetType(), static closed
+            => CloserFor<Func<Neuron, Synapse, DeliveryEnvelope, CancellationToken, Task>>(
+                nameof(ForwardFactAsync), closed));
+        return factDeliverer(this, fact, envelope, cancellationToken);
     }
 
-    // The filter/transport envelope hand-off. Turns are serialized and the filter runs
-    // synchronously before its Invoke, so one slot per direction cannot be overwritten.
-    private SynapseMetadata? incomingEnvelope;
-    private SynapseMetadata? outboundDelivery;
+    private DeliveryEnvelope? incomingEnvelope;
+    private DeliveryEnvelope? outboundDelivery;
 
-    internal void AcceptEnvelope(SynapseMetadata metadata) => incomingEnvelope = metadata;
+    internal void AcceptEnvelope(DeliveryEnvelope envelope) => incomingEnvelope = envelope;
 
-    internal void StageOutboundDelivery(SynapseMetadata metadata) => outboundDelivery = metadata;
+    internal void StageOutboundDelivery(DeliveryEnvelope envelope) => outboundDelivery = envelope;
 
-    internal SynapseMetadata TakeOutboundDelivery()
+    internal DeliveryEnvelope TakeOutboundDelivery()
     {
         var staged = outboundDelivery ?? throw new InvalidOperationException(
             $"A transport delivery left {Id} without a staged envelope; the drain stages it "
@@ -99,7 +90,7 @@ public abstract partial class Neuron : Neuron.ITransport
         return staged;
     }
 
-    private SynapseMetadata TakeEnvelope()
+    private DeliveryEnvelope TakeEnvelope()
     {
         var envelope = incomingEnvelope ?? throw new InvalidOperationException(
             $"A delivery reached {Id} without its envelope; Core writes the headers before "
@@ -127,6 +118,8 @@ public abstract partial class Neuron : Neuron.ITransport
                 entry.Entry,
                 entry.Kind,
                 entry.ToMetadata(Id),
+                entry.Cause?.ToSynapseRef(),
+                entry.Answers?.ToSynapseRef(),
                 entry.To is { } to
                     ? [.. to.Select(receiver => new Delivery(receiver.ToNeuronId(), receiver.Via ?? string.Empty))]
                     : null,
@@ -154,27 +147,16 @@ public abstract partial class Neuron : Neuron.ITransport
         => receiver.DeliverAsync((TFact)fact, cancellationToken);
 
     private static Task SendQuestionAsync<TQuestion, TReply>(ITransport receiver, Synapse question, CancellationToken cancellationToken)
-        where TQuestion : Synapse<TReply>
+        where TQuestion : Synapse
         where TReply : Synapse
         => receiver.DeliverQuestionAsync<TQuestion, TReply>((TQuestion)question, cancellationToken);
 
-    private static Task ForwardFactAsync<TFact>(Neuron receiver, Synapse fact, SynapseMetadata metadata, CancellationToken cancellationToken)
+    private static Task ForwardFactAsync<TFact>(Neuron receiver, Synapse fact, DeliveryEnvelope envelope, CancellationToken cancellationToken)
         where TFact : Synapse
-        => receiver.DeliverCoreAsync((TFact)fact, metadata, cancellationToken);
+        => receiver.DeliverCoreAsync((TFact)fact, envelope, cancellationToken);
 
-    private static Task ForwardQuestionAsync<TQuestion, TReply>(Neuron receiver, Synapse question, SynapseMetadata metadata, CancellationToken cancellationToken)
-        where TQuestion : Synapse<TReply>
+    private static Task ForwardQuestionAsync<TQuestion, TReply>(Neuron receiver, Synapse question, DeliveryEnvelope envelope, CancellationToken cancellationToken)
+        where TQuestion : Synapse
         where TReply : Synapse
-        => receiver.DeliverQuestionCoreAsync<TQuestion, TReply>((TQuestion)question, metadata, cancellationToken);
-
-    private static Func<Neuron, Synapse, Synapse, CancellationToken, Task> ContinuationInvokerFor(Type questionType, Type replyType)
-        => ContinuationInvokers.GetOrAdd((questionType, replyType), static closed
-            => CloserFor<Func<Neuron, Synapse, Synapse, CancellationToken, Task>>(
-                nameof(ContinueCoreAsync), closed.Question, closed.Reply));
-
-    private static Task ContinueCoreAsync<TQuestion, TReply>(Neuron receiver, Synapse question, Synapse reply, CancellationToken cancellationToken)
-        where TQuestion : Synapse<TReply>
-        where TReply : Synapse
-        => ((INeuron<Answer<TQuestion, TReply>>)receiver).HandleAsync(
-            new Answer<TQuestion, TReply>((TQuestion)question, (TReply)reply), cancellationToken);
+        => receiver.DeliverQuestionCoreAsync<TQuestion, TReply>((TQuestion)question, envelope, cancellationToken);
 }

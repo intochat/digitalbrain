@@ -1,10 +1,5 @@
 namespace DigitalBrain;
 
-// The session grain and its wire (§5, the edge). The class is nested so its name mints the
-// Core-owned "session" kind through the one convention (NeuronId.KindOf) and so it reaches
-// the turn machinery it shares with every neuron — journal, watermark, outbox, connections.
-// Each entry runs ONE session turn and returns after the commit; delivery rides the same
-// drain as any neuron's. Edge-born facts carry Cause: null.
 public abstract partial class Neuron
 {
     [Alias("db.session")]
@@ -22,16 +17,13 @@ public abstract partial class Neuron
 
     internal sealed class Session : Neuron, ISessionEntry
     {
-        // The session declares no continuations; its asks close by the journaled reception
-        // alone (ReceiveReplyAsync releases the pin, the edge poll matches on Answers).
         private protected override bool ContinuesAsks => false;
 
         async Task ISessionEntry.EmitAsync(Synapse fact)
         {
             ArgumentNullException.ThrowIfNull(fact);
             RefusePoisoned();
-            RefuseContinuationEmission(fact.GetType());
-            var staged = StagedFor(fact);   // unknown vocabulary refuses here, before staging
+            var staged = StagedFor(fact);
 
             bool deliverable;
             try
@@ -52,13 +44,10 @@ public abstract partial class Neuron
         {
             ArgumentNullException.ThrowIfNull(fact);
             RefusePoisoned();
-            RefuseContinuationEmission(fact.GetType());
             var staged = StagedFor(fact);
 
             try
             {
-                // Directed: exactly the named receiver, no declaration or connection
-                // fan-out — the route a Session.SendAsync names is the route it gets.
                 journal.AppendSaid(
                     staged.Kind,
                     clock.GetUtcNow(),
@@ -81,7 +70,6 @@ public abstract partial class Neuron
             ArgumentNullException.ThrowIfNull(question);
             RefusePoisoned();
             var questionType = question.GetType();
-            _ = Catalog.ReplyTypeOf(questionType);   // only questions can be asked — refuse loudly
             var staged = StagedFor(question);
             staged = catalog.TryGetAnswererKind(questionType, out var answererKind)
                 ? staged with { AskAnswererKind = answererKind }
@@ -91,7 +79,7 @@ public abstract partial class Neuron
             bool deliverable;
             try
             {
-                position = journal.LastSeq + 1;   // the question's said entry stages first
+                position = journal.LastSeq + 1;
                 deliverable = StageSaid(
                     staged, cause: null, clock.GetUtcNow(), replyTo: null, journal.OpenAsksSnapshot());
             }
@@ -107,8 +95,6 @@ public abstract partial class Neuron
     }
 }
 
-// The edge (§5): sessions and reads over the one grain factory a cluster client hands out.
-// Get<TNeuron> died as a send/ask surface — the edge speaks facts and reads journals.
 public sealed class Brain(IGrainFactory grains)
 {
     public Session Session(string context)
@@ -125,9 +111,6 @@ public sealed class Brain(IGrainFactory grains)
             .WaitAsync(cancellationToken);
 }
 
-// The client half of a session: every wire call fires EXACTLY once and returns after the
-// session turn commits. The Task is volatile sugar — the journal is the ask: a crashed and
-// restarted edge reconstructs the whole round trip from the session journal alone.
 public sealed class Session
 {
     private static readonly TimeSpan PollBackoff = TimeSpan.FromMilliseconds(75);
@@ -156,12 +139,7 @@ public sealed class Session
         return Entry().SendAsync(receiver, fact);
     }
 
-    // Fire once, then poll the session journal from the ask's own position: the reception
-    // stamped with Answers is the reply; DeliveryFailed or AskExpired for the ask is the
-    // failure; a wire failure on the single fire is an ambiguous outcome — recovery is
-    // reading the session journal, never retrying the call (a second fire would journal a
-    // second ask that dedup correctly cannot catch).
-    public async Task<TReply> AskAsync<TReply>(Synapse<TReply> question, CancellationToken cancellationToken = default)
+    public async Task<TReply> AskAsync<TReply>(Synapse question, CancellationToken cancellationToken = default)
         where TReply : Synapse
     {
         ArgumentNullException.ThrowIfNull(question);
@@ -192,7 +170,7 @@ public sealed class Session
                 cursor = Math.Max(cursor, fact.Position);
                 switch (fact.Body)
                 {
-                    case TReply reply when fact.Metadata.Answers == askRef:
+                    case TReply reply when fact.Answers == askRef:
                         return reply;
                     case DeliveryFailed failed when failed.Fact == askRef:
                         throw new AskFailedException(Id, askRef, failed);
@@ -230,9 +208,6 @@ public sealed class Session
         => grains.GetGrain<Neuron.ISessionEntry>(Neuron.AddressOf(Id));
 }
 
-// The ask ended in a journaled Core fact instead of a reply: DeliveryFailed (the ask never
-// landed, or no answerer exists) or AskExpired (delivered, never answered inside the
-// horizon). The fact IS the failure record; the exception just carries it to the caller.
 public sealed class AskFailedException : Exception
 {
     internal AskFailedException(NeuronId session, SynapseRef ask, DeliveryFailed failure)
@@ -248,8 +223,6 @@ public sealed class AskFailedException : Exception
     public Synapse Fact { get; }
 }
 
-// The single fire's wire call failed, so whether the session turn committed is unknown.
-// Recovery is reading the session journal — never retrying the fire.
 public sealed class AskOutcomeUnknownException : Exception
 {
     internal AskOutcomeUnknownException(NeuronId session, Exception wireFailure)

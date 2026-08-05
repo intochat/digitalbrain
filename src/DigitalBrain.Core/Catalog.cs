@@ -1,27 +1,18 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 
 namespace DigitalBrain;
 
-// The boot catalog: one reflection pass over the composition's explicit neuron type set.
-// A pure function of the types, held per-silo in DI, never static — test clusters compose
-// independently. Every refusal below is a tested contract: the message is the assertion.
 internal sealed class Catalog
 {
     private static readonly Type[] ReservedKinds =
         [typeof(Connect), typeof(Disconnect), typeof(Schedule), typeof(Unschedule)];
 
-    // Core's own journaled vocabulary is seeded so its kinds exist without any declaration
-    // (Core journals Connect receptions and emits DeliveryFailed whether or not a module
-    // listens) and so a module record reusing one of these names collides loudly.
     private static readonly Type[] CoreVocabulary =
     [
         typeof(Connect), typeof(Disconnect), typeof(ConnectionRefused), typeof(DeliveryFailed),
         typeof(AskExpired), typeof(Schedule), typeof(Unschedule), typeof(ScheduleFailed),
-        typeof(DeclaredRouteSurvives),
     ];
 
     private readonly Dictionary<string, Type> kinds;
@@ -29,8 +20,7 @@ internal sealed class Catalog
     private readonly Dictionary<Type, string> factKindNames;
     private readonly Dictionary<Type, HashSet<string>> listeners;
     private readonly Dictionary<Type, string> answerers;
-    private readonly HashSet<(string NeuronKind, Type Question)> continuations;
-    private readonly Dictionary<Type, string> shapeFingerprints;
+    private readonly Dictionary<Type, Type> replyTypes;
 
     private Catalog(
         Dictionary<string, Type> kinds,
@@ -38,8 +28,7 @@ internal sealed class Catalog
         Dictionary<Type, string> factKindNames,
         Dictionary<Type, HashSet<string>> listeners,
         Dictionary<Type, string> answerers,
-        HashSet<(string NeuronKind, Type Question)> continuations,
-        Dictionary<Type, string> shapeFingerprints,
+        Dictionary<Type, Type> replyTypes,
         string fingerprint)
     {
         this.kinds = kinds;
@@ -47,13 +36,10 @@ internal sealed class Catalog
         this.factKindNames = factKindNames;
         this.listeners = listeners;
         this.answerers = answerers;
-        this.continuations = continuations;
-        this.shapeFingerprints = shapeFingerprints;
+        this.replyTypes = replyTypes;
         Fingerprint = fingerprint;
     }
 
-    // Hash of the sorted (kind, declaredFactKind|answeredFactKind) rows; silos whose
-    // fingerprints differ refuse to form a cluster.
     internal string Fingerprint { get; }
 
     internal IReadOnlyCollection<Type> FactTypes => factKindNames.Keys;
@@ -67,7 +53,7 @@ internal sealed class Catalog
         var factKindNames = new Dictionary<Type, string>();
         var listeners = new Dictionary<Type, HashSet<string>>();
         var answerers = new Dictionary<Type, string>();
-        var continuations = new HashSet<(string NeuronKind, Type Question)>();
+        var replyTypes = new Dictionary<Type, Type>();
         var rows = new List<string>();
 
         foreach (var coreFact in CoreVocabulary)
@@ -82,7 +68,7 @@ internal sealed class Catalog
             {
                 if (collidingNeuron == neuronType)
                 {
-                    continue;   // the same type listed twice is not a collision
+                    continue;
                 }
 
                 throw new InvalidOperationException(
@@ -106,21 +92,6 @@ internal sealed class Catalog
                 if (shape == typeof(INeuron<>))
                 {
                     var factType = declaration.GetGenericArguments()[0];
-                    if (factType.IsGenericType && factType.GetGenericTypeDefinition() == typeof(Answer<,>))
-                    {
-                        // Answer<Q,R> is Core-internal, never cataloged as a fact: the
-                        // declaration is the continuation claim the Ask guard reads.
-                        var questionType = factType.GetGenericArguments()[0];
-                        var replyType = factType.GetGenericArguments()[1];
-                        RequireCatalogable(neuronType, questionType);
-                        RequireCatalogable(neuronType, replyType);
-                        RegisterFactKind(factKinds, factKindNames, questionType);
-                        RegisterFactKind(factKinds, factKindNames, replyType);
-                        continuations.Add((kind, questionType));
-                        rows.Add($"{kind} continues {NeuronId.KindOf(questionType)}");
-                        continue;
-                    }
-
                     RefuseReserved(neuronType, factType);
                     RequireCatalogable(neuronType, factType);
                     RegisterFactKind(factKinds, factKindNames, factType);
@@ -134,7 +105,7 @@ internal sealed class Catalog
                     heardFacts.Add(factType);
                     rows.Add($"{kind} hears {NeuronId.KindOf(factType)}");
                 }
-                else if (shape == typeof(INeuron<,>))
+                else if (shape == typeof(IAnswers<,>))
                 {
                     var questionType = declaration.GetGenericArguments()[0];
                     var replyType = declaration.GetGenericArguments()[1];
@@ -150,9 +121,9 @@ internal sealed class Catalog
                     }
 
                     answerers.Add(questionType, kind);
-                    RequireAnswererOverride(neuronType, declaration, questionType, replyType);
+                    replyTypes.Add(questionType, replyType);
                     answeredQuestions.Add(questionType);
-                    rows.Add($"{kind} answers {NeuronId.KindOf(questionType)}");
+                    rows.Add($"{kind} answers {NeuronId.KindOf(questionType)}→{NeuronId.KindOf(replyType)}");
                 }
             }
 
@@ -162,32 +133,16 @@ internal sealed class Catalog
                 {
                     throw new InvalidOperationException(
                         $"{Describe(neuronType)} declares both INeuron<{questionType.Name}> and "
-                        + $"INeuron<{questionType.Name}, {ReplyTypeOf(questionType).Name}> for one question; "
+                        + $"IAnswers<{questionType.Name}, {replyTypes[questionType].Name}> for one question; "
                         + "a kind is either a listener or the answerer, never both.");
                 }
             }
         }
 
-        foreach (var (neuronKind, questionType) in continuations)
-        {
-            if (!answerers.ContainsKey(questionType))
-            {
-                throw new InvalidOperationException(
-                    $"'{neuronKind}' declares INeuron<Answer<{questionType.Name}, {ReplyTypeOf(questionType).Name}>> "
-                    + $"but no kind in the composition answers {Describe(questionType)}.");
-            }
-        }
-
         var payload = string.Join('\n', rows.Order(StringComparer.Ordinal));
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
-        var shapeFingerprints = factKindNames.Keys.ToDictionary(
-            factType => factType,
-            factType => FingerprintOfShape(factType
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Select(property => property.Name)));
 
-        return new Catalog(
-            kinds, factKinds, factKindNames, listeners, answerers, continuations, shapeFingerprints, fingerprint);
+        return new Catalog(kinds, factKinds, factKindNames, listeners, answerers, replyTypes, fingerprint);
     }
 
     internal bool TryGetNeuronType(string kind, [NotNullWhen(true)] out Type? neuronType)
@@ -216,48 +171,24 @@ internal sealed class Catalog
         => answerers.TryGetValue(questionType, out var answererKind)
         && string.Equals(answererKind, neuronKind, StringComparison.Ordinal);
 
+    internal bool IsQuestion(Type factType) => answerers.ContainsKey(factType);
+
+    internal bool TryGetReplyType(Type questionType, [NotNullWhen(true)] out Type? replyType)
+        => replyTypes.TryGetValue(questionType, out replyType);
+
+    internal Type ReplyTypeOf(Type questionType)
+        => TryGetReplyType(questionType, out var replyType)
+            ? replyType
+            : throw new InvalidOperationException(
+                $"{Describe(questionType)} has no answerer in the composition; only IAnswers questions carry a reply type.");
+
+    // Asker may continue when it declares INeuron for the question's reply type.
     internal bool HasContinuation(string neuronKind, Type questionType)
-        => continuations.Contains((neuronKind, questionType));
+        => TryGetReplyType(questionType, out var replyType)
+        && ListenerKindsOf(replyType).Contains(neuronKind);
 
-    internal bool HasContinuation(Type neuronType, Type questionType)
-        => HasContinuation(NeuronId.KindOf(neuronType), questionType);
-
-    // The Answer-reconstruction guard's third conjunct (§5): a hash of the question's
-    // serialized member names, computed at boot per fact type and compared against the
-    // journaled ask body's property names before any Answer<Q,R> is dispatched — a drifted
-    // shape must never rehydrate with silently-defaulted members.
-    internal string ShapeFingerprintOf(Type factType) => shapeFingerprints[factType];
-
-    internal static string FingerprintOfShape(IEnumerable<string> memberNames)
-    {
-        ArgumentNullException.ThrowIfNull(memberNames);
-
-        var payload = string.Join('\n', memberNames
-            .Select(JsonNamingPolicy.CamelCase.ConvertName)
-            .Order(StringComparer.Ordinal));
-
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
-    }
-
-    internal static Type? ReplyTypeOrNull(Type factType)
-    {
-        ArgumentNullException.ThrowIfNull(factType);
-
-        for (var ancestor = factType.BaseType; ancestor is not null; ancestor = ancestor.BaseType)
-        {
-            if (ancestor.IsGenericType && ancestor.GetGenericTypeDefinition() == typeof(Synapse<>))
-            {
-                return ancestor.GetGenericArguments()[0];
-            }
-        }
-
-        return null;
-    }
-
-    internal static Type ReplyTypeOf(Type questionType)
-        => ReplyTypeOrNull(questionType)
-            ?? throw new InvalidOperationException(
-                $"{Describe(questionType)} does not derive Synapse<TReply>; only questions carry a reply type.");
+    internal bool ListensTo(string neuronKind, Type factType)
+        => ListenerKindsOf(factType).Contains(neuronKind);
 
     internal static string Describe(Type type)
         => type.IsGenericType
@@ -299,9 +230,8 @@ internal sealed class Catalog
         if (factType.IsAbstract)
         {
             throw new InvalidOperationException(
-                $"{Describe(neuronType)} declares INeuron over abstract synapse {Describe(factType)}; "
-                + "dispatch is exact-declared-type — declare sealed concrete facts "
-                + "(journal-mirrors read journals instead of declaring wildcards).");
+                $"{Describe(neuronType)} declares an interface over abstract synapse {Describe(factType)}; "
+                + "dispatch is exact-declared-type — declare sealed concrete facts.");
         }
 
         if (factType.IsGenericTypeDefinition || factType.IsGenericType)
@@ -317,25 +247,5 @@ internal sealed class Catalog
                 $"Fact {Describe(factType)} declared by {Describe(neuronType)} is not sealed; "
                 + "every concrete fact record must be sealed so exact-type dispatch is total.");
         }
-    }
-
-    private static void RequireAnswererOverride(
-        Type neuronType, Type answererInterface, Type questionType, Type replyType)
-    {
-        // A target method whose DeclaringType is the interface itself is the default
-        // implementation: nothing on the class overrode it.
-        var map = neuronType.GetInterfaceMap(answererInterface);
-        foreach (var target in map.TargetMethods)
-        {
-            if (target.DeclaringType is { IsInterface: false })
-            {
-                return;
-            }
-        }
-
-        throw new InvalidOperationException(
-            $"{Describe(neuronType)} declares INeuron<{questionType.Name}, {replyType.Name}> but overrides "
-            + $"neither {nameof(INeuron<,>.HandleAsync)} nor {nameof(INeuron<,>.Answer)}; "
-            + "a never-overridden answerer would defer every ask forever — a dead claim.");
     }
 }

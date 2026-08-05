@@ -1,11 +1,5 @@
 namespace DigitalBrain;
 
-// The envelope over the wire (§4): kind strings, longs and ticks in RequestContext —
-// transport convenience only, never AQN, never authority (the journal is). The outgoing
-// filter writes from the sender's staged delivery just before every wire call; the
-// incoming filter consumes on arrival. Consume removes the keys and returns null when no
-// envelope rode the call — the filter decides whether that is legal (it is not, for a
-// delivery: a delivery without an envelope is a kernel bug).
 internal static class SynapseHeaders
 {
     private const string SourceKindKey = "db.src.kind";
@@ -19,19 +13,19 @@ internal static class SynapseHeaders
     private const string AnswersNameKey = "db.answers.name";
     private const string AnswersSequenceKey = "db.answers.seq";
 
-    internal static void Write(SynapseMetadata metadata)
+    internal static void Write(DeliveryEnvelope envelope)
     {
-        ArgumentNullException.ThrowIfNull(metadata);
+        ArgumentNullException.ThrowIfNull(envelope);
 
-        RequestContext.Set(SourceKindKey, metadata.Source.Kind);
-        RequestContext.Set(SourceNameKey, metadata.Source.Name);
-        RequestContext.Set(SequenceKey, metadata.Sequence);
-        RequestContext.Set(TimestampKey, metadata.Timestamp.UtcTicks);
-        WriteRef(CauseKindKey, CauseNameKey, CauseSequenceKey, metadata.Cause);
-        WriteRef(AnswersKindKey, AnswersNameKey, AnswersSequenceKey, metadata.Answers);
+        RequestContext.Set(SourceKindKey, envelope.Source.Kind);
+        RequestContext.Set(SourceNameKey, envelope.Source.Name);
+        RequestContext.Set(SequenceKey, envelope.Sequence);
+        RequestContext.Set(TimestampKey, envelope.Timestamp.UtcTicks);
+        WriteRef(CauseKindKey, CauseNameKey, CauseSequenceKey, envelope.Cause);
+        WriteRef(AnswersKindKey, AnswersNameKey, AnswersSequenceKey, envelope.Answers);
     }
 
-    internal static SynapseMetadata? Consume()
+    internal static DeliveryEnvelope? Consume()
     {
         var sourceKind = TakeString(SourceKindKey);
         var sourceName = TakeString(SourceNameKey);
@@ -45,7 +39,7 @@ internal static class SynapseHeaders
             return null;
         }
 
-        return new SynapseMetadata(
+        return new DeliveryEnvelope(
             new NeuronId(sourceKind, sourceName ?? throw Missing(SourceNameKey)),
             sequence ?? throw Missing(SequenceKey),
             new DateTimeOffset(timestampTicks ?? throw Missing(TimestampKey), TimeSpan.Zero),

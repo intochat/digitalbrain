@@ -72,7 +72,9 @@ public abstract partial class Neuron : Neuron.IDrainEntry
 
     private partial void ScheduleDrain()
     {
-        if (unsettled.Count == 0 || drainTimer is not null)
+        // Outbox drain and ask-horizon expiry share this timer: pins must be swept while
+        // the activation is live, not only when unsettled said rows remain (AskExpired).
+        if (drainTimer is not null || (unsettled.Count == 0 && !journal.HasAskPins))
         {
             return;
         }
@@ -217,7 +219,7 @@ public abstract partial class Neuron : Neuron.IDrainEntry
             await CommitCoreBatchAsync(deliverable: false);
         }
 
-        if (unsettled.Count == 0)
+        if (unsettled.Count == 0 && !journal.HasAskPins)
         {
             drainTimer?.Dispose();
             drainTimer = null;
@@ -236,14 +238,12 @@ public abstract partial class Neuron : Neuron.IDrainEntry
         NeuronId receiverId,
         CancellationToken drainToken)
     {
-        var metadata = entry.ToMetadata(Id);
+        var envelope = entry.ToEnvelope(Id);
         var factType = fact.GetType();
         var questionRoute = receiver.Via == NeuronIdEntry.Ask
             && entry.Answers is null
-            && Catalog.ReplyTypeOrNull(factType) is not null;
+            && catalog.IsQuestion(factType);
 
-        // Every attempt gets a cancelable, bounded token: reminder-driven drains must hold
-        // one that can actually fire, not one that is merely CanBeCanceled forever.
         using var attemptSource = drainToken.CanBeCanceled
             ? CancellationTokenSource.CreateLinkedTokenSource(drainToken)
             : new CancellationTokenSource();
@@ -254,13 +254,12 @@ public abstract partial class Neuron : Neuron.IDrainEntry
         {
             if (receiverId == Id)
             {
-                // Self-delivery is a direct method call, never the proxy (proven deadlock).
-                await DeliverToSelfAsync(fact, metadata, questionRoute, attemptToken);
+                await DeliverToSelfAsync(fact, envelope, questionRoute, attemptToken);
             }
             else
             {
                 var transport = base.GrainFactory.GetGrain<ITransport>(AddressOf(receiverId));
-                StageOutboundDelivery(metadata);   // the outgoing filter writes the headers
+                StageOutboundDelivery(envelope);
                 await (questionRoute
                     ? WireQuestionDelivererFor(factType)
                     : WireDelivererFor(factType))(transport, fact, attemptToken);

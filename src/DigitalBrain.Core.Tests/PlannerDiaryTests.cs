@@ -26,7 +26,7 @@ public sealed class PlannerDiaryTests(BrainTestClusters clusters) : DigitalBrain
         var sessionReading = await ReadAsync(session.Id, ct);
         var utterance = sessionReading.SaidSingle<PlanDay>();
         Assert.Equal("declared", utterance.DeliveryTo(plannerId).Via);
-        Assert.Null(utterance.Metadata.Cause);
+        Assert.Null(utterance.Cause);
 
         var plannerReading = await ReadAsync(plannerId, ct);
         var planHeard = plannerReading.HeardSingle<PlanDay>();
@@ -35,7 +35,7 @@ public sealed class PlannerDiaryTests(BrainTestClusters clusters) : DigitalBrain
 
         var plannedSaid = plannerReading.SaidSingle<DayPlanned>();
         Assert.Equal("declared", plannedSaid.DeliveryTo(diaryId).Via);
-        Assert.Equal(new SynapseRef(session.Id, utterance.Position), plannedSaid.Metadata.Cause);
+        Assert.Equal(new SynapseRef(session.Id, utterance.Position), plannedSaid.Cause);
 
         var diaryReading = await ReadAsync(diaryId, ct);
         var reception = diaryReading.HeardSingle<DayPlanned>();

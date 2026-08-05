@@ -25,13 +25,15 @@ public static class JournalAssertions
         => All<TFact>(reading, Said);
 
     public static Delivery DeliveryTo(this JournalFact said, NeuronId receiver)
-    {
-        ArgumentNullException.ThrowIfNull(said);
-
-        return said.To?.FirstOrDefault(delivery => delivery.Receiver == receiver)
+        => DeliveryToOrNull(said, receiver)
             ?? throw new InvalidOperationException(
                 $"The said '{said.Kind}' at position {said.Position} does not deliver to {receiver}; "
                 + $"its receivers are [{string.Join(", ", said.To?.Select(Render) ?? [])}].");
+
+    public static Delivery? DeliveryToOrNull(this JournalFact said, NeuronId receiver)
+    {
+        ArgumentNullException.ThrowIfNull(said);
+        return said.To?.FirstOrDefault(delivery => delivery.Receiver == receiver);
     }
 
     private static IReadOnlyList<JournalFact> All<TFact>(NeuronReading reading, string entry)

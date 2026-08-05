@@ -15,8 +15,8 @@ public abstract partial class Neuron
 {
     private readonly Dictionary<string, ArmedScheduleTimer> scheduleTimers = new(StringComparer.Ordinal);
 
-    private Task ReceiveScheduleAsync(Schedule schedule, SynapseMetadata metadata)
-        => RunCoreReceptionAsync(schedule, metadata, (heardFrom, heardPosition, now) =>
+    private Task ReceiveScheduleAsync(Schedule schedule, DeliveryEnvelope envelope)
+        => RunCoreReceptionAsync(schedule, envelope, (heardFrom, heardPosition, now) =>
         {
             if (ScheduleRefusalOf(schedule) is { } reason)
             {
@@ -24,7 +24,7 @@ public abstract partial class Neuron
                     new ScheduleFailed(NeuronId.KindOf(schedule.Fact.GetType()), reason, ConsecutiveFailures: 0),
                     heardFrom,
                     now,
-                    directedTo: metadata.Source);
+                    directedTo: envelope.Source);
             }
 
             var factKind = catalog.KindOfFact(schedule.Fact.GetType());
@@ -38,10 +38,10 @@ public abstract partial class Neuron
             return false;
         });
 
-    private Task ReceiveUnscheduleAsync(Unschedule unschedule, SynapseMetadata metadata)
-        => RunCoreReceptionAsync(unschedule, metadata, (_, _, _) =>
+    private Task ReceiveUnscheduleAsync(Unschedule unschedule, DeliveryEnvelope envelope)
+        => RunCoreReceptionAsync(unschedule, envelope, (_, _, _) =>
         {
-            _ = journal.RemoveSchedule(unschedule.Fact);   // unknown kind: the journaled reception IS the no-op
+            _ = journal.RemoveSchedule(unschedule.Fact);
             return false;
         });
 
@@ -130,13 +130,13 @@ public abstract partial class Neuron
 
             var fact = codec.Decode(entry.Fact, factType) as Synapse
                 ?? throw new InvalidOperationException($"the scheduled '{factKind}' body does not rehydrate");
-            var metadata = new SynapseMetadata(
+            var envelope = new DeliveryEnvelope(
                 Id,
                 journal.LastSeq + 1,
                 clock.GetUtcNow(),
                 new SynapseRef(Id, entry.Cause),
                 Answers: null);
-            await DeliverToSelfAsync(fact, metadata, asQuestion: false, cancellationToken);
+            await DeliverToSelfAsync(fact, envelope, asQuestion: false, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
