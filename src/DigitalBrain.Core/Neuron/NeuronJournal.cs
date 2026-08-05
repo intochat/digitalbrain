@@ -20,6 +20,7 @@ internal sealed class NeuronJournal
     private const string DedupKey = "dedup";
     private const string ConnectionsKey = "connections";
     private const string ScheduleKey = "schedule";
+    private const string DepthsKey = "outbox.depths";
     private const string HeardTalliesKey = "tallies.heard";
     private const string SaidTalliesKey = "tallies.said";
     private const string StateKey = "state";
@@ -27,7 +28,7 @@ internal sealed class NeuronJournal
     internal static readonly FrozenSet<string> CoreKeys = new[]
     {
         JournalKey, SequenceKey, CursorKey, ProgressKey, AsksKey, OpenAsksKey,
-        DedupKey, ConnectionsKey, ScheduleKey, HeardTalliesKey, SaidTalliesKey, StateKey,
+        DedupKey, ConnectionsKey, ScheduleKey, DepthsKey, HeardTalliesKey, SaidTalliesKey, StateKey,
     }.ToFrozenSet(StringComparer.Ordinal);
 
     private readonly IDurableList<JournalEntry> journal;
@@ -39,6 +40,7 @@ internal sealed class NeuronJournal
     private readonly IDurableDictionary<string, WatermarkEntry> dedup;
     private readonly IDurableDictionary<string, NeuronIdEntry[]> connections;
     private readonly IDurableDictionary<string, ScheduleEntry> schedule;
+    private readonly IDurableDictionary<string, int> depths;
     private readonly IDurableDictionary<string, long> heardTallies;
     private readonly IDurableDictionary<string, long> saidTallies;
     private readonly IDurableValue<JsonElement> state;
@@ -56,6 +58,7 @@ internal sealed class NeuronJournal
         dedup = services.GetRequiredKeyedService<IDurableDictionary<string, WatermarkEntry>>(DedupKey);
         connections = services.GetRequiredKeyedService<IDurableDictionary<string, NeuronIdEntry[]>>(ConnectionsKey);
         schedule = services.GetRequiredKeyedService<IDurableDictionary<string, ScheduleEntry>>(ScheduleKey);
+        depths = services.GetRequiredKeyedService<IDurableDictionary<string, int>>(DepthsKey);
         heardTallies = services.GetRequiredKeyedService<IDurableDictionary<string, long>>(HeardTalliesKey);
         saidTallies = services.GetRequiredKeyedService<IDurableDictionary<string, long>>(SaidTalliesKey);
         state = services.GetRequiredKeyedService<IDurableValue<JsonElement>>(StateKey);
@@ -102,7 +105,7 @@ internal sealed class NeuronJournal
         JsonElement body)
     {
         var seq = Mint();
-        journal.Add(new JournalEntry(seq, JournalEntry.Heard, kind, at, cause, answers, from, To: null, body));
+        journal.Add(new JournalEntry(seq, JournalEntry.Heard, kind, at, cause, answers, from, To: null, body, Depth: 0));
         heardTallies[kind] = TallyOf(heardTallies, kind) + 1;
         return seq;
     }
@@ -113,13 +116,20 @@ internal sealed class NeuronJournal
         SynapseRefEntry? cause,
         SynapseRefEntry? answers,
         NeuronIdEntry[] to,
-        JsonElement body)
+        JsonElement body,
+        int depth = 1)
     {
         var seq = Mint();
-        journal.Add(new JournalEntry(seq, JournalEntry.Said, kind, at, cause, answers, From: null, to, body));
+        var speechDepth = Math.Max(1, depth);
+        journal.Add(new JournalEntry(
+            seq, JournalEntry.Said, kind, at, cause, answers, From: null, to, body, speechDepth));
+        depths[Key(seq)] = speechDepth;
         saidTallies[kind] = TallyOf(saidTallies, kind) + 1;
         return seq;
     }
+
+    internal int DepthOf(long position)
+        => depths.TryGetValue(Key(position), out var depth) && depth > 0 ? depth : 1;
 
     internal JournalEntry? EntryAt(long position)
     {

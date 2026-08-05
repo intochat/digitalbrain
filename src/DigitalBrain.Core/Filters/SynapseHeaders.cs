@@ -12,6 +12,7 @@ internal static class SynapseHeaders
     private const string AnswersKindKey = "db.answers.kind";
     private const string AnswersNameKey = "db.answers.name";
     private const string AnswersSequenceKey = "db.answers.seq";
+    private const string DepthKey = "db.depth";
 
     internal static void Write(DeliveryEnvelope envelope)
     {
@@ -21,6 +22,7 @@ internal static class SynapseHeaders
         RequestContext.Set(SourceNameKey, envelope.Source.Name);
         RequestContext.Set(SequenceKey, envelope.Sequence);
         RequestContext.Set(TimestampKey, envelope.Timestamp.UtcTicks);
+        RequestContext.Set(DepthKey, (long)Math.Max(1, envelope.Depth));
         WriteRef(CauseKindKey, CauseNameKey, CauseSequenceKey, envelope.Cause);
         WriteRef(AnswersKindKey, AnswersNameKey, AnswersSequenceKey, envelope.Answers);
     }
@@ -31,6 +33,7 @@ internal static class SynapseHeaders
         var sourceName = TakeString(SourceNameKey);
         var sequence = TakeInt64(SequenceKey);
         var timestampTicks = TakeInt64(TimestampKey);
+        var depthValue = TakeInt64(DepthKey);
         var cause = TakeRef(CauseKindKey, CauseNameKey, CauseSequenceKey);
         var answers = TakeRef(AnswersKindKey, AnswersNameKey, AnswersSequenceKey);
 
@@ -39,12 +42,15 @@ internal static class SynapseHeaders
             return null;
         }
 
+        var depth = depthValue is > 0 and <= int.MaxValue ? (int)depthValue.Value : 1;
+
         return new DeliveryEnvelope(
             new NeuronId(sourceKind, sourceName ?? throw Missing(SourceNameKey)),
             sequence ?? throw Missing(SequenceKey),
             new DateTimeOffset(timestampTicks ?? throw Missing(TimestampKey), TimeSpan.Zero),
             cause,
-            answers);
+            answers,
+            depth);
     }
 
     private static void WriteRef(string kindKey, string nameKey, string sequenceKey, SynapseRef? reference)
@@ -85,9 +91,18 @@ internal static class SynapseHeaders
 
     private static long? TakeInt64(string key)
     {
-        var value = RequestContext.Get(key) is long present ? present : (long?)null;
+        var value = RequestContext.Get(key);
         RequestContext.Remove(key);
-        return value;
+        return value switch
+        {
+            long present => present,
+            int present => present,
+            uint present => present,
+            string text when long.TryParse(
+                text, System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out var parsed) => parsed,
+            _ => null,
+        };
     }
 
     private static InvalidOperationException Missing(string key)

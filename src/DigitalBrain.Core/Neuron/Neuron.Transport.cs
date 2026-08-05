@@ -77,9 +77,19 @@ public abstract partial class Neuron : Neuron.ITransport
     private DeliveryEnvelope? incomingEnvelope;
     private DeliveryEnvelope? outboundDelivery;
 
-    internal void AcceptEnvelope(DeliveryEnvelope envelope) => incomingEnvelope = envelope;
+    internal void AcceptEnvelope(DeliveryEnvelope envelope)
+    {
+        var carried = SpeechDepthCarrier.Take(envelope.Source, envelope.Sequence);
+        incomingEnvelope = carried > 0
+            ? envelope with { Depth = Math.Max(Math.Max(1, envelope.Depth), carried) }
+            : envelope with { Depth = Math.Max(1, envelope.Depth) };
+    }
 
-    internal void StageOutboundDelivery(DeliveryEnvelope envelope) => outboundDelivery = envelope;
+    internal void StageOutboundDelivery(DeliveryEnvelope envelope)
+    {
+        outboundDelivery = envelope;
+        SpeechDepthCarrier.Stage(envelope.Source, envelope.Sequence, envelope.Depth);
+    }
 
     internal DeliveryEnvelope TakeOutboundDelivery()
     {

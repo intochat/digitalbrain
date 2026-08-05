@@ -319,9 +319,10 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
         var openAsks = journal.OpenAsksSnapshot();
         var deliverable = false;
 
+        var emissionDepth = active.Envelope.EmissionDepth;
         foreach (var staged in active.Emissions)
         {
-            deliverable |= StageSaid(staged, heardFrom, now, replyTo: null, openAsks);
+            deliverable |= StageSaid(staged, heardFrom, now, replyTo: null, openAsks, emissionDepth);
         }
 
         if (StateSlotIfTouched() is { } touchedState)
@@ -339,7 +340,7 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
         foreach (var change in active.ScheduleChanges)
         {
             var recordPosition = journal.AppendSaid(
-                change.RecordKind, now, heardFrom, answers: null, to: [], change.Record);
+                change.RecordKind, now, heardFrom, answers: null, to: [], change.Record, emissionDepth);
             if (change.Fact is { } scheduledFact)
             {
                 journal.SetSchedule(change.FactKind, new ScheduleEntry(
@@ -359,7 +360,8 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
 
         if (reply is not null)
         {
-            deliverable |= StageSaid(StagedFor(reply), heardFrom, now, replyTo: heardFrom, openAsks);
+            deliverable |= StageSaid(
+                StagedFor(reply), heardFrom, now, replyTo: heardFrom, openAsks, emissionDepth);
         }
 
         return deliverable;
@@ -370,7 +372,8 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
         SynapseRefEntry? cause,
         DateTimeOffset now,
         SynapseRefEntry? replyTo,
-        List<KeyValuePair<string, SynapseRefEntry>> openAsks)
+        List<KeyValuePair<string, SynapseRefEntry>> openAsks,
+        int depth = 1)
     {
         var receivers = new List<NeuronIdEntry>();
         var routed = new HashSet<NeuronId>();
@@ -445,14 +448,68 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
             }
         }
 
-        var position = journal.AppendSaid(staged.Kind, now, cause, answers, [.. receivers], staged.Body);
+        var speechDepth = Math.Max(1, depth);
+        var overDepth = speechDepth > DeliveryPolicy.MaximumDepth;
+        var position = journal.AppendSaid(
+            staged.Kind,
+            now,
+            cause,
+            answers,
+            overDepth ? [] : [.. receivers],
+            staged.Body,
+            speechDepth);
 
-        if (staged.AskAnswererKind is not null)
+        if (staged.AskAnswererKind is not null && !overDepth)
         {
             journal.PinAsk(position, now);
         }
 
-        var deliverable = receivers.Count > 0;
+        var deliverable = false;
+
+        if (overDepth)
+        {
+            var failedRef = new SynapseRefEntry(Id.Kind, Id.Name, position);
+            var reason =
+                $"depth {speechDepth} exceeds maximum {DeliveryPolicy.MaximumDepth}";
+            if (receivers.Count == 0)
+            {
+                deliverable |= StageSaid(
+                    StagedFor(new DeliveryFailed(
+                        new SynapseRef(Id, position),
+                        Id,
+                        reason,
+                        Attempts: 1)),
+                    cause,
+                    now,
+                    replyTo: null,
+                    openAsks,
+                    depth: 1);
+            }
+            else
+            {
+                foreach (var receiver in receivers)
+                {
+                    deliverable |= StageSaid(
+                        StagedFor(new DeliveryFailed(
+                            new SynapseRef(Id, position),
+                            receiver.ToNeuronId(),
+                            reason,
+                            Attempts: 1)) with
+                        {
+                            DirectedTo = receiver.ToNeuronId(),
+                        },
+                        cause,
+                        now,
+                        replyTo: null,
+                        openAsks,
+                        depth: 1);
+                }
+            }
+
+            return deliverable;
+        }
+
+        deliverable = receivers.Count > 0;
 
         if (staged.AskLacksAnswerer)
         {
@@ -461,7 +518,7 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
                 new NeuronId(string.Empty, string.Empty),
                 "no-answerer",
                 Attempts: 0);
-            deliverable |= StageSaid(StagedFor(failure), cause, now, replyTo: null, openAsks);
+            deliverable |= StageSaid(StagedFor(failure), cause, now, replyTo: null, openAsks, speechDepth);
         }
 
         return deliverable;

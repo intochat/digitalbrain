@@ -12,13 +12,15 @@ internal sealed record JournalEntry(
     SynapseRefEntry? Answers,
     SynapseRefEntry? From,
     NeuronIdEntry[]? To,
-    JsonElement Body)
+    JsonElement Body,
+    int Depth = 0)
 {
     internal const string Heard = "heard";
     internal const string Said = "said";
 
     internal DeliveryEnvelope ToEnvelope(NeuronId journalOwner)
     {
+        var depth = Depth > 0 ? Depth : 1;
         if (From is { } emission)
         {
             return new DeliveryEnvelope(
@@ -26,7 +28,8 @@ internal sealed record JournalEntry(
                 emission.Seq,
                 At,
                 Cause?.ToSynapseRef(),
-                Answers?.ToSynapseRef());
+                Answers?.ToSynapseRef(),
+                depth);
         }
 
         return new DeliveryEnvelope(
@@ -34,7 +37,8 @@ internal sealed record JournalEntry(
             Seq,
             At,
             Cause?.ToSynapseRef(),
-            Answers?.ToSynapseRef());
+            Answers?.ToSynapseRef(),
+            depth);
     }
 }
 

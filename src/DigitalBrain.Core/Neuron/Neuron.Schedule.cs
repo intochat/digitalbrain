@@ -122,7 +122,8 @@ public abstract partial class Neuron
                 journal.LastSeq + 1,
                 clock.GetUtcNow(),
                 new SynapseRef(Id, entry.Cause),
-                Answers: null);
+                Answers: null,
+                Depth: 1);
             await DeliverToSelfAsync(fact, envelope, asQuestion: false, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

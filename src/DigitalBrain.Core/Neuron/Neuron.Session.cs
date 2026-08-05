@@ -29,7 +29,12 @@ public abstract partial class Neuron
             try
             {
                 deliverable = StageSaid(
-                    staged, cause: null, clock.GetUtcNow(), replyTo: null, journal.OpenAsksSnapshot());
+                    staged,
+                    cause: null,
+                    clock.GetUtcNow(),
+                    replyTo: null,
+                    journal.OpenAsksSnapshot(),
+                    depth: 1);
             }
             catch
             {
@@ -54,7 +59,8 @@ public abstract partial class Neuron
                     cause: null,
                     answers: null,
                     to: [NeuronIdEntry.From(receiver, NeuronIdEntry.Directed)],
-                    staged.Body);
+                    staged.Body,
+                    depth: 1);
             }
             catch
             {
@@ -81,7 +87,12 @@ public abstract partial class Neuron
             {
                 position = journal.LastSeq + 1;
                 deliverable = StageSaid(
-                    staged, cause: null, clock.GetUtcNow(), replyTo: null, journal.OpenAsksSnapshot());
+                    staged,
+                    cause: null,
+                    clock.GetUtcNow(),
+                    replyTo: null,
+                    journal.OpenAsksSnapshot(),
+                    depth: 1);
             }
             catch
             {

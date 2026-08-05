@@ -214,9 +214,16 @@ public abstract partial class Neuron : Neuron.IDrainEntry
         NeuronId receiverId,
         CancellationToken drainToken)
     {
-        var envelope = entry.ToEnvelope(Id);
+        var speechDepth = journal.DepthOf(entry.Seq);
+        var envelope = entry.ToEnvelope(Id) with { Depth = speechDepth };
         var factType = fact.GetType();
         var questionRoute = receiver.IsQuestionDeliver;
+
+        if (speechDepth > DeliveryPolicy.MaximumDepth)
+        {
+            return DeliveryAttempt.Terminal(
+                $"depth {speechDepth} exceeds maximum {DeliveryPolicy.MaximumDepth}");
+        }
 
         using var attemptSource = drainToken.CanBeCanceled
             ? CancellationTokenSource.CreateLinkedTokenSource(drainToken)
@@ -234,6 +241,7 @@ public abstract partial class Neuron : Neuron.IDrainEntry
             {
                 var transport = base.GrainFactory.GetGrain<ITransport>(AddressOf(receiverId));
                 StageOutboundDelivery(envelope);
+                SynapseHeaders.Write(envelope);
                 await (questionRoute
                     ? WireQuestionDelivererFor(factType)
                     : WireDelivererFor(factType))(transport, fact, attemptToken);
@@ -378,7 +386,8 @@ public abstract partial class Neuron : Neuron.IDrainEntry
             cause,
             now,
             replyTo: null,
-            journal.OpenAsksSnapshot());
+            journal.OpenAsksSnapshot(),
+            depth: 1);
 
     private async ValueTask DisarmWakeupWhenIdleAsync()
     {

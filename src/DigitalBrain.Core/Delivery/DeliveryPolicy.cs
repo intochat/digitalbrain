@@ -2,6 +2,8 @@ namespace DigitalBrain;
 
 internal static class DeliveryPolicy
 {
+    internal const int MaximumDepth = 16;
+
     internal const int MaximumAttempts = 1000;
 
     internal static readonly TimeSpan RetryHorizon = TimeSpan.FromMinutes(30);
