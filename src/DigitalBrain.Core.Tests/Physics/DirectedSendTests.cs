@@ -42,7 +42,7 @@ public sealed class DirectedSendTests(BrainTestClusters clusters) : DigitalBrain
         var sent = sessionAfterSend.SaidSingle<StageSaid>();
         Assert.NotNull(sent.To);
         Assert.Single(sent.To);
-        Assert.Equal("ask", sent.DeliveryTo(audienceId).Via);
+        Assert.Equal("directed", sent.DeliveryTo(audienceId).Via);
         Assert.Null(sent.DeliveryToOrNull(archiveId));
 
         var archiveAfterSend = await ReadAsync(archiveId, ct);

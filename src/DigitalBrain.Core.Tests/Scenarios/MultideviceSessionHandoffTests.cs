@@ -103,12 +103,12 @@ public sealed class MultideviceSessionHandoffTests(BrainTestClusters clusters) :
         Assert.Empty(desktopSessionReading.AllHeard<WorkProgressLogged>());
 
         var phoneDraftSaid = phoneSessionReading.SaidSingle<WorkDraftCommitted>();
-        Assert.Equal("ask", phoneDraftSaid.DeliveryTo(workId).Via);
+        Assert.Equal("directed", phoneDraftSaid.DeliveryTo(workId).Via);
         Assert.Equal(phone.Id, afterDesktop.HeardSingle<WorkDraftCommitted>().Metadata.Source);
         Assert.Equal(phoneDraftSaid.Position, afterDesktop.HeardSingle<WorkDraftCommitted>().Metadata.Sequence);
 
         var desktopProgressSaid = desktopSessionReading.SaidSingle<WorkProgressLogged>();
-        Assert.Equal("ask", desktopProgressSaid.DeliveryTo(workId).Via);
+        Assert.Equal("directed", desktopProgressSaid.DeliveryTo(workId).Via);
         Assert.Equal(desktop.Id, afterDesktop.HeardSingle<WorkProgressLogged>().Metadata.Source);
         Assert.Equal(
             desktopProgressSaid.Position,

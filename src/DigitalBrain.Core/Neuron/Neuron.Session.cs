@@ -53,7 +53,7 @@ public abstract partial class Neuron
                     clock.GetUtcNow(),
                     cause: null,
                     answers: null,
-                    to: [NeuronIdEntry.From(receiver, NeuronIdEntry.Ask)],
+                    to: [NeuronIdEntry.From(receiver, NeuronIdEntry.Directed)],
                     staged.Body);
             }
             catch

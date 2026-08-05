@@ -216,9 +216,7 @@ public abstract partial class Neuron : Neuron.IDrainEntry
     {
         var envelope = entry.ToEnvelope(Id);
         var factType = fact.GetType();
-        var questionRoute = receiver.Via == NeuronIdEntry.Ask
-            && entry.Answers is null
-            && catalog.IsQuestion(factType);
+        var questionRoute = receiver.IsQuestionDeliver;
 
         using var attemptSource = drainToken.CanBeCanceled
             ? CancellationTokenSource.CreateLinkedTokenSource(drainToken)

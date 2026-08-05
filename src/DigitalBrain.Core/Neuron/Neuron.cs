@@ -398,7 +398,7 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
 
         if (staged.DirectedTo is { } directed)
         {
-            RouteTo(receivers, routed, directed, NeuronIdEntry.Ask);
+            RouteTo(receivers, routed, directed, NeuronIdEntry.Directed);
         }
 
         SynapseRefEntry? answers = null;
@@ -406,11 +406,20 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
         if (replyTo is { } questionRef)
         {
             answers = questionRef;
-            RouteTo(receivers, routed, new NeuronId(questionRef.Kind, questionRef.Name), NeuronIdEntry.Ask);
+            RouteTo(
+                receivers,
+                routed,
+                new NeuronId(questionRef.Kind, questionRef.Name),
+                NeuronIdEntry.Request);
         }
         else if (staged.AskAnswererKind is { } answererKind)
         {
-            RouteTo(receivers, routed, new NeuronId(answererKind, Id.Name), NeuronIdEntry.Ask);
+            RouteTo(
+                receivers,
+                routed,
+                new NeuronId(answererKind, Id.Name),
+                NeuronIdEntry.Request,
+                NeuronIdEntry.DeliverQuestion);
         }
         else
         {
@@ -425,7 +434,11 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
                 }
 
                 answers = askedBy;
-                RouteTo(receivers, routed, new NeuronId(askedBy.Kind, askedBy.Name), NeuronIdEntry.Ask);
+                RouteTo(
+                    receivers,
+                    routed,
+                    new NeuronId(askedBy.Kind, askedBy.Name),
+                    NeuronIdEntry.Request);
                 journal.RemoveOpenAsk(questionKind);
                 openAsks.RemoveAt(index);
                 break;
@@ -455,11 +468,15 @@ public abstract partial class Neuron : DurableGrain, IGrainWithStringKey
     }
 
     private static void RouteTo(
-        List<NeuronIdEntry> receivers, HashSet<NeuronId> routed, NeuronId receiver, string via)
+        List<NeuronIdEntry> receivers,
+        HashSet<NeuronId> routed,
+        NeuronId receiver,
+        string via,
+        string deliver = NeuronIdEntry.DeliverFact)
     {
         if (routed.Add(receiver))
         {
-            receivers.Add(NeuronIdEntry.From(receiver, via));
+            receivers.Add(NeuronIdEntry.From(receiver, via, deliver));
         }
     }
 

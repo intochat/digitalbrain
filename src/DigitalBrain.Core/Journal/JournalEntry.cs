@@ -46,15 +46,23 @@ internal sealed record SynapseRefEntry(string Kind, string Name, long Seq)
     internal SynapseRef ToSynapseRef() => new(new NeuronId(Kind, Name), Seq);
 }
 
-internal sealed record NeuronIdEntry(string Kind, string Name, string? Via)
+internal sealed record NeuronIdEntry(string Kind, string Name, string? Via, string? Deliver = null)
 {
     internal const string Declared = "declared";
     internal const string Connected = "connected";
-    internal const string Ask = "ask";
+    internal const string Directed = "directed";
+    internal const string Request = "ask";
 
-    internal static NeuronIdEntry From(NeuronId id, string? via) => new(id.Kind, id.Name, via);
+    internal const string DeliverFact = "fact";
+    internal const string DeliverQuestion = "question";
+
+    internal static NeuronIdEntry From(NeuronId id, string via, string deliver = DeliverFact)
+        => new(id.Kind, id.Name, via, deliver);
 
     internal NeuronId ToNeuronId() => new(Kind, Name);
+
+    internal bool IsQuestionDeliver
+        => string.Equals(Deliver, DeliverQuestion, StringComparison.Ordinal);
 }
 
 internal sealed record ScheduleEntry(

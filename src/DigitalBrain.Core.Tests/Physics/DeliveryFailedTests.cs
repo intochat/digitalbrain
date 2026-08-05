@@ -47,7 +47,7 @@ public sealed class DeliveryFailedTests(BrainTestClusters clusters) : DigitalBra
             ct);
 
         var sent = reading.SaidSingle<AskExpired>();
-        Assert.Equal("ask", sent.DeliveryTo(missing).Via);
+        Assert.Equal("directed", sent.DeliveryTo(missing).Via);
 
         var failedSaid = reading.SaidSingle<DeliveryFailed>();
         var body = Assert.IsType<DeliveryFailed>(failedSaid.Body);

@@ -30,7 +30,7 @@ public sealed class DeliveryFailedHealTests(BrainTestClusters clusters) : Digita
             ct);
 
         var sent = sessionReading.SaidSingle<AskExpired>();
-        Assert.Equal("ask", sent.DeliveryTo(missing).Via);
+        Assert.Equal("directed", sent.DeliveryTo(missing).Via);
         Assert.Single(sent.To ?? []);
 
         var failedSaid = sessionReading.SaidSingle<DeliveryFailed>();

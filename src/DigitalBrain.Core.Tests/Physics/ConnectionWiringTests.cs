@@ -108,7 +108,7 @@ public sealed class ConnectionWiringTests(BrainTestClusters clusters) : DigitalB
         Assert.Empty(speakerReading.Connections);
 
         var saidRefusal = speakerReading.SaidSingle<ConnectionRefused>();
-        Assert.Equal("ask", saidRefusal.DeliveryTo(session.Id).Via);
+        Assert.Equal("directed", saidRefusal.DeliveryTo(session.Id).Via);
         Assert.Equal(stageKind, Assert.IsType<ConnectionRefused>(saidRefusal.Body).Fact);
     }
 

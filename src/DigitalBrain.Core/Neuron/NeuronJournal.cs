@@ -188,7 +188,7 @@ internal sealed class NeuronJournal
             return false;
         }
 
-        connections[factKind] = [.. row, NeuronIdEntry.From(to, via: null)];
+        connections[factKind] = [.. row, NeuronIdEntry.From(to, via: string.Empty)];
         return true;
     }
 

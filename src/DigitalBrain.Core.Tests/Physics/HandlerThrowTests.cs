@@ -43,7 +43,7 @@ public sealed class HandlerThrowTests(BrainTestClusters clusters) : DigitalBrain
         var midSession = await ReadAsync(session.Id, ct);
         Assert.Empty(midSession.AllSaid<DeliveryFailed>());
         var unsettled = midSession.SaidSingle<FragileWork>();
-        Assert.Equal("ask", unsettled.DeliveryTo(receiverId).Via);
+        Assert.Equal("directed", unsettled.DeliveryTo(receiverId).Via);
 
         Gate.Refuse = false;
 
