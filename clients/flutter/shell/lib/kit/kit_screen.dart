@@ -5,6 +5,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../brain_theme.dart';
+import 'kit_chart.dart';
+import 'kit_chat.dart';
 
 /// Offline UI-kit gallery for developers. No backend, no C# — pure Flutter demos.
 final class KitScreen extends StatelessWidget {
@@ -37,6 +39,10 @@ final class KitScreen extends StatelessWidget {
               _MetricsSection(),
               SizedBox(height: 28),
               _ClocksSection(),
+              SizedBox(height: 28),
+              _ChatSection(),
+              SizedBox(height: 28),
+              _ChartsSection(),
               SizedBox(height: 28),
               _CardsSection(),
             ],
@@ -625,6 +631,53 @@ final class _CountdownPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CountdownPainter oldDelegate) =>
       oldDelegate.progress != progress;
+}
+
+final class _ChatSection extends StatelessWidget {
+  const _ChatSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _GroupLabel('Chat'),
+        Text(
+          'Product chat surface (flutter_chat_ui + flyer bubbles). Offline fixtures; type to echo.',
+          style: BrainType.bodyMuted,
+        ),
+        SizedBox(height: 14),
+        KitChatDemo(height: 380),
+      ],
+    );
+  }
+}
+
+final class _ChartsSection extends StatelessWidget {
+  const _ChartsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _GroupLabel('Charts'),
+        Text(
+          'graphic package — grammar of graphics (bar + line).',
+          style: BrainType.bodyMuted,
+        ),
+        SizedBox(height: 14),
+        Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: [
+            KitChartCard(title: 'Synapses / day', child: KitBarChart()),
+            KitChartCard(title: 'Latency trend', child: KitLineChart()),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 final class _CardsSection extends StatelessWidget {

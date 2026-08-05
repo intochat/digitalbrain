@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../brain_theme.dart';
+import '../kit/kit_chart.dart';
 import '../kit/kit_screen.dart';
 import 'panel_manager.dart';
 
@@ -58,12 +59,6 @@ final class _WindowingScreenState extends State<WindowingScreen> {
                               onClose: () => _manager.close(panel.id),
                             ),
                           ),
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: _DockStrip(manager: _manager),
-                        ),
                       ],
                     );
                   },
@@ -79,6 +74,16 @@ final class _WindowingScreenState extends State<WindowingScreen> {
               onTidy: _manager.autoLayout,
               onReset: _manager.resetDemo,
               onSpawn: _manager.addPanel,
+            ),
+          ),
+          // Dock sits above panels/toolbar so minimized icons are always visible.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 18,
+            child: AnimatedBuilder(
+              animation: _manager,
+              builder: (context, _) => _MacDock(manager: _manager),
             ),
           ),
         ],
@@ -360,6 +365,7 @@ final class _PanelBody extends StatelessWidget {
       WindowPanelKind.notes => const _NotesBody(),
       WindowPanelKind.activity => const _ActivityBody(),
       WindowPanelKind.inspector => const _InspectorBody(),
+      WindowPanelKind.chart => const KitBarChart(height: 200),
     };
   }
 }
@@ -473,8 +479,9 @@ final class _InspectorBody extends StatelessWidget {
   }
 }
 
-final class _DockStrip extends StatelessWidget {
-  const _DockStrip({required this.manager});
+/// macOS-style bottom dock: large app icons for minimized windows.
+final class _MacDock extends StatelessWidget {
+  const _MacDock({required this.manager});
 
   final PanelManager manager;
 
@@ -482,25 +489,113 @@ final class _DockStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final docked = manager.minimized;
     if (docked.isEmpty) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final p in docked)
-            ActionChip(
-              avatar: Icon(
-                Icons.crop_square,
-                size: 14,
-                color: BrainPalette.signal,
+
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          key: const Key('windowing_dock'),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          decoration: BoxDecoration(
+            color: const Color(0xCC1B1F2A),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.45),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
               ),
-              label: Text(p.title, style: BrainType.meta),
-              backgroundColor: BrainPalette.surfaceRaised,
-              side: const BorderSide(color: BrainPalette.line),
-              onPressed: () => manager.toggleMinimize(p.id),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < docked.length; i++) ...[
+                if (i > 0) const SizedBox(width: 10),
+                _DockIcon(
+                  panel: docked[i],
+                  onTap: () => manager.toggleMinimize(docked[i].id),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+final class _DockIcon extends StatefulWidget {
+  const _DockIcon({required this.panel, required this.onTap});
+
+  final WindowPanel panel;
+  final VoidCallback onTap;
+
+  @override
+  State<_DockIcon> createState() => _DockIconState();
+}
+
+final class _DockIconState extends State<_DockIcon> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = windowPanelAccent(widget.panel.kind);
+    final icon = windowPanelIcon(widget.panel.kind);
+    final scale = _hover ? 1.14 : 1.0;
+
+    return Tooltip(
+      message: widget.panel.title,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedScale(
+            scale: scale,
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOutCubic,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        accent.withValues(alpha: 0.95),
+                        accent.withValues(alpha: 0.55),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: accent.withValues(alpha: 0.35),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 26),
+                ),
+                const SizedBox(height: 4),
+                // Reflection/dot like macOS running indicator.
+                Container(
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.75),
+                  ),
+                ),
+              ],
             ),
-        ],
+          ),
+        ),
       ),
     );
   }

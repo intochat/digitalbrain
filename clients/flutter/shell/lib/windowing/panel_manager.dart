@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Icons;
+import 'package:flutter/widgets.dart' show IconData;
 
 enum WindowPanelState { normal, minimized }
 
@@ -26,7 +28,25 @@ final class WindowPanel {
   final WindowPanelKind kind;
 }
 
-enum WindowPanelKind { clock, metrics, notes, activity, inspector }
+enum WindowPanelKind { clock, metrics, notes, activity, inspector, chart }
+
+IconData windowPanelIcon(WindowPanelKind kind) => switch (kind) {
+  WindowPanelKind.clock => Icons.schedule_rounded,
+  WindowPanelKind.metrics => Icons.speed_rounded,
+  WindowPanelKind.notes => Icons.sticky_note_2_outlined,
+  WindowPanelKind.activity => Icons.timeline_rounded,
+  WindowPanelKind.inspector => Icons.search_rounded,
+  WindowPanelKind.chart => Icons.bar_chart_rounded,
+};
+
+Color windowPanelAccent(WindowPanelKind kind) => switch (kind) {
+  WindowPanelKind.clock => const Color(0xFFE09261),
+  WindowPanelKind.metrics => const Color(0xFF7B9BE3),
+  WindowPanelKind.notes => const Color(0xFF65C5A0),
+  WindowPanelKind.activity => const Color(0xFFC49BFF),
+  WindowPanelKind.inspector => const Color(0xFFE8C26A),
+  WindowPanelKind.chart => const Color(0xFF5EC8E8),
+};
 
 /// In-canvas window manager for the Windowing demo tab.
 final class PanelManager extends ChangeNotifier {
@@ -53,6 +73,7 @@ final class PanelManager extends ChangeNotifier {
     const kinds = <(String, WindowPanelKind)>[
       ('Analog clock', WindowPanelKind.clock),
       ('Live metrics', WindowPanelKind.metrics),
+      ('Synapses chart', WindowPanelKind.chart),
       ('Scratch notes', WindowPanelKind.notes),
       ('Activity strip', WindowPanelKind.activity),
       ('Inspector', WindowPanelKind.inspector),
@@ -79,6 +100,7 @@ final class PanelManager extends ChangeNotifier {
       WindowPanelKind.notes => 'Scratch notes',
       WindowPanelKind.activity => 'Activity strip',
       WindowPanelKind.inspector => 'Inspector',
+      WindowPanelKind.chart => 'Synapses chart',
     };
     final id = 'demo-${DateTime.now().microsecondsSinceEpoch}';
     _panels.add(
