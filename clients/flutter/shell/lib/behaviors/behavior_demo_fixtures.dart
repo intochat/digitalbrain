@@ -81,18 +81,18 @@ public static class BehaviorEntry
 
         var dossier = await research.SendAsync(new ResearchCompanyRequest(
             company,
-            string.Concat(mail.Subject, "\n", mail.PlaintextBody)));
+            $"{mail.Subject}\n{mail.PlaintextBody}"));
 
-        var description = string.Concat(
-            "Email from ", mail.Sender, ": ", mail.Subject, "\n",
-            mail.PlaintextBody, "\n\n",
-            "Research: ", dossier.CompanyName, "\n",
-            "Industry: ", dossier.Industry, "\n",
-            "Website: ", dossier.Website, "\n",
-            dossier.Summary);
+        var description =
+            $"Email from {mail.Sender}: {mail.Subject}\n" +
+            $"{mail.PlaintextBody}\n\n" +
+            $"Research: {dossier.CompanyName}\n" +
+            $"Industry: {dossier.Industry}\n" +
+            $"Website: {dossier.Website}\n" +
+            $"{dossier.Summary}";
 
         await salesforce.SendAsync(new SalesforceRequest(
-            string.Concat("Propose Account Description for ", trigger.AccountId),
+            $"Propose Account Description for {trigger.AccountId}",
             CommandId.New(),
             trigger.AccountId,
             description));
@@ -107,7 +107,7 @@ public static class BehaviorEntry
             return sender;
         }
 
-        return sender.Substring(start + 1, end - start - 1);
+        return sender[(start + 1)..end];
     }
 }
 
