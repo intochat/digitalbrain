@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/shell_test_support.dart';
 
 void main() {
-  testWidgets('the workspace exposes Chat, Activity, Brain, and Behaviors destinations', (
+  testWidgets('the workspace exposes Chat, Activity, Brain, Behaviors, Kit, and Windowing destinations', (
     tester,
   ) async {
     await prepareShellSurface(tester);
@@ -23,6 +23,8 @@ void main() {
     expect(find.byKey(const Key('destination_activity')), findsOneWidget);
     expect(find.byKey(const Key('destination_brain')), findsOneWidget);
     expect(find.byKey(const Key('destination_behaviors')), findsOneWidget);
+    expect(find.byKey(const Key('destination_kit')), findsOneWidget);
+    expect(find.byKey(const Key('destination_windowing')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('destination_activity')));
     await tester.pumpAndSettle();
@@ -39,6 +41,18 @@ void main() {
     expect(find.byKey(const Key('behavior_workspace')), findsOneWidget);
     expect(find.byKey(const Key('behavior_library')), findsOneWidget);
     await drainShellTimers(tester);
+
+    await tester.tap(find.byKey(const Key('destination_kit')));
+    await tester.pump();
+    await drainShellTimers(tester);
+    expect(find.byKey(const Key('kit_screen')), findsOneWidget);
+    expect(find.text('UI Kit'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('destination_windowing')));
+    await tester.pump();
+    await drainShellTimers(tester);
+    expect(find.byKey(const Key('windowing_screen')), findsOneWidget);
+    expect(find.textContaining('Windowing demo'), findsOneWidget);
   });
 
   testWidgets('narrow windows use bottom navigation', (tester) async {

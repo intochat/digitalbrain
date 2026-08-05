@@ -66,6 +66,16 @@ final class WorkspaceNavigationBar extends StatelessWidget {
           selectedIcon: Icon(Icons.account_tree, key: Key('destination_behaviors')),
           label: 'Behaviors',
         ),
+        NavigationDestination(
+          icon: Icon(Icons.widgets_outlined, key: Key('destination_kit')),
+          selectedIcon: Icon(Icons.widgets, key: Key('destination_kit')),
+          label: 'Kit',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.desktop_windows_outlined, key: Key('destination_windowing')),
+          selectedIcon: Icon(Icons.desktop_windows, key: Key('destination_windowing')),
+          label: 'Windowing',
+        ),
       ],
     );
   }
@@ -91,6 +101,16 @@ const workspaceRailDestinations = <NavigationRailDestination>[
     icon: Icon(Icons.account_tree_outlined, key: Key('destination_behaviors')),
     selectedIcon: Icon(Icons.account_tree, key: Key('destination_behaviors')),
     label: Text('Behaviors'),
+  ),
+  NavigationRailDestination(
+    icon: Icon(Icons.widgets_outlined, key: Key('destination_kit')),
+    selectedIcon: Icon(Icons.widgets, key: Key('destination_kit')),
+    label: Text('Kit'),
+  ),
+  NavigationRailDestination(
+    icon: Icon(Icons.desktop_windows_outlined, key: Key('destination_windowing')),
+    selectedIcon: Icon(Icons.desktop_windows, key: Key('destination_windowing')),
+    label: Text('Windowing'),
   ),
 ];
 
@@ -176,5 +196,8 @@ String workspaceSectionName(int index) => switch (index) {
   0 => 'Chat',
   1 => 'Activity',
   2 => 'Brain',
-  _ => 'Behaviors',
+  3 => 'Behaviors',
+  4 => 'Kit',
+  5 => 'Windowing',
+  _ => 'Chat',
 };

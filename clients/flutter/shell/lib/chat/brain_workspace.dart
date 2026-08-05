@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 import '../activity_screen.dart';
 import '../behaviors/behavior_workspace.dart';
 import '../brain_screen.dart';
+import '../kit/kit_screen.dart';
 import '../user_actions/user_action_card.dart';
+import '../windowing/windowing_screen.dart';
 import 'brain_chat_screen.dart';
 import 'chat_contracts.dart';
 import 'workspace_chrome.dart';
@@ -175,35 +177,49 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
     super.dispose();
   }
 
+  Widget _destinationPage() {
+    // Product tabs stay in an IndexedStack so chat/topology state survives
+    // switches. Kit/Windowing mount only while selected (offline demos with
+    // periodic clocks would otherwise block widget tests via IndexedStack).
+    if (_destination <= behaviorsDestinationIndex) {
+      return IndexedStack(
+        index: _destination,
+        children: [
+          BrainChatScreen(
+            chatName: widget.chatName,
+            turns: _projectedTurns,
+            signInCards: _signInCards,
+            onSend: widget.onSend,
+            onStream: widget.onStream,
+            onOpenSignIn: widget.onOpenSignIn,
+          ),
+          ActivityScreen(
+            turns: _projectedTurns,
+            userActions: widget.userActions,
+            onOpenUserAction: widget.onOpenSignIn,
+          ),
+          BrainScreen(
+            chatName: widget.chatName,
+            turns: _projectedTurns,
+            topology: _topology,
+            statusMessage: _statusMessage,
+          ),
+          BehaviorWorkspace(
+            client: widget.behaviorClient,
+            userActions: widget.userActions,
+            onOpenUserAction: widget.onOpenSignIn,
+          ),
+        ],
+      );
+    }
+    if (_destination == kitDestinationIndex) {
+      return const KitScreen();
+    }
+    return const WindowingScreen();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      BrainChatScreen(
-        chatName: widget.chatName,
-        turns: _projectedTurns,
-        signInCards: _signInCards,
-        onSend: widget.onSend,
-        onStream: widget.onStream,
-        onOpenSignIn: widget.onOpenSignIn,
-      ),
-      ActivityScreen(
-        turns: _projectedTurns,
-        userActions: widget.userActions,
-        onOpenUserAction: widget.onOpenSignIn,
-      ),
-      BrainScreen(
-        chatName: widget.chatName,
-        turns: _projectedTurns,
-        topology: _topology,
-        statusMessage: _statusMessage,
-      ),
-      BehaviorWorkspace(
-        client: widget.behaviorClient,
-        userActions: widget.userActions,
-        onOpenUserAction: widget.onOpenSignIn,
-      ),
-    ];
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < _compactBreakpoint;
@@ -214,9 +230,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
               section: workspaceSectionName(_destination),
               message: _statusMessage,
             ),
-            Expanded(
-              child: IndexedStack(index: _destination, children: pages),
-            ),
+            Expanded(child: _destinationPage()),
           ],
         );
 
