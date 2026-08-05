@@ -36,8 +36,9 @@ public sealed class BehaviorEditorEndpoints(UiEdgeFixture fixture)
         Assert.False(document.ActivationGateOpen);
         Assert.Contains("BehaviorEntry", document.ProgramSource, StringComparison.Ordinal);
         Assert.Contains("brain.Get<IGmail>", document.ProgramSource, StringComparison.Ordinal);
+        Assert.Contains("brain.Get<IResearch>", document.ProgramSource, StringComparison.Ordinal);
         Assert.Contains("brain.Get<ISalesforce>", document.ProgramSource, StringComparison.Ordinal);
-        Assert.Contains("SendAsync", document.ProgramSource, StringComparison.Ordinal);
+        Assert.Contains("ResearchCompanyRequest", document.ProgramSource, StringComparison.Ordinal);
         Assert.Contains("GmailSearchRequest", document.ProgramSource, StringComparison.Ordinal);
         Assert.Contains("SalesforceRequest", document.ProgramSource, StringComparison.Ordinal);
         Assert.Equal(AccountEnrichmentTestProgram.FeatureName, document.FeatureName);

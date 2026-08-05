@@ -12,16 +12,17 @@ abstract final class BehaviorDemoFixtures {
     BehaviorLibraryItem(
       behaviorId: accountEnrichmentId,
       displayName: 'Account enrichment',
-      description: 'Gmail → Salesforce: last inbound email enriches an account.',
+      description:
+          'Read Gmail, research the company online, propose Salesforce account fields.',
       status: 'Active',
       runState: 'Running',
       activationGateOpen: true,
       activeArtifactHash: 'demo-active-account-enrichment',
       overview:
-          'Demo flow: search latest inbox mail, draft Account.Description, propose for human approval.',
+          'Gmail → IResearch (company online) → Salesforce Account Description proposal.',
       scenarioTitles: [
-        'enrich account from last email',
-        'propose salesforce description',
+        'enrich account from email',
+        'research company before salesforce',
       ],
       health: 'healthy',
     ),
@@ -64,9 +65,10 @@ abstract final class BehaviorDemoFixtures {
     featureName: 'account-enrichment',
     featureText: accountEnrichmentFeatureText,
     displayName: 'Account enrichment',
-    description: 'Gmail → Salesforce: last inbound email enriches an account.',
+    description:
+        'Read Gmail, research the company online, propose Salesforce account fields.',
     overview:
-        'Demo flow: search latest inbox mail, draft Account.Description, propose for human approval.',
+        'Gmail → IResearch (company online) → Salesforce Account Description proposal.',
     activeSignatureHex: 'DEMOAE01',
     activeTaskCount: 0,
     scenarios: const [
@@ -168,17 +170,38 @@ abstract final class BehaviorDemoFixtures {
   );
 
   static const accountEnrichmentProgramSource = r'''
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Google;
 using DigitalBrain.Salesforce;
+using Orleans;
 
 public sealed record EnrichAccountFromEmail(
     string MessageId,
     string AccountId) : Synapse;
+
+[Alias("db.research")]
+[Description("Online research neuron")]
+public interface IResearch : INeuron;
+
+[Alias("db.research.company-response")]
+[Description("Company research result")]
+public sealed record ResearchCompanyResponse(
+    string CompanyName,
+    string Summary,
+    string Website,
+    string Industry) : Synapse;
+
+[Alias("db.research.company-request")]
+[Description("Research a company from email-derived identity")]
+public sealed record ResearchCompanyRequest(
+    string CompanyName,
+    string Context) : RequestSynapse<ResearchCompanyResponse>;
 
 public sealed class AccountEnrichmentProgram : IBehaviorProgram<EnrichAccountFromEmail>
 {
@@ -196,6 +219,7 @@ public static class BehaviorEntry
         var trigger = brain.Trigger;
 
         var gmail = brain.Get<IGmail>("default");
+        var research = brain.Get<IResearch>("default");
         var salesforce = brain.Get<ISalesforce>("salesforce");
 
         var search = await gmail.SendAsync(new GmailSearchRequest("in:inbox", 1));
@@ -215,14 +239,37 @@ public static class BehaviorEntry
         }
 
         var mail = fetched.Message;
+        var company = CompanyFromSender(mail.Sender);
+
+        var dossier = await research.SendAsync(new ResearchCompanyRequest(
+            company,
+            $"{mail.Subject}\n{mail.PlaintextBody}"));
+
         var description =
-            $"Email from {mail.Sender}: {mail.Subject}\n{mail.PlaintextBody}";
+            $"Email from {mail.Sender}: {mail.Subject}\n" +
+            $"{mail.PlaintextBody}\n\n" +
+            $"Research: {dossier.CompanyName}\n" +
+            $"Industry: {dossier.Industry}\n" +
+            $"Website: {dossier.Website}\n" +
+            $"{dossier.Summary}";
 
         await salesforce.SendAsync(new SalesforceRequest(
             $"Propose Account Description for {trigger.AccountId}",
             CommandId.New(),
             trigger.AccountId,
             description));
+    }
+
+    static string CompanyFromSender(string sender)
+    {
+        var start = sender.LastIndexOf('@');
+        var end = sender.LastIndexOf('.');
+        if (start < 0 || end <= start + 1)
+        {
+            return sender;
+        }
+
+        return sender[(start + 1)..end];
     }
 }
 
@@ -241,9 +288,9 @@ public sealed class AccountEnrichmentInstallTests : IBehaviorInstallTests
                 true,
                 "account-enrichment"),
             new BehaviorScenarioResult(
-                "scenario.read-gmail-then-propose-salesforce",
-                "read gmail then propose salesforce",
-                "bind.read-gmail-then-propose-salesforce",
+                "scenario.research-company-before-salesforce",
+                "research company before salesforce",
+                "bind.research-company-before-salesforce",
                 true,
                 "account-enrichment"),
         ],
