@@ -1,175 +1,13 @@
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 
-/// Offline / empty-edge demo content for Behavior Studio.
-/// Not a live grain — [BehaviorStudioController] serves these when the edge
-/// has nothing to show. Seed real grains with
-/// `dart run bin/seed_demo_behaviors.dart` against UiEdge.
+// Offline / empty-edge demo content for Behavior Studio.
+// Seed real grains: dart run bin/seed_demo_behaviors.dart against UiEdge.
 abstract final class BehaviorDemoFixtures {
   static const accountEnrichmentId = 'com.digitalbrain.account-enrichment';
   static const inboxBriefId = 'com.digitalbrain.inbox-brief';
 
-  static const library = <BehaviorLibraryItem>[
-    BehaviorLibraryItem(
-      behaviorId: accountEnrichmentId,
-      displayName: 'Account enrichment',
-      description:
-          'Read Gmail, research the company online, propose Salesforce account fields.',
-      status: 'Active',
-      runState: 'Running',
-      activationGateOpen: true,
-      activeArtifactHash: 'demo-active-account-enrichment',
-      overview:
-          'Gmail → IResearch (company online) → Salesforce Account Description proposal.',
-      scenarioTitles: [
-        'enrich account from email',
-        'research company before salesforce',
-      ],
-      health: 'healthy',
-    ),
-    BehaviorLibraryItem(
-      behaviorId: inboxBriefId,
-      displayName: 'Inbox brief',
-      description: 'Summarize the latest Gmail message into chat.',
-      status: 'Active',
-      runState: 'Stopped',
-      activationGateOpen: false,
-      activeArtifactHash: 'demo-active-inbox-brief',
-      overview: 'Demo flow: read one inbox message and emit a short brief fact.',
-      scenarioTitles: ['brief latest inbox message'],
-      health: 'stopped',
-    ),
-  ];
-
-  static bool isDemoId(String behaviorId) =>
-      behaviorId == accountEnrichmentId || behaviorId == inboxBriefId;
-
-  static BehaviorDocument? documentFor(String behaviorId) => switch (behaviorId) {
-        accountEnrichmentId => accountEnrichment,
-        inboxBriefId => inboxBrief,
-        _ => null,
-      };
-
-  static final accountEnrichment = BehaviorDocument(
-    behaviorId: accountEnrichmentId,
-    status: 'Active',
-    runState: 'Running',
-    activationGateOpen: true,
-    proposedArtifactHash: null,
-    activeArtifactHash: 'demo-active-account-enrichment',
-    priorArtifactHash: null,
-    lastCompileFailure: null,
-    testsPassed: true,
-    isApproved: true,
-    lastExecutionOutcome: 'demo: proposed Salesforce description from last Gmail',
-    programSource: accountEnrichmentProgramSource,
-    featureName: 'account-enrichment',
-    featureText: accountEnrichmentFeatureText,
-    displayName: 'Account enrichment',
-    description:
-        'Read Gmail, research the company online, propose Salesforce account fields.',
-    overview:
-        'Gmail → IResearch (company online) → Salesforce Account Description proposal.',
-    activeSignatureHex: 'DEMOAE01',
-    activeTaskCount: 0,
-    scenarios: const [
-      BehaviorScenario(
-        scenarioId: 'scenario.enrich-account-from-last-email',
-        title: 'enrich account from last email',
-        bindingKey: 'bind.enrich-account-from-last-email',
-        passed: true,
-        detail: 'demo fixture',
-      ),
-      BehaviorScenario(
-        scenarioId: 'scenario.propose-salesforce-description',
-        title: 'propose salesforce description',
-        bindingKey: 'bind.propose-salesforce-description',
-        passed: true,
-        detail: 'demo fixture',
-      ),
-    ],
-    bindings: const [
-      BehaviorBinding(
-        bindingId: 'bind.enrich-account-from-last-email',
-        sourceModule: 'DigitalBrain.Google',
-        sourceSynapse: 'GmailSearchRequest',
-        targetCase: 'EnrichFromLatestEmail',
-        contractVersion: 'v1-demo',
-        enabled: true,
-        configurationHint: 'Gmail account name (default)',
-      ),
-      BehaviorBinding(
-        bindingId: 'bind.propose-salesforce-description',
-        sourceModule: 'DigitalBrain.Salesforce',
-        sourceSynapse: 'SalesforceRequest',
-        targetCase: 'EnrichFromLatestEmail',
-        contractVersion: 'v1-demo',
-        enabled: true,
-        configurationHint: 'Salesforce account id',
-      ),
-    ],
-    revisions: const [
-      BehaviorRevision(
-        role: 'active',
-        artifactHash: 'demo-active-account-enrichment',
-        signatureHex: 'DEMOAE01',
-        status: 'Active',
-        isActive: true,
-      ),
-    ],
-  );
-
-  static final inboxBrief = BehaviorDocument(
-    behaviorId: inboxBriefId,
-    status: 'Active',
-    runState: 'Stopped',
-    activationGateOpen: false,
-    proposedArtifactHash: null,
-    activeArtifactHash: 'demo-active-inbox-brief',
-    priorArtifactHash: null,
-    lastCompileFailure: null,
-    testsPassed: true,
-    isApproved: true,
-    lastExecutionOutcome: null,
-    programSource: inboxBriefProgramSource,
-    featureName: 'inbox-brief',
-    featureText: inboxBriefFeatureText,
-    displayName: 'Inbox brief',
-    description: 'Summarize the latest Gmail message into chat.',
-    overview: 'Demo flow: read one inbox message and emit a short brief fact.',
-    activeSignatureHex: 'DEMOIB01',
-    activeTaskCount: 0,
-    scenarios: const [
-      BehaviorScenario(
-        scenarioId: 'scenario.brief-latest-inbox',
-        title: 'brief latest inbox message',
-        bindingKey: 'bind.brief-latest-inbox',
-        passed: true,
-        detail: 'demo fixture',
-      ),
-    ],
-    bindings: const [
-      BehaviorBinding(
-        bindingId: 'bind.brief-latest-inbox',
-        sourceModule: 'DigitalBrain.Google',
-        sourceSynapse: 'GmailSearchRequest',
-        targetCase: 'BriefLatestInbox',
-        contractVersion: 'v1-demo',
-        enabled: false,
-        configurationHint: 'Gmail account name (default)',
-      ),
-    ],
-    revisions: const [
-      BehaviorRevision(
-        role: 'active',
-        artifactHash: 'demo-active-inbox-brief',
-        signatureHex: 'DEMOIB01',
-        status: 'Active',
-        isActive: true,
-      ),
-    ],
-  );
-
-  static const accountEnrichmentProgramSource = r'''
+  // Program sources first so document fields can reference them.
+  static const accountEnrichmentProgramSource = r"""
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -243,18 +81,18 @@ public static class BehaviorEntry
 
         var dossier = await research.SendAsync(new ResearchCompanyRequest(
             company,
-            $"{mail.Subject}\n{mail.PlaintextBody}"));
+            string.Concat(mail.Subject, "\n", mail.PlaintextBody)));
 
-        var description =
-            $"Email from {mail.Sender}: {mail.Subject}\n" +
-            $"{mail.PlaintextBody}\n\n" +
-            $"Research: {dossier.CompanyName}\n" +
-            $"Industry: {dossier.Industry}\n" +
-            $"Website: {dossier.Website}\n" +
-            $"{dossier.Summary}";
+        var description = string.Concat(
+            "Email from ", mail.Sender, ": ", mail.Subject, "\n",
+            mail.PlaintextBody, "\n\n",
+            "Research: ", dossier.CompanyName, "\n",
+            "Industry: ", dossier.Industry, "\n",
+            "Website: ", dossier.Website, "\n",
+            dossier.Summary);
 
         await salesforce.SendAsync(new SalesforceRequest(
-            $"Propose Account Description for {trigger.AccountId}",
+            string.Concat("Propose Account Description for ", trigger.AccountId),
             CommandId.New(),
             trigger.AccountId,
             description));
@@ -269,7 +107,7 @@ public static class BehaviorEntry
             return sender;
         }
 
-        return sender[(start + 1)..end];
+        return sender.Substring(start + 1, end - start - 1);
     }
 }
 
@@ -296,28 +134,26 @@ public sealed class AccountEnrichmentInstallTests : IBehaviorInstallTests
         ],
         "account-enrichment"));
 }
-'''
+""";
 
-  static const accountEnrichmentFeatureText = '''
+  static const accountEnrichmentFeatureText = """
 Feature: account enrichment
-  Scenario: enrich account from last email
-    Given a Gmail connection and a Salesforce account id
-    When the behavior searches in:inbox for the latest message
-    Then it drafts an account description from that email
-  Scenario: propose salesforce description
-    Given a drafted description
-    When the behavior proposes a Salesforce Account Description mutation
-    Then a human approval card is shown before write
-''';
+  Scenario: enrich account from email
+    Given a gmail message and salesforce account
+    When the enrichment behavior runs
+    Then the account description is proposed for approval
+  Scenario: research company before salesforce
+    Given company identity from the inbound email
+    When research gathers online facts about the company
+    Then Salesforce is proposed with email plus research
+""";
 
-  static const inboxBriefProgramSource = r'''
+  static const inboxBriefProgramSource = r"""
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
-
-// Demo: brief the latest inbox message. Live path would call Gmail search.
 
 public sealed record BriefLatestInbox(string GmailAccount) : Synapse;
 
@@ -328,7 +164,7 @@ public sealed class InboxBriefProgram : IBehaviorProgram<BriefLatestInbox>
         IBehaviorContext context,
         CancellationToken cancellationToken)
     {
-        context.SetState("outcome", $"demo-brief:{trigger.GmailAccount}:last-inbox");
+        context.SetState("outcome", string.Concat("demo-brief:", trigger.GmailAccount, ":last-inbox"));
         return ValueTask.CompletedTask;
     }
 }
@@ -350,13 +186,183 @@ public sealed class InboxBriefInstallTests : IBehaviorInstallTests
         ],
         "inbox-brief"));
 }
-''';
+""";
 
-  static const inboxBriefFeatureText = '''
+  static const inboxBriefFeatureText = """
 Feature: inbox brief
   Scenario: brief latest inbox message
     Given a Gmail connection
     When the behavior reads the latest inbox message
     Then it records a short brief outcome
-''';
+""";
+
+  static const library = <BehaviorLibraryItem>[
+    BehaviorLibraryItem(
+      behaviorId: accountEnrichmentId,
+      displayName: 'Account enrichment',
+      description:
+          'Read Gmail, research the company online, propose Salesforce account fields.',
+      status: 'Active',
+      runState: 'Running',
+      activationGateOpen: true,
+      activeArtifactHash: 'demo-active-account-enrichment',
+      overview:
+          'Gmail -> IResearch (company online) -> Salesforce Account Description proposal.',
+      scenarioTitles: [
+        'enrich account from email',
+        'research company before salesforce',
+      ],
+      health: 'healthy',
+    ),
+    BehaviorLibraryItem(
+      behaviorId: inboxBriefId,
+      displayName: 'Inbox brief',
+      description: 'Summarize the latest Gmail message into chat.',
+      status: 'Active',
+      runState: 'Stopped',
+      activationGateOpen: false,
+      activeArtifactHash: 'demo-active-inbox-brief',
+      overview: 'Demo flow: read one inbox message and emit a short brief fact.',
+      scenarioTitles: ['brief latest inbox message'],
+      health: 'stopped',
+    ),
+  ];
+
+  static bool isDemoId(String behaviorId) =>
+      behaviorId == accountEnrichmentId || behaviorId == inboxBriefId;
+
+  static BehaviorDocument? documentFor(String behaviorId) => switch (behaviorId) {
+        accountEnrichmentId => accountEnrichment,
+        inboxBriefId => inboxBrief,
+        _ => null,
+      };
+
+  static final accountEnrichment = BehaviorDocument(
+    behaviorId: accountEnrichmentId,
+    status: 'Active',
+    runState: 'Running',
+    activationGateOpen: true,
+    proposedArtifactHash: null,
+    activeArtifactHash: 'demo-active-account-enrichment',
+    priorArtifactHash: null,
+    lastCompileFailure: null,
+    testsPassed: true,
+    isApproved: true,
+    lastExecutionOutcome: 'demo: proposed Salesforce description from last Gmail',
+    programSource: accountEnrichmentProgramSource,
+    featureName: 'account-enrichment',
+    featureText: accountEnrichmentFeatureText,
+    displayName: 'Account enrichment',
+    description:
+        'Read Gmail, research the company online, propose Salesforce account fields.',
+    overview:
+        'Gmail -> IResearch (company online) -> Salesforce Account Description proposal.',
+    activeSignatureHex: 'DEMOAE01',
+    activeTaskCount: 0,
+    scenarios: const [
+      BehaviorScenario(
+        scenarioId: 'scenario.enrich-account-from-email',
+        title: 'enrich account from email',
+        bindingKey: 'bind.enrich-account-from-email',
+        passed: true,
+        detail: 'demo fixture',
+      ),
+      BehaviorScenario(
+        scenarioId: 'scenario.research-company-before-salesforce',
+        title: 'research company before salesforce',
+        bindingKey: 'bind.research-company-before-salesforce',
+        passed: true,
+        detail: 'demo fixture',
+      ),
+    ],
+    bindings: const [
+      BehaviorBinding(
+        bindingId: 'bind.enrich-account-from-email',
+        sourceModule: 'DigitalBrain.Google',
+        sourceSynapse: 'GmailSearchRequest',
+        targetCase: 'EnrichAccountFromEmail',
+        contractVersion: 'v1-demo',
+        enabled: true,
+        configurationHint: 'Gmail account name (default)',
+      ),
+      BehaviorBinding(
+        bindingId: 'bind.research-company-before-salesforce',
+        sourceModule: 'DigitalBrain.Research',
+        sourceSynapse: 'ResearchCompanyRequest',
+        targetCase: 'EnrichAccountFromEmail',
+        contractVersion: 'v1-demo',
+        enabled: true,
+        configurationHint: 'company name from email domain',
+      ),
+      BehaviorBinding(
+        bindingId: 'bind.propose-salesforce-description',
+        sourceModule: 'DigitalBrain.Salesforce',
+        sourceSynapse: 'SalesforceRequest',
+        targetCase: 'EnrichAccountFromEmail',
+        contractVersion: 'v1-demo',
+        enabled: true,
+        configurationHint: 'Salesforce account id',
+      ),
+    ],
+    revisions: const [
+      BehaviorRevision(
+        role: 'active',
+        artifactHash: 'demo-active-account-enrichment',
+        signatureHex: 'DEMOAE01',
+        status: 'Active',
+        isActive: true,
+      ),
+    ],
+  );
+
+  static final inboxBrief = BehaviorDocument(
+    behaviorId: inboxBriefId,
+    status: 'Active',
+    runState: 'Stopped',
+    activationGateOpen: false,
+    proposedArtifactHash: null,
+    activeArtifactHash: 'demo-active-inbox-brief',
+    priorArtifactHash: null,
+    lastCompileFailure: null,
+    testsPassed: true,
+    isApproved: true,
+    lastExecutionOutcome: null,
+    programSource: inboxBriefProgramSource,
+    featureName: 'inbox-brief',
+    featureText: inboxBriefFeatureText,
+    displayName: 'Inbox brief',
+    description: 'Summarize the latest Gmail message into chat.',
+    overview: 'Demo flow: read one inbox message and emit a short brief fact.',
+    activeSignatureHex: 'DEMOIB01',
+    activeTaskCount: 0,
+    scenarios: const [
+      BehaviorScenario(
+        scenarioId: 'scenario.brief-latest-inbox',
+        title: 'brief latest inbox message',
+        bindingKey: 'bind.brief-latest-inbox',
+        passed: true,
+        detail: 'demo fixture',
+      ),
+    ],
+    bindings: const [
+      BehaviorBinding(
+        bindingId: 'bind.brief-latest-inbox',
+        sourceModule: 'DigitalBrain.Google',
+        sourceSynapse: 'GmailSearchRequest',
+        targetCase: 'BriefLatestInbox',
+        contractVersion: 'v1-demo',
+        enabled: false,
+        configurationHint: 'Gmail account name (default)',
+      ),
+    ],
+    revisions: const [
+      BehaviorRevision(
+        role: 'active',
+        artifactHash: 'demo-active-inbox-brief',
+        signatureHex: 'DEMOIB01',
+        status: 'Active',
+        isActive: true,
+      ),
+    ],
+  );
 }
