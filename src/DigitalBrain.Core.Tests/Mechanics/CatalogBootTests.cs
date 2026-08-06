@@ -1,41 +1,52 @@
+using DigitalBrain.Testing.Mechanics;
+
 namespace DigitalBrain;
 
 public sealed class CatalogBootTests
 {
     [Fact]
-    public void UsesExplicitOrleansGrainTypesAsNeuronKinds()
+    public void UsesExplicitLogicalKindsForRegisteredBehaviors()
     {
-        var catalog = Catalog.Build([typeof(CatalogLeft), typeof(CatalogRight)]);
+        var catalog = new DigitalBrainComposition()
+            .RegisterVocabulary(typeof(MechanicsPulse).Assembly)
+            .RegisterNeuron<MechanicsEmitter>("mechanics.catalog.left")
+            .RegisterNeuron<MechanicsReceiver>("mechanics.catalog.right")
+            .Seal();
 
         Assert.True(catalog.HasNeuronKind("mechanics.catalog.left"));
         Assert.True(catalog.HasNeuronKind("mechanics.catalog.right"));
     }
 
     [Fact]
-    public void RejectsAnImplicitNeuronKind()
+    public void UsesTheCSharpFullNameAsTheCanonicalSynapseKind()
     {
-        var failure = Assert.Throws<InvalidOperationException>(
-            () => Catalog.Build([typeof(CatalogImplicit)]));
+        var catalog = new DigitalBrainComposition()
+            .RegisterVocabulary(typeof(MechanicsPulse).Assembly)
+            .RegisterNeuron<MechanicsReceiver>("mechanics.catalog.left")
+            .Seal();
 
-        Assert.Contains("[GrainType", failure.Message, StringComparison.Ordinal);
+        Assert.Equal(typeof(MechanicsPulse).FullName, catalog.KindOfSynapse(typeof(MechanicsPulse)));
     }
-}
 
-public sealed record CatalogPulse : Synapse;
+    [Fact]
+    public void RejectsDuplicateLogicalKinds()
+    {
+        var failure = Assert.Throws<InvalidOperationException>(() => new DigitalBrainComposition()
+            .RegisterVocabulary(typeof(MechanicsPulse).Assembly)
+            .RegisterNeuron<MechanicsEmitter>("mechanics.catalog.same")
+            .RegisterNeuron<MechanicsReceiver>("mechanics.catalog.same")
+            .Seal());
 
-[GrainType("mechanics.catalog.left")]
-public sealed class CatalogLeft : Neuron, INeuron<CatalogPulse>
-{
-    public Task HandleAsync(CatalogPulse synapse, CancellationToken cancellationToken) => Task.CompletedTask;
-}
+        Assert.Contains("mechanics.catalog.same", failure.Message, StringComparison.Ordinal);
+    }
 
-[GrainType("mechanics.catalog.right")]
-public sealed class CatalogRight : Neuron, INeuron<CatalogPulse>
-{
-    public Task HandleAsync(CatalogPulse synapse, CancellationToken cancellationToken) => Task.CompletedTask;
-}
+    [Fact]
+    public void RejectsAHandlerWhoseSynapseWasNotRegisteredAsVocabulary()
+    {
+        var failure = Assert.Throws<InvalidOperationException>(() => new DigitalBrainComposition()
+            .RegisterNeuron<MechanicsReceiver>("mechanics.catalog.left")
+            .Seal());
 
-public sealed class CatalogImplicit : Neuron, INeuron<CatalogPulse>
-{
-    public Task HandleAsync(CatalogPulse synapse, CancellationToken cancellationToken) => Task.CompletedTask;
+        Assert.Contains("was not registered as vocabulary", failure.Message, StringComparison.Ordinal);
+    }
 }

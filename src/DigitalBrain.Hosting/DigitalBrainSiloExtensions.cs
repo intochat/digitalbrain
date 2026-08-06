@@ -1,4 +1,3 @@
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Journaling;
@@ -9,111 +8,89 @@ namespace DigitalBrain;
 
 public static class DigitalBrainSiloExtensions
 {
-    public static ISiloBuilder AddDigitalBrain(this ISiloBuilder silo, params Assembly[] moduleAssemblies)
-    {
-        ArgumentNullException.ThrowIfNull(moduleAssemblies);
-        return silo.AddDigitalBrain(ModuleTypesOf(moduleAssemblies));
-    }
-
-    public static ISiloBuilder AddDigitalBrain(this ISiloBuilder silo, IEnumerable<Type> moduleTypes)
+    public static ISiloBuilder AddDigitalBrain(
+        this ISiloBuilder silo,
+        Action<DigitalBrainComposition> configure)
     {
         ArgumentNullException.ThrowIfNull(silo);
-        var neurons = NeuronTypesOf(moduleTypes);
-        var catalog = Catalog.Build(neurons);
-        var codec = new BodyCodec(catalog);
-        codec.ValidateVocabulary(catalog);
-        foreach (var neuron in neurons)
-        {
-            if (StateTypeOf(neuron) is { } state)
-            {
-                codec.ValidateState(state);
-            }
-        }
+        var catalog = BuildCatalog(configure);
+        var serialization = ValidateAndCreateSerialization(catalog);
 
-        silo.Services.AddSingleton<ICatalog>(catalog);
-        silo.Services.AddSingleton<ISynapseCodec>(codec);
+        silo.Services.AddSingleton(catalog);
+        silo.Services.AddSingleton<ISynapseSerialization>(serialization);
+        silo.Services.AddSingleton<Router>();
         silo.Services.AddSingleton<IEnvelopeCarrier, RequestContextEnvelopeCarrier>();
-        silo.Services.AddScoped<Journal>(provider => new Journal(provider));
+        silo.Services.AddScoped<Journal>(static provider => new Journal(provider));
+        AddAccessAdapters(silo.Services);
         silo.AddJournalStorage();
         GateDurableKeys(silo.Services);
         silo.Services.TryAddSingleton<IJournalStorageProvider, VolatileJournalStorageProvider>();
         silo.UseJsonJournalFormat(JournalJsonContext.Default);
-        silo.Services.AddSerializer(wire => ConfigureWire(wire, neurons, codec));
+        silo.Services.AddSerializer(wire => ConfigureWire(wire, catalog, serialization));
         return silo;
     }
 
-    public static IServiceCollection AddDigitalBrainWireCodec(
+    public static IServiceCollection AddDigitalBrainSerialization(
         this IServiceCollection services,
-        params Assembly[] moduleAssemblies)
-    {
-        ArgumentNullException.ThrowIfNull(moduleAssemblies);
-        return services.AddDigitalBrainWireCodec(ModuleTypesOf(moduleAssemblies));
-    }
-
-    public static IServiceCollection AddDigitalBrainWireCodec(
-        this IServiceCollection services,
-        IEnumerable<Type> moduleTypes)
+        Action<DigitalBrainComposition> configure)
     {
         ArgumentNullException.ThrowIfNull(services);
-        var neurons = NeuronTypesOf(moduleTypes);
-        var codec = new BodyCodec(Catalog.Build(neurons));
-        return services.AddSerializer(wire => ConfigureWire(wire, neurons, codec));
+        var catalog = BuildCatalog(configure);
+        var serialization = ValidateAndCreateSerialization(catalog);
+
+        services.AddSingleton(catalog);
+        services.AddSingleton<ISynapseSerialization>(serialization);
+        AddAccessAdapters(services);
+        services.AddSerializer(wire => ConfigureWire(wire, catalog, serialization));
+        return services;
     }
 
-    private static void ConfigureWire(ISerializerBuilder wire, IReadOnlyList<Type> neurons, BodyCodec codec)
+    private static CompositionCatalog BuildCatalog(Action<DigitalBrainComposition> configure)
     {
-        foreach (var assembly in neurons.Select(neuron => neuron.Assembly)
-                     .Append(typeof(Ingress).Assembly)
-                     .Distinct())
+        ArgumentNullException.ThrowIfNull(configure);
+        var composition = new DigitalBrainComposition();
+        configure(composition);
+        return composition.Seal();
+    }
+
+    private static SynapseSerialization ValidateAndCreateSerialization(CompositionCatalog catalog)
+    {
+        var serialization = new SynapseSerialization(catalog);
+        serialization.ValidateVocabulary();
+        foreach (var behavior in catalog.BehaviorTypes)
+        {
+            if (CompositionCatalog.StateTypeOf(behavior) is { } state)
+            {
+                serialization.ValidateState(state);
+            }
+        }
+
+        return serialization;
+    }
+
+    private static void AddAccessAdapters(IServiceCollection services)
+    {
+        services.TryAddSingleton<SynapsePublisher, OrleansSynapsePublisher>();
+        services.TryAddSingleton<JournalReader, OrleansJournalReader>();
+    }
+
+    private static void ConfigureWire(
+        ISerializerBuilder wire,
+        CompositionCatalog catalog,
+        SynapseSerialization serialization)
+    {
+        foreach (var assembly in catalog.WireAssemblies)
         {
             wire.AddAssembly(assembly);
         }
 
-        wire.Services.AddSingleton<ITypeFilter, CoreWireTypeFilter>();
-        wire.AddJsonSerializer(IsWireContract, codec.Options);
-    }
-
-    private static Type[] ModuleTypesOf(IEnumerable<Assembly> assemblies)
-        => [.. assemblies
-            .Distinct()
-            .SelectMany(assembly => assembly.GetTypes())
-            .Where(type => typeof(Neuron).IsAssignableFrom(type) && !type.IsAbstract)];
-
-    private static Type[] NeuronTypesOf(IEnumerable<Type> moduleTypes)
-    {
-        ArgumentNullException.ThrowIfNull(moduleTypes);
-        var neurons = moduleTypes.Distinct().ToArray();
-        foreach (var type in neurons)
-        {
-            if (!typeof(Neuron).IsAssignableFrom(type) || type.IsAbstract)
-            {
-                throw new InvalidOperationException($"{Catalog.Describe(type)} is not a concrete neuron.");
-            }
-        }
-
-        return neurons;
-    }
-
-    private static Type? StateTypeOf(Type neuron)
-    {
-        for (var current = neuron.BaseType; current is not null; current = current.BaseType)
-        {
-            if (current.IsGenericType && current.GetGenericTypeDefinition() == typeof(Neuron<>))
-            {
-                return current.GetGenericArguments()[0];
-            }
-        }
-
-        return null;
+        wire.Services.AddSingleton<ITypeFilter, HostingWireTypeFilter>();
+        wire.AddJsonSerializer(IsWireContract, serialization.Options);
     }
 
     private static bool IsWireContract(Type type)
         => typeof(Synapse).IsAssignableFrom(type)
-            || type == typeof(SynapseMetadata)
-            || type == typeof(NeuronId)
-            || type == typeof(SynapseRef)
-            || type == typeof(NeuronReading)
-            || type == typeof(JournalFact);
+            || typeof(JournalRead).IsAssignableFrom(type);
 
     private static void GateDurableKeys(IServiceCollection services)
     {

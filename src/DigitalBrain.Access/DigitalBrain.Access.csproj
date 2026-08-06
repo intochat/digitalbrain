@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DigitalBrain</RootNamespace>
+    <NoWarn>$(NoWarn);CA1715;IDE1006</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+  </ItemGroup>
+</Project>

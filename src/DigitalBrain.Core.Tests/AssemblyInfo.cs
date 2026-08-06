@@ -1,3 +1,3 @@
 using DigitalBrain.Testing;
 
-[assembly: AssemblyFixture(typeof(BrainTestClusters))]
+[assembly: AssemblyFixture(typeof(DigitalBrainTestClusters))]

@@ -1,5 +1,8 @@
 # DigitalBrain Core — the design
 
+> **Status:** historical design exploration. It does not define the current
+> module/runtime seam. See [CORE-ARCHITECTURE.md](CORE-ARCHITECTURE.md).
+
 Working document, 2026-08-05. The Core of DigitalBrain OS as a disciplined composition of
 the proven prototype capabilities. Inputs: CORE-RESEARCH.md, OS.md, FLOWS.md, CORE-PROMPT.md;
 two evidence sweeps over all eight prototypes plus the v1 kernel (10 readers, file:line

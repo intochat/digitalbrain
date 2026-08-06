@@ -1,110 +1,81 @@
 using DigitalBrain.Testing;
+using DigitalBrain.Testing.Mechanics;
 
 namespace DigitalBrain;
 
-public sealed class OutboxTests(BrainTestClusters clusters) : DigitalBrainTest(clusters)
+public sealed class OutboxTests(DigitalBrainTestClusters clusters) : DigitalBrainTest(clusters)
 {
-    protected override void Compose(DigitalBrainTestBuilder brain)
-        => brain.AddModule<OutboxEmitter>().AddModule<OutboxReceiver>();
+    protected override void Compose(DigitalBrainTestBuilder composition)
+        => composition
+            .RegisterVocabulary(typeof(MechanicsStart).Assembly)
+            .RegisterNeuron<MechanicsEmitter>("outboxemitter")
+            .RegisterNeuron<MechanicsReceiver>("outboxreceiver");
 
     [Fact]
-    public async Task CommitsTheSaidReceiverSnapshotBeforeTheReceiverHearsTheFact()
+    public async Task RecordsTheProducedReceiverSnapshotBeforeTheReceiverReceivesTheSynapse()
     {
         const string name = "mechanics";
-        var session = Brain.Session(name);
         var emitter = new NeuronId("outboxemitter", name);
         var receiver = new NeuronId("outboxreceiver", name);
 
-        await session.EmitAsync(new OutboxStart(), Cancellation);
+        await PublishAsync(name, new MechanicsStart(), Cancellation);
 
-        var senderJournal = await WaitForJournalAsync(
+        var senderPage = await WaitForJournalAsync(
             emitter,
-            reading => reading.Journal.Any(fact => fact.Entry == "said" && fact.Body is OutboxPulse),
-            "a committed outbox pulse",
+            page => page.Records.Any(record => record.Direction == JournalRecordDirection.Produced
+                && record.SynapseKind == typeof(MechanicsPulse).FullName),
+            "a recorded outbox pulse",
             Cancellation);
-        var said = senderJournal.Journal.Single(fact => fact.Entry == "said" && fact.Body is OutboxPulse);
-        Assert.Contains(receiver, said.To ?? []);
+        var produced = senderPage.Records.Single(record => record.Direction == JournalRecordDirection.Produced
+            && record.SynapseKind == typeof(MechanicsPulse).FullName);
+        Assert.Contains(receiver, produced.DeliveryTargets);
+        Assert.False(produced.Serialization.GetProperty("echo").GetBoolean());
 
-        var receiverJournal = await WaitForJournalAsync(
+        var receiverPage = await WaitForJournalAsync(
             receiver,
-            reading => reading.Journal.Any(fact => fact.Entry == "heard" && fact.Body is OutboxPulse),
+            page => page.Records.Any(record => record.Direction == JournalRecordDirection.Received
+                && record.SynapseKind == typeof(MechanicsPulse).FullName),
             "a delivered outbox pulse",
             Cancellation);
-        var heard = receiverJournal.Journal.Single(fact => fact.Entry == "heard" && fact.Body is OutboxPulse);
-        Assert.Equal(emitter, heard.Metadata.Source);
-        Assert.Equal(said.Position, heard.Metadata.Sequence);
+        var received = receiverPage.Records.Single(record => record.Direction == JournalRecordDirection.Received
+            && record.SynapseKind == typeof(MechanicsPulse).FullName);
+        Assert.Equal(emitter, received.Origin.Source);
+        Assert.Equal(produced.Position, received.Origin.Sequence);
     }
 
     [Fact]
-    public async Task ReturnsAfterCommitInsteadOfWaitingForAChildOutbox()
+    public async Task PublicationReturnsAfterRecordingInsteadOfWaitingForAChildOutbox()
     {
         const string name = "cycle";
         var emitter = new NeuronId("outboxemitter", name);
 
-        await Brain.Session(name)
-            .EmitAsync(new OutboxStart(Echo: true), Cancellation)
+        await PublishAsync(name, new MechanicsStart(Echo: true), Cancellation)
             .WaitAsync(TimeSpan.FromSeconds(2), Cancellation);
 
         _ = await WaitForJournalAsync(
             emitter,
-            reading => reading.Journal.Any(fact => fact.Entry == "heard" && fact.Body is OutboxEcho),
+            page => page.Records.Any(record => record.Direction == JournalRecordDirection.Received
+                && record.SynapseKind == typeof(MechanicsEcho).FullName),
             "an asynchronously delivered outbox echo",
             Cancellation);
     }
 
     [Fact]
-    public async Task JournalsSpeechWithNoDeclaredReceiver()
+    public async Task RecordsProducedSynapsesWithNoDeclaredReceiver()
     {
         const string name = "audit";
         var emitter = new NeuronId("outboxemitter", name);
 
-        await Brain.Session(name).EmitAsync(new OutboxStart(Audit: true), Cancellation);
+        await PublishAsync(name, new MechanicsStart(Audit: true), Cancellation);
 
-        var reading = await WaitForJournalAsync(
+        var page = await WaitForJournalAsync(
             emitter,
-            journal => journal.Journal.Any(fact => fact.Entry == "said" && fact.Body is OutboxAudit),
-            "a committed zero-receiver speech entry",
+            journal => journal.Records.Any(record => record.Direction == JournalRecordDirection.Produced
+                && record.SynapseKind == typeof(MechanicsAudit).FullName),
+            "a recorded zero-target production",
             Cancellation);
-        var said = reading.Journal.Single(fact => fact.Entry == "said" && fact.Body is OutboxAudit);
-        Assert.Empty(said.To ?? []);
-    }
-}
-
-public sealed record OutboxStart(bool Echo = false, bool Audit = false) : Synapse;
-
-public sealed record OutboxPulse(bool Echo) : Synapse;
-
-public sealed record OutboxEcho : Synapse;
-
-public sealed record OutboxAudit : Synapse;
-
-[GrainType("outboxemitter")]
-public sealed class OutboxEmitter : Neuron, INeuron<OutboxStart>, INeuron<OutboxEcho>
-{
-    public Task HandleAsync(OutboxStart synapse, CancellationToken cancellationToken)
-    {
-        Emit(new OutboxPulse(synapse.Echo));
-        if (synapse.Audit)
-        {
-            Emit(new OutboxAudit());
-        }
-
-        return Task.CompletedTask;
-    }
-
-    public Task HandleAsync(OutboxEcho synapse, CancellationToken cancellationToken) => Task.CompletedTask;
-}
-
-[GrainType("outboxreceiver")]
-public sealed class OutboxReceiver : Neuron, INeuron<OutboxPulse>
-{
-    public Task HandleAsync(OutboxPulse synapse, CancellationToken cancellationToken)
-    {
-        if (synapse.Echo)
-        {
-            Emit(new OutboxEcho());
-        }
-
-        return Task.CompletedTask;
+        var produced = page.Records.Single(record => record.Direction == JournalRecordDirection.Produced
+            && record.SynapseKind == typeof(MechanicsAudit).FullName);
+        Assert.Empty(produced.DeliveryTargets);
     }
 }

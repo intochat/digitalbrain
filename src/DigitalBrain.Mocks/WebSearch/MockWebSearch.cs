@@ -1,14 +1,5 @@
 namespace DigitalBrain.Mocks;
 
-public sealed record WebSearchRequested(string Query, string Domain) : Synapse;
-
-public sealed record WebSearchCompleted(
-    string Query,
-    string Domain,
-    string Snippet,
-    string Source) : Synapse;
-
-[GrainType("mockwebsearch")]
 public sealed class MockWebSearch : Neuron, INeuron<WebSearchRequested>
 {
     public Task HandleAsync(WebSearchRequested question, CancellationToken cancellationToken)

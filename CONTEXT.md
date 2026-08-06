@@ -1,48 +1,67 @@
 # DigitalBrain
 
-The language of a single-owner digital brain whose durable behavior emerges from neurons
-communicating with immutable facts.
+DigitalBrain is a programming model for durable module behavior. This glossary
+names the concepts shared by its module surface, trusted access boundary, and
+Hosting runtime.
 
 ## Language
 
-**Owner**:
-The single person or organization whose memory, policies, and behavior belong to a brain.
-_Avoid_: Tenant, principal
+**Synapse**:
+A sealed piece of module vocabulary that a source or behavior produces and a
+behavior may handle.
+_Avoid_: Fact, event, message
 
-**Brain**:
-The durable body of memory and behavior belonging to one owner.
-_Avoid_: Application, agent platform
+**Neuron**:
+A module behavior whose useful lifetime is one bound turn.
+_Avoid_: Grain, actor, worker
 
-**Deployment**:
-One isolated instance of a brain. Organizations isolate owners with separate deployments.
-_Avoid_: Tenant, account
+**Turn**:
+One handling opportunity for a received synapse, including any staged output
+and optional state change.
+_Avoid_: Invocation, transaction
 
-**Core**:
-The programming paradigm and invariant runtime physics shared by every neuron and synapse.
-_Avoid_: OS, product host
+**Produced synapse**:
+A synapse staged by a source or behavior during a turn for later delivery.
+_Avoid_: Emitted fact, command
 
-**Kernel**:
-The deployable operating system built on Core; it owns behavior creation, behavior lifecycle,
-and capability composition.
-_Avoid_: Core, framework
+**Recorded turn**:
+The durable unit containing a turn's received and produced synapses, touched
+state, and delivery watermark.
+_Avoid_: Commit, event batch
+
+**Journal**:
+The ordered durable truth of a logical behavior instance.
+_Avoid_: Log, event store
+
+**Journal record**:
+One received or produced synapse entry in a journal, with origin, causation,
+delivery targets, and raw serialization.
+_Avoid_: Journal fact, envelope
+
+**Delivery**:
+The post-record attempt to present a produced synapse to a receiving behavior.
+_Avoid_: Send, dispatch
+
+**NeuronId**:
+The logical identity of one behavior instance, made of its registered kind and
+its name.
+_Avoid_: Grain key, address
+
+**Source**:
+A trusted publisher identity that begins a recorded synapse flow.
+_Avoid_: Ingress, session
 
 **Module**:
-An independently shipped vocabulary of synapses and neuron kinds.
-_Avoid_: Plugin registration, service collection
+A package of synapse vocabulary and behavior types that depends only on
+Abstractions and Core.
+_Avoid_: Plugin host, runtime service
 
-**Behavior**:
-A neuron created or installed by Kernel to express an owner-requested capability. It is not a
-separate execution abstraction.
-_Avoid_: Workflow, script, orchestrator
+**Access**:
+Trusted publication and journal-reading capabilities used outside behavior
+modules.
+_Avoid_: Module API, behavior capability
 
-**Broadcast**:
-A synapse spoken to every neuron kind that declares it in the current context.
-_Avoid_: Emit, publish
-
-**Reply**:
-The synapse returned by a neuron to the source of the synapse it handled.
-_Avoid_: Answer wrapper, response envelope
-
-**Completed**:
-The Core synapse recording that a neuron handled a synapse without producing a reply.
-_Avoid_: Null reply, empty result
+**Hosting**:
+The runtime boundary that composes modules and owns durability, activation,
+serialization, routing, and delivery.
+_Avoid_: Core, module

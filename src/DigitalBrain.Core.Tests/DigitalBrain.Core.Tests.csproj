@@ -2,9 +2,9 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
-    <!-- CA1062: null-check ceremony inside module handlers contradicts the zero-ceremony
-         module surface the flows ratify (Core never delivers a null fact); CA1515: module
-         neuron classes are hosted grains and must stay public. -->
+    <!-- CA1062: null-check ceremony inside behavior handlers contradicts the concise
+         facade (Hosting never delivers a null synapse); CA1515: test behavior types are
+         public so composition can discover and construct them. -->
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1515;CA1062</NoWarn>
   </PropertyGroup>
   <ItemGroup>
@@ -14,6 +14,7 @@
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Hosting\DigitalBrain.Hosting.csproj" />
     <ProjectReference Include="..\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Testing.Mechanics\DigitalBrain.Testing.Mechanics.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3" />

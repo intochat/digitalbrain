@@ -16,8 +16,8 @@ internal sealed class RequestContextEnvelopeCarrier : IEnvelopeCarrier
         RequestContext.Set(SourceKind, envelope.Source.Kind);
         RequestContext.Set(SourceName, envelope.Source.Name);
         RequestContext.Set(Sequence, envelope.Sequence);
-        RequestContext.Set(Timestamp, envelope.Timestamp.UtcTicks);
-        WriteReference(CauseKind, CauseName, CauseSequence, envelope.Cause);
+        RequestContext.Set(Timestamp, envelope.OccurredAt.UtcTicks);
+        WriteReference(CauseKind, CauseName, CauseSequence, envelope.CausedBy);
     }
 
     public DeliveryEnvelope? Consume()
@@ -36,7 +36,11 @@ internal sealed class RequestContextEnvelopeCarrier : IEnvelopeCarrier
                 cause);
     }
 
-    private static void WriteReference(string kindKey, string nameKey, string sequenceKey, SynapseRef? reference)
+    private static void WriteReference(
+        string kindKey,
+        string nameKey,
+        string sequenceKey,
+        SynapseReference? reference)
     {
         if (reference is { } value)
         {
@@ -51,14 +55,16 @@ internal sealed class RequestContextEnvelopeCarrier : IEnvelopeCarrier
         RequestContext.Remove(sequenceKey);
     }
 
-    private static SynapseRef? TakeReference(string kindKey, string nameKey, string sequenceKey)
+    private static SynapseReference? TakeReference(string kindKey, string nameKey, string sequenceKey)
     {
         var kind = TakeString(kindKey);
         var name = TakeString(nameKey);
         var sequence = TakeLong(sequenceKey);
         return kind is null
             ? null
-            : new SynapseRef(new NeuronId(kind, name ?? throw Missing(nameKey)), sequence ?? throw Missing(sequenceKey));
+            : new SynapseReference(
+                new NeuronId(kind, name ?? throw Missing(nameKey)),
+                sequence ?? throw Missing(sequenceKey));
     }
 
     private static string? TakeString(string key)

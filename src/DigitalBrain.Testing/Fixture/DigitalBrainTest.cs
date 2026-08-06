@@ -6,7 +6,7 @@ using Xunit;
 
 namespace DigitalBrain.Testing;
 
-public abstract class DigitalBrainTest(BrainTestClusters clusters) : IAsyncLifetime
+public abstract class DigitalBrainTest(DigitalBrainTestClusters clusters) : IAsyncLifetime
 {
     private const BindingFlags DeclaredCompose =
         BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly;
@@ -25,11 +25,7 @@ public abstract class DigitalBrainTest(BrainTestClusters clusters) : IAsyncLifet
 
     protected static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
-    protected Brain Brain => Fixture.Brain;
-
-    protected TestClock Clock => Fixture.Clock;
-
-    protected virtual void Compose(DigitalBrainTestBuilder brain)
+    protected virtual void Compose(DigitalBrainTestBuilder composition)
     {
     }
 
@@ -56,39 +52,37 @@ public abstract class DigitalBrainTest(BrainTestClusters clusters) : IAsyncLifet
         return leaked is null
             ? ValueTask.CompletedTask
             : throw new InvalidOperationException(
-                "Unconsumed journal commit faults remain: " + string.Join("; ", leaked));
+                "Unconsumed journal recording faults remain: " + string.Join("; ", leaked));
     }
 
-    protected Task<NeuronReading> ReadAsync(NeuronId neuron, CancellationToken cancellationToken = default)
-        => Brain.ReadAsync(neuron, 0, cancellationToken);
+    protected Task PublishAsync(string source, Synapse synapse, CancellationToken cancellationToken = default)
+        => Fixture.Publisher.PublishAsync(new SynapseSource(source), synapse, cancellationToken);
 
-    protected async Task<TFact> WaitForAsync<TFact>(NeuronId neuron, CancellationToken cancellationToken = default)
-        where TFact : Synapse
+    protected Task<JournalRead> ReadOutcomeAsync(
+        NeuronId neuron,
+        long afterPosition = 0,
+        int maximumRecords = 256,
+        CancellationToken cancellationToken = default)
+        => Fixture.Reader.ReadAsync(neuron, afterPosition, maximumRecords, cancellationToken);
+
+    protected async Task<JournalPage> ReadAsync(
+        NeuronId neuron,
+        long afterPosition = 0,
+        int maximumRecords = 256,
+        CancellationToken cancellationToken = default)
     {
-        var reading = await WaitForJournalAsync(
-            neuron,
-            observed => observed.Journal.Any(fact => fact.Body is TFact),
-            $"a {typeof(TFact).Name} body",
-            cancellationToken);
-
-        for (var index = reading.Journal.Count - 1; index >= 0; index--)
-        {
-            if (reading.Journal[index].Body is TFact fact)
-            {
-                return fact;
-            }
-        }
-
-        throw new UnreachableException($"The awaited {typeof(TFact).Name} vanished from a committed journal.");
+        var read = await ReadOutcomeAsync(neuron, afterPosition, maximumRecords, cancellationToken);
+        return read as JournalPage
+            ?? throw new InvalidOperationException($"{neuron} returned unavailable journal history in a test without retention.");
     }
 
     [SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
-        Justification = "A poll attempt against a poisoned or mid-deactivation neuron throws by design; the bound reports the last failure if the wait never succeeds.")]
-    protected async Task<NeuronReading> WaitForJournalAsync(
+        Justification = "A poll attempt against a poisoned or mid-deactivation host can throw; the bound reports the last failure if the wait never succeeds.")]
+    protected async Task<JournalPage> WaitForJournalAsync(
         NeuronId neuron,
-        Func<NeuronReading, bool> holds,
+        Func<JournalPage, bool> holds,
         string expectation,
         CancellationToken cancellationToken = default)
     {
@@ -97,19 +91,19 @@ public abstract class DigitalBrainTest(BrainTestClusters clusters) : IAsyncLifet
 
         var stopwatch = Stopwatch.StartNew();
         Exception? lastFailure = null;
-        IReadOnlyList<JournalFact>? lastJournal = null;
+        IReadOnlyList<JournalRecord>? lastRecords = null;
 
         while (stopwatch.Elapsed < WaitBound)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var reading = await Brain.ReadAsync(neuron, 0, cancellationToken);
-                lastJournal = reading.Journal;
+                var page = await ReadAsync(neuron, cancellationToken: cancellationToken);
+                lastRecords = page.Records;
                 lastFailure = null;
-                if (holds(reading))
+                if (holds(page))
                 {
-                    return reading;
+                    return page;
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -124,20 +118,20 @@ public abstract class DigitalBrainTest(BrainTestClusters clusters) : IAsyncLifet
             await Task.Delay(PollBackoff, cancellationToken);
         }
 
-        var observed = lastJournal is null
+        var observed = lastRecords is null
             ? lastFailure is null ? "no read ever completed" : $"the last read failed: {lastFailure.Message}"
-            : $"the journal holds [{string.Join(", ", lastJournal.Select(fact => $"{fact.Entry} {fact.Kind}"))}]";
+            : $"the journal holds [{string.Join(", ", lastRecords.Select(record => $"{record.Direction} {record.SynapseKind}"))}]";
         throw new TimeoutException(
-            $"{neuron} did not journal {expectation} within {WaitBound.TotalSeconds:F0}s; {observed}.");
+            $"{neuron} did not record {expectation} within {WaitBound.TotalSeconds:F0}s; {observed}.");
     }
 
-    protected JournalFaultHandle FailNextJournalCommit(
-        NeuronId neuron, int allowCommitsBeforeFault = 0, bool stickyUntilDisarm = false)
+    protected JournalFaultHandle FailNextJournalRecording(
+        NeuronId neuron, int allowRecordingsBeforeFault = 0, bool stickyUntilDisarm = false)
     {
         var registration = Fixture.ArmFault(
             neuron,
-            $"Injected journal commit fault on {neuron}.",
-            allowCommitsBeforeFault,
+            $"Injected journal recording fault on {neuron}.",
+            allowRecordingsBeforeFault,
             stickyUntilDisarm);
         var handle = new JournalFaultHandle(registration, armed => Fixture.DisarmFault(armed.Registration));
         faultHandles.Add(handle);
@@ -150,11 +144,14 @@ public abstract class DigitalBrainTest(BrainTestClusters clusters) : IAsyncLifet
         return Fixture.DeactivateAsync(neurons, cancellationToken);
     }
 
+    protected Task DrainAsync(NeuronId neuron, CancellationToken cancellationToken = default)
+        => Fixture.DrainAsync(neuron, cancellationToken);
+
     private ComposedFixture Fixture
     {
         get => field ?? throw new InvalidOperationException(
             $"The test has not been initialized; {nameof(DigitalBrainTest)} leases its cluster in "
-            + $"{nameof(InitializeAsync)} — is [assembly: AssemblyFixture(typeof(BrainTestClusters))] declared?");
+            + $"{nameof(InitializeAsync)} — is [assembly: AssemblyFixture(typeof(DigitalBrainTestClusters))] declared?");
         set;
     }
 

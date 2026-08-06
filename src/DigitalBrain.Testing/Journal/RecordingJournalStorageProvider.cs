@@ -12,10 +12,10 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
         => new RecordingJournalStorage(this, journalId, inner.CreateStorage(journalId));
 
     internal JournalFaultRegistration ArmFault(
-        NeuronId target, string message, int allowCommitsBeforeFault, bool stickyUntilDisarm)
+        NeuronId target, string message, int allowRecordingsBeforeFault, bool stickyUntilDisarm)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        ArgumentOutOfRangeException.ThrowIfNegative(allowCommitsBeforeFault);
+        ArgumentOutOfRangeException.ThrowIfNegative(allowRecordingsBeforeFault);
 
         lock (gate)
         {
@@ -23,10 +23,10 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
             if (faults.ContainsKey(journalId))
             {
                 throw new InvalidOperationException(
-                    $"A journal commit fault is already armed for neuron '{target}'.");
+                    $"A journal recording fault is already armed for neuron '{target}'.");
             }
 
-            var state = new JournalFaultState(target, message, allowCommitsBeforeFault, stickyUntilDisarm);
+            var state = new JournalFaultState(target, message, allowRecordingsBeforeFault, stickyUntilDisarm);
             faults.Add(journalId, state);
             return new JournalFaultRegistration(target, message, state.Consumed.Task, state);
         }
@@ -59,7 +59,7 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     }
 
     private static JournalId JournalIdOf(NeuronId target)
-        => JournalId.FromGrainId(GrainId.Create(target.Kind, target.Name));
+        => JournalId.FromGrainId(NeuronHost.AddressOf(target));
 
     private void BeforeWrite(JournalId journalId)
     {
@@ -70,14 +70,14 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
                 return;
             }
 
-            if (fault.RemainingAllowedCommits > 0)
+            if (fault.RemainingAllowedRecordings > 0)
             {
-                fault.RemainingAllowedCommits--;
+                fault.RemainingAllowedRecordings--;
                 return;
             }
 
             fault.Consumed.TrySetResult();
-            // One-shot faults remove themselves so later commits succeed; sticky faults keep
+            // One-shot faults remove themselves so later recordings succeed; sticky faults keep
             // failing until disarmed, so redelivery cannot leap past a faulted turn.
             if (!fault.StickyUntilDisarm)
             {
@@ -89,7 +89,7 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     }
 
     private sealed class JournalFaultState(
-        NeuronId target, string message, int allowCommitsBeforeFault, bool stickyUntilDisarm)
+        NeuronId target, string message, int allowRecordingsBeforeFault, bool stickyUntilDisarm)
     {
         internal TaskCompletionSource Consumed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -97,7 +97,7 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
 
         internal string Message { get; } = message;
 
-        internal int RemainingAllowedCommits { get; set; } = allowCommitsBeforeFault;
+        internal int RemainingAllowedRecordings { get; set; } = allowRecordingsBeforeFault;
 
         internal bool StickyUntilDisarm { get; } = stickyUntilDisarm;
     }
@@ -140,5 +140,3 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
             => inner.UpdateMetadataAsync(metadata, tagsToRemove, eTag, cancellationToken);
     }
 }
-
-internal sealed record JournalFaultRegistration(NeuronId Target, string Message, Task Consumed, object Token);

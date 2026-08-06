@@ -4,8 +4,11 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Access\DigitalBrain.Access.csproj" />
     <InternalsVisibleTo Include="DigitalBrain.Core.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Testing" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Journaling" />

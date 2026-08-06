@@ -1,20 +1,30 @@
+using System.Reflection;
+
 namespace DigitalBrain.Testing;
 
 public sealed class DigitalBrainTestBuilder
 {
-    private readonly List<Type> moduleTypes = [];
+    private readonly List<Action<DigitalBrainComposition>> registrations = [];
+    private readonly List<string> registrationRows = [];
     private readonly List<(Type Contract, object Instance)> services = [];
     private bool sealed_;
 
-    public DigitalBrainTestBuilder AddModule<TNeuron>()
-        where TNeuron : Neuron
+    public DigitalBrainTestBuilder RegisterVocabulary(Assembly assembly)
     {
         RefuseSealed();
-        if (!moduleTypes.Contains(typeof(TNeuron)))
-        {
-            moduleTypes.Add(typeof(TNeuron));
-        }
+        ArgumentNullException.ThrowIfNull(assembly);
+        registrations.Add(composition => composition.RegisterVocabulary(assembly));
+        registrationRows.Add($"vocabulary={assembly.FullName}");
+        return this;
+    }
 
+    public DigitalBrainTestBuilder RegisterNeuron<TBehavior>(string kind)
+        where TBehavior : Neuron
+    {
+        RefuseSealed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
+        registrations.Add(composition => composition.RegisterNeuron<TBehavior>(kind));
+        registrationRows.Add($"neuron={typeof(TBehavior).FullName}:{kind}");
         return this;
     }
 
@@ -30,7 +40,7 @@ public sealed class DigitalBrainTestBuilder
     internal TestComposition Seal()
     {
         sealed_ = true;
-        return new TestComposition([.. moduleTypes], [.. services]);
+        return new TestComposition([.. registrations], [.. registrationRows], [.. services]);
     }
 
     private void RefuseSealed()
@@ -39,22 +49,5 @@ public sealed class DigitalBrainTestBuilder
         {
             throw new InvalidOperationException("The DigitalBrain test composition is already sealed.");
         }
-    }
-}
-
-internal sealed record TestComposition(
-    IReadOnlyList<Type> ModuleTypes,
-    IReadOnlyList<(Type Contract, object Instance)> Services)
-{
-    internal string Fingerprint()
-    {
-        var modules = ModuleTypes
-            .Select(module => module.FullName ?? module.Name)
-            .Order(StringComparer.Ordinal);
-        var serviceRows = Services
-            .Select(service => $"{service.Contract.FullName}={service.Instance.GetType().FullName}")
-            .Order(StringComparer.Ordinal);
-
-        return string.Join('|', [.. modules, .. serviceRows]);
     }
 }

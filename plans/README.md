@@ -1,5 +1,8 @@
 # Plans — product resurrection via Core stability
 
+> **Status:** historical execution planning. It does not define the current
+> Core boundary. See [the current architecture](../CORE-ARCHITECTURE.md).
+
 ## Documents
 
 | File | Purpose |

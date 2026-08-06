@@ -1,51 +1,59 @@
-using DigitalBrain.Testing;
-
 using DigitalBrain.Mocks.Tests.Support;
+using DigitalBrain.Testing;
+using DigitalBrain.Testing.Mechanics;
 
 namespace DigitalBrain.Mocks.Tests.Smoke;
 
-public sealed class MockXSmokeTests(BrainTestClusters clusters) : DigitalBrainTest(clusters)
+public sealed class MockXSmokeTests(DigitalBrainTestClusters clusters) : DigitalBrainTest(clusters)
 {
-    protected override void Compose(DigitalBrainTestBuilder brain)
-        => brain.ComposeMocks().AddModule<MockDashboard>();
+    protected override void Compose(DigitalBrainTestBuilder composition)
+        => composition.ComposeMocks().RegisterNeuron<MockDashboard>("mockdashboard");
 
-    [Fact(DisplayName = "Session emit triggers MockX and MockDashboard hears XPostObserved by declaration")]
-    public async Task SessionEmitTriggersMockXAndDashboardHearsByDeclaration()
+    [Fact(DisplayName = "Source publication triggers MockX and MockDashboard receives XPostObserved by declaration")]
+    public async Task SourcePublicationTriggersMockXAndDashboardReceivesByDeclaration()
     {
         var ct = Cancellation;
-        var context = "owner-six";
-        var session = Brain.Session(context);
-        var mockXId = new NeuronId("mockx", context);
-        var dashboardId = new NeuronId("mockdashboard", context);
+        var sourceName = "owner-six";
+        var source = new NeuronId("digitalbrain.synapse-source", sourceName);
+        var mockXId = new NeuronId("mockx", sourceName);
+        var dashboardId = new NeuronId("mockdashboard", sourceName);
         var createdAt = new DateTimeOffset(2026, 8, 5, 12, 0, 0, TimeSpan.Zero);
 
-        await session.EmitAsync(
+        await PublishAsync(
+            sourceName,
             new ObserveXPost("post-1", "elonmusk", "BTC to the moon", createdAt),
             ct);
 
-        var observed = await WaitForAsync<XPostObserved>(dashboardId, ct);
-        Assert.Equal("post-1", observed.PostId);
-        Assert.Equal("elonmusk", observed.Author);
-        Assert.Equal("BTC to the moon", observed.Text);
-        Assert.Equal(createdAt, observed.CreatedAt);
+        var dashboardPage = await WaitForJournalAsync(
+            dashboardId,
+            page => page.Records.Any(record => record.Direction == JournalRecordDirection.Received
+                && record.SynapseKind == typeof(XPostObserved).FullName),
+            "a received X post observation",
+            ct);
+        var receivedByDashboard = dashboardPage.Records.Single(record => record.Direction == JournalRecordDirection.Received
+            && record.SynapseKind == typeof(XPostObserved).FullName);
+        Assert.Equal("post-1", receivedByDashboard.Serialization.GetProperty("postId").GetString());
+        Assert.Equal("elonmusk", receivedByDashboard.Serialization.GetProperty("author").GetString());
+        Assert.Equal("BTC to the moon", receivedByDashboard.Serialization.GetProperty("text").GetString());
+        Assert.Equal(createdAt, receivedByDashboard.Serialization.GetProperty("createdAt").GetDateTimeOffset());
 
-        var sessionReading = await ReadAsync(session.Id, ct);
-        var injectSaid = sessionReading.SaidSingle<ObserveXPost>();
-        Assert.Contains(mockXId, injectSaid.To ?? []);
+        var sourcePage = await ReadAsync(source, cancellationToken: ct);
+        var published = sourcePage.Records.Single(record => record.Direction == JournalRecordDirection.Produced
+            && record.SynapseKind == typeof(ObserveXPost).FullName);
+        Assert.Contains(mockXId, published.DeliveryTargets);
 
-        var mockXReading = await ReadAsync(mockXId, ct);
-        var injectHeard = mockXReading.HeardSingle<ObserveXPost>();
-        Assert.Equal(session.Id, injectHeard.Metadata.Source);
-        Assert.Equal(injectSaid.Position, injectHeard.Metadata.Sequence);
+        var mockXPage = await ReadAsync(mockXId, cancellationToken: ct);
+        var receivedByMockX = mockXPage.Records.Single(record => record.Direction == JournalRecordDirection.Received
+            && record.SynapseKind == typeof(ObserveXPost).FullName);
+        Assert.Equal(source, receivedByMockX.Origin.Source);
+        Assert.Equal(published.Position, receivedByMockX.Origin.Sequence);
 
-        var ambientSaid = mockXReading.SaidSingle<XPostObserved>();
-        Assert.Contains(dashboardId, ambientSaid.To ?? []);
-        Assert.Equal(new SynapseRef(mockXId, injectHeard.Position), ambientSaid.Cause);
+        var producedByMockX = mockXPage.Records.Single(record => record.Direction == JournalRecordDirection.Produced
+            && record.SynapseKind == typeof(XPostObserved).FullName);
+        Assert.Contains(dashboardId, producedByMockX.DeliveryTargets);
+        Assert.Equal(new SynapseReference(mockXId, receivedByMockX.Position), producedByMockX.CausedBy);
 
-        var dashboardReading = await ReadAsync(dashboardId, ct);
-        var ambientHeard = dashboardReading.HeardSingle<XPostObserved>();
-        Assert.Equal(mockXId, ambientHeard.Metadata.Source);
-        Assert.Equal(ambientSaid.Position, ambientHeard.Metadata.Sequence);
-        Assert.Equal("post-1", Assert.IsType<XPostObserved>(ambientHeard.Body).PostId);
+        Assert.Equal(mockXId, receivedByDashboard.Origin.Source);
+        Assert.Equal(producedByMockX.Position, receivedByDashboard.Origin.Sequence);
     }
 }

@@ -1,20 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>DigitalBrain</RootNamespace>
-    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1812;CA1308</NoWarn>
+    <NoWarn>$(NoWarn);CA2007;CA1812;CA1308</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Core.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Testing" />
-    <InternalsVisibleTo Include="DigitalBrain.Edge" />
     <InternalsVisibleTo Include="DigitalBrain.Hosting" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Journaling" />
-    <PackageReference Include="Microsoft.Orleans.Reminders" />
-    <PackageReference Include="Microsoft.Orleans.Sdk" />
   </ItemGroup>
 </Project>

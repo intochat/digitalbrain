@@ -1,9 +1,12 @@
 # 50 user scenarios — Core stress set
 
+> **Status:** historical stress material. It does not define the current Core
+> surface. See [the current architecture](../CORE-ARCHITECTURE.md).
+
 These scenarios assume **modules exist** (Gmail, Salesforce, X, crypto, chat, shell, behaviors, …).
 They exist to force **Core shape**, not to implement product features.
 
-Companion: [`../CORE-ARCHITECTURE.md`](../CORE-ARCHITECTURE.md) (ratified).
+Current architecture: [`../CORE-ARCHITECTURE.md`](../CORE-ARCHITECTURE.md).
 
 ## How to use
 

@@ -32,7 +32,13 @@ internal sealed class ComposedFixture : IAsyncDisposable
 
     internal TestClock Clock { get; }
 
-    internal Brain Brain
+    internal SynapsePublisher Publisher
+    {
+        get => field ?? throw new InvalidOperationException("The composed DigitalBrain cluster is not running.");
+        private set;
+    }
+
+    internal JournalReader Reader
     {
         get => field ?? throw new InvalidOperationException("The composed DigitalBrain cluster is not running.");
         private set;
@@ -52,8 +58,8 @@ internal sealed class ComposedFixture : IAsyncDisposable
     }
 
     internal JournalFaultRegistration ArmFault(
-        NeuronId target, string message, int allowCommitsBeforeFault, bool stickyUntilDisarm)
-        => journalStorage.ArmFault(target, message, allowCommitsBeforeFault, stickyUntilDisarm);
+        NeuronId target, string message, int allowRecordingsBeforeFault, bool stickyUntilDisarm)
+        => journalStorage.ArmFault(target, message, allowRecordingsBeforeFault, stickyUntilDisarm);
 
     internal bool DisarmFault(JournalFaultRegistration registration)
         => journalStorage.DisarmFault(registration);
@@ -65,7 +71,7 @@ internal sealed class ComposedFixture : IAsyncDisposable
         var running = cluster
             ?? throw new InvalidOperationException("The composed DigitalBrain cluster is not running.");
         var management = running.Client.GetGrain<IManagementGrain>(0);
-        var addresses = neurons.Select(neuron => GrainId.Create(neuron.Kind, neuron.Name)).ToArray();
+        var addresses = neurons.Select(NeuronHost.AddressOf).ToArray();
 
         var bound = DateTime.UtcNow + DeactivationBound;
         while (true)
@@ -91,6 +97,16 @@ internal sealed class ComposedFixture : IAsyncDisposable
 
             await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
         }
+    }
+
+    internal Task DrainAsync(NeuronId neuron, CancellationToken cancellationToken)
+    {
+        var running = cluster
+            ?? throw new InvalidOperationException("The composed DigitalBrain cluster is not running.");
+        return running.Client
+            .GetGrain<INeuronHost>(NeuronHost.AddressOf(neuron))
+            .DrainAsync()
+            .WaitAsync(cancellationToken);
     }
 
     [SuppressMessage(
@@ -147,9 +163,9 @@ internal sealed class ComposedFixture : IAsyncDisposable
             }
 
             silo.UseInMemoryReminderService();
-            silo.AddDigitalBrain(composition.ModuleTypes);
+            silo.AddDigitalBrain(composition.Configure);
         });
-        clusterBuilder.ConfigureClient(client => client.Services.AddDigitalBrainWireCodec(composition.ModuleTypes));
+        clusterBuilder.ConfigureClient(client => client.Services.AddDigitalBrainSerialization(composition.Configure));
 
         var deployed = clusterBuilder.Build();
         try
@@ -163,6 +179,7 @@ internal sealed class ComposedFixture : IAsyncDisposable
         }
 
         cluster = deployed;
-        Brain = new Brain(deployed.Client);
+        Publisher = deployed.Client.ServiceProvider.GetRequiredService<SynapsePublisher>();
+        Reader = deployed.Client.ServiceProvider.GetRequiredService<JournalReader>();
     }
 }

@@ -1,23 +1,28 @@
 # DigitalBrain
 
-Clean-room rebuild in progress. Code enters this tree file by file, each file
-justified by a consumer that exists today. The complete previous system lives
-in `v1/` — its product status in `v1/README.md` — and is retired piecewise as
-its replacement lands here.
+DigitalBrain is a clean-room, durable behavior model. Its Core is intentionally
+small: module authors write synapse vocabulary and behavior, while Hosting owns
+the durable runtime.
 
-## Built
+## Current packages
 
-- `src/DigitalBrain.Abstractions` — the programming model. Four dependency-free
-  types: `Synapse` (the fact), `INeuron<in TSynapse>` (the actor, typed by what
-  it handles), `NeuronId` (the address), `SynapseMetadata` (the lineage:
-  source, sequence, timestamp). Namespace `DigitalBrain`.
-- `src/DigitalBrain.Core` — the runtime, growing consumer-first: `Neuron`, the
-  durable base every neuron inherits. Uncommitted, in review.
+| Package | Responsibility |
+| --- | --- |
+| `DigitalBrain.Abstractions` | `Synapse`, `INeuron<TSynapse>`, and `NeuronId` |
+| `DigitalBrain.Core` | Pure `Neuron` behavior facade, optional turn state, and public journal-read types |
+| `DigitalBrain.Access` | Trusted `SynapsePublisher` and `JournalReader` capabilities |
+| `DigitalBrain.Hosting` | Explicit composition, serialization, the durable Orleans adapter, journal recording, routing, and post-record delivery |
+| `DigitalBrain.Testing` | Real-cluster mechanical test support |
+| `DigitalBrain.Mocks` | Small vocabulary fixtures used to exercise mechanics, not product implementations |
 
-## Next
+The package boundary is strict:
 
-- `DigitalBrain.Core` — the runtime library: `Neuron` base, journaling,
-  serialization of plain facts, type-safe addressing, lineage via grain-call
-  filters. Causation and correlation are derived from journal structure, never
-  stored.
-- `DigitalBrain.Kernel` — the silo host that boots the brain.
+```text
+module ──> Abstractions + Core
+Access ──> Core
+Hosting ──> Abstractions + Core + Access + Orleans
+```
+
+Start with [the current Core architecture](CORE-ARCHITECTURE.md) and the
+[Core README](src/DigitalBrain.Core/README.md). Earlier research and design
+material remains as historical evidence rather than current authority.

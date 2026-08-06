@@ -5,7 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Edge\DigitalBrain.Edge.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Access\DigitalBrain.Access.csproj" />
     <ProjectReference Include="..\DigitalBrain.Hosting\DigitalBrain.Hosting.csproj" />
   </ItemGroup>
   <ItemGroup>

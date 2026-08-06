@@ -1,9 +1,11 @@
 # Architecture grill dossier
 
-Autonomous brainstorm + self-grill agents produced these files. They are the **decision record** for Stage-1 Core.
+> **Status:** historical exploration. These records informed earlier designs but
+> do not define the current module/runtime seam. See
+> [the current architecture](../CORE-ARCHITECTURE.md).
 
-**Constitution (ship shape):** [`../CORE-ARCHITECTURE.md`](../CORE-ARCHITECTURE.md)  
-**Scenarios (expressibility):** [`../scenarios/`](../scenarios/README.md)
+**Current architecture:** [`../CORE-ARCHITECTURE.md`](../CORE-ARCHITECTURE.md)
+**Historical scenarios:** [`../scenarios/`](../scenarios/README.md)
 
 | # | File | Topic | Outcome |
 |---|---|---|---|
