@@ -31,7 +31,7 @@ public sealed class MockXSmokeTests(BrainTestClusters clusters) : DigitalBrainTe
 
         var sessionReading = await ReadAsync(session.Id, ct);
         var injectSaid = sessionReading.SaidSingle<ObserveXPost>();
-        Assert.Equal("declared", injectSaid.DeliveryTo(mockXId).Via);
+        Assert.Contains(mockXId, injectSaid.To ?? []);
 
         var mockXReading = await ReadAsync(mockXId, ct);
         var injectHeard = mockXReading.HeardSingle<ObserveXPost>();
@@ -39,8 +39,8 @@ public sealed class MockXSmokeTests(BrainTestClusters clusters) : DigitalBrainTe
         Assert.Equal(injectSaid.Position, injectHeard.Metadata.Sequence);
 
         var ambientSaid = mockXReading.SaidSingle<XPostObserved>();
-        Assert.Equal("declared", ambientSaid.DeliveryTo(dashboardId).Via);
-        Assert.Equal(new SynapseRef(session.Id, injectSaid.Position), ambientSaid.Cause);
+        Assert.Contains(dashboardId, ambientSaid.To ?? []);
+        Assert.Equal(new SynapseRef(mockXId, injectHeard.Position), ambientSaid.Cause);
 
         var dashboardReading = await ReadAsync(dashboardId, ct);
         var ambientHeard = dashboardReading.HeardSingle<XPostObserved>();

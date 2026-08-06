@@ -1,14 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>DigitalBrain</RootNamespace>
-    <!-- CA1032/CA1064: UnhandledFactException is the Core refusal signal — deliberately
-         internal (modules never construct or catch it by design) and constructible only
-         with the fact kind and receiver it names; the standard exception constructors
-         would permit a kindless refusal. AskFailedException/AskOutcomeUnknownException are
-         likewise constructible only by the edge, carrying the journaled fact they name.
-         CA1724: the edge type IS named Session by the ratified design (§5); the collision
-         is with Orleans.Serialization.Session, a namespace no module ever opens. -->
-    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1812;CA1308;CA1032;CA1064;CA1724</NoWarn>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1812;CA1308</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
@@ -16,11 +9,12 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Core.Tests" />
     <InternalsVisibleTo Include="DigitalBrain.Testing" />
+    <InternalsVisibleTo Include="DigitalBrain.Edge" />
+    <InternalsVisibleTo Include="DigitalBrain.Hosting" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Journaling" />
     <PackageReference Include="Microsoft.Orleans.Reminders" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
-    <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
   </ItemGroup>
 </Project>

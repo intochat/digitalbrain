@@ -10,6 +10,7 @@ public sealed record SpotSnapshot(
     decimal Price,
     DateTimeOffset At) : Synapse;
 
+[GrainType("mockcrypto")]
 public sealed class MockCrypto : Neuron, INeuron<ObserveSpot>
 {
     public Task HandleAsync(ObserveSpot command, CancellationToken cancellationToken)

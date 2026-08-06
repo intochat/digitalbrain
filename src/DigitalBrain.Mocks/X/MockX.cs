@@ -12,6 +12,7 @@ public sealed record XPostObserved(
     string Text,
     DateTimeOffset CreatedAt) : Synapse;
 
+[GrainType("mockx")]
 public sealed class MockX : Neuron, INeuron<ObserveXPost>
 {
     public Task HandleAsync(ObserveXPost command, CancellationToken cancellationToken)

@@ -14,6 +14,7 @@ public sealed record EmailReceived(
     string Subject,
     string Snippet) : Synapse;
 
+[GrainType("mockgmail")]
 public sealed class MockGmail : Neuron, INeuron<ObserveEmail>
 {
     public Task HandleAsync(ObserveEmail command, CancellationToken cancellationToken)

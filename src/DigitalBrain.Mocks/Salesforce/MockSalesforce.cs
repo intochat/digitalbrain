@@ -18,6 +18,7 @@ public sealed record AccountEnriched(
     string Domain,
     string FieldDiff) : Synapse;
 
+[GrainType("mocksalesforce")]
 public sealed class MockSalesforce : Neuron, INeuron<ProposeAccountEnrichment>
 {
     public Task HandleAsync(ProposeAccountEnrichment command, CancellationToken cancellationToken)

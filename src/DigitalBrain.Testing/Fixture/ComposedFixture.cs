@@ -140,7 +140,6 @@ internal sealed class ComposedFixture : IAsyncDisposable
         var clusterBuilder = new InProcessTestClusterBuilder(1);
         clusterBuilder.ConfigureSilo((options, silo) =>
         {
-            silo.Services.AddKeyedSingleton<TimeProvider>(NeuronTime.ServiceKey, timeProvider);
             silo.Services.AddSingleton<IJournalStorageProvider>(journalStorage);
             foreach (var (contract, instance) in composition.Services)
             {

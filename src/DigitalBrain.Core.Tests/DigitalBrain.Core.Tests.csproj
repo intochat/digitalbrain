@@ -12,13 +12,10 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Mocks\DigitalBrain.Mocks.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Hosting\DigitalBrain.Hosting.csproj" />
     <ProjectReference Include="..\DigitalBrain.Testing\DigitalBrain.Testing.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Journaling" />
-    <PackageReference Include="Microsoft.Orleans.Sdk" />
-    <PackageReference Include="Microsoft.Orleans.TestingHost" />
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
 </Project>

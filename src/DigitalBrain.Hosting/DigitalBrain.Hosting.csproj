@@ -1,18 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>DigitalBrain.Testing</RootNamespace>
+    <RootNamespace>DigitalBrain</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Edge\DigitalBrain.Edge.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Hosting\DigitalBrain.Hosting.csproj" />
+    <InternalsVisibleTo Include="DigitalBrain.Core.Tests" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Journaling" />
     <PackageReference Include="Microsoft.Orleans.Reminders" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
-    <PackageReference Include="Microsoft.Orleans.TestingHost" />
-    <PackageReference Include="xunit.v3.extensibility.core" />
+    <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
   </ItemGroup>
 </Project>

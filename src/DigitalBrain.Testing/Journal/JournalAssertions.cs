@@ -21,18 +21,6 @@ public static class JournalAssertions
         where TFact : Synapse
         => All<TFact>(reading, Said);
 
-    public static Delivery DeliveryTo(this JournalFact said, NeuronId receiver)
-        => DeliveryToOrNull(said, receiver)
-            ?? throw new InvalidOperationException(
-                $"The said '{said.Kind}' at position {said.Position} does not deliver to {receiver}; "
-                + $"its receivers are [{string.Join(", ", said.To?.Select(Render) ?? [])}].");
-
-    public static Delivery? DeliveryToOrNull(this JournalFact said, NeuronId receiver)
-    {
-        ArgumentNullException.ThrowIfNull(said);
-        return said.To?.FirstOrDefault(delivery => delivery.Receiver == receiver);
-    }
-
     private static IReadOnlyList<JournalFact> All<TFact>(NeuronReading reading, string entry)
         where TFact : Synapse
     {
@@ -54,6 +42,4 @@ public static class JournalAssertions
                 $"Expected exactly one {entry} {typeof(TFact).Name}, found {matches.Length}; "
                 + $"the journal holds [{string.Join(", ", reading.Journal.Select(fact => $"{fact.Entry} {fact.Kind}"))}].");
     }
-
-    private static string Render(Delivery delivery) => $"{delivery.Receiver} via {delivery.Via}";
 }
