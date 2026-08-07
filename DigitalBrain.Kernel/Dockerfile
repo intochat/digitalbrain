@@ -3,7 +3,6 @@
 # Product image: digitalbrain
 #   - Orleans silo (DigitalBrain.Kernel) — brokers + health on 8080
 #   - Northbound MCP (DigitalBrain.Mcp) as cluster client at /mcp on port 5000
-#   - Behavior worker (DigitalBrain.BehaviorHost) as a supervised sibling process
 #   - AppHost remains separate for local aspire run; Docker does not include AppHost
 #
 # Build (repo root):
@@ -28,13 +27,7 @@
 #     DigitalBrain__AI__OpenAI__ApiKey
 #     DigitalBrain__AI__OpenAI__Gpt56__Model
 #
-#   Behavior broker (shared silo ↔ behavior-host service credential — not an owner identity)
-#     DigitalBrain__Behaviors__Broker__Credential
-#     DigitalBrain__Behaviors__Broker__BaseAddress # default in entrypoint: http://127.0.0.1:8080
-#     DigitalBrain__Behaviors__Host__BaseAddress   # default in entrypoint: http://127.0.0.1:8081
-#     DigitalBrain__Behaviors__Executor            # default: Host
-#
-#   Durable state protection (shared by silo + behavior-host)
+#   Durable state protection
 #     DigitalBrain__Security__StateProtectionKey
 #
 #   Azure Storage (Orleans clustering, reminders, journal)
@@ -80,10 +73,6 @@ RUN dotnet publish DigitalBrain.Kernel/DigitalBrain.Kernel.csproj \
  && dotnet publish DigitalBrain.Mcp/DigitalBrain.Mcp.csproj \
       -c Release \
       -o /out/mcp \
-      --nologo \
- && dotnet publish product/DigitalBrain.BehaviorHost/DigitalBrain.BehaviorHost.csproj \
-      -c Release \
-      -o /out/behavior-host \
       --nologo
 
 FROM mcr.microsoft.com/dotnet/aspnet:11.0-preview AS final
@@ -91,12 +80,10 @@ WORKDIR /app
 
 COPY --from=build /out/silo /app/silo
 COPY --from=build /out/mcp /app/mcp
-COPY --from=build /out/behavior-host /app/behavior-host
 COPY --chmod=755 DigitalBrain.Kernel/docker-entrypoint.sh /app/docker-entrypoint.sh
 
 ENV ASPNETCORE_ENVIRONMENT=Production \
-    DOTNET_EnableDiagnostics=0 \
-    DigitalBrain__Behaviors__Executor=Host
+    DOTNET_EnableDiagnostics=0
 
 EXPOSE 8080 5000
 

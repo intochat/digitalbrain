@@ -1,12 +1,8 @@
-using System.Security.Cryptography;
-using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.Publishing;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Behaviors;
-using DigitalBrain.Behaviors.Host;
+using DigitalBrain.Assistant;
 using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Chat;
 using DigitalBrain.Google;
@@ -14,7 +10,6 @@ using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.Introspection;
 using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
-using DigitalBrain.Assistant;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
 using DigitalBrain.Shell;
@@ -51,26 +46,10 @@ brain.AddModule<TasksModule>();
 brain.AddModule<TimeModule>();
 brain.AddModule<IntrospectionModule>();
 
-var behaviorBrokerCredential = builder.ExecutionContext.IsRunMode
-    ? builder.AddParameter(
-        "behavior-broker-credential",
-        new BehaviorBrokerCredentialParameterDefault(),
-        secret: true,
-        persist: true)
-    : builder.AddParameter("behavior-broker-credential", secret: true);
-behaviorBrokerCredential.WithDescription(
-    "Shared service credential for the BehaviorHost → silo reverse payload broker. Not an owner identity.");
-
-// Option A process boundary: distinct project resources — not co-hosted in one process.
-// Silo residual executor is Host (HTTP to BehaviorHost); authored load is BehaviorHost-only.
+// Process boundary: silo + northbound MCP + optional scripting probe. Residual behavior
+// execution stays InProcess-closed in the silo (no BehaviorHost product process).
 var silo = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Silo)
     .WithReference(brain)
-    .WithEnvironment(
-        BehaviorsModule.ExecutorConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
-        BehaviorsModule.HostExecutorName)
-    .WithEnvironment(
-        BehaviorBrokerContract.CredentialConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
-        behaviorBrokerCredential)
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
         ShellHostingExtensions.DefaultOwner)
@@ -93,33 +72,11 @@ mcp.WithMcpServer(
     ProductSurfaceResources.McpHttpEndpointName);
 #pragma warning restore ASPIREMCP001
 
-var behaviorHost = builder.AddProject<Projects.DigitalBrain_BehaviorHost>(ProductSurfaceResources.BehaviorHost)
+builder.AddProject<Projects.DigitalBrain_Scripting>(ProductSurfaceResources.Scripting)
     .WithReference(brain.AsClient())
-    .WithStateProtectionKey(brain)
-    .WithEnvironment(
-        BehaviorHostHosting.BrokerBaseAddressConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
-        silo.GetEndpoint("http"))
-    .WithEnvironment(
-        BehaviorBrokerContract.CredentialConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
-        behaviorBrokerCredential)
-    .WithHttpHealthCheck("/health")
-    .WaitFor(silo)
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
-        ShellHostingExtensions.DefaultOwner);
-
-silo.WithReference(behaviorHost)
-    .WithEnvironment(
-        BehaviorsModule.HostBaseAddressConfigurationKey.Replace(":", "__", StringComparison.Ordinal),
-        behaviorHost.GetEndpoint("http"));
+        ShellHostingExtensions.DefaultOwner)
+    .WaitFor(silo);
 
 builder.Build().Run();
-
-file sealed class BehaviorBrokerCredentialParameterDefault : ParameterDefault
-{
-    public override string GetDefaultValue()
-        => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-
-    public override void WriteToManifest(ManifestPublishingContext context)
-        => throw new InvalidOperationException("Local behavior-broker credential defaults cannot be published.");
-}

@@ -48,7 +48,6 @@ services:
       # DigitalBrain__AI__Ollama__Endpoint: http://host.docker.internal:11434
       # DigitalBrain__AI__OpenAI__ApiKey:
       # DigitalBrain__AI__OpenAI__Endpoint:
-      # DigitalBrain__Behaviors__Broker__Credential:  # required for behavior rail
       # DigitalBrain__Security__StateProtectionKey:   # required for durable payload protection
       ConnectionStrings__brain-clustering: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
       ConnectionStrings__brain-reminders: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"

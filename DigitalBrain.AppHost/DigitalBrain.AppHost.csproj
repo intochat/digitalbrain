@@ -14,9 +14,8 @@
     <ProjectReference Include="..\src\core\aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
     <ProjectReference Include="..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
-    <ProjectReference Include="..\product\DigitalBrain.BehaviorHost\DigitalBrain.BehaviorHost.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Scripting\DigitalBrain.Scripting.csproj" />
     <ProjectReference Include="..\src\core\behaviors\DigitalBrain.Behaviors.Runtime\DigitalBrain.Behaviors.Runtime.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\src\core\behaviors\DigitalBrain.Behaviors.Host\DigitalBrain.Behaviors.Host.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\src\modules\tasks\Tasks\DigitalBrain.Modules.Tasks.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\src\modules\time\Time\DigitalBrain.Modules.Time.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\src\modules\introspection\Introspection\DigitalBrain.Modules.Introspection.csproj" IsAspireProjectResource="false" />
