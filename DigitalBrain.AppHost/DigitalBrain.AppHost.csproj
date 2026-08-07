@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.5.0-preview.1.26376.5">
+<Project Sdk="Aspire.AppHost.Sdk/13.5.0-preview.1.26405.3">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
@@ -29,11 +29,7 @@
     <PropertyGroup>
       <CodeGraphIndexed>$([System.IO.File]::Exists('$(CodeGraphRoot)\.codegraph\codegraph.db'))</CodeGraphIndexed>
     </PropertyGroup>
-    <Exec Command="npx -y @colbymchenry/codegraph@latest init &quot;$(CodeGraphRoot)&quot;"
-          WorkingDirectory="$(CodeGraphRoot)"
-          Condition="'$(CodeGraphIndexed)' != 'True'" />
-    <Exec Command="npx -y @colbymchenry/codegraph@latest sync &quot;$(CodeGraphRoot)&quot;"
-          WorkingDirectory="$(CodeGraphRoot)"
-          Condition="'$(CodeGraphIndexed)' == 'True'" />
+    <Exec Command="npx -y @colbymchenry/codegraph@latest init &quot;$(CodeGraphRoot)&quot;" WorkingDirectory="$(CodeGraphRoot)" Condition="'$(CodeGraphIndexed)' != 'True'" />
+    <Exec Command="npx -y @colbymchenry/codegraph@latest sync &quot;$(CodeGraphRoot)&quot;" WorkingDirectory="$(CodeGraphRoot)" Condition="'$(CodeGraphIndexed)' == 'True'" />
   </Target>
 </Project>
