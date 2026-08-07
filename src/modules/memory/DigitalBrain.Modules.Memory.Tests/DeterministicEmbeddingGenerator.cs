@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Memory.Tests;
@@ -26,7 +27,7 @@ internal sealed class DeterministicEmbeddingGenerator : IEmbeddingGenerator<stri
         var vector = new float[8];
         foreach (var token in tokens)
         {
-            var hash = StringComparer.OrdinalIgnoreCase.GetHashCode(token);
+            var hash = StableTokenHash(token);
             var index = (int)((uint)hash % vector.Length);
             vector[index] += 1f + (hash & 0xFF) / 255f;
         }
@@ -39,5 +40,20 @@ internal sealed class DeterministicEmbeddingGenerator : IEmbeddingGenerator<stri
         }
 
         return vector;
+    }
+
+    private static int StableTokenHash(string token)
+    {
+        unchecked
+        {
+            uint hash = 2166136261;
+            foreach (var b in Encoding.UTF8.GetBytes(token.ToUpperInvariant()))
+            {
+                hash ^= b;
+                hash *= 16777619;
+            }
+
+            return (int)hash;
+        }
     }
 }
