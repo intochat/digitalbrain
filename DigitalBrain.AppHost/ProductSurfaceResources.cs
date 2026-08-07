@@ -1,7 +1,6 @@
-// Product packaging Option A: the digitalbrain product image supervises silo, mcp, and
-// behavior-host as separate child processes. Authored behavior assemblies load only in
-// behavior-host; silo residual in-process execution stays closed; northbound MCP is a client.
-// Docker: product/DigitalBrain.Kernel/Dockerfile + docker-entrypoint.sh (AppHost stays local-only).
+// Product packaging: the digitalbrain image supervises silo, mcp, and behavior-host as
+// separate child processes. Authored assemblies load only in behavior-host; northbound MCP
+// is a cluster client. Docker: DigitalBrain.Kernel/Dockerfile + docker-entrypoint.sh.
 internal static class ProductSurfaceResources
 {
     public const string Brain = "brain";

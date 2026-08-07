@@ -7,7 +7,7 @@
 #   - AppHost remains separate for local aspire run; Docker does not include AppHost
 #
 # Build (repo root):
-#   docker build -f product/DigitalBrain.Kernel/Dockerfile -t digitalbrain .
+#   docker build -f DigitalBrain.Kernel/Dockerfile -t digitalbrain .
 #
 # No secrets are baked into this image. Inject at run/deploy (Azure Key Vault → env):
 #
@@ -68,14 +68,16 @@ WORKDIR /src
 COPY nuget.config Directory.Build.props Directory.Packages.props DigitalBrain.slnx global.json ./
 COPY src/ ./src/
 COPY product/ ./product/
+COPY DigitalBrain.Kernel/ ./DigitalBrain.Kernel/
+COPY DigitalBrain.Mcp/ ./DigitalBrain.Mcp/
 COPY samples/ ./samples/
 COPY assets/ ./assets/
 
-RUN dotnet publish product/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj \
+RUN dotnet publish DigitalBrain.Kernel/DigitalBrain.Kernel.csproj \
       -c Release \
       -o /out/silo \
       --nologo \
- && dotnet publish product/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj \
+ && dotnet publish DigitalBrain.Mcp/DigitalBrain.Mcp.csproj \
       -c Release \
       -o /out/mcp \
       --nologo \
@@ -90,7 +92,7 @@ WORKDIR /app
 COPY --from=build /out/silo /app/silo
 COPY --from=build /out/mcp /app/mcp
 COPY --from=build /out/behavior-host /app/behavior-host
-COPY --chmod=755 product/DigitalBrain.Kernel/docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY --chmod=755 DigitalBrain.Kernel/docker-entrypoint.sh /app/docker-entrypoint.sh
 
 ENV ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_EnableDiagnostics=0 \

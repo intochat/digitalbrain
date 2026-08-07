@@ -55,10 +55,10 @@
     <Project Path="src/modules/time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/modules/time/Time/DigitalBrain.Modules.Time.csproj" />
   </Folder>
-  <Folder Name="/product/">
+  <Folder Name="/processes/">
     <Project Path="DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
-    <Project Path="product/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
-    <Project Path="product/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
+    <Project Path="DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+    <Project Path="DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
     <Project Path="product/DigitalBrain.BehaviorHost/DigitalBrain.BehaviorHost.csproj" />
     <Project Path="product/DigitalBrain.UiEdge/DigitalBrain.UiEdge.csproj" />
     <Project Path="product/DigitalBrain.Assistant/DigitalBrain.Assistant.csproj" />

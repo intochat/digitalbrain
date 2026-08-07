@@ -9,7 +9,7 @@
 #   docker compose build
 #
 # Secrets: never commit real values. Prefer env file or Key Vault-injected env
-# (see headers in product/DigitalBrain.Kernel/Dockerfile and product/DigitalBrain.UiEdge/Dockerfile).
+# (see headers in DigitalBrain.Kernel/Dockerfile and product/DigitalBrain.UiEdge/Dockerfile).
 
 services:
   azurite:
@@ -33,7 +33,7 @@ services:
     image: digitalbrain:local
     build:
       context: .
-      dockerfile: product/DigitalBrain.Kernel/Dockerfile
+      dockerfile: DigitalBrain.Kernel/Dockerfile
     ports:
       - "8080:8080"
       - "5000:5000"
