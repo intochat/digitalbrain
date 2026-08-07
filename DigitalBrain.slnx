@@ -10,9 +10,11 @@
     <Project Path="src/core/aspire/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
     <Project Path="src/core/kernel/DigitalBrain.SourceGeneration/DigitalBrain.SourceGeneration.csproj" />
     <Project Path="src/core/security/DigitalBrain.Security/DigitalBrain.Security.csproj" />
-    <Project Path="src/core/sdk/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
   </Folder>
   <Folder Name="/modules/" />
+  <Folder Name="/modules/sdk/">
+    <Project Path="src/modules/sdk/DigitalBrain.Modules.Sdk/DigitalBrain.Modules.Sdk.csproj" />
+  </Folder>
   <Folder Name="/modules/ai/">
     <Project Path="src/modules/ai/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <Project Path="src/modules/ai/AI/DigitalBrain.Modules.AI.csproj" />

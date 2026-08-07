@@ -1,5 +1,5 @@
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Sdk.Webhook;
+namespace DigitalBrain.Modules.Sdk.Webhook;
 
 public sealed partial class WebhookModule : IModule;

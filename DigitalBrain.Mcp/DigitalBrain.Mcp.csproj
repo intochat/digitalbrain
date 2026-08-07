@@ -12,6 +12,6 @@
     <ProjectReference Include="..\src\core\behaviors\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
     <ProjectReference Include="..\src\core\aspire\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
-    <ProjectReference Include="..\src\core\sdk\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="..\src\modules\sdk\DigitalBrain.Modules.Sdk\DigitalBrain.Modules.Sdk.csproj" />
   </ItemGroup>
 </Project>

@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
-namespace DigitalBrain.Sdk.Webhook;
+namespace DigitalBrain.Modules.Sdk.Webhook;
 
 [GrainType("webhook-ingress")]
 [SuppressMessage(

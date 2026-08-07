@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Sdk.Webhook;
+namespace DigitalBrain.Modules.Sdk.Webhook;
 
 [GenerateSerializer]
 [Alias("db.webhook.verified-delivery-received")]

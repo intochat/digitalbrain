@@ -12,7 +12,7 @@
     <ProjectReference Include="..\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
     <ProjectReference Include="..\..\kernel\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\..\security\DigitalBrain.Security\DigitalBrain.Security.csproj" />
-    <ProjectReference Include="..\..\sdk\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="..\..\..\modules\sdk\DigitalBrain.Modules.Sdk\DigitalBrain.Modules.Sdk.csproj" />
     <ProjectReference Include="..\..\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
     <ProjectReference Include="..\..\..\modules\tasks\Contracts\DigitalBrain.Modules.Tasks.Contracts.csproj" />
     <ProjectReference Include="..\..\..\modules\google\Contracts\DigitalBrain.Modules.Google.Contracts.csproj" />
