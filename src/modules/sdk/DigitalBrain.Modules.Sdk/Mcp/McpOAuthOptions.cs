@@ -9,11 +9,12 @@ internal static class McpOAuthOptions
         McpServerDefinition server,
         IConfiguration configuration,
         ITokenCache tokenCache,
-        McpAuthorizationAmbientState? ambient = null)
+        McpOAuthSession session)
     {
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(tokenCache);
+        ArgumentNullException.ThrowIfNull(session);
 
         return new ClientOAuthOptions
         {
@@ -24,7 +25,8 @@ internal static class McpOAuthOptions
             RedirectUri = RequiredUri(configuration, server, "RedirectUri"),
             Scopes = server.Scopes,
             TokenCache = tokenCache,
-            AuthorizationCallbackHandler = McpAuthorizationCallback.Create(configuration, ambient),
+            AuthorizationCallbackHandler = (context, cancellationToken) =>
+                McpOAuthCallback.AuthorizeAsync(context, session, cancellationToken),
         };
     }
 

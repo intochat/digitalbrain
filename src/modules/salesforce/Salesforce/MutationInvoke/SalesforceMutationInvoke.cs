@@ -20,8 +20,9 @@ internal sealed partial class Salesforce
             _durableIdentity,
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        return await _runtime.RunAsync(
+        return await McpClientSessions.RunAsync(
             Server,
+            ServiceProvider,
             _tokenState,
             () => WriteStateAsync(),
             _durableIdentity,
@@ -45,7 +46,7 @@ internal sealed partial class Salesforce
                 var result = await updateTool.Tool.CallAsync(
                     UpdateArguments(mutation),
                     cancellationToken: callbackCancellation).ConfigureAwait(true);
-                var content = McpRuntime.RequireStructuredContent(result, Server, UpdateAccountName);
+                var content = McpClientSessions.RequireStructuredContent(result, Server, UpdateAccountName);
 
                 return mutation with
                 {
@@ -94,8 +95,9 @@ internal sealed partial class Salesforce
                 _durableIdentity,
                 cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-            var content = await _runtime.RunAsync(
+            var content = await McpClientSessions.RunAsync(
                 Server,
+                ServiceProvider,
                 _tokenState,
                 () => WriteStateAsync(),
                 _durableIdentity,
@@ -119,7 +121,7 @@ internal sealed partial class Salesforce
                     var result = await queryTool.Tool.CallAsync(
                         QueryArguments(mutation),
                         cancellationToken: callbackCancellation).ConfigureAwait(true);
-                    return McpRuntime.RequireStructuredContent(result, Server, QueryAccountName);
+                    return McpClientSessions.RequireStructuredContent(result, Server, QueryAccountName);
                 },
                 cancellationToken).ConfigureAwait(true);
 

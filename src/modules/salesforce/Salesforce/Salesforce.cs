@@ -29,15 +29,12 @@ internal sealed partial class Salesforce :
     private static readonly TimeSpan ReconciliationTimeout = TimeSpan.FromSeconds(30);
     private readonly string _durableIdentity;
     private readonly IDurableDictionary<Guid, byte[]> _mutations;
-    private readonly McpRuntime _runtime;
     private readonly Serializer<MutationData> _states;
     private readonly IDurableValue<byte[]> _tokenState;
     private SynapseDelivery? _activeDelivery;
 
-    public Salesforce(McpRuntime runtime)
+    public Salesforce()
     {
-        ArgumentNullException.ThrowIfNull(runtime);
-        _runtime = runtime;
         _mutations = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(MutationsName);
         _states = ServiceProvider.GetRequiredService<Serializer<MutationData>>();
         _tokenState = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(TokensName);
@@ -84,8 +81,9 @@ internal sealed partial class Salesforce :
                 cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             var chat = ServiceProvider.GetRequiredService<IChatClient>();
-            _ = await _runtime.RunAsync(
+            _ = await McpClientSessions.RunAsync(
                 Server,
+                ServiceProvider,
                 _tokenState,
                 () => WriteStateAsync(),
                 _durableIdentity,

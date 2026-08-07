@@ -1,7 +1,6 @@
 using DigitalBrain.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.Modules.Sdk.Mcp;
 
@@ -16,10 +15,8 @@ public static class McpRuntimeHosting
         ArgumentNullException.ThrowIfNull(configuration);
 
         services.AddHttpClient(
-            McpRuntime.HttpClientName,
+            McpClientSessions.HttpClientName,
             static client => client.Timeout = TimeSpan.FromMinutes(5));
         DurablePayloadProtectionHosting.Configure(services, configuration);
-        services.TryAddSingleton<IMcpClientSessionFactory, HttpMcpClientSessionFactory>();
-        services.TryAddSingleton<McpRuntime>();
     }
 }

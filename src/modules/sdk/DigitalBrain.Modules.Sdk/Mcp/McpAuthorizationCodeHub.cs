@@ -9,27 +9,27 @@ internal static class McpAuthorizationCodeHub
         new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, CodeHubOutcome> Completions =
         new(StringComparer.Ordinal);
-    private static readonly ConcurrentDictionary<string, McpAuthorizationAmbientState> AmbientsByState =
+    private static readonly ConcurrentDictionary<string, McpOAuthSession> SessionsByState =
         new(StringComparer.Ordinal);
-    private static readonly ConcurrentDictionary<Guid, McpAuthorizationAmbientState> AmbientsByCommand = new();
+    private static readonly ConcurrentDictionary<Guid, McpOAuthSession> SessionsByCommand = new();
 
-    internal static void RegisterAmbient(string state, McpAuthorizationAmbientState ambient)
+    internal static void RegisterSession(string state, McpOAuthSession session)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(state);
-        ArgumentNullException.ThrowIfNull(ambient);
-        AmbientsByState[state] = ambient;
-        AmbientsByCommand[ambient.CommandId.Value] = ambient;
+        ArgumentNullException.ThrowIfNull(session);
+        SessionsByState[state] = session;
+        SessionsByCommand[session.CommandId.Value] = session;
     }
 
-    internal static void UnregisterAmbient(McpAuthorizationAmbientState ambient)
+    internal static void UnregisterSession(McpOAuthSession session)
     {
-        ArgumentNullException.ThrowIfNull(ambient);
-        AmbientsByCommand.TryRemove(ambient.CommandId.Value, out _);
-        foreach (var pair in AmbientsByState.ToArray())
+        ArgumentNullException.ThrowIfNull(session);
+        SessionsByCommand.TryRemove(session.CommandId.Value, out _);
+        foreach (var pair in SessionsByState.ToArray())
         {
-            if (ReferenceEquals(pair.Value, ambient))
+            if (ReferenceEquals(pair.Value, session))
             {
-                AmbientsByState.TryRemove(pair.Key, out _);
+                SessionsByState.TryRemove(pair.Key, out _);
             }
         }
     }
@@ -50,27 +50,27 @@ internal static class McpAuthorizationCodeHub
 
         if (result is null)
         {
-            if (AmbientsByState.TryRemove(state, out var ambient))
+            if (SessionsByState.TryRemove(state, out var session))
             {
-                AmbientsByCommand.TryRemove(ambient.CommandId.Value, out _);
-                ambient.AbortOpen();
+                SessionsByCommand.TryRemove(session.CommandId.Value, out _);
+                session.Cancel();
             }
 
             return;
         }
 
-        if (AmbientsByState.TryRemove(state, out var completed))
+        if (SessionsByState.TryRemove(state, out var completed))
         {
-            AmbientsByCommand.TryRemove(completed.CommandId.Value, out _);
+            SessionsByCommand.TryRemove(completed.CommandId.Value, out _);
         }
     }
 
     internal static void AbortOpen(CommandId commandId)
     {
-        if (AmbientsByCommand.TryRemove(commandId.Value, out var ambient))
+        if (SessionsByCommand.TryRemove(commandId.Value, out var session))
         {
-            UnregisterAmbient(ambient);
-            ambient.AbortOpen();
+            UnregisterSession(session);
+            session.Cancel();
         }
     }
 
@@ -83,13 +83,13 @@ internal static class McpAuthorizationCodeHub
 
         Waiters.Clear();
 
-        foreach (var ambient in AmbientsByCommand.Values.ToArray())
+        foreach (var session in SessionsByCommand.Values.ToArray())
         {
-            ambient.AbortOpen();
+            session.Cancel();
         }
 
-        AmbientsByCommand.Clear();
-        AmbientsByState.Clear();
+        SessionsByCommand.Clear();
+        SessionsByState.Clear();
     }
 
     internal static void ResetForTests()

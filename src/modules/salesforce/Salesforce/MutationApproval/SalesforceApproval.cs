@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Modules.Sdk.Mcp;
 
 namespace DigitalBrain.Salesforce;
 
@@ -44,8 +45,9 @@ internal sealed partial class Salesforce
         ValidateApprovalEvidence(mutation, approval, approvalEvidence);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var admitted = await _runtime.RunAsync(
+        var admitted = await McpClientSessions.RunAsync(
             Server,
+            ServiceProvider,
             _tokenState,
             () => WriteStateAsync(),
             _durableIdentity,
