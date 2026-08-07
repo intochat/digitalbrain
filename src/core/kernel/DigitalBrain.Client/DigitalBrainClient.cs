@@ -139,32 +139,34 @@ public sealed class DigitalBrainClient : IDigitalBrain
 
         var sessionId = ISessionNeuron.ForOwner(Owner);
         var session = Session();
-        var cursor = (await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, afterSequence: 0))
-            .ResumeSequence;
+        var cursor = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, afterSequence: 0);
 
-        var delivery = await SendValidatedAsync(receiver, request, cancellationToken);
-
-        while (true)
+        if (!TryCreateJournalObserver(out var observer, out var reference))
         {
-            var read = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, cursor);
-            foreach (var candidate in read.Delta)
-            {
-                if (candidate.CorrelationId == delivery.CorrelationId
-                    && responseType.IsInstanceOfType(candidate.Synapse))
-                {
-                    return candidate.Synapse;
-                }
-            }
+            var polled = await SendValidatedAsync(receiver, request, cancellationToken);
+            return await PollForResponseAsync(
+                session,
+                sessionId,
+                cursor.ResumeSequence,
+                polled.CorrelationId,
+                responseType,
+                cancellationToken);
+        }
 
-            if (read.ResetSnapshot is not null)
-            {
-                throw new InvalidOperationException(
-                    $"The session journal compacted past sequence {cursor} before a "
-                    + $"'{responseType.Name}' response arrived for correlation '{delivery.CorrelationId}'.");
-            }
+        try
+        {
+            await session.WatchNeuron(sessionId, JournalKind.Incoming, cursor.ResumeSequence, reference);
 
-            cursor = read.ResumeSequence;
-            await Task.Delay(ResponsePollInterval, cancellationToken).ConfigureAwait(false);
+            var delivery = await SendValidatedAsync(receiver, request, cancellationToken);
+            return await WaitForResponseAsync(
+                observer,
+                delivery.CorrelationId,
+                responseType,
+                cancellationToken);
+        }
+        finally
+        {
+            await TeardownWatchAsync(session, sessionId, reference, observer);
         }
     }
 
@@ -182,6 +184,112 @@ public sealed class DigitalBrainClient : IDigitalBrain
         cancellationToken.ThrowIfCancellationRequested();
         await ActivateAsync(cancellationToken);
         return await Session().Fire(receiver, synapse);
+    }
+
+    private bool TryCreateJournalObserver(
+        [NotNullWhen(true)] out ChannelJournalObserver? observer,
+        [NotNullWhen(true)] out IJournalObserver? reference)
+    {
+        var candidate = new ChannelJournalObserver(JournalKind.Incoming);
+        try
+        {
+            reference = _grains.CreateObjectReference<IJournalObserver>(candidate);
+            observer = candidate;
+            return true;
+        }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("object reference", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate.Complete();
+            observer = null;
+            reference = null;
+            return false;
+        }
+    }
+
+    private static async Task<Synapse> WaitForResponseAsync(
+        ChannelJournalObserver observer,
+        CorrelationId correlation,
+        Type responseType,
+        CancellationToken cancellationToken)
+    {
+        await foreach (var page in observer.Reads.ReadAllAsync(cancellationToken))
+        {
+            foreach (var delivery in page.Delta)
+            {
+                if (delivery.CorrelationId == correlation
+                    && responseType.IsInstanceOfType(delivery.Synapse))
+                {
+                    return delivery.Synapse;
+                }
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"The session journal watch ended before a '{responseType.Name}' response arrived for correlation '{correlation}'.");
+    }
+
+    private static async Task<Synapse> PollForResponseAsync(
+        ISessionNeuron session,
+        NeuronId sessionId,
+        long cursor,
+        CorrelationId correlation,
+        Type responseType,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var read = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, cursor);
+            foreach (var candidate in read.Delta)
+            {
+                if (candidate.CorrelationId == correlation
+                    && responseType.IsInstanceOfType(candidate.Synapse))
+                {
+                    return candidate.Synapse;
+                }
+            }
+
+            if (read.ResetSnapshot is not null)
+            {
+                throw new InvalidOperationException(
+                    $"The session journal compacted past sequence {cursor} before a "
+                    + $"'{responseType.Name}' response arrived for correlation '{correlation}'.");
+            }
+
+            cursor = read.ResumeSequence;
+            await Task.Delay(ResponsePollInterval, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Watch teardown must not mask the awaited response or its failure.")]
+    private async Task TeardownWatchAsync(
+        ISessionNeuron session,
+        NeuronId sessionId,
+        IJournalObserver reference,
+        ChannelJournalObserver observer)
+    {
+        try
+        {
+            await session.UnwatchNeuron(sessionId, reference);
+        }
+        catch (Exception)
+        {
+        }
+
+        try
+        {
+            _grains.DeleteObjectReference<IJournalObserver>(reference);
+        }
+        catch (Exception)
+        {
+        }
+        finally
+        {
+            observer.Complete();
+        }
     }
 
     private static void RequireDomainNeuronContract(Type neuronType)
