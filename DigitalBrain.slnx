@@ -14,6 +14,7 @@
     <Project Path="src/core/sdk/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <Project Path="src/core/mcp/DigitalBrain.Mcp.Aspire.Hosting/DigitalBrain.Mcp.Aspire.Hosting.csproj" />
   </Folder>
+  <Folder Name="/modules/" />
   <Folder Name="/modules/ai/">
     <Project Path="src/modules/ai/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <Project Path="src/modules/ai/AI/DigitalBrain.Modules.AI.csproj" />
@@ -55,15 +56,13 @@
     <Project Path="src/modules/time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/modules/time/Time/DigitalBrain.Modules.Time.csproj" />
   </Folder>
-  <Folder Name="/processes/">
-    <Project Path="DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
-    <Project Path="DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
-    <Project Path="DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
-    <Project Path="DigitalBrain.Scripting/DigitalBrain.Scripting.csproj" />
-  </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/DigitalBrain.AccountEnrichment/DigitalBrain.AccountEnrichment.csproj" />
     <Project Path="samples/DigitalBrain.Compositions/DigitalBrain.Compositions.csproj" />
     <Project Path="samples/DigitalBrain.VectorMemory/DigitalBrain.VectorMemory.csproj" />
   </Folder>
+  <Project Path="DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
+  <Project Path="DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+  <Project Path="DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
+  <Project Path="DigitalBrain.Scripting/DigitalBrain.Scripting.csproj" />
 </Solution>
