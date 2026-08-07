@@ -57,8 +57,8 @@
   </Folder>
   <Folder Name="/os/">
     <Project Path="os/DigitalBrain.OS.Host/DigitalBrain.OS.Host.csproj" />
+    <Project Path="os/DigitalBrain.OS.Mcp/DigitalBrain.OS.Mcp.csproj" />
     <Project Path="os/DigitalBrain.OS.BehaviorHost/DigitalBrain.OS.BehaviorHost.csproj" />
-    <Project Path="os/DigitalBrain.OS.AgentTools/DigitalBrain.OS.AgentTools.csproj" />
     <Project Path="os/DigitalBrain.OS.UiEdge/DigitalBrain.OS.UiEdge.csproj" />
     <Project Path="os/DigitalBrain.OS.AppHost/DigitalBrain.OS.AppHost.csproj" />
     <Project Path="os/DigitalBrain.OS.Assistant/DigitalBrain.OS.Assistant.csproj" />

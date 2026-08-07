@@ -6,9 +6,12 @@ namespace DigitalBrain.Aspire.Hosting;
 
 public static class DigitalBrainHostingExtensions
 {
-    public const string JournalConnectionName = "journal";
-    public const string StateProtectionKeyConfigurationKey = "DigitalBrain:Security:StateProtectionKey";
-    public const string ModulesConfigurationKey = "DigitalBrain:Modules";
+    public static string JournalConnectionName => DigitalBrainResourceNames.JournalConnectionName;
+
+    public static string StateProtectionKeyConfigurationKey
+        => DigitalBrainResourceNames.StateProtectionKeyConfigurationKey;
+
+    public static string ModulesConfigurationKey => DigitalBrainResourceNames.ModulesConfigurationKey;
 
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name)
     {
@@ -16,11 +19,11 @@ public static class DigitalBrainHostingExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         var storage = builder
-            .AddAzureStorage($"{name}-storage")
+            .AddAzureStorage(DigitalBrainResourceNames.Storage(name))
             .RunAsEmulator();
-        var clustering = storage.AddTables($"{name}-clustering");
-        var reminders = storage.AddTables($"{name}-reminders");
-        var journal = storage.AddBlobs($"{name}-journal");
+        var clustering = storage.AddTables(DigitalBrainResourceNames.Clustering(name));
+        var reminders = storage.AddTables(DigitalBrainResourceNames.Reminders(name));
+        var journal = storage.AddBlobs(DigitalBrainResourceNames.JournalResource(name));
         var orleans = builder
             .AddOrleans(name)
             .WithClustering(clustering)
@@ -72,7 +75,7 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(brain);
 
         builder.WithReference(brain.Orleans);
-        builder.WithReference(brain.Journal, JournalConnectionName);
+        builder.WithReference(brain.Journal, DigitalBrainResourceNames.JournalConnectionName);
 
         foreach (var dependency in brain.StartupDependencies)
         {
@@ -81,7 +84,9 @@ public static class DigitalBrainHostingExtensions
 
         if (brain.StateProtectionKey is not null)
         {
-            builder.WithEnvironment(ConfigurationEnvironment(StateProtectionKeyConfigurationKey), brain.StateProtectionKey);
+            builder.WithEnvironment(
+                ConfigurationEnvironment(DigitalBrainResourceNames.StateProtectionKeyConfigurationKey),
+                brain.StateProtectionKey);
         }
 
         ProjectModuleManifest(builder, brain);
@@ -100,6 +105,7 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(client);
 
+        // Client projection: Orleans client clustering only — no journal, reminders, or silo secrets.
         builder.WithReference(client.Brain.Orleans.AsClient());
         ProjectModuleManifest(builder, client.Brain);
         return builder;
@@ -117,7 +123,7 @@ public static class DigitalBrainHostingExtensions
         if (brain.StateProtectionKey is not null)
         {
             builder.WithEnvironment(
-                ConfigurationEnvironment(StateProtectionKeyConfigurationKey),
+                ConfigurationEnvironment(DigitalBrainResourceNames.StateProtectionKeyConfigurationKey),
                 brain.StateProtectionKey);
         }
 
@@ -131,7 +137,7 @@ public static class DigitalBrainHostingExtensions
             for (var index = 0; index < brain.Modules.Count; index++)
             {
                 context.EnvironmentVariables[
-                    $"{ConfigurationEnvironment(ModulesConfigurationKey)}__{index}"] =
+                    $"{ConfigurationEnvironment(DigitalBrainResourceNames.ModulesConfigurationKey)}__{index}"] =
                     brain.Modules[index].Value;
             }
         });

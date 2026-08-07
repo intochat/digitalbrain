@@ -7,7 +7,8 @@ and method-scoped `TestBrain` fixtures fire real multi-silo traffic and assert o
 > **A brain you program by writing ordinary C#, and that can program itself.**
 
 ```csharp
-// production: builder.AddDigitalBrainClient(owner); inject IDigitalBrain
+// grain clients (mcp, ui-edge): builder.AddDigitalBrainClient(); inject IDigitalBrain
+// silo host only: builder.AddDigitalBrainSilo(silo => silo.AddDigitalBrain());
 await brain.SendAsync<IAnalyst>(
     "incident-42",
     new SummaryRequested("Summarize the incident."));
@@ -42,7 +43,7 @@ The plan of record. Nothing is shipped unless it says Built.
 | Product shell — responsive Chat, content-safe Activity, live 3D-projected Brain topology, pulses and inspector | **Built** |
 | Behavior Studio surface (six views, host APIs) | **Built** |
 | NL → C# behavior authoring (C1 ladder) | Designed until C1 green |
-| Product MCP surface — durable chat send/read, neuron journal observation, active-neuron discovery | **Built** — live-verified over the silo's `/mcp` (`read_neuron_journal`, `read_chat_transcript`, `list_active_neurons`) against a real `aspire run` |
+| Product MCP surface — durable chat send/read, neuron journal observation, active-neuron discovery | **Built** — northbound MCP is `DigitalBrain.OS.Mcp` (cluster client) on `/mcp` port 5000; tools call `IDigitalBrain` |
 | Introspection — model-callable journal tally, journal read, and topology read as brain capabilities (`introspection.tally-journal-request`, `introspection.read-journal-request`, `introspection.read-topology-request`) | **Built** — the capabilities answer correctly when invoked, live-verified via the MCP surface above and via deterministic capability-call tests. Live Gemma4 (`gemma4:12b`) did **not** select `introspection.tally-journal-request` across repeated real turns in one session, even when told its name: it answered "how many messages have I sent" from conversation memory, once exhausted its context budget mid-deliberation without answering at all, and once substituted `chat.read-transcript-request` and counted turns manually. The off-by-one tally policy (the in-flight question counts) held in every case where an answer was given. Model tool-selection for this capability is an open live gap, not a code gap — see CLAUDE.md traps |
 | Dual live Google + Salesforce OAuth productization | In progress — Gmail is Google SDK (REST) with reflected read-only catalog + typed ops; one browser sign-in flow via app callback `/oauth/callback`; Salesforce stays MCP. Unverified Google app in Testing mode: re-consent every 7 days, ≤100 test users. Register redirect `http://localhost:5080/oauth/callback` (owner re-registration pending, lane g6). Live dual-provider proof pending |
 | Time — durable one-shot `ICountdown` and its recovery tests | **Built** |
@@ -65,7 +66,7 @@ One assumption remains load-bearing and unmeasured: **that a model can reliably 
 ```text
 src/       published packages: core/ (framework) and modules/ (IModule domains),
            plus the publish gate that polices them
-os/        the product: silo (OS.Host, northbound MCP folded in), HTTP/SSE UI edge
+os/        the product: silo (OS.Host), northbound MCP client (OS.Mcp), HTTP/SSE UI edge
            (OS.UiEdge), behavior worker, assistant neuron, AppHost
 clients/   flutter/core (pure Dart edge) and flutter/shell (Material chrome)
 samples/   product-shaped compositions and process neurons (not packable product)
@@ -74,9 +75,13 @@ tests/     fixtures/apphosts — shared L2 AppHost scaffolding
 
 Southbound MCP transport lives in package `DigitalBrain.Mcp` (Salesforce and shared OAuth rail
 mechanics). Gmail no longer uses southbound MCP — it calls Gmail REST through `Google.Apis.Gmail.v1`
-with a reflected read-only planner catalog. Northbound agent tools live in library
-`DigitalBrain.OS.AgentTools`, mapped on the silo host — not a separate product process. Older docs
-that say `DigitalBrain.Integrations.Mcp` mean the southbound package.
+with a reflected read-only planner catalog. Northbound agent tools live in `DigitalBrain.OS.Mcp`
+(separate process, `AddDigitalBrainClient`). Older docs that say `DigitalBrain.Integrations.Mcp`
+mean the southbound package; docs that say MCP is on the silo are stale.
+
+Aspire split: `DigitalBrain.Aspire.Hosting` is AppHost-only; `DigitalBrain.Aspire` owns
+`AddDigitalBrainClient` (grain clients) and `AddDigitalBrainSilo` (silo host). Resource names are
+shared via `DigitalBrainResourceNames` so hosting and client connection keys cannot drift.
 
 Retired prototype generations live in git history — `git log --diff-filter=D --summary`, then
 `git show <sha>^:<path>`.

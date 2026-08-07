@@ -1,15 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
-    <PackageReference Include="Aspire.Azure.Data.Tables" />
-    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
-    <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" />
-    <PackageReference Include="ModelContextProtocol.AspNetCore" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\..\src\modules\ai\AI\DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="..\..\src\modules\chat\Chat\DigitalBrain.Modules.Chat.csproj" />
     <ProjectReference Include="..\DigitalBrain.OS.Assistant\DigitalBrain.OS.Assistant.csproj" />
-    <ProjectReference Include="..\DigitalBrain.OS.AgentTools\DigitalBrain.OS.AgentTools.csproj" />
     <ProjectReference Include="..\..\src\core\behaviors\DigitalBrain.Behaviors.Runtime\DigitalBrain.Behaviors.Runtime.csproj" />
     <ProjectReference Include="..\..\src\modules\tasks\Tasks\DigitalBrain.Modules.Tasks.csproj" />
     <ProjectReference Include="..\..\src\modules\time\Time\DigitalBrain.Modules.Time.csproj" />
@@ -19,7 +12,6 @@
     <ProjectReference Include="..\..\src\modules\google\Google\DigitalBrain.Modules.Google.csproj" />
     <ProjectReference Include="..\..\src\modules\salesforce\Salesforce\DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
-    <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>

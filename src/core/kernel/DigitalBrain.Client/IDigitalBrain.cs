@@ -27,4 +27,16 @@ public interface IDigitalBrain
     Task SendAsync(NeuronId receiver, Synapse synapse, CancellationToken cancellationToken = default);
 
     Task EmitAsync(Synapse synapse, CancellationToken cancellationToken = default);
+
+    Task<JournalRead> ReadJournalAsync(
+        NeuronId subject,
+        JournalKind kind,
+        long afterSequence = 0,
+        CancellationToken cancellationToken = default);
+
+    IAsyncEnumerable<JournalRead> WatchJournalAsync(
+        NeuronId subject,
+        JournalKind kind,
+        long afterSequence = 0,
+        CancellationToken cancellationToken = default);
 }

@@ -10,9 +10,7 @@ internal static class UiEdgeServices
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddSingleton(static services =>
-            OwnerSessionJournal.Open(
-                services.GetRequiredService<IGrainFactory>(),
-                services.GetRequiredService<IDigitalBrain>().Owner));
+            new OwnerSessionJournal(services.GetRequiredService<IDigitalBrain>()));
 
         return services;
     }

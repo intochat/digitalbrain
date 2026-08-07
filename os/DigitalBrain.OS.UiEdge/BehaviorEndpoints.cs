@@ -143,13 +143,11 @@ internal static class BehaviorEndpoints
                 string behaviorId,
                 ApproveBehaviorRequest request,
                 IDigitalBrain brain,
-                IGrainFactory grains,
                 CancellationToken cancellationToken) =>
             {
                 ArgumentException.ThrowIfNullOrWhiteSpace(behaviorId);
                 ArgumentNullException.ThrowIfNull(request);
                 ArgumentNullException.ThrowIfNull(brain);
-                ArgumentNullException.ThrowIfNull(grains);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 if (string.IsNullOrWhiteSpace(request.ArtifactHash)
@@ -167,17 +165,17 @@ internal static class BehaviorEndpoints
                     DateTimeOffset.UtcNow);
 
                 var neuron = brain.GetGrainProxy<IBehaviorNeuron>(behaviorId);
-                await brain.SendAsync(
-                    NeuronId.For<IBehaviorNeuron>(brain.Owner, behaviorId),
-                    approval,
-                    cancellationToken);
-
-                var session = grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(brain.Owner).ToGrainId());
                 var neuronId = NeuronId.For<IBehaviorNeuron>(brain.Owner, behaviorId);
+                await brain.SendAsync(neuronId, approval, cancellationToken);
+
                 var after = 0L;
                 for (var attempt = 0; attempt < 50; attempt++)
                 {
-                    var journal = await session.ReadNeuronJournal(neuronId, JournalKind.Incoming, after);
+                    var journal = await brain.ReadJournalAsync(
+                        neuronId,
+                        JournalKind.Incoming,
+                        after,
+                        cancellationToken);
                     if (journal.Delta.Any(delivery =>
                             delivery.Synapse is BehaviorRevisionApproval recorded
                             && recorded == approval
@@ -193,7 +191,6 @@ internal static class BehaviorEndpoints
                 var snapshot = await neuron.Approve(approval);
                 return Results.Ok(ToDocument(behaviorId, snapshot));
             });
-
         endpoints.MapPost(
             UiEdgeContract.BehaviorActivatePath,
             static async Task<IResult> (

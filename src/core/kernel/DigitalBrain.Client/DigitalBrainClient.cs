@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
 
@@ -106,6 +107,62 @@ public sealed class DigitalBrainClient : IDigitalBrain
         await Session().Emit(synapse).ConfigureAwait(false);
     }
 
+    public Task<JournalRead> ReadJournalAsync(
+        NeuronId subject,
+        JournalKind kind,
+        long afterSequence = 0,
+        CancellationToken cancellationToken = default)
+    {
+        RequireOwnedSubject(subject);
+        ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Session().ReadNeuronJournal(subject, kind, afterSequence);
+    }
+
+    public async IAsyncEnumerable<JournalRead> WatchJournalAsync(
+        NeuronId subject,
+        JournalKind kind,
+        long afterSequence = 0,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        RequireOwnedSubject(subject);
+        ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!TryCreateJournalObserver(kind, out var observer, out var reference))
+        {
+            // No grain-observer support on this client: poll the session journal.
+            var cursor = afterSequence;
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var page = await Session().ReadNeuronJournal(subject, kind, cursor).ConfigureAwait(false);
+                if (page.Delta.Count > 0 || page.ResetSnapshot is not null)
+                {
+                    yield return page;
+                }
+
+                cursor = page.ResumeSequence;
+                await Task.Delay(ResponsePollInterval, cancellationToken).ConfigureAwait(false);
+            }
+
+            yield break;
+        }
+
+        var session = Session();
+        try
+        {
+            await session.WatchNeuron(subject, kind, afterSequence, reference).ConfigureAwait(false);
+            await foreach (var page in observer.Reads.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            {
+                yield return page;
+            }
+        }
+        finally
+        {
+            await TeardownWatchAsync(session, subject, reference, observer).ConfigureAwait(false);
+        }
+    }
+
     internal Task SendToAsync(NeuronId receiver, Synapse synapse, CancellationToken cancellationToken)
         => SendValidatedAsync(receiver, synapse, cancellationToken);
 
@@ -141,7 +198,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
         var session = Session();
         var cursor = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, afterSequence: 0).ConfigureAwait(false);
 
-        if (!TryCreateJournalObserver(out var observer, out var reference))
+        if (!TryCreateJournalObserver(JournalKind.Incoming, out var observer, out var reference))
         {
             var polled = await SendValidatedAsync(receiver, request, cancellationToken).ConfigureAwait(false);
             return await PollForResponseAsync(
@@ -176,6 +233,15 @@ public sealed class DigitalBrainClient : IDigitalBrain
     private ISessionNeuron Session()
         => _grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(Owner).ToGrainId());
 
+    private void RequireOwnedSubject(NeuronId subject)
+    {
+        if (subject.Owner != Owner)
+        {
+            throw new NeuronAuthorizationException(
+                $"Client owner '{Owner}' cannot observe journal of neuron '{subject}' owned by '{subject.Owner}'.");
+        }
+    }
+
     private async Task<SynapseDelivery> SendValidatedAsync(
         NeuronId receiver,
         Synapse synapse,
@@ -187,10 +253,11 @@ public sealed class DigitalBrainClient : IDigitalBrain
     }
 
     private bool TryCreateJournalObserver(
+        JournalKind kind,
         [NotNullWhen(true)] out ChannelJournalObserver? observer,
         [NotNullWhen(true)] out IJournalObserver? reference)
     {
-        var candidate = new ChannelJournalObserver(JournalKind.Incoming);
+        var candidate = new ChannelJournalObserver(kind);
         try
         {
             reference = _grains.CreateObjectReference<IJournalObserver>(candidate);
@@ -267,13 +334,13 @@ public sealed class DigitalBrainClient : IDigitalBrain
         Justification = "Watch teardown must not mask the awaited response or its failure.")]
     private async Task TeardownWatchAsync(
         ISessionNeuron session,
-        NeuronId sessionId,
+        NeuronId subject,
         IJournalObserver reference,
         ChannelJournalObserver observer)
     {
         try
         {
-            await session.UnwatchNeuron(sessionId, reference).ConfigureAwait(false);
+            await session.UnwatchNeuron(subject, reference).ConfigureAwait(false);
         }
         catch (Exception)
         {
@@ -300,7 +367,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
             || typeof(IBehavior).IsAssignableFrom(neuronType))
         {
             throw new NeuronAuthorizationException(
-                $"'{neuronType.Name}' is not addressable through IDigitalBrain.Get. Activate the brain with ActivateAsync; address domain neuron contracts with Get; fire and emit through SendAsync and EmitAsync. Journal observation is not an IDigitalBrain API.");
+                $"'{neuronType.Name}' is not addressable through IDigitalBrain.Get. Activate the brain with ActivateAsync; address domain neuron contracts with Get; fire and emit through SendAsync and EmitAsync; observe journals through ReadJournalAsync and WatchJournalAsync.");
         }
     }
 }

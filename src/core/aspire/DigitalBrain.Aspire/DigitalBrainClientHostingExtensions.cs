@@ -1,4 +1,6 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
+using DigitalBrain.ServiceDefaults;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -8,13 +10,16 @@ namespace DigitalBrain.Aspire;
 public static class DigitalBrainClientHostingExtensions
 {
     public const string DefaultOwner = "dev";
-    public const string OwnerConfigurationKey = "DigitalBrain:Owner";
+
+    public static string OwnerConfigurationKey => DigitalBrainResourceNames.OwnerConfigurationKey;
+
+    public static string ClusteringConnectionName => DigitalBrainResourceNames.Clustering();
 
     public static string ResolveOwner(IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var owner = configuration[OwnerConfigurationKey];
+        var owner = configuration[DigitalBrainResourceNames.OwnerConfigurationKey];
         return string.IsNullOrWhiteSpace(owner) ? DefaultOwner : owner;
     }
 
@@ -34,6 +39,8 @@ public static class DigitalBrainClientHostingExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
 
+        builder.AddServiceDefaults();
+        builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.Clustering());
         builder.UseOrleansClient(client =>
         {
             client.Services.AddDigitalBrainClientWireSerializers();
@@ -81,4 +88,3 @@ public static class DigitalBrainClientHostingExtensions
         return services;
     }
 }
-

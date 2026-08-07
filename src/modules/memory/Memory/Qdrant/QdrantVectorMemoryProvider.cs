@@ -153,9 +153,9 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
 
         try
         {
-            var results = await _client.SearchAsync(
+            var results = await _client.QueryAsync(
                     _collectionName,
-                    queryEmbedding,
+                    query: queryEmbedding,
                     filter: new Filter { Must = { must } },
                     limit: (ulong)limit,
                     payloadSelector: true,

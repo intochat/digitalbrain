@@ -18,11 +18,9 @@ internal static class McpOAuthCallbackEndpoints
                 string? error,
                 string? iss,
                 IDigitalBrain brain,
-                IGrainFactory grains,
                 CancellationToken cancellationToken) =>
             {
                 ArgumentNullException.ThrowIfNull(brain);
-                ArgumentNullException.ThrowIfNull(grains);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 if (string.IsNullOrWhiteSpace(state))
@@ -33,8 +31,7 @@ internal static class McpOAuthCallbackEndpoints
                         statusCode: StatusCodes.Status400BadRequest);
                 }
 
-                var authorization = grains.GetGrain<IMcpAuthorization>(
-                    NeuronId.For<IMcpAuthorization>(brain.Owner, McpAuthorizationNeuron.InstanceName).ToGrainId());
+                var authorization = brain.GetGrainProxy<IMcpAuthorization>(McpAuthorizationNeuron.InstanceName);
                 var delivery = await authorization.DeliverCallback(
                     new DeliverMcpAuthorizationCallback(state, code, error, iss),
                     cancellationToken);

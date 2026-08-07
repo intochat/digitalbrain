@@ -4,16 +4,13 @@
     <NoWarn>$(NoWarn);CA2007;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Aspire.Azure.Data.Tables" />
     <PackageReference Include="Microsoft.Extensions.AI" />
-    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\modules\chat\Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
     <ProjectReference Include="..\..\src\modules\introspection\Contracts\DigitalBrain.Modules.Introspection.Contracts.csproj" />
     <ProjectReference Include="..\..\src\modules\shell\Contracts\DigitalBrain.Modules.Shell.Contracts.csproj" />
     <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
-    <ProjectReference Include="..\..\src\core\aspire\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\src\core\behaviors\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
     <ProjectReference Include="..\..\src\modules\ai\Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />

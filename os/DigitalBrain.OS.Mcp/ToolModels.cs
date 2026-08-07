@@ -1,4 +1,4 @@
-namespace DigitalBrain.OS.AgentTools;
+namespace DigitalBrain.OS.Mcp;
 
 internal sealed record NeuronJournalPage(
     string Neuron,
@@ -7,7 +7,12 @@ internal sealed record NeuronJournalPage(
     bool Compacted,
     IReadOnlyList<JournaledSynapse> Entries);
 
-internal sealed record JournaledSynapse(long Sequence, string Synapse, string Caller, string Correlation, DateTimeOffset Timestamp);
+internal sealed record JournaledSynapse(
+    long Sequence,
+    string Synapse,
+    string Caller,
+    string Correlation,
+    DateTimeOffset Timestamp);
 
 internal sealed record ActiveNeuron(string GrainType, string Identity);
 

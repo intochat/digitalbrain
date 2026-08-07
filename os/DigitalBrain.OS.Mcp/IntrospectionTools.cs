@@ -1,26 +1,19 @@
 using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
 using DigitalBrain.Introspection;
 using ModelContextProtocol.Server;
 
-namespace DigitalBrain.OS.AgentTools;
+namespace DigitalBrain.OS.Mcp;
 
 [McpServerToolType]
-[SuppressMessage(
-    "Performance",
-    "CA1812:Avoid uninstantiated internal classes",
-    Justification = "Constructed by the MCP server DI container via WithTools<DigitalBrainIntrospectionTools>().")]
-internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain)
+internal sealed class IntrospectionTools(IDigitalBrain brain)
 {
-    // A directed request is fired, handled and replied through the outbox, so the answer can outlive
-    // a single delivery attempt. Waiting on the session journal watch is otherwise unbounded: without
-    // a deadline an introspection neuron that never answers hangs the MCP request forever.
+    // Directed request/reply goes through the outbox; without a deadline a silent neuron hangs MCP forever.
     internal static readonly TimeSpan ReplyBound = TimeSpan.FromSeconds(90);
 
-    [McpServerTool(Name = AgentToolEndpoints.ListActiveNeuronsToolName)]
+    [McpServerTool(Name = McpSurface.ListActiveNeurons)]
     [Description("List the neurons currently activated in the cluster, with their grain type and identity.")]
     public async Task<IReadOnlyList<ActiveNeuron>> ListActiveNeuronsAsync(
         CancellationToken cancellationToken = default)
@@ -33,7 +26,7 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain)
         return [.. topology.Neurons.Select(static neuron => new ActiveNeuron(neuron.GrainType, neuron.Identity))];
     }
 
-    [McpServerTool(Name = AgentToolEndpoints.ReadNeuronJournalToolName)]
+    [McpServerTool(Name = McpSurface.ReadNeuronJournal)]
     [Description(
         "Read a neuron's durable synapse journal. Returns the causal facts the kernel committed, "
         + "never argument or payload content.")]
@@ -75,7 +68,7 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain)
             ]);
     }
 
-    [McpServerTool(Name = AgentToolEndpoints.ReadChatTranscriptToolName)]
+    [McpServerTool(Name = McpSurface.ReadChatTranscript)]
     [Description("Read the durable transcript of a conversation as the owner would see it.")]
     public async Task<ChatTranscriptPage> ReadChatTranscriptAsync(
         [Description("Conversation name, for example 'main'")] string chatName = "main",
@@ -91,7 +84,9 @@ internal sealed class DigitalBrainIntrospectionTools(IDigitalBrain brain)
         return new ChatTranscriptPage(
             chatName,
             [
-                .. read.Transcript.Turns.Select(turn => new ChatTranscriptTurn(turn.FromUser ? "you" : "brain", turn.Text)),
+                .. read.Transcript.Turns.Select(turn => new ChatTranscriptTurn(
+                    turn.FromUser ? "you" : "brain",
+                    turn.Text)),
             ]);
     }
 

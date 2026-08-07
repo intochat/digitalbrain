@@ -4,8 +4,6 @@ using DigitalBrain.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.AddServiceDefaults();
-builder.AddKeyedAzureTableServiceClient("brain-clustering");
 builder.AddDigitalBrainClient();
 builder.Services.AddUiEdgeServices();
 

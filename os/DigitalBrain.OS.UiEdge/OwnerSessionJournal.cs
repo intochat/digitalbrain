@@ -1,5 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Chat;
@@ -9,36 +7,15 @@ using DigitalBrain.Shell;
 
 namespace DigitalBrain.OS.UiEdge;
 
-internal sealed class OwnerSessionJournal
+internal sealed class OwnerSessionJournal(IDigitalBrain brain)
 {
-    private readonly IGrainFactory _grains;
-    private readonly ISessionNeuron _session;
-    private readonly OwnerId _owner;
-
-    private OwnerSessionJournal(IGrainFactory grains, ISessionNeuron session, OwnerId owner)
-    {
-        _grains = grains;
-        _session = session;
-        _owner = owner;
-    }
-
-    public static OwnerSessionJournal Open(IGrainFactory grains, OwnerId owner)
-    {
-        ArgumentNullException.ThrowIfNull(grains);
-
-        return new OwnerSessionJournal(
-            grains,
-            grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(owner).ToGrainId()),
-            owner);
-    }
-
     public Task<JournalRead> ReadShellOutgoingAsync(string shellName, long afterSequence)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(shellName);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-        return _session.ReadNeuronJournal(
-            NeuronId.For<IShell>(_owner, shellName),
+        return brain.ReadJournalAsync(
+            NeuronId.For<IShell>(brain.Owner, shellName),
             JournalKind.Outgoing,
             afterSequence);
     }
@@ -48,8 +25,8 @@ internal sealed class OwnerSessionJournal
         ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-        return _session.ReadNeuronJournal(
-            NeuronId.For<IChat>(_owner, chatName),
+        return brain.ReadJournalAsync(
+            NeuronId.For<IChat>(brain.Owner, chatName),
             JournalKind.Outgoing,
             afterSequence);
     }
@@ -62,7 +39,11 @@ internal sealed class OwnerSessionJournal
         ArgumentException.ThrowIfNullOrWhiteSpace(shellName);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-        return WatchOutgoingAsync(NeuronId.For<IShell>(_owner, shellName), afterSequence, cancellationToken);
+        return brain.WatchJournalAsync(
+            NeuronId.For<IShell>(brain.Owner, shellName),
+            JournalKind.Outgoing,
+            afterSequence,
+            cancellationToken);
     }
 
     public IAsyncEnumerable<JournalRead> WatchChatOutgoingAsync(
@@ -73,7 +54,11 @@ internal sealed class OwnerSessionJournal
         ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-        return WatchOutgoingAsync(NeuronId.For<IChat>(_owner, chatName), afterSequence, cancellationToken);
+        return brain.WatchJournalAsync(
+            NeuronId.For<IChat>(brain.Owner, chatName),
+            JournalKind.Outgoing,
+            afterSequence,
+            cancellationToken);
     }
 
     public IAsyncEnumerable<JournalRead> WatchAuthorizationOutgoingAsync(
@@ -82,8 +67,9 @@ internal sealed class OwnerSessionJournal
     {
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-        return WatchOutgoingAsync(
-            NeuronId.For<IMcpAuthorization>(_owner, McpAuthorizationNeuron.InstanceName),
+        return brain.WatchJournalAsync(
+            NeuronId.For<IMcpAuthorization>(brain.Owner, McpAuthorizationNeuron.InstanceName),
+            JournalKind.Outgoing,
             afterSequence,
             cancellationToken);
     }
@@ -96,50 +82,10 @@ internal sealed class OwnerSessionJournal
         ArgumentException.ThrowIfNullOrWhiteSpace(behaviorId);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-        return WatchOutgoingAsync(
-            NeuronId.For<IBehaviorNeuron>(_owner, behaviorId),
+        return brain.WatchJournalAsync(
+            NeuronId.For<IBehaviorNeuron>(brain.Owner, behaviorId),
+            JournalKind.Outgoing,
             afterSequence,
             cancellationToken);
-    }
-
-    [SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "SSE disconnect cleanup must tear down the grain observer without masking the stream completion.")]
-    private async IAsyncEnumerable<JournalRead> WatchOutgoingAsync(
-        NeuronId subject,
-        long afterSequence,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        var observer = new ChannelJournalObserver(JournalKind.Outgoing);
-        var reference = _grains.CreateObjectReference<IJournalObserver>(observer);
-        try
-        {
-            await _session.WatchNeuron(subject, JournalKind.Outgoing, afterSequence, reference);
-            await foreach (var batch in observer.Reads.ReadAllAsync(cancellationToken))
-            {
-                yield return batch;
-            }
-        }
-        finally
-        {
-            try
-            {
-                await _session.UnwatchNeuron(subject, reference);
-            }
-            catch (Exception)
-            {
-            }
-
-            try
-            {
-                _grains.DeleteObjectReference<IJournalObserver>(reference);
-            }
-            catch (Exception)
-            {
-            }
-
-            observer.Complete();
-        }
     }
 }

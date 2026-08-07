@@ -74,14 +74,21 @@ var silo = builder.AddProject<Projects.DigitalBrain_OS_Host>(ProductSurfaceResou
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
         ShellHostingExtensions.DefaultOwner)
-    .WithHttpEndpoint(
-        port: ProductSurfaceResources.McpHttpPort,
-        name: ProductSurfaceResources.McpHttpEndpointName,
-        isProxied: false)
     .WithHttpHealthCheck("/health");
 
+var mcp = builder.AddProject<Projects.DigitalBrain_OS_Mcp>(ProductSurfaceResources.Mcp)
+    .WithReference(brain.AsClient())
+    .WithEnvironment(
+        ShellHostingExtensions.OwnerEnvironmentVariable,
+        ShellHostingExtensions.DefaultOwner)
+    .WithHttpEndpoint(
+        port: ProductSurfaceResources.McpHttpPort,
+        name: ProductSurfaceResources.McpHttpEndpointName)
+    .WithHttpHealthCheck("/health", endpointName: ProductSurfaceResources.McpHttpEndpointName)
+    .WaitFor(silo);
+
 #pragma warning disable ASPIREMCP001
-silo.WithMcpServer(
+mcp.WithMcpServer(
     ProductSurfaceResources.McpPath,
     ProductSurfaceResources.McpHttpEndpointName);
 #pragma warning restore ASPIREMCP001

@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 #
 # Product image: digitalbrain
-#   - Orleans silo (OS.Host) with northbound MCP at /mcp (Wave 2: port 5000)
+#   - Orleans silo (OS.Host) — brokers + health on 8080
+#   - Northbound MCP (OS.Mcp) as cluster client at /mcp on port 5000
 #   - Behavior worker (OS.BehaviorHost) as a supervised sibling process (I1a Option A)
 #   - AppHost remains separate for local aspire run; Docker does not include AppHost
 #
@@ -74,6 +75,10 @@ RUN dotnet publish os/DigitalBrain.OS.Host/DigitalBrain.OS.Host.csproj \
       -c Release \
       -o /out/silo \
       --nologo \
+ && dotnet publish os/DigitalBrain.OS.Mcp/DigitalBrain.OS.Mcp.csproj \
+      -c Release \
+      -o /out/mcp \
+      --nologo \
  && dotnet publish os/DigitalBrain.OS.BehaviorHost/DigitalBrain.OS.BehaviorHost.csproj \
       -c Release \
       -o /out/behavior-host \
@@ -83,6 +88,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:11.0-preview AS final
 WORKDIR /app
 
 COPY --from=build /out/silo /app/silo
+COPY --from=build /out/mcp /app/mcp
 COPY --from=build /out/behavior-host /app/behavior-host
 COPY --chmod=755 os/DigitalBrain.OS.Host/docker-entrypoint.sh /app/docker-entrypoint.sh
 

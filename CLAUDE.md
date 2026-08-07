@@ -131,7 +131,7 @@ compiler for generated symbols. The index is refreshed by `RefreshCodeGraph` in
 `os/DigitalBrain.OS.AppHost/DigitalBrain.OS.AppHost.csproj`, which belongs to that project alone.
 
 MCP lives in root `.mcp.json`: `aspire` (resources, logs, traces), `codegraph`, `context7`,
-`microsoft-learn`, `dart`, and `digitalbrain-mcp` (the running brain; needs silo up — northbound MCP is on the silo).
+`microsoft-learn`, `dart`, and `digitalbrain-mcp` (the running brain; needs silo up — northbound MCP is the `mcp` process, a cluster client on port 5000).
 **If an accelerator is unavailable, say so and fall back. Do not skip silently.** When dispatching
 parallel agents, give them the rule by which a finding counts, or they return summaries.
 
