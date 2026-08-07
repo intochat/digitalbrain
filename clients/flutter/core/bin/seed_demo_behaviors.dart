@@ -1,4 +1,4 @@
-// Seeds 1–2 demo behaviors into a running DigitalBrain UiEdge so Behavior Studio
+// Seeds 1–2 demo behaviors into a running DigitalBrain Kernel HTTP surface (legacy demo helper)
 // lists real grains (not Flutter fixtures).
 //
 // Why this exists:
@@ -8,7 +8,7 @@
 //   shell uses (POST /behaviors/{id}/propose).
 //
 // Prerequisites:
-//   aspire run  (or any host that exposes UiEdge)
+//   aspire run  (or any host that exposes Kernel HTTP maps)
 //   DIGITALBRAIN_UI_BASE=http://localhost:<ui-port>   # AppHost injects this for
 //                                                     # Flutter; set it for this
 //                                                     # script when running alone

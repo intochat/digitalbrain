@@ -62,7 +62,7 @@ the live system. Tests are the regression net, not the proof.
 
 1. `dotnet build DigitalBrain.slnx -c Release`
 2. `aspire run` (or `aspire start` / `aspire stop`), then `list_resources` — every resource Healthy.
-3. Drive the real scenario through the real edge — HTTP to `digitalbrain-ui`, or the Flutter shell.
+3. Drive the real scenario through the real surface — HTTP to Kernel (`DIGITALBRAIN_UI_BASE`), or the Flutter shell.
 4. **Read the journal** via `digitalbrain-mcp`: `read_neuron_journal`, `read_chat_transcript`,
    `list_active_neurons`. Confirm the expected synapses fired, one correlation id, right order.
 5. Cross-check Aspire against structured logs and spans.

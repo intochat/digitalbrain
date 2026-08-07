@@ -1,7 +1,7 @@
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 
 // Offline / empty-edge demo content for Behavior Studio.
-// Seed real grains: dart run bin/seed_demo_behaviors.dart against UiEdge.
+// Seed real grains: dart run bin/seed_demo_behaviors.dart against Kernel HTTP.
 abstract final class BehaviorDemoFixtures {
   static const accountEnrichmentId = 'com.digitalbrain.account-enrichment';
   static const inboxBriefId = 'com.digitalbrain.inbox-brief';

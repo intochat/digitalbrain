@@ -64,7 +64,7 @@ final class BehaviorStudioController extends ChangeNotifier {
       library = BehaviorDemoFixtures.library;
       showingDemoFixtures = true;
       statusMessage =
-          'Demo fixtures — edge error ($error). Seed live when UiEdge is up.';
+          'Demo fixtures — HTTP error ($error). Seed live when Kernel HTTP is up.';
     } finally {
       loading = false;
       notifyListeners();
