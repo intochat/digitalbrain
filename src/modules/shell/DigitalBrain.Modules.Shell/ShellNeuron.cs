@@ -12,14 +12,20 @@ namespace DigitalBrain.Shell;
 internal sealed class ShellNeuron :
     Neuron,
     IShell,
+    IHandle<OpenScene>,
     IEmit<SceneOpened>
 {
-    public Task Open(OpenScene command)
+    public Task HandleAsync(OpenScene synapse, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(command);
-        ArgumentException.ThrowIfNullOrWhiteSpace(command.SceneKey);
-        ArgumentException.ThrowIfNullOrWhiteSpace(command.Title);
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        return EmitAsync(new SceneOpened(command.CommandId, Id, command.SceneKey, command.Title));
+        if (string.IsNullOrWhiteSpace(synapse.SceneKey)
+            || string.IsNullOrWhiteSpace(synapse.Title))
+        {
+            return Task.CompletedTask;
+        }
+
+        return EmitAsync(new SceneOpened(synapse.CommandId, Id, synapse.SceneKey, synapse.Title));
     }
 }

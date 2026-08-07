@@ -258,6 +258,60 @@ public sealed class CapabilityManifestGeneration
         Assert.Equal(DiagnosticSeverity.Error, descriptor.DefaultSeverity);
     }
 
+    [Fact(DisplayName =
+        "generator publishes neuron DefaultInstanceName from the contract constant, not a hardcoded default")]
+    public void PublishesDefaultInstanceNameFromNeuronContractConstant()
+    {
+        var result = Run(
+            """
+            using System.ComponentModel;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using DigitalBrain.Abstractions;
+            using Orleans;
+
+            namespace Sample;
+
+            public sealed partial class SampleModule : IModule;
+
+            [Alias("sample.shell")]
+            [Description("Shell neuron")]
+            public partial interface ISampleShell : INeuron
+            {
+                const string DefaultInstanceName = "desk";
+            }
+
+            [Alias("sample.open")]
+            [Description("Open a scene")]
+            public sealed record OpenSample : Synapse;
+
+            public sealed class SampleShell : ISampleShell, IHandle<OpenSample>
+            {
+                public Task HandleAsync(OpenSample synapse, CancellationToken cancellationToken)
+                    => Task.CompletedTask;
+            }
+            """);
+
+        Assert.Empty(result.Diagnostics.Where(diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error
+            && diagnostic.Id.StartsWith("DBGEN", StringComparison.Ordinal)));
+
+        var generated = string.Join(
+            Environment.NewLine,
+            result.GeneratedTrees.Select(tree => tree.ToString()));
+
+        Assert.Contains("sample.shell", generated, StringComparison.Ordinal);
+        Assert.Contains("\"desk\"", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            """
+            "sample.shell",
+                                "Shell neuron",
+                                "default",
+            """,
+            generated,
+            StringComparison.Ordinal);
+    }
+
     private static GeneratorDriverRunResult Run(string source)
     {
         var compilation = CreateCompilation(source);

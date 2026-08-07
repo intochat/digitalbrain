@@ -27,11 +27,13 @@ internal static class BehaviorEditorSurface
                     : behaviorId.Trim();
                 var shellName = string.IsNullOrWhiteSpace(shell) ? "desk" : shell.Trim();
 
-                await brain.GetGrainProxy<IShell>(shellName).Open(
+                await brain.SendAsync<IShell>(
+                    shellName,
                     new OpenScene(
                         CommandId.New(),
                         UiEdgeContract.BehaviorEditorSceneKey,
-                        UiEdgeContract.BehaviorEditorSceneTitle));
+                        UiEdgeContract.BehaviorEditorSceneTitle),
+                    cancellationToken);
 
                 return Results.Content(
                     RenderHtml(id),

@@ -12,7 +12,7 @@ public sealed class ShellSceneRoundTrip
     private const string PrimaryControlId = "primary";
     private const string SubmitIntent = "submit";
 
-    [Fact(DisplayName = "IShell.Open journals SceneOpened on the shell")]
+    [Fact(DisplayName = "directed OpenScene journals SceneOpened on the shell")]
     public async Task OpenJournalsSceneOpenedOnTheShell()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -20,7 +20,7 @@ public sealed class ShellSceneRoundTrip
         var shell = test.Neuron<IShell>(ShellName);
         var command = new OpenScene(CommandId.New(), HomeSceneKey, HomeSceneTitle);
 
-        await shell.Reference.Open(command);
+        await test.Client.SendAsync<IShell>(ShellName, command, cancellationToken);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(command.CommandId, opened.Synapse.CommandId);
@@ -47,14 +47,17 @@ public sealed class ShellSceneRoundTrip
     }
 
     [Fact(DisplayName =
-        "ClientEntryPoint IShell.Open from an unattributed client does not journal capability facts")]
+        "directed OpenScene produces SceneOpened with zero capability envelopes on shell journals")]
     public async Task OpenDoesNotJournalCapabilityFacts()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await OSCluster.Fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(ShellName);
 
-        await shell.Reference.Open(new OpenScene(CommandId.New(), HomeSceneKey, HomeSceneTitle));
+        await test.Client.SendAsync<IShell>(
+            ShellName,
+            new OpenScene(CommandId.New(), HomeSceneKey, HomeSceneTitle),
+            cancellationToken);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(HomeSceneKey, opened.Synapse.SceneKey);
@@ -68,23 +71,18 @@ public sealed class ShellSceneRoundTrip
     }
 
     [Fact(DisplayName =
-        "IShell.Open rejects blank SceneKey and Title without journaling SceneOpened")]
-    public async Task OpenRejectsBlankSceneKeyAndTitle()
+        "blank SceneKey or Title is refused when minting OpenScene — synchronous ArgumentException at construction, not a Deliver retry storm")]
+    public void OpenSceneRejectsBlankSceneKeyAndTitleAtMint()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var test = await OSCluster.Fixture.CreateBrainAsync(cancellationToken);
-        var shell = test.Neuron<IShell>(ShellName);
         var commandId = CommandId.New();
 
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            shell.Reference.Open(new OpenScene(commandId, string.Empty, HomeSceneTitle)));
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            shell.Reference.Open(new OpenScene(commandId, "   ", HomeSceneTitle)));
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            shell.Reference.Open(new OpenScene(commandId, HomeSceneKey, string.Empty)));
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            shell.Reference.Open(new OpenScene(commandId, HomeSceneKey, "   ")));
-
-        Assert.Empty(await shell.Outgoing.ReadAsync<SceneOpened>(cancellationToken: cancellationToken));
+        Assert.Throws<ArgumentException>(() =>
+            new OpenScene(commandId, string.Empty, HomeSceneTitle));
+        Assert.Throws<ArgumentException>(() =>
+            new OpenScene(commandId, "   ", HomeSceneTitle));
+        Assert.Throws<ArgumentException>(() =>
+            new OpenScene(commandId, HomeSceneKey, string.Empty));
+        Assert.Throws<ArgumentException>(() =>
+            new OpenScene(commandId, HomeSceneKey, "   "));
     }
 }

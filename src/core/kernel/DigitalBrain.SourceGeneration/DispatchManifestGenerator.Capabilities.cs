@@ -83,6 +83,7 @@ public sealed partial class DispatchManifestGenerator
                     accumulator = new NeuronCapabilityAccumulator(
                         contractId,
                         description,
+                        DefaultInstanceNameOf(neuronContract),
                         alias is not null,
                         DescriptionOf(neuronContract) is not null,
                         neuronContract.Locations.FirstOrDefault() ?? Location.None);
@@ -107,7 +108,7 @@ public sealed partial class DispatchManifestGenerator
             .Select(entry => new NeuronCapabilityModel(
                 entry.ContractId,
                 entry.Description,
-                "default",
+                entry.DefaultInstanceName,
                 entry.HasAlias,
                 entry.HasDescription,
                 entry.Location,
@@ -277,6 +278,25 @@ public sealed partial class DispatchManifestGenerator
         return null;
     }
 
+    private static string DefaultInstanceNameOf(INamedTypeSymbol neuronContract)
+    {
+        foreach (var member in neuronContract.GetMembers("DefaultInstanceName"))
+        {
+            if (member is IFieldSymbol
+                {
+                    IsConst: true,
+                    Type.SpecialType: SpecialType.System_String,
+                    ConstantValue: string name,
+                }
+                && !string.IsNullOrWhiteSpace(name))
+            {
+                return name;
+            }
+        }
+
+        return "default";
+    }
+
     private static void ReportCapabilityDiagnostics(
         SourceProductionContext production,
         ImmutableArray<NeuronCapabilityModel> neurons,
@@ -382,6 +402,7 @@ public sealed partial class DispatchManifestGenerator
     private sealed class NeuronCapabilityAccumulator(
         string contractId,
         string description,
+        string defaultInstanceName,
         bool hasAlias,
         bool hasDescription,
         Location location)
@@ -389,6 +410,8 @@ public sealed partial class DispatchManifestGenerator
         public string ContractId { get; } = contractId;
 
         public string Description { get; } = description;
+
+        public string DefaultInstanceName { get; } = defaultInstanceName;
 
         public bool HasAlias { get; } = hasAlias;
 

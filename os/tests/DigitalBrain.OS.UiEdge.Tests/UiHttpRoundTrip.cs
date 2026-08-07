@@ -100,7 +100,7 @@ public sealed class UiHttpRoundTrip(UiEdgeFixture fixture)
         using var http = CreateClient(app, streaming: true);
         await using var events = await OpenShellEventStreamAsync(http, cancellationToken);
 
-        await test.Client.GetGrainProxy<IShell>(UiEdgeFixture.DefaultShellName).Open(command);
+        await test.Client.SendAsync<IShell>(UiEdgeFixture.DefaultShellName, command, cancellationToken);
 
         var journaled = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(command.CommandId, journaled.Synapse.CommandId);
@@ -140,8 +140,10 @@ public sealed class UiHttpRoundTrip(UiEdgeFixture fixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var test = await fixture.CreateBrainAsync(cancellationToken);
         var shell = test.Neuron<IShell>(UiEdgeFixture.DefaultShellName);
-        await test.Client.GetGrainProxy<IShell>(UiEdgeFixture.DefaultShellName).Open(
-            new OpenScene(CommandId.New(), HomeSceneKey, HomeTitle));
+        await test.Client.SendAsync<IShell>(
+            UiEdgeFixture.DefaultShellName,
+            new OpenScene(CommandId.New(), HomeSceneKey, HomeTitle),
+            cancellationToken);
 
         await using var app = await UiEdgeFixture.StartUiHttpAsync(test, cancellationToken);
         using var http = CreateClient(app);

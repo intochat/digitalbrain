@@ -15,7 +15,9 @@ public sealed class OpenHome
         ArgumentException.ThrowIfNullOrWhiteSpace(shellName);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var shell = brain.GetGrainProxy<IShell>(shellName);
-        await shell.Open(new OpenScene(CommandId.New(), SceneKey, SceneTitle));
+        await brain.SendAsync<IShell>(
+            shellName,
+            new OpenScene(CommandId.New(), SceneKey, SceneTitle),
+            cancellationToken);
     }
 }

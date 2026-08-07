@@ -22,8 +22,10 @@ public sealed class CountdownSurface
         ArgumentException.ThrowIfNullOrWhiteSpace(countdownName);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var shell = brain.GetGrainProxy<IShell>(shellName);
-        await shell.Open(new OpenScene(CommandId.New(), SceneKey, SceneTitle));
+        await brain.SendAsync<IShell>(
+            shellName,
+            new OpenScene(CommandId.New(), SceneKey, SceneTitle),
+            cancellationToken);
 
         var countdown = brain.GetGrainProxy<ICountdown>(countdownName);
         var destination = NeuronId.For<IScene>(brain.Owner, SceneKey);

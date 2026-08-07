@@ -22,13 +22,15 @@ public sealed class NavigateShell
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var shell = brain.GetGrainProxy<IShell>(shellName);
         foreach (var (sceneKey, title) in scenes)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(sceneKey);
             ArgumentException.ThrowIfNullOrWhiteSpace(title);
             cancellationToken.ThrowIfCancellationRequested();
-            await shell.Open(new OpenScene(CommandId.New(), sceneKey, title));
+            await brain.SendAsync<IShell>(
+                shellName,
+                new OpenScene(CommandId.New(), sceneKey, title),
+                cancellationToken);
         }
     }
 }

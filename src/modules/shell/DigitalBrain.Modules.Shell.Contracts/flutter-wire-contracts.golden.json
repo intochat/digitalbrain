@@ -25,16 +25,7 @@
       "kind": "interface",
       "alias": "flutter.shell",
       "properties": [],
-      "methods": [
-        {
-          "name": "Open",
-          "alias": "Open",
-          "parameters": [
-            { "name": "command", "type": "OpenScene" }
-          ],
-          "returnType": "Task"
-        }
-      ]
+      "methods": []
     },
     {
       "name": "OpenScene",

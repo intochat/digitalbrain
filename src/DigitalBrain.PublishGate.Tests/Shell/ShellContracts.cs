@@ -44,22 +44,12 @@ public sealed class ShellContracts
     }
 
     [Fact(DisplayName =
-        "IShell.Open is unsuffixed, aliased, and takes OpenScene only — IScene is surface key only")]
-    public void ShellAndSceneMethodsMatchFirstVerticalWire()
+        "IShell and IScene are marker INeurons with no declared operation methods")]
+    public void ShellAndSceneAreMarkersWithNoOperationMethods()
     {
         var shellMethods = typeof(IShell)
             .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-
-        Assert.Equal([nameof(IShell.Open)], shellMethods.Select(method => method.Name));
-        Assert.All(shellMethods, method =>
-        {
-            Assert.DoesNotContain("Async", method.Name, StringComparison.Ordinal);
-            Assert.Equal(method.Name, method.GetCustomAttribute<AliasAttribute>()?.Alias);
-            Assert.Equal(typeof(Task), method.ReturnType);
-            Assert.Equal(
-                [typeof(OpenScene)],
-                method.GetParameters().Select(parameter => parameter.ParameterType));
-        });
+        Assert.Empty(shellMethods);
 
         Assert.DoesNotContain(
             typeof(IScene)
@@ -67,6 +57,35 @@ public sealed class ShellContracts
             method => !method.IsSpecialName);
         Assert.Contains(typeof(INeuron), typeof(IShell).GetInterfaces());
         Assert.Contains(typeof(INeuron), typeof(IScene).GetInterfaces());
+        Assert.Null(typeof(IShell).GetCustomAttribute<ClientEntryPointAttribute>());
+    }
+
+    [Fact(DisplayName =
+        "OpenScene is a directed synapse; blank SceneKey or Title is refused at construction")]
+    public void OpenSceneIsSynapseThatRejectsBlankAtMint()
+    {
+        Assert.True(typeof(Synapse).IsAssignableFrom(typeof(OpenScene)));
+        Assert.Equal("desk", IShell.DefaultInstanceName);
+
+        var commandId = CommandId.New();
+        Assert.Throws<ArgumentException>(() => new OpenScene(commandId, string.Empty, "Home"));
+        Assert.Throws<ArgumentException>(() => new OpenScene(commandId, "home", string.Empty));
+        Assert.Throws<ArgumentException>(() => new OpenScene(commandId, "   ", "Home"));
+        Assert.Throws<ArgumentException>(() => new OpenScene(commandId, "home", "   "));
+    }
+
+    [Fact(DisplayName =
+        "ShellModule catalog publishes flutter.shell default desk accepting open-scene and emitting scene-opened")]
+    public void ShellCapabilityCatalogPublishesDeskAndOpenScene()
+    {
+        var shell = Assert.Single(
+            ShellModule.Capabilities.Neurons,
+            neuron => neuron.ContractId == "flutter.shell");
+
+        Assert.Equal(IShell.DefaultInstanceName, shell.DefaultInstanceName);
+        Assert.Equal("desk", shell.DefaultInstanceName);
+        Assert.Contains(shell.Accepted, synapse => synapse.ContractId == "flutter.open-scene");
+        Assert.Contains(shell.Emitted, synapse => synapse.ContractId == "flutter.scene-opened");
     }
 
     [Fact(DisplayName = "flutter-wire-contracts.golden.json matches Contracts assembly wire shape")]

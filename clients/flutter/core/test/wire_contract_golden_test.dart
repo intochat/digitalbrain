@@ -30,16 +30,7 @@ const _expectedWireManifest = <String, Object?>{
       'kind': 'interface',
       'alias': 'flutter.shell',
       'properties': <Object?>[],
-      'methods': [
-        {
-          'name': 'Open',
-          'alias': 'Open',
-          'parameters': [
-            {'name': 'command', 'type': 'OpenScene'},
-          ],
-          'returnType': 'Task',
-        },
-      ],
+      'methods': <Object?>[],
     },
     {
       'name': 'OpenScene',

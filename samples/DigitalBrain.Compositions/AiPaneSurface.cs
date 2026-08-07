@@ -24,8 +24,10 @@ public sealed class AiPaneSurface
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var shell = brain.GetGrainProxy<IShell>(shellName);
-        await shell.Open(new OpenScene(CommandId.New(), SceneKey, SceneTitle));
+        await brain.SendAsync<IShell>(
+            shellName,
+            new OpenScene(CommandId.New(), SceneKey, SceneTitle),
+            cancellationToken);
 
         var model = brain.GetGrainProxy<ILlama32>(modelName);
         return await model.Respond([new ChatMessage(ChatRole.User, prompt)]);

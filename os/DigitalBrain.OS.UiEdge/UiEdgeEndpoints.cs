@@ -25,8 +25,10 @@ internal static class UiEdgeEndpoints
                 ArgumentException.ThrowIfNullOrWhiteSpace(request.Title);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var shell = brain.GetGrainProxy<IShell>(shellName);
-                await shell.Open(new OpenScene(CommandId.New(), request.SceneKey, request.Title));
+                await brain.SendAsync<IShell>(
+                    shellName,
+                    new OpenScene(CommandId.New(), request.SceneKey, request.Title),
+                    cancellationToken);
 
                 return Results.Accepted();
             });

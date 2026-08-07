@@ -37,10 +37,13 @@ public sealed class AccountEnrichmentProcessSample(IntegrationsFixture fixture)
         var homeOpened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal("home", homeOpened.Synapse.SceneKey);
 
-        await shell.Reference.Open(new OpenScene(
-            CommandId.New(),
-            IntegrationsFixture.EnrichmentSceneKey,
-            IntegrationsFixture.EnrichmentSceneTitle));
+        await test.Client.SendAsync<IShell>(
+            IntegrationsFixture.ShellName,
+            new OpenScene(
+                CommandId.New(),
+                IntegrationsFixture.EnrichmentSceneKey,
+                IntegrationsFixture.EnrichmentSceneTitle),
+            cancellationToken);
 
         var opened = await shell.Outgoing.NextAsync<SceneOpened>(cancellationToken);
         Assert.Equal(IntegrationsFixture.EnrichmentSceneKey, opened.Synapse.SceneKey);

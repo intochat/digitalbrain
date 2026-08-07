@@ -13,7 +13,7 @@ internal sealed class ShellBootNeuron :
     Neuron,
     IHandle<DigitalBrainActivated>
 {
-    public const string DefaultShellName = "desk";
+    public const string DefaultShellName = IShell.DefaultInstanceName;
     public const string HomeSceneKey = "home";
     public const string HomeSceneTitle = "Home";
 
@@ -27,8 +27,8 @@ internal sealed class ShellBootNeuron :
             return Task.CompletedTask;
         }
 
-        var shell = GrainFactory.GetGrain<IShell>(NeuronId.For<IShell>(Id.Owner, DefaultShellName).ToGrainId());
-
-        return shell.Open(new OpenScene(CommandId.New(), HomeSceneKey, HomeSceneTitle));
+        return SendAsync(
+            NeuronId.For<IShell>(Id.Owner, DefaultShellName),
+            new OpenScene(CommandId.New(), HomeSceneKey, HomeSceneTitle));
     }
 }
