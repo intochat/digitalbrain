@@ -116,12 +116,7 @@ internal static class BaseUiKitAssembly
         };
 
     private static string UnavailableReason(SalesInsightUnavailableReason reason)
-        => reason switch
-        {
-            SalesInsightUnavailableReason.ReaderUnavailable => "ReaderUnavailable",
-            SalesInsightUnavailableReason.InvalidReaderData => "InvalidReaderData",
-            _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "The sales unavailable reason is not recognized."),
-        };
+        => Enum.IsDefined(reason) ? reason.ToString() : "Unavailable";
 
     private static string OpaqueId(string version, params string[] values)
     {

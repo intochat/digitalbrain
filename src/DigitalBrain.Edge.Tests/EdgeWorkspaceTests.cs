@@ -13,6 +13,10 @@ public sealed class EdgeWorkspaceTests
         ApprovalWorkspaceProjectionNeuron.Kind,
         ApprovalWorkspaceInboxNeuron.Name);
 
+    public static IEnumerable<object?[]> SafeUnavailableReasons
+        => Enum.GetValues<SalesInsightUnavailableReason>()
+            .Select(static reason => new object?[] { reason });
+
     [Fact]
     public async Task ReplayedChatApprovalBuildsChatDrawerInboxAndPendingOpaqueActions()
     {
@@ -84,6 +88,32 @@ public sealed class EdgeWorkspaceTests
         Assert.Empty(surface.Components.OfType<ActionComponent>());
     }
 
+    [Theory]
+    [InlineData(ApprovalWorkspaceItemStatus.Rejected, "Rejected")]
+    [InlineData(ApprovalWorkspaceItemStatus.Expired, "Expired")]
+    [InlineData(ApprovalWorkspaceItemStatus.MutationUncertain, "MutationUncertain")]
+    public async Task TerminalApprovalStatusesRenderStatusWithoutActions(
+        ApprovalWorkspaceItemStatus status,
+        string expectedStatus)
+    {
+        var approval = ApprovalSurface(
+            revision: 4,
+            Item(
+                proposalId: $"approval-{expectedStatus}",
+                fingerprint: $"fingerprint-{expectedStatus}",
+                context: null,
+                status: status,
+                approveReference: $"apr_{expectedStatus}_approve",
+                rejectReference: $"apr_{expectedStatus}_reject"));
+
+        var snapshot = await new WorkspaceUiAssembler(SourceWithApproval(approval)).ReadAsync([], CancellationToken.None);
+
+        var surface = Assert.Single(snapshot.Surfaces);
+        Assert.Contains(surface.Components, component => component is StatusComponent rendered
+            && rendered.Value == expectedStatus);
+        Assert.Empty(surface.Components.OfType<ActionComponent>());
+    }
+
     [Fact]
     public async Task SalesReadyBuildsBarChartAndTableWhileUnavailableBuildsOnlyUnavailable()
     {
@@ -110,6 +140,42 @@ public sealed class EdgeWorkspaceTests
         var unavailableComponent = Assert.Single(unavailable.Components);
         var typedUnavailable = Assert.IsType<UnavailableComponent>(unavailableComponent);
         Assert.Equal("ReaderUnavailable", typedUnavailable.Reason);
+    }
+
+    [Theory]
+    [MemberData(nameof(SafeUnavailableReasons))]
+    public async Task EveryDefinedUnavailableReasonBuildsExactlyOneSafeUnavailableComponent(
+        SalesInsightUnavailableReason reason)
+    {
+        var queryId = $"sales-unavailable-{(int)reason}";
+        var reader = new FakeJournalReader();
+        reader.Add(
+            new NeuronId(SalesInsightProjectionNeuron.Kind, queryId),
+            Produced(17, SalesUnavailable(queryId, reason)));
+
+        var surface = await new WorkspaceUiSurfaceSource(new FakeWorkspaceChannel(reader))
+            .ReadSalesAsync(queryId, CancellationToken.None);
+
+        Assert.NotNull(surface);
+        var component = Assert.IsType<UnavailableComponent>(Assert.Single(surface.Components));
+        Assert.False(string.IsNullOrWhiteSpace(component.Reason));
+    }
+
+    [Fact]
+    public async Task UndefinedUnavailableReasonBuildsAGenericSafeUnavailableComponent()
+    {
+        const string queryId = "sales-unavailable-generic";
+        var reader = new FakeJournalReader();
+        reader.Add(
+            new NeuronId(SalesInsightProjectionNeuron.Kind, queryId),
+            Produced(17, SalesUnavailable(queryId, (SalesInsightUnavailableReason)999)));
+
+        var surface = await new WorkspaceUiSurfaceSource(new FakeWorkspaceChannel(reader))
+            .ReadSalesAsync(queryId, CancellationToken.None);
+
+        Assert.NotNull(surface);
+        var component = Assert.IsType<UnavailableComponent>(Assert.Single(surface.Components));
+        Assert.Equal("Unavailable", component.Reason);
     }
 
     [Fact]
@@ -191,7 +257,7 @@ public sealed class EdgeWorkspaceTests
     }
 
     [Fact]
-    public async Task MalformedUnknownAndOtherSnapshotActionsDoNotAuthorizeOrPublish()
+    public async Task MalformedUnknownNonPendingAndOtherChannelActionsDoNotAuthorizeOrPublish()
     {
         var current = ApprovalSurface(
             revision: 3,
@@ -212,18 +278,33 @@ public sealed class EdgeWorkspaceTests
         var authorizer = new FakeAuthorizer();
         var publisher = new FakePublisher();
         var (bridge, reader) = BridgeWithApproval(current, publisher, authorizer);
+        var otherWorkspace = ApprovalSurface(
+            revision: 5,
+            Item(
+                proposalId: "approval-other-workspace",
+                fingerprint: "fingerprint-other-workspace",
+                context: null,
+                status: ApprovalWorkspaceItemStatus.Pending,
+                approveReference: "apr_other_workspace_approve",
+                rejectReference: "apr_other_workspace_reject"));
+        var otherReader = new FakeJournalReader();
+        otherReader.Add(ApprovalProjection, Produced(1, otherWorkspace));
+        var otherSnapshot = await new WorkspaceUiSurfaceSource(new FakeWorkspaceChannel(otherReader))
+            .ReadApprovalsAsync(CancellationToken.None);
+        var otherAction = Assert.Single(otherSnapshot!.Items).Actions[0].Reference;
 
         var malformed = await bridge.InvokeAsync(new OpaqueUiActionReference(" "), CancellationToken.None);
         var padded = await bridge.InvokeAsync(new OpaqueUiActionReference(" apr_current_approve "), CancellationToken.None);
         var unknown = await bridge.InvokeAsync(new OpaqueUiActionReference("apr_unknown"), CancellationToken.None);
-        var otherSnapshot = await bridge.InvokeAsync(new OpaqueUiActionReference("apr_other_workspace"), CancellationToken.None);
+        var otherChannel = await bridge.InvokeAsync(new OpaqueUiActionReference(otherAction), CancellationToken.None);
         var nonPending = await bridge.InvokeAsync(new OpaqueUiActionReference("apr_terminal_approve"), CancellationToken.None);
 
         Assert.False(malformed.Accepted);
         Assert.False(padded.Accepted);
         Assert.False(unknown.Accepted);
-        Assert.False(otherSnapshot.Accepted);
+        Assert.False(otherChannel.Accepted);
         Assert.False(nonPending.Accepted);
+        Assert.Equal(1, otherReader.ReadCount);
         Assert.Equal(4, reader.ReadCount);
         Assert.Equal(0, authorizer.Calls);
         Assert.Empty(publisher.Published);
@@ -348,11 +429,13 @@ public sealed class EdgeWorkspaceTests
             [SalesInsightDisplay.BarChart, SalesInsightDisplay.Table],
             [SalesInsightPlacement.Chat, SalesInsightPlacement.ContextDrawer]);
 
-    private static SalesInsightUnavailableSurfaceRequested SalesUnavailable(string queryId)
+    private static SalesInsightUnavailableSurfaceRequested SalesUnavailable(
+        string queryId,
+        SalesInsightUnavailableReason reason = SalesInsightUnavailableReason.ReaderUnavailable)
         => new(
             queryId,
             new SalesInsightContext(SalesInsightContextKind.ChatConversation, "conversation/sales"),
-            SalesInsightUnavailableReason.ReaderUnavailable,
+            reason,
             [SalesInsightPlacement.Chat, SalesInsightPlacement.ContextDrawer]);
 
     private static JournalRecord Produced<TSynapse>(long position, TSynapse synapse)
