@@ -11,7 +11,7 @@
     <Project Path="src/core/aspire/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
     <Project Path="src/core/kernel/DigitalBrain.SourceGeneration/DigitalBrain.SourceGeneration.csproj" />
     <Project Path="src/core/security/DigitalBrain.Security/DigitalBrain.Security.csproj" />
-    <Project Path="src/core/mcp/DigitalBrain.Mcp.Sdk/DigitalBrain.Mcp.Sdk.csproj" />
+    <Project Path="src/core/sdk/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <Project Path="src/core/mcp/DigitalBrain.Mcp.Aspire.Hosting/DigitalBrain.Mcp.Aspire.Hosting.csproj" />
   </Folder>
   <Folder Name="/modules/ai/">

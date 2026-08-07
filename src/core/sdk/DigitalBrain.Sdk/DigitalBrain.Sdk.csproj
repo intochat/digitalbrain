@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>DigitalBrain.Mcp</RootNamespace>
-    <AssemblyName>DigitalBrain.Mcp.Sdk</AssemblyName>
-    <PackageId>DigitalBrain.Mcp.Sdk</PackageId>
+    <RootNamespace>DigitalBrain.Sdk</RootNamespace>
+    <AssemblyName>DigitalBrain.Sdk</AssemblyName>
+    <PackageId>DigitalBrain.Sdk</PackageId>
     <IsPackable>true</IsPackable>
-    <Description>Southbound official MCP SDK transport, OAuth, token cache, session, and fingerprint mechanics for DigitalBrain modules.</Description>
+    <Description>Module infrastructure: southbound MCP rail and shared webhook ingress for DigitalBrain modules.</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>

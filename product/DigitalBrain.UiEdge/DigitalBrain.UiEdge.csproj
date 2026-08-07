@@ -14,6 +14,6 @@
     <ProjectReference Include="..\..\src\core\behaviors\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
     <ProjectReference Include="..\..\src\modules\ai\Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
-    <ProjectReference Include="..\..\src\core\mcp\DigitalBrain.Mcp.Sdk\DigitalBrain.Mcp.Sdk.csproj" />
+    <ProjectReference Include="..\..\src\core\sdk\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj" />
   </ItemGroup>
 </Project>

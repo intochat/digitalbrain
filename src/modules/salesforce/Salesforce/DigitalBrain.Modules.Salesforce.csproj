@@ -10,7 +10,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Contracts\DigitalBrain.Modules.Salesforce.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\..\src\core\mcp\DigitalBrain.Mcp.Sdk\DigitalBrain.Mcp.Sdk.csproj" />
+    <ProjectReference Include="..\..\..\..\src\core\sdk\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"
                       OutputItemType="Analyzer"
