@@ -22,7 +22,6 @@
     <ProjectReference Include="..\..\..\..\os\DigitalBrain.OS.UiEdge\DigitalBrain.OS.UiEdge.csproj" />
     <ProjectReference Include="..\..\aspire\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
     <ProjectReference Include="..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Mcp.Testing\DigitalBrain.Mcp.Testing.csproj" />
     <ProjectReference Include="..\..\behaviors\DigitalBrain.Behaviors.Runtime\DigitalBrain.Behaviors.Runtime.csproj" />
     <ProjectReference Include="..\..\behaviors\DigitalBrain.Behaviors.Host\DigitalBrain.Behaviors.Host.csproj" />
     <ProjectReference Include="..\..\..\modules\tasks\DigitalBrain.Modules.Tasks\DigitalBrain.Modules.Tasks.csproj" />

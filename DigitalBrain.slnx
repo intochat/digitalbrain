@@ -19,7 +19,6 @@
     <Project Path="src/core/kernel/DigitalBrain.SourceGeneration.Tests/DigitalBrain.SourceGeneration.Tests.csproj" />
     <Project Path="src/core/security/DigitalBrain.Security/DigitalBrain.Security.csproj" />
     <Project Path="src/core/mcp/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
-    <Project Path="src/core/mcp/DigitalBrain.Mcp.Testing/DigitalBrain.Mcp.Testing.csproj" />
     <Project Path="src/core/mcp/DigitalBrain.Mcp.Aspire.Hosting/DigitalBrain.Mcp.Aspire.Hosting.csproj" />
     <Project Path="src/core/mcp/DigitalBrain.Integrations.Tests/DigitalBrain.Integrations.Tests.csproj" />
   </Folder>
