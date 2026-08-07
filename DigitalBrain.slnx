@@ -1,6 +1,5 @@
 <Solution>
-  <Folder Name="/src/" />
-  <Folder Name="/src/core/">
+  <Folder Name="/core/">
     <Project Path="src/core/kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
     <Project Path="src/core/behaviors/DigitalBrain.Behaviors/DigitalBrain.Behaviors.csproj" />
     <Project Path="src/core/behaviors/DigitalBrain.Behaviors.Runtime/DigitalBrain.Behaviors.Runtime.csproj" />
@@ -15,30 +14,46 @@
     <Project Path="src/core/mcp/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
     <Project Path="src/core/mcp/DigitalBrain.Mcp.Aspire.Hosting/DigitalBrain.Mcp.Aspire.Hosting.csproj" />
   </Folder>
-  <Folder Name="/src/modules/">
-    <Project Path="src/modules/ai/DigitalBrain.Modules.AI.Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
-    <Project Path="src/modules/ai/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
-    <Project Path="src/modules/ai/DigitalBrain.Modules.AI.Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
-    <Project Path="src/modules/tasks/DigitalBrain.Modules.Tasks.Contracts/DigitalBrain.Modules.Tasks.Contracts.csproj" />
-    <Project Path="src/modules/tasks/DigitalBrain.Modules.Tasks/DigitalBrain.Modules.Tasks.csproj" />
-    <Project Path="src/modules/time/DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
-    <Project Path="src/modules/time/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" />
-    <Project Path="src/modules/introspection/DigitalBrain.Modules.Introspection.Contracts/DigitalBrain.Modules.Introspection.Contracts.csproj" />
-    <Project Path="src/modules/introspection/DigitalBrain.Modules.Introspection/DigitalBrain.Modules.Introspection.csproj" />
-    <Project Path="src/modules/chat/DigitalBrain.Modules.Chat.Contracts/DigitalBrain.Modules.Chat.Contracts.csproj" />
-    <Project Path="src/modules/chat/DigitalBrain.Modules.Chat/DigitalBrain.Modules.Chat.csproj" />
-    <Project Path="src/modules/shell/DigitalBrain.Modules.Shell.Contracts/DigitalBrain.Modules.Shell.Contracts.csproj" />
-    <Project Path="src/modules/shell/DigitalBrain.Modules.Shell/DigitalBrain.Modules.Shell.csproj" />
-    <Project Path="src/modules/shell/DigitalBrain.Modules.Shell.Aspire.Hosting/DigitalBrain.Modules.Shell.Aspire.Hosting.csproj" />
-    <Project Path="src/modules/google/DigitalBrain.Modules.Google.Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
-    <Project Path="src/modules/google/DigitalBrain.Modules.Google/DigitalBrain.Modules.Google.csproj" />
-    <Project Path="src/modules/google/DigitalBrain.Modules.Google.Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />
-    <Project Path="src/modules/salesforce/DigitalBrain.Modules.Salesforce.Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
-    <Project Path="src/modules/salesforce/DigitalBrain.Modules.Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
-    <Project Path="src/modules/salesforce/DigitalBrain.Modules.Salesforce.Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" />
-    <Project Path="src/modules/memory/DigitalBrain.Modules.Memory.Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
-    <Project Path="src/modules/memory/DigitalBrain.Modules.Memory/DigitalBrain.Modules.Memory.csproj" />
-    <Project Path="src/modules/memory/DigitalBrain.Modules.Memory.Aspire.Hosting/DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" />
+  <Folder Name="/modules/ai/">
+    <Project Path="src/modules/ai/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
+    <Project Path="src/modules/ai/AI/DigitalBrain.Modules.AI.csproj" />
+    <Project Path="src/modules/ai/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
+  </Folder>
+  <Folder Name="/modules/chat/">
+    <Project Path="src/modules/chat/Contracts/DigitalBrain.Modules.Chat.Contracts.csproj" />
+    <Project Path="src/modules/chat/Chat/DigitalBrain.Modules.Chat.csproj" />
+  </Folder>
+  <Folder Name="/modules/google/">
+    <Project Path="src/modules/google/Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
+    <Project Path="src/modules/google/Google/DigitalBrain.Modules.Google.csproj" />
+    <Project Path="src/modules/google/Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />
+  </Folder>
+  <Folder Name="/modules/introspection/">
+    <Project Path="src/modules/introspection/Contracts/DigitalBrain.Modules.Introspection.Contracts.csproj" />
+    <Project Path="src/modules/introspection/Introspection/DigitalBrain.Modules.Introspection.csproj" />
+  </Folder>
+  <Folder Name="/modules/memory/">
+    <Project Path="src/modules/memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
+    <Project Path="src/modules/memory/Memory/DigitalBrain.Modules.Memory.csproj" />
+    <Project Path="src/modules/memory/Aspire.Hosting/DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" />
+  </Folder>
+  <Folder Name="/modules/salesforce/">
+    <Project Path="src/modules/salesforce/Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
+    <Project Path="src/modules/salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
+    <Project Path="src/modules/salesforce/Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" />
+  </Folder>
+  <Folder Name="/modules/shell/">
+    <Project Path="src/modules/shell/Contracts/DigitalBrain.Modules.Shell.Contracts.csproj" />
+    <Project Path="src/modules/shell/Shell/DigitalBrain.Modules.Shell.csproj" />
+    <Project Path="src/modules/shell/Aspire.Hosting/DigitalBrain.Modules.Shell.Aspire.Hosting.csproj" />
+  </Folder>
+  <Folder Name="/modules/tasks/">
+    <Project Path="src/modules/tasks/Contracts/DigitalBrain.Modules.Tasks.Contracts.csproj" />
+    <Project Path="src/modules/tasks/Tasks/DigitalBrain.Modules.Tasks.csproj" />
+  </Folder>
+  <Folder Name="/modules/time/">
+    <Project Path="src/modules/time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
+    <Project Path="src/modules/time/Time/DigitalBrain.Modules.Time.csproj" />
   </Folder>
   <Folder Name="/os/">
     <Project Path="os/DigitalBrain.OS.Host/DigitalBrain.OS.Host.csproj" />

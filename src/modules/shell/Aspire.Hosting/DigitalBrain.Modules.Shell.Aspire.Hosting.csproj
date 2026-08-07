@@ -5,7 +5,7 @@
     <RootNamespace>DigitalBrain.Shell.Aspire.Hosting</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DigitalBrain.Modules.Shell\DigitalBrain.Modules.Shell.csproj" />
+    <ProjectReference Include="..\Shell\DigitalBrain.Modules.Shell.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

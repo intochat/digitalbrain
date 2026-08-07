@@ -11,6 +11,6 @@
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"
                       PrivateAssets="all" />
-    <ProjectReference Include="..\..\tasks\DigitalBrain.Modules.Tasks.Contracts\DigitalBrain.Modules.Tasks.Contracts.csproj" />
+    <ProjectReference Include="..\..\tasks\Contracts\DigitalBrain.Modules.Tasks.Contracts.csproj" />
   </ItemGroup>
 </Project>

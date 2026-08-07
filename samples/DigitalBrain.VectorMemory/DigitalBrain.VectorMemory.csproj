@@ -11,7 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\modules\memory\DigitalBrain.Modules.Memory.Contracts\DigitalBrain.Modules.Memory.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\modules\memory\Contracts\DigitalBrain.Modules.Memory.Contracts.csproj" />
   </ItemGroup>
   <Target Name="StripOrleansUsingsFromVectorMemorySample" BeforeTargets="CoreCompile;GenerateGlobalUsings">
     <ItemGroup>
