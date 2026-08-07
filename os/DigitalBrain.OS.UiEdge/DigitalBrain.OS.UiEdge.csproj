@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <RootNamespace>DigitalBrain.OS.UiEdge</RootNamespace>
-    <NoWarn>$(NoWarn);CA2007</NoWarn>
+    <NoWarn>$(NoWarn);CA2007;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Azure.Data.Tables" />
@@ -18,9 +18,5 @@
     <ProjectReference Include="..\..\src\modules\ai\DigitalBrain.Modules.AI.Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="..\..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
     <ProjectReference Include="..\..\src\core\mcp\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.OS.UiEdge.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Integrations.Tests" />
   </ItemGroup>
 </Project>

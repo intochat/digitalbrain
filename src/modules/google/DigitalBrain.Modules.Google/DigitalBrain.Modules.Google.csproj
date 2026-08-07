@@ -3,7 +3,7 @@
     <IsPackable>true</IsPackable>
     <Description>Google module: Gmail neuron backed by the official Gmail SDK facade.</Description>
     <RootNamespace>DigitalBrain.Google</RootNamespace>
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Google.Apis.Auth" />

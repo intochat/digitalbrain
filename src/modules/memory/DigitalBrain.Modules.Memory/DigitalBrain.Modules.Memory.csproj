@@ -3,7 +3,7 @@
     <IsPackable>true</IsPackable>
     <Description>Memory module: owner-isolated vector memory store and search.</Description>
     <RootNamespace>DigitalBrain.Memory</RootNamespace>
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.Memory.Contracts\DigitalBrain.Modules.Memory.Contracts.csproj" />
