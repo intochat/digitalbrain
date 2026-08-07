@@ -724,7 +724,15 @@ public sealed class BehaviorProtectedPayloadBrokerEndpointsTests
         public T Value { get; set; } = value;
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JSON-deserialized by ReadFromJsonAsync; not constructed in source.")]
     private sealed record ProtectedReferenceResponse(string Id, DateTimeOffset? ExpiresAt);
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JSON-deserialized by ReadFromJsonAsync; not constructed in source.")]
     private sealed record LoadPayloadResponse(string ContentBase64);
 }

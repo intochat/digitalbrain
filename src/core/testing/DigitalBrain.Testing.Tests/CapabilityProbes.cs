@@ -60,6 +60,10 @@ public partial interface ICapabilityTarget : INeuron
     Task Settle();
 }
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class CapabilityCaller :
     Neuron,
     ICapabilityCaller,
@@ -130,6 +134,10 @@ public partial interface IWindowBoundCaller : INeuron;
 
 // Production remembers 4096 deliveries. Overriding the bound is what makes the eviction steady
 // state — window full, every Remember dropping one as it adds one — reachable in a test.
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class WindowBoundCaller :
     Neuron,
     IWindowBoundCaller,
@@ -159,6 +167,10 @@ internal sealed class WindowBoundCaller :
             NeuronId.For<ICapabilityTarget>(Id.Owner, TestingScenario.CapabilityTarget).ToGrainId());
 }
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class CapabilityTarget : Neuron, ICapabilityTarget
 {
     public Task Poke() => Task.CompletedTask;

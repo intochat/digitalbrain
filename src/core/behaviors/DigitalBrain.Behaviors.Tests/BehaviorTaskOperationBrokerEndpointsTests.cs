@@ -399,6 +399,10 @@ public sealed class BehaviorTaskOperationBrokerEndpointsTests
         }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JSON-deserialized by ReadFromJsonAsync; not constructed in source.")]
     private sealed record SnapshotResponse(
         string Attempt,
         int Sequence,
@@ -408,6 +412,10 @@ public sealed class BehaviorTaskOperationBrokerEndpointsTests
         ProtectedReferenceResponse? ResponsePayload,
         string? RedactedSummary);
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JSON-deserialized by ReadFromJsonAsync; not constructed in source.")]
     private sealed record EdgeResponse(
         string TargetType,
         string TargetOwner,
@@ -417,7 +425,15 @@ public sealed class BehaviorTaskOperationBrokerEndpointsTests
         string ResponseId,
         int ResponseVersion);
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JSON-deserialized by ReadFromJsonAsync; not constructed in source.")]
     private sealed record ProtectedReferenceResponse(string Id, DateTimeOffset? ExpiresAt);
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JSON-deserialized by ReadFromJsonAsync; not constructed in source.")]
     private sealed record ReadResponse(SnapshotResponse? Operation);
 }

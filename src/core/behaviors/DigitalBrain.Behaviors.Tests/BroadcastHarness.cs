@@ -44,6 +44,10 @@ public sealed record ProbeFactStalled([property: Id(0)] string Label) : Synapse;
 public sealed record ProbeFactStalledOnce([property: Id(0)] string Label) : Synapse;
 
 [GrainType(BroadcastHarness.GrainTypeName)]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class BroadcastProbeEmitterNeuron : Neuron, IBroadcastProbeEmitter
 {
     public Task BroadcastDeclared(string label) => EmitAsync(new ProbeFactRaised(label));
@@ -122,6 +126,10 @@ public sealed record ProbeActivationTail : Synapse;
 // Activation is the one reachable emission point with neither a delivery turn nor a client
 // entry scope, so it is where an unbound correlation is observable.
 [GrainType(BroadcastHarness.ActivationGrainTypeName)]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class ActivationPairEmitterNeuron : Neuron, IActivationPairEmitter
 {
     protected override async Task OnNeuronActivatedAsync(CancellationToken cancellationToken)

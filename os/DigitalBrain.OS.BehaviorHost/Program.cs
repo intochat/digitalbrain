@@ -210,6 +210,10 @@ static OwnerId RequireOwner(string? value, string reason)
     return new OwnerId(value);
 }
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "JSON-bound MapPost body constructed by ASP.NET model binding.")]
 internal sealed record DeployRequest(
     string Owner,
     string Behavior,
@@ -218,8 +222,16 @@ internal sealed record DeployRequest(
     string AssemblyBytesBase64,
     string SignatureBase64);
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "JSON-bound MapPost body constructed by ASP.NET model binding.")]
 internal sealed record ActivationRequest(string Owner, string Behavior, string ArtifactHash);
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "JSON-bound MapPost body constructed by ASP.NET model binding.")]
 internal sealed record ExecuteRequest(
     string Owner,
     string Behavior,
@@ -240,6 +252,10 @@ internal sealed record ExecuteRequest(
     string? WorkerName = null,
     int? Hops = null);
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "JSON-bound MapPost body constructed by ASP.NET model binding.")]
 internal sealed record CapabilityEdgeRequest(
     string TargetType,
     string TargetOwner,

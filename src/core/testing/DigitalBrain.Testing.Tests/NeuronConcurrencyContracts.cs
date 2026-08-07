@@ -86,22 +86,22 @@ public sealed class NeuronConcurrencyContracts
         Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence);
     }
 
-    private sealed class InterleavingHandlerProbe : IInterleavingHandler
+    private abstract class InterleavingHandlerProbe : IInterleavingHandler
     {
         public Task HandleAsync() => Task.CompletedTask;
     }
 
-    private sealed class ReadOnlyHandlerProbe : IReadOnlyHandler
+    private abstract class ReadOnlyHandlerProbe : IReadOnlyHandler
     {
         public Task HandleAsync() => Task.CompletedTask;
     }
 
-    private sealed class RedeclaredJournalReadProbe : IRedeclaredJournalRead
+    private abstract class RedeclaredJournalReadProbe : IRedeclaredJournalRead
     {
         public Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence)
             => Task.FromResult(new JournalRead(0, [], null));
     }
 
     [Reentrant]
-    private sealed class ReentrantProbe;
+    private abstract class ReentrantProbe;
 }

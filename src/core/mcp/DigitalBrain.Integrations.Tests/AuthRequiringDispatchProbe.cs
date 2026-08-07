@@ -28,6 +28,10 @@ public sealed record AuthRequiringProbeResponse(
     [property: Id(1)] string DetailCode) : Synapse;
 
 [GrainType(AuthRequiringDispatchProbe.GrainTypeName)]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class AuthRequiringProbeNeuron :
     Neuron,
     IAuthRequiringProbe,

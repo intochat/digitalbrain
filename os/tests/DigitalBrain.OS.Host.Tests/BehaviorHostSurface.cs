@@ -458,9 +458,21 @@ public sealed class BehaviorHostSurface(TestingAppHostFixture fixture)
         string CaseId,
         string TriggerTypeName);
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JSON-deserialized by ReadFromJsonAsync; not constructed in source.")]
     private sealed record LoadPayloadResponse(string ContentBase64);
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JSON-deserialized by ReadFromJsonAsync; not constructed in source.")]
     private sealed record StoredPayloadResponse(string Id, DateTimeOffset? ExpiresAt);
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JSON-deserialized by ReadFromJsonAsync; not constructed in source.")]
     private sealed record ExecuteResponse(bool Succeeded, string Outcome);
 }

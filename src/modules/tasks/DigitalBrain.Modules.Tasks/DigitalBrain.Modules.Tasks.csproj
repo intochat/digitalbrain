@@ -3,7 +3,7 @@
     <IsPackable>true</IsPackable>
     <Description>Tasks module: durable task lifecycle and worker attempt coordination.</Description>
     <RootNamespace>DigitalBrain.Tasks</RootNamespace>
-    <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812;CA2007</NoWarn>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.Tasks.Contracts\DigitalBrain.Modules.Tasks.Contracts.csproj" />

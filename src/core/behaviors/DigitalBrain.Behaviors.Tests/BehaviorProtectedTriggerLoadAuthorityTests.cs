@@ -279,5 +279,9 @@ public sealed class BehaviorProtectedTriggerLoadAuthorityTests(BehaviorDispatchF
             => await app.DisposeAsync();
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JSON-deserialized by ReadFromJsonAsync; not constructed in source.")]
     private sealed record LoadTriggerResponse(string ContentBase64);
 }

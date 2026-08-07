@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Ollama;
@@ -7,6 +8,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.OS.Assistant;
 
+[SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the silo from IAssistant grain identity.")]
 internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient chatClient)
     : Agent(chatClient), IAssistant
 {

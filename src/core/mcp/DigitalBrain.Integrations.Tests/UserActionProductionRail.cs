@@ -1352,6 +1352,10 @@ public sealed class UserActionProductionRail(UserActionProductionRailFixture fix
         }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "Constructed by the generic host DI container.")]
     private sealed class NoOpTaskOperations : IBehaviorTaskOperationAccess
     {
         public ValueTask<TaskOperationSnapshot> PrepareAsync(

@@ -71,7 +71,7 @@ public sealed class StreamingNeuronGuards
             .GetRequiredService<Serializer<ChatResponseUpdate>>();
 }
 
-internal sealed class ChatNeuronProbe : Neuron
+internal abstract class ChatNeuronProbe : Neuron
 {
     public IAsyncEnumerable<ChatResponseUpdate> Probe(CancellationToken cancellationToken = default)
         => AsyncEnumerable.Empty<ChatResponseUpdate>();

@@ -24,6 +24,10 @@ public sealed record DispatchProbeResponse(
     [property: Id(1)] string? DetailCode = null) : Synapse;
 
 [GrainType(DispatchHarness.GrainTypeName)]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class DispatchProbeNeuron :
     Neuron,
     IDispatchProbe,

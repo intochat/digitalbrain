@@ -8,6 +8,10 @@ namespace DigitalBrain.Tasks.Tests;
 public sealed partial class TasksHarnessModule : IModule;
 
 [GrainType(GrainTypeName)]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class ScriptedWorker :
     Neuron,
     IWorker,

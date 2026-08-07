@@ -292,6 +292,10 @@ public sealed class BehaviorTaskOperationBrokerLifecycle(BehaviorsFixture fixtur
         public ValueTask DisposeAsync() => app.DisposeAsync();
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JSON-deserialized by ReadFromJsonAsync; not constructed in source.")]
     private sealed record SnapshotResponse(
         string Attempt,
         int Sequence,
@@ -300,7 +304,15 @@ public sealed class BehaviorTaskOperationBrokerLifecycle(BehaviorsFixture fixtur
         ProtectedReferenceResponse? ResponsePayload,
         string? RedactedSummary);
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JSON-deserialized by ReadFromJsonAsync; not constructed in source.")]
     private sealed record ProtectedReferenceResponse(string Id, DateTimeOffset? ExpiresAt);
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JSON-deserialized by ReadFromJsonAsync; not constructed in source.")]
     private sealed record ReadResponse(SnapshotResponse? Operation);
 }

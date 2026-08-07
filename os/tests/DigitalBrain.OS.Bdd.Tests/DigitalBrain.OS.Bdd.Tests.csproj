@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <NoWarn>$(NoWarn);CA2007;CA1515;CA1812;CA1707</NoWarn>
+    <NoWarn>$(NoWarn);CA2007;CA1515;CA1707</NoWarn>
     <ReqnrollUseIntermediateOutputPathForCodeBehind>true</ReqnrollUseIntermediateOutputPathForCodeBehind>
   </PropertyGroup>
   <ItemGroup>

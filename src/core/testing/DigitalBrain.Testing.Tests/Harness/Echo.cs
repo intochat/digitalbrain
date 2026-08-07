@@ -25,6 +25,10 @@ public sealed record EchoRequest([property: Id(0)] string Text) : RequestSynapse
 [Description("Echo response text")]
 public sealed record EchoResponse([property: Id(0)] string Text) : Synapse;
 
+[SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class Echo :
     Neuron,
     IEcho,
@@ -50,6 +54,10 @@ public partial interface IRelay : INeuron
     Task<string> RelayEcho(string echoName, string text);
 }
 
+[SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class Relay : Neuron, IRelay
 {
     [SuppressMessage(
@@ -77,6 +85,10 @@ public partial interface IReplyProbe : INeuron
     Task ReplyOutsideContext();
 }
 
+[SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class ReplyProbe : Neuron, IReplyProbe
 {
     public Task ReplyOutsideContext()

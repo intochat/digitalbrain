@@ -22,6 +22,10 @@ public partial interface IUserActionBridgeDispositionProbe : INeuron
 }
 
 [GrainType(UserActionBridgeDispositionProbe.GrainTypeName)]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class UserActionBridgeDispositionProbeNeuron :
     Neuron,
     IUserActionBridgeDispositionProbe

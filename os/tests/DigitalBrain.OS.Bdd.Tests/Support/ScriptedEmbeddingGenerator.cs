@@ -2,6 +2,10 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.OS.Bdd.Tests;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Constructed by the generic host DI container.")]
 internal sealed class ScriptedEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>
 {
     public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(

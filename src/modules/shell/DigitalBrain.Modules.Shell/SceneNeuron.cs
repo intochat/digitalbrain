@@ -1,9 +1,14 @@
+using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Shell;
 
 [GrainType("scene")]
+[SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the silo from GrainType metadata.")]
 internal sealed class SceneNeuron :
     Neuron,
     IScene,

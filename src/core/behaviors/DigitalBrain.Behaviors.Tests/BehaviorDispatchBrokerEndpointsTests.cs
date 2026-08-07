@@ -437,5 +437,9 @@ public sealed class BehaviorDispatchBrokerEndpointsTests
         }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JSON-deserialized by ReadFromJsonAsync; not constructed in source.")]
     private sealed record ProtectedReferenceResponse(string Id, DateTimeOffset? ExpiresAt);
 }

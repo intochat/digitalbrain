@@ -37,6 +37,10 @@ public sealed record ProbeCyclePing([property: Id(0)] string Label) : Synapse;
 public sealed record ProbeCyclePong([property: Id(0)] string Label) : Synapse;
 
 [GrainType(AuthoredHostHarness.OpenerGrainTypeName)]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class AuthoredCycleOpenerNeuron : Neuron, IAuthoredCycleOpener
 {
     public Task OpenCycle(string label) => EmitAsync(new ProbeCyclePing(label));

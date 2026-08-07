@@ -21,6 +21,10 @@ public partial interface IUnauthorizedUserActionBinder : INeuron
 }
 
 [GrainType(UnauthorizedUserActionBinder.GrainTypeName)]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class UnauthorizedUserActionBinderNeuron :
     Neuron,
     IUnauthorizedUserActionBinder

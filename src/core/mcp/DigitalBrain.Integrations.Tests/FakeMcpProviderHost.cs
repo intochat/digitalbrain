@@ -365,6 +365,10 @@ internal sealed class DelegateTokenValidator(Func<string, bool> validate) : IOpa
     public bool Validate(string token) => validate(token);
 }
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Constructed by ASP.NET authentication scheme registration.")]
 internal sealed class OpaqueBearerHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
     ILoggerFactory logger,

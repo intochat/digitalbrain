@@ -158,6 +158,10 @@ public partial interface IClockProbe : INeuron
     Task<string[]> EventsAsync();
 }
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class ClockProbe : Neuron, IClockProbe, IRemindable
 {
     private const string ReminderName = "clock-probe";

@@ -14,6 +14,10 @@ public partial interface IIntegrationDriver : INeuron
 {
 }
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain activated by the test silo from GrainType metadata.")]
 internal sealed class IntegrationDriver :
     Neuron,
     IIntegrationDriver,
