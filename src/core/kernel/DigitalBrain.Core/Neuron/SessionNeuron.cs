@@ -2,6 +2,7 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Core;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Orleans or DI activated; never constructed in-process.")]
 internal sealed class SessionNeuron : Neuron, ISessionNeuron
 {
     public Task<SynapseDelivery> Fire(NeuronId receiver, Synapse synapse)

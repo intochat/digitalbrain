@@ -43,7 +43,7 @@ public sealed class SynapseDelivery
     [Id(6)]
     public DateTimeOffset Timestamp { get; }
 
-    internal static SynapseDelivery Create(
+    public static SynapseDelivery Create(
         Synapse synapse,
         NeuronId caller,
         long sequence,

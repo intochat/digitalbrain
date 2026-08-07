@@ -3,7 +3,7 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
 
-internal static class GrainCallerContext
+public static class GrainCallerContext
 {
     private const string SourceKey = "db.grain-caller-source";
     private const string AuthorizationInitiatorKey = "db.mcp-authorization-initiator";
@@ -25,7 +25,7 @@ internal static class GrainCallerContext
         return new CallerScope(previousSource, previousInitiator);
     }
 
-    internal static bool TryGetNeuronId(out NeuronId caller)
+    public static bool TryGetNeuronId(out NeuronId caller)
     {
         if (RequestContext.Get(SourceKey) is not GrainId source
             || !TryParseNeuronId(source, out caller))
@@ -37,7 +37,7 @@ internal static class GrainCallerContext
         return true;
     }
 
-    internal static bool TryGetAuthorizationInitiator(out NeuronId initiator)
+    public static bool TryGetAuthorizationInitiator(out NeuronId initiator)
     {
         if (RequestContext.Get(AuthorizationInitiatorKey) is GrainId source
             && TryParseNeuronId(source, out initiator)
