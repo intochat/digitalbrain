@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 using DigitalBrain.Memory;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;

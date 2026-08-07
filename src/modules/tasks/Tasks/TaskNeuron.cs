@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;

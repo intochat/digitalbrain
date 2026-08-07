@@ -1,5 +1,5 @@
 using System.Text;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Memory;
 

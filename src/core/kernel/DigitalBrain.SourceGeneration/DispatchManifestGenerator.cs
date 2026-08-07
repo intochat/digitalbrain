@@ -12,9 +12,9 @@ public sealed partial class DispatchManifestGenerator : IIncrementalGenerator
     private const string EmitInterface = "DigitalBrain.Abstractions.IEmit<TSynapse>";
     private const string NeuronInterface = "DigitalBrain.Abstractions.INeuron";
     private const string ModuleInterface = "DigitalBrain.Abstractions.IModule";
-    private const string CompiledModuleInterface = "DigitalBrain.Kernel.ICompiledModule";
+    private const string CompiledModuleInterface = "DigitalBrain.Core.ICompiledModule";
     private const string SiloBuilder = "Orleans.Hosting.ISiloBuilder";
-    private const string DigitalBrainRuntime = "DigitalBrain.Kernel.DigitalBrainRuntime";
+    private const string DigitalBrainRuntime = "DigitalBrain.Core.DigitalBrainRuntime";
 
     private static readonly SymbolDisplayFormat FullName =
         SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Omitted);

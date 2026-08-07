@@ -127,24 +127,24 @@ public sealed partial class DispatchManifestGenerator
         }
 
         source.AppendLine();
-        source.AppendLine($"public {(module.IsSealed ? "sealed " : string.Empty)}partial class {module.Name} : global::DigitalBrain.Kernel.ICompiledModule");
+        source.AppendLine($"public {(module.IsSealed ? "sealed " : string.Empty)}partial class {module.Name} : global::DigitalBrain.Core.ICompiledModule");
         source.AppendLine("{");
         source.AppendLine("    public static global::DigitalBrain.Abstractions.ModuleId Id { get; } =");
         source.AppendLine($"        new(\"{module.FullName}\");");
         source.AppendLine();
         source.AppendLine("    global::DigitalBrain.Abstractions.ModuleId");
-        source.AppendLine("        global::DigitalBrain.Kernel.ICompiledModule.Id => Id;");
+        source.AppendLine("        global::DigitalBrain.Core.ICompiledModule.Id => Id;");
         AppendCapabilities(source, module);
         source.AppendLine();
-        source.AppendLine("    void global::DigitalBrain.Kernel.ICompiledModule.PrepareSerialization(");
+        source.AppendLine("    void global::DigitalBrain.Core.ICompiledModule.PrepareSerialization(");
         source.AppendLine("        global::Microsoft.Extensions.DependencyInjection.IServiceCollection services)");
         source.AppendLine("        => ConfigureSerialization(services);");
         source.AppendLine();
-        source.AppendLine("    void global::DigitalBrain.Kernel.ICompiledModule.Activate(");
+        source.AppendLine("    void global::DigitalBrain.Core.ICompiledModule.Activate(");
         source.AppendLine("        global::Orleans.Hosting.ISiloBuilder builder)");
         source.AppendLine("    {");
         source.AppendLine("        ConfigureRuntime(builder);");
-        source.AppendLine("        global::DigitalBrain.Kernel.DigitalBrainSiloBuilderExtensions.AddBroadcastHandlers(");
+        source.AppendLine("        global::DigitalBrain.Core.DigitalBrainSiloBuilderExtensions.AddBroadcastHandlers(");
         source.AppendLine($"            builder, typeof(global::{module.FullName}).Assembly);");
         source.AppendLine("    }");
         source.AppendLine();

@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Behaviors;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;

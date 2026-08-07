@@ -1,5 +1,5 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 

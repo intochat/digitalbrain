@@ -1,5 +1,5 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Memory;

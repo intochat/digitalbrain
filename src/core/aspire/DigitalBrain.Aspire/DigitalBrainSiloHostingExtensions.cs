@@ -1,5 +1,5 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 using DigitalBrain.ServiceDefaults;
 using Microsoft.Extensions.Hosting;
 

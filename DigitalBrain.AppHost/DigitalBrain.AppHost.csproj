@@ -1,0 +1,39 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.5.0-preview.1.26376.5">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <UserSecretsId>digitalbrain-os-apphost-7c3e9a2f-4b81-4d6e-9f0a-1e5c8b2d6a44</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\src\modules\ai\Aspire.Hosting\DigitalBrain.Modules.AI.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\src\modules\chat\Chat\DigitalBrain.Modules.Chat.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\product\DigitalBrain.Assistant\DigitalBrain.Assistant.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\src\modules\shell\Aspire.Hosting\DigitalBrain.Modules.Shell.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\src\modules\google\Aspire.Hosting\DigitalBrain.Modules.Google.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\src\modules\salesforce\Aspire.Hosting\DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\src\modules\memory\Aspire.Hosting\DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\src\core\aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\product\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="..\product\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
+    <ProjectReference Include="..\product\DigitalBrain.BehaviorHost\DigitalBrain.BehaviorHost.csproj" />
+    <ProjectReference Include="..\src\core\behaviors\DigitalBrain.Behaviors.Runtime\DigitalBrain.Behaviors.Runtime.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\src\core\behaviors\DigitalBrain.Behaviors.Host\DigitalBrain.Behaviors.Host.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\src\modules\tasks\Tasks\DigitalBrain.Modules.Tasks.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\src\modules\time\Time\DigitalBrain.Modules.Time.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\src\modules\introspection\Introspection\DigitalBrain.Modules.Introspection.csproj" IsAspireProjectResource="false" />
+  </ItemGroup>
+  <PropertyGroup>
+    <CodeGraphRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))</CodeGraphRoot>
+  </PropertyGroup>
+  <Target Name="RefreshCodeGraph" BeforeTargets="Build">
+    <PropertyGroup>
+      <CodeGraphIndexed>$([System.IO.File]::Exists('$(CodeGraphRoot)\.codegraph\codegraph.db'))</CodeGraphIndexed>
+    </PropertyGroup>
+    <Exec Command="npx -y @colbymchenry/codegraph@latest init &quot;$(CodeGraphRoot)&quot;"
+          WorkingDirectory="$(CodeGraphRoot)"
+          Condition="'$(CodeGraphIndexed)' != 'True'" />
+    <Exec Command="npx -y @colbymchenry/codegraph@latest sync &quot;$(CodeGraphRoot)&quot;"
+          WorkingDirectory="$(CodeGraphRoot)"
+          Condition="'$(CodeGraphIndexed)' == 'True'" />
+  </Target>
+</Project>

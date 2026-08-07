@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Tasks;
 

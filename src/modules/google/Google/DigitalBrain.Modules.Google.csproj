@@ -13,8 +13,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Contracts\DigitalBrain.Modules.Google.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\..\src\core\mcp\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
-    <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="..\..\..\..\src\core\mcp\DigitalBrain.Mcp.Sdk\DigitalBrain.Mcp.Sdk.csproj" />
+    <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\security\DigitalBrain.Security\DigitalBrain.Security.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"
                       OutputItemType="Analyzer"

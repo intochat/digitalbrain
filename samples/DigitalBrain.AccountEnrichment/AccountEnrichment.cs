@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Google;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 using DigitalBrain.Salesforce;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;

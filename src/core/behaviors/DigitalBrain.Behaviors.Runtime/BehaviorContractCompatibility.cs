@@ -1,5 +1,5 @@
 using DigitalBrain.Behaviors.Manifest;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Behaviors.Runtime;
 

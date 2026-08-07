@@ -83,7 +83,7 @@ the product AppHost opts Development into prompt and response capture for local 
 | Application traces | works — ASP.NET, Orleans and kernel spans carry causal identifiers |
 | GenAI spans, metrics | works — provider, model, duration, token usage and finish reason; prompt and response content only when the AI module explicitly enables it |
 
-`dotnet test os/tests/DigitalBrain.OS.Product.Tests -c Release -- -explicit only` is the live oracle.
+`dotnet test os/tests/DigitalBrain.Product.Tests -c Release -- -explicit only` is the live oracle.
 It starts and stops the product AppHost, drives a real Gemma4 turn and retry, confirms the durable
 transcript and correlation, checks owner-scoped active-neuron discovery, and verifies GenAI usage
 and Development message content in the exported span.
@@ -128,7 +128,7 @@ different API from `Microsoft.Orleans.Journaling`. Do not conflate them.
 blast radius, replacing a grep-and-read loop. It indexes what git tracks, across C# and Dart alike;
 because it honours `.gitignore`, **source-generated code under `obj/` is invisible to it** — use the
 compiler for generated symbols. The index is refreshed by `RefreshCodeGraph` in
-`os/DigitalBrain.OS.AppHost/DigitalBrain.OS.AppHost.csproj`, which belongs to that project alone.
+`DigitalBrain.AppHost/DigitalBrain.AppHost.csproj`, which belongs to that project alone.
 
 MCP lives in root `.mcp.json`: `aspire` (resources, logs, traces), `codegraph`, `context7`,
 `microsoft-learn`, `dart`, and `digitalbrain-mcp` (the running brain; needs silo up — northbound MCP is the `mcp` process, a cluster client on port 5000).

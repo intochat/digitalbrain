@@ -9,7 +9,7 @@
 #   docker compose build
 #
 # Secrets: never commit real values. Prefer env file or Key Vault-injected env
-# (see headers in os/DigitalBrain.OS.Host/Dockerfile and os/DigitalBrain.OS.UiEdge/Dockerfile).
+# (see headers in product/DigitalBrain.Kernel/Dockerfile and product/DigitalBrain.UiEdge/Dockerfile).
 
 services:
   azurite:
@@ -33,7 +33,7 @@ services:
     image: digitalbrain:local
     build:
       context: .
-      dockerfile: os/DigitalBrain.OS.Host/Dockerfile
+      dockerfile: product/DigitalBrain.Kernel/Dockerfile
     ports:
       - "8080:8080"
       - "5000:5000"
@@ -60,7 +60,7 @@ services:
       DigitalBrain__Modules__0: DigitalBrain.AI.AIModule
       DigitalBrain__Modules__1: DigitalBrain.Chat.ChatModule
       DigitalBrain__Modules__2: DigitalBrain.Memory.MemoryModule
-      DigitalBrain__Modules__3: DigitalBrain.OS.Assistant.AssistantModule
+      DigitalBrain__Modules__3: DigitalBrain.Assistant.AssistantModule
       DigitalBrain__Modules__4: DigitalBrain.Shell.ShellModule
       DigitalBrain__Modules__5: DigitalBrain.Google.GoogleModule
       DigitalBrain__Modules__6: DigitalBrain.Salesforce.SalesforceModule
@@ -77,7 +77,7 @@ services:
     image: digitalbrain-ui:local
     build:
       context: .
-      dockerfile: os/DigitalBrain.OS.UiEdge/Dockerfile
+      dockerfile: product/DigitalBrain.UiEdge/Dockerfile
     ports:
       - "5080:8080"
     environment:
@@ -87,7 +87,7 @@ services:
       DigitalBrain__Modules__0: DigitalBrain.AI.AIModule
       DigitalBrain__Modules__1: DigitalBrain.Chat.ChatModule
       DigitalBrain__Modules__2: DigitalBrain.Memory.MemoryModule
-      DigitalBrain__Modules__3: DigitalBrain.OS.Assistant.AssistantModule
+      DigitalBrain__Modules__3: DigitalBrain.Assistant.AssistantModule
       DigitalBrain__Modules__4: DigitalBrain.Shell.ShellModule
       DigitalBrain__Modules__5: DigitalBrain.Google.GoogleModule
       DigitalBrain__Modules__6: DigitalBrain.Salesforce.SalesforceModule

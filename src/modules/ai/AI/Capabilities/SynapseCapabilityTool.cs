@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI;

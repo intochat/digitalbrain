@@ -37,7 +37,8 @@ public sealed partial class DispatchManifestGenerator
         var definesModule = TypesIn(compilation.Assembly.GlobalNamespace)
             .Any(type => type.AllInterfaces.Any(contract =>
                 SymbolEqualityComparer.Default.Equals(contract, moduleContract)));
-        var emit = compilation.AssemblyName != "DigitalBrain.Kernel"
+        // Compose only into product silos / hosts, never into the Core library itself.
+        var emit = compilation.AssemblyName != "DigitalBrain.Core"
             && !definesModule
             && siloBuilder is not null
             && compilation.GetTypeByMetadataName(DigitalBrainRuntime) is not null;
@@ -74,7 +75,7 @@ public sealed partial class DispatchManifestGenerator
         source.AppendLine("    internal static class CompiledModuleCatalog");
         source.AppendLine("    {");
         source.AppendLine("        internal static global::System.Collections.Generic.IReadOnlyList<");
-        source.AppendLine("            global::DigitalBrain.Kernel.ICompiledModule> Modules { get; } =");
+        source.AppendLine("            global::DigitalBrain.Core.ICompiledModule> Modules { get; } =");
         source.AppendLine("        [");
 
         foreach (var module in model.Modules)
@@ -86,7 +87,7 @@ public sealed partial class DispatchManifestGenerator
         source.AppendLine("    }");
         source.AppendLine("}");
         source.AppendLine();
-        source.AppendLine("namespace DigitalBrain.Kernel");
+        source.AppendLine("namespace DigitalBrain.Core");
         source.AppendLine("{");
         source.AppendLine("    [ExcludeFromCodeCoverage]");
         source.AppendLine("    internal static class GeneratedDigitalBrainSiloBuilderExtensions");
@@ -94,7 +95,7 @@ public sealed partial class DispatchManifestGenerator
         source.AppendLine("        internal static global::Orleans.Hosting.ISiloBuilder AddDigitalBrain(");
         source.AppendLine("            this global::Orleans.Hosting.ISiloBuilder builder)");
         source.AppendLine("        {");
-        source.AppendLine("            global::DigitalBrain.Kernel.DigitalBrainRuntime.Add(");
+        source.AppendLine("            global::DigitalBrain.Core.DigitalBrainRuntime.Add(");
         source.AppendLine("                builder,");
         source.AppendLine("                global::DigitalBrain.Generated.CompiledModuleCatalog.Modules);");
         source.AppendLine();

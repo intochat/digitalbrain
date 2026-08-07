@@ -27,7 +27,7 @@ BrainTopologySnapshot shellTopology() => BrainTopologySnapshot(
     BrainModule(id: 'DigitalBrain.AI.AIModule'),
     BrainModule(id: 'DigitalBrain.Shell.ShellModule'),
     BrainModule(id: 'DigitalBrain.Google.GoogleModule'),
-    BrainModule(id: 'DigitalBrain.OS.Assistant.AssistantModule'),
+    BrainModule(id: 'DigitalBrain.Assistant.AssistantModule'),
     BrainModule(id: 'DigitalBrain.Salesforce.SalesforceModule'),
   ],
   neurons: const [

@@ -2,7 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;

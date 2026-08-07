@@ -1,6 +1,6 @@
 using System.Globalization;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.AI;
 

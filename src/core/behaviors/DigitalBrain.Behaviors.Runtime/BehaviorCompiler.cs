@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Manifest;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 

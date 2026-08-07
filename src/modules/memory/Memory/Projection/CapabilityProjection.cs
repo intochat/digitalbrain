@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Memory;
 

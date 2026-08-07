@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors.Manifest;
 using DigitalBrain.Behaviors.Artifacts;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 using DigitalBrain.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 

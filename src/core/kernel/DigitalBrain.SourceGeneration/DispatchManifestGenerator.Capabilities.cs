@@ -368,7 +368,7 @@ public sealed partial class DispatchManifestGenerator
         source.AppendLine("            ]);");
         source.AppendLine();
         source.AppendLine("    global::DigitalBrain.Abstractions.CapabilityManifest");
-        source.AppendLine("        global::DigitalBrain.Kernel.ICompiledModule.Capabilities => Capabilities;");
+        source.AppendLine("        global::DigitalBrain.Core.ICompiledModule.Capabilities => Capabilities;");
     }
 
     private static void AppendSynapseArray(

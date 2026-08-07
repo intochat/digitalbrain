@@ -17,7 +17,7 @@ public sealed partial class BehaviorsModule
     {
         DurablePayloadProtectionHosting.Configure(builder.Services, builder.Configuration);
         builder.Services.AddSingleton(static provider =>
-            new BehaviorCompiler(provider.GetRequiredService<DigitalBrain.Kernel.ActiveCapabilityCatalog>()));
+            new BehaviorCompiler(provider.GetRequiredService<DigitalBrain.Core.ActiveCapabilityCatalog>()));
         builder.Services.AddSingleton<IBehaviorBddGate, InstallTestsBddGate>();
         builder.Services.TryAddSingleton<IBehaviorArtifactTrust>(static provider =>
             new BehaviorArtifactTrust(provider.GetRequiredService<IDurablePayloadProtector>()));
@@ -25,10 +25,10 @@ public sealed partial class BehaviorsModule
         builder.Services.TryAddSingleton<IBehaviorProtectedTriggerAccess, GrainBehaviorProtectedTriggerAccess>();
         builder.Services.TryAddSingleton<IBehaviorTaskOperationAccess, GrainBehaviorTaskOperationAccess>();
         builder.Services.TryAddSingleton<IBehaviorCapabilityDispatchAccess, GrainBehaviorCapabilityDispatchAccess>();
-        builder.Services.TryAddSingleton<DigitalBrain.Kernel.IBroadcastSubscribers, BehaviorBroadcastSubscribers>();
+        builder.Services.TryAddSingleton<DigitalBrain.Core.IBroadcastSubscribers, BehaviorBroadcastSubscribers>();
         builder.Services.TryAddSingleton<IUserActionCustody>(static provider =>
         {
-            var time = provider.GetKeyedService<TimeProvider>(DigitalBrain.Kernel.NeuronTime.ServiceKey)
+            var time = provider.GetKeyedService<TimeProvider>(DigitalBrain.Core.NeuronTime.ServiceKey)
                 ?? provider.GetService<TimeProvider>()
                 ?? TimeProvider.System;
             return new GrainUserActionCustody(

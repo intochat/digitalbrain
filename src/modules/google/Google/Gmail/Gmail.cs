@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Google.Auth;
-using DigitalBrain.Kernel;
+using DigitalBrain.Core;
 using DigitalBrain.Mcp;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;

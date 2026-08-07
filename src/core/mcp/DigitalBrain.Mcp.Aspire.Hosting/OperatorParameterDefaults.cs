@@ -18,7 +18,7 @@ internal sealed class OperatorSuppliedParameterDefault(string parameterName) : P
     public override string GetDefaultValue()
         => throw new MissingParameterValueException(
             $"Parameter '{parameterName}' has no value. Set it in the Aspire dashboard (Save to user secrets) "
-            + $"or: dotnet user-secrets set \"Parameters:{parameterName}\" \"<value>\" --project os/DigitalBrain.OS.AppHost");
+            + $"or: dotnet user-secrets set \"Parameters:{parameterName}\" \"<value>\" --project DigitalBrain.AppHost");
 
     public override void WriteToManifest(ManifestPublishingContext context)
         => throw new InvalidOperationException(
