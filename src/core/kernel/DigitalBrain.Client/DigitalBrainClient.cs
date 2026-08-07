@@ -2,7 +2,6 @@ using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Behaviors;
 
 namespace DigitalBrain.Client;
 
@@ -27,20 +26,6 @@ public sealed class DigitalBrainClient : IDigitalBrain
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
 
         return new DigitalBrainClient(grains, new OwnerId(owner));
-    }
-
-    public static Task<BehaviorBrain<TTrigger>> ConnectAsync<TTrigger>(
-        CancellationToken cancellationToken = default)
-        where TTrigger : Synapse
-    {
-        if (cancellationToken.CanBeCanceled)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-        }
-
-        return Task.FromException<BehaviorBrain<TTrigger>>(
-            new InvalidOperationException(
-                "DigitalBrainClient.ConnectAsync is supplied by the isolated behavior worker."));
     }
 
     public Task ActivateAsync(CancellationToken cancellationToken = default)
@@ -363,8 +348,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
     {
         if (neuronType == typeof(INeuron)
             || typeof(ISessionNeuron).IsAssignableFrom(neuronType)
-            || typeof(IDigitalBrainNeuron).IsAssignableFrom(neuronType)
-            || typeof(IBehavior).IsAssignableFrom(neuronType))
+            || typeof(IDigitalBrainNeuron).IsAssignableFrom(neuronType))
         {
             throw new NeuronAuthorizationException(
                 $"'{neuronType.Name}' is not addressable through IDigitalBrain.Get. Activate the brain with ActivateAsync; address domain neuron contracts with Get; fire and emit through SendAsync and EmitAsync; observe journals through ReadJournalAsync and WatchJournalAsync.");

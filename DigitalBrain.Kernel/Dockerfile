@@ -48,10 +48,9 @@
 #     DigitalBrain__Modules__4=DigitalBrain.Shell.ShellModule
 #     DigitalBrain__Modules__5=DigitalBrain.Google.GoogleModule
 #     DigitalBrain__Modules__6=DigitalBrain.Salesforce.SalesforceModule
-#     DigitalBrain__Modules__7=DigitalBrain.Behaviors.Runtime.BehaviorsModule
-#     DigitalBrain__Modules__8=DigitalBrain.Tasks.TasksModule
-#     DigitalBrain__Modules__9=DigitalBrain.Time.TimeModule
-#     DigitalBrain__Modules__10=DigitalBrain.Introspection.IntrospectionModule
+#     DigitalBrain__Modules__7=DigitalBrain.Tasks.TasksModule
+#     DigitalBrain__Modules__8=DigitalBrain.Time.TimeModule
+#     DigitalBrain__Modules__9=DigitalBrain.Introspection.IntrospectionModule
 #
 # Ports: 8080 silo HTTP (broker + health), 5000 northbound MCP (/mcp)
 

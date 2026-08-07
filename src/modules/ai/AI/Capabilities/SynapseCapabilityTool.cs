@@ -30,7 +30,8 @@ public static class SynapseCapabilityTool
 
         if (string.Equals(capability.Kind, CapabilityKinds.Behavior, StringComparison.Ordinal))
         {
-            return MaterializeBehavior(capability, grains, owner);
+            throw new InvalidOperationException(
+                "Authored behavior capabilities are not loaded in this product composition.");
         }
 
         if (!typeMap.TryGetSynapseType(capability.ContractId, capability.SchemaVersion, out var requestType)
@@ -132,55 +133,6 @@ public static class SynapseCapabilityTool
         }
 
         return synapse;
-    }
-
-    private static AIFunction MaterializeBehavior(
-        ValidatedCapability capability,
-        IGrainFactory grains,
-        OwnerId owner)
-    {
-        if (string.IsNullOrWhiteSpace(capability.ArtifactHash))
-        {
-            throw new InvalidOperationException(
-                $"Published behavior '{capability.BehaviorId}' is missing an exact active artifact hash.");
-        }
-
-        // Exact catalog artifact hash is captured here; vector metadata never chooses the revision.
-        var boundArtifactHash = capability.ArtifactHash;
-        var instanceName = capability.DefaultInstanceName;
-        var description =
-            $"{capability.Description} Active revision {boundArtifactHash}. "
-            + "Provide the trigger CLR type name and its JSON payload to run once.";
-
-        async Task<string> InvokeAsync(string triggerTypeName, string triggerJson)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(triggerTypeName);
-            ArgumentException.ThrowIfNullOrWhiteSpace(triggerJson);
-            ArgumentException.ThrowIfNullOrWhiteSpace(boundArtifactHash);
-
-            var behavior = grains.GetGrain<DigitalBrain.Behaviors.IBehaviorNeuron>(
-                NeuronId.For<DigitalBrain.Behaviors.IBehaviorNeuron>(owner, instanceName).ToGrainId());
-            var snapshot = await behavior.Read().ConfigureAwait(false);
-            if (!string.Equals(snapshot.ActiveArtifactHash, boundArtifactHash, StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    $"Exact active revision for behavior '{capability.BehaviorId}' is "
-                    + $"'{snapshot.ActiveArtifactHash}', not vector-suggested '{boundArtifactHash}'.");
-            }
-
-            var result = await behavior.Execute(
-                new DigitalBrain.Behaviors.ExecuteBehaviorRevision(
-                    CommandId.New(),
-                    triggerTypeName,
-                    triggerJson))
-                .ConfigureAwait(false);
-            return result.Outcome ?? "behavior executed";
-        }
-
-        return AIFunctionFactory.Create(
-            InvokeAsync,
-            capability.ToolName,
-            description);
     }
 
     private static bool TryGetResponseType(Type requestType, out Type? responseType)

@@ -8,6 +8,5 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
-    <ProjectReference Include="..\..\behaviors\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
   </ItemGroup>
 </Project>

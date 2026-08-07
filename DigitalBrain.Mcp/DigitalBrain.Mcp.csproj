@@ -9,7 +9,6 @@
   <ItemGroup>
     <ProjectReference Include="..\src\modules\chat\Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
     <ProjectReference Include="..\src\modules\introspection\Contracts\DigitalBrain.Modules.Introspection.Contracts.csproj" />
-    <ProjectReference Include="..\src\core\behaviors\DigitalBrain.Behaviors\DigitalBrain.Behaviors.csproj" />
     <ProjectReference Include="..\src\core\aspire\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
     <ProjectReference Include="..\src\modules\sdk\DigitalBrain.Modules.Sdk\DigitalBrain.Modules.Sdk.csproj" />

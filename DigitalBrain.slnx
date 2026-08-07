@@ -1,8 +1,6 @@
 <Solution>
   <Folder Name="/core/">
     <Project Path="src/core/kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
-    <Project Path="src/core/behaviors/DigitalBrain.Behaviors/DigitalBrain.Behaviors.csproj" />
-    <Project Path="src/core/behaviors/DigitalBrain.Behaviors.Runtime/DigitalBrain.Behaviors.Runtime.csproj" />
     <Project Path="src/core/kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <Project Path="src/core/kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <Project Path="src/core/aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />

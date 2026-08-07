@@ -41,8 +41,8 @@ The plan of record. Nothing is shipped unless it says Built.
 | Automatic discovery — exact catalog + semantic projection (lab) | **Built** (product claim pending live E1) |
 | Shell vertical — shell/scene vocabulary, Kernel-hosted HTTP/SSE maps (`MapChatStreams`/`MapShellStreams`/`MapOAuthCallback`), Flutter hosts (`WithHeadlessHost`/`WithWindowHost`/`WithWebHost`), Windows + web chrome | **Built** (web deploy host; K1 six-view pixel parity on web still open) |
 | Product shell — responsive Chat, content-safe Activity, live 3D-projected Brain topology, pulses and inspector | **Built** |
-| Behavior Studio surface (six views, host APIs) | Removed from product surface this pass — Monaco/studio HTTP deleted with UiEdge |
-| NL → C# behavior authoring (C1 ladder) | Designed until C1 green |
+| Behavior Studio surface (six views, host APIs) | Removed |
+| NL → C# authoring / Scripting | Designed — product `DigitalBrain.Scripting` is a dummy generate+run chat proof; full AI→C# rail not in tree |
 | Product MCP surface — durable chat send/read, neuron journal observation, active-neuron discovery | **Built** — northbound MCP is `DigitalBrain.Mcp` (cluster client) on `/mcp` port 5000; tools call `IDigitalBrain` |
 | Introspection — model-callable journal tally, journal read, and topology read as brain capabilities (`introspection.tally-journal-request`, `introspection.read-journal-request`, `introspection.read-topology-request`) | **Built** — the capabilities answer correctly when invoked, live-verified via the MCP surface above and via deterministic capability-call tests. Live Gemma4 (`gemma4:12b`) did **not** select `introspection.tally-journal-request` across repeated real turns in one session, even when told its name: it answered "how many messages have I sent" from conversation memory, once exhausted its context budget mid-deliberation without answering at all, and once substituted `chat.read-transcript-request` and counted turns manually. The off-by-one tally policy (the in-flight question counts) held in every case where an answer was given. Model tool-selection for this capability is an open live gap, not a code gap — see CLAUDE.md traps |
 | Dual live Google + Salesforce OAuth productization | In progress — Gmail is Google SDK (REST) with reflected read-only catalog + typed ops; one browser sign-in flow via app callback `/oauth/callback`; Salesforce stays MCP. Unverified Google app in Testing mode: re-consent every 7 days, ≤100 test users. Register redirect `http://localhost:5080/oauth/callback` (owner re-registration pending, lane g6). Live dual-provider proof pending |
@@ -51,16 +51,12 @@ The plan of record. Nothing is shipped unless it says Built.
 | Multi-principal IdP edge, journal observation on `IDigitalBrain` | Designed |
 | Multi-model UI combine / Settings model switch | Designed |
 | Docker product image (`digitalbrain` = silo + northbound MCP) | In progress — Kernel Dockerfile + local `docker-compose.yml` smoke; Flutter is not a container image; no CI image build, no Docker Hub publish |
-| Behavior rail libraries under `src/core/behaviors` | **Built** as libraries; product BehaviorHost process replaced by dummy `DigitalBrain.Scripting` proof (generate+run chat client). Signed deploy/activate/execute product process removed |
 | Scripting — external worker proof that generates a single-file C# brain client and prints a chat reply | **Built** (dummy) |
 | Observability spine — host OpenTelemetry, structured logs, causal kernel spans, GenAI spans and metrics | **Built** |
 
-`DigitalBrain.Behaviors` is a packable SDK foundation (authoring interfaces, constrained context,
-manifests, artifact identities) and holds the canonical artifact codec. The product AppHost loads
-`BehaviorsModule` with residual InProcess-closed execution. Full NL→C# authoring is not ship-claimed
-until C1 is green. Chat still owns its turn in `ChatNeuron` today; `IAssistant` lives in the AI module.
-
-One assumption remains load-bearing and unmeasured: **that a model can reliably emit behaviour scripts.**
+Chat still owns its turn in `ChatNeuron` today; `IAssistant` lives in the AI module. Authored
+behavior packages (`DigitalBrain.Behaviors` / Runtime) are removed from the product tree; residual
+`BehaviorId` identity types remain in Abstractions for Tasks/Security wire compatibility.
 
 ## Repository shape
 

@@ -3,7 +3,6 @@ using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Assistant;
-using DigitalBrain.Behaviors.Runtime;
 using DigitalBrain.Chat;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
@@ -40,13 +39,11 @@ brain.AddModule<ShellModule>(shell => shell
     );
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
-brain.AddModule<BehaviorsModule>();
 brain.AddModule<TasksModule>();
 brain.AddModule<TimeModule>();
 brain.AddModule<IntrospectionModule>();
 
 // Process boundary: silo (HTTP maps + grains) + northbound MCP + scripting probe.
-// Residual behavior execution stays InProcess-closed (no BehaviorHost product process).
 var silo = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Silo)
     .WithReference(brain)
     .WithEnvironment(
