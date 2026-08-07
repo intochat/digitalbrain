@@ -17,11 +17,6 @@ public sealed class McpRuntime
         ArgumentNullException.ThrowIfNull(sessions);
         _sessions = sessions;
     }
-
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Reliability",
-        "CA2025:Ensure tasks using 'IDisposable' instances complete before the instances are disposed",
-        Justification = "On no-code auth outcomes the MCP SDK CreateAsync may never complete; the open token is canceled and the parked Task.Run is abandoned so the grain turn can return.")]
     public async ValueTask<T> RunAsync<T>(
         McpServerDefinition server,
         IDurableValue<byte[]> tokenState,
@@ -46,7 +41,7 @@ public sealed class McpRuntime
             server.DisplayName,
             owner,
             grains);
-        // Register by command id immediately so deny/cancel can always AbortOpen this ambient.
+
         McpAuthorizationCodeHub.RegisterAmbient(commandId.ToString(), ambient);
         using var scope = McpAuthorizationAmbient.Enter(ambient);
         using var openLinked = CancellationTokenSource.CreateLinkedTokenSource(
@@ -54,8 +49,6 @@ public sealed class McpRuntime
             ambient.OpenCancellation);
         var openToken = openLinked.Token;
 
-        // MCP open off the grain turn so OAuth's wait on BeginCompleted cannot deadlock against
-        // this turn's WhenAny/Begin sequence under Orleans serialization.
         var work = Task.Run(
             () => OpenAndInvokeAsync(
                 server,
@@ -88,9 +81,6 @@ public sealed class McpRuntime
                 ambient.BeginCompleted.TrySetResult();
             }
 
-            // Race hold-open work against any no-code terminal (deny, cancel, abandon).
-            // On terminal, cancel and abandon the parked CreateAsync — awaiting it after a null
-            // AuthorizationResult can hang forever on MCP SDK session Completion.
             var settled = await Task.WhenAny(work, ambient.Terminal.Task).WaitAsync(cancellationToken).ConfigureAwait(false);
             if (ReferenceEquals(settled, ambient.Terminal.Task) && !work.IsCompleted)
             {

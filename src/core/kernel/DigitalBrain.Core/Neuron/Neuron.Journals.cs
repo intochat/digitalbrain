@@ -44,10 +44,6 @@ public abstract partial class Neuron
         await watcher.Observer.ObserveAsync(watcher.Kind, read).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "An observer that cannot be reached is a disconnected client, not a fault of this neuron. Dropping it is the recovery, and the client resumes with its cursor.")]
     private async Task NotifyWatchersAsync()
     {
         foreach (var watcher in _watchers.ToArray())

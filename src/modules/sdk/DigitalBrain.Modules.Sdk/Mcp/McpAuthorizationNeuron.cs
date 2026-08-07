@@ -9,10 +9,6 @@ using Orleans.Serialization;
 namespace DigitalBrain.Modules.Sdk.Mcp;
 
 [GrainType("mcpauthorization")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage(
-    "Performance",
-    "CA1812:Avoid uninstantiated internal classes",
-    Justification = "Orleans grain; activated by the silo, never constructed in-process.")]
 internal sealed class McpAuthorizationNeuron :
     Neuron,
     IMcpAuthorization,
@@ -187,8 +183,7 @@ internal sealed class McpAuthorizationNeuron :
 
         if (!_pending.TryGetValue(delivery.State, out var serialized))
         {
-            // Unknown/foreign state: complete any hub waiter for this state only. Do not AbortOpen
-            // other ambients — a live hold-open for a different state must keep parking.
+
             McpAuthorizationCodeHub.Complete(delivery.State, result: null);
             return new McpAuthorizationCallbackDelivery(Accepted: false, Completed: false, Denied: false);
         }
@@ -205,13 +200,11 @@ internal sealed class McpAuthorizationNeuron :
             }
             else if (pending.Outcome is PendingAuthorizationOutcome.Denied)
             {
-                // Abort before any re-delivery that might re-enter the requesting grain turn.
+
                 McpAuthorizationCodeHub.Complete(delivery.State, result: null);
                 McpAuthorizationCodeHub.AbortOpen(pending.CommandId);
             }
 
-            // Explicit callback redelivery redrives the completion target even after a prior notify,
-            // so a target-side turn fault/retraction can recover without ordinary outbox dependence.
             await NotifyCompletionTargetAsync(pending, force: true).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             return new McpAuthorizationCallbackDelivery(
@@ -224,8 +217,7 @@ internal sealed class McpAuthorizationNeuron :
             || string.IsNullOrWhiteSpace(delivery.Code))
         {
             pending = await PersistOutcomeAsync(pending, PendingAuthorizationOutcome.Denied, code: null, iss: null).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            // Release hold-open BEFORE Emit/Notify: NotifyCompletionTarget can re-enter the
-            // requesting grain still parked on Terminal — abort first so that turn can finish.
+
             McpAuthorizationCodeHub.Complete(delivery.State, result: null);
             McpAuthorizationCodeHub.AbortOpen(pending.CommandId);
             await EmitAsync(new AuthorizationDenied(pending.CommandId, pending.ServerKey, pending.State)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
@@ -238,7 +230,7 @@ internal sealed class McpAuthorizationNeuron :
             PendingAuthorizationOutcome.Completed,
             delivery.Code,
             delivery.Iss).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        // Hub first so a hold-open TakeCompletedCode/AwaitAsync can resume before journal drain.
+
         McpAuthorizationCodeHub.Complete(
             delivery.State,
             new McpAuthorizationCodeResult(delivery.Code, delivery.Iss));

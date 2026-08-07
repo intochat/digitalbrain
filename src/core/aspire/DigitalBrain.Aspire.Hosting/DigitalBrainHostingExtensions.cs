@@ -105,7 +105,6 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(client);
 
-        // Client projection: Orleans client clustering only — no journal, reminders, or silo secrets.
         builder.WithReference(client.Brain.Orleans.AsClient());
         ProjectModuleManifest(builder, client.Brain);
         return builder;

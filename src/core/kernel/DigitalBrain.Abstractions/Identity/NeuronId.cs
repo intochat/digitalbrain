@@ -7,10 +7,6 @@ using System.Text.Json.Serialization;
 public readonly record struct NeuronId
 {
     [JsonConstructor]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Globalization",
-        "CA1308:Normalize strings to uppercase",
-        Justification = "Neuron type names are Orleans grain type names, which Orleans itself normalizes to lowercase.")]
     public NeuronId(string type, OwnerId owner, string name)
     {
         Type = IdentityPart.Validated(type, nameof(type)).ToLowerInvariant();

@@ -1,46 +1,67 @@
 using System.Collections.Concurrent;
 using System.Reflection;
+using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Core;
 
 internal static class SynapseWiring
 {
-    private const string GeneratedManifestType = "DigitalBrain.Generated.DispatchManifest";
-    private const string GeneratedWiringsField = "Wirings";
-
-    private static readonly ConcurrentDictionary<Assembly, DispatchManifest?> Manifests = new();
+    private static readonly ConcurrentDictionary<Assembly, DispatchManifest> Manifests = new();
 
     internal static bool TryGetManifest(Assembly assembly, out DispatchManifest manifest)
     {
-        var found = Manifests.GetOrAdd(assembly, static probed => Load(probed));
-        manifest = found ?? new DispatchManifest([]);
-
-        return found is not null;
+        manifest = Manifests.GetOrAdd(assembly, static probed => Discover(probed));
+        return true;
     }
 
-    private static DispatchManifest? Load(Assembly assembly)
+    private static DispatchManifest Discover(Assembly assembly)
     {
-        if (assembly.GetType(GeneratedManifestType, throwOnError: false) is not { } generated)
-        {
-            return null;
-        }
-
-        if (generated.GetField(GeneratedWiringsField, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)?
-            .GetValue(null) is not IEnumerable<ValueTuple<string, string, bool>> wirings)
-        {
-            return null;
-        }
-
+        var handleOpen = typeof(IHandle<>);
         var handlers = new List<SynapseWiringEntry>();
 
-        foreach (var (neuron, synapse, isHandler) in wirings)
+        foreach (var type in SafeGetTypes(assembly))
         {
-            if (isHandler)
+            if (type is not { IsClass: true, IsAbstract: false })
             {
-                handlers.Add(new SynapseWiringEntry(neuron, synapse));
+                continue;
+            }
+
+            var neuronName = type.FullName;
+            if (neuronName is null)
+            {
+                continue;
+            }
+
+            foreach (var contract in type.GetInterfaces())
+            {
+                if (!contract.IsGenericType
+                    || contract.GetGenericTypeDefinition() != handleOpen)
+                {
+                    continue;
+                }
+
+                var synapseName = contract.GenericTypeArguments[0].FullName;
+                if (synapseName is null)
+                {
+                    continue;
+                }
+
+                handlers.Add(new SynapseWiringEntry(neuronName, synapseName));
             }
         }
 
         return new DispatchManifest(handlers);
+    }
+
+    private static IEnumerable<Type> SafeGetTypes(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException exception)
+        {
+            return exception.Types.OfType<Type>();
+        }
     }
 }

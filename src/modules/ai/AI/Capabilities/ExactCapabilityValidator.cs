@@ -393,8 +393,6 @@ public sealed class ExactCapabilityValidator
             return true;
         }
 
-        // Catalog descriptions are long; match substantial tokens so "Gmail" hits
-        // "Intent-level Gmail request..." without requiring the full description in the prompt.
         foreach (var token in term.Split(TermSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             if (token.Length < 4)

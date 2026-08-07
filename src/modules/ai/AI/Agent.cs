@@ -152,7 +152,7 @@ public abstract class Agent : Neuron, IAgent
             }
             catch (InvalidOperationException)
             {
-                // Catalog may contain accepted synapses whose CLR types are not loadable in this process.
+
             }
         }
 

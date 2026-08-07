@@ -1,14 +1,9 @@
-using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Salesforce;
 
 internal sealed partial class Salesforce
 {
-    [SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "Any failure after durable Invoking makes the external mutation outcome uncertain and must not escape into an automatic retry path.")]
     private async Task<SalesforceAccountDescriptionMutation> ApproveAccountDescriptionAsync(
         SalesforceMutationApproval approval,
         SynapseDelivery approvalEvidence,
@@ -126,8 +121,6 @@ internal sealed partial class Salesforce
                 $"Salesforce mutation '{mutation.CommandId}' has no exact durable human approval evidence.");
         }
 
-        // First binding stores the delivery id; re-approvals may arrive as a new session delivery of
-        // the same approval content and must still be accepted as exact human evidence.
         if (mutation.Approval is not null
             && mutation.ApprovalEvidence is not null
             && mutation.ApprovalEvidence != evidence.SynapseId

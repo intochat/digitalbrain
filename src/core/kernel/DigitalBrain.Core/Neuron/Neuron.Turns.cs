@@ -30,11 +30,6 @@ public abstract partial class Neuron
         }
     }
 
-    // The handled mark is set membership, not a suffix. Once the window is full Remember evicts as
-    // it adds, so the count a turn started at is reached again and truncating back to it retracts
-    // nothing — the delivery would stay marked handled while its turn was thrown away, and the
-    // outbox would swallow its own redelivery for good. A retraction has to name what this turn
-    // added and put back what adding it pushed out.
     private void ForgetHandled(SynapseDelivery delivery)
     {
         for (var index = _handled.Count - 1; index >= 0; index--)
@@ -68,7 +63,6 @@ public abstract partial class Neuron
             ? handler(this, synapse, cancellationToken)
             : OnUnboundSynapseAsync(synapse, cancellationToken);
 
-    // Runs inside the delivery turn, so anything emitted here inherits the delivery correlation.
     protected virtual Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
         => Task.CompletedTask;
 
@@ -91,9 +85,6 @@ public abstract partial class Neuron
         _turnCheckpoint = turn.PreviousCheckpoint;
     }
 
-    // A capability request commits mid-turn, so what that commit produced — the outgoing record and
-    // whatever the turn had already staged for the outbox — must survive a later retraction. The
-    // inbound cause must not: it is the turn's outcome, not the request's.
     private void AdvanceTurnCheckpoint()
     {
         if (_turnCheckpoint is { } checkpoint)
@@ -107,10 +98,6 @@ public abstract partial class Neuron
         }
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "A retraction commit failure must not replace the turn failure that caused it.")]
     private async Task CommitRetractionAsync()
     {
         try

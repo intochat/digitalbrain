@@ -41,8 +41,7 @@ internal sealed partial class TaskNeuron
                 && existing.ParkRevision == control.ParkRevision
                 && existing.Completer == control.Completer)
             {
-                // Same durable park: re-emit park-ready so a lost completer rendezvous can recover
-                // without ordinary outbox horizon dependence on the original signal.
+
                 await SendParkReadyAsync(control).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 return;
             }
@@ -101,8 +100,7 @@ internal sealed partial class TaskNeuron
 
         StageForTurn(data);
         await RegisterDispatchReminderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        // Turn-atomic: buffer Task→relay and clear PendingDispatch in staged memory only.
-        // A mid-turn durable ownership transfer would journal-commit before the outer turn.
+
         await StagePendingDispatchForTurnAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
@@ -136,8 +134,6 @@ internal sealed partial class TaskNeuron
         var snapshot = Snapshot(data);
         data.Receipts.Add(command.CommandId, snapshot);
 
-        // Stage only; reminder cleanup then the outer durable turn commits state/receipt once.
-        // Mid-handler durable writes are forbidden — cleanup failure throws and rolls back to Waiting.
         StageForTurn(data);
         await UnregisterReminderAsync(RetryReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await UnregisterReminderAsync(DispatchReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);

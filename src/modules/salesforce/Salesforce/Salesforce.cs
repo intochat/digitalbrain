@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
 using DigitalBrain.Modules.Sdk.Mcp;
@@ -51,11 +50,6 @@ internal sealed partial class Salesforce :
         _activeDelivery = delivery;
         return base.Deliver(delivery, cancellationToken);
     }
-
-    [SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "Planner/provider failures become a typed SalesforceResponse so directed request/reply does not retry forever.")]
     public async Task HandleAsync(SalesforceRequest synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
@@ -125,11 +119,6 @@ internal sealed partial class Salesforce :
                 cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
-
-    [SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "Approval failures become a typed SalesforceResponse; uncertain provider outcomes stay durable.")]
     public async Task HandleAsync(ApproveSalesforceMutation synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);

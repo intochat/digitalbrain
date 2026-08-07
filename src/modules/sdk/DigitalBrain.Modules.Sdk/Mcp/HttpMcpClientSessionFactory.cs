@@ -1,24 +1,14 @@
-using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Security;
 using Microsoft.Extensions.Configuration;
 using ModelContextProtocol.Client;
 using Orleans.Journaling;
 
 namespace DigitalBrain.Modules.Sdk.Mcp;
-
-[SuppressMessage(
-    "Performance",
-    "CA1812:Avoid uninstantiated internal classes",
-    Justification = "Registered with DI as IMcpClientSessionFactory; never constructed directly.")]
 internal sealed class HttpMcpClientSessionFactory(
     IConfiguration configuration,
     IHttpClientFactory httpClients,
     IDurablePayloadProtector protector) : IMcpClientSessionFactory
 {
-    [SuppressMessage(
-        "Reliability",
-        "CA2000:Dispose objects before losing scope",
-        Justification = "The official MCP client takes ownership of its transport and disposes it with the session.")]
     public async ValueTask<McpClient> OpenAsync(
         McpServerDefinition server,
         IDurableValue<byte[]> tokenState,

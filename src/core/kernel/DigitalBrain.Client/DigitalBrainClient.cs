@@ -116,7 +116,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
 
         if (!TryCreateJournalObserver(kind, out var observer, out var reference))
         {
-            // No grain-observer support on this client: poll the session journal.
+
             var cursor = afterSequence;
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -312,11 +312,6 @@ public sealed class DigitalBrainClient : IDigitalBrain
             await Task.Delay(ResponsePollInterval, cancellationToken).ConfigureAwait(false);
         }
     }
-
-    [SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "Watch teardown must not mask the awaited response or its failure.")]
     private async Task TeardownWatchAsync(
         ISessionNeuron session,
         NeuronId subject,

@@ -1,9 +1,6 @@
 using System.Diagnostics;
 using System.Text;
 
-// Dummy external-worker proof: materialize a single-file C# brain client, run it, print stdout.
-// Not a signed BehaviorHost rail — no deploy/activate/execute, no reverse broker.
-
 var workRoot = Path.Combine(Path.GetTempPath(), "digitalbrain-scripting", Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(workRoot);
 

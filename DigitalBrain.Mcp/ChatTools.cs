@@ -41,8 +41,6 @@ internal sealed class ChatTools(IDigitalBrain brain)
         var authorizationId = NeuronId.For<IMcpAuthorization>(brain.Owner, IMcpAuthorization.DefaultInstanceName);
         var command = new CommandId(commandIdentity);
 
-        // Activate owner brain first so DigitalBrainActivated boots capability projection
-        // before the assistant turn resolves catalog tools.
         await brain.ActivateAsync(cancellationToken);
         await brain.GetGrainProxy<IChat>(chatName).Send(new SendMessage(command, text));
 

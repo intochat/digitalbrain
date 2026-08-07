@@ -10,7 +10,7 @@ namespace DigitalBrain.Mcp;
 [McpServerToolType]
 internal sealed class IntrospectionTools(IDigitalBrain brain)
 {
-    // Directed request/reply goes through the outbox; without a deadline a silent neuron hangs MCP forever.
+
     internal static readonly TimeSpan ReplyBound = TimeSpan.FromSeconds(90);
 
     [McpServerTool(Name = McpSurface.ListActiveNeurons)]

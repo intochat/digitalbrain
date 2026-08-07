@@ -33,8 +33,6 @@ public abstract partial class Neuron
     async Task IOutboxDrain.Drain()
     {
         _wakeUpRegistered = true;
-        // Reminder/wakeup path has no caller token. Use a cancelable lifecycle source so every
-        // Deliver attempt can link a real abort signal; attempt timeout supplies the bound.
         using var drainLifecycle = new CancellationTokenSource();
         await DrainAsync(drainLifecycle.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
@@ -157,10 +155,6 @@ public abstract partial class Neuron
         || TimeProvider.GetUtcNow() - entry.Delivery.Timestamp
             > DeliveryPolicy.RetryHorizon;
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "Any failure other than a permanent refusal keeps the receiver pending so the outbox redelivers it; letting it escape would abandon the delivery guarantee.")]
     private async Task<bool> TryDeliverAsync(
         OutboxEntry entry,
         NeuronId receiver,
@@ -168,8 +162,6 @@ public abstract partial class Neuron
     {
         DeliveryPolicy.CarryDepth(entry.Depth);
 
-        // Every Deliver attempt gets a cancelable, bounded token. Link any real upstream drain
-        // token; always attach a finite attempt timeout so the token can actually cancel.
         using var attemptCts = drainToken.CanBeCanceled
             ? CancellationTokenSource.CreateLinkedTokenSource(drainToken)
             : new CancellationTokenSource();
@@ -197,7 +189,6 @@ public abstract partial class Neuron
         }
         catch (OperationCanceledException) when (attemptToken.IsCancellationRequested)
         {
-            // Cancelled/expired attempt: leave pending for retry; never remove or bypass retraction.
             return false;
         }
         catch (Exception)

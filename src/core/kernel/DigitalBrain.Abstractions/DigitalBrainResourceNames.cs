@@ -4,7 +4,6 @@ public static class DigitalBrainResourceNames
 {
     public const string DefaultBrainName = "brain";
 
-    // Connection string alias injected on the silo via WithReference(journal, name).
     public const string JournalConnectionName = "journal";
 
     public const string ModulesConfigurationKey = "DigitalBrain:Modules";

@@ -104,7 +104,6 @@ public static class ShellHostingExtensions
                 ? DefaultChatName
                 : options.ChatName;
 
-            // DIGITALBRAIN_UI_BASE is bound in Apply when the silo (HTTP surface) is registered.
             var host = appHost
                 .AddExecutable(resourceName, launch.Command, launch.WorkingDirectory, launch.Args)
                 .WithEnvironment(ShellEnvironmentVariable, shell)
@@ -128,7 +127,6 @@ public static class ShellHostingExtensions
                 return;
             }
 
-            // Silo hosts chat/shell/oauth HTTP maps; Flutter renders against that base URL.
             var uiEndpoint = builder.GetEndpoint(HttpEndpointName);
             _flutterHost
                 .WithEnvironment(UIBaseEnvironmentVariable, uiEndpoint)

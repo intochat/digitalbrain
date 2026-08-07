@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
@@ -20,11 +19,6 @@ public sealed class VectorMemoryCapabilitySearch : ICapabilityCandidateSearch
         _grains = grains;
         _memoryInstanceName = memoryInstanceName;
     }
-
-    [SuppressMessage(
-        "Usage",
-        "CA1849:Call async methods when in an async method",
-        Justification = "DigitalBrainClient.Connect is the in-silo factory; ConnectAsync is the behavior-worker surface.")]
     public async Task<IReadOnlyList<CapabilityCandidate>> SearchAsync(
         OwnerId owner,
         string prompt,

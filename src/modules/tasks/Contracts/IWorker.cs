@@ -11,10 +11,6 @@ public interface IWorker : INeuron
     Task Accept(AttemptRequest request);
 
     [Alias(nameof(Continue))]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Naming",
-        "CA1716:Identifiers should not match keywords",
-        Justification = "Continue is the ratified domain verb for advancing an accepted task attempt.")]
     Task Continue(AttemptCursor cursor);
 
     [Alias(nameof(Cancel))]

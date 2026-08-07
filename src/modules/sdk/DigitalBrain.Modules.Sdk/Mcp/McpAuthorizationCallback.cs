@@ -12,7 +12,6 @@ internal static class McpAuthorizationCallback
         ArgumentNullException.ThrowIfNull(configuration);
         _ = configuration;
 
-        // Capture ambient at OpenAsync time — AsyncLocal does not survive Orleans/HTTP continuations.
         return (context, cancellationToken) =>
             BrowserSignInCallback.AuthorizeAsync(context, ambient, cancellationToken);
     }

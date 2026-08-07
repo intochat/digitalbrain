@@ -1,5 +1,4 @@
 using System.ClientModel;
-using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
 using Microsoft.Extensions.AI;
@@ -41,11 +40,6 @@ internal static class AIClients
                 provider.GetRequiredService<IConfiguration>(),
                 typeof(TModel).Name,
                 defaultTag));
-
-    [SuppressMessage(
-        "Reliability",
-        "CA2000:Dispose objects before losing scope",
-        Justification = "The telemetry middleware owns and disposes the inner Ollama client.")]
     private static IChatClient Ollama(
         IConfiguration configuration,
         string modelName,

@@ -21,11 +21,6 @@ internal static class McpAuthorizationAmbient
         public void Dispose() => Current.Value = previous;
     }
 }
-
-[System.Diagnostics.CodeAnalysis.SuppressMessage(
-    "Design",
-    "CA1001:Types that own disposable fields should be disposable",
-    Justification = "OpenLifetime is cancel-only for the hold-open attempt lifetime; aborted rather than disposed mid-flight under Task.Run.")]
 internal sealed class McpAuthorizationAmbientState
 {
     private readonly CancellationTokenSource _openLifetime = new();
@@ -46,7 +41,7 @@ internal sealed class McpAuthorizationAmbientState
             TaskCreationOptions.RunContinuationsAsynchronously);
         BeginCompleted = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        // Terminal = no code will arrive (deny, cancel, abandon). Releases WhenAny in McpRuntime.
+
         Terminal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 

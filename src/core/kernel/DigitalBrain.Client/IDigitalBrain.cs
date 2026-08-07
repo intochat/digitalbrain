@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Client;
@@ -10,10 +9,6 @@ public interface IDigitalBrain
 
     Task ActivateAsync(CancellationToken cancellationToken = default);
 
-    [SuppressMessage(
-        "Naming",
-        "CA1716:Identifiers should not match keywords",
-        Justification = "Get is the ratified client verb for addressing a typed neuron by instance name.")]
     NeuronReference<TNeuron> Get<TNeuron>(string name = "default")
         where TNeuron : INeuron;
 

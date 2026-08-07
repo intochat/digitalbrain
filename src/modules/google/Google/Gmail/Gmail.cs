@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Google.Auth;
 using DigitalBrain.Core;
@@ -36,11 +35,6 @@ internal sealed partial class Gmail :
         _durableIdentity = Id.ToString();
         _userKey = Id.Name;
     }
-
-    [SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "Planner/provider failures become a typed GmailResponse so directed request/reply does not retry forever.")]
     public async Task HandleAsync(GmailRequest synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
@@ -86,11 +80,6 @@ internal sealed partial class Gmail :
                 cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
-
-    [SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "Typed op failures become a typed response so directed request/reply does not retry forever.")]
     public async Task HandleAsync(GmailSearchRequest synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
@@ -122,11 +111,6 @@ internal sealed partial class Gmail :
                 cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
-
-    [SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "Typed op failures become a typed response so directed request/reply does not retry forever.")]
     public async Task HandleAsync(GmailGetMessageRequest synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
@@ -155,11 +139,6 @@ internal sealed partial class Gmail :
                 cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
-
-    [SuppressMessage(
-        "Reliability",
-        "CA2000:Dispose objects before losing scope",
-        Justification = "Sign-in and GmailService ownership transfers to fields or is disposed on failure paths; ConfigureAwait prevents CA2000 from proving that.")]
     private async Task<GmailProvider> EnsureReadyAsync(CommandId commandId, CancellationToken cancellationToken)
     {
         await GmailAuthRail.EnsureAuthorizedAsync(
@@ -240,7 +219,7 @@ internal sealed partial class Gmail :
             var service = await _signIn.CreateServiceAsync(_userKey, cancellationToken, baseUri).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             try
             {
-                // Force credential materialization so permanent refresh failures re-park.
+
                 if (service.HttpClientInitializer is global::Google.Apis.Auth.OAuth2.UserCredential credential)
                 {
                     _ = await credential.GetAccessTokenForRequestAsync(cancellationToken: cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);

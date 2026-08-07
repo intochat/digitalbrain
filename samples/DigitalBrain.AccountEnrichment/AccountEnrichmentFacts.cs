@@ -31,4 +31,3 @@ public sealed record AccountEnriched(
     [property: Id(2)] string AccountId,
     [property: Id(3)] string Description) : Synapse;
 
-

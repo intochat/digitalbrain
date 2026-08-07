@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using DigitalBrain.Modules.Sdk.Mcp;
 using ModelContextProtocol.Client;
@@ -79,11 +78,6 @@ internal sealed partial class Salesforce
         using var reconciliation = new CancellationTokenSource(ReconciliationTimeout);
         return await ReconcileAsync(mutation, reconciliation.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
-
-    [SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "Reconciliation is best effort; inability to prove the provider state must durably become OutcomeUncertain.")]
     private async Task<MutationData> ReconcileAsync(MutationData mutation, CancellationToken cancellationToken)
     {
         try

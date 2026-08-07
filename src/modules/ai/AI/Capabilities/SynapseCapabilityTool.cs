@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using DigitalBrain.Abstractions;
@@ -154,11 +153,6 @@ public static class SynapseCapabilityTool
         return false;
     }
 
-    // A capability that outlives one outbox delivery attempt is not a failed capability: the outbox
-    // keeps retrying it for DeliveryPolicy.RetryHorizon. Giving up after a single attempt would tell
-    // the model the request failed while its side effect is still in flight, so the tool waits
-    // several attempts, and when it does give up it says the request may still complete and names
-    // the correlation the journals can be searched by.
     internal static readonly TimeSpan ToolResponseWait = DeliveryPolicy.DeliveryAttemptTimeout * 3;
 
     internal static string ResponseTimeoutMessage(
@@ -210,11 +204,6 @@ public static class SynapseCapabilityTool
         public override string Description => _capability.Description;
 
         public override JsonElement JsonSchema => _schema;
-
-        [SuppressMessage(
-            "Usage",
-            "CA1849:Call async methods when in an async method",
-            Justification = "DigitalBrainClient.Connect is the in-silo factory; ConnectAsync is the behavior-worker surface.")]
         protected override async ValueTask<object?> InvokeCoreAsync(
             AIFunctionArguments arguments,
             CancellationToken cancellationToken)
@@ -227,11 +216,6 @@ public static class SynapseCapabilityTool
             return JsonSerializer.Serialize(response, _responseType, SerializerOptions);
         }
 
-        // A model tool runs inside the agent neuron's turn. IDigitalBrain.SendRequestAsync awaits a
-        // grain observer callback, and Orleans dispatches that callback onto the activation that
-        // created the reference — the very turn that is blocked on this tool. Polling the owner
-        // session's incoming journal reads the same directed reply without any callback into an
-        // occupied activation.
         private async Task<Synapse> AwaitDirectedResponseAsync(Synapse request, CancellationToken cancellationToken)
         {
             var sessionId = ISessionNeuron.ForOwner(_owner);

@@ -5,7 +5,6 @@ namespace DigitalBrain.Core;
 
 [GrainType(GrainTypeName)]
 [Reentrant]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Orleans or DI activated; never constructed in-process.")]
 internal sealed class OutboxWakeup :
     Grain,
     IOutboxWakeup,

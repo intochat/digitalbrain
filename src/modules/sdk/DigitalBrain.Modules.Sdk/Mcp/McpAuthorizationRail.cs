@@ -62,8 +62,7 @@ public static class McpAuthorizationRail
                         claim.Denied
                         ?? throw new InvalidOperationException("Authorization claim is missing the denied fact."));
                 case McpAuthorizationClaimKind.Completed:
-                    // Missing real token: open the session so the SDK exchanges the delivered code.
-                    // Never fabricate a credential marker.
+
                     return;
                 default:
                     throw new InvalidOperationException($"Authorization claim kind '{claim.Kind}' is unsupported.");
@@ -75,9 +74,6 @@ public static class McpAuthorizationRail
             return;
         }
 
-        // Expired durable tokens always re-park. Pure missing tokens park when a public sign-in
-        // base is configured (scripted park/continue). Real HttpMcpClientSessionFactory proofs
-        // leave PublicSignInBase unset so SDK hold-open OAuth journals the provider authorize URL.
         var publicSignInBase = configuration[McpRuntimeHosting.PublicSignInBaseKey];
         if (hadProtectedToken || !string.IsNullOrWhiteSpace(publicSignInBase))
         {

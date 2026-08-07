@@ -2,9 +2,6 @@ namespace DigitalBrain.Abstractions;
 
 [GenerateSerializer]
 [Alias("db.authorization-error")]
-// TryDeliverAsync records a refusal and consumes the outbox entry, so the sender is done with the
-// delivery. Retracting the receiver's inbound cause as well would erase every trace that the fact
-// ever arrived at the neuron that refused it.
 [SettledDeliveryFailure]
 public sealed class NeuronAuthorizationException : Exception
 {

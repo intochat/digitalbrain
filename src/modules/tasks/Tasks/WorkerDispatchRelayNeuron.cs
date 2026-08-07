@@ -1,14 +1,9 @@
-using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
 
 namespace DigitalBrain.Tasks;
 
 [GrainType(WorkerDispatchRelay.GrainTypeName)]
-[SuppressMessage(
-    "Performance",
-    "CA1812:Avoid uninstantiated internal classes",
-    Justification = "Orleans grain activated by the silo from GrainType metadata.")]
 internal sealed class WorkerDispatchRelayNeuron :
     Neuron,
     IHandle<RelayWorkerAccept>,

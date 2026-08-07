@@ -89,8 +89,6 @@ internal sealed partial class IntrospectionNeuron :
                     delivery.Timestamp)),
         ];
 
-        // A truncated page must resume at the last entry it actually handed over, never at the
-        // journal end, or the caller's next request silently steps over everything it dropped.
         var truncated = read.Delta.Count > entries.Length;
 
         await ReplyAsync(

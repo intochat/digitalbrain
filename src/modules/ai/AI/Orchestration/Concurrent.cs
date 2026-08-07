@@ -1,15 +1,9 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI;
-
-[SuppressMessage(
-    "Naming",
-    "CA1724:Type names should not match namespaces",
-    Justification = "Concurrent is the ratified public orchestration vocabulary.")]
 public abstract class Concurrent : Neuron, IAgent
 {
     private readonly DirectAgentSession _directSession;

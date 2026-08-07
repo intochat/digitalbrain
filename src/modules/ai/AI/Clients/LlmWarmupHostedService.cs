@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
 using Microsoft.Extensions.AI;
@@ -9,11 +8,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.AI;
-
-[SuppressMessage(
-    "Performance",
-    "CA1812:Avoid uninstantiated internal classes",
-    Justification = "Constructed by the generic host DI container via AddHostedService.")]
 internal sealed partial class LlmWarmupHostedService(
     IServiceProvider services,
     IConfiguration configuration,
@@ -77,11 +71,6 @@ internal sealed partial class LlmWarmupHostedService(
             yield return (typeof(Gpt56), $"{AIClients.ConfigurationRoot}:OpenAI:Gpt56:Model");
         }
     }
-
-    [SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "Warmup must never take down the silo; cold start remains a soft failure.")]
     private async Task WarmOneAsync(Type modelKey, CancellationToken cancellationToken)
     {
         var name = modelKey.Name;

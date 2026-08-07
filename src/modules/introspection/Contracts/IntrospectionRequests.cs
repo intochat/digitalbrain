@@ -4,9 +4,6 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Introspection;
 
-// NeuronId rejects separators and whitespace by throwing. A model-supplied identity must fail here,
-// while it is still a request-validation error, rather than inside a handler where the throw becomes
-// an undeliverable synapse the outbox retries for its whole horizon.
 internal static class IntrospectionIdentity
 {
     private const char GrainKeySeparator = '/';

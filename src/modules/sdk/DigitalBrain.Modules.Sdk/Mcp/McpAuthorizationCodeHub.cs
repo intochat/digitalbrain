@@ -34,12 +34,6 @@ internal static class McpAuthorizationCodeHub
         }
     }
 
-    /// <summary>
-    /// Completes the hub waiter for <paramref name="state"/>. A null result is a no-code outcome:
-    /// the matching ambient (if any) is aborted so hold-open CreateAsync is abandoned.
-    /// Unknown/foreign states complete only the hub — they must not abort a live park for a
-    /// different state.
-    /// </summary>
     internal static void Complete(string state, McpAuthorizationCodeResult? result)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(state);
@@ -71,10 +65,6 @@ internal static class McpAuthorizationCodeHub
         }
     }
 
-    /// <summary>
-    /// Aborts the hold-open ambient for <paramref name="commandId"/> by command identity.
-    /// Authoritative for deny/cancel when OAuth state keys diverge from the register key.
-    /// </summary>
     internal static void AbortOpen(CommandId commandId)
     {
         if (AmbientsByCommand.TryRemove(commandId.Value, out var ambient))
@@ -84,9 +74,6 @@ internal static class McpAuthorizationCodeHub
         }
     }
 
-    /// <summary>
-    /// Releases every in-process hold-open OAuth attempt (teardown / tests).
-    /// </summary>
     internal static void AbortAllOpenSessions()
     {
         foreach (var waiter in Waiters.Values.ToArray())
@@ -105,10 +92,6 @@ internal static class McpAuthorizationCodeHub
         AmbientsByState.Clear();
     }
 
-    /// <summary>
-    /// Test isolation: drop static waiters/completions/ambients so a parked session cannot leak
-    /// across method scopes or fixture lifetime.
-    /// </summary>
     internal static void ResetForTests()
     {
         AbortAllOpenSessions();

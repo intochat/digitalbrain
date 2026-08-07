@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Abstractions;
@@ -18,11 +17,6 @@ internal static class MafParticipantAdapter
                 ?? throw new InvalidOperationException("A participant contract has no assembly-qualified identity."),
             participant.Id);
     }
-
-    [SuppressMessage(
-        "Reliability",
-        "CA2000:Dispose objects before losing scope",
-        Justification = "NeuronChatClient has empty disposal and is owned by the ChatClientAgent for the agent lifetime.")]
     internal static AIAgent Create<TNeuron>(
         IGrainFactory grains,
         NeuronId id,

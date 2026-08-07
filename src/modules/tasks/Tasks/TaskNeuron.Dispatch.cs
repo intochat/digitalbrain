@@ -14,11 +14,6 @@ internal sealed partial class TaskNeuron
             await this.UnregisterReminder(reminder).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
-
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "A durable pending dispatch remains registered for reminder-driven redelivery after any staging failure.")]
     private async Task TryDispatchPendingAsync()
     {
         var data = LoadIfStarted();
@@ -49,21 +44,11 @@ internal sealed partial class TaskNeuron
             return;
         }
 
-        // Ownership transfer: once Task durably stages Task→relay, PendingDispatch clears and the
-        // dispatch reminder unregisters. Downstream relay→Worker delivery is owned by the durable
-        // outbox on the relay activation.
         current.PendingDispatch = null;
         await SaveAsync(current).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await UnregisterReminderAsync(DispatchReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    // Turn-atomic path for Complete: buffers Task→relay into the outer turn outbox;
-    // PendingDispatch clears only through turn staging (no mid-turn journal write); dispatch
-    // reminder stays registered until a later reminder observes no pending and unregisters.
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "A pending dispatch remains for reminder-driven redelivery after any staging failure; turn rollback restores staged state.")]
     private async Task StagePendingDispatchForTurnAsync()
     {
         var data = LoadIfStarted();
@@ -103,11 +88,6 @@ internal sealed partial class TaskNeuron
         current.PendingDispatch = null;
         StageForTurn(current);
     }
-
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "A durable pending dispatch remains registered for reminder-driven redelivery after any staging failure.")]
     private async Task<bool> TrySendPendingDispatchAsync(TaskData data, PendingWorkerDispatch pending)
     {
         Synapse envelope = BuildPendingDispatchEnvelope(data, pending);

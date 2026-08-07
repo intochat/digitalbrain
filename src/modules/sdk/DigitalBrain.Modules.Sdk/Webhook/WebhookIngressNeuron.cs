@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,10 +7,6 @@ using Orleans.Serialization;
 namespace DigitalBrain.Modules.Sdk.Webhook;
 
 [GrainType("webhook-ingress")]
-[SuppressMessage(
-    "Performance",
-    "CA1812:Avoid uninstantiated internal classes",
-    Justification = "Orleans grain activated by the silo from GrainType metadata.")]
 internal sealed class WebhookIngressNeuron :
     Neuron,
     IHandle<VerifiedWebhookDeliveryReceived>,
@@ -35,7 +30,6 @@ internal sealed class WebhookIngressNeuron :
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Subscription identity is the grain instance name (one ingress grain per subscription).
         if (!string.Equals(Id.Name, synapse.SubscriptionId, StringComparison.Ordinal))
         {
             return;

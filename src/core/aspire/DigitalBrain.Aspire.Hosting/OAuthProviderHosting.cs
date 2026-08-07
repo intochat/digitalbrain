@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Abstractions;
@@ -6,9 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Aspire.Hosting;
 
-// RedirectUriDescription is operator-facing markdown about a redirect-URI parameter, not a URI value.
-[SuppressMessage("Design", "CA1054", Justification = "Parameter is prose describing a redirect URI, not a URI.")]
-[SuppressMessage("Design", "CA1056", Justification = "Property is prose describing a redirect URI, not a URI.")]
 public sealed record OAuthProviderHostingDefinition(
     string Key,
     string DisplayName,
@@ -122,8 +118,7 @@ public static class OAuthProviderHosting
             string description,
             string? localValue)
         {
-            // persist: true enables Aspire dashboard "Save to user secrets" (requires AppHost UserSecretsId).
-            // Run-mode redirect defaults use ConstantParameterDefault; operator secrets do not.
+
             var resource = _builder.ExecutionContext.IsRunMode
                 ? localValue is null
                     ? _builder.AddParameter(

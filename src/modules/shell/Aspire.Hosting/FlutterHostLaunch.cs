@@ -42,14 +42,12 @@ internal static class FlutterHostLaunch
             return packageRoot;
         }
 
-        // Nested shell under the pure-Dart package (legacy clients/digitalbrain_flutter/shell).
         var nestedShell = Path.Combine(packageRoot, ShellPackageDirectoryName);
         if (HasWindowMarkers(nestedShell, deviceTarget))
         {
             return nestedShell;
         }
 
-        // Sibling shell next to core (clients/flutter/shell beside clients/flutter/core).
         var siblingShell = Path.GetFullPath(Path.Combine(packageRoot, "..", ShellPackageDirectoryName));
         if (HasWindowMarkers(siblingShell, deviceTarget))
         {
@@ -167,11 +165,6 @@ internal static class FlutterHostLaunch
                 "index.html"));
     }
 
-    /// <summary>
-    /// v0.1.18 shape: options → DigitalBrain:FlutterCommand → FLUTTER_COMMAND → "flutter".
-    /// When the default name is used, prefer an absolute path resolved from PATH so Aspire DCP
-    /// does not depend on inheriting an interactive shell PATH (still the flutter CLI, not a .bat brand).
-    /// </summary>
     internal static string ResolveFlutterCommand(
         FlutterHostOptions options,
         Microsoft.Extensions.Configuration.IConfiguration? configuration = null)
@@ -248,10 +241,6 @@ internal static class FlutterHostLaunch
         return true;
     }
 
-    /// <summary>
-    /// Resolve a command the way a shell would: search process PATH, then User+Machine PATH,
-    /// applying PATHEXT on Windows. Returns an absolute path when found.
-    /// </summary>
     internal static bool TryResolveCommandOnPath(string commandName, out string absolutePath)
     {
         absolutePath = string.Empty;
@@ -301,7 +290,6 @@ internal static class FlutterHostLaunch
             return [commandName];
         }
 
-        // PATHEXT order (common default). Prefer extensionless only if present (Unix-style shim).
         return
         [
             commandName,
@@ -319,7 +307,6 @@ internal static class FlutterHostLaunch
             yield return directory;
         }
 
-        // DCP / non-interactive hosts often lack a full interactive User PATH. Merge User+Machine.
         foreach (var directory in SplitPath(Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User)))
         {
             yield return directory;

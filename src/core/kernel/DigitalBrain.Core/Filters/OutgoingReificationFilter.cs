@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Core;
 
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Orleans or DI activated; never constructed in-process.")]
 internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
 {
     public async Task Invoke(IOutgoingGrainCallContext context)
@@ -26,9 +25,6 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
             return;
         }
 
-        // Northbound surfaces (MCP, HTTP) call ClientEntryPoint methods from outside a neuron.
-        // Orleans clients never register this filter; silo-hosted MCP does, so match Incoming's
-        // unattributed ClientEntryPoint allowance instead of requiring a capability-bearing caller.
         if (context.SourceContext?.GrainInstance is not Neuron
             && IsClientEntryPoint(context.InterfaceMethod))
         {
@@ -165,10 +161,6 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
         await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Abandoned).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "CA1031:Do not catch general exception types",
-        Justification = "An abandonment journal failure must not replace the original disposal exception.")]
     private static async Task ClaimAbandonmentWithoutMaskingAsync(Neuron caller, Guid enumerationId)
     {
         try

@@ -28,8 +28,6 @@ public abstract partial class Neuron
         await OnNeuronActivatedAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    // Runs on every activation once journals, outbox and drain are restored, so a neuron can
-    // repair state it publishes outside itself and cannot otherwise notice has diverged.
     protected virtual Task OnNeuronActivatedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     public async Task Deliver(SynapseDelivery delivery, CancellationToken cancellationToken = default)
@@ -83,8 +81,6 @@ public abstract partial class Neuron
 
             if (SettlesDelivery(failure))
             {
-                // The failure is this delivery's answer, so the fact stays received and handled
-                // whether or not the turn got as far as journaling its cause.
                 StageInboundCause();
             }
             else

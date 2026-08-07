@@ -144,8 +144,6 @@ internal sealed class AccountEnrichment :
                 $"Salesforce approval '{synapse.ApprovalId}' does not match the enrichment proposal.");
         }
 
-        // Human session approves Salesforce directly; this neuron records completion after the owner
-        // posts the matching approval fact (session-owned evidence is validated by Salesforce itself).
         Stage(synapse.CommandId, request with { Completed = true, Phase = RequestPhase.Completed });
         await EmitAsync(new AccountEnriched(
             synapse.CommandId,

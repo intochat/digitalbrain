@@ -25,8 +25,7 @@ internal static class BrowserSignInCallback
 
         if (ambient is not null)
         {
-            // Surface the real provider authorize URL, wait for Begin so DeliverCallback has a
-            // pending record, then await the app-callback-delivered code (never robot-GET).
+
             McpAuthorizationCodeHub.RegisterAmbient(state, ambient);
             ambient.SignInReady.TrySetResult(new McpAuthorizationSignIn(context.AuthorizationUri, state));
             await ambient.BeginCompleted.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -46,8 +45,6 @@ internal static class BrowserSignInCallback
         var authorization = ambient.Grains.GetGrain<IMcpAuthorization>(
             NeuronId.For<IMcpAuthorization>(ambient.Owner, McpAuthorizationNeuron.InstanceName).ToGrainId());
 
-        // Hub + terminal + durable claim/code. Any no-code outcome must throw OCE so CreateAsync
-        // does not park on session Completion after a null AuthorizationResult.
         var hubTask = McpAuthorizationCodeHub.AwaitAsync(state, cancellationToken);
         var terminalTask = ambient.Terminal.Task;
         while (!hubTask.IsCompleted && !terminalTask.IsCompleted)
@@ -85,7 +82,7 @@ internal static class BrowserSignInCallback
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            // Hub waiter canceled without the outer token — fall through to grain.
+
         }
 
         if (await IsDeniedAsync(authorization, ambient.CommandId, cancellationToken).ConfigureAwait(false))
@@ -121,8 +118,7 @@ internal static class BrowserSignInCallback
     private static AuthorizationResult? FailNoCode(McpAuthorizationAmbientState ambient)
     {
         ambient.AbortOpen();
-        // Returning null makes MCP SDK 2.0 CreateAsync await session Completion after the OAuth
-        // failure, which can park forever. OperationCanceledException is excluded from that path.
+
         throw new OperationCanceledException(
             "MCP authorization ended without a code; the pending session open was canceled.");
     }

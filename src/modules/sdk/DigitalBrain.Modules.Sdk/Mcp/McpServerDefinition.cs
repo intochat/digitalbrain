@@ -23,11 +23,11 @@ public sealed class McpServerDefinition
 
         if (endpoint.Scheme == Uri.UriSchemeHttps)
         {
-            // Production endpoints are HTTPS.
+
         }
         else if (endpoint.Scheme == Uri.UriSchemeHttp && endpoint.IsLoopback)
         {
-            // Loopback HTTP is reserved for test-owned fake providers.
+
         }
         else
         {

@@ -11,10 +11,6 @@ public interface ISessionNeuron : INeuron
         => new(GrainTypeName, owner, InstanceName);
 
     [Alias(nameof(Fire))]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "CA1030:Use events where appropriate",
-        Justification = "Fire is the contract's ratified verb for sending a synapse into the brain; it raises no event.")]
     Task<SynapseDelivery> Fire(NeuronId receiver, Synapse synapse);
 
     [Alias(nameof(Emit))]

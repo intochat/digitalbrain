@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.AI;
 using DigitalBrain.Assistant;
 using DigitalBrain.Chat;
@@ -13,9 +12,8 @@ using DigitalBrain.Shell;
 using DigitalBrain.Tasks;
 using DigitalBrain.Time;
 
-namespace DigitalBrain.Generated
+namespace DigitalBrain.Kernel
 {
-    [ExcludeFromCodeCoverage]
     internal static class CompiledModuleCatalog
     {
         internal static IReadOnlyList<ICompiledModule> Modules { get; } =
@@ -38,12 +36,11 @@ namespace DigitalBrain.Generated
 
 namespace DigitalBrain.Core
 {
-    [ExcludeFromCodeCoverage]
-    internal static class GeneratedDigitalBrainSiloBuilderExtensions
+    internal static class DigitalBrainSiloHostExtensions
     {
         internal static ISiloBuilder AddDigitalBrain(this ISiloBuilder builder)
         {
-            DigitalBrainRuntime.Add(builder, DigitalBrain.Generated.CompiledModuleCatalog.Modules);
+            DigitalBrainRuntime.Add(builder, DigitalBrain.Kernel.CompiledModuleCatalog.Modules);
             return builder;
         }
     }

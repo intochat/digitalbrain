@@ -5,7 +5,6 @@ using Orleans.Journaling;
 namespace DigitalBrain.Core;
 
 [GrainType(IDigitalBrainNeuron.GrainTypeName)]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Orleans or DI activated; never constructed in-process.")]
 internal sealed class DigitalBrainNeuron : Neuron, IDigitalBrainNeuron
 {
     private const string ActivationPublishedName = "activation-published";

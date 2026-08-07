@@ -78,15 +78,6 @@ internal sealed class ChatNeuron :
 
     public Task<ChatTranscript> Read() => Task.FromResult(new ChatTranscript(Turns()));
 
-    // Dispatch for this capability always targets one fixed instance (the catalog's generated
-    // default). Once a request naming that instance reaches this handler, answering locally is
-    // free - no grain call, so the branch itself is never reentrant. Reaching the handler is not
-    // free: if the ASKING conversation is that fixed instance, the delivery queues behind its own
-    // occupied turn before this branch ever runs - the same delivery-layer hazard as proxying into
-    // any other busy conversation below. The owner session brokers every mid-turn capability call,
-    // so the delivery this handler eventually sees is never attributed to the asking conversation;
-    // neither hazard is detectable here, and both are bounded only by the outbox's existing
-    // delivery timeout.
     public async Task HandleAsync(ReadTranscriptRequest synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
