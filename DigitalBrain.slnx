@@ -61,7 +61,6 @@
     <Project Path="DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
     <Project Path="product/DigitalBrain.BehaviorHost/DigitalBrain.BehaviorHost.csproj" />
     <Project Path="product/DigitalBrain.UiEdge/DigitalBrain.UiEdge.csproj" />
-    <Project Path="product/DigitalBrain.Assistant/DigitalBrain.Assistant.csproj" />
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/DigitalBrain.AccountEnrichment/DigitalBrain.AccountEnrichment.csproj" />

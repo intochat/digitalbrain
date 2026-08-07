@@ -7,7 +7,6 @@
   <ItemGroup>
     <ProjectReference Include="..\src\modules\ai\Aspire.Hosting\DigitalBrain.Modules.AI.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\src\modules\chat\Chat\DigitalBrain.Modules.Chat.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="..\product\DigitalBrain.Assistant\DigitalBrain.Assistant.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\src\modules\shell\Aspire.Hosting\DigitalBrain.Modules.Shell.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\src\modules\google\Aspire.Hosting\DigitalBrain.Modules.Google.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\src\modules\salesforce\Aspire.Hosting\DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" IsAspireProjectResource="false" />

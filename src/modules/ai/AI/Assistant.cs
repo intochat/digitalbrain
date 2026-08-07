@@ -94,9 +94,10 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
             var team = GrainFactory.GetGrain<ITeam>(
                 NeuronId.For<ITeam>(Id.Owner, lineUp.TeamName).ToGrainId());
 
-            await team.Form(lineUp.Formation);
+            await team.Form(lineUp.Formation).ConfigureAwait(true);
 
-            var answer = await team.Respond([new ChatMessage(ChatRole.User, question)]);
+            var answer = await team.Respond([new ChatMessage(ChatRole.User, question)])
+                .ConfigureAwait(true);
 
             return answer.Text;
         }
