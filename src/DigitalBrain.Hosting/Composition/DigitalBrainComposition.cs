@@ -6,6 +6,8 @@ public sealed class DigitalBrainComposition
 {
     private readonly List<Assembly> vocabularyAssemblies = [];
     private readonly List<NeuronRegistration> neurons = [];
+    private readonly List<WorkspaceServiceRegistration> workspaceServices = [];
+    private readonly HashSet<Type> ingressSynapses = [];
 
     public DigitalBrainComposition RegisterVocabulary(Assembly assembly)
     {
@@ -26,6 +28,24 @@ public sealed class DigitalBrainComposition
         return this;
     }
 
+    public DigitalBrainComposition RegisterIngress<TSynapse>()
+        where TSynapse : Synapse
+    {
+        ingressSynapses.Add(typeof(TSynapse));
+        return this;
+    }
+
+    public DigitalBrainComposition RegisterWorkspaceService<TService>(
+        Func<WorkspaceBinding, TService> factory)
+        where TService : class
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        workspaceServices.Add(new WorkspaceServiceRegistration(
+            typeof(TService),
+            workspace => factory(workspace)));
+        return this;
+    }
+
     internal CompositionCatalog Seal()
-        => CompositionCatalog.Create(vocabularyAssemblies, neurons);
+        => CompositionCatalog.Create(vocabularyAssemblies, neurons, workspaceServices, ingressSynapses);
 }

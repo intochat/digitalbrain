@@ -10,7 +10,8 @@ public static class DigitalBrainSiloExtensions
 {
     public static ISiloBuilder AddDigitalBrain(
         this ISiloBuilder silo,
-        Action<DigitalBrainComposition> configure)
+        Action<DigitalBrainComposition> configure,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(silo);
         var catalog = BuildCatalog(configure);
@@ -20,8 +21,9 @@ public static class DigitalBrainSiloExtensions
         silo.Services.AddSingleton<ISynapseSerialization>(serialization);
         silo.Services.AddSingleton<Router>();
         silo.Services.AddSingleton<IEnvelopeCarrier, RequestContextEnvelopeCarrier>();
+        silo.Services.AddSingleton(new DigitalBrainClock(timeProvider ?? TimeProvider.System));
         silo.Services.AddScoped<Journal>(static provider => new Journal(provider));
-        AddAccessAdapters(silo.Services);
+        AddWorkspaceServices(silo.Services, catalog);
         silo.AddJournalStorage();
         GateDurableKeys(silo.Services);
         silo.Services.TryAddSingleton<IJournalStorageProvider, VolatileJournalStorageProvider>();
@@ -40,7 +42,6 @@ public static class DigitalBrainSiloExtensions
 
         services.AddSingleton(catalog);
         services.AddSingleton<ISynapseSerialization>(serialization);
-        AddAccessAdapters(services);
         services.AddSerializer(wire => ConfigureWire(wire, catalog, serialization));
         return services;
     }
@@ -68,10 +69,16 @@ public static class DigitalBrainSiloExtensions
         return serialization;
     }
 
-    private static void AddAccessAdapters(IServiceCollection services)
+    private static void AddWorkspaceServices(IServiceCollection services, CompositionCatalog catalog)
     {
-        services.TryAddSingleton<SynapsePublisher, OrleansSynapsePublisher>();
-        services.TryAddSingleton<JournalReader, OrleansJournalReader>();
+        services.AddScoped<WorkspaceBindingHolder>();
+        foreach (var registration in catalog.WorkspaceServices)
+        {
+            services.AddScoped(
+                registration.ServiceType,
+                provider => registration.Factory(
+                    provider.GetRequiredService<WorkspaceBindingHolder>().Binding));
+        }
     }
 
     private static void ConfigureWire(

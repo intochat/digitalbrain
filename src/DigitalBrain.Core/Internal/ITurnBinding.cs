@@ -4,7 +4,9 @@ internal interface ITurnBinding
 {
     NeuronId Id { get; }
 
-    void Stage(Synapse synapse);
+    SynapseOrigin Origin { get; }
+
+    void Stage(Synapse synapse, Dispatch dispatch);
 
     TState GetState<TState>()
         where TState : class, new();

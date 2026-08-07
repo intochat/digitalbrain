@@ -28,6 +28,27 @@ public sealed class DigitalBrainTestBuilder
         return this;
     }
 
+    public DigitalBrainTestBuilder RegisterIngress<TSynapse>()
+        where TSynapse : Synapse
+    {
+        RefuseSealed();
+        registrations.Add(composition => composition.RegisterIngress<TSynapse>());
+        registrationRows.Add($"ingress={typeof(TSynapse).FullName}");
+        return this;
+    }
+
+    public DigitalBrainTestBuilder RegisterWorkspaceService<TService>(
+        Func<WorkspaceBinding, TService> factory)
+        where TService : class
+    {
+        RefuseSealed();
+        ArgumentNullException.ThrowIfNull(factory);
+        registrations.Add(composition => composition.RegisterWorkspaceService(factory));
+        registrationRows.Add(
+            $"workspace-service={typeof(TService).FullName}:{factory.Method.DeclaringType?.FullName}.{factory.Method.Name}");
+        return this;
+    }
+
     public DigitalBrainTestBuilder AddService<TService>(TService instance)
         where TService : class
     {

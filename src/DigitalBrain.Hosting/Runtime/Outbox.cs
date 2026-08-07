@@ -8,7 +8,8 @@ internal sealed class Outbox(
     Journal journal,
     Router router,
     ISynapseSerialization serialization,
-    IEnvelopeCarrier envelopes)
+    IEnvelopeCarrier envelopes,
+    DigitalBrainClock clock)
 {
     private IGrainTimer? retryTimer;
     private bool wakeupArmed;
@@ -43,6 +44,11 @@ internal sealed class Outbox(
             foreach (var receiver in pending)
             {
                 var result = await TryDeliverAsync(entry, receiver, cancellationToken);
+                if (result.Rejected)
+                {
+                    continue;
+                }
+
                 if (result.Reason is { } reason)
                 {
                     terminal.Add((receiver, reason));
@@ -54,7 +60,7 @@ internal sealed class Outbox(
             }
 
             if (attempts >= DeliveryPolicy.MaximumAttempts
-                || TimeProvider.System.GetUtcNow() - entry.Origin.OccurredAt >= DeliveryPolicy.RetryHorizon)
+                || clock.UtcNow - entry.Origin.OccurredAt >= DeliveryPolicy.RetryHorizon)
             {
                 terminal.AddRange(remaining.Select(receiver => (receiver, "delivery retry horizon exhausted")));
                 remaining.Clear();
@@ -105,7 +111,7 @@ internal sealed class Outbox(
         if (!wakeupArmed)
         {
             await owner.RuntimeGrainFactory
-                .GetGrain<IOutboxWakeup>(OutboxWakeup.AddressOf(owner.Id))
+                .GetGrain<IOutboxWakeup>(OutboxWakeup.AddressOf(owner.Address))
                 .ArmAsync();
             wakeupArmed = true;
         }
@@ -116,7 +122,7 @@ internal sealed class Outbox(
         retryTimer?.Dispose();
         retryTimer = null;
         await owner.RuntimeGrainFactory
-            .GetGrain<IOutboxWakeup>(OutboxWakeup.AddressOf(owner.Id))
+            .GetGrain<IOutboxWakeup>(OutboxWakeup.AddressOf(owner.Address))
             .DisarmAsync();
         wakeupArmed = false;
     }
@@ -163,7 +169,8 @@ internal sealed class Outbox(
         try
         {
             envelopes.Write(entry.ToEnvelope());
-            var host = owner.RuntimeGrainFactory.GetGrain<INeuronHost>(NeuronHost.AddressOf(receiver));
+            var host = owner.RuntimeGrainFactory.GetGrain<INeuronHost>(
+                NeuronHost.AddressOf(new ScopedNeuronAddress(owner.Scope, receiver)));
             return await NeuronHost.WireDelivererFor(synapse.GetType())(host, synapse, timeout.Token);
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested)

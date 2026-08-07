@@ -7,4 +7,5 @@ public sealed class RetryEmitter : Neuron, INeuron<RetrySeed>
         Emit(new RetryPulse(synapse.Key));
         return Task.CompletedTask;
     }
+
 }

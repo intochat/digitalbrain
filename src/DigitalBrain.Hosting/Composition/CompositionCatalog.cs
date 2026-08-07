@@ -10,18 +10,23 @@ internal sealed class CompositionCatalog
     private readonly Dictionary<string, Type> synapseTypes;
     private readonly Dictionary<Type, string> synapseKinds;
     private readonly Dictionary<Type, HashSet<string>> listeners;
+    private readonly HashSet<Type> ingressSynapses;
 
     private CompositionCatalog(
         Dictionary<string, Type> behaviorTypes,
         Dictionary<string, Type> synapseTypes,
         Dictionary<Type, string> synapseKinds,
         Dictionary<Type, HashSet<string>> listeners,
+        IReadOnlyList<WorkspaceServiceRegistration> workspaceServices,
+        HashSet<Type> ingressSynapses,
         IReadOnlyList<Assembly> wireAssemblies)
     {
         this.behaviorTypes = behaviorTypes;
         this.synapseTypes = synapseTypes;
         this.synapseKinds = synapseKinds;
         this.listeners = listeners;
+        this.ingressSynapses = ingressSynapses;
+        WorkspaceServices = workspaceServices;
         WireAssemblies = wireAssemblies;
     }
 
@@ -31,12 +36,18 @@ internal sealed class CompositionCatalog
 
     internal IReadOnlyList<Assembly> WireAssemblies { get; }
 
+    internal IReadOnlyList<WorkspaceServiceRegistration> WorkspaceServices { get; }
+
     internal static CompositionCatalog Create(
         IReadOnlyList<Assembly> vocabularyAssemblies,
-        IReadOnlyList<NeuronRegistration> registrations)
+        IReadOnlyList<NeuronRegistration> registrations,
+        IReadOnlyList<WorkspaceServiceRegistration> workspaceServices,
+        IReadOnlyCollection<Type> ingressSynapses)
     {
         ArgumentNullException.ThrowIfNull(vocabularyAssemblies);
         ArgumentNullException.ThrowIfNull(registrations);
+        ArgumentNullException.ThrowIfNull(workspaceServices);
+        ArgumentNullException.ThrowIfNull(ingressSynapses);
 
         var moduleAssemblies = vocabularyAssemblies
             .Concat(registrations.Select(static registration => registration.BehaviorType.Assembly))
@@ -51,6 +62,16 @@ internal sealed class CompositionCatalog
         var synapseTypes = new Dictionary<string, Type>(StringComparer.Ordinal);
         var synapseKinds = new Dictionary<Type, string>();
         var listeners = new Dictionary<Type, HashSet<string>>();
+        var registeredWorkspaceServices = new HashSet<Type>();
+
+        foreach (var workspaceService in workspaceServices)
+        {
+            if (!registeredWorkspaceServices.Add(workspaceService.ServiceType))
+            {
+                throw new InvalidOperationException(
+                    $"Workspace service '{Describe(workspaceService.ServiceType)}' is registered more than once.");
+            }
+        }
 
         RegisterSynapse(synapseTypes, synapseKinds, typeof(DeliveryFailed));
         foreach (var assembly in vocabularyAssemblies)
@@ -60,6 +81,25 @@ internal sealed class CompositionCatalog
                 RequireSynapse(assembly.GetName().Name ?? assembly.FullName ?? "<unknown>", synapse);
                 RegisterSynapse(synapseTypes, synapseKinds, synapse);
             }
+        }
+
+        var registeredIngressSynapses = new HashSet<Type>();
+        foreach (var ingressSynapse in ingressSynapses)
+        {
+            RequireSynapse("External ingress", ingressSynapse);
+            if (ingressSynapse == typeof(DeliveryFailed))
+            {
+                throw new InvalidOperationException(
+                    $"{nameof(DeliveryFailed)} is a Hosting-only terminal delivery outcome and cannot be external ingress.");
+            }
+
+            if (!synapseKinds.ContainsKey(ingressSynapse))
+            {
+                throw new InvalidOperationException(
+                    $"External ingress {Describe(ingressSynapse)} is not registered vocabulary.");
+            }
+
+            registeredIngressSynapses.Add(ingressSynapse);
         }
 
         foreach (var registration in registrations)
@@ -111,7 +151,14 @@ internal sealed class CompositionCatalog
             .Append(typeof(CompositionCatalog).Assembly)
             .Distinct()
             .ToArray();
-        return new CompositionCatalog(behaviorTypes, synapseTypes, synapseKinds, listeners, wireAssemblies);
+        return new CompositionCatalog(
+            behaviorTypes,
+            synapseTypes,
+            synapseKinds,
+            listeners,
+            [.. workspaceServices],
+            registeredIngressSynapses,
+            wireAssemblies);
     }
 
     internal bool TryGetSynapseType(string kind, [NotNullWhen(true)] out Type? synapseType)
@@ -124,6 +171,8 @@ internal sealed class CompositionCatalog
 
     internal IReadOnlyCollection<string> ListenerKindsOf(Type synapseType)
         => listeners.TryGetValue(synapseType, out var kinds) ? kinds : [];
+
+    internal bool AllowsIngress(Type synapseType) => ingressSynapses.Contains(synapseType);
 
     internal bool HasNeuronKind(string kind) => behaviorTypes.ContainsKey(kind);
 

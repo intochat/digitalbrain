@@ -8,6 +8,7 @@ public sealed class DeliveryRecoveryTests(DigitalBrainTestClusters clusters) : D
     protected override void Compose(DigitalBrainTestBuilder composition)
         => composition
             .RegisterVocabulary(typeof(RetrySeed).Assembly)
+            .RegisterIngress<RetrySeed>()
             .RegisterNeuron<RetryEmitter>("retry-emitter")
             .RegisterNeuron<RetryReceiver>("retry-receiver");
 

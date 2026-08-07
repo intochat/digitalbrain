@@ -9,8 +9,8 @@ internal sealed class OutboxWakeup : Grain, IOutboxWakeup, IRemindable
     internal const string GrainTypeName = "digitalbrain.outbox-wakeup";
     private const string ReminderName = "db.outbox";
 
-    internal static GrainId AddressOf(NeuronId owner)
-        => GrainId.Create(GrainTypeName, NeuronKey.Encode(owner));
+    internal static GrainId AddressOf(ScopedNeuronAddress owner)
+        => GrainId.Create(GrainTypeName, ScopedNeuronAddressCodec.Encode(owner));
 
     public async Task ArmAsync()
         => _ = await this.RegisterOrUpdateReminder(
@@ -33,7 +33,7 @@ internal sealed class OutboxWakeup : Grain, IOutboxWakeup, IRemindable
             throw new InvalidOperationException($"Unknown outbox reminder '{reminderName}'.");
         }
 
-        var owner = NeuronKey.Decode(this.GetPrimaryKeyString());
+        var owner = ScopedNeuronAddressCodec.Decode(this.GetPrimaryKeyString());
         await GrainFactory.GetGrain<INeuronHost>(NeuronHost.AddressOf(owner)).DrainAsync();
     }
 }

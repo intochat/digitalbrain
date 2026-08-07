@@ -101,6 +101,7 @@ internal sealed class Journal
         NeuronId source,
         string synapseKind,
         DateTimeOffset occurredAt,
+        SynapseOriginAuthority authority,
         SynapseReference? causedBy,
         DeliveryTarget[] deliveryTargets,
         JsonElement serialization)
@@ -110,7 +111,7 @@ internal sealed class Journal
             next,
             JournalRecordDirection.Produced,
             synapseKind,
-            new SynapseOrigin(source, next, occurredAt),
+            new SynapseOrigin(source, next, occurredAt, authority),
             causedBy,
             deliveryTargets,
             serialization));

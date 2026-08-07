@@ -8,6 +8,7 @@ public sealed class TurnStateTests(DigitalBrainTestClusters clusters) : DigitalB
     protected override void Compose(DigitalBrainTestBuilder composition)
         => composition
             .RegisterVocabulary(typeof(CounterInput).Assembly)
+            .RegisterIngress<CounterInput>()
             .RegisterNeuron<CounterBehavior>("counter");
 
     [Fact]

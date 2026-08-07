@@ -18,6 +18,7 @@ internal sealed class NeuronHost : DurableGrain, INeuronHost
     private readonly CompositionCatalog catalog;
     private readonly ISynapseSerialization serialization;
     private readonly IEnvelopeCarrier envelopes;
+    private readonly DigitalBrainClock clock;
     private readonly ProducedSynapseStager stager;
     private readonly Outbox outbox;
     private bool poisoned;
@@ -30,14 +31,20 @@ internal sealed class NeuronHost : DurableGrain, INeuronHost
         catalog = services.GetRequiredService<CompositionCatalog>();
         serialization = services.GetRequiredService<ISynapseSerialization>();
         envelopes = services.GetRequiredService<IEnvelopeCarrier>();
+        clock = services.GetRequiredService<DigitalBrainClock>();
         stager = new ProducedSynapseStager(journal, router, serialization);
-        outbox = new Outbox(this, journal, router, serialization, envelopes);
+        outbox = new Outbox(this, journal, router, serialization, envelopes, clock);
     }
 
-    internal NeuronId Id => NeuronKey.Decode(this.GetPrimaryKeyString());
+    internal ScopedNeuronAddress Address
+        => ScopedNeuronAddressCodec.Decode(this.GetPrimaryKeyString());
 
-    internal static GrainId AddressOf(NeuronId id)
-        => GrainId.Create(GrainTypeName, NeuronKey.Encode(id));
+    internal NeuronId Id => Address.Neuron;
+
+    internal ScopeKey Scope => Address.Scope;
+
+    internal static GrainId AddressOf(ScopedNeuronAddress address)
+        => GrainId.Create(GrainTypeName, ScopedNeuronAddressCodec.Encode(address));
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -88,7 +95,7 @@ internal sealed class NeuronHost : DurableGrain, INeuronHost
             Id,
             new DeliveryFailed(failedSynapse, receiver, reason, attempts),
             causedBy,
-            TimeProvider.System.GetUtcNow());
+            clock.UtcNow);
 
     internal void Poison()
     {
@@ -126,10 +133,13 @@ internal sealed class NeuronHost : DurableGrain, INeuronHost
             throw new InvalidOperationException($"{Id} is not a source identity.");
         }
 
-        stager.ValidateAuthored(synapse);
         try
         {
-            _ = stager.StageAuthored(Id, synapse, causedBy: null, TimeProvider.System.GetUtcNow());
+            _ = stager.StageIngress(
+                Id,
+                synapse,
+                causedBy: null,
+                clock.UtcNow);
             await outbox.PrepareRecordAsync();
             await RecordAsync();
         }
@@ -166,8 +176,14 @@ internal sealed class NeuronHost : DurableGrain, INeuronHost
                 $"{Id} does not handle '{router.KindOf(typeof(TSynapse))}'.");
         }
 
-        var behavior = catalog.CreateBehavior(Id.Kind, base.ServiceProvider);
-        var binding = new TurnBinding(Id, journal, serialization);
+        using var behaviorScope = base.ServiceProvider.CreateScope();
+        behaviorScope.ServiceProvider.GetRequiredService<WorkspaceBindingHolder>().Bind(Scope);
+        var behavior = catalog.CreateBehavior(Id.Kind, behaviorScope.ServiceProvider);
+        var binding = new TurnBinding(
+            Id,
+            new SynapseOrigin(envelope.Source, envelope.Sequence, envelope.OccurredAt, envelope.Authority),
+            journal,
+            serialization);
         behavior.Bind(binding);
         try
         {
@@ -178,11 +194,10 @@ internal sealed class NeuronHost : DurableGrain, INeuronHost
             behavior.Unbind(binding);
         }
 
-        await RecordTurnAsync(synapse, envelope, binding);
-        return DeliveryResult.Success;
+        return await RecordTurnAsync(synapse, envelope, binding);
     }
 
-    private async Task RecordTurnAsync<TSynapse>(
+    private async Task<DeliveryResult> RecordTurnAsync<TSynapse>(
         TSynapse received,
         DeliveryEnvelope envelope,
         TurnBinding binding)
@@ -190,15 +205,32 @@ internal sealed class NeuronHost : DurableGrain, INeuronHost
     {
         try
         {
+            foreach (var produced in binding.Staged)
+            {
+                stager.ValidateForRecording(Id, produced.Synapse, produced.Dispatch);
+            }
+        }
+        catch (Exception rejection) when (rejection is DirectDispatchRejectedException or AuthoredSynapseRejectedException)
+        {
+            return DeliveryResult.Reject(rejection.Message);
+        }
+
+        try
+        {
             var receivedPosition = journal.AppendReceived(
                 router.KindOf(received.GetType()),
-                new SynapseOrigin(envelope.Source, envelope.Sequence, envelope.OccurredAt),
+                new SynapseOrigin(envelope.Source, envelope.Sequence, envelope.OccurredAt, envelope.Authority),
                 envelope.CausedBy,
                 serialization.Serialize(received));
             var causedBy = new SynapseReference(Id, receivedPosition);
             foreach (var produced in binding.Staged)
             {
-                _ = stager.StageAuthored(Id, produced, causedBy, TimeProvider.System.GetUtcNow());
+                _ = stager.StageAuthored(
+                    Id,
+                    produced.Synapse,
+                    produced.Dispatch,
+                    causedBy,
+                    clock.UtcNow);
             }
 
             if (binding.SerializeTouchedState() is { } state)
@@ -217,6 +249,7 @@ internal sealed class NeuronHost : DurableGrain, INeuronHost
         }
 
         outbox.Kick();
+        return DeliveryResult.Success;
     }
 
     private void RefusePoisoned()

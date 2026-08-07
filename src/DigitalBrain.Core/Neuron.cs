@@ -6,10 +6,12 @@ public abstract class Neuron
 
     protected NeuronId Id => Binding.Id;
 
-    protected void Emit(Synapse synapse)
+    protected SynapseOrigin Origin => Binding.Origin;
+
+    protected void Emit(Synapse synapse, Dispatch dispatch = default)
     {
         ArgumentNullException.ThrowIfNull(synapse);
-        Binding.Stage(synapse);
+        Binding.Stage(synapse, dispatch);
     }
 
     internal void Bind(ITurnBinding turnBinding)

@@ -8,6 +8,7 @@ public sealed class OutboxClassificationTests(DigitalBrainTestClusters clusters)
     protected override void Compose(DigitalBrainTestBuilder composition)
         => composition
             .RegisterVocabulary(typeof(RetrySeed).Assembly)
+            .RegisterIngress<RetrySeed>()
             .RegisterNeuron<RetryEmitter>("classification-emitter")
             .RegisterNeuron<ForgedRejectionReceiver>("classification-receiver");
 

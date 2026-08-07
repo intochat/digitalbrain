@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DigitalBrain.Product.Google</RootNamespace>
+    <NoWarn>$(NoWarn);CA2007;CA1062</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Product.Enrichment\DigitalBrain.Product.Enrichment.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Product.Webhooks\DigitalBrain.Product.Webhooks.csproj" />
+  </ItemGroup>
+</Project>

@@ -6,7 +6,9 @@ namespace DigitalBrain;
 public sealed class RecordedTurnRecoveryTests(DigitalBrainTestClusters clusters) : DigitalBrainTest(clusters)
 {
     protected override void Compose(DigitalBrainTestBuilder composition)
-        => composition.RegisterVocabulary(typeof(MechanicsStart).Assembly);
+        => composition
+            .RegisterVocabulary(typeof(MechanicsStart).Assembly)
+            .RegisterIngress<MechanicsStart>();
 
     [Fact]
     public async Task ReloadsFromRecordedTruthAfterARecordingFailure()

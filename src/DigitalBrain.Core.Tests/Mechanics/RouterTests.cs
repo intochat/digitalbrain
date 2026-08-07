@@ -29,4 +29,39 @@ public sealed class RouterTests
 
         Assert.Equal(id, NeuronKey.Decode(NeuronKey.Encode(id)));
     }
+
+    [Fact]
+    public void DirectDispatchSnapshotsTheDeclaredListeningReceiver()
+    {
+        var catalog = new DigitalBrainComposition()
+            .RegisterVocabulary(typeof(MechanicsPulse).Assembly)
+            .RegisterNeuron<MechanicsEmitter>("routeremitter")
+            .RegisterNeuron<MechanicsReceiver>("routerreceiver")
+            .Seal();
+        var router = new Router(catalog);
+        var receiver = new NeuronId("routerreceiver", "destination");
+
+        var receivers = router.Resolve(
+            new NeuronId("routeremitter", "origin"),
+            typeof(MechanicsPulse),
+            Dispatch.Direct(receiver));
+
+        Assert.Equal([receiver], receivers);
+    }
+
+    [Fact]
+    public void DirectDispatchRejectsAReceiverThatDoesNotHandleTheSynapse()
+    {
+        var catalog = new DigitalBrainComposition()
+            .RegisterVocabulary(typeof(MechanicsPulse).Assembly)
+            .RegisterNeuron<MechanicsEmitter>("routeremitter")
+            .RegisterNeuron<MechanicsReceiver>("routerreceiver")
+            .Seal();
+        var router = new Router(catalog);
+
+        Assert.Throws<DirectDispatchRejectedException>(() => router.Resolve(
+            new NeuronId("routeremitter", "origin"),
+            typeof(MechanicsPulse),
+            Dispatch.Direct(new NeuronId("routeremitter", "destination"))));
+    }
 }

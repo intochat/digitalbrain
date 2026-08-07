@@ -12,7 +12,10 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
         => new RecordingJournalStorage(this, journalId, inner.CreateStorage(journalId));
 
     internal JournalFaultRegistration ArmFault(
-        NeuronId target, string message, int allowRecordingsBeforeFault, bool stickyUntilDisarm)
+        ScopedNeuronAddress target,
+        string message,
+        int allowRecordingsBeforeFault,
+        bool stickyUntilDisarm)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
         ArgumentOutOfRangeException.ThrowIfNegative(allowRecordingsBeforeFault);
@@ -28,7 +31,7 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
 
             var state = new JournalFaultState(target, message, allowRecordingsBeforeFault, stickyUntilDisarm);
             faults.Add(journalId, state);
-            return new JournalFaultRegistration(target, message, state.Consumed.Task, state);
+            return new JournalFaultRegistration(target.Scope, target.Neuron, message, state.Consumed.Task, state);
         }
     }
 
@@ -36,7 +39,7 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     {
         lock (gate)
         {
-            var journalId = JournalIdOf(registration.Target);
+            var journalId = JournalIdOf(new ScopedNeuronAddress(registration.Scope, registration.Target));
             if (!faults.TryGetValue(journalId, out var state) || !ReferenceEquals(state, registration.Token))
             {
                 return false;
@@ -58,7 +61,7 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
         }
     }
 
-    private static JournalId JournalIdOf(NeuronId target)
+    private static JournalId JournalIdOf(ScopedNeuronAddress target)
         => JournalId.FromGrainId(NeuronHost.AddressOf(target));
 
     private void BeforeWrite(JournalId journalId)
@@ -89,11 +92,14 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
     }
 
     private sealed class JournalFaultState(
-        NeuronId target, string message, int allowRecordingsBeforeFault, bool stickyUntilDisarm)
+        ScopedNeuronAddress target,
+        string message,
+        int allowRecordingsBeforeFault,
+        bool stickyUntilDisarm)
     {
         internal TaskCompletionSource Consumed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        internal NeuronId Target { get; } = target;
+        internal ScopedNeuronAddress Target { get; } = target;
 
         internal string Message { get; } = message;
 

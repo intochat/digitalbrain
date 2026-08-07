@@ -12,7 +12,12 @@ internal sealed record StoredJournalRecord(
     JsonElement Serialization)
 {
     internal DeliveryEnvelope ToEnvelope()
-        => new(Origin.Source, Origin.Sequence, Origin.OccurredAt, CausedBy);
+        => new(
+            Origin.Source,
+            Origin.Sequence,
+            Origin.OccurredAt,
+            SynapseSourceIdentity.ResolveLegacyAuthority(Origin.Source, Origin.Authority),
+            CausedBy);
 
     internal JournalRecord ToJournalRecord()
         => new(

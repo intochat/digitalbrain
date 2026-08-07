@@ -8,4 +8,18 @@
   <Project Path="src/DigitalBrain.Testing.Mechanics/DigitalBrain.Testing.Mechanics.csproj" />
   <Project Path="src/DigitalBrain.Mocks/DigitalBrain.Mocks.csproj" />
   <Project Path="src/DigitalBrain.Mocks.Tests/DigitalBrain.Mocks.Tests.csproj" />
+  <Project Path="src/DigitalBrain.Product.Approvals/DigitalBrain.Product.Approvals.csproj" />
+  <Project Path="src/DigitalBrain.Product.Time/DigitalBrain.Product.Time.csproj" />
+  <Project Path="src/DigitalBrain.Product.Salesforce/DigitalBrain.Product.Salesforce.csproj" />
+  <Project Path="src/DigitalBrain.Product.Memory/DigitalBrain.Product.Memory.csproj" />
+  <Project Path="src/DigitalBrain.Product.Memory.Qdrant/DigitalBrain.Product.Memory.Qdrant.csproj" />
+  <Project Path="src/DigitalBrain.Product.Memory.Qdrant.Tests/DigitalBrain.Product.Memory.Qdrant.Tests.csproj" />
+  <Project Path="src/DigitalBrain.Product.Enrichment/DigitalBrain.Product.Enrichment.csproj" />
+  <Project Path="src/DigitalBrain.Product.Conversation/DigitalBrain.Product.Conversation.csproj" />
+  <Project Path="src/DigitalBrain.Product.SalesInsights/DigitalBrain.Product.SalesInsights.csproj" />
+  <Project Path="src/DigitalBrain.Product.Webhooks/DigitalBrain.Product.Webhooks.csproj" />
+  <Project Path="src/DigitalBrain.Product.Google/DigitalBrain.Product.Google.csproj" />
+  <Project Path="src/DigitalBrain.Product.Presentation/DigitalBrain.Product.Presentation.csproj" />
+  <Project Path="src/DigitalBrain.Product.Testing/DigitalBrain.Product.Testing.csproj" />
+  <Project Path="src/DigitalBrain.Product.Tests/DigitalBrain.Product.Tests.csproj" />
 </Solution>

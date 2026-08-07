@@ -4,22 +4,25 @@ namespace DigitalBrain;
 
 internal sealed class TurnBinding(
     NeuronId id,
+    SynapseOrigin origin,
     Journal journal,
     ISynapseSerialization serialization) : ITurnBinding
 {
-    private readonly List<Synapse> staged = [];
+    private readonly List<StagedSynapse> staged = [];
     private object? state;
     private Type? stateType;
     private bool stateTouched;
 
     public NeuronId Id { get; } = id;
 
-    internal IReadOnlyList<Synapse> Staged => staged;
+    public SynapseOrigin Origin { get; } = origin;
 
-    public void Stage(Synapse synapse)
+    internal IReadOnlyList<StagedSynapse> Staged => staged;
+
+    public void Stage(Synapse synapse, Dispatch dispatch)
     {
         ArgumentNullException.ThrowIfNull(synapse);
-        staged.Add(synapse);
+        staged.Add(new StagedSynapse(synapse, dispatch));
     }
 
     public TState GetState<TState>()

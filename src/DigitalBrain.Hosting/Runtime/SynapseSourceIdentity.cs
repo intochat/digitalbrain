@@ -12,4 +12,13 @@ internal static class SynapseSourceIdentity
 
     internal static bool Is(NeuronId id)
         => string.Equals(id.Kind, Kind, StringComparison.Ordinal);
+
+    internal static SynapseOriginAuthority ResolveLegacyAuthority(
+        NeuronId source,
+        SynapseOriginAuthority authority)
+        => authority == SynapseOriginAuthority.LegacyUnknown
+            ? Is(source)
+                ? SynapseOriginAuthority.ExternalIngress
+                : SynapseOriginAuthority.Internal
+            : authority;
 }

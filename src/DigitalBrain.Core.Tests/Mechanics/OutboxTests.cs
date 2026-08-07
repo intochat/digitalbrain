@@ -8,6 +8,7 @@ public sealed class OutboxTests(DigitalBrainTestClusters clusters) : DigitalBrai
     protected override void Compose(DigitalBrainTestBuilder composition)
         => composition
             .RegisterVocabulary(typeof(MechanicsStart).Assembly)
+            .RegisterIngress<MechanicsStart>()
             .RegisterNeuron<MechanicsEmitter>("outboxemitter")
             .RegisterNeuron<MechanicsReceiver>("outboxreceiver");
 

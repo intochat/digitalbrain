@@ -49,4 +49,24 @@ public sealed class CatalogBootTests
 
         Assert.Contains("was not registered as vocabulary", failure.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void RejectsTheHostingOwnedDeliveryFailureAsExternalIngress()
+    {
+        var failure = Assert.Throws<InvalidOperationException>(() => new DigitalBrainComposition()
+            .RegisterIngress<DeliveryFailed>()
+            .Seal());
+
+        Assert.Contains("Hosting-only", failure.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RejectsIngressThatWasNotRegisteredAsVocabulary()
+    {
+        var failure = Assert.Throws<InvalidOperationException>(() => new DigitalBrainComposition()
+            .RegisterIngress<MechanicsPulse>()
+            .Seal());
+
+        Assert.Contains("not registered vocabulary", failure.Message, StringComparison.Ordinal);
+    }
 }

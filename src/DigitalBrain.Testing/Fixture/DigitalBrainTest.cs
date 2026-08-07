@@ -25,6 +25,8 @@ public abstract class DigitalBrainTest(DigitalBrainTestClusters clusters) : IAsy
 
     protected static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
+    protected TestClock Clock => Fixture.Clock;
+
     protected virtual void Compose(DigitalBrainTestBuilder composition)
     {
     }
@@ -56,14 +58,39 @@ public abstract class DigitalBrainTest(DigitalBrainTestClusters clusters) : IAsy
     }
 
     protected Task PublishAsync(string source, Synapse synapse, CancellationToken cancellationToken = default)
-        => Fixture.Publisher.PublishAsync(new SynapseSource(source), synapse, cancellationToken);
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        return Fixture
+            .OpenDefaultWorkspace(source, synapse.GetType())
+            .Publisher
+            .PublishAsync(synapse, cancellationToken);
+    }
+
+    protected WorkspaceChannel OpenWorkspace(
+        string scope,
+        string source,
+        params Type[] permittedIngressSynapses)
+        => Fixture.OpenWorkspace(scope, source, permittedIngressSynapses);
+
+    protected bool HasAmbientAccessServices() => Fixture.HasAmbientAccessServices();
 
     protected Task<JournalRead> ReadOutcomeAsync(
         NeuronId neuron,
         long afterPosition = 0,
         int maximumRecords = 256,
         CancellationToken cancellationToken = default)
-        => Fixture.Reader.ReadAsync(neuron, afterPosition, maximumRecords, cancellationToken);
+        => ReadOutcomeAsync(Fixture.DefaultWorkspace, neuron, afterPosition, maximumRecords, cancellationToken);
+
+    protected static Task<JournalRead> ReadOutcomeAsync(
+        WorkspaceChannel workspace,
+        NeuronId neuron,
+        long afterPosition = 0,
+        int maximumRecords = 256,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        return workspace.Journal.ReadAsync(neuron, afterPosition, maximumRecords, cancellationToken);
+    }
 
     protected async Task<JournalPage> ReadAsync(
         NeuronId neuron,
@@ -72,6 +99,18 @@ public abstract class DigitalBrainTest(DigitalBrainTestClusters clusters) : IAsy
         CancellationToken cancellationToken = default)
     {
         var read = await ReadOutcomeAsync(neuron, afterPosition, maximumRecords, cancellationToken);
+        return read as JournalPage
+            ?? throw new InvalidOperationException($"{neuron} returned unavailable journal history in a test without retention.");
+    }
+
+    protected static async Task<JournalPage> ReadAsync(
+        WorkspaceChannel workspace,
+        NeuronId neuron,
+        long afterPosition = 0,
+        int maximumRecords = 256,
+        CancellationToken cancellationToken = default)
+    {
+        var read = await ReadOutcomeAsync(workspace, neuron, afterPosition, maximumRecords, cancellationToken);
         return read as JournalPage
             ?? throw new InvalidOperationException($"{neuron} returned unavailable journal history in a test without retention.");
     }
@@ -125,6 +164,57 @@ public abstract class DigitalBrainTest(DigitalBrainTestClusters clusters) : IAsy
             $"{neuron} did not record {expectation} within {WaitBound.TotalSeconds:F0}s; {observed}.");
     }
 
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "A poll attempt against a scoped host can throw while it reloads; the bound reports the last failure if the wait never succeeds.")]
+    protected static async Task<JournalPage> WaitForJournalAsync(
+        WorkspaceChannel workspace,
+        NeuronId neuron,
+        Func<JournalPage, bool> holds,
+        string expectation,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(holds);
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectation);
+
+        var stopwatch = Stopwatch.StartNew();
+        Exception? lastFailure = null;
+        IReadOnlyList<JournalRecord>? lastRecords = null;
+
+        while (stopwatch.Elapsed < WaitBound)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                var page = await ReadAsync(workspace, neuron, cancellationToken: cancellationToken);
+                lastRecords = page.Records;
+                lastFailure = null;
+                if (holds(page))
+                {
+                    return page;
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception failure)
+            {
+                lastFailure = failure;
+            }
+
+            await Task.Delay(PollBackoff, cancellationToken);
+        }
+
+        var observed = lastRecords is null
+            ? lastFailure is null ? "no read ever completed" : $"the last read failed: {lastFailure.Message}"
+            : $"the journal holds [{string.Join(", ", lastRecords.Select(record => $"{record.Direction} {record.SynapseKind}"))}]";
+        throw new TimeoutException(
+            $"{neuron} did not record {expectation} within {WaitBound.TotalSeconds:F0}s; {observed}.");
+    }
+
     protected JournalFaultHandle FailNextJournalRecording(
         NeuronId neuron, int allowRecordingsBeforeFault = 0, bool stickyUntilDisarm = false)
     {
@@ -144,8 +234,24 @@ public abstract class DigitalBrainTest(DigitalBrainTestClusters clusters) : IAsy
         return Fixture.DeactivateAsync(neurons, cancellationToken);
     }
 
+    protected Task DeactivateAsync(
+        string workspaceScope,
+        IReadOnlyList<NeuronId> neurons,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceScope);
+        ArgumentNullException.ThrowIfNull(neurons);
+        return Fixture.DeactivateAsync(workspaceScope, neurons, cancellationToken);
+    }
+
     protected Task DrainAsync(NeuronId neuron, CancellationToken cancellationToken = default)
         => Fixture.DrainAsync(neuron, cancellationToken);
+
+    protected Task DrainAsync(string workspaceScope, NeuronId neuron, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceScope);
+        return Fixture.DrainAsync(workspaceScope, neuron, cancellationToken);
+    }
 
     private ComposedFixture Fixture
     {
