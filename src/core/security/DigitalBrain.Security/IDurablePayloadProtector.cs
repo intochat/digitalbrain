@@ -1,6 +1,6 @@
 namespace DigitalBrain.Security;
 
-internal interface IDurablePayloadProtector
+public interface IDurablePayloadProtector
 {
     byte[] Protect(string purpose, ReadOnlySpan<byte> plaintext);
 

@@ -6,11 +6,11 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.Security;
 
-internal static class DurablePayloadProtectionHosting
+public static class DurablePayloadProtectionHosting
 {
     private const string ConfigurationKey = "DigitalBrain:Security:StateProtectionKey";
 
-    internal static void Configure(IServiceCollection services, IConfiguration configuration)
+    public static void Configure(IServiceCollection services, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
