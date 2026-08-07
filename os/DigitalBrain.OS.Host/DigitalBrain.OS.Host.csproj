@@ -1,7 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-  <PropertyGroup>
-    <NoWarn>$(NoWarn);MSB3277;NU1608</NoWarn>
-  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Azure.Data.Tables" />
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />

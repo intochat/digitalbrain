@@ -2,7 +2,7 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>DigitalBrain Behavior rail runtime: BehaviorNeuron, contract-only compiler, BDD gate, and execution seam.</Description>
-    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007;NU1608</NoWarn>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
