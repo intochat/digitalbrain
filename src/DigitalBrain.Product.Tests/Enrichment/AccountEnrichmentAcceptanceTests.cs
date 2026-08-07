@@ -47,6 +47,7 @@ public sealed class AccountEnrichmentAcceptanceTests(DigitalBrainTestClusters cl
             .RegisterNeuron<SalesforceMutationNeuron>(SalesforceMutationNeuron.Kind)
             .RegisterNeuron<SalesforceEffectNeuron>(SalesforceEffectNeuron.Kind)
             .RegisterNeuron<ApprovalNeuron>(ApprovalNeuron.Kind)
+            .RegisterNeuron<ApprovalWorkspaceInboxNeuron>(ApprovalWorkspaceInboxNeuron.Kind)
             .RegisterNeuron<ApprovalProposalIngress>(ApprovalProposalIngress.Kind)
             .RegisterNeuron<ApprovalDecisionIngress>(ApprovalDecisionIngress.Kind)
             .RegisterNeuron<ProposalDeadlineNeuron>(ProposalDeadlineNeuron.Kind)

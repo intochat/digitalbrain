@@ -17,6 +17,7 @@ public sealed class ProposalDeadlineTests(DigitalBrainTestClusters clusters) : D
             .RegisterIngress<ForgeApprovalPending>()
             .RegisterWorkspaceService<IProposalDeadlineScheduler>(static _ => new RecordingDeadlineScheduler())
             .RegisterNeuron<ApprovalNeuron>(ApprovalNeuron.Kind)
+            .RegisterNeuron<ApprovalWorkspaceInboxNeuron>(ApprovalWorkspaceInboxNeuron.Kind)
             .RegisterNeuron<ApprovalProposalIngress>(ApprovalProposalIngress.Kind)
             .RegisterNeuron<ForgedApprovalPendingEmitter>(ForgedApprovalPendingEmitter.Kind)
             .RegisterNeuron<ProposalDeadlineNeuron>("proposal-deadline");

@@ -16,6 +16,7 @@ public sealed class ApprovalReviewProjectionTests(DigitalBrainTestClusters clust
             .RegisterIngress<ApprovalDecisionSubmitted>()
             .RegisterIngress<ForgeApprovalPending>()
             .RegisterNeuron<ApprovalNeuron>(ApprovalNeuron.Kind)
+            .RegisterNeuron<ApprovalWorkspaceInboxNeuron>(ApprovalWorkspaceInboxNeuron.Kind)
             .RegisterNeuron<ApprovalProposalIngress>(ApprovalProposalIngress.Kind)
             .RegisterNeuron<ApprovalDecisionIngress>(ApprovalDecisionIngress.Kind)
             .RegisterNeuron<ForgedApprovalPendingEmitter>(ForgedApprovalPendingEmitter.Kind)

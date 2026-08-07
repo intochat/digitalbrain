@@ -13,6 +13,7 @@ public sealed class WholeProposalApprovalTests(DigitalBrainTestClusters clusters
             .RegisterIngress<ApprovalDecisionSubmitted>()
             .RegisterIngress<ApprovalDeadlineElapsed>()
             .RegisterNeuron<ApprovalNeuron>(ApprovalNeuron.Kind)
+            .RegisterNeuron<ApprovalWorkspaceInboxNeuron>(ApprovalWorkspaceInboxNeuron.Kind)
             .RegisterNeuron<ApprovalProposalIngress>(ApprovalProposalIngress.Kind)
             .RegisterNeuron<ApprovalDecisionIngress>(ApprovalDecisionIngress.Kind)
             .RegisterNeuron<ApprovalDeadlineIngress>(ApprovalDeadlineIngress.Kind)
@@ -301,6 +302,7 @@ public sealed class WholeProposalApprovalTests(DigitalBrainTestClusters clusters
                 && record.SynapseKind == typeof(ApprovalPending).FullName),
             "the pending approval before delayed decision delivery",
             Cancellation);
+        await DrainAsync(approval, Cancellation);
 
         var fault = FailNextJournalRecording(approval, stickyUntilDisarm: true);
         try
@@ -312,6 +314,14 @@ public sealed class WholeProposalApprovalTests(DigitalBrainTestClusters clusters
                     proposal.Fingerprint,
                     Guid.NewGuid(),
                     ApprovalDecision.Approve),
+                Cancellation);
+            _ = await WaitForJournalAsync(
+                decisionIngress,
+                page => page.Records.Any(record => record.Direction == JournalRecordDirection.Received
+                    && record.SynapseKind == typeof(ApprovalDecisionSubmitted).FullName)
+                    && page.Records.Any(record => record.Direction == JournalRecordDirection.Produced
+                        && record.SynapseKind == typeof(ApprovalDecisionRequested).FullName),
+                "the durable delayed-decision source outbox",
                 Cancellation);
             await fault.Consumed.WaitAsync(Cancellation);
             await DeactivateAsync([decisionIngress], Cancellation);

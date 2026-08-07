@@ -23,6 +23,7 @@ public sealed class ApprovedMutationTests(DigitalBrainTestClusters clusters) : D
             .RegisterIngress<ForgeSalesforceOutcome>()
             .RegisterWorkspaceService<ISalesforceGateway>(workspace => Gateways.For(workspace.Id))
             .RegisterNeuron<ApprovalNeuron>(ApprovalNeuron.Kind)
+            .RegisterNeuron<ApprovalWorkspaceInboxNeuron>(ApprovalWorkspaceInboxNeuron.Kind)
             .RegisterNeuron<ApprovalProposalIngress>(ApprovalProposalIngress.Kind)
             .RegisterNeuron<ApprovalDecisionIngress>(ApprovalDecisionIngress.Kind)
             .RegisterNeuron<SalesforceMutationNeuron>(SalesforceMutationNeuron.Kind)

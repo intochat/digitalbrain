@@ -3,7 +3,8 @@ namespace DigitalBrain.Product.Approvals;
 public sealed class ApprovalNeuron : Neuron<ApprovalState>,
     INeuron<ApprovalProposed>,
     INeuron<ApprovalDecisionRequested>,
-    INeuron<ApprovalDeadlineObserved>
+    INeuron<ApprovalDeadlineObserved>,
+    INeuron<ApprovalMutationOutcomeUncertain>
 {
     public const string Kind = "approval";
 
@@ -25,12 +26,15 @@ public sealed class ApprovalNeuron : Neuron<ApprovalState>,
             return Task.CompletedTask;
         }
 
+        var pending = new ApprovalPending(synapse.Proposal);
         state.Proposal = synapse.Proposal;
         state.Status = ApprovalStatus.Pending;
+        state.WorkspaceItem = ApprovalWorkspaceInboxItem.Pending(pending);
         var bufferedDecision = state.BufferedDecision;
         state.BufferedDecision = null;
         State = state;
-        Emit(new ApprovalPending(synapse.Proposal));
+        Emit(pending);
+        EmitWorkspaceItemChanged(state);
         if (bufferedDecision is not null)
         {
             ProcessDecision(state, bufferedDecision);
@@ -104,9 +108,11 @@ public sealed class ApprovalNeuron : Neuron<ApprovalState>,
         if (synapse.DecidedAt >= proposal.ExpiresAt)
         {
             state.Status = ApprovalStatus.Expired;
+            SetWorkspaceStatus(state, ApprovalWorkspaceItemStatus.Expired);
             State = state;
             Emit(new ApprovalExpired(proposal, synapse.DecidedAt));
             EmitStatusChanged(proposal, ApprovalStatus.Expired);
+            EmitWorkspaceItemChanged(state);
             Ignore(synapse.ProposalId, synapse.DecisionId, ApprovalDecisionIgnoreReason.Expired);
             return;
         }
@@ -116,18 +122,22 @@ public sealed class ApprovalNeuron : Neuron<ApprovalState>,
             case ApprovalDecision.Approve:
                 RecordDecision(state, synapse);
                 state.Status = ApprovalStatus.Approved;
+                SetWorkspaceStatus(state, ApprovalWorkspaceItemStatus.Approved);
                 State = state;
                 Emit(
                     new ApprovalGranted(proposal, synapse.DecisionId, synapse.Actor, synapse.DecidedAt),
                     Dispatch.Direct(proposal.Action.ExecutionTarget));
                 EmitStatusChanged(proposal, ApprovalStatus.Approved);
+                EmitWorkspaceItemChanged(state);
                 return;
             case ApprovalDecision.Reject:
                 RecordDecision(state, synapse);
                 state.Status = ApprovalStatus.Rejected;
+                SetWorkspaceStatus(state, ApprovalWorkspaceItemStatus.Rejected);
                 State = state;
                 Emit(new ApprovalRejected(proposal, synapse.DecisionId, synapse.Actor, synapse.DecidedAt));
                 EmitStatusChanged(proposal, ApprovalStatus.Rejected);
+                EmitWorkspaceItemChanged(state);
                 return;
             default:
                 Ignore(synapse.ProposalId, synapse.DecisionId, ApprovalDecisionIgnoreReason.InvalidDecision);
@@ -178,9 +188,34 @@ public sealed class ApprovalNeuron : Neuron<ApprovalState>,
         }
 
         state.Status = ApprovalStatus.Expired;
+        SetWorkspaceStatus(state, ApprovalWorkspaceItemStatus.Expired);
         State = state;
         Emit(new ApprovalExpired(proposal, synapse.OccurredAt));
         EmitStatusChanged(proposal, ApprovalStatus.Expired);
+        EmitWorkspaceItemChanged(state);
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(ApprovalMutationOutcomeUncertain synapse, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var state = State;
+        if (!MatchesId(synapse.ProposalId)
+            || state.MutationOutcomeUncertain
+            || state.Status != ApprovalStatus.Approved
+            || state.Proposal is not { } proposal
+            || !string.Equals(proposal.Fingerprint, synapse.ProposalFingerprint, StringComparison.Ordinal)
+            || Origin.Source != proposal.Action.ExecutionTarget)
+        {
+            return Task.CompletedTask;
+        }
+
+        state.MutationOutcomeUncertain = true;
+        SetWorkspaceStatus(state, ApprovalWorkspaceItemStatus.MutationUncertain);
+        State = state;
+        EmitWorkspaceItemChanged(state);
         return Task.CompletedTask;
     }
 
@@ -209,4 +244,22 @@ public sealed class ApprovalNeuron : Neuron<ApprovalState>,
             proposal.ProposalId,
             proposal.Fingerprint,
             status));
+
+    private static void SetWorkspaceStatus(ApprovalState state, ApprovalWorkspaceItemStatus status)
+    {
+        var workspaceItem = state.WorkspaceItem
+            ?? throw new InvalidOperationException("An approval lifecycle transition needs its frozen workspace item.");
+        state.WorkspaceItem = workspaceItem.WithStatus(status);
+    }
+
+    private void EmitWorkspaceItemChanged(ApprovalState state)
+    {
+        var workspaceItem = state.WorkspaceItem
+            ?? throw new InvalidOperationException("An approval workspace update needs its frozen review item.");
+        Emit(
+            new ApprovalWorkspaceInboxItemChanged(workspaceItem),
+            Dispatch.Direct(new NeuronId(
+                ApprovalWorkspaceInboxNeuron.Kind,
+                ApprovalWorkspaceInboxNeuron.Name)));
+    }
 }

@@ -12,6 +12,10 @@ public sealed class ApprovalState
 
     public ApprovalStatus Status { get; set; }
 
+    public ApprovalWorkspaceInboxItem? WorkspaceItem { get; set; }
+
+    public bool MutationOutcomeUncertain { get; set; }
+
     public Guid? DecisionId { get; set; }
 
     public string? Actor { get; set; }

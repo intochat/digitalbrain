@@ -43,6 +43,8 @@ public sealed class SalesforceMutationNeuron : Neuron<SalesforceMutationState>,
         }
 
         state.InvocationRequested = true;
+        state.ApprovedProposalId = synapse.Proposal.ProposalId;
+        state.ApprovedProposalFingerprint = synapse.Proposal.Fingerprint;
         State = state;
         Emit(
             new SalesforceInvocationRequested(mutation),
@@ -93,7 +95,21 @@ public sealed class SalesforceMutationNeuron : Neuron<SalesforceMutationState>,
         }
 
         state.Outcome = outcome;
+        var approvedProposalId = state.ApprovedProposalId;
+        var approvedProposalFingerprint = state.ApprovedProposalFingerprint;
+        state.ApprovedProposalId = null;
+        state.ApprovedProposalFingerprint = null;
         State = state;
         Emit(synapse);
+        if (outcome == SalesforceGatewayOutcome.OutcomeUncertain
+            && approvedProposalId is not null
+            && approvedProposalFingerprint is not null)
+        {
+            Emit(
+                new ApprovalMutationOutcomeUncertain(
+                    approvedProposalId,
+                    approvedProposalFingerprint),
+                Dispatch.Direct(new NeuronId(ApprovalNeuron.Kind, approvedProposalId)));
+        }
     }
 }

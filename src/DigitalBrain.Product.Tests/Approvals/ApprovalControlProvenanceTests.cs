@@ -14,6 +14,7 @@ public sealed class ApprovalControlProvenanceTests(DigitalBrainTestClusters clus
             .RegisterIngress<ForgeApprovalDecision>()
             .RegisterIngress<ForgeApprovalDeadline>()
             .RegisterNeuron<ApprovalNeuron>(ApprovalNeuron.Kind)
+            .RegisterNeuron<ApprovalWorkspaceInboxNeuron>(ApprovalWorkspaceInboxNeuron.Kind)
             .RegisterNeuron<ApprovalProposalIngress>(ApprovalProposalIngress.Kind)
             .RegisterNeuron<ApprovalGrantProbe>("approval-grant-probe")
             .RegisterNeuron<ForgedApprovalControlEmitter>(ForgedApprovalControlEmitter.Kind);
