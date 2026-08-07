@@ -83,7 +83,7 @@ public static class ShellHostingExtensions
                     $"Call {nameof(WithHeadlessHost)}, {nameof(WithWindowHost)}, or {nameof(WithWebHost)} exactly once.");
             }
 
-            var appHost = brain.GetApplicationBuilder();
+            var appHost = brain.ApplicationBuilder;
             var packageRoot = ResolveFlutterWorkingDirectory(appHost.AppHostDirectory, options.WorkingDirectory);
             if (!Directory.Exists(packageRoot)
                 || !File.Exists(Path.Combine(packageRoot, "pubspec.yaml")))

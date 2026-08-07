@@ -122,7 +122,7 @@ public static class AIHostingExtensions
 
         private void AddOllamaModel(Type model, string resourceSuffix, string tag)
         {
-            var builder = brain.GetApplicationBuilder();
+            var builder = brain.ApplicationBuilder;
             _ollama ??= builder
                 .AddOllama($"{brain.Name}-ai-ollama")
                 .WithImageTag(OllamaImageTag)
@@ -137,7 +137,7 @@ public static class AIHostingExtensions
 
         private void AddGpt56()
         {
-            var builder = brain.GetApplicationBuilder();
+            var builder = brain.ApplicationBuilder;
             _openAIKey ??= builder
                 .AddParameter($"{brain.Name}-ai-openai-api-key", secret: true)
                 .WithDescription(

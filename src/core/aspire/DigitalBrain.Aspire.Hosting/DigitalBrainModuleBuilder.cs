@@ -7,11 +7,11 @@ public sealed class DigitalBrainModuleBuilder<TModule>
 {
     internal DigitalBrainModuleBuilder(DigitalBrainBuilder brain) => Brain = brain;
 
-    internal DigitalBrainBuilder Brain { get; }
+    public DigitalBrainBuilder Brain { get; }
 
-    internal void AddProjection(DigitalBrainModuleProjection projection)
+    public void AddProjection(DigitalBrainModuleProjection projection)
         => Brain.AddProjection(projection);
 
-    internal void RequireStateProtection()
+    public void RequireStateProtection()
         => Brain.RequireStateProtection();
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Abstractions;
@@ -5,7 +6,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Aspire.Hosting;
 
-internal sealed record OAuthProviderHostingDefinition(
+// RedirectUriDescription is operator-facing markdown about a redirect-URI parameter, not a URI value.
+[SuppressMessage("Design", "CA1054", Justification = "Parameter is prose describing a redirect URI, not a URI.")]
+[SuppressMessage("Design", "CA1056", Justification = "Property is prose describing a redirect URI, not a URI.")]
+public sealed record OAuthProviderHostingDefinition(
     string Key,
     string DisplayName,
     string ParameterPrefix,
@@ -14,15 +18,15 @@ internal sealed record OAuthProviderHostingDefinition(
     string? ClientSecretDescription,
     string RedirectUriDescription);
 
-internal static class OAuthProviderHosting
+public static class OAuthProviderHosting
 {
-    internal static void Register<TModule>(DigitalBrainModuleBuilder<TModule> module, OAuthProviderHostingDefinition definition)
+    public static void Register<TModule>(DigitalBrainModuleBuilder<TModule> module, OAuthProviderHostingDefinition definition)
         where TModule : class, IModule, new()
     {
         ArgumentNullException.ThrowIfNull(module);
         ArgumentNullException.ThrowIfNull(definition);
 
-        var application = GetOrAddApplicationParameters(module.Brain.GetApplicationBuilder());
+        var application = GetOrAddApplicationParameters(module.Brain.ApplicationBuilder);
         var projection = module.Brain.GetOrAddState(
             static brain => new OAuthBrainProjection(brain),
             out var added);

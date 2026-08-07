@@ -38,7 +38,7 @@ public static class MemoryHostingExtensions
                 return;
             }
 
-            var builder = brain.GetApplicationBuilder();
+            var builder = brain.ApplicationBuilder;
             _qdrant = builder.AddQdrant($"{brain.Name}-memory-qdrant");
             _enabled = true;
         }

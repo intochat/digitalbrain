@@ -32,7 +32,7 @@ public sealed class DigitalBrainBuilder
         Journal = journal;
     }
 
-    internal string Name { get; }
+    public string Name { get; }
 
     internal IResourceBuilder<AzureBlobStorageResource> Journal { get; }
 
@@ -59,9 +59,9 @@ public sealed class DigitalBrainBuilder
         _localDevelopmentOAuthCallbackUri = callbackUri;
     }
 
-    internal IDistributedApplicationBuilder GetApplicationBuilder() => _builder;
+    public IDistributedApplicationBuilder ApplicationBuilder => _builder;
 
-    internal TState GetOrAddState<TState>(Func<DigitalBrainBuilder, TState> create, out bool added)
+    public TState GetOrAddState<TState>(Func<DigitalBrainBuilder, TState> create, out bool added)
         where TState : class
     {
         ArgumentNullException.ThrowIfNull(create);
