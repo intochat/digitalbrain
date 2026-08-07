@@ -21,7 +21,6 @@ internal sealed partial class BehaviorNeuron :
     private readonly IBehaviorBddGate _bddGate;
     private readonly IBehaviorExecutor _executor;
     private readonly IBehaviorArtifactTrust _artifactTrust;
-    private readonly IBehaviorHostGateway? _host;
 
     public BehaviorNeuron()
     {
@@ -31,7 +30,6 @@ internal sealed partial class BehaviorNeuron :
         _bddGate = ServiceProvider.GetRequiredService<IBehaviorBddGate>();
         _executor = ServiceProvider.GetRequiredService<IBehaviorExecutor>();
         _artifactTrust = ServiceProvider.GetRequiredService<IBehaviorArtifactTrust>();
-        _host = ServiceProvider.GetService<IBehaviorHostGateway>();
     }
 
     public Task<BehaviorSnapshot> Read() => Task.FromResult(Snapshot(LoadOrEmpty()));
@@ -273,36 +271,8 @@ internal sealed partial class BehaviorNeuron :
         }
 
         var behaviorId = BehaviorIdOfName();
-        if (_host is not null)
-        {
-            try
-            {
-                await _host.DeployAsync(
-                    new BehaviorHostDeployCommand(
-                        Id.Owner,
-                        behaviorId,
-                        command.ArtifactHash,
-                        data.ArtifactBytes,
-                        data.AssemblyBytes,
-                        data.ArtifactSignature),
-                    CancellationToken.None).ConfigureAwait(true);
-                await _host.ActivateAsync(
-                    new BehaviorHostActivationCommand(Id.Owner, behaviorId, command.ArtifactHash),
-                    CancellationToken.None).ConfigureAwait(true);
-            }
-            catch (BehaviorHostException exception)
-            {
-                await EmitAsync(new BehaviorRevisionDeployRefused(
-                    command.CommandId,
-                    behaviorId,
-                    command.ArtifactHash,
-                    exception.Reason)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-                throw new InvalidOperationException(
-                    $"Behavior host refused deploy of '{command.ArtifactHash}': {exception.Reason}.");
-            }
-
-            await EmitAsync(new BehaviorRevisionDeployed(command.CommandId, behaviorId, command.ArtifactHash)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
+        // External signed Host worker is gone; activation is silo-journaled only.
+        // Authored execute stays closed (InProcessBehaviorExecutor).
 
         var prior = data.ActiveArtifactHash;
         data = data with
@@ -354,15 +324,6 @@ internal sealed partial class BehaviorNeuron :
         var demoted = data.ActiveArtifactHash;
         var restored = data.PriorArtifactHash;
         var behaviorId = BehaviorIdOfName();
-        if (_host is not null)
-        {
-            await _host.DeactivateAsync(
-                new BehaviorHostDeactivationCommand(Id.Owner, behaviorId, demoted),
-                CancellationToken.None).ConfigureAwait(true);
-            await _host.ActivateAsync(
-                new BehaviorHostActivationCommand(Id.Owner, behaviorId, restored),
-                CancellationToken.None).ConfigureAwait(true);
-        }
 
         data = data with
         {

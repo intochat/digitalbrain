@@ -1,11 +1,10 @@
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Mcp.Aspire.Hosting;
 
 namespace DigitalBrain.Salesforce.Aspire.Hosting;
 
 public static class SalesforceHostingExtensions
 {
-    private static readonly McpProviderHostingDefinition Salesforce = new(
+    private static readonly OAuthProviderHostingDefinition Salesforce = new(
         "salesforce",
         "Salesforce",
         "salesforce",
@@ -20,7 +19,7 @@ public static class SalesforceHostingExtensions
     {
         ArgumentNullException.ThrowIfNull(module);
 
-        McpProviderHosting.Register(module, Salesforce);
+        OAuthProviderHosting.Register(module, Salesforce);
         return module;
     }
 }

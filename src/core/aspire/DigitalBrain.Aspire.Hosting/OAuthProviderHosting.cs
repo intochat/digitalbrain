@@ -1,12 +1,11 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Aspire.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Mcp.Aspire.Hosting;
+namespace DigitalBrain.Aspire.Hosting;
 
-internal sealed record McpProviderHostingDefinition(
+internal sealed record OAuthProviderHostingDefinition(
     string Key,
     string DisplayName,
     string ParameterPrefix,
@@ -15,9 +14,9 @@ internal sealed record McpProviderHostingDefinition(
     string? ClientSecretDescription,
     string RedirectUriDescription);
 
-internal static class McpProviderHosting
+internal static class OAuthProviderHosting
 {
-    internal static void Register<TModule>(DigitalBrainModuleBuilder<TModule> module, McpProviderHostingDefinition definition)
+    internal static void Register<TModule>(DigitalBrainModuleBuilder<TModule> module, OAuthProviderHostingDefinition definition)
         where TModule : class, IModule, new()
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -25,7 +24,7 @@ internal static class McpProviderHosting
 
         var application = GetOrAddApplicationParameters(module.Brain.GetApplicationBuilder());
         var projection = module.Brain.GetOrAddState(
-            static brain => new McpBrainProjection(brain),
+            static brain => new OAuthBrainProjection(brain),
             out var added);
         if (added)
         {
@@ -36,34 +35,34 @@ internal static class McpProviderHosting
         projection.Add(definition, application.Register(definition, module.Brain.LocalDevelopmentOAuthCallbackUri));
     }
 
-    private static McpApplicationParameters GetOrAddApplicationParameters(IDistributedApplicationBuilder builder)
+    private static OAuthApplicationParameters GetOrAddApplicationParameters(IDistributedApplicationBuilder builder)
     {
         var existing = builder.Services
-            .LastOrDefault(descriptor => descriptor.ServiceType == typeof(McpApplicationParameters))
-            ?.ImplementationInstance as McpApplicationParameters;
+            .LastOrDefault(descriptor => descriptor.ServiceType == typeof(OAuthApplicationParameters))
+            ?.ImplementationInstance as OAuthApplicationParameters;
         if (existing is not null)
         {
             return existing;
         }
 
-        var created = new McpApplicationParameters(builder);
+        var created = new OAuthApplicationParameters(builder);
         builder.Services.AddSingleton(created);
         return created;
     }
 
-    private sealed class McpApplicationParameters
+    private sealed class OAuthApplicationParameters
     {
         private readonly IDistributedApplicationBuilder _builder;
-        private readonly Dictionary<string, McpProviderParameters> _providers =
+        private readonly Dictionary<string, OAuthProviderParameters> _providers =
             new(StringComparer.Ordinal);
 
-        internal McpApplicationParameters(IDistributedApplicationBuilder builder)
+        internal OAuthApplicationParameters(IDistributedApplicationBuilder builder)
         {
             _builder = builder;
         }
 
-        internal McpProviderParameters Register(
-            McpProviderHostingDefinition definition,
+        internal OAuthProviderParameters Register(
+            OAuthProviderHostingDefinition definition,
             string? localDevelopmentCallbackUri)
         {
             Validate(definition);
@@ -73,7 +72,7 @@ internal static class McpProviderHosting
                 if (existing.Definition != definition)
                 {
                     throw new InvalidOperationException(
-                        $"MCP provider key '{definition.Key}' has conflicting AppHost definitions.");
+                        $"OAuth provider key '{definition.Key}' has conflicting AppHost definitions.");
                 }
 
                 return existing;
@@ -81,7 +80,7 @@ internal static class McpProviderHosting
 
             var localRun = _builder.ExecutionContext.IsRunMode;
             var localCallback = localRun ? localDevelopmentCallbackUri : null;
-            var created = new McpProviderParameters(
+            var created = new OAuthProviderParameters(
                 definition,
                 Parameter(
                     $"{definition.ParameterPrefix}-client-id",
@@ -105,7 +104,7 @@ internal static class McpProviderHosting
         }
 
         private static string RedirectUriDescription(
-            McpProviderHostingDefinition definition,
+            OAuthProviderHostingDefinition definition,
             string? localCallbackUri)
             => localCallbackUri is null
                 ? definition.RedirectUriDescription
@@ -139,18 +138,18 @@ internal static class McpProviderHosting
         }
     }
 
-    private sealed class McpBrainProjection : DigitalBrainModuleProjection
+    private sealed class OAuthBrainProjection : DigitalBrainModuleProjection
     {
         private readonly DigitalBrainBuilder _brain;
-        private readonly Dictionary<string, McpProviderParameters> _providers =
+        private readonly Dictionary<string, OAuthProviderParameters> _providers =
             new(StringComparer.Ordinal);
 
-        internal McpBrainProjection(DigitalBrainBuilder brain)
+        internal OAuthBrainProjection(DigitalBrainBuilder brain)
         {
             _brain = brain;
         }
 
-        internal void Add(McpProviderHostingDefinition definition, McpProviderParameters parameters)
+        internal void Add(OAuthProviderHostingDefinition definition, OAuthProviderParameters parameters)
         {
             if (_providers.ContainsKey(definition.Key))
             {
@@ -180,7 +179,7 @@ internal static class McpProviderHosting
         }
     }
 
-    private static void Validate(McpProviderHostingDefinition definition)
+    private static void Validate(OAuthProviderHostingDefinition definition)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.Key);
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.DisplayName);
@@ -195,8 +194,8 @@ internal static class McpProviderHosting
         ArgumentException.ThrowIfNullOrWhiteSpace(definition.RedirectUriDescription);
     }
 
-    private sealed record McpProviderParameters(
-        McpProviderHostingDefinition Definition,
+    private sealed record OAuthProviderParameters(
+        OAuthProviderHostingDefinition Definition,
         IResourceBuilder<ParameterResource> ClientId,
         IResourceBuilder<ParameterResource>? ClientSecret,
         IResourceBuilder<ParameterResource> RedirectUri);

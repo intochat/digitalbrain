@@ -1,11 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>DigitalBrain Behavior rail runtime: BehaviorNeuron, contract-only compiler, BDD gate, and execution seam.</Description>
+    <Description>DigitalBrain Behavior rail runtime: BehaviorNeuron, contract-only compiler, BDD gate, and closed in-process execution seam.</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" ExcludeAssets="analyzers" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
   </ItemGroup>

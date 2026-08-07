@@ -8,11 +8,6 @@ namespace DigitalBrain.Behaviors.Runtime;
 
 public sealed partial class BehaviorsModule
 {
-    public const string ExecutorConfigurationKey = "DigitalBrain:Behaviors:Executor";
-    public const string HostBaseAddressConfigurationKey = "DigitalBrain:Behaviors:Host:BaseAddress";
-    public const string HostExecutorName = "Host";
-    public const string InProcessExecutorName = "InProcess";
-
     static partial void ConfigureRuntime(ISiloBuilder builder)
     {
         DurablePayloadProtectionHosting.Configure(builder.Services, builder.Configuration);
@@ -36,28 +31,7 @@ public sealed partial class BehaviorsModule
                 time);
         });
 
-        var executor = builder.Configuration[ExecutorConfigurationKey];
-        var baseAddress = builder.Configuration[HostBaseAddressConfigurationKey];
-        var useHost =
-            string.Equals(executor, HostExecutorName, StringComparison.OrdinalIgnoreCase)
-            || (!string.IsNullOrWhiteSpace(baseAddress)
-                && !string.Equals(executor, InProcessExecutorName, StringComparison.OrdinalIgnoreCase));
-
-        if (useHost)
-        {
-            if (!string.IsNullOrWhiteSpace(baseAddress))
-            {
-                builder.Services.AddHttpClient<IBehaviorHostGateway, HttpBehaviorHostClient>(client =>
-                {
-                    client.BaseAddress = new Uri(baseAddress, UriKind.Absolute);
-                });
-            }
-
-            builder.Services.AddSingleton<IBehaviorExecutor, HostedBehaviorExecutor>();
-            return;
-        }
-
-        // Closed residual only: never loads authored assemblies in the silo process.
+        // No external Host worker: authored assemblies never load in the silo process.
         builder.Services.AddSingleton<IBehaviorExecutor, InProcessBehaviorExecutor>();
     }
 }

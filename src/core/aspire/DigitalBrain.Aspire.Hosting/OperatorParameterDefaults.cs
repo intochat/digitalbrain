@@ -2,7 +2,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Publishing;
 
-namespace DigitalBrain.Mcp.Aspire.Hosting;
+namespace DigitalBrain.Aspire.Hosting;
 
 internal sealed class ConstantParameterDefault(string value) : ParameterDefault
 {

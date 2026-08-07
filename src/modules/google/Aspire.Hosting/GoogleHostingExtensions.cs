@@ -1,11 +1,10 @@
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Mcp.Aspire.Hosting;
 
 namespace DigitalBrain.Google.Aspire.Hosting;
 
 public static class GoogleHostingExtensions
 {
-    private static readonly McpProviderHostingDefinition Gmail = new(
+    private static readonly OAuthProviderHostingDefinition Gmail = new(
         "google.gmail",
         "Gmail",
         "google",
@@ -18,7 +17,7 @@ public static class GoogleHostingExtensions
     {
         ArgumentNullException.ThrowIfNull(module);
 
-        McpProviderHosting.Register(module, Gmail);
+        OAuthProviderHosting.Register(module, Gmail);
         return module;
     }
 }
