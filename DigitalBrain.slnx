@@ -22,4 +22,6 @@
   <Project Path="src/DigitalBrain.Product.Presentation/DigitalBrain.Product.Presentation.csproj" />
   <Project Path="src/DigitalBrain.Product.Testing/DigitalBrain.Product.Testing.csproj" />
   <Project Path="src/DigitalBrain.Product.Tests/DigitalBrain.Product.Tests.csproj" />
+  <Project Path="src/DigitalBrain.Edge/DigitalBrain.Edge.csproj" />
+  <Project Path="src/DigitalBrain.Edge.Tests/DigitalBrain.Edge.Tests.csproj" />
 </Solution>

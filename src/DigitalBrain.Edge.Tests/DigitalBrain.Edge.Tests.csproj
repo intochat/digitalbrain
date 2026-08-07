@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <NoWarn>$(NoWarn);CA2007;CA1515;CA1062</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DigitalBrain.Edge\DigitalBrain.Edge.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Access\DigitalBrain.Access.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Product.Approvals\DigitalBrain.Product.Approvals.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Product.Presentation\DigitalBrain.Product.Presentation.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Product.SalesInsights\DigitalBrain.Product.SalesInsights.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+</Project>
