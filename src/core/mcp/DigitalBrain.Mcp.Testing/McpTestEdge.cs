@@ -12,13 +12,17 @@ namespace DigitalBrain.Mcp.Testing;
 
 public static class McpTestEdge
 {
-    public static void ConfigureMcpEdge(this DigitalBrainTestBuilder builder)
+    public static void ConfigureMcpEdge(
+        this DigitalBrainTestBuilder builder,
+        Action<IServiceCollection>? configureServices = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        _ = ConfigureMcpChatEdge(builder);
+        _ = ConfigureMcpChatEdge(builder, configureServices);
     }
 
-    public static McpChatEdgeScript ConfigureMcpChatEdge(this DigitalBrainTestBuilder builder)
+    public static McpChatEdgeScript ConfigureMcpChatEdge(
+        this DigitalBrainTestBuilder builder,
+        Action<IServiceCollection>? configureServices = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         var script = new McpChatEdgeScript();
@@ -29,6 +33,7 @@ public static class McpTestEdge
                 services.AddSingleton<IMcpClientSessionFactory>(new ScriptedMcpSessionFactory(script.Mcp));
                 services.RemoveAll<IChatClient>();
                 services.AddSingleton<IChatClient>(script.Chat);
+                configureServices?.Invoke(services);
             },
             script,
             static edge => edge.Reset());

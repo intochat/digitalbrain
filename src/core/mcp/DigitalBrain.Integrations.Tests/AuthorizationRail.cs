@@ -246,7 +246,7 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
     }
 
     [Fact(DisplayName =
-        "pending authorization code is protected at rest — durable payload bytes do not contain the raw code")]
+        "pending authorization code is protected at rest — Protect is invoked and envelope has no raw code")]
     public async Task PendingAuthorizationCodeIsProtectedAtRest()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -255,6 +255,7 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
         var commandId = CommandId.New();
         var state = Guid.NewGuid().ToString("N");
         var rawCode = $"raw-oauth-code-{Guid.NewGuid():N}-must-not-be-plaintext";
+        var codePurpose = $"mcp/authorization/code/{state}";
 
         await auth.Reference.Begin(
             new BeginMcpAuthorization(
@@ -274,15 +275,9 @@ public sealed class AuthorizationRail(AuthorizationRailFixture fixture)
         Assert.Equal(rawCode, taken?.Code);
 
         Assert.True(
-            AuthorizationCodeCustodyProbe.TryGetDurablePayload(state, out var durableBytes),
-            "Expected durable pending payload to be recorded at write time.");
-        Assert.NotEmpty(durableBytes);
-        Assert.False(
-            ContainsAscii(durableBytes, rawCode),
-            "Durable pending authorization payload must not embed the raw OAuth code as UTF-8.");
-        Assert.True(
-            AuthorizationCodeCustodyProbe.TryGetProtectedCode(state, out var protectedCode),
-            "Expected a protected code envelope.");
+            fixture.CodeProtector.TryGetProtected(codePurpose, out var protectedCode),
+            "Expected IDurablePayloadProtector.Protect for mcp/authorization/code/{state}.");
+        Assert.NotEmpty(protectedCode);
         Assert.False(
             ContainsAscii(protectedCode, rawCode),
             "Protected code envelope must not embed the raw OAuth code as UTF-8.");

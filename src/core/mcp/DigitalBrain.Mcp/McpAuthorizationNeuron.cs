@@ -350,19 +350,16 @@ internal sealed class McpAuthorizationNeuron :
         string? iss)
     {
         string? protectedCode = null;
-        byte[]? protectedBytes = null;
         if (!string.IsNullOrWhiteSpace(code))
         {
-            protectedBytes = _protector.Protect(
-                CodePurpose(pending.State),
-                Encoding.UTF8.GetBytes(code));
-            // Store as base64 so durable payload never contains the raw OAuth code string.
-            protectedCode = Convert.ToBase64String(protectedBytes);
+            protectedCode = Convert.ToBase64String(
+                _protector.Protect(
+                    CodePurpose(pending.State),
+                    Encoding.UTF8.GetBytes(code)));
         }
 
         var updated = pending with { Outcome = outcome, Code = protectedCode, Iss = iss };
         var durablePayload = _serializer.SerializeToArray(updated);
-        AuthorizationCodeCustodyProbe.Record(pending.State, durablePayload, protectedBytes);
         _pending[pending.State] = durablePayload;
         _commands[pending.CommandId.Value] = _commandsSerializer.SerializeToArray(ToCommandRecord(updated));
         await WriteStateAsync();
