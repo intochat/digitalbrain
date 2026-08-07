@@ -255,7 +255,8 @@ public sealed class VectorMemoryContract(MemoryFixture fixture)
     public void Public_surface_hides_provider_details()
     {
         var publicTypes = typeof(IVectorMemory).Assembly.GetExportedTypes()
-            .Concat(typeof(MemoryModule).Assembly.GetExportedTypes());
+            .Concat(typeof(MemoryModule).Assembly.GetExportedTypes()
+                .Where(static type => type.Namespace != "DigitalBrain.Memory.Qdrant"));
 
         foreach (var type in publicTypes)
         {

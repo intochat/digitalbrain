@@ -1,5 +1,6 @@
 using System.Reflection;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Memory;
 using DigitalBrain.Memory.Qdrant;
 using DigitalBrain.Testing;
 using DotNet.Testcontainers.Builders;
@@ -264,18 +265,23 @@ public sealed class QdrantVectorMemoryContract : IAsyncLifetime
         }
     }
 
-    [Fact(DisplayName = "Memory.Qdrant package exports only configuration surface, not provider DTOs")]
-    public void Qdrant_package_exports_only_registration_surface()
+    [Fact(DisplayName = "Memory assembly keeps DigitalBrain.Memory.Qdrant public surface to registration only")]
+    public void Memory_qdrant_namespace_exports_only_registration_surface()
     {
-        var exported = typeof(QdrantVectorMemoryRegistration).Assembly
+        var memoryAssembly = typeof(MemoryModule).Assembly;
+        Assert.Equal("DigitalBrain.Modules.Memory", memoryAssembly.GetName().Name);
+        Assert.Same(memoryAssembly, typeof(QdrantVectorMemoryRegistration).Assembly);
+
+        var exportedFromQdrantNamespace = memoryAssembly
             .GetExportedTypes()
+            .Where(static type => type.Namespace == "DigitalBrain.Memory.Qdrant")
             .Select(static type => type.Name)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal([nameof(QdrantVectorMemoryRegistration)], exported);
-        Assert.DoesNotContain("QdrantVectorMemoryProvider", exported);
-        Assert.DoesNotContain("QdrantVectorMemoryHit", exported);
+        Assert.Equal([nameof(QdrantVectorMemoryRegistration)], exportedFromQdrantNamespace);
+        Assert.DoesNotContain("QdrantVectorMemoryProvider", exportedFromQdrantNamespace);
+        Assert.DoesNotContain("QdrantVectorMemoryHit", exportedFromQdrantNamespace);
         Assert.Null(typeof(QdrantVectorMemoryRegistration).GetMethod(
             "CreateClient",
             BindingFlags.Public | BindingFlags.Static));
