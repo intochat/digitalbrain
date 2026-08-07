@@ -30,7 +30,7 @@ internal static class OAuthCallbackHttpMaps
                         statusCode: StatusCodes.Status400BadRequest);
                 }
 
-                var authorization = brain.GetGrainProxy<IMcpAuthorization>(McpAuthorizationNeuron.InstanceName);
+                var authorization = brain.GetGrainProxy<IMcpAuthorization>(IMcpAuthorization.DefaultInstanceName);
                 var delivery = await authorization.DeliverCallback(
                     new DeliverMcpAuthorizationCallback(state, code, error, iss),
                     cancellationToken).ConfigureAwait(false);

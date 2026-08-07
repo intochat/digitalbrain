@@ -45,7 +45,7 @@ internal sealed class OwnerSessionJournal(IDigitalBrain brain)
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
         return brain.WatchJournalAsync(
-            NeuronId.For<IMcpAuthorization>(brain.Owner, McpAuthorizationNeuron.InstanceName),
+            NeuronId.For<IMcpAuthorization>(brain.Owner, IMcpAuthorization.DefaultInstanceName),
             JournalKind.Outgoing,
             afterSequence,
             cancellationToken);

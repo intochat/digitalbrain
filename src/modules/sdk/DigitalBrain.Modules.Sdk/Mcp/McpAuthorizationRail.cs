@@ -6,9 +6,9 @@ using Orleans.Journaling;
 
 namespace DigitalBrain.Modules.Sdk.Mcp;
 
-internal static class McpAuthorizationRail
+public static class McpAuthorizationRail
 {
-    internal static async Task EnsureAuthorizedAsync(
+    public static async Task EnsureAuthorizedAsync(
         IGrainFactory grains,
         OwnerId owner,
         IServiceProvider services,

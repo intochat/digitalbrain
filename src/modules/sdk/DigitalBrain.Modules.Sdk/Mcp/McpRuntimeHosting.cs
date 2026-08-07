@@ -5,12 +5,12 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.Modules.Sdk.Mcp;
 
-internal static class McpRuntimeHosting
+public static class McpRuntimeHosting
 {
-    internal const string PublicSignInBaseKey = "DigitalBrain:Integrations:Mcp:PublicSignInBase";
-    internal const string EndpointConfigurationSuffix = "Endpoint";
+    public const string PublicSignInBaseKey = "DigitalBrain:Integrations:Mcp:PublicSignInBase";
+    public const string EndpointConfigurationSuffix = "Endpoint";
 
-    internal static void Configure(IServiceCollection services, IConfiguration configuration)
+    public static void Configure(IServiceCollection services, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);

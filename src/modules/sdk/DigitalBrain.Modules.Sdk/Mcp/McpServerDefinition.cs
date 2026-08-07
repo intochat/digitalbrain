@@ -1,8 +1,8 @@
 namespace DigitalBrain.Modules.Sdk.Mcp;
 
-internal sealed class McpServerDefinition
+public sealed class McpServerDefinition
 {
-    internal McpServerDefinition(
+    public McpServerDefinition(
         string key,
         string displayName,
         Uri endpoint,
@@ -49,18 +49,18 @@ internal sealed class McpServerDefinition
         RequiresClientSecret = requiresClientSecret;
     }
 
-    internal string Key { get; }
+    public string Key { get; }
 
-    internal string DisplayName { get; }
+    public string DisplayName { get; }
 
-    internal Uri Endpoint { get; }
+    public Uri Endpoint { get; }
 
-    internal string ConfigurationRoot { get; }
+    public string ConfigurationRoot { get; }
 
-    internal IReadOnlyList<string> Scopes { get; }
+    public IReadOnlyList<string> Scopes { get; }
 
-    internal bool RequiresClientSecret { get; }
+    public bool RequiresClientSecret { get; }
 
-    internal McpServerDefinition WithEndpoint(Uri endpoint)
+    public McpServerDefinition WithEndpoint(Uri endpoint)
         => new(Key, DisplayName, endpoint, ConfigurationRoot, Scopes, RequiresClientSecret);
 }

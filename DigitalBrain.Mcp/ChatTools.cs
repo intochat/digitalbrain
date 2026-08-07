@@ -38,7 +38,7 @@ internal sealed class ChatTools(IDigitalBrain brain)
         }
 
         var chatId = NeuronId.For<IChat>(brain.Owner, chatName);
-        var authorizationId = NeuronId.For<IMcpAuthorization>(brain.Owner, McpAuthorizationNeuron.InstanceName);
+        var authorizationId = NeuronId.For<IMcpAuthorization>(brain.Owner, IMcpAuthorization.DefaultInstanceName);
         var command = new CommandId(commandIdentity);
 
         // Activate owner brain first so DigitalBrainActivated boots capability projection

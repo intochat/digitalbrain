@@ -9,6 +9,10 @@ using Orleans.Serialization;
 namespace DigitalBrain.Modules.Sdk.Mcp;
 
 [GrainType("mcpauthorization")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Orleans grain; activated by the silo, never constructed in-process.")]
 internal sealed class McpAuthorizationNeuron :
     Neuron,
     IMcpAuthorization,
@@ -16,7 +20,7 @@ internal sealed class McpAuthorizationNeuron :
     IEmit<AuthorizationCompleted>,
     IEmit<AuthorizationDenied>
 {
-    internal const string InstanceName = "mcp";
+    internal const string InstanceName = IMcpAuthorization.DefaultInstanceName;
     private const string PendingName = "mcp.authorization.pending";
     private const string CommandsName = "mcp.authorization.commands";
     private const string CodeProtectionPurposePrefix = "mcp/authorization/code";

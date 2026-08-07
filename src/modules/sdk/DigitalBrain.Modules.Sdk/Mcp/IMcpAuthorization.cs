@@ -8,6 +8,8 @@ namespace DigitalBrain.Modules.Sdk.Mcp;
 [Description("MCP OAuth authorization neuron")]
 public partial interface IMcpAuthorization : INeuron
 {
+    const string DefaultInstanceName = "mcp";
+
     [Alias(nameof(Begin))]
     Task<AuthorizationRequired> Begin(BeginMcpAuthorization request, CancellationToken cancellationToken = default);
 

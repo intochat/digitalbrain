@@ -6,6 +6,10 @@ using Orleans.Journaling;
 
 namespace DigitalBrain.Modules.Sdk.Mcp;
 
+[SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Registered with DI as IMcpClientSessionFactory; never constructed directly.")]
 internal sealed class HttpMcpClientSessionFactory(
     IConfiguration configuration,
     IHttpClientFactory httpClients,

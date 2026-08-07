@@ -52,7 +52,7 @@ internal static class GmailAuthRail
             protector,
             DurableGoogleTokenStore.Purpose(ServerKey, durableIdentity));
         var authorization = grains.GetGrain<IMcpAuthorization>(
-            NeuronId.For<IMcpAuthorization>(owner, McpAuthorizationNeuron.InstanceName).ToGrainId());
+            NeuronId.For<IMcpAuthorization>(owner, IMcpAuthorization.DefaultInstanceName).ToGrainId());
 
         McpAuthorizationClaim? claim = null;
         try

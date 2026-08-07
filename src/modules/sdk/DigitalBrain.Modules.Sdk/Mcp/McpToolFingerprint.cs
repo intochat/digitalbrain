@@ -4,9 +4,9 @@ using System.Text.Json;
 
 namespace DigitalBrain.Modules.Sdk.Mcp;
 
-internal static class McpToolFingerprint
+public static class McpToolFingerprint
 {
-    internal static string Create(
+    public static string Create(
         JsonElement inputSchema,
         JsonElement? outputSchema,
         bool? readOnly,

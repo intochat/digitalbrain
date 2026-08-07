@@ -6,15 +6,23 @@ using Orleans.Journaling;
 
 namespace DigitalBrain.Modules.Sdk.Mcp;
 
-internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
+public sealed class McpRuntime
 {
     internal const string HttpClientName = "DigitalBrain.Mcp";
+
+    private readonly IMcpClientSessionFactory _sessions;
+
+    internal McpRuntime(IMcpClientSessionFactory sessions)
+    {
+        ArgumentNullException.ThrowIfNull(sessions);
+        _sessions = sessions;
+    }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Reliability",
         "CA2025:Ensure tasks using 'IDisposable' instances complete before the instances are disposed",
         Justification = "On no-code auth outcomes the MCP SDK CreateAsync may never complete; the open token is canceled and the parked Task.Run is abandoned so the grain turn can return.")]
-    internal async ValueTask<T> RunAsync<T>(
+    public async ValueTask<T> RunAsync<T>(
         McpServerDefinition server,
         IDurableValue<byte[]> tokenState,
         Func<ValueTask> commit,
@@ -116,7 +124,7 @@ internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
         Func<McpClient, CancellationToken, ValueTask<T>> callback,
         CancellationToken cancellationToken)
     {
-        var client = await sessions.OpenAsync(
+        var client = await _sessions.OpenAsync(
             server,
             tokenState,
             commit,
@@ -129,7 +137,7 @@ internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
         }
     }
 
-    internal static JsonElement RequireStructuredContent(CallToolResult result, McpServerDefinition server, string toolName)
+    public static JsonElement RequireStructuredContent(CallToolResult result, McpServerDefinition server, string toolName)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(server);
