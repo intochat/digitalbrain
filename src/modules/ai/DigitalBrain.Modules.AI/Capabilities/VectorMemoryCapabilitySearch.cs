@@ -8,6 +8,8 @@ namespace DigitalBrain.AI;
 
 public sealed class VectorMemoryCapabilitySearch : ICapabilityCandidateSearch
 {
+    internal static readonly TimeSpan SearchBound = TimeSpan.FromSeconds(10);
+
     private readonly IGrainFactory _grains;
     private readonly string _memoryInstanceName;
 
@@ -33,29 +35,40 @@ public sealed class VectorMemoryCapabilitySearch : ICapabilityCandidateSearch
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var brain = DigitalBrainClient.Connect(_grains, owner.Value);
-        var memory = brain.Get<IVectorMemory>(_memoryInstanceName);
-        var perNamespace = Math.Max(limit, 1);
-        var candidates = new List<CapabilityCandidate>();
+        using var bound = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        bound.CancelAfter(SearchBound);
 
-        await AppendAsync(
-                candidates,
-                memory,
-                VectorMemoryNamespace.Capabilities,
-                prompt,
-                perNamespace,
-                cancellationToken)
-            .ConfigureAwait(false);
-        await AppendAsync(
-                candidates,
-                memory,
-                VectorMemoryNamespace.Behaviors,
-                prompt,
-                perNamespace,
-                cancellationToken)
-            .ConfigureAwait(false);
+        try
+        {
+            var brain = DigitalBrainClient.Connect(_grains, owner.Value);
+            var memory = brain.Get<IVectorMemory>(_memoryInstanceName);
+            var perNamespace = Math.Max(limit, 1);
+            var candidates = new List<CapabilityCandidate>();
 
-        return candidates;
+            await AppendAsync(
+                    candidates,
+                    memory,
+                    VectorMemoryNamespace.Capabilities,
+                    prompt,
+                    perNamespace,
+                    bound.Token)
+                .ConfigureAwait(false);
+            await AppendAsync(
+                    candidates,
+                    memory,
+                    VectorMemoryNamespace.Behaviors,
+                    prompt,
+                    perNamespace,
+                    bound.Token)
+                .ConfigureAwait(false);
+
+            return candidates;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"Vector memory capability search did not complete within {SearchBound.TotalSeconds} seconds.");
+        }
     }
 
     private static async Task AppendAsync(
