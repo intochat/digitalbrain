@@ -1,17 +1,18 @@
+using System.Net.ServerSentEvents;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using DigitalBrain.Shell;
 
-namespace DigitalBrain.UiEdge;
+namespace DigitalBrain.Kernel;
 
-internal static class UiEdgeEndpoints
+internal static class ShellStreamsHttpMaps
 {
-    public static IEndpointRouteBuilder MapUI(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapShellStreams(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints.MapPost(
-            UiEdgeContract.OpenScenePath,
+            HttpSurfacePaths.OpenScenePath,
             static async Task<IResult> (
                 string shellName,
                 OpenSceneRequest request,
@@ -28,13 +29,13 @@ internal static class UiEdgeEndpoints
                 await brain.SendAsync<IShell>(
                     shellName,
                     new OpenScene(CommandId.New(), request.SceneKey, request.Title),
-                    cancellationToken);
+                    cancellationToken).ConfigureAwait(false);
 
                 return Results.Accepted();
             });
 
         endpoints.MapGet(
-            UiEdgeContract.ShellEventsPath,
+            HttpSurfacePaths.ShellEventsPath,
             static async Task (
                 HttpContext http,
                 string shellName,
@@ -56,12 +57,12 @@ internal static class UiEdgeEndpoints
 
                 await SseResponse.WriteAsync(
                     http.Response,
-                    ShellEventFeed.WatchSceneOpenedAsync(sessionJournal, shellName, cursor, cancellationToken),
-                    cancellationToken);
+                    WatchSceneOpenedAsync(sessionJournal, shellName, cursor, cancellationToken),
+                    cancellationToken).ConfigureAwait(false);
             });
 
         endpoints.MapPost(
-            UiEdgeContract.ActivateControlPath,
+            HttpSurfacePaths.ActivateControlPath,
             static async Task<IResult> (
                 string sceneKey,
                 string controlId,
@@ -85,11 +86,32 @@ internal static class UiEdgeEndpoints
                 await brain.SendAsync<IScene>(
                     sceneKey,
                     new ControlActivated(sceneKey, controlId, request.Intent),
-                    cancellationToken);
+                    cancellationToken).ConfigureAwait(false);
 
                 return Results.Accepted();
             });
 
         return endpoints;
     }
+
+    private static IAsyncEnumerable<SseItem<SceneOpenedEvent>> WatchSceneOpenedAsync(
+        OwnerSessionJournal sessionJournal,
+        string shellName,
+        long afterSequence,
+        CancellationToken cancellationToken)
+        => JournalProjection.WatchAsync(
+            token => sessionJournal.WatchShellOutgoingAsync(shellName, afterSequence, token),
+            HttpSurfacePaths.SceneOpenedEvent,
+            ProjectSceneOpened,
+            cancellationToken);
+
+    private static SceneOpenedEvent? ProjectSceneOpened(SynapseDelivery delivery)
+        => delivery.Synapse is not SceneOpened opened
+            ? null
+            : new SceneOpenedEvent(
+                delivery.Sequence,
+                opened.SceneKey,
+                opened.Title,
+                opened.CommandId.ToString(),
+                opened.Shell.ToString());
 }

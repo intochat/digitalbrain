@@ -3,7 +3,7 @@ using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.UiEdge;
+namespace DigitalBrain.Kernel;
 
 internal static class JournalProjection
 {
@@ -18,7 +18,7 @@ internal static class JournalProjection
         ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
         ArgumentNullException.ThrowIfNull(project);
 
-        await foreach (var page in openOutgoing(cancellationToken))
+        await foreach (var page in openOutgoing(cancellationToken).ConfigureAwait(false))
         {
             if (page.ResetSnapshot is not null)
             {

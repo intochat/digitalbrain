@@ -6,7 +6,6 @@ namespace DigitalBrain.Shell.Aspire.Hosting;
 
 public static class ShellHostingExtensions
 {
-    public const string DefaultUIResourceName = "digitalbrain-ui";
     public const string DefaultFlutterResourceName = "digitalbrain-flutter";
     public const string UIBaseEnvironmentVariable = "DIGITALBRAIN_UI_BASE";
     public const string ShellEnvironmentVariable = "DIGITALBRAIN_SHELL";
@@ -21,20 +20,7 @@ public static class ShellHostingExtensions
     public const string DefaultDeviceTarget = "windows";
     public const string DefaultWebDeviceTarget = "chrome";
     public const string WebPlatformDirectoryName = "web";
-    public const string UiEdgeEndpointName = "http";
-    public const string UiEdgeHealthPath = "/health";
-
-    public static DigitalBrainModuleBuilder<ShellModule> WithUiEdge(
-        this DigitalBrainModuleBuilder<ShellModule> module,
-        Action<ShellUiEdgeOptions>? configure = null)
-    {
-        ArgumentNullException.ThrowIfNull(module);
-
-        var options = new ShellUiEdgeOptions();
-        configure?.Invoke(options);
-        GetOrCreateState(module).EnsureUiEdge(options);
-        return module;
-    }
+    public const string HttpEndpointName = "http";
 
     public static DigitalBrainModuleBuilder<ShellModule> WithHeadlessHost(
         this DigitalBrainModuleBuilder<ShellModule> module,
@@ -84,43 +70,9 @@ public static class ShellHostingExtensions
 
     private sealed class ShellHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
     {
-        private IResourceBuilder<ProjectResource>? _ui;
         private IResourceBuilder<ExecutableResource>? _flutterHost;
-
-        internal void EnsureUiEdge(ShellUiEdgeOptions options)
-        {
-            if (_ui is not null)
-            {
-                throw new InvalidOperationException(
-                    $"UI HTTP is already configured on brain '{brain.Name}'. Call {nameof(WithUiEdge)} exactly once.");
-            }
-
-            var appHost = brain.GetApplicationBuilder();
-            var projectPath = ResolveUiEdgeProjectPath(appHost.AppHostDirectory, options.ProjectPath);
-            if (!File.Exists(projectPath))
-            {
-                throw new InvalidOperationException(
-                    $"UI HTTP project was not found at '{projectPath}'. " +
-                    $"Pass {nameof(ShellUiEdgeOptions)}.{nameof(ShellUiEdgeOptions.ProjectPath)}, or place DigitalBrain.UiEdge under product/.");
-            }
-
-            var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
-                ? DefaultUIResourceName
-                : options.ResourceName;
-            var owner = string.IsNullOrWhiteSpace(options.Owner)
-                ? DefaultOwner
-                : options.Owner;
-
-            _ui = appHost
-                .AddProject(resourceName, projectPath)
-                .WithReference(brain.AsClient())
-                .WithHttpEndpoint(
-                    port: options.HttpPort,
-                    name: UiEdgeEndpointName,
-                    isProxied: options.HttpPort is null)
-                .WithHttpHealthCheck(UiEdgeHealthPath)
-                .WithEnvironment(OwnerEnvironmentVariable, owner);
-        }
+        private FlutterHostKind _flutterKind;
+        private bool _uiBaseBound;
 
         internal void EnsureFlutterHost(FlutterHostKind kind, FlutterHostOptions options)
         {
@@ -129,11 +81,6 @@ public static class ShellHostingExtensions
                 throw new InvalidOperationException(
                     $"Flutter host is already configured on brain '{brain.Name}'. " +
                     $"Call {nameof(WithHeadlessHost)}, {nameof(WithWindowHost)}, or {nameof(WithWebHost)} exactly once.");
-            }
-
-            if (_ui is null)
-            {
-                EnsureUiEdge(new ShellUiEdgeOptions());
             }
 
             var appHost = brain.GetApplicationBuilder();
@@ -156,63 +103,46 @@ public static class ShellHostingExtensions
             var chat = string.IsNullOrWhiteSpace(options.ChatName)
                 ? DefaultChatName
                 : options.ChatName;
-            var ui = _ui!;
-            var uiEndpoint = ui.GetEndpoint(UiEdgeEndpointName);
 
+            // DIGITALBRAIN_UI_BASE is bound in Apply when the silo (HTTP surface) is registered.
             var host = appHost
                 .AddExecutable(resourceName, launch.Command, launch.WorkingDirectory, launch.Args)
-                .WithEnvironment(UIBaseEnvironmentVariable, uiEndpoint)
                 .WithEnvironment(ShellEnvironmentVariable, shell)
-                .WithEnvironment(ChatEnvironmentVariable, chat)
-                .WaitFor(ui);
-
-            // Browser JS cannot read process env; bake the exclusive edge contract into dart-defines.
-            if (kind == FlutterHostKind.Web)
-            {
-                host.WithArgs(
-                    ReferenceExpression.Create($"--dart-define={UIBaseEnvironmentVariable}={uiEndpoint}"),
-                    $"--dart-define={ShellEnvironmentVariable}={shell}",
-                    $"--dart-define={ChatEnvironmentVariable}={chat}");
-            }
+                .WithEnvironment(ChatEnvironmentVariable, chat);
 
             _flutterHost = host;
+            _flutterKind = kind;
+            _pendingShell = shell;
+            _pendingChat = chat;
         }
+
+        private string _pendingShell = DefaultShellName;
+        private string _pendingChat = DefaultChatName;
 
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
             ArgumentNullException.ThrowIfNull(builder);
 
-            if (_ui is not null)
+            if (_flutterHost is null || _uiBaseBound)
             {
-                _ui.WithAnnotation(new WaitAnnotation(builder.Resource, WaitType.WaitUntilHealthy, exitCode: 0));
-            }
-        }
-
-        private static string ResolveUiEdgeProjectPath(string appHostDirectory, string? configured)
-        {
-            if (!string.IsNullOrWhiteSpace(configured))
-            {
-                return Path.IsPathRooted(configured)
-                    ? Path.GetFullPath(configured)
-                    : Path.GetFullPath(Path.Combine(appHostDirectory, configured));
+                return;
             }
 
-            string[] candidates =
-            [
-                Path.Combine(appHostDirectory, "..", "product", "DigitalBrain.UiEdge", "DigitalBrain.UiEdge.csproj"),
-                Path.Combine(appHostDirectory, "..", "DigitalBrain.UiEdge", "DigitalBrain.UiEdge.csproj"),
-            ];
+            // Silo hosts chat/shell/oauth HTTP maps; Flutter renders against that base URL.
+            var uiEndpoint = builder.GetEndpoint(HttpEndpointName);
+            _flutterHost
+                .WithEnvironment(UIBaseEnvironmentVariable, uiEndpoint)
+                .WithAnnotation(new WaitAnnotation(builder.Resource, WaitType.WaitUntilHealthy, exitCode: 0));
 
-            foreach (var candidate in candidates)
+            if (_flutterKind == FlutterHostKind.Web)
             {
-                var full = Path.GetFullPath(candidate);
-                if (File.Exists(full))
-                {
-                    return full;
-                }
+                _flutterHost.WithArgs(
+                    ReferenceExpression.Create($"--dart-define={UIBaseEnvironmentVariable}={uiEndpoint}"),
+                    $"--dart-define={ShellEnvironmentVariable}={_pendingShell}",
+                    $"--dart-define={ChatEnvironmentVariable}={_pendingChat}");
             }
 
-            return Path.GetFullPath(candidates[0]);
+            _uiBaseBound = true;
         }
 
         private static string ResolveFlutterWorkingDirectory(string appHostDirectory, string? configured)
@@ -243,4 +173,3 @@ public static class ShellHostingExtensions
         }
     }
 }
-

@@ -1,17 +1,16 @@
-using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using DigitalBrain.Mcp;
 
-namespace DigitalBrain.UiEdge;
+namespace DigitalBrain.Kernel;
 
-internal static class McpOAuthCallbackEndpoints
+internal static class OAuthCallbackHttpMaps
 {
-    public static IEndpointRouteBuilder MapMcpOAuthCallback(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapOAuthCallback(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints.MapGet(
-            UiEdgeContract.McpOAuthCallbackPath,
+            HttpSurfacePaths.McpOAuthCallbackPath,
             static async Task<IResult> (
                 string? state,
                 string? code,
@@ -34,7 +33,7 @@ internal static class McpOAuthCallbackEndpoints
                 var authorization = brain.GetGrainProxy<IMcpAuthorization>(McpAuthorizationNeuron.InstanceName);
                 var delivery = await authorization.DeliverCallback(
                     new DeliverMcpAuthorizationCallback(state, code, error, iss),
-                    cancellationToken);
+                    cancellationToken).ConfigureAwait(false);
 
                 if (!delivery.Accepted)
                 {

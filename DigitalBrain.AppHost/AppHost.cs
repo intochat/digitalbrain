@@ -34,7 +34,6 @@ brain.AddModule<ChatModule>();
 brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
 brain.AddModule<AssistantModule>();
 brain.AddModule<ShellModule>(shell => shell
-    .WithUiEdge(ui => ui.HttpPort = ProductSurfaceResources.UiHttpPort)
     //.WithHeadlessHost() // pure-Dart host; swap with window for headless-only dev
     //.WithWebHost() // deploy UX: flutter run -d chrome under shell/; local default stays window
     .WithWindowHost()
@@ -46,13 +45,17 @@ brain.AddModule<TasksModule>();
 brain.AddModule<TimeModule>();
 brain.AddModule<IntrospectionModule>();
 
-// Process boundary: silo + northbound MCP + optional scripting probe. Residual behavior
-// execution stays InProcess-closed in the silo (no BehaviorHost product process).
+// Process boundary: silo (HTTP maps + grains) + northbound MCP + scripting probe.
+// Residual behavior execution stays InProcess-closed (no BehaviorHost product process).
 var silo = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Silo)
     .WithReference(brain)
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
         ShellHostingExtensions.DefaultOwner)
+    .WithHttpEndpoint(
+        port: ProductSurfaceResources.UiHttpPort,
+        name: ShellHostingExtensions.HttpEndpointName,
+        isProxied: false)
     .WithHttpHealthCheck("/health");
 
 var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)

@@ -60,7 +60,6 @@ WORKDIR /src
 
 COPY nuget.config Directory.Build.props Directory.Packages.props DigitalBrain.slnx global.json ./
 COPY src/ ./src/
-COPY product/ ./product/
 COPY DigitalBrain.Kernel/ ./DigitalBrain.Kernel/
 COPY DigitalBrain.Mcp/ ./DigitalBrain.Mcp/
 COPY samples/ ./samples/

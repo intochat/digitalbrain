@@ -60,7 +60,6 @@
     <Project Path="DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
     <Project Path="DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
     <Project Path="DigitalBrain.Scripting/DigitalBrain.Scripting.csproj" />
-    <Project Path="product/DigitalBrain.UiEdge/DigitalBrain.UiEdge.csproj" />
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/DigitalBrain.AccountEnrichment/DigitalBrain.AccountEnrichment.csproj" />

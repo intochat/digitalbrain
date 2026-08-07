@@ -16,7 +16,7 @@ internal static class ProductSurfaceResources
     public const string McpPath = "/mcp";
     public const int McpHttpPort = 5000;
 
-    // Stable host port so Google/Salesforce OAuth redirect URIs need registering only once.
+    // Kernel HTTP port (chat streams, shell maps, OAuth callback). Stable for OAuth registration.
     public const int UiHttpPort = 5080;
     public const string LocalDevelopmentOAuthCallbackUri = "http://localhost:5080/oauth/callback";
 }

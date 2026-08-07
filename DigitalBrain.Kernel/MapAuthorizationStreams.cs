@@ -2,23 +2,51 @@ using System.Net.ServerSentEvents;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Mcp;
 
-namespace DigitalBrain.UiEdge;
+namespace DigitalBrain.Kernel;
 
-internal static class AuthorizationEventFeed
+internal static class AuthorizationStreamsHttpMaps
 {
-    public static IAsyncEnumerable<SseItem<AuthorizationEvent>> WatchAuthorizationsAsync(
+    public static IEndpointRouteBuilder MapAuthorizationStreams(this IEndpointRouteBuilder endpoints)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+
+        endpoints.MapGet(
+            HttpSurfacePaths.AuthorizationEventsPath,
+            static async Task (
+                HttpContext http,
+                long? afterSequence,
+                OwnerSessionJournal sessionJournal,
+                CancellationToken cancellationToken) =>
+            {
+                ArgumentNullException.ThrowIfNull(http);
+                ArgumentNullException.ThrowIfNull(sessionJournal);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var cursor = afterSequence.GetValueOrDefault();
+                if (cursor < 0)
+                {
+                    http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                    return;
+                }
+
+                await SseResponse.WriteAsync(
+                    http.Response,
+                    WatchAuthorizationsAsync(sessionJournal, cursor, cancellationToken),
+                    cancellationToken).ConfigureAwait(false);
+            });
+
+        return endpoints;
+    }
+
+    private static IAsyncEnumerable<SseItem<AuthorizationEvent>> WatchAuthorizationsAsync(
         OwnerSessionJournal sessionJournal,
         long afterSequence,
         CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(sessionJournal);
-
-        return JournalProjection.WatchAsync(
+        => JournalProjection.WatchAsync(
             token => sessionJournal.WatchAuthorizationOutgoingAsync(afterSequence, token),
-            UiEdgeContract.AuthorizationEvent,
+            HttpSurfacePaths.AuthorizationEvent,
             ProjectAuthorization,
             cancellationToken);
-    }
 
     private static AuthorizationEvent? ProjectAuthorization(SynapseDelivery delivery)
     {

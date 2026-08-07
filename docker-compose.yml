@@ -1,4 +1,4 @@
-# Local smoke for product images (Wave 11). Not a production topology.
+# Local smoke for product images. Not a production topology.
 #
 # Platform dependencies are external to product Hub images:
 #   - Qdrant: start separately or uncomment the service below (not a product image)
@@ -9,7 +9,8 @@
 #   docker compose build
 #
 # Secrets: never commit real values. Prefer env file or Key Vault-injected env
-# (see headers in DigitalBrain.Kernel/Dockerfile and product/DigitalBrain.UiEdge/Dockerfile).
+# (see headers in DigitalBrain.Kernel/Dockerfile).
+# Kernel HTTP serves chat streams + OAuth on 8080 (map host 5080 for stable OAuth if needed).
 
 services:
   azurite:
@@ -36,6 +37,7 @@ services:
       dockerfile: DigitalBrain.Kernel/Dockerfile
     ports:
       - "8080:8080"
+      - "5080:8080"
       - "5000:5000"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
@@ -71,29 +73,3 @@ services:
       - azurite
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
-  digitalbrain-ui:
-    image: digitalbrain-ui:local
-    build:
-      context: .
-      dockerfile: product/DigitalBrain.UiEdge/Dockerfile
-    ports:
-      - "5080:8080"
-    environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      DigitalBrain__Owner: dev
-      ConnectionStrings__brain-clustering: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
-      DigitalBrain__Modules__0: DigitalBrain.AI.AIModule
-      DigitalBrain__Modules__1: DigitalBrain.Chat.ChatModule
-      DigitalBrain__Modules__2: DigitalBrain.Memory.MemoryModule
-      DigitalBrain__Modules__3: DigitalBrain.Assistant.AssistantModule
-      DigitalBrain__Modules__4: DigitalBrain.Shell.ShellModule
-      DigitalBrain__Modules__5: DigitalBrain.Google.GoogleModule
-      DigitalBrain__Modules__6: DigitalBrain.Salesforce.SalesforceModule
-      DigitalBrain__Modules__7: DigitalBrain.Behaviors.Runtime.BehaviorsModule
-      DigitalBrain__Modules__8: DigitalBrain.Tasks.TasksModule
-      DigitalBrain__Modules__9: DigitalBrain.Time.TimeModule
-      DigitalBrain__Modules__10: DigitalBrain.Introspection.IntrospectionModule
-    depends_on:
-      - azurite
-      - digitalbrain

@@ -1,22 +1,18 @@
 using DigitalBrain.Client;
 using DigitalBrain.Introspection;
 
-namespace DigitalBrain.UiEdge;
+namespace DigitalBrain.Kernel;
 
-internal static class BrainEndpoints
+internal static class BrainTopologyHttpMaps
 {
-    // A directed request is fired, handled and replied through the outbox, so the answer can outlive
-    // a single delivery attempt. The session journal watch it waits on carries no deadline of its
-    // own, so without this an introspection neuron that never answers holds the HTTP request open
-    // until the client gives up, well past the grain-call response timeout it exists to tighten.
     internal static readonly TimeSpan TopologyReplyBound = TimeSpan.FromSeconds(90);
 
-    public static IEndpointRouteBuilder MapBrain(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapBrainTopology(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints.MapGet(
-            UiEdgeContract.BrainTopologyPath,
+            HttpSurfacePaths.BrainTopologyPath,
             static async Task<IResult> (
                 IDigitalBrain brain,
                 CancellationToken cancellationToken) =>
@@ -32,7 +28,8 @@ internal static class BrainEndpoints
                 {
                     read = await brain
                         .Get<IIntrospection>()
-                        .SendAsync(new ReadTopologyRequest(), deadline.Token);
+                        .SendAsync(new ReadTopologyRequest(), deadline.Token)
+                        .ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                 {

@@ -2,7 +2,7 @@ using System.Net.ServerSentEvents;
 using System.Text.Json;
 using Microsoft.Extensions.AI;
 
-namespace DigitalBrain.UiEdge;
+namespace DigitalBrain.Kernel;
 
 internal static class SseResponse
 {
@@ -18,10 +18,10 @@ internal static class SseResponse
         ArgumentNullException.ThrowIfNull(response);
         ArgumentNullException.ThrowIfNull(events);
 
-        response.Headers.CacheControl = UiEdgeContract.CacheControlNoCache;
-        response.ContentType = UiEdgeContract.EventStreamContentType;
-        await response.Body.WriteAsync(ConnectedComment, cancellationToken);
-        await response.Body.FlushAsync(cancellationToken);
+        response.Headers.CacheControl = HttpSurfacePaths.CacheControlNoCache;
+        response.ContentType = HttpSurfacePaths.EventStreamContentType;
+        await response.Body.WriteAsync(ConnectedComment, cancellationToken).ConfigureAwait(false);
+        await response.Body.FlushAsync(cancellationToken).ConfigureAwait(false);
 
         var json = typeof(T) == typeof(ChatResponseUpdate) ? AiJson : EventJson;
 
@@ -35,7 +35,7 @@ internal static class SseResponse
                 payload.CopyTo(span);
                 writer.Advance(payload.Length);
             },
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
     }
 
     private static JsonSerializerOptions CreateAiJson()
