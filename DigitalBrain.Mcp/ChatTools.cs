@@ -2,7 +2,7 @@ using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
-using DigitalBrain.Mcp;
+using DigitalBrain.Modules.Sdk.Mcp;
 using ModelContextProtocol.Server;
 
 namespace DigitalBrain.Mcp;

@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
-using DigitalBrain.Mcp;
+using DigitalBrain.Modules.Sdk.Mcp;
 using DigitalBrain.Shell;
 
 namespace DigitalBrain.Kernel;

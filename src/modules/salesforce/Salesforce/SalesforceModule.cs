@@ -1,5 +1,5 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Mcp;
+using DigitalBrain.Modules.Sdk.Mcp;
 
 namespace DigitalBrain.Salesforce;
 

@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Google.Auth;
-using DigitalBrain.Mcp;
+using DigitalBrain.Modules.Sdk.Mcp;
 using DigitalBrain.Security;
 using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Util;

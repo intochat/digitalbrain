@@ -1,7 +1,7 @@
 using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.Modules.Sdk.Mcp;
 
 public static class McpAuthorizationElicitation
 {

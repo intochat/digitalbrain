@@ -3,7 +3,7 @@ using DigitalBrain.Security;
 using ModelContextProtocol.Authentication;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.Modules.Sdk.Mcp;
 
 internal static class McpTokenPresence
 {

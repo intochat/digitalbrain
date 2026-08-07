@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
-using DigitalBrain.Mcp;
+using DigitalBrain.Modules.Sdk.Mcp;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;

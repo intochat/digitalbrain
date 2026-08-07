@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.Modules.Sdk.Mcp;
 
 [GrainType("mcpauthorization")]
 internal sealed class McpAuthorizationNeuron :

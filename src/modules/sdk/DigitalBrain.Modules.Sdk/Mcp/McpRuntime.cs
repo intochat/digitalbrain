@@ -4,7 +4,7 @@ using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.Modules.Sdk.Mcp;
 
 internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
 {

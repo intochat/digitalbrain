@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
-using DigitalBrain.Mcp;
+using DigitalBrain.Modules.Sdk.Mcp;
 using DigitalBrain.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;

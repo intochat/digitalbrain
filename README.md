@@ -74,10 +74,11 @@ clients/                flutter/core (pure Dart transport client) and flutter/sh
 samples/                product-shaped compositions and process neurons (not packable product)
 ```
 
-Southbound MCP transport lives in `DigitalBrain.Modules.Sdk` (Mcp + Webhook folders; Salesforce and
-shared OAuth rail). Gmail calls Gmail REST through `Google.Apis.Gmail.v1` with a reflected read-only
-planner catalog. Northbound agent tools live in process `DigitalBrain.Mcp` (`AddDigitalBrainClient`).
-Docs that say MCP is co-hosted on the silo are stale.
+Southbound MCP transport lives in `DigitalBrain.Modules.Sdk` under namespace
+`DigitalBrain.Modules.Sdk.Mcp` (plus Webhook). Google/Salesforce depend only on that package — never
+on the northbound process. Gmail uses Gmail REST; Salesforce uses hosted MCP. Northbound agent tools
+live in process `DigitalBrain.Mcp` (`AddDigitalBrainClient`). Docs that say MCP is co-hosted on the
+silo are stale.
 
 Aspire split: `DigitalBrain.Aspire.Hosting` is AppHost-only; `DigitalBrain.Aspire` owns
 `AddDigitalBrainClient` (grain clients) and `AddDigitalBrainSilo` (silo host). Resource names are

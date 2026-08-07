@@ -1,4 +1,4 @@
-using DigitalBrain.Mcp;
+using DigitalBrain.Modules.Sdk.Mcp;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
 

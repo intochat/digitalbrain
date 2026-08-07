@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 using ModelContextProtocol.Authentication;
 
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.Modules.Sdk.Mcp;
 
 internal static class BrowserSignInCallback
 {

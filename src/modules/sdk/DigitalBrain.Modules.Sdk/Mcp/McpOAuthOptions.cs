@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using ModelContextProtocol.Authentication;
 
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.Modules.Sdk.Mcp;
 
 internal static class McpOAuthOptions
 {

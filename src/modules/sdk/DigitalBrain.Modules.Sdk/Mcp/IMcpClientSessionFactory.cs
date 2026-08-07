@@ -1,7 +1,7 @@
 using ModelContextProtocol.Client;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.Modules.Sdk.Mcp;
 
 internal interface IMcpClientSessionFactory
 {

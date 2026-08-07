@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.Modules.Sdk.Mcp;
 
 [GenerateSerializer]
 [Alias("db.mcp.authorization-required-exception")]
