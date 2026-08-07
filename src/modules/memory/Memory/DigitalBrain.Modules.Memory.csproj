@@ -8,10 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Contracts\DigitalBrain.Modules.Memory.Contracts.csproj" />
     <ProjectReference Include="..\..\..\core\kernel\DigitalBrain.Core\DigitalBrain.Core.csproj" />
-    <ProjectReference Include="..\..\..\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false"
-                      PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.AI" />

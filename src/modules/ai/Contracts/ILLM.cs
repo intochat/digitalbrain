@@ -4,7 +4,8 @@ using Microsoft.Extensions.AI;
 namespace DigitalBrain.AI;
 
 [ClientEntryPoint]
-public partial interface ILLM : INeuron
+[Alias("DigitalBrain.AI.ILLM")]
+public interface ILLM : INeuron
 {
     [Alias(nameof(Respond))]
     Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages);

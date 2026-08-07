@@ -1,3 +1,4 @@
 namespace DigitalBrain.AI.Ollama;
 
-public partial interface IQwen35 : ILLM;
+[Alias("DigitalBrain.AI.Ollama.IQwen35")]
+public interface IQwen35 : ILLM;

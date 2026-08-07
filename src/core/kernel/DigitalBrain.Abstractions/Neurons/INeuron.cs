@@ -2,7 +2,8 @@ using Orleans.Concurrency;
 
 namespace DigitalBrain.Abstractions;
 
-public partial interface INeuron : IGrainWithStringKey
+[Alias("DigitalBrain.Abstractions.INeuron")]
+public interface INeuron : IGrainWithStringKey
 {
     [Alias(nameof(Deliver))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]

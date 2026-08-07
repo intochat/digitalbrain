@@ -1,3 +1,4 @@
 namespace DigitalBrain.AI.Ollama;
 
-public partial interface IGranite41 : ILLM;
+[Alias("DigitalBrain.AI.Ollama.IGranite41")]
+public interface IGranite41 : ILLM;

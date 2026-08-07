@@ -1,3 +1,4 @@
 namespace DigitalBrain.AI.Ollama;
 
-public partial interface ILlama32 : ILLM;
+[Alias("DigitalBrain.AI.Ollama.ILlama32")]
+public interface ILlama32 : ILLM;

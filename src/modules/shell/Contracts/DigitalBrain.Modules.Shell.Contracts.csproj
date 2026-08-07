@@ -6,10 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
-    <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false"
-                      PrivateAssets="all" />
     <None Include="flutter-wire-contracts.golden.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

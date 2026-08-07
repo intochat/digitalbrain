@@ -3,7 +3,8 @@ using DigitalBrain.Abstractions;
 namespace DigitalBrain.Time;
 
 [ClientEntryPoint]
-public partial interface ICountdown : INeuron
+[Alias("DigitalBrain.Time.ICountdown")]
+public interface ICountdown : INeuron
 {
     [Alias(nameof(Start))]
     Task<CountdownSnapshot> Start(StartCountdown command);

@@ -1,7 +1,8 @@
 namespace DigitalBrain.Abstractions;
 
 [ClientEntryPoint]
-public partial interface ISessionNeuron : INeuron
+[Alias("DigitalBrain.Abstractions.ISessionNeuron")]
+public interface ISessionNeuron : INeuron
 {
     const string GrainTypeName = "sessionneuron";
     const string InstanceName = "session";

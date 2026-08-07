@@ -2,4 +2,5 @@ using DigitalBrain.Tasks;
 
 namespace DigitalBrain.AI;
 
-public partial interface IGroupChat : IAgent, IWorker;
+[Alias("DigitalBrain.AI.IGroupChat")]
+public interface IGroupChat : IAgent, IWorker;

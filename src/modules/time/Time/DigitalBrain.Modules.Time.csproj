@@ -8,9 +8,5 @@
   <ItemGroup>
     <ProjectReference Include="..\Contracts\DigitalBrain.Modules.Time.Contracts.csproj" />
     <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.Core\DigitalBrain.Core.csproj" />
-    <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.SourceGeneration\DigitalBrain.SourceGeneration.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false"
-                      PrivateAssets="all" />
   </ItemGroup>
 </Project>

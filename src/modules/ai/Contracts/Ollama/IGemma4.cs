@@ -1,3 +1,4 @@
 namespace DigitalBrain.AI.Ollama;
 
-public partial interface IGemma4 : ILLM;
+[Alias("DigitalBrain.AI.Ollama.IGemma4")]
+public interface IGemma4 : ILLM;

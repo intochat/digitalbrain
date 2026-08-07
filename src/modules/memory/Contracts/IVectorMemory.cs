@@ -4,4 +4,5 @@ using DigitalBrain.Abstractions;
 namespace DigitalBrain.Memory;
 
 [Description("Owner-isolated vector memory neuron")]
-public partial interface IVectorMemory : INeuron;
+[Alias("DigitalBrain.Memory.IVectorMemory")]
+public interface IVectorMemory : INeuron;

@@ -1,3 +1,4 @@
 namespace DigitalBrain.AI;
 
-public partial interface IAssistant : IAgent;
+[Alias("DigitalBrain.AI.IAssistant")]
+public interface IAssistant : IAgent;
