@@ -24,7 +24,7 @@
     <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.5.0-preview.1.26405.3" />
     <PackageVersion Include="Qdrant.Client" Version="1.19.0" />
     <PackageVersion Include="Testcontainers" Version="4.13.0" />
-    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.4.1-beta.687" />
+    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.4.1-beta.706" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="11.0.0-preview.6.26359.118" />
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.8.3" />
     <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.8.3" />
