@@ -84,16 +84,16 @@ public sealed class RunningAppHost : IAsyncDisposable
         await AttemptAsync(
             () => _application.StopAsync(cleanup.Token),
             failures,
-            cleanup.Token);
+            cleanup.Token).ConfigureAwait(false);
         await AttemptAsync(
             () => _application.DisposeAsync().AsTask(),
             failures,
-            cleanup.Token);
+            cleanup.Token).ConfigureAwait(false);
         Attempt(_ => _release(this), failures, cleanup.Token);
         await AttemptAsync(
             () => _lease.DisposeAsync().AsTask(),
             failures,
-            cleanup.Token);
+            cleanup.Token).ConfigureAwait(false);
 
         ReportFailures(failures);
     }
@@ -114,7 +114,7 @@ public sealed class RunningAppHost : IAsyncDisposable
         using var operation = Linked(cancellationToken);
         await _application.ResourceNotifications.WaitForResourceHealthyAsync(
             resourceName,
-            operation.Token);
+            operation.Token).ConfigureAwait(false);
     }
 
     [SuppressMessage(
@@ -156,7 +156,7 @@ public sealed class RunningAppHost : IAsyncDisposable
     {
         try
         {
-            await operation().WaitAsync(cancellationToken);
+            await operation().WaitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception failure)
         {

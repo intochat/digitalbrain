@@ -72,7 +72,7 @@ internal sealed class BehaviorProtectedPayloadGrain : DurableGrain, IBehaviorPro
             plaintext,
             lifetime,
             cancellationToken,
-            stableEntryId);
+            stableEntryId).ConfigureAwait(true);
     }
 
     public async Task<byte[]> LoadAsync(
@@ -89,12 +89,12 @@ internal sealed class BehaviorProtectedPayloadGrain : DurableGrain, IBehaviorPro
             task,
             attempt.Value,
             reference,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(true);
         return plaintext.ToArray();
     }
 
     private async ValueTask CommitAsync()
     {
-        await WriteStateAsync();
+        await WriteStateAsync().ConfigureAwait(true);
     }
 }

@@ -43,7 +43,7 @@ internal sealed class BehaviorTaskAuthorityNeuron : Neuron, IBehaviorTaskAuthori
         TaskSnapshot snapshot;
         try
         {
-            snapshot = await GrainFactory.GetGrain<ITask>(task.ToGrainId()).Read();
+            snapshot = await GrainFactory.GetGrain<ITask>(task.ToGrainId()).Read().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (InvalidOperationException exception) when (
             exception.Message.Contains("has not been started", StringComparison.Ordinal))

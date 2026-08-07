@@ -35,8 +35,8 @@ internal sealed partial class Salesforce
         {
             ValidateApprovalEvidence(mutation, approval, approvalEvidence);
             EnsureSameApproval(mutation, approval);
-            mutation = await ReconcileBoundedAsync(mutation);
-            await SaveAsync(mutation);
+            mutation = await ReconcileBoundedAsync(mutation).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await SaveAsync(mutation).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return Receipt(mutation);
         }
 
@@ -59,12 +59,12 @@ internal sealed partial class Salesforce
             GrainFactory,
             async (client, callbackCancellation) =>
             {
-                var tools = await client.ListToolsAsync(cancellationToken: callbackCancellation);
+                var tools = await client.ListToolsAsync(cancellationToken: callbackCancellation).ConfigureAwait(true);
                 return (
                     Update: SelectUpdateTool(tools).Fingerprint,
                     Query: SelectQueryTool(tools).Fingerprint);
             },
-            cancellationToken);
+            cancellationToken).ConfigureAwait(true);
         mutation = mutation with
         {
             Approval = approval,
@@ -73,23 +73,23 @@ internal sealed partial class Salesforce
             QuerySchemaFingerprint = admitted.Query,
             Status = MutationStatus.Invoking,
         };
-        await SaveAsync(mutation);
+        await SaveAsync(mutation).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         try
         {
-            mutation = await InvokeUpdateAsync(mutation, cancellationToken);
+            mutation = await InvokeUpdateAsync(mutation, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (Exception)
         {
-            mutation = await ReconcileBoundedAsync(mutation);
+            mutation = await ReconcileBoundedAsync(mutation).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
         if (mutation.Status is MutationStatus.Invoking)
         {
-            mutation = await ReconcileBoundedAsync(mutation);
+            mutation = await ReconcileBoundedAsync(mutation).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
-        await SaveAsync(mutation);
+        await SaveAsync(mutation).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return Receipt(mutation);
     }
 

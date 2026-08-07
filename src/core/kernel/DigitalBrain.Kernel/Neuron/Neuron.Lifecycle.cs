@@ -9,13 +9,13 @@ public abstract partial class Neuron
     {
         NeuronConcurrency.RequireSerializedTurns(GetType());
 
-        await base.OnActivateAsync(cancellationToken);
+        await base.OnActivateAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         RecallHandledDeliveries();
 
         if (_outbox.Count > 0)
         {
-            await Wakeup().Arm();
+            await Wakeup().Arm().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             _wakeUpRegistered = true;
         }
         else
@@ -25,7 +25,7 @@ public abstract partial class Neuron
 
         ScheduleDrain();
 
-        await OnNeuronActivatedAsync(cancellationToken);
+        await OnNeuronActivatedAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     // Runs on every activation once journals, outbox and drain are restored, so a neuron can
@@ -61,15 +61,15 @@ public abstract partial class Neuron
 
         try
         {
-            await DispatchAsync(Snapshot(delivery.Synapse), cancellationToken);
+            await DispatchAsync(Snapshot(delivery.Synapse), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             FlushOutgoing();
             StageInboundCause();
 
-            await CommitAsync(cancellationToken);
+            await CommitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             AdvanceTurnCheckpoint();
 
-            await NotifyWatchersAsync();
+            await NotifyWatchersAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (Exception failure)
         {
@@ -95,7 +95,7 @@ public abstract partial class Neuron
 
             RollbackTurnState();
 
-            await CommitRetractionAsync();
+            await CommitRetractionAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             RecallHandledDeliveries();
             ScheduleDrain();

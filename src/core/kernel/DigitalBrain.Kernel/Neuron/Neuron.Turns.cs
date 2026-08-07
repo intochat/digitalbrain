@@ -115,7 +115,7 @@ public abstract partial class Neuron
     {
         try
         {
-            await CommitAsync(CancellationToken.None);
+            await CommitAsync(CancellationToken.None).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (Exception unretracted)
         {

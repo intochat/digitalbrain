@@ -131,7 +131,7 @@ public sealed class TestBrain : IAsyncDisposable
         {
             try
             {
-                await Clock.InvalidateAsync();
+                await Clock.InvalidateAsync().ConfigureAwait(false);
             }
             catch (Exception failure)
             {
@@ -145,7 +145,7 @@ public sealed class TestBrain : IAsyncDisposable
 
             try
             {
-                await DisposeJournalsAsync();
+                await DisposeJournalsAsync().ConfigureAwait(false);
             }
             catch (Exception failure)
             {
@@ -230,7 +230,7 @@ public sealed class TestBrain : IAsyncDisposable
         try
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _release) is null, this);
-            await Cluster.RestartHostAsync(target, cancellationToken);
+            await Cluster.RestartHostAsync(target, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception failure) when (failure is not BrainTestFailureException)
         {
@@ -305,7 +305,7 @@ public sealed class TestBrain : IAsyncDisposable
         {
             try
             {
-                await journal.DisposeAsync();
+                await journal.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception failure)
             {

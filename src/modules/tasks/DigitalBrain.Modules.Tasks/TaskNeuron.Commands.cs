@@ -39,7 +39,7 @@ internal sealed partial class TaskNeuron
                 $"Worker '{command.Worker}' does not belong to Task '{Id}'s owner.");
         }
 
-        await ValidatePredecessorAsync(command.RetryOf);
+        await ValidatePredecessorAsync(command.RetryOf).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var attempt = new AttemptId(Guid.NewGuid());
         var data = new TaskData(
@@ -63,9 +63,9 @@ internal sealed partial class TaskNeuron
         var snapshot = Snapshot(data);
         data.Receipts.Add(command.CommandId, snapshot);
 
-        await RegisterDispatchReminderAsync();
-        await SaveAsync(data);
-        await TryDispatchPendingAsync();
+        await RegisterDispatchReminderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await TryDispatchPendingAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         return snapshot;
     }
@@ -92,7 +92,7 @@ internal sealed partial class TaskNeuron
         {
             var terminal = Snapshot(data);
             data.Receipts.Add(command.CommandId, terminal);
-            await SaveAsync(data);
+            await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return terminal;
         }
 
@@ -104,9 +104,9 @@ internal sealed partial class TaskNeuron
 
             var cancelled = Snapshot(data);
             data.Receipts.Add(command.CommandId, cancelled);
-            await SaveAsync(data);
-            await UnregisterReminderAsync(RetryReminderName);
-            await UnregisterReminderAsync(DispatchReminderName);
+            await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await UnregisterReminderAsync(RetryReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await UnregisterReminderAsync(DispatchReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return cancelled;
         }
 
@@ -118,16 +118,16 @@ internal sealed partial class TaskNeuron
 
             var uncertainSnapshot = Snapshot(data);
             data.Receipts.Add(command.CommandId, uncertainSnapshot);
-            await RegisterDispatchReminderAsync();
-            await SaveAsync(data);
+            await RegisterDispatchReminderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             await EmitAsync(new AttemptOutcomeUncertain(
                 Id,
                 data.Worker,
                 data.ActiveAttempt.Value,
                 data.Revision,
-                uncertainBlocker));
-            await UnregisterReminderAsync(RetryReminderName);
-            await TryDispatchPendingAsync();
+                uncertainBlocker)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await UnregisterReminderAsync(RetryReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await TryDispatchPendingAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return uncertainSnapshot;
         }
 
@@ -138,9 +138,9 @@ internal sealed partial class TaskNeuron
         var snapshot = Snapshot(data);
         data.Receipts.Add(command.CommandId, snapshot);
 
-        await RegisterDispatchReminderAsync();
-        await SaveAsync(data);
-        await TryDispatchPendingAsync();
+        await RegisterDispatchReminderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await TryDispatchPendingAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         return snapshot;
     }

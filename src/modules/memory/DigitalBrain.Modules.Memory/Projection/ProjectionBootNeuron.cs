@@ -31,14 +31,14 @@ internal sealed class ProjectionBootNeuron :
             Id.Owner.Value,
             VectorMemoryNamespace.Capabilities,
             CapabilityProjection.FromCatalog(catalog),
-            cancellationToken);
-        await EmitAsync(capabilities);
+            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await EmitAsync(capabilities).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var behaviors = await reconciler.ReconcileAsync(
             Id.Owner.Value,
             VectorMemoryNamespace.Behaviors,
             BehaviorProjection.FromActiveCatalog(catalog),
-            cancellationToken);
-        await EmitAsync(behaviors);
+            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await EmitAsync(behaviors).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 }

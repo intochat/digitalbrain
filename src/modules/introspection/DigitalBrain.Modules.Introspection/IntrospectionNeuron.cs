@@ -19,15 +19,15 @@ internal sealed partial class IntrospectionNeuron :
         ArgumentNullException.ThrowIfNull(synapse);
 
         var subject = SubjectOf(synapse.NeuronType, synapse.NeuronName);
-        if (await RefusalForAsync(subject, cancellationToken) is { } refusal)
+        if (await RefusalForAsync(subject, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext) is { } refusal)
         {
             await ReplyAsync(
                 JournalTallied.Refused(synapse.CommandId, subject, synapse.Direction, refusal),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
-        var (read, unanswered) = await TryReadAsync(subject, synapse.Kind, BeyondJournalEnd, cancellationToken);
+        var (read, unanswered) = await TryReadAsync(subject, synapse.Kind, BeyondJournalEnd, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         if (read?.ResetSnapshot is not { } snapshot)
         {
             await ReplyAsync(
@@ -36,7 +36,7 @@ internal sealed partial class IntrospectionNeuron :
                     subject,
                     synapse.Direction,
                     unanswered ?? $"Neuron '{subject}' returned no journal snapshot to tally."),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -48,7 +48,7 @@ internal sealed partial class IntrospectionNeuron :
                 snapshot.TotalRecorded,
                 snapshot.LastSequence,
                 [.. snapshot.Tallies]),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(ReadJournalRequest synapse, CancellationToken cancellationToken)
@@ -56,11 +56,11 @@ internal sealed partial class IntrospectionNeuron :
         ArgumentNullException.ThrowIfNull(synapse);
 
         var subject = SubjectOf(synapse.NeuronType, synapse.NeuronName);
-        if (await RefusalForAsync(subject, cancellationToken) is { } refusal)
+        if (await RefusalForAsync(subject, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext) is { } refusal)
         {
             await ReplyAsync(
                 JournalPageRead.Refused(synapse.CommandId, subject, synapse.Direction, refusal),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -68,12 +68,12 @@ internal sealed partial class IntrospectionNeuron :
             subject,
             synapse.Kind,
             synapse.AfterSequence,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         if (read is null)
         {
             await ReplyAsync(
                 JournalPageRead.Refused(synapse.CommandId, subject, synapse.Direction, unanswered!),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -101,14 +101,14 @@ internal sealed partial class IntrospectionNeuron :
                 truncated ? entries[^1].Sequence : read.ResumeSequence,
                 read.ResetSnapshot is not null,
                 entries),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(ReadTopologyRequest synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
 
-        await ReplyAsync(await ReadTopologyAsync(synapse.CommandId, cancellationToken), cancellationToken);
+        await ReplyAsync(await ReadTopologyAsync(synapse.CommandId, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private NeuronId SubjectOf(string neuronType, string neuronName)

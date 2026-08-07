@@ -16,7 +16,7 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
         {
             if (IsTrustedReminderProvider(context.SourceId))
             {
-                await context.Invoke();
+                await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 return;
             }
 
@@ -27,7 +27,7 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
         if (IsOutboxDrainCall(context))
         {
             RequireDedicatedWakeupForTarget(context);
-            await context.Invoke();
+            await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -44,7 +44,7 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
             {
                 try
                 {
-                    await context.Invoke();
+                    await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 }
                 finally
                 {
@@ -54,7 +54,7 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
                 return;
             }
 
-            await context.Invoke();
+            await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -76,12 +76,12 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
             && CapabilityInvocation.IsEnumerationStart(context.InterfaceMethod)
             && CapabilityInvocation.EnumerationId(context.Request) is { } startedEnumeration)
         {
-            await context.Invoke();
+            await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             bindTarget.BindStreamedEnumeration(startedEnumeration, context.SourceId);
             return;
         }
 
-        await context.Invoke();
+        await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private static void RequireSameOwnerWhenAttributed(IIncomingGrainCallContext context, Neuron target)

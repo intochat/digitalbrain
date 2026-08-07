@@ -136,18 +136,20 @@ internal static class McpAuthorizationCodeHub
             return already.ToResult();
         }
 
-        await using var registration = cancellationToken.Register(
+        await using (cancellationToken.Register(
             static target => ((TaskCompletionSource<CodeHubOutcome>)target!).TrySetCanceled(),
-            waiter);
-        try
+            waiter).ConfigureAwait(false))
         {
-            var outcome = await waiter.Task.WaitAsync(cancellationToken);
-            Completions.TryRemove(state, out _);
-            return outcome.ToResult();
-        }
-        finally
-        {
-            Waiters.TryRemove(state, out _);
+            try
+            {
+                var outcome = await waiter.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                Completions.TryRemove(state, out _);
+                return outcome.ToResult();
+            }
+            finally
+            {
+                Waiters.TryRemove(state, out _);
+            }
         }
     }
 

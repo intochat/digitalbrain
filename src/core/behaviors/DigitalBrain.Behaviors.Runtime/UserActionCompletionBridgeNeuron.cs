@@ -103,8 +103,8 @@ internal sealed class UserActionCompletionBridgeNeuron :
             StageForTurn(data);
         }
 
-        data = await ObserveParkIfWaitingAsync(data, cancellationToken);
-        await TryDispatchHeldCompletionAsync(data);
+        data = await ObserveParkIfWaitingAsync(data, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await TryDispatchHeldCompletionAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(AuthorizationDenied denied, CancellationToken cancellationToken)
@@ -132,8 +132,8 @@ internal sealed class UserActionCompletionBridgeNeuron :
             StageForTurn(data);
         }
 
-        data = await ObserveParkIfWaitingAsync(data, cancellationToken);
-        await TryDispatchHeldCompletionAsync(data);
+        data = await ObserveParkIfWaitingAsync(data, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await TryDispatchHeldCompletionAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public Task HandleAsync(UserActionParkReady parkReady, CancellationToken cancellationToken)
@@ -156,7 +156,7 @@ internal sealed class UserActionCompletionBridgeNeuron :
 
     private async Task BindCoreAsync(BindUserActionCompletion bind, CancellationToken cancellationToken)
     {
-        await RequireAuthorizedProductionBinderAsync(bind, cancellationToken);
+        await RequireAuthorizedProductionBinderAsync(bind, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var data = Load();
         if (data is not null)
@@ -203,7 +203,7 @@ internal sealed class UserActionCompletionBridgeNeuron :
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var snapshot = await GrainFactory.GetGrain<ITask>(data.Task.ToGrainId()).Read();
+        var snapshot = await GrainFactory.GetGrain<ITask>(data.Task.ToGrainId()).Read().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         if (snapshot.State != TaskState.Waiting
             || snapshot.ActiveAttempt != data.Attempt
             || snapshot.Blocker is not UserActionPending pending
@@ -316,7 +316,7 @@ internal sealed class UserActionCompletionBridgeNeuron :
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var snapshot = await GrainFactory.GetGrain<ITask>(bind.Task.ToGrainId()).Read();
+        var snapshot = await GrainFactory.GetGrain<ITask>(bind.Task.ToGrainId()).Read().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         if (snapshot.Worker != binder
             || snapshot.ActiveAttempt != bind.Attempt
             || snapshot.State is not (TaskState.Running or TaskState.Pending or TaskState.Waiting))

@@ -77,8 +77,8 @@ internal sealed partial class BehaviorNeuron :
                 PriorArtifactHash = priorHash,
             };
             data = WithReceipt(data, command.CommandId, Snapshot(data));
-            await SaveAsync(data);
-            await EmitAsync(new BehaviorCompileFailed(command.CommandId, behaviorId, diagnostics));
+            await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await EmitAsync(new BehaviorCompileFailed(command.CommandId, behaviorId, diagnostics)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return Snapshot(data);
         }
 
@@ -117,9 +117,9 @@ internal sealed partial class BehaviorNeuron :
             ApprovalEvidence = null,
         };
         data = WithReceipt(data, command.CommandId, Snapshot(data));
-        await SaveAsync(data);
-        await EmitAsync(new BehaviorRevisionProposed(command.CommandId, behaviorId, hash));
-        await EmitAsync(new BehaviorCompileSucceeded(command.CommandId, behaviorId, hash));
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await EmitAsync(new BehaviorRevisionProposed(command.CommandId, behaviorId, hash)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await EmitAsync(new BehaviorCompileSucceeded(command.CommandId, behaviorId, hash)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return Snapshot(data);
     }
 
@@ -167,8 +167,8 @@ internal sealed partial class BehaviorNeuron :
                 TestsPassed = true,
             };
             data = WithReceipt(data, command.CommandId, Snapshot(data));
-            await SaveAsync(data);
-            await EmitAsync(new BehaviorTestsPassed(command.CommandId, behaviorId, command.ArtifactHash, report.ScenarioCount));
+            await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await EmitAsync(new BehaviorTestsPassed(command.CommandId, behaviorId, command.ArtifactHash, report.ScenarioCount)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return Snapshot(data);
         }
 
@@ -179,8 +179,8 @@ internal sealed partial class BehaviorNeuron :
             IsApproved = false,
         };
         data = WithReceipt(data, command.CommandId, Snapshot(data));
-        await SaveAsync(data);
-        await EmitAsync(new BehaviorTestsFailed(command.CommandId, behaviorId, command.ArtifactHash, report.Detail));
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await EmitAsync(new BehaviorTestsFailed(command.CommandId, behaviorId, command.ArtifactHash, report.Detail)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return Snapshot(data);
     }
 
@@ -205,7 +205,7 @@ internal sealed partial class BehaviorNeuron :
                 approval.CommandId,
                 behaviorId,
                 approval.Fingerprint,
-                "stale-or-mismatched-artifact-hash"));
+                "stale-or-mismatched-artifact-hash")).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             throw new NeuronAuthorizationException(
                 $"Behavior approval fingerprint '{approval.Fingerprint}' does not match the proposed artifact.");
         }
@@ -216,12 +216,12 @@ internal sealed partial class BehaviorNeuron :
                 approval.CommandId,
                 behaviorId,
                 approval.Fingerprint,
-                "bdd-gate-not-green"));
+                "bdd-gate-not-green")).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             throw new InvalidOperationException(
                 $"Behavior '{Id}' cannot be approved until the BDD gate is green for '{approval.Fingerprint}'.");
         }
 
-        var approvalEvidence = await ApprovalEvidenceAsync(approval);
+        var approvalEvidence = await ApprovalEvidenceAsync(approval).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         ValidateApprovalEvidence(approval, approvalEvidence);
 
         if (data.ArtifactBytes is null)
@@ -241,12 +241,12 @@ internal sealed partial class BehaviorNeuron :
             ArtifactSignature = signature,
         };
         data = WithReceipt(data, approval.CommandId, Snapshot(data));
-        await SaveAsync(data);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await EmitAsync(new BehaviorRevisionApproved(
             approval.CommandId,
             behaviorId,
             approval.Fingerprint,
-            approval.ApprovalId));
+            approval.ApprovalId)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return Snapshot(data);
     }
 
@@ -285,10 +285,10 @@ internal sealed partial class BehaviorNeuron :
                         data.ArtifactBytes,
                         data.AssemblyBytes,
                         data.ArtifactSignature),
-                    CancellationToken.None);
+                    CancellationToken.None).ConfigureAwait(true);
                 await _host.ActivateAsync(
                     new BehaviorHostActivationCommand(Id.Owner, behaviorId, command.ArtifactHash),
-                    CancellationToken.None);
+                    CancellationToken.None).ConfigureAwait(true);
             }
             catch (BehaviorHostException exception)
             {
@@ -296,12 +296,12 @@ internal sealed partial class BehaviorNeuron :
                     command.CommandId,
                     behaviorId,
                     command.ArtifactHash,
-                    exception.Reason));
+                    exception.Reason)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 throw new InvalidOperationException(
                     $"Behavior host refused deploy of '{command.ArtifactHash}': {exception.Reason}.");
             }
 
-            await EmitAsync(new BehaviorRevisionDeployed(command.CommandId, behaviorId, command.ArtifactHash));
+            await EmitAsync(new BehaviorRevisionDeployed(command.CommandId, behaviorId, command.ArtifactHash)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
         var prior = data.ActiveArtifactHash;
@@ -322,14 +322,14 @@ internal sealed partial class BehaviorNeuron :
             ActivationGateOpen = true,
         };
         data = WithReceipt(data, command.CommandId, Snapshot(data));
-        await SaveAsync(data);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         PublishExactCapability(data);
-        await PublishSubscriptionsAsync(data, CancellationToken.None);
+        await PublishSubscriptionsAsync(data, CancellationToken.None).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await EmitAsync(new BehaviorRevisionActivated(
             command.CommandId,
             behaviorId,
             command.ArtifactHash,
-            prior));
+            prior)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return Snapshot(data);
     }
 
@@ -358,10 +358,10 @@ internal sealed partial class BehaviorNeuron :
         {
             await _host.DeactivateAsync(
                 new BehaviorHostDeactivationCommand(Id.Owner, behaviorId, demoted),
-                CancellationToken.None);
+                CancellationToken.None).ConfigureAwait(true);
             await _host.ActivateAsync(
                 new BehaviorHostActivationCommand(Id.Owner, behaviorId, restored),
-                CancellationToken.None);
+                CancellationToken.None).ConfigureAwait(true);
         }
 
         data = data with
@@ -379,14 +379,14 @@ internal sealed partial class BehaviorNeuron :
             PriorProgramSource = data.ActiveProgramSource,
         };
         data = WithReceipt(data, command.CommandId, Snapshot(data));
-        await SaveAsync(data);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         PublishExactCapability(data);
-        await PublishSubscriptionsAsync(data, CancellationToken.None);
+        await PublishSubscriptionsAsync(data, CancellationToken.None).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await EmitAsync(new BehaviorRevisionRolledBack(
             command.CommandId,
             behaviorId,
             restored,
-            demoted));
+            demoted)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return Snapshot(data);
     }
 
@@ -424,15 +424,15 @@ internal sealed partial class BehaviorNeuron :
                 command.TriggerJson,
                 new GrainBehaviorCapabilityResolver(GrainFactory, Id.Owner),
                 TimeProvider),
-            CancellationToken.None);
+            CancellationToken.None).ConfigureAwait(true);
 
         data = data with { LastExecutionOutcome = outcome.Outcome };
-        await SaveAsync(data);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await EmitAsync(new BehaviorExecuted(
             command.CommandId,
             BehaviorIdOfName(),
             data.ActiveArtifactHash,
-            outcome.Outcome));
+            outcome.Outcome)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         return new BehaviorExecutionResult(
             command.CommandId,

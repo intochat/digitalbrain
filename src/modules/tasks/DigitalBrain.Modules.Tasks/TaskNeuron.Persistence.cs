@@ -33,6 +33,6 @@ internal sealed partial class TaskNeuron
     private async Task SaveAsync(TaskData data)
     {
         Stage(data);
-        await WriteStateAsync();
+        await WriteStateAsync().ConfigureAwait(true);
     }
 }

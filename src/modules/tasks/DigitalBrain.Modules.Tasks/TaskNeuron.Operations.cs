@@ -20,7 +20,7 @@ internal sealed partial class TaskNeuron
         operations.TryGetValue(key, out var operation);
 
         cancellationToken.ThrowIfCancellationRequested();
-        await ReplyAsync(new ReadTaskOperationResult(operation), cancellationToken);
+        await ReplyAsync(new ReadTaskOperationResult(operation), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(PrepareTaskOperation synapse, CancellationToken cancellationToken)
@@ -46,7 +46,7 @@ internal sealed partial class TaskNeuron
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            await ReplyAsync(existing, cancellationToken);
+            await ReplyAsync(existing, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -64,9 +64,9 @@ internal sealed partial class TaskNeuron
         operations[key] = snapshot;
         data.Operations = operations;
         cancellationToken.ThrowIfCancellationRequested();
-        await SaveAsync(data);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         cancellationToken.ThrowIfCancellationRequested();
-        await ReplyAsync(snapshot, cancellationToken);
+        await ReplyAsync(snapshot, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(TransitionTaskOperation synapse, CancellationToken cancellationToken)
@@ -91,7 +91,7 @@ internal sealed partial class TaskNeuron
             && existing.RedactedSummary == synapse.RedactedSummary)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await ReplyAsync(existing, cancellationToken);
+            await ReplyAsync(existing, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -121,23 +121,23 @@ internal sealed partial class TaskNeuron
             data.PendingDispatch = null;
 
             cancellationToken.ThrowIfCancellationRequested();
-            await SaveAsync(data);
+            await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             cancellationToken.ThrowIfCancellationRequested();
             await EmitAsync(new AttemptOutcomeUncertain(
                 Id,
                 data.Worker,
                 synapse.Attempt,
                 data.Revision,
-                blockerId));
+                blockerId)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             cancellationToken.ThrowIfCancellationRequested();
-            await ReplyAsync(snapshot, cancellationToken);
+            await ReplyAsync(snapshot, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        await SaveAsync(data);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         cancellationToken.ThrowIfCancellationRequested();
-        await ReplyAsync(snapshot, cancellationToken);
+        await ReplyAsync(snapshot, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private static Dictionary<string, TaskOperationSnapshot> Operations(TaskData data)

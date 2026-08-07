@@ -70,7 +70,7 @@ public sealed partial class TestJournal
             ThrowIfDisposed();
             var read = await _session
                 .ReadNeuronJournal(_subject, _direction, afterSequence)
-                .WaitAsync(cancellationToken);
+                .WaitAsync(cancellationToken).ConfigureAwait(false);
 
             if (read.ResetSnapshot is not null)
             {
@@ -111,7 +111,7 @@ public sealed partial class TestJournal
         IJournalObserver? reference;
         var watching = false;
 
-        await _setupGate.WaitAsync();
+        await _setupGate.WaitAsync().ConfigureAwait(false);
         try
         {
             observer = _observer;
@@ -135,7 +135,7 @@ public sealed partial class TestJournal
             {
                 try
                 {
-                    await _session.UnwatchNeuron(_subject, reference);
+                    await _session.UnwatchNeuron(_subject, reference).ConfigureAwait(false);
                 }
                 catch (Exception failure)
                 {
@@ -154,7 +154,7 @@ public sealed partial class TestJournal
 
             try
             {
-                await observer.DisposeAsync();
+                await observer.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception failure)
             {
@@ -172,7 +172,7 @@ public sealed partial class TestJournal
         {
             try
             {
-                await task;
+                await task.ConfigureAwait(false);
             }
             catch
             {

@@ -61,8 +61,8 @@ public sealed class BrainTestClusters : IAsyncLifetime
         {
             try
             {
-                await fixture.SettleAsync();
-                await fixture.DisposeAsync();
+                await fixture.SettleAsync().ConfigureAwait(false);
+                await fixture.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception failure)
             {

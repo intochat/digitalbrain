@@ -15,7 +15,7 @@ internal sealed partial class IntrospectionNeuron
         var statistics = await GrainFactory
             .GetGrain<IManagementGrain>(0)
             .GetDetailedGrainStatistics()
-            .WaitAsync(cancellationToken);
+            .WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var ownerPrefix = $"{Id.Owner.Value}{IdentityPartSeparator}";
 
@@ -33,7 +33,7 @@ internal sealed partial class IntrospectionNeuron
 
     private async Task<TopologyRead> ReadTopologyAsync(CommandId commandId, CancellationToken cancellationToken)
     {
-        var ownerStatistics = await ActivatedOwnerNeuronsAsync(cancellationToken);
+        var ownerStatistics = await ActivatedOwnerNeuronsAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         var placements = ownerStatistics
             .Select(static neuron => neuron.Silo)
             .Distinct()

@@ -35,7 +35,7 @@ internal sealed class TestReminderDriver
                 ?? throw new InvalidOperationException("A due reminder has no grain type."),
             due.GrainId.Key.ToString());
 
-        await _caller.Deliver(target, due.ReminderName, due.FirstTickTime.UtcDateTime, due.Period, due.Due.UtcDateTime);
+        await _caller.Deliver(target, due.ReminderName, due.FirstTickTime.UtcDateTime, due.Period, due.Due.UtcDateTime).ConfigureAwait(false);
 
         _table.CompleteDelivery(due);
         return true;

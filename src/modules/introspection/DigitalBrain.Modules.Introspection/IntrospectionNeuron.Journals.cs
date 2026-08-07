@@ -24,7 +24,7 @@ internal sealed partial class IntrospectionNeuron
         // the kernel: an unknown grain type would throw out of the handler and leave the outbox
         // retrying for its whole horizon, and an unknown name would silently activate a fresh grain
         // just by being asked about.
-        var activated = await ActivatedOwnerNeuronsAsync(cancellationToken);
+        var activated = await ActivatedOwnerNeuronsAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         if (!activated.Any(neuron => string.Equals(neuron.Type, subject.Type, StringComparison.OrdinalIgnoreCase)))
         {
@@ -55,7 +55,7 @@ internal sealed partial class IntrospectionNeuron
             var read = await GrainFactory
                 .GetGrain<INeuron>(subject.ToGrainId())
                 .ReadJournal(kind, afterSequence)
-                .WaitAsync(JournalReadBound, cancellationToken);
+                .WaitAsync(JournalReadBound, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             return (read, null);
         }

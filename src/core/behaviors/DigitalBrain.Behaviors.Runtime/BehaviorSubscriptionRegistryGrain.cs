@@ -42,7 +42,7 @@ internal static class BehaviorSubscriptionRegistry
 
         try
         {
-            await registryCall(bounded.Token);
+            await registryCall(bounded.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -107,7 +107,7 @@ internal sealed class BehaviorSubscriptionRegistryGrain : DurableGrain, IBehavio
         }
 
         _state.Value = _states.SerializeToArray(new BehaviorSubscriptionData { ByAlias = next });
-        await WriteStateAsync(cancellationToken);
+        await WriteStateAsync(cancellationToken).ConfigureAwait(true);
     }
 
     public Task<IReadOnlyList<string>> SubscribersOf(string eventAlias, CancellationToken cancellationToken)
@@ -154,7 +154,7 @@ internal sealed class BehaviorBroadcastSubscribers : IBroadcastSubscribers
 
         var registry = _grains.GetGrain<IBehaviorSubscriptionRegistry>(
             BehaviorSubscriptionRegistry.ForOwner(owner).ToGrainId());
-        var subscribers = await registry.SubscribersOf(eventAlias, cancellationToken).ConfigureAwait(false);
+        var subscribers = await registry.SubscribersOf(eventAlias, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         return subscribers.Count == 0
             ? []

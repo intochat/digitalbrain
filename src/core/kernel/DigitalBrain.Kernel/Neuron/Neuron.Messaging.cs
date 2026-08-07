@@ -35,10 +35,10 @@ public abstract partial class Neuron
 
         var receivers = catalog.HandlerGrainTypes(synapseType)
             .Select(grainType => NeuronId.BroadcastReceiver(grainType, Id.Owner, correlation))
-            .Concat(await SubscribedReceiversAsync(synapse))
+            .Concat(await SubscribedReceiversAsync(synapse).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext))
             .ToArray();
 
-        await FireAsync(synapse, receivers, correlation);
+        await FireAsync(synapse, receivers, correlation).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private async Task<IReadOnlyCollection<NeuronId>> SubscribedReceiversAsync(Synapse synapse)
@@ -52,7 +52,7 @@ public abstract partial class Neuron
         using var bound = new CancellationTokenSource(DeliveryPolicy.SubscriptionRegistryTimeout);
         try
         {
-            return await subscribers.ReceiversFor(Id.Owner, alias, bound.Token);
+            return await subscribers.ReceiversFor(Id.Owner, alias, bound.Token).ConfigureAwait(true);
         }
         catch (OperationCanceledException) when (bound.IsCancellationRequested)
         {
@@ -86,7 +86,7 @@ public abstract partial class Neuron
         _handlingDepth = deliveryDepth - 1;
         try
         {
-            await EmitAsync(synapse, correlation);
+            await EmitAsync(synapse, correlation).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         finally
         {
@@ -123,8 +123,8 @@ public abstract partial class Neuron
 
         if (_handling is null)
         {
-            await CommitAsync(CancellationToken.None);
-            await NotifyWatchersAsync();
+            await CommitAsync(CancellationToken.None).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await NotifyWatchersAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             ScheduleDrain();
         }
 

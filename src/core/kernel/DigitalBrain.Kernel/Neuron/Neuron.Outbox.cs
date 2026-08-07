@@ -10,13 +10,13 @@ public abstract partial class Neuron
     {
         if (_outbox.Count > 0 && !_wakeUpRegistered)
         {
-            await Wakeup().Arm();
+            await Wakeup().Arm().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             _wakeUpRegistered = true;
         }
 
-        await WriteStateAsync(cancellationToken);
+        await WriteStateAsync(cancellationToken).ConfigureAwait(true);
 
-        await ForgetWakeUpWhenOutboxIsEmptyAsync();
+        await ForgetWakeUpWhenOutboxIsEmptyAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private async Task ForgetWakeUpWhenOutboxIsEmptyAsync()
@@ -26,7 +26,7 @@ public abstract partial class Neuron
             return;
         }
 
-        await Wakeup().Disarm();
+        await Wakeup().Disarm().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         _wakeUpRegistered = false;
     }
 
@@ -36,7 +36,7 @@ public abstract partial class Neuron
         // Reminder/wakeup path has no caller token. Use a cancelable lifecycle source so every
         // Deliver attempt can link a real abort signal; attempt timeout supplies the bound.
         using var drainLifecycle = new CancellationTokenSource();
-        await DrainAsync(drainLifecycle.Token);
+        await DrainAsync(drainLifecycle.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private IOutboxWakeup Wakeup()
@@ -113,7 +113,7 @@ public abstract partial class Neuron
                     continue;
                 }
 
-                if (await TryDeliverAsync(entry, receiver, cancellationToken))
+                if (await TryDeliverAsync(entry, receiver, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext))
                 {
                     continue;
                 }
@@ -147,7 +147,7 @@ public abstract partial class Neuron
             index++;
         }
 
-        await CommitAsync(cancellationToken);
+        await CommitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         StopDrainingWhenOutboxIsEmpty();
     }
@@ -180,11 +180,11 @@ public abstract partial class Neuron
         {
             if (receiver == Id)
             {
-                await Deliver(entry.Delivery, attemptToken);
+                await Deliver(entry.Delivery, attemptToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
             else
             {
-                await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).Deliver(entry.Delivery, attemptToken);
+                await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).Deliver(entry.Delivery, attemptToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
 
             return true;

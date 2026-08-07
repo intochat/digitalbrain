@@ -9,9 +9,9 @@ internal sealed partial class TaskNeuron
 
     private async Task UnregisterReminderAsync(string reminderName)
     {
-        if (await this.GetReminder(reminderName) is { } reminder)
+        if (await this.GetReminder(reminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext) is { } reminder)
         {
-            await this.UnregisterReminder(reminder);
+            await this.UnregisterReminder(reminder).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
 
@@ -25,7 +25,7 @@ internal sealed partial class TaskNeuron
 
         if (data is null)
         {
-            await UnregisterReminderAsync(DispatchReminderName);
+            await UnregisterReminderAsync(DispatchReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -33,11 +33,11 @@ internal sealed partial class TaskNeuron
 
         if (pending is null)
         {
-            await UnregisterReminderAsync(DispatchReminderName);
+            await UnregisterReminderAsync(DispatchReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
-        if (!await TrySendPendingDispatchAsync(data, pending))
+        if (!await TrySendPendingDispatchAsync(data, pending).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext))
         {
             return;
         }
@@ -53,8 +53,8 @@ internal sealed partial class TaskNeuron
         // dispatch reminder unregisters. Downstream relay→Worker delivery is owned by the durable
         // outbox on the relay activation.
         current.PendingDispatch = null;
-        await SaveAsync(current);
-        await UnregisterReminderAsync(DispatchReminderName);
+        await SaveAsync(current).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await UnregisterReminderAsync(DispatchReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     // Turn-atomic path for Complete: buffers Task→relay into the outer turn outbox;
@@ -85,11 +85,11 @@ internal sealed partial class TaskNeuron
 
         try
         {
-            await SendAsync(relay, envelope);
+            await SendAsync(relay, envelope).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (Exception)
         {
-            await RegisterDispatchReminderAsync();
+            await RegisterDispatchReminderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -115,12 +115,12 @@ internal sealed partial class TaskNeuron
 
         try
         {
-            await SendAsync(relay, envelope);
+            await SendAsync(relay, envelope).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return true;
         }
         catch (Exception)
         {
-            await RegisterDispatchReminderAsync();
+            await RegisterDispatchReminderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return false;
         }
     }

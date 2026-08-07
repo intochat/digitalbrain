@@ -51,7 +51,7 @@ public abstract class DigitalBrainAppHostFixture : IAsyncLifetime
         {
             try
             {
-                await active.DisposeAsync();
+                await active.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception failure)
             {
@@ -86,13 +86,13 @@ public abstract class DigitalBrainAppHostFixture : IAsyncLifetime
 
         try
         {
-            lease = await AppHostExclusiveLease.AcquireAsync(cancellationToken);
+            lease = await AppHostExclusiveLease.AcquireAsync(cancellationToken).ConfigureAwait(false);
             using var startup = CancellationTokenSource
                 .CreateLinkedTokenSource(cancellationToken);
             startup.CancelAfter(StartupTimeout);
 
-            application = await BuildApplicationAsync(startup.Token);
-            await application.StartAsync(startup.Token);
+            application = await BuildApplicationAsync(startup.Token).ConfigureAwait(false);
+            await application.StartAsync(startup.Token).ConfigureAwait(false);
 
             var running = new RunningAppHost(
                 application,
@@ -109,7 +109,7 @@ public abstract class DigitalBrainAppHostFixture : IAsyncLifetime
             {
                 try
                 {
-                    await application.DisposeAsync();
+                    await application.DisposeAsync().ConfigureAwait(false);
                 }
                 catch
                 {
@@ -120,7 +120,7 @@ public abstract class DigitalBrainAppHostFixture : IAsyncLifetime
             {
                 try
                 {
-                    await lease.DisposeAsync();
+                    await lease.DisposeAsync().ConfigureAwait(false);
                 }
                 catch
                 {
@@ -198,7 +198,7 @@ public abstract class DigitalBrainAppHostFixture<TAppHost> : DigitalBrainAppHost
                 args: [],
                 configureBuilder: static (options, _) =>
                     options.EnableResourceLogging = ResourceLoggingEnabled,
-                cancellationToken);
-        return await builder.BuildAsync(cancellationToken);
+                cancellationToken).ConfigureAwait(false);
+        return await builder.BuildAsync(cancellationToken).ConfigureAwait(false);
     }
 }

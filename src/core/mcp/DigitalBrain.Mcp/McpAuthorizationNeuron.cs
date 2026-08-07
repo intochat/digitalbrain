@@ -107,7 +107,7 @@ internal sealed class McpAuthorizationNeuron :
         _pending[request.State] = _serializer.SerializeToArray(pending);
         _commands[request.CommandId.Value] = _commandsSerializer.SerializeToArray(
             ToCommandRecord(pending));
-        await WriteStateAsync(cancellationToken);
+        await WriteStateAsync(cancellationToken).ConfigureAwait(true);
 
         var required = new AuthorizationRequired(
             request.CommandId,
@@ -115,7 +115,7 @@ internal sealed class McpAuthorizationNeuron :
             request.ServerDisplayName,
             request.SignInUrl,
             request.State);
-        await EmitAsync(required);
+        await EmitAsync(required).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return required;
     }
 
@@ -164,12 +164,12 @@ internal sealed class McpAuthorizationNeuron :
         pending = pending with { CompletionTarget = request.CompletionTarget };
         _pending[pending.State] = _serializer.SerializeToArray(pending);
         _commands[pending.CommandId.Value] = _commandsSerializer.SerializeToArray(ToCommandRecord(pending));
-        await WriteStateAsync(cancellationToken);
+        await WriteStateAsync(cancellationToken).ConfigureAwait(true);
 
         if (pending.Outcome is PendingAuthorizationOutcome.Completed
             || pending.Outcome is PendingAuthorizationOutcome.Denied)
         {
-            await NotifyCompletionTargetAsync(pending);
+            await NotifyCompletionTargetAsync(pending).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
 
@@ -208,7 +208,7 @@ internal sealed class McpAuthorizationNeuron :
 
             // Explicit callback redelivery redrives the completion target even after a prior notify,
             // so a target-side turn fault/retraction can recover without ordinary outbox dependence.
-            await NotifyCompletionTargetAsync(pending, force: true);
+            await NotifyCompletionTargetAsync(pending, force: true).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             return new McpAuthorizationCallbackDelivery(
                 Accepted: true,
@@ -219,13 +219,13 @@ internal sealed class McpAuthorizationNeuron :
         if (!string.IsNullOrWhiteSpace(delivery.Error)
             || string.IsNullOrWhiteSpace(delivery.Code))
         {
-            pending = await PersistOutcomeAsync(pending, PendingAuthorizationOutcome.Denied, code: null, iss: null);
+            pending = await PersistOutcomeAsync(pending, PendingAuthorizationOutcome.Denied, code: null, iss: null).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             // Release hold-open BEFORE Emit/Notify: NotifyCompletionTarget can re-enter the
             // requesting grain still parked on Terminal — abort first so that turn can finish.
             McpAuthorizationCodeHub.Complete(delivery.State, result: null);
             McpAuthorizationCodeHub.AbortOpen(pending.CommandId);
-            await EmitAsync(new AuthorizationDenied(pending.CommandId, pending.ServerKey, pending.State));
-            await NotifyCompletionTargetAsync(pending);
+            await EmitAsync(new AuthorizationDenied(pending.CommandId, pending.ServerKey, pending.State)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await NotifyCompletionTargetAsync(pending).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return new McpAuthorizationCallbackDelivery(Accepted: true, Completed: false, Denied: true);
         }
 
@@ -233,13 +233,13 @@ internal sealed class McpAuthorizationNeuron :
             pending,
             PendingAuthorizationOutcome.Completed,
             delivery.Code,
-            delivery.Iss);
+            delivery.Iss).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         // Hub first so a hold-open TakeCompletedCode/AwaitAsync can resume before journal drain.
         McpAuthorizationCodeHub.Complete(
             delivery.State,
             new McpAuthorizationCodeResult(delivery.Code, delivery.Iss));
-        await EmitAsync(new AuthorizationCompleted(pending.CommandId, pending.ServerKey, pending.State));
-        await NotifyCompletionTargetAsync(pending);
+        await EmitAsync(new AuthorizationCompleted(pending.CommandId, pending.ServerKey, pending.State)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await NotifyCompletionTargetAsync(pending).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return new McpAuthorizationCallbackDelivery(Accepted: true, Completed: true, Denied: false);
     }
 
@@ -323,13 +323,13 @@ internal sealed class McpAuthorizationNeuron :
         {
             await SendAsync(
                 target,
-                new AuthorizationCompleted(pending.CommandId, pending.ServerKey, pending.State));
+                new AuthorizationCompleted(pending.CommandId, pending.ServerKey, pending.State)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         else if (pending.Outcome is PendingAuthorizationOutcome.Denied)
         {
             await SendAsync(
                 target,
-                new AuthorizationDenied(pending.CommandId, pending.ServerKey, pending.State));
+                new AuthorizationDenied(pending.CommandId, pending.ServerKey, pending.State)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
         if (pending.CompletionNotified)
@@ -340,7 +340,7 @@ internal sealed class McpAuthorizationNeuron :
         var notified = pending with { CompletionNotified = true };
         _pending[notified.State] = _serializer.SerializeToArray(notified);
         _commands[notified.CommandId.Value] = _commandsSerializer.SerializeToArray(ToCommandRecord(notified));
-        await WriteStateAsync();
+        await WriteStateAsync().ConfigureAwait(true);
     }
 
     private async Task<PendingAuthorization> PersistOutcomeAsync(
@@ -362,7 +362,7 @@ internal sealed class McpAuthorizationNeuron :
         var durablePayload = _serializer.SerializeToArray(updated);
         _pending[pending.State] = durablePayload;
         _commands[pending.CommandId.Value] = _commandsSerializer.SerializeToArray(ToCommandRecord(updated));
-        await WriteStateAsync();
+        await WriteStateAsync().ConfigureAwait(true);
         return updated;
     }
 

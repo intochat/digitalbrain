@@ -190,21 +190,24 @@ internal static class GmailAuthRail
 
         var oauth = GoogleOAuthOptions.Read(configuration);
         var tokenServerUrl = configuration[$"{GoogleOAuthOptions.ConfigurationRoot}:TokenServerUrl"];
-        await using var signIn = GoogleSignIn.Create(
+        var signIn = GoogleSignIn.Create(
             oauth.ClientId,
             oauth.ClientSecret,
             [ReadonlyScope],
             store,
             string.IsNullOrWhiteSpace(tokenServerUrl) ? null : tokenServerUrl,
             clock);
-        await signIn.ExchangeAsync(
-            userKey,
-            code.Code,
-            oauth.RedirectUri.AbsoluteUri,
-            cancellationToken).ConfigureAwait(false);
+        await using (signIn.ConfigureAwait(false))
+        {
+            await signIn.ExchangeAsync(
+                userKey,
+                code.Code,
+                oauth.RedirectUri.AbsoluteUri,
+                cancellationToken).ConfigureAwait(false);
 
-        pendingStates.Remove(commandId.Value);
-        await commit().ConfigureAwait(false);
+            pendingStates.Remove(commandId.Value);
+            await commit().ConfigureAwait(false);
+        }
     }
 
     private static async Task<bool> HasUsableRefreshTokenAsync(DurableGoogleTokenStore store, string userKey)

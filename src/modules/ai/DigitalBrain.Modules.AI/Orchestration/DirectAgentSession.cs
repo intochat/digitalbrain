@@ -52,10 +52,10 @@ internal sealed class DirectAgentSession(
         ArgumentNullException.ThrowIfNull(messages);
 
         var session = state.Value is { Length: > 0 } serialized
-            ? await RestoreAsync(agent, serialized, definition, cancellationToken)
-            : await agent.CreateSessionAsync(cancellationToken);
+            ? await RestoreAsync(agent, serialized, definition, cancellationToken).ConfigureAwait(false)
+            : await agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
 
-        await foreach (var update in agent.RunStreamingAsync(messages, session, cancellationToken: cancellationToken))
+        await foreach (var update in agent.RunStreamingAsync(messages, session, cancellationToken: cancellationToken).ConfigureAwait(false))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -66,7 +66,7 @@ internal sealed class DirectAgentSession(
 
         invocations.RequireAnyInvoked(neuron);
 
-        await PersistSessionAsync(agent, session, definition, cancellationToken);
+        await PersistSessionAsync(agent, session, definition, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task PersistSessionAsync(
@@ -75,7 +75,7 @@ internal sealed class DirectAgentSession(
         OrchestrationDefinition definition,
         CancellationToken cancellationToken)
     {
-        var serializedSession = await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken);
+        var serializedSession = await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken).ConfigureAwait(false);
         var protectedSession = protector.Protect(
             Purpose(definition.Fingerprint),
             Encoding.UTF8.GetBytes(serializedSession.GetRawText()));
@@ -86,7 +86,7 @@ internal sealed class DirectAgentSession(
 
         try
         {
-            await commit();
+            await commit().ConfigureAwait(false);
         }
         catch
         {
@@ -133,7 +133,7 @@ internal sealed class DirectAgentSession(
 
             return await agent.DeserializeSessionAsync(
                 sessionJson.RootElement.Clone(),
-                cancellationToken: cancellationToken);
+                cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (Exception failure) when (failure is CryptographicException
             or JsonException

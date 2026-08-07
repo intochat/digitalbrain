@@ -12,7 +12,7 @@ public sealed partial class TestJournal
     {
         try
         {
-            return await NextCoreAsync<TSynapse>(cancellationToken);
+            return await NextCoreAsync<TSynapse>(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception failure) when (failure is not BrainTestFailureException)
         {
@@ -23,11 +23,11 @@ public sealed partial class TestJournal
     private async Task<ObservedSynapse<TSynapse>> NextCoreAsync<TSynapse>(CancellationToken cancellationToken)
         where TSynapse : Synapse
     {
-        await _nextGate.WaitAsync(cancellationToken);
+        await _nextGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             ThrowIfDisposed();
-            var observer = await EnsureWatchingAsync(cancellationToken);
+            var observer = await EnsureWatchingAsync(cancellationToken).ConfigureAwait(false);
 
             while (true)
             {
@@ -39,7 +39,7 @@ public sealed partial class TestJournal
                 JournalRead batch;
                 try
                 {
-                    batch = await observer.Observations.ReadAsync(cancellationToken);
+                    batch = await observer.Observations.ReadAsync(cancellationToken).ConfigureAwait(false);
                 }
                 catch (ChannelClosedException closed)
                     when (closed.InnerException is not null)
@@ -102,7 +102,7 @@ public sealed partial class TestJournal
         Justification = "Observer ownership transfers on success.")]
     private async Task<TestJournalObserver> EnsureWatchingAsync(CancellationToken cancellationToken)
     {
-        await _setupGate.WaitAsync(cancellationToken);
+        await _setupGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             ThrowIfDisposed();
@@ -116,7 +116,7 @@ public sealed partial class TestJournal
             try
             {
                 reference = _cluster.Client.CreateObjectReference<IJournalObserver>(observer);
-                await _session.WatchNeuron(_subject, _direction, afterSequence: 0, reference);
+                await _session.WatchNeuron(_subject, _direction, afterSequence: 0, reference).ConfigureAwait(false);
                 _observer = observer;
                 _reference = reference;
                 _watching = true;
@@ -129,7 +129,7 @@ public sealed partial class TestJournal
                 {
                     try
                     {
-                        await _session.UnwatchNeuron(_subject, reference);
+                        await _session.UnwatchNeuron(_subject, reference).ConfigureAwait(false);
                     }
                     catch
                     {
@@ -146,7 +146,7 @@ public sealed partial class TestJournal
 
                 try
                 {
-                    await observer.DisposeAsync();
+                    await observer.DisposeAsync().ConfigureAwait(false);
                 }
                 catch
                 {

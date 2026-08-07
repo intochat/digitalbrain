@@ -58,7 +58,7 @@ internal sealed partial class LlmWarmupHostedService(
                 return;
             }
 
-            await WarmOneAsync(key, cancellationToken);
+            await WarmOneAsync(key, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -92,7 +92,7 @@ internal sealed partial class LlmWarmupHostedService(
             budget.CancelAfter(WarmBudget);
 
             var clock = Stopwatch.StartNew();
-            _ = await client.GetResponseAsync([WarmPrompt], cancellationToken: budget.Token);
+            _ = await client.GetResponseAsync([WarmPrompt], cancellationToken: budget.Token).ConfigureAwait(false);
             LogWarmed(logger, name, clock.ElapsedMilliseconds);
         }
         catch (Exception failure) when (failure is not OperationCanceledException

@@ -18,7 +18,7 @@ public abstract partial class Neuron
         var watcher = new Watcher(observer, kind, afterSequence);
         _watchers.Add(watcher);
 
-        await PushAsync(watcher);
+        await PushAsync(watcher).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public Task Unwatch(IJournalObserver observer)
@@ -41,7 +41,7 @@ public abstract partial class Neuron
 
         watcher.Cursor = read.ResumeSequence;
 
-        await watcher.Observer.ObserveAsync(watcher.Kind, read);
+        await watcher.Observer.ObserveAsync(watcher.Kind, read).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -54,7 +54,7 @@ public abstract partial class Neuron
         {
             try
             {
-                await PushAsync(watcher);
+                await PushAsync(watcher).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
             catch (Exception unreachable)
             {

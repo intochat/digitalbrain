@@ -33,7 +33,7 @@ internal sealed partial class Salesforce
             Approval: null,
             ApprovalEvidence: null,
             MutationStatus.AwaitingApproval);
-        await SaveAsync(proposed, add: true);
+        await SaveAsync(proposed, add: true).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         return Receipt(proposed);
     }

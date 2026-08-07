@@ -58,6 +58,6 @@ internal static class McpTokenPresence
         cancellationToken.ThrowIfCancellationRequested();
 
         var cache = new DurableMcpTokenCache(tokenState, commit, protector, purpose);
-        await cache.StoreTokensAsync(tokens, cancellationToken);
+        await cache.StoreTokensAsync(tokens, cancellationToken).ConfigureAwait(false);
     }
 }

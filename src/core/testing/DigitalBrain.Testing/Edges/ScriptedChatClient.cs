@@ -82,7 +82,7 @@ public sealed class ScriptedChatClient : IChatClient
         ChatOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var response = await GetResponseAsync(messages, options, cancellationToken);
+        var response = await GetResponseAsync(messages, options, cancellationToken).ConfigureAwait(false);
 
         foreach (var update in response.ToChatResponseUpdates())
         {

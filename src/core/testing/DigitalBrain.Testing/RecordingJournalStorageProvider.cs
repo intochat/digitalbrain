@@ -104,13 +104,13 @@ internal sealed class RecordingJournalStorageProvider(IJournalStorageProvider in
         public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             recorder.BeforeWrite(journalId);
-            await inner.AppendAsync(value, cancellationToken);
+            await inner.AppendAsync(value, cancellationToken).ConfigureAwait(false);
         }
 
         public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             recorder.BeforeWrite(journalId);
-            await inner.ReplaceAsync(value, cancellationToken);
+            await inner.ReplaceAsync(value, cancellationToken).ConfigureAwait(false);
         }
 
         public ValueTask<bool> CreateIfNotExistsAsync(

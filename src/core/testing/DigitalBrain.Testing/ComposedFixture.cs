@@ -40,8 +40,8 @@ internal sealed class ComposedFixture : DigitalBrainFixture
 
     internal async Task<TestBrain> LeaseAsync(CancellationToken cancellationToken)
     {
-        await _boot.Value;
-        return await CreateBrainAsync(cancellationToken);
+        await _boot.Value.ConfigureAwait(false);
+        return await CreateBrainAsync(cancellationToken).ConfigureAwait(false);
     }
 
     [SuppressMessage(
@@ -57,7 +57,7 @@ internal sealed class ComposedFixture : DigitalBrainFixture
 
         try
         {
-            await _boot.Value;
+            await _boot.Value.ConfigureAwait(false);
         }
         catch (Exception)
         {

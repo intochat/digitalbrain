@@ -53,9 +53,9 @@ internal sealed partial class TaskNeuron :
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var snapshot = await Start(synapse);
+        var snapshot = await Start(synapse).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         cancellationToken.ThrowIfCancellationRequested();
-        await ReplyAsync(snapshot, cancellationToken);
+        await ReplyAsync(snapshot, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     Task INeuron.Deliver(SynapseDelivery delivery, CancellationToken cancellationToken)

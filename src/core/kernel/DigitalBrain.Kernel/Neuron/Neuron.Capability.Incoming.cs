@@ -19,7 +19,7 @@ public abstract partial class Neuron
 
         try
         {
-            await CommitAsync(CancellationToken.None);
+            await CommitAsync(CancellationToken.None).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch
         {
@@ -29,7 +29,7 @@ public abstract partial class Neuron
             throw;
         }
 
-        await NotifyWatchersAsync();
+        await NotifyWatchersAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     internal async Task<CapabilityTurn> BeginIncomingCapabilityRequestAsync(
@@ -54,8 +54,8 @@ public abstract partial class Neuron
             _handlingDepth,
             _turnCheckpoint);
 
-        await CommitIncomingCapabilityRequestAsync(delivery);
-        await NotifyWatchersAsync();
+        await CommitIncomingCapabilityRequestAsync(delivery).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await NotifyWatchersAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         _handling = delivery;
         _handlingDepth = DeliveryPolicy.InboundDepth();
@@ -68,9 +68,9 @@ public abstract partial class Neuron
     internal async Task CompleteIncomingCapabilityRequestAsync(CapabilityTurn turn)
     {
         FlushOutgoing();
-        await CommitAsync(CancellationToken.None);
+        await CommitAsync(CancellationToken.None).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         AdvanceTurnCheckpoint();
-        await NotifyWatchersAsync();
+        await NotifyWatchersAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         Restore(turn);
         ScheduleDrain();
@@ -106,7 +106,7 @@ public abstract partial class Neuron
         try
         {
             _incoming.Append(delivery);
-            await CommitAsync(CancellationToken.None);
+            await CommitAsync(CancellationToken.None).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch
         {
@@ -123,7 +123,7 @@ public abstract partial class Neuron
         RollbackTurnState();
         _firedWhileHandling.Clear();
 
-        await CommitRetractionAsync();
+        await CommitRetractionAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         Restore(turn);
         ScheduleDrain();

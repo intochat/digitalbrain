@@ -24,7 +24,7 @@ internal sealed partial class Salesforce
                 _mutations[key] = serialized;
             }
 
-            await WriteStateAsync();
+            await WriteStateAsync().ConfigureAwait(true);
         }
         catch
         {

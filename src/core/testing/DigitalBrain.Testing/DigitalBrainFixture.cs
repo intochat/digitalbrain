@@ -13,18 +13,18 @@ public abstract class DigitalBrainFixture : IAsyncLifetime
     {
         var brain = new DigitalBrainTestBuilder();
         Configure(brain);
-        _cluster = await FixtureCluster.StartAsync(brain.Seal());
+        _cluster = await FixtureCluster.StartAsync(brain.Seal()).ConfigureAwait(false);
     }
 
     public async Task<TestBrain> CreateBrainAsync(CancellationToken cancellationToken = default)
     {
-        await _methodLease.WaitAsync(cancellationToken);
+        await _methodLease.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             var scope = $"test-{Guid.NewGuid():N}";
             var cluster = Cluster();
             var diagnostics = new BrainTestDiagnostics(scope);
-            var method = await cluster.PrepareMethodAsync(scope, diagnostics);
+            var method = await cluster.PrepareMethodAsync(scope, diagnostics).ConfigureAwait(false);
             return new TestBrain(
                 cluster,
                 scope,
@@ -49,7 +49,7 @@ public abstract class DigitalBrainFixture : IAsyncLifetime
         {
             if (Interlocked.Exchange(ref _cluster, null) is { } cluster)
             {
-                await cluster.DisposeAsync();
+                await cluster.DisposeAsync().ConfigureAwait(false);
             }
         }
         finally

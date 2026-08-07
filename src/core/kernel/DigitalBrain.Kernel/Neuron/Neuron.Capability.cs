@@ -69,9 +69,9 @@ public abstract partial class Neuron
         StageInboundCause();
         FlushOutgoing();
         _outgoing.Append(delivery);
-        await CommitAsync(CancellationToken.None);
+        await CommitAsync(CancellationToken.None).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         AdvanceTurnCheckpoint();
-        await NotifyWatchersAsync();
+        await NotifyWatchersAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         return delivery;
     }
@@ -102,8 +102,8 @@ public abstract partial class Neuron
 
         FlushOutgoing();
         _outgoing.Append(delivery);
-        await CommitAsync(CancellationToken.None);
+        await CommitAsync(CancellationToken.None).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         AdvanceTurnCheckpoint();
-        await NotifyWatchersAsync();
+        await NotifyWatchersAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 }

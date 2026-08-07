@@ -3,7 +3,7 @@
     <IsPackable>true</IsPackable>
     <Description>Time module: durable one-shot countdown execution.</Description>
     <RootNamespace>DigitalBrain.Time</RootNamespace>
-    <NoWarn>$(NoWarn);ORLEANSEXP005;CA2007</NoWarn>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Modules.Time.Contracts\DigitalBrain.Modules.Time.Contracts.csproj" />

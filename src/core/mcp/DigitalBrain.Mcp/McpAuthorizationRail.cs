@@ -43,7 +43,7 @@ internal static class McpAuthorizationRail
         McpAuthorizationClaim? claim = null;
         try
         {
-            claim = await authorization.Claim(commandId, cancellationToken);
+            claim = await authorization.Claim(commandId, cancellationToken).ConfigureAwait(false);
         }
         catch (InvalidOperationException)
         {
@@ -86,7 +86,7 @@ internal static class McpAuthorizationRail
                 configuration,
                 commandId,
                 server,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
             throw new McpAuthorizationRequiredException(required);
         }
     }

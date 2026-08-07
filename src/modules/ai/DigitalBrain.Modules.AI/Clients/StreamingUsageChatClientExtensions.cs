@@ -15,7 +15,7 @@ internal static class StreamingUsageChatClientExtensions
             return builder.Use(async (messages, options, next, cancellationToken) =>
             {
                 options = EnsureStreamOptions(options);
-                await next(messages, options, cancellationToken);
+                await next(messages, options, cancellationToken).ConfigureAwait(false);
             });
         }
     }

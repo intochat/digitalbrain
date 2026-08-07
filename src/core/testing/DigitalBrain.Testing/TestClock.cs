@@ -37,7 +37,7 @@ public sealed class TestClock
         try
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(duration, TimeSpan.Zero);
-            await AdvanceCoreAsync(duration, cancellationToken);
+            await AdvanceCoreAsync(duration, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception failure)
             when (failure is not BrainTestFailureException)
@@ -48,7 +48,7 @@ public sealed class TestClock
 
     private async Task AdvanceCoreAsync(TimeSpan duration, CancellationToken cancellationToken)
     {
-        await _advanceGate.WaitAsync(cancellationToken);
+        await _advanceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
@@ -71,7 +71,7 @@ public sealed class TestClock
                 // Dispose the next selection before this attempt. Re-poll; the drain bound still caps spins.
                 var delivered = nextIsTimer
                     ? _provider.TryFireNextDue(target)
-                    : await _reminders.TryDeliverNextDueAsync(target, cancellationToken);
+                    : await _reminders.TryDeliverNextDueAsync(target, cancellationToken).ConfigureAwait(false);
 
                 operations++;
                 await Task.Yield();
@@ -91,7 +91,7 @@ public sealed class TestClock
 
     internal async ValueTask InvalidateAsync()
     {
-        await _advanceGate.WaitAsync();
+        await _advanceGate.WaitAsync().ConfigureAwait(false);
         try
         {
             _disposed = true;

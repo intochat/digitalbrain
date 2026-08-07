@@ -48,7 +48,7 @@ internal sealed class BehaviorAuthorNeuron :
     public async Task HandleAsync(ProposeBehaviorChangeRequest synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
-        await ReplyAsync(await ProposeAsync(synapse, cancellationToken), cancellationToken);
+        await ReplyAsync(await ProposeAsync(synapse, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task<BehaviorChangeDecision> Approve(ApproveBehaviorChange command)
@@ -72,11 +72,11 @@ internal sealed class BehaviorAuthorNeuron :
             return await SettleAsync(
                 data,
                 command,
-                new BehaviorChangeDecision(proposal with { Status = BehaviorChangeStatus.Rejected }, Applied: false));
+                new BehaviorChangeDecision(proposal with { Status = BehaviorChangeStatus.Rejected }, Applied: false)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
         var behavior = Behavior(command.BehaviorId);
-        var current = Authored.Of(command.BehaviorId, await behavior.Read());
+        var current = Authored.Of(command.BehaviorId, await behavior.Read().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext));
         var applied = await Author().ApplyApprovedScenarios(
             new BehaviorChangeRequest(
                 command.BehaviorId,
@@ -91,7 +91,7 @@ internal sealed class BehaviorAuthorNeuron :
                     ? proposal.ProposedFeatureText
                     : command.FeatureText,
                 proposal.DiffSummary ?? "approved scenario change"),
-            TurnCancellationToken);
+            TurnCancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var featureName = string.IsNullOrWhiteSpace(command.FeatureName)
             ? applied.FeatureName
@@ -104,9 +104,9 @@ internal sealed class BehaviorAuthorNeuron :
             applied.ProgramSource,
             new Dictionary<string, string>(StringComparer.Ordinal) { [featureName] = applied.FeatureText },
             current.DisplayName,
-            current.Description));
+            current.Description)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        return await SettleAsync(data, command, new BehaviorChangeDecision(proposal, Applied: true));
+        return await SettleAsync(data, command, new BehaviorChangeDecision(proposal, Applied: true)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private async Task<BehaviorChangeProposed> ProposeAsync(
@@ -122,7 +122,7 @@ internal sealed class BehaviorAuthorNeuron :
         BehaviorSnapshot snapshot;
         try
         {
-            snapshot = await Behavior(request.BehaviorId).Read().WaitAsync(BehaviorReadBound, cancellationToken);
+            snapshot = await Behavior(request.BehaviorId).Read().WaitAsync(BehaviorReadBound, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (TimeoutException)
         {
@@ -154,7 +154,7 @@ internal sealed class BehaviorAuthorNeuron :
         {
             Drafts = data.Drafts.With(request.CommandId.Value, proposal, RetainedEntries),
             Proposals = data.Proposals.With(proposal.ProposalId, proposal, RetainedEntries),
-        });
+        }).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return new BehaviorChangeProposed(request.CommandId, proposal);
     }
 
@@ -167,7 +167,7 @@ internal sealed class BehaviorAuthorNeuron :
         {
             Proposals = data.Proposals.Without(command.ProposalId),
             Decisions = data.Decisions.With(command.CommandId.Value, decision, RetainedEntries),
-        });
+        }).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return decision;
     }
 
@@ -184,7 +184,7 @@ internal sealed class BehaviorAuthorNeuron :
                 cancellationToken.ThrowIfCancellationRequested();
                 var response = await GrainFactory
                     .GetGrain<IGemma4>(NeuronId.For<IGemma4>(Id.Owner, ModelNeuronName).ToGrainId())
-                    .Respond([.. messages]);
+                    .Respond([.. messages]).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 return response.Text ?? string.Empty;
             });
 
@@ -202,7 +202,7 @@ internal sealed class BehaviorAuthorNeuron :
         _state.Value = _states.SerializeToArray(data);
         try
         {
-            await WriteStateAsync();
+            await WriteStateAsync().ConfigureAwait(true);
         }
         catch
         {

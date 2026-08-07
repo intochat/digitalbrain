@@ -39,11 +39,11 @@ public sealed class VectorMemoryNeuron :
                     synapse.Namespace,
                     synapse.Key,
                     VectorMemoryStoreStatus.ReservedNamespace),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
-        var embedding = await EmbedAsync(synapse.Text, cancellationToken);
+        var embedding = await EmbedAsync(synapse.Text, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         cancellationToken.ThrowIfCancellationRequested();
         var metadata = synapse.Metadata is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)
@@ -58,7 +58,7 @@ public sealed class VectorMemoryNeuron :
                 metadata,
                 synapse.Payload,
                 embedding),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         await ReplyAsync(
             new VectorMemoryStored(
@@ -66,7 +66,7 @@ public sealed class VectorMemoryNeuron :
                 synapse.Namespace,
                 synapse.Key,
                 VectorMemoryStoreStatus.Stored),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(SearchVectorMemory synapse, CancellationToken cancellationToken)
@@ -75,7 +75,7 @@ public sealed class VectorMemoryNeuron :
         cancellationToken.ThrowIfCancellationRequested();
         ValidateSearch(synapse);
 
-        var queryEmbedding = await EmbedAsync(synapse.Query, cancellationToken);
+        var queryEmbedding = await EmbedAsync(synapse.Query, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         cancellationToken.ThrowIfCancellationRequested();
         var matches = await _store.SearchAsync(
             Id.Owner.Value,
@@ -83,9 +83,9 @@ public sealed class VectorMemoryNeuron :
             queryEmbedding,
             synapse.Limit,
             synapse.Metadata,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        await ReplyAsync(new VectorMemoryMatches(synapse.Namespace, matches), cancellationToken);
+        await ReplyAsync(new VectorMemoryMatches(synapse.Namespace, matches), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(RemoveVectorMemory synapse, CancellationToken cancellationToken)
@@ -96,7 +96,7 @@ public sealed class VectorMemoryNeuron :
 
         if (IsReserved(synapse.Namespace))
         {
-            await ReplyAsync(new VectorMemoryRemoved(Removed: false, synapse.Namespace, synapse.Key), cancellationToken);
+            await ReplyAsync(new VectorMemoryRemoved(Removed: false, synapse.Namespace, synapse.Key), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -104,15 +104,15 @@ public sealed class VectorMemoryNeuron :
             Id.Owner.Value,
             synapse.Namespace.Value,
             synapse.Key,
-            cancellationToken);
-        await ReplyAsync(new VectorMemoryRemoved(removed, synapse.Namespace, synapse.Key), cancellationToken);
+            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await ReplyAsync(new VectorMemoryRemoved(removed, synapse.Namespace, synapse.Key), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private async Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken)
     {
         var generated = await _embeddings.GenerateAsync(
             [text],
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         return generated[0].Vector.ToArray();
     }

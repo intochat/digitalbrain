@@ -64,10 +64,10 @@ internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
             var authorization = grains.GetGrain<IMcpAuthorization>(
                 NeuronId.For<IMcpAuthorization>(owner, McpAuthorizationNeuron.InstanceName).ToGrainId());
 
-            var step = await Task.WhenAny(work, ambient.SignInReady.Task).WaitAsync(cancellationToken);
+            var step = await Task.WhenAny(work, ambient.SignInReady.Task).WaitAsync(cancellationToken).ConfigureAwait(false);
             if (ReferenceEquals(step, ambient.SignInReady.Task) && !work.IsCompleted)
             {
-                var signIn = await ambient.SignInReady.Task;
+                var signIn = await ambient.SignInReady.Task.ConfigureAwait(false);
                 McpAuthorizationCodeHub.RegisterAmbient(signIn.State, ambient);
                 await authorization.Begin(
                     new BeginMcpAuthorization(
@@ -76,14 +76,14 @@ internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
                         server.DisplayName,
                         signIn.SignInUrl,
                         signIn.State),
-                    cancellationToken);
+                    cancellationToken).ConfigureAwait(false);
                 ambient.BeginCompleted.TrySetResult();
             }
 
             // Race hold-open work against any no-code terminal (deny, cancel, abandon).
             // On terminal, cancel and abandon the parked CreateAsync — awaiting it after a null
             // AuthorizationResult can hang forever on MCP SDK session Completion.
-            var settled = await Task.WhenAny(work, ambient.Terminal.Task).WaitAsync(cancellationToken);
+            var settled = await Task.WhenAny(work, ambient.Terminal.Task).WaitAsync(cancellationToken).ConfigureAwait(false);
             if (ReferenceEquals(settled, ambient.Terminal.Task) && !work.IsCompleted)
             {
                 ambient.AbortOpen();
@@ -91,7 +91,7 @@ internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
                     $"Authorization for '{server.Key}' ended without a code for command '{commandId}'.");
             }
 
-            return await work;
+            return await work.ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested
             || ambient.OpenCancellation.IsCancellationRequested)
@@ -116,14 +116,17 @@ internal sealed class McpRuntime(IMcpClientSessionFactory sessions)
         Func<McpClient, CancellationToken, ValueTask<T>> callback,
         CancellationToken cancellationToken)
     {
-        await using var client = await sessions.OpenAsync(
+        var client = await sessions.OpenAsync(
             server,
             tokenState,
             commit,
             durableIdentity,
             cancellationToken,
-            ambient);
-        return await callback(client, cancellationToken);
+            ambient).ConfigureAwait(false);
+        await using (client.ConfigureAwait(false))
+        {
+            return await callback(client, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     internal static JsonElement RequireStructuredContent(CallToolResult result, McpServerDefinition server, string toolName)

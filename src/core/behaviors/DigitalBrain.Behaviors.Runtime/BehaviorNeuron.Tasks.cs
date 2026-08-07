@@ -113,7 +113,7 @@ internal sealed partial class BehaviorNeuron
                 goal,
                 binding.WorkerId,
                 new TaskPolicy(1, TimeSpan.Zero, null),
-                Activation: activation));
+                Activation: activation)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         if (snapshot.Worker != binding.WorkerId || snapshot.Activation != activation)
         {
@@ -143,7 +143,7 @@ internal sealed partial class BehaviorNeuron
             ActiveTaskIds = trackedTasks,
             RegisteredBindings = nextBindings,
         };
-        await SaveAsync(data);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         return new BoundBehaviorActivationResult(
             binding.TaskId,
@@ -176,7 +176,7 @@ internal sealed partial class BehaviorNeuron
         bindings[index] = bindings[index] with { Enabled = command.Enabled };
         data = data with { RegisteredBindings = bindings };
         data = WithReceipt(data, command.CommandId, Snapshot(data));
-        await SaveAsync(data);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return Snapshot(data);
     }
 
@@ -202,7 +202,7 @@ internal sealed partial class BehaviorNeuron
         if (data.RunState == BehaviorRunState.Stopped && !data.ActivationGateOpen)
         {
             data = WithReceipt(data, command.CommandId, Snapshot(data));
-            await SaveAsync(data);
+            await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return Snapshot(data);
         }
 
@@ -213,10 +213,10 @@ internal sealed partial class BehaviorNeuron
             ActivationGateOpen = false,
             RunState = BehaviorRunState.Stopping,
         };
-        await SaveAsync(data);
-        await PublishSubscriptionsAsync(data, CancellationToken.None);
-        await EmitAsync(new BehaviorActivationGateClosed(command.CommandId, behaviorId));
-        await EmitAsync(new BehaviorStopping(command.CommandId, behaviorId));
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await PublishSubscriptionsAsync(data, CancellationToken.None).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await EmitAsync(new BehaviorActivationGateClosed(command.CommandId, behaviorId)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await EmitAsync(new BehaviorStopping(command.CommandId, behaviorId)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var remaining = new List<NeuronId>();
         foreach (var taskId in data.ActiveTaskIds)
@@ -225,7 +225,7 @@ internal sealed partial class BehaviorNeuron
             TaskSnapshot snapshot;
             try
             {
-                snapshot = await task.Read();
+                snapshot = await task.Read().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
             catch (InvalidOperationException)
             {
@@ -237,14 +237,14 @@ internal sealed partial class BehaviorNeuron
                 continue;
             }
 
-            await EmitAsync(new BehaviorTaskCancelRequested(command.CommandId, behaviorId, taskId));
+            await EmitAsync(new BehaviorTaskCancelRequested(command.CommandId, behaviorId, taskId)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             try
             {
-                snapshot = await task.Cancel(new CancelTask(CommandId.New(), snapshot.Revision));
+                snapshot = await task.Cancel(new CancelTask(CommandId.New(), snapshot.Revision)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
             catch (InvalidOperationException)
             {
-                snapshot = await task.Read();
+                snapshot = await task.Read().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
 
             if (!IsTaskSettledForStop(snapshot))
@@ -260,12 +260,12 @@ internal sealed partial class BehaviorNeuron
             ActivationGateOpen = false,
         };
         data = WithReceipt(data, command.CommandId, Snapshot(data));
-        await SaveAsync(data);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         if (data.RunState == BehaviorRunState.Stopped)
         {
             UnpublishExactCapability();
-            await EmitAsync(new BehaviorStopped(command.CommandId, behaviorId));
+            await EmitAsync(new BehaviorStopped(command.CommandId, behaviorId)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
         return Snapshot(data);
@@ -299,10 +299,10 @@ internal sealed partial class BehaviorNeuron
             ActivationGateOpen = true,
         };
         data = WithReceipt(data, command.CommandId, Snapshot(data));
-        await SaveAsync(data);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         PublishExactCapability(data);
-        await PublishSubscriptionsAsync(data, CancellationToken.None);
-        await EmitAsync(new BehaviorStarted(command.CommandId, BehaviorIdOfName()));
+        await PublishSubscriptionsAsync(data, CancellationToken.None).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await EmitAsync(new BehaviorStarted(command.CommandId, BehaviorIdOfName())).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return Snapshot(data);
     }
 

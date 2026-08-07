@@ -36,7 +36,7 @@ internal sealed class QdrantVectorMemoryStore(QdrantVectorMemoryProvider provide
             queryEmbedding,
             limit,
             metadataFilter,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
 
         return hits
             .Select(static hit => new VectorMemoryMatch(hit.Key, hit.Text, hit.Metadata, hit.Payload))

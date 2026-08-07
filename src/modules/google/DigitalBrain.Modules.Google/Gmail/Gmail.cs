@@ -48,7 +48,7 @@ internal sealed partial class Gmail :
 
         try
         {
-            var provider = await EnsureReadyAsync(synapse.CommandId, cancellationToken);
+            var provider = await EnsureReadyAsync(synapse.CommandId, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             var chat = ServiceProvider.GetRequiredService<IChatClient>();
             var catalog = SdkCatalogAdmission.Build(provider.Service);
             if (catalog.Count == 0)
@@ -61,11 +61,11 @@ internal sealed partial class Gmail :
                 chat,
                 catalog,
                 synapse.Intent,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(true);
 
             await ReplyAsync(
                 new GmailResponse(synapse.CommandId, synapse.Intent, messages),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (OperationCanceledException)
         {
@@ -83,7 +83,7 @@ internal sealed partial class Gmail :
                     synapse.Intent,
                     [],
                     failure.Message),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
 
@@ -98,14 +98,14 @@ internal sealed partial class Gmail :
 
         try
         {
-            var provider = await EnsureReadyAsync(synapse.CommandId, cancellationToken);
+            var provider = await EnsureReadyAsync(synapse.CommandId, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             var headers = await provider.SearchAsync(
                 synapse.Query,
                 synapse.MaxResults,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             await ReplyAsync(
                 new GmailSearchResponse(synapse.CommandId, headers),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (OperationCanceledException)
         {
@@ -119,7 +119,7 @@ internal sealed partial class Gmail :
         {
             await ReplyAsync(
                 new GmailSearchResponse(synapse.CommandId, [], failure.Message),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
 
@@ -134,11 +134,11 @@ internal sealed partial class Gmail :
 
         try
         {
-            var provider = await EnsureReadyAsync(synapse.CommandId, cancellationToken);
-            var message = await provider.GetMessageAsync(synapse.MessageId, cancellationToken);
+            var provider = await EnsureReadyAsync(synapse.CommandId, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            var message = await provider.GetMessageAsync(synapse.MessageId, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             await ReplyAsync(
                 new GmailGetMessageResponse(synapse.CommandId, message),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (OperationCanceledException)
         {
@@ -152,10 +152,14 @@ internal sealed partial class Gmail :
         {
             await ReplyAsync(
                 new GmailGetMessageResponse(synapse.CommandId, null, failure.Message),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
 
+    [SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "Sign-in and GmailService ownership transfers to fields or is disposed on failure paths; ConfigureAwait prevents CA2000 from proving that.")]
     private async Task<GmailProvider> EnsureReadyAsync(CommandId commandId, CancellationToken cancellationToken)
     {
         await GmailAuthRail.EnsureAuthorizedAsync(
@@ -169,7 +173,7 @@ internal sealed partial class Gmail :
             _durableIdentity,
             _userKey,
             cancellationToken,
-            TimeProvider);
+            TimeProvider).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         if (_provider is not null)
         {
@@ -177,7 +181,7 @@ internal sealed partial class Gmail :
             {
                 if (_provider.Service.HttpClientInitializer is global::Google.Apis.Auth.OAuth2.UserCredential cached)
                 {
-                    _ = await cached.GetAccessTokenForRequestAsync(cancellationToken: cancellationToken);
+                    _ = await cached.GetAccessTokenForRequestAsync(cancellationToken: cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 }
 
                 return _provider;
@@ -187,7 +191,7 @@ internal sealed partial class Gmail :
                 _provider = null;
                 if (_signIn is not null)
                 {
-                    await _signIn.DisposeAsync();
+                    await _signIn.DisposeAsync().ConfigureAwait(true);
                     _signIn = null;
                 }
 
@@ -198,7 +202,7 @@ internal sealed partial class Gmail :
                     DigitalBrain.Google.Auth.DurableGoogleTokenStore.Purpose(
                         GmailAuthRail.ServerKey,
                         _durableIdentity));
-                await store.DeleteAsync<global::Google.Apis.Auth.OAuth2.Responses.TokenResponse>(_userKey);
+                await store.DeleteAsync<global::Google.Apis.Auth.OAuth2.Responses.TokenResponse>(_userKey).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 await GmailAuthRail.EnsureAuthorizedAsync(
                     GrainFactory,
                     Id.Owner,
@@ -210,14 +214,14 @@ internal sealed partial class Gmail :
                     _durableIdentity,
                     _userKey,
             cancellationToken,
-            TimeProvider);
+            TimeProvider).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 throw new InvalidOperationException("Gmail authorization recovery did not park after token failure.");
             }
         }
 
         if (_signIn is not null)
         {
-            await _signIn.DisposeAsync();
+            await _signIn.DisposeAsync().ConfigureAwait(true);
             _signIn = null;
         }
 
@@ -229,17 +233,17 @@ internal sealed partial class Gmail :
                 () => WriteStateAsync(),
                 _durableIdentity,
                 cancellationToken,
-                TimeProvider);
+                TimeProvider).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             var configuration = ServiceProvider.GetRequiredService<IConfiguration>();
             var baseUri = ResolveBaseUri(configuration);
-            var service = await _signIn.CreateServiceAsync(_userKey, cancellationToken, baseUri);
+            var service = await _signIn.CreateServiceAsync(_userKey, cancellationToken, baseUri).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             try
             {
                 // Force credential materialization so permanent refresh failures re-park.
                 if (service.HttpClientInitializer is global::Google.Apis.Auth.OAuth2.UserCredential credential)
                 {
-                    _ = await credential.GetAccessTokenForRequestAsync(cancellationToken: cancellationToken);
+                    _ = await credential.GetAccessTokenForRequestAsync(cancellationToken: cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 }
 
                 _provider = new GmailProvider(service);
@@ -255,7 +259,7 @@ internal sealed partial class Gmail :
         {
             if (_signIn is not null)
             {
-                await _signIn.DisposeAsync();
+                await _signIn.DisposeAsync().ConfigureAwait(true);
                 _signIn = null;
             }
 
@@ -267,7 +271,7 @@ internal sealed partial class Gmail :
                 DigitalBrain.Google.Auth.DurableGoogleTokenStore.Purpose(
                     GmailAuthRail.ServerKey,
                     _durableIdentity));
-            await store.DeleteAsync<global::Google.Apis.Auth.OAuth2.Responses.TokenResponse>(_userKey);
+            await store.DeleteAsync<global::Google.Apis.Auth.OAuth2.Responses.TokenResponse>(_userKey).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             await GmailAuthRail.EnsureAuthorizedAsync(
                 GrainFactory,
                 Id.Owner,
@@ -279,7 +283,7 @@ internal sealed partial class Gmail :
                 _durableIdentity,
                 _userKey,
             cancellationToken,
-            TimeProvider);
+            TimeProvider).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             throw new InvalidOperationException("Gmail authorization recovery did not park after token failure.");
         }
     }

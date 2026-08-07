@@ -19,7 +19,7 @@ internal sealed partial class Salesforce
             _tokenState,
             () => WriteStateAsync(),
             _durableIdentity,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         return await _runtime.RunAsync(
             Server,
@@ -31,7 +31,7 @@ internal sealed partial class Salesforce
             GrainFactory,
             async (client, callbackCancellation) =>
             {
-                var tools = await client.ListToolsAsync(cancellationToken: callbackCancellation);
+                var tools = await client.ListToolsAsync(cancellationToken: callbackCancellation).ConfigureAwait(true);
                 var updateTool = SelectUpdateTool(tools);
 
                 if (!string.Equals(
@@ -45,7 +45,7 @@ internal sealed partial class Salesforce
 
                 var result = await updateTool.Tool.CallAsync(
                     UpdateArguments(mutation),
-                    cancellationToken: callbackCancellation);
+                    cancellationToken: callbackCancellation).ConfigureAwait(true);
                 var content = McpRuntime.RequireStructuredContent(result, Server, UpdateAccountName);
 
                 return mutation with
@@ -55,7 +55,7 @@ internal sealed partial class Salesforce
                         : MutationStatus.Invoking,
                 };
             },
-            cancellationToken);
+            cancellationToken).ConfigureAwait(true);
     }
 
     private static Dictionary<string, object?> UpdateArguments(MutationData mutation)
@@ -77,7 +77,7 @@ internal sealed partial class Salesforce
     private async Task<MutationData> ReconcileBoundedAsync(MutationData mutation)
     {
         using var reconciliation = new CancellationTokenSource(ReconciliationTimeout);
-        return await ReconcileAsync(mutation, reconciliation.Token);
+        return await ReconcileAsync(mutation, reconciliation.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     [SuppressMessage(
@@ -98,7 +98,7 @@ internal sealed partial class Salesforce
                 _tokenState,
                 () => WriteStateAsync(),
                 _durableIdentity,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             var content = await _runtime.RunAsync(
                 Server,
@@ -110,7 +110,7 @@ internal sealed partial class Salesforce
                 GrainFactory,
                 async (client, callbackCancellation) =>
                 {
-                    var tools = await client.ListToolsAsync(cancellationToken: callbackCancellation);
+                    var tools = await client.ListToolsAsync(cancellationToken: callbackCancellation).ConfigureAwait(true);
                     var queryTool = SelectQueryTool(tools);
 
                     if (!string.Equals(
@@ -124,10 +124,10 @@ internal sealed partial class Salesforce
 
                     var result = await queryTool.Tool.CallAsync(
                         QueryArguments(mutation),
-                        cancellationToken: callbackCancellation);
+                        cancellationToken: callbackCancellation).ConfigureAwait(true);
                     return McpRuntime.RequireStructuredContent(result, Server, QueryAccountName);
                 },
-                cancellationToken);
+                cancellationToken).ConfigureAwait(true);
 
             return mutation with
             {

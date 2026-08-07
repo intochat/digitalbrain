@@ -41,7 +41,7 @@ public abstract class GroupChat : Neuron, IGroupChat
         var agent = shape.CreateAgent(GrainFactory, TaskScheduler.Current);
 
         await foreach (var update in _directSession
-            .RunStreamingAsync(agent, shape.Definition, shape.Invocations, messages, cancellationToken))
+            .RunStreamingAsync(agent, shape.Definition, shape.Invocations, messages, cancellationToken).ConfigureAwait(true))
         {
             yield return update;
         }

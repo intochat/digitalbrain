@@ -19,14 +19,14 @@ internal sealed partial class CountdownNeuron
                 reminderName,
                 StringComparison.Ordinal))
         {
-            await RetireReminderAsync(reminderName);
+            await RetireReminderAsync(reminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
         var observedAt = TimeProvider.GetUtcNow();
         if (observedAt < data.DueAt)
         {
-            await RegisterReminderAsync(reminderName, data.DueAt - observedAt);
+            await RegisterReminderAsync(reminderName, data.DueAt - observedAt).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -58,7 +58,7 @@ internal sealed partial class CountdownNeuron
                     data.ScheduledAt,
                     data.DueAt,
                     observedAt,
-                    resolution));
+                    resolution)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch
         {
@@ -67,7 +67,7 @@ internal sealed partial class CountdownNeuron
             throw;
         }
 
-        await RetireReminderAsync(reminderName);
+        await RetireReminderAsync(reminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private Task<Orleans.Runtime.IGrainReminder> RegisterReminderAsync(string reminderName, TimeSpan dueTime)
@@ -76,9 +76,9 @@ internal sealed partial class CountdownNeuron
     private async Task RetireReminderAsync(string? reminderName)
     {
         if (reminderName is not null
-            && await this.GetReminder(reminderName) is { } reminder)
+            && await this.GetReminder(reminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext) is { } reminder)
         {
-            await this.UnregisterReminder(reminder);
+            await this.UnregisterReminder(reminder).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
 

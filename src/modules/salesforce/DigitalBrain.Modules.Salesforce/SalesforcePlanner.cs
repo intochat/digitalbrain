@@ -29,7 +29,7 @@ internal static class SalesforcePlanner
         ArgumentException.ThrowIfNullOrWhiteSpace(intent);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var listed = await client.ListToolsAsync(cancellationToken: cancellationToken);
+        var listed = await client.ListToolsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         var admitted = AdmitReadTools(listed);
         if (admitted.Count == 0)
@@ -54,7 +54,7 @@ internal static class SalesforcePlanner
         for (var turn = 0; turn < MaxPlannerTurns; turn++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var response = await chat.GetResponseAsync(conversation, options, cancellationToken);
+            var response = await chat.GetResponseAsync(conversation, options, cancellationToken).ConfigureAwait(false);
             conversation.AddMessages(response);
             lastText = response.Text;
 
@@ -76,7 +76,7 @@ internal static class SalesforcePlanner
                 }
 
                 var arguments = ToArguments(call.Arguments);
-                var result = await tool.CallAsync(arguments, cancellationToken: cancellationToken);
+                var result = await tool.CallAsync(arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
                 if (result.IsError is true)
                 {
                     throw new InvalidOperationException(

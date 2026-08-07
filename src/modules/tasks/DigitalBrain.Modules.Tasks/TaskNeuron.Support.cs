@@ -122,7 +122,7 @@ internal sealed partial class TaskNeuron
 
         var snapshot = await GrainFactory
             .GetGrain<ITask>(predecessor.Value.ToGrainId())
-            .Read();
+            .Read().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         if (!IsTerminal(snapshot.State))
         {

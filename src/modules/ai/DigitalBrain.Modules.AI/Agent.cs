@@ -43,7 +43,7 @@ public abstract class Agent : Neuron, IAgent
         cancellationToken.ThrowIfCancellationRequested();
 
         var turnScheduler = TaskScheduler.Current;
-        var tools = await ResolveToolsAsync(messages, cancellationToken);
+        var tools = await ResolveToolsAsync(messages, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         var options = new ChatOptions
         {
             Tools = [.. tools.Select(tool => new TurnBoundFunction(tool, turnScheduler))],
@@ -57,7 +57,7 @@ public abstract class Agent : Neuron, IAgent
         var selected = new List<string>();
 
         await foreach (var update in _toolCallingClient
-            .GetStreamingResponseAsync(request, options, cancellationToken))
+            .GetStreamingResponseAsync(request, options, cancellationToken).ConfigureAwait(true))
         {
             selected.AddRange(update.Contents.OfType<FunctionCallContent>().Select(call => call.Name));
             yield return update;
@@ -65,7 +65,7 @@ public abstract class Agent : Neuron, IAgent
 
         foreach (var capability in selected)
         {
-            await EmitAsync(new CapabilityToolSelected(capability));
+            await EmitAsync(new CapabilityToolSelected(capability)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
 
@@ -90,7 +90,7 @@ public abstract class Agent : Neuron, IAgent
         cancellationToken.ThrowIfCancellationRequested();
 
         var additional = AdditionalToolsFor(messages);
-        var discovered = await DiscoverCatalogToolsAsync(messages, cancellationToken);
+        var discovered = await DiscoverCatalogToolsAsync(messages, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         if (additional.Count == 0)
         {
@@ -137,7 +137,7 @@ public abstract class Agent : Neuron, IAgent
             return [];
         }
 
-        var selected = await router.SelectAsync(Id.Owner, prompt, cancellationToken);
+        var selected = await router.SelectAsync(Id.Owner, prompt, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         if (selected.Count == 0 || typeMap is null)
         {
             return [];

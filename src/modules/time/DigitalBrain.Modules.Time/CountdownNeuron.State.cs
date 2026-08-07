@@ -23,7 +23,7 @@ internal sealed partial class CountdownNeuron
 
         try
         {
-            await WriteStateAsync();
+            await WriteStateAsync().ConfigureAwait(true);
         }
         catch
         {

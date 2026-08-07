@@ -23,7 +23,7 @@ internal sealed partial class BehaviorNeuron
             return;
         }
 
-        await PublishSubscriptionsAsync(data, cancellationToken);
+        await PublishSubscriptionsAsync(data, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     protected override async Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
@@ -55,7 +55,7 @@ internal sealed partial class BehaviorNeuron
             return;
         }
 
-        await DispatchWakeAsync(synapse, data, manifest, subscribedCase, cancellationToken);
+        await DispatchWakeAsync(synapse, data, manifest, subscribedCase, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     // Running the program here would hold this neuron's turn across the host call, and the first
@@ -85,7 +85,7 @@ internal sealed partial class BehaviorNeuron
             revision,
             subscribedCase.CaseId,
             BehaviorPayloadJson.Serialize(fact, fact.GetType()),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(true);
 
         var capabilities = DeriveResultBearingEdges(Id.Owner, manifest.CapabilityGrants);
         var contractVersion = manifest.EntryPoints.Contract.ContractMajorVersion
@@ -117,15 +117,15 @@ internal sealed partial class BehaviorNeuron
                 goal,
                 worker,
                 new TaskPolicy(1, TimeSpan.Zero, null),
-                Activation: activation));
+                Activation: activation)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        await SaveAsync(data with { ActiveTaskIds = TrackWakeTask(data.ActiveTaskIds, task) });
+        await SaveAsync(data with { ActiveTaskIds = TrackWakeTask(data.ActiveTaskIds, task) }).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await EmitAsync(new BehaviorWokeOnFact(
             command,
             behaviorId,
             data.ActiveArtifactHash!,
             task,
-            snapshot.ActiveAttempt ?? default));
+            snapshot.ActiveAttempt ?? default)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     // Every wake starts its own one-shot attempt, so tracking them without a bound would grow
@@ -200,7 +200,7 @@ internal sealed partial class BehaviorNeuron
                 command,
                 behaviorId,
                 correlation,
-                BehaviorFactEmission.HopBudgetExhausted);
+                BehaviorFactEmission.HopBudgetExhausted).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
         if (data.ActiveArtifactHash is null
@@ -208,7 +208,7 @@ internal sealed partial class BehaviorNeuron
             || !data.ActivationGateOpen
             || data.RunState is not BehaviorRunState.Running)
         {
-            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.NotRunning);
+            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.NotRunning).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
         // The signed manifest is the grant. Absent BroadcastEmitAliases means no emit rights.
@@ -216,12 +216,12 @@ internal sealed partial class BehaviorNeuron
         if (manifest.EntryPoints.BroadcastEmitAliases is not { } granted
             || !granted.Contains(command.EmitAlias, StringComparer.Ordinal))
         {
-            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.UndeclaredAlias);
+            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.UndeclaredAlias).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
         if (!TryReifyFact(command.EmitAlias, command.PayloadJson, out var fact))
         {
-            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.UnknownSynapse);
+            return await RefuseEmitAsync(command, behaviorId, correlation, BehaviorFactEmission.UnknownSynapse).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
         // The receipt is written only once the fact is durably spoken. EmitFact runs with no
@@ -237,15 +237,15 @@ internal sealed partial class BehaviorNeuron
         await EmitAtDepthAsync(
             fact,
             correlation,
-            Math.Max(BehaviorFactEmission.MaximumHops - command.HopsRemaining, 1));
+            Math.Max(BehaviorFactEmission.MaximumHops - command.HopsRemaining, 1)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await EmitAsync(
             new BehaviorFactEmitted(
                 command.CommandId,
                 behaviorId,
                 data.ActiveArtifactHash,
                 command.EmitAlias),
-            correlation);
-        await SaveAsync(WithEmitReceipt(data, command.CommandId, BehaviorFactEmission.Emitted));
+            correlation).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await SaveAsync(WithEmitReceipt(data, command.CommandId, BehaviorFactEmission.Emitted)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return BehaviorFactEmission.Emitted;
     }
 
@@ -268,7 +268,7 @@ internal sealed partial class BehaviorNeuron
                 behaviorId,
                 command.EmitAlias,
                 reason),
-            correlation);
+            correlation).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return reason;
     }
 
@@ -318,6 +318,6 @@ internal sealed partial class BehaviorNeuron
             token => registry.Replace(Id.Name, aliases, token),
             nameof(IBehaviorSubscriptionRegistry.Replace),
             DeliveryPolicy.SubscriptionRegistryTimeout,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 }

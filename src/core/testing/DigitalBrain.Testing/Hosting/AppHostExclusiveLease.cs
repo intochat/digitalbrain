@@ -11,7 +11,7 @@ internal sealed class AppHostExclusiveLease : IAsyncDisposable
 
     internal static async Task<AppHostExclusiveLease> AcquireAsync(CancellationToken cancellationToken)
     {
-        await Gate.WaitAsync(cancellationToken);
+        await Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         return new AppHostExclusiveLease();
     }
 

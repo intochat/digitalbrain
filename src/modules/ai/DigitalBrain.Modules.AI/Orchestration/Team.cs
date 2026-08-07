@@ -46,7 +46,7 @@ internal sealed class Team : GroupChat, ITeam
 
         try
         {
-            await WriteStateAsync();
+            await WriteStateAsync().ConfigureAwait(true);
         }
         catch
         {

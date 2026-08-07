@@ -23,8 +23,8 @@ internal sealed class DigitalBrainNeuron : Neuron, IDigitalBrainNeuron
             return;
         }
 
-        await EmitAsync(new DigitalBrainActivated(Id.Owner));
+        await EmitAsync(new DigitalBrainActivated(Id.Owner)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         _activationPublished.Value = true;
-        await WriteStateAsync();
+        await WriteStateAsync().ConfigureAwait(true);
     }
 }

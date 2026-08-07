@@ -48,7 +48,7 @@ internal sealed partial class TaskNeuron
     }
 
     public async Task HandleAsync(AttemptProgressed fact, CancellationToken cancellationToken)
-        => await AdvanceAsync(fact);
+        => await AdvanceAsync(fact).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
     private async Task AdvanceAsync(AttemptFact fact)
     {
@@ -68,9 +68,9 @@ internal sealed partial class TaskNeuron
         data.Blocker = null;
         data.PendingDispatch = new ContinueWorkerDispatch(Cursor(data));
 
-        await RegisterDispatchReminderAsync();
-        await SaveAsync(data);
-        await TryDispatchPendingAsync();
+        await RegisterDispatchReminderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await TryDispatchPendingAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public Task HandleAsync(AttemptSucceeded fact, CancellationToken cancellationToken)
@@ -133,7 +133,7 @@ internal sealed partial class TaskNeuron
         {
             data.State = TaskState.Waiting;
             data.Blocker = new RetryScheduled(new BlockerId(Guid.NewGuid()));
-            await this.RegisterOrUpdateReminder(RetryReminderName, data.Policy.RetryDelay, ReminderPeriod);
+            await this.RegisterOrUpdateReminder(RetryReminderName, data.Policy.RetryDelay, ReminderPeriod).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             Stage(data);
             return;
         }

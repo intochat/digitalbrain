@@ -7,7 +7,7 @@ internal sealed partial class TaskNeuron
     {
         if (string.Equals(reminderName, DispatchReminderName, StringComparison.Ordinal))
         {
-            await TryDispatchPendingAsync();
+            await TryDispatchPendingAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -21,7 +21,7 @@ internal sealed partial class TaskNeuron
 
         if (data is null)
         {
-            await UnregisterReminderAsync(RetryReminderName);
+            await UnregisterReminderAsync(RetryReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -30,7 +30,7 @@ internal sealed partial class TaskNeuron
             || data.AttemptCount >= data.Policy.MaximumAttempts
             || (data.Policy.Deadline is not null && data.Policy.Deadline <= DateTimeOffset.UtcNow))
         {
-            await UnregisterReminderAsync(RetryReminderName);
+            await UnregisterReminderAsync(RetryReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -41,9 +41,9 @@ internal sealed partial class TaskNeuron
         data.AttemptCount++;
         data.PendingDispatch = new AcceptWorkerDispatch(Request(data));
 
-        await RegisterDispatchReminderAsync();
-        await SaveAsync(data);
-        await UnregisterReminderAsync(RetryReminderName);
-        await TryDispatchPendingAsync();
+        await RegisterDispatchReminderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await UnregisterReminderAsync(RetryReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await TryDispatchPendingAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 }

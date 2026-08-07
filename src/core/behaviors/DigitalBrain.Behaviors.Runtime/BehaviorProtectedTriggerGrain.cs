@@ -66,7 +66,7 @@ internal sealed class BehaviorProtectedTriggerGrain : DurableGrain, IBehaviorPro
             caseId,
             plaintext,
             DefaultLifetime,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(true);
     }
 
     public async Task<byte[]> LoadAsync(
@@ -88,12 +88,12 @@ internal sealed class BehaviorProtectedTriggerGrain : DurableGrain, IBehaviorPro
             revision,
             caseId,
             reference,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(true);
         return plaintext.ToArray();
     }
 
     private async ValueTask CommitAsync()
     {
-        await WriteStateAsync();
+        await WriteStateAsync().ConfigureAwait(true);
     }
 }

@@ -152,7 +152,7 @@ internal sealed class ScriptedMcpSessionFactory(McpEdgeScript script) : IMcpClie
                 ToolCollection = [.. tools],
             });
         var run = mcpServer.RunAsync(CancellationToken.None);
-        var client = await McpClient.CreateAsync(clientTransport, cancellationToken: cancellationToken);
+        var client = await McpClient.CreateAsync(clientTransport, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         // Client dispose closes the duplex stream; complete server cleanup off the caller's dispose path.
         _ = CompleteServerAsync(mcpServer, run);

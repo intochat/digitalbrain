@@ -19,7 +19,7 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
             {
                 try
                 {
-                    await context.Invoke();
+                    await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 }
                 finally
                 {
@@ -39,7 +39,7 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
             || (CapabilityInvocation.IsEnumerationDispatch(context.InterfaceMethod)
                 && !contract.DeclaringType!.IsInstanceOfType(target)))
         {
-            await context.Invoke();
+            await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             return;
         }
@@ -52,7 +52,7 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
             {
                 if (IsClientEntryPoint(contract))
                 {
-                    await InvokeClientEntryAsync(context, target);
+                    await InvokeClientEntryAsync(context, target).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                     return;
                 }
 
@@ -66,22 +66,22 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
 
         if (CapabilityInvocation.IsEnumerationDispatch(context.InterfaceMethod))
         {
-            await target.RecordStreamedCapabilityRequestAsync(delivery, context.SourceId);
-            await context.Invoke();
+            await target.RecordStreamedCapabilityRequestAsync(delivery, context.SourceId).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             return;
         }
 
-        var turn = await target.BeginIncomingCapabilityRequestAsync(delivery, context.SourceId);
+        var turn = await target.BeginIncomingCapabilityRequestAsync(delivery, context.SourceId).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         try
         {
-            await context.Invoke();
-            await target.CompleteIncomingCapabilityRequestAsync(turn);
+            await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await target.CompleteIncomingCapabilityRequestAsync(turn).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch
         {
-            await target.FailIncomingCapabilityRequestAsync(turn);
+            await target.FailIncomingCapabilityRequestAsync(turn).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             throw;
         }
@@ -99,7 +99,7 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
             {
                 try
                 {
-                    await context.Invoke();
+                    await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 }
                 catch
                 {
@@ -120,7 +120,7 @@ internal sealed class IncomingReificationFilter : IIncomingGrainCallFilter
 
         using (target.EnterClientEntryCorrelation(correlation))
         {
-            await context.Invoke();
+            await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
 

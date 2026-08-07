@@ -70,10 +70,10 @@ internal sealed partial class Salesforce :
                     ISessionNeuron.ForOwner(Id.Owner),
                     synapse.AccountId!,
                     synapse.Description!,
-                    cancellationToken);
+                    cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 await ReplyAsync(
                     new SalesforceResponse(synapse.CommandId, synapse.Intent, proposed),
-                    cancellationToken);
+                    cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 return;
             }
 
@@ -87,7 +87,7 @@ internal sealed partial class Salesforce :
                 _tokenState,
                 () => WriteStateAsync(),
                 _durableIdentity,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             var chat = ServiceProvider.GetRequiredService<IChatClient>();
             _ = await _runtime.RunAsync(
@@ -104,11 +104,11 @@ internal sealed partial class Salesforce :
                     Server,
                     synapse.Intent,
                     callbackCancellation),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(true);
 
             await ReplyAsync(
                 new SalesforceResponse(synapse.CommandId, synapse.Intent),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (OperationCanceledException)
         {
@@ -122,7 +122,7 @@ internal sealed partial class Salesforce :
         {
             await ReplyAsync(
                 new SalesforceResponse(synapse.CommandId, synapse.Intent, null, failure.Message),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
 
@@ -140,13 +140,13 @@ internal sealed partial class Salesforce :
         try
         {
             var evidence = CurrentApprovalEvidence(approval);
-            var mutation = await ApproveAccountDescriptionAsync(approval, evidence, cancellationToken);
+            var mutation = await ApproveAccountDescriptionAsync(approval, evidence, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             await ReplyAsync(
                 new SalesforceResponse(
                     approval.CommandId,
                     "Approve Salesforce mutation",
                     mutation),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (OperationCanceledException)
         {
@@ -164,7 +164,7 @@ internal sealed partial class Salesforce :
                     "Approve Salesforce mutation",
                     null,
                     failure.Message),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
 

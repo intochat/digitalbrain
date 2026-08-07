@@ -33,7 +33,7 @@ public abstract class DigitalBrainTest : IAsyncLifetime
         => _leased ??= await BrainTestClusters.Registered.LeaseAsync(
             CompositionOf(GetType()),
             Compose,
-            Cancellation);
+            Cancellation).ConfigureAwait(false);
 
     public virtual ValueTask InitializeAsync()
         => ValueTask.CompletedTask;
@@ -46,7 +46,7 @@ public abstract class DigitalBrainTest : IAsyncLifetime
         _leased = null;
         if (brain is not null)
         {
-            await brain.DisposeAsync();
+            await brain.DisposeAsync().ConfigureAwait(false);
         }
     }
 

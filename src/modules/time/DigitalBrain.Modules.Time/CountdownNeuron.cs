@@ -84,8 +84,8 @@ internal sealed partial class CountdownNeuron :
         Remember(data, command.CommandId, snapshot);
         var rollbackState = SerializedState();
 
-        await RegisterReminderAsync(reminderName, command.Duration);
-        await SaveAsync(data, rollbackState);
+        await RegisterReminderAsync(reminderName, command.Duration).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await SaveAsync(data, rollbackState).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return snapshot;
     }
 
@@ -120,9 +120,9 @@ internal sealed partial class CountdownNeuron :
         Remember(next, command.CommandId, snapshot);
         var rollbackState = SerializedState();
 
-        await RegisterReminderAsync(reminderName, command.Duration);
-        await SaveAsync(next, rollbackState);
-        await RetireReminderAsync(current.ActiveReminderName);
+        await RegisterReminderAsync(reminderName, command.Duration).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await SaveAsync(next, rollbackState).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await RetireReminderAsync(current.ActiveReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return snapshot;
     }
 
@@ -152,8 +152,8 @@ internal sealed partial class CountdownNeuron :
         var snapshot = Snapshot(next);
         Remember(next, command.CommandId, snapshot);
 
-        await SaveAsync(next, SerializedState());
-        await RetireReminderAsync(current.ActiveReminderName);
+        await SaveAsync(next, SerializedState()).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await RetireReminderAsync(current.ActiveReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return snapshot;
     }
 
@@ -195,9 +195,9 @@ internal sealed partial class CountdownNeuron :
         Remember(next, command.CommandId, snapshot);
         var rollbackState = SerializedState();
 
-        await RegisterReminderAsync(reminderName, command.Duration);
-        await SaveAsync(next, rollbackState);
-        await RetireReminderAsync(current.ActiveReminderName);
+        await RegisterReminderAsync(reminderName, command.Duration).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await SaveAsync(next, rollbackState).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await RetireReminderAsync(current.ActiveReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return snapshot;
     }
 
@@ -209,6 +209,6 @@ internal sealed partial class CountdownNeuron :
                 $"Countdown neuron '{Id}' does not own reminder '{reminderName}'.");
         }
 
-        await ElapseIfDue(generation, revision);
+        await ElapseIfDue(generation, revision).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 }

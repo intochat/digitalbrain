@@ -434,32 +434,35 @@ internal sealed class HttpBehaviorHostBrokerClient : IBehaviorHostBrokerClient
         HttpResponseMessage response,
         CancellationToken cancellationToken)
     {
-        await using var stream = await response.Content
+        var responseStream = await response.Content
             .ReadAsStreamAsync(cancellationToken)
             .ConfigureAwait(false);
-        if (stream.CanSeek && stream.Length == 0)
+        await using (responseStream.ConfigureAwait(false))
         {
-            throw new BehaviorHostException("empty-broker-response");
-        }
+            if (responseStream.CanSeek && responseStream.Length == 0)
+            {
+                throw new BehaviorHostException("empty-broker-response");
+            }
 
-        T? body;
-        try
-        {
-            body = await JsonSerializer
-                .DeserializeAsync<T>(stream, JsonOptions, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (JsonException exception)
-        {
-            throw new BehaviorHostException("invalid-broker-response", exception);
-        }
+            T? body;
+            try
+            {
+                body = await JsonSerializer
+                    .DeserializeAsync<T>(responseStream, JsonOptions, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (JsonException exception)
+            {
+                throw new BehaviorHostException("invalid-broker-response", exception);
+            }
 
-        if (body is null)
-        {
-            throw new BehaviorHostException("empty-broker-response");
-        }
+            if (body is null)
+            {
+                throw new BehaviorHostException("empty-broker-response");
+            }
 
-        return body;
+            return body;
+        }
     }
 
     private TaskOperationSnapshot FromWire(SnapshotDto dto)

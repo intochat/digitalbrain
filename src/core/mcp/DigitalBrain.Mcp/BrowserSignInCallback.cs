@@ -29,12 +29,12 @@ internal static class BrowserSignInCallback
             // pending record, then await the app-callback-delivered code (never robot-GET).
             McpAuthorizationCodeHub.RegisterAmbient(state, ambient);
             ambient.SignInReady.TrySetResult(new McpAuthorizationSignIn(context.AuthorizationUri, state));
-            await ambient.BeginCompleted.Task.WaitAsync(cancellationToken);
-            return await AwaitDeliveredCodeAsync(state, ambient, cancellationToken);
+            await ambient.BeginCompleted.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return await AwaitDeliveredCodeAsync(state, ambient, cancellationToken).ConfigureAwait(false);
         }
 
         return ToAuthorizationResult(
-            await McpAuthorizationCodeHub.AwaitAsync(state, cancellationToken),
+            await McpAuthorizationCodeHub.AwaitAsync(state, cancellationToken).ConfigureAwait(false),
             state);
     }
 
@@ -54,28 +54,28 @@ internal static class BrowserSignInCallback
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (await IsDeniedAsync(authorization, ambient.CommandId, cancellationToken))
+            if (await IsDeniedAsync(authorization, ambient.CommandId, cancellationToken).ConfigureAwait(false))
             {
                 return FailNoCode(ambient);
             }
 
-            var taken = await authorization.TakeCompletedCode(state, cancellationToken);
+            var taken = await authorization.TakeCompletedCode(state, cancellationToken).ConfigureAwait(false);
             if (taken is not null)
             {
                 return ToAuthorizationResult(taken, state);
             }
 
-            await Task.WhenAny(hubTask, terminalTask, Task.Delay(GrainPollInterval, cancellationToken));
+            await Task.WhenAny(hubTask, terminalTask, Task.Delay(GrainPollInterval, cancellationToken)).ConfigureAwait(false);
         }
 
-        if (terminalTask.IsCompleted || await IsDeniedAsync(authorization, ambient.CommandId, cancellationToken))
+        if (terminalTask.IsCompleted || await IsDeniedAsync(authorization, ambient.CommandId, cancellationToken).ConfigureAwait(false))
         {
             return FailNoCode(ambient);
         }
 
         try
         {
-            var hubDelivered = await hubTask;
+            var hubDelivered = await hubTask.ConfigureAwait(false);
             if (hubDelivered is null)
             {
                 return FailNoCode(ambient);
@@ -88,12 +88,12 @@ internal static class BrowserSignInCallback
             // Hub waiter canceled without the outer token — fall through to grain.
         }
 
-        if (await IsDeniedAsync(authorization, ambient.CommandId, cancellationToken))
+        if (await IsDeniedAsync(authorization, ambient.CommandId, cancellationToken).ConfigureAwait(false))
         {
             return FailNoCode(ambient);
         }
 
-        var afterHub = await authorization.TakeCompletedCode(state, cancellationToken);
+        var afterHub = await authorization.TakeCompletedCode(state, cancellationToken).ConfigureAwait(false);
         if (afterHub is null)
         {
             return FailNoCode(ambient);
@@ -109,7 +109,7 @@ internal static class BrowserSignInCallback
     {
         try
         {
-            var claim = await authorization.Claim(commandId, cancellationToken);
+            var claim = await authorization.Claim(commandId, cancellationToken).ConfigureAwait(false);
             return claim.Kind is McpAuthorizationClaimKind.Denied;
         }
         catch (InvalidOperationException)

@@ -49,6 +49,6 @@ internal sealed class HttpMcpClientSessionFactory(
             httpClient,
             loggerFactory: null,
             ownsHttpClient: true);
-        return await McpClient.CreateAsync(transport, cancellationToken: cancellationToken);
+        return await McpClient.CreateAsync(transport, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 }

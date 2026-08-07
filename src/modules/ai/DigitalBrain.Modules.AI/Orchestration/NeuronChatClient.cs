@@ -36,7 +36,7 @@ internal sealed class NeuronChatClient(
 
             try
             {
-                carrying = await MoveNextOnTurnAsync(updates, cancellationToken);
+                carrying = await MoveNextOnTurnAsync(updates, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception failure)
             {
@@ -50,12 +50,12 @@ internal sealed class NeuronChatClient(
             {
                 yield return updates.Current;
 
-                carrying = await MoveNextOnTurnAsync(updates, cancellationToken);
+                carrying = await MoveNextOnTurnAsync(updates, cancellationToken).ConfigureAwait(false);
             }
         }
         finally
         {
-            await DisposeOnTurnAsync(updates);
+            await DisposeOnTurnAsync(updates).ConfigureAwait(false);
         }
     }
 

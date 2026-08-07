@@ -13,14 +13,14 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
             && CapabilityInvocation.IsEnumerationDispatch(context.InterfaceMethod)
             && CapabilityInvocation.EnumerationId(context.Request) is { } enumerationId)
         {
-            await InvokeStreamedAsync(context, streamingCaller, enumerationId);
+            await InvokeStreamedAsync(context, streamingCaller, enumerationId).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             return;
         }
 
         if (!CapabilityInvocation.IsRequest(context.InterfaceMethod))
         {
-            await context.Invoke();
+            await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             return;
         }
@@ -31,7 +31,7 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
         if (context.SourceContext?.GrainInstance is not Neuron
             && IsClientEntryPoint(context.InterfaceMethod))
         {
-            await context.Invoke();
+            await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             return;
         }
@@ -43,26 +43,26 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
         var interfaceName = context.InterfaceMethod!.DeclaringType!.FullName!;
         var methodName = context.InterfaceMethod.Name;
         var target = TargetOf(context);
-        var request = await caller.BeginCapabilityRequestAsync(interfaceName, methodName, target);
+        var request = await caller.BeginCapabilityRequestAsync(interfaceName, methodName, target).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         try
         {
-            await CapabilityRequestContext.InvokeAsync(request, context.Invoke);
+            await CapabilityRequestContext.InvokeAsync(request, context.Invoke).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (NeuronAuthorizationException) when (caller.Id.Owner != target.Owner)
         {
-            await caller.RecordCapabilityOutcomeAsync(CapabilityOutcome.Rejected, request);
+            await caller.RecordCapabilityOutcomeAsync(CapabilityOutcome.Rejected, request).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             throw;
         }
         catch
         {
-            await caller.RecordCapabilityOutcomeAsync(CapabilityOutcome.Failed, request);
+            await caller.RecordCapabilityOutcomeAsync(CapabilityOutcome.Failed, request).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             throw;
         }
 
-        await caller.RecordCapabilityOutcomeAsync(CapabilityOutcome.Completed, request);
+        await caller.RecordCapabilityOutcomeAsync(CapabilityOutcome.Completed, request).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private static Task InvokeStreamedAsync(IOutgoingGrainCallContext context, Neuron caller, Guid enumerationId)
@@ -89,7 +89,7 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
     {
         if (CapabilityInvocation.ContractMethod(context.InterfaceMethod, context.Request) is not { } contract)
         {
-            await context.Invoke();
+            await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             return;
         }
@@ -98,32 +98,32 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
         var request = await caller.BeginCapabilityRequestAsync(
             contract.DeclaringType!.FullName!,
             contract.Name,
-            target);
+            target).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         if (!caller.TryRegisterStreamedCapabilityRequest(enumerationId, request))
         {
-            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Abandoned);
+            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Abandoned).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             caller.TryRegisterStreamedCapabilityRequest(enumerationId, request);
         }
 
         try
         {
-            await CapabilityRequestContext.InvokeAsync(request, context.Invoke);
+            await CapabilityRequestContext.InvokeAsync(request, context.Invoke).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (NeuronAuthorizationException) when (caller.Id.Owner != target.Owner)
         {
-            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Rejected);
+            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Rejected).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             throw;
         }
         catch
         {
-            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Failed);
+            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Failed).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             throw;
         }
 
-        await ClaimStreamedTerminusAsync(caller, enumerationId, context.Result);
+        await ClaimStreamedTerminusAsync(caller, enumerationId, context.Result).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private static async Task ContinueStreamedRequestAsync(
@@ -133,16 +133,16 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
     {
         try
         {
-            await context.Invoke();
+            await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch
         {
-            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Failed);
+            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Failed).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             throw;
         }
 
-        await ClaimStreamedTerminusAsync(caller, enumerationId, context.Result);
+        await ClaimStreamedTerminusAsync(caller, enumerationId, context.Result).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private static async Task AbandonStreamedRequestAsync(
@@ -152,16 +152,16 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
     {
         try
         {
-            await context.Invoke();
+            await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch
         {
-            await ClaimAbandonmentWithoutMaskingAsync(caller, enumerationId);
+            await ClaimAbandonmentWithoutMaskingAsync(caller, enumerationId).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             throw;
         }
 
-        await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Abandoned);
+        await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Abandoned).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -172,7 +172,7 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
     {
         try
         {
-            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Abandoned);
+            await ClaimStreamedOutcomeAsync(caller, enumerationId, CapabilityOutcome.Abandoned).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch
         {
@@ -188,7 +188,7 @@ internal sealed class OutgoingReificationFilter : IOutgoingGrainCallFilter
     {
         if (caller.TryClaimStreamedCapabilityRequest(enumerationId, out var request))
         {
-            await caller.RecordCapabilityOutcomeAsync(outcome, request);
+            await caller.RecordCapabilityOutcomeAsync(outcome, request).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
 

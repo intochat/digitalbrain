@@ -42,14 +42,14 @@ internal sealed class FixtureCluster : IAsyncDisposable
 
         try
         {
-            await fixture.StartCoreAsync();
+            await fixture.StartCoreAsync().ConfigureAwait(false);
             return fixture;
         }
         catch (Exception startupFailure)
         {
             try
             {
-                await fixture.DisposeAsync();
+                await fixture.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception cleanupFailure)
             {
@@ -88,14 +88,14 @@ internal sealed class FixtureCluster : IAsyncDisposable
     internal async Task<bool> HasOutboxWakeupAsync(NeuronId neuron)
     {
         var grainId = GrainId.Create(OutboxWakeup.GrainTypeName, neuron.ToString());
-        var entry = await _reminderTable.ReadRow(grainId, OutboxWakeup.ReminderName);
+        var entry = await _reminderTable.ReadRow(grainId, OutboxWakeup.ReminderName).ConfigureAwait(false);
         return entry is not null;
     }
 
     internal async Task<(TestClock Clock, long EdgeGeneration)> PrepareMethodAsync(string scope, BrainTestDiagnostics diagnostics)
     {
         var edgeGeneration = _edges.ResetMethodScope();
-        await _reminderTable.TestOnlyClearTable();
+        await _reminderTable.TestOnlyClearTable().ConfigureAwait(false);
         return (
             new TestClock(_clock, new TestReminderDriver(_reminderTable, Client, scope), diagnostics),
             edgeGeneration);
@@ -109,7 +109,7 @@ internal sealed class FixtureCluster : IAsyncDisposable
         var management = cluster.Client.GetGrain<IManagementGrain>(0);
         var statistics = await management
             .GetDetailedGrainStatistics()
-            .WaitAsync(cancellationToken);
+            .WaitAsync(cancellationToken).ConfigureAwait(false);
         var hosting = statistics
             .FirstOrDefault(statistic => statistic.GrainId == neuron.ToGrainId())
             ?.SiloAddress
@@ -121,13 +121,13 @@ internal sealed class FixtureCluster : IAsyncDisposable
         // from starting, but cannot detach this method from an in-flight restart
         // and let the fixture lease expose an unstable cluster to the next test.
         cancellationToken.ThrowIfCancellationRequested();
-        await cluster.RestartSiloAsync(host);
+        await cluster.RestartSiloAsync(host).ConfigureAwait(false);
         await cluster
             .WaitForLivenessToStabilizeAsync(didKill: true)
-            .WaitAsync(cancellationToken);
+            .WaitAsync(cancellationToken).ConfigureAwait(false);
         await cluster
             .WaitForClusterManifestToStabilizeAsync(didKill: true)
-            .WaitAsync(cancellationToken);
+            .WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async ValueTask DisposeAsync()
@@ -140,11 +140,11 @@ internal sealed class FixtureCluster : IAsyncDisposable
 
         try
         {
-            await cluster.StopAllSilosAsync();
+            await cluster.StopAllSilosAsync().ConfigureAwait(false);
         }
         finally
         {
-            await cluster.DisposeAsync();
+            await cluster.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -203,6 +203,6 @@ internal sealed class FixtureCluster : IAsyncDisposable
         });
 
         _cluster = builder.Build();
-        await _cluster.DeployAsync();
+        await _cluster.DeployAsync().ConfigureAwait(false);
     }
 }

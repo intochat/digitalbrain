@@ -34,7 +34,7 @@ internal sealed class TestReminderRegistry(VolatileReminderTable table, Controll
             StartAt = startAt,
             Period = period,
         };
-        var etag = await table.UpsertRow(entry);
+        var etag = await table.UpsertRow(entry).ConfigureAwait(false);
 
         return new ReminderHandle(callingGrainId, reminderName, etag);
     }
@@ -59,14 +59,14 @@ internal sealed class TestReminderRegistry(VolatileReminderTable table, Controll
                 $"Cannot unregister reminder '{handle.ReminderName}' for grain '{callingGrainId}' because its ETag no longer matches the registered reminder.");
         }
 
-        await Task.CompletedTask;
+        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     public async Task<IGrainReminder> GetReminder(GrainId callingGrainId, string reminderName)
     {
         ValidateName(reminderName);
 
-        var entry = await table.ReadRow(callingGrainId, reminderName);
+        var entry = await table.ReadRow(callingGrainId, reminderName).ConfigureAwait(false);
         return entry is null
             ? null!
             : new ReminderHandle(entry.GrainId, entry.ReminderName, entry.ETag);
@@ -74,7 +74,7 @@ internal sealed class TestReminderRegistry(VolatileReminderTable table, Controll
 
     public async Task<List<IGrainReminder>> GetReminders(GrainId callingGrainId)
     {
-        var data = await table.ReadRows(callingGrainId);
+        var data = await table.ReadRows(callingGrainId).ConfigureAwait(false);
         return
         [
             .. data.Reminders.Select(entry =>

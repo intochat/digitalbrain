@@ -40,7 +40,7 @@ internal sealed class ChatNeuron :
 
     public async Task Send(SendMessage message)
     {
-        await foreach (var _ in SendStreaming(message, CancellationToken.None))
+        await foreach (var _ in SendStreaming(message, CancellationToken.None).ConfigureAwait(true))
         {
         }
     }
@@ -54,11 +54,11 @@ internal sealed class ChatNeuron :
             yield break;
         }
 
-        await RememberOwnerTurnAsync(message);
+        await RememberOwnerTurnAsync(message).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var answer = new StringBuilder();
 
-        await foreach (var chunk in Assistant().RespondStreaming([.. Turns().Select(AsChatMessage)], cancellationToken))
+        await foreach (var chunk in Assistant().RespondStreaming([.. Turns().Select(AsChatMessage)], cancellationToken).ConfigureAwait(true))
         {
             answer.Append(chunk.Text);
 
@@ -73,7 +73,7 @@ internal sealed class ChatNeuron :
         }
 
         Remember(new ChatTurn(FromUser: false, answered));
-        await EmitAsync(new AssistantResponded(message.CommandId, Id, answered));
+        await EmitAsync(new AssistantResponded(message.CommandId, Id, answered)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public Task<ChatTranscript> Read() => Task.FromResult(new ChatTranscript(Turns()));
@@ -95,11 +95,11 @@ internal sealed class ChatNeuron :
 
         var transcript = subject == Id
             ? new ChatTranscript(Turns())
-            : await GrainFactory.GetGrain<IChat>(subject.ToGrainId()).Read().WaitAsync(cancellationToken);
+            : await GrainFactory.GetGrain<IChat>(subject.ToGrainId()).Read().WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         await ReplyAsync(
             new TranscriptRead(synapse.CommandId, subject, Trimmed(transcript, synapse.MaxTurns)),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private static ChatTranscript Trimmed(ChatTranscript transcript, int? maxTurns)

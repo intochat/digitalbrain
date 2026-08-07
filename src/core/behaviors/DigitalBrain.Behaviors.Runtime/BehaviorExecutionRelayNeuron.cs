@@ -80,7 +80,7 @@ internal sealed class BehaviorExecutionRelayNeuron :
         try
         {
             var executor = ServiceProvider.GetRequiredService<IBehaviorExecutor>();
-            outcome = await executor.ExecuteAsync(request, linked.Token);
+            outcome = await executor.ExecuteAsync(request, linked.Token).ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
@@ -151,7 +151,7 @@ internal sealed class BehaviorExecutionRelayNeuron :
                 outcome.Succeeded && !cancelled,
                 stableCode,
                 cancelled,
-                userAction));
+                userAction)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private static bool MatchesAttempt(UserActionRequired requirement, AttemptRequest attempt)

@@ -94,7 +94,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
                 "The owner DigitalBrain and session are not Send targets. Use ActivateAsync, domain Get, SendAsync to domain neurons, and EmitAsync to broadcast.");
         }
 
-        await SendToAsync(receiver, synapse, cancellationToken);
+        await SendToAsync(receiver, synapse, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task EmitAsync(Synapse synapse, CancellationToken cancellationToken = default)
@@ -102,8 +102,8 @@ public sealed class DigitalBrainClient : IDigitalBrain
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
 
-        await ActivateAsync(cancellationToken);
-        await Session().Emit(synapse);
+        await ActivateAsync(cancellationToken).ConfigureAwait(false);
+        await Session().Emit(synapse).ConfigureAwait(false);
     }
 
     internal Task SendToAsync(NeuronId receiver, Synapse synapse, CancellationToken cancellationToken)
@@ -139,34 +139,34 @@ public sealed class DigitalBrainClient : IDigitalBrain
 
         var sessionId = ISessionNeuron.ForOwner(Owner);
         var session = Session();
-        var cursor = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, afterSequence: 0);
+        var cursor = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, afterSequence: 0).ConfigureAwait(false);
 
         if (!TryCreateJournalObserver(out var observer, out var reference))
         {
-            var polled = await SendValidatedAsync(receiver, request, cancellationToken);
+            var polled = await SendValidatedAsync(receiver, request, cancellationToken).ConfigureAwait(false);
             return await PollForResponseAsync(
                 session,
                 sessionId,
                 cursor.ResumeSequence,
                 polled.CorrelationId,
                 responseType,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
         }
 
         try
         {
-            await session.WatchNeuron(sessionId, JournalKind.Incoming, cursor.ResumeSequence, reference);
+            await session.WatchNeuron(sessionId, JournalKind.Incoming, cursor.ResumeSequence, reference).ConfigureAwait(false);
 
-            var delivery = await SendValidatedAsync(receiver, request, cancellationToken);
+            var delivery = await SendValidatedAsync(receiver, request, cancellationToken).ConfigureAwait(false);
             return await WaitForResponseAsync(
                 observer,
                 delivery.CorrelationId,
                 responseType,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            await TeardownWatchAsync(session, sessionId, reference, observer);
+            await TeardownWatchAsync(session, sessionId, reference, observer).ConfigureAwait(false);
         }
     }
 
@@ -182,8 +182,8 @@ public sealed class DigitalBrainClient : IDigitalBrain
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await ActivateAsync(cancellationToken);
-        return await Session().Fire(receiver, synapse);
+        await ActivateAsync(cancellationToken).ConfigureAwait(false);
+        return await Session().Fire(receiver, synapse).ConfigureAwait(false);
     }
 
     private bool TryCreateJournalObserver(
@@ -213,7 +213,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
         Type responseType,
         CancellationToken cancellationToken)
     {
-        await foreach (var page in observer.Reads.ReadAllAsync(cancellationToken))
+        await foreach (var page in observer.Reads.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             foreach (var delivery in page.Delta)
             {
@@ -239,7 +239,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
     {
         while (true)
         {
-            var read = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, cursor);
+            var read = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, cursor).ConfigureAwait(false);
             foreach (var candidate in read.Delta)
             {
                 if (candidate.CorrelationId == correlation
@@ -273,7 +273,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
     {
         try
         {
-            await session.UnwatchNeuron(sessionId, reference);
+            await session.UnwatchNeuron(sessionId, reference).ConfigureAwait(false);
         }
         catch (Exception)
         {

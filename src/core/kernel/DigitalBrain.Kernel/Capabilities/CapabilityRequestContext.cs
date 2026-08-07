@@ -22,7 +22,7 @@ internal static class CapabilityRequestContext
 
         try
         {
-            await invoke();
+            await invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         finally
         {

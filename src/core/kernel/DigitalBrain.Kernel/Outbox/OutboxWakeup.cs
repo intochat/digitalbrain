@@ -16,13 +16,13 @@ internal sealed class OutboxWakeup :
         TimeSpan.FromMinutes(1);
 
     public async Task Arm()
-        => _ = await this.RegisterOrUpdateReminder(ReminderName, RetryCadence, RetryCadence);
+        => _ = await this.RegisterOrUpdateReminder(ReminderName, RetryCadence, RetryCadence).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
     public async Task Disarm()
     {
-        if (await this.GetReminder(ReminderName) is { } reminder)
+        if (await this.GetReminder(ReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext) is { } reminder)
         {
-            await this.UnregisterReminder(reminder);
+            await this.UnregisterReminder(reminder).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
     }
 
@@ -36,7 +36,7 @@ internal sealed class OutboxWakeup :
 
         await GrainFactory
             .GetGrain<IOutboxDrain>(Target().ToGrainId())
-            .Drain();
+            .Drain().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     internal static bool TryParseTarget(string encoded, out NeuronId target)

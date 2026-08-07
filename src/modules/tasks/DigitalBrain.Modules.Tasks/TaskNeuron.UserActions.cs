@@ -43,7 +43,7 @@ internal sealed partial class TaskNeuron
             {
                 // Same durable park: re-emit park-ready so a lost completer rendezvous can recover
                 // without ordinary outbox horizon dependence on the original signal.
-                await SendParkReadyAsync(control);
+                await SendParkReadyAsync(control).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 return;
             }
 
@@ -69,7 +69,7 @@ internal sealed partial class TaskNeuron
         data.PendingDispatch = null;
 
         StageForTurn(data);
-        await SendParkReadyAsync(control);
+        await SendParkReadyAsync(control).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(CompleteUserAction command, CancellationToken cancellationToken)
@@ -100,10 +100,10 @@ internal sealed partial class TaskNeuron
         data.Receipts.Add(command.CommandId, snapshot);
 
         StageForTurn(data);
-        await RegisterDispatchReminderAsync();
+        await RegisterDispatchReminderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         // Turn-atomic: buffer Task→relay and clear PendingDispatch in staged memory only.
         // A mid-turn durable ownership transfer would journal-commit before the outer turn.
-        await StagePendingDispatchForTurnAsync();
+        await StagePendingDispatchForTurnAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(DenyUserAction command, CancellationToken cancellationToken)
@@ -139,8 +139,8 @@ internal sealed partial class TaskNeuron
         // Stage only; reminder cleanup then the outer durable turn commits state/receipt once.
         // Mid-handler durable writes are forbidden — cleanup failure throws and rolls back to Waiting.
         StageForTurn(data);
-        await UnregisterReminderAsync(RetryReminderName);
-        await UnregisterReminderAsync(DispatchReminderName);
+        await UnregisterReminderAsync(RetryReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await UnregisterReminderAsync(DispatchReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private UserActionPending RequireUserActionAuthority(

@@ -35,7 +35,7 @@ internal sealed partial class BehaviorNeuron
         _state.Value = _states.SerializeToArray(data);
         try
         {
-            await WriteStateAsync();
+            await WriteStateAsync().ConfigureAwait(true);
         }
         catch
         {
@@ -222,7 +222,7 @@ internal sealed partial class BehaviorNeuron
 
     private async Task<SynapseDelivery> ApprovalEvidenceAsync(BehaviorRevisionApproval approval)
     {
-        var incoming = await ReadJournal(JournalKind.Incoming, afterSequence: 0);
+        var incoming = await ReadJournal(JournalKind.Incoming, afterSequence: 0).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return incoming.Delta.FirstOrDefault(delivery =>
                 delivery.Caller == approval.Approver
                 && delivery.Synapse is BehaviorRevisionApproval recorded

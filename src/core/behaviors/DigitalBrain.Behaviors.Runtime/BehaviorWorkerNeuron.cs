@@ -30,7 +30,7 @@ internal sealed class BehaviorWorkerNeuron :
 
         await SendAsync(
             request.Task,
-            new AttemptAccepted(request.Task, request.Worker, request.Attempt, request.Revision));
+            new AttemptAccepted(request.Task, request.Worker, request.Attempt, request.Revision)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         // Process-local CTS for this attempt (never durable). Cancel links into host execution via
         // BehaviorAttemptCancellation; late terminals remain idempotent on the Task.
@@ -49,7 +49,7 @@ internal sealed class BehaviorWorkerNeuron :
                 Id,
                 request,
                 BehaviorExecutionId.New(),
-                TimeProvider.GetUtcNow()));
+                TimeProvider.GetUtcNow())).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         _ = goal;
     }
 
@@ -71,7 +71,7 @@ internal sealed class BehaviorWorkerNeuron :
             cursor.Task,
             cursor.Attempt,
             requireActivation: true,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         if (snapshot.Worker != Id)
         {
             throw new NeuronAuthorizationException("worker-mismatch");
@@ -101,7 +101,7 @@ internal sealed class BehaviorWorkerNeuron :
                 Id,
                 request,
                 BehaviorExecutionId.New(),
-                TimeProvider.GetUtcNow()));
+                TimeProvider.GetUtcNow())).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task Cancel(AttemptCursor cursor)
@@ -114,7 +114,7 @@ internal sealed class BehaviorWorkerNeuron :
 
         await SendAsync(
             cursor.Task,
-            new AttemptCancelled(cursor.Task, cursor.Worker, cursor.Attempt, cursor.Revision));
+            new AttemptCancelled(cursor.Task, cursor.Worker, cursor.Attempt, cursor.Revision)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public Task HandleAsync(DispatchWorkerAccept command, CancellationToken cancellationToken)
@@ -166,7 +166,7 @@ internal sealed class BehaviorWorkerNeuron :
                     request.Attempt,
                     request.Revision,
                     new BehaviorTaskResult(BehaviorExecutionCodes.Succeeded),
-                    Evidence: []));
+                    Evidence: [])).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -184,11 +184,11 @@ internal sealed class BehaviorWorkerNeuron :
                         request.Attempt,
                         request.Revision,
                         new BehaviorTaskFailure(BehaviorExecutionCodes.Exception),
-                        Retryable: false));
+                        Retryable: false)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 return;
             }
 
-            await SendAsync(request.Task, userAction);
+            await SendAsync(request.Task, userAction).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -205,7 +205,7 @@ internal sealed class BehaviorWorkerNeuron :
                     request.Attempt,
                     request.Revision,
                     new BehaviorTaskFailure(BehaviorExecutionCodes.Cancelled),
-                    Retryable: false));
+                    Retryable: false)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -217,7 +217,7 @@ internal sealed class BehaviorWorkerNeuron :
                 request.Attempt,
                 request.Revision,
                 new BehaviorTaskFailure(stableCode),
-                Retryable: false));
+                Retryable: false)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task<WorkerOperationReceipt> StagePrepare(
@@ -230,7 +230,7 @@ internal sealed class BehaviorWorkerNeuron :
         RequireStageTaskIdentity(task);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var delivery = await SendAsync(task, command);
+        var delivery = await SendAsync(task, command).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return new WorkerOperationReceipt(delivery.CorrelationId, Id, task);
     }
 
@@ -244,7 +244,7 @@ internal sealed class BehaviorWorkerNeuron :
         RequireStageTaskIdentity(task);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var delivery = await SendAsync(task, command);
+        var delivery = await SendAsync(task, command).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return new WorkerOperationReceipt(delivery.CorrelationId, Id, task);
     }
 
@@ -258,7 +258,7 @@ internal sealed class BehaviorWorkerNeuron :
         RequireStageTaskIdentity(task);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var delivery = await SendAsync(task, command);
+        var delivery = await SendAsync(task, command).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return new WorkerOperationReceipt(delivery.CorrelationId, Id, task);
     }
 
@@ -289,7 +289,7 @@ internal sealed class BehaviorWorkerNeuron :
             task,
             attempt,
             requireActivation: true,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         if (snapshot.Worker != Id)
         {
             throw new InvalidOperationException("worker-mismatch");
@@ -301,7 +301,7 @@ internal sealed class BehaviorWorkerNeuron :
         var resolved = BehaviorCapabilityEdgeAuthority.ResolveExact(Id.Owner, edge, catalog, typeMap);
 
         cancellationToken.ThrowIfCancellationRequested();
-        var plaintext = await payloads.LoadAsync(Id.Owner, task, attempt, requestPayload, cancellationToken);
+        var plaintext = await payloads.LoadAsync(Id.Owner, task, attempt, requestPayload, cancellationToken).ConfigureAwait(true);
         if (plaintext.IsEmpty)
         {
             throw new InvalidOperationException("invalid-payload-content");
@@ -335,7 +335,7 @@ internal sealed class BehaviorWorkerNeuron :
             CorrelationId.New());
         try
         {
-            await GrainFactory.GetGrain<INeuron>(resolved.DeliveryTarget.ToGrainId()).Deliver(delivery, cancellationToken);
+            await GrainFactory.GetGrain<INeuron>(resolved.DeliveryTarget.ToGrainId()).Deliver(delivery, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (McpAuthorizationRequiredException authorizationRequired)
             when (authorizationRequired.Requirement is { } requirement)
@@ -360,7 +360,7 @@ internal sealed class BehaviorWorkerNeuron :
                 lifetime,
                 completer,
                 actionEpoch,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(true);
 
             var bind = new BindUserActionCompletion(
                 task,
@@ -377,13 +377,13 @@ internal sealed class BehaviorWorkerNeuron :
             // Direct Deliver (not outbox): bind must complete before the park exception surfaces.
             await GrainFactory.GetGrain<INeuron>(completer.ToGrainId()).Deliver(
                 SynapseDelivery.Create(bind, Id, sequence: 1, cause: null, TimeProvider, CorrelationId.New()),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             var authorization = GrainFactory.GetGrain<IMcpAuthorization>(
                 NeuronId.For<IMcpAuthorization>(Id.Owner, McpAuthorizationNeuron.InstanceName).ToGrainId());
             await authorization.BindCompletionTarget(
                 new BindMcpAuthorizationCompletionTarget(requirement.CommandId, completer),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             throw new BehaviorUserActionRequiredException(issued.Requirement);
         }

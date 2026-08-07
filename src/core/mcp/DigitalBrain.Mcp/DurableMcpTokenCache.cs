@@ -36,7 +36,7 @@ internal sealed class DurableMcpTokenCache(
 
         try
         {
-            await commit();
+            await commit().ConfigureAwait(false);
         }
         catch
         {
