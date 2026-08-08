@@ -4,6 +4,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Kernel;
 using DigitalBrain.ServiceDefaults;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Dashboard;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,4 +19,5 @@ app.MapShellStreams();
 app.MapAuthorizationStreams();
 app.MapBrainTopology();
 app.MapOAuthCallback();
+app.MapOrleansDashboard("/orleans");
 app.Run();

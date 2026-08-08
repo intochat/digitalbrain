@@ -2,6 +2,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
 using DigitalBrain.ServiceDefaults;
 using Microsoft.Extensions.Hosting;
+using Orleans.Dashboard;
 
 namespace DigitalBrain.Aspire;
 
@@ -21,6 +22,11 @@ public static class DigitalBrainRuntimeHostingExtensions
         {
             silo.AddDigitalBrainJournalStorage(builder.Configuration);
             DigitalBrainRuntime.Add(silo, modules);
+            silo.AddDashboard(options =>
+            {
+                options.CounterUpdateIntervalMs = 5000;
+                options.HistoryLength = 200;
+            });
         });
         builder.AddDigitalBrainOwner(activateOnStart: false);
         return builder;

@@ -51,7 +51,15 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
         port: ProductSurfaceResources.UiHttpPort,
         name: ShellHostingExtensions.HttpEndpointName,
         isProxied: false)
-    .WithHttpHealthCheck("/health");
+    .WithHttpHealthCheck("/health")
+    .WithUrlForEndpoint(
+        ShellHostingExtensions.HttpEndpointName,
+        endpoint => new ResourceUrlAnnotation
+        {
+            Url = "/orleans",
+            DisplayText = "Orleans Dashboard",
+            Endpoint = endpoint,
+        });
 
 var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
     .WithReference(brain.AsClient())

@@ -1,10 +1,12 @@
 using DigitalBrain.Abstractions;
 using Orleans.Concurrency;
+using Orleans.Dashboard;
 
 namespace DigitalBrain.Core;
 
 [GrainType(GrainTypeName)]
 [Reentrant]
+[NoProfiling]
 internal sealed class OutboxWakeup :
     Grain,
     IOutboxWakeup,
