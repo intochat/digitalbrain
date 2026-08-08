@@ -34,6 +34,22 @@ public static class DigitalBrainResourceNames
         return "journal";
     }
 
+    public static string Streams(string brainName = DefaultBrainName)
+    {
+        RequireBrainName(brainName);
+        return "streams";
+    }
+
+    public static string PubSub(string brainName = DefaultBrainName)
+    {
+        RequireBrainName(brainName);
+        return "pubsub";
+    }
+
+    public const string StreamProviderName = "DigitalBrain";
+
+    public const string PubSubStoreName = "PubSubStore";
+
     private static void RequireBrainName(string brainName)
         => ArgumentException.ThrowIfNullOrWhiteSpace(brainName);
 }

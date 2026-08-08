@@ -24,11 +24,15 @@ public static class DigitalBrainHostingExtensions
         var clustering = storage.AddTables(DigitalBrainResourceNames.Clustering(name));
         var reminders = storage.AddTables(DigitalBrainResourceNames.Reminders(name));
         var journal = storage.AddBlobs(DigitalBrainResourceNames.JournalResource(name));
+        var streams = storage.AddQueues(DigitalBrainResourceNames.Streams(name));
+        var pubSub = storage.AddTables(DigitalBrainResourceNames.PubSub(name));
         var orleans = builder
             .AddOrleans(name)
             .WithClustering(clustering)
-            .WithReminders(reminders);
-        var brain = new DigitalBrainBuilder(builder, name, orleans, journal);
+            .WithReminders(reminders)
+            .WithGrainStorage(DigitalBrainResourceNames.PubSubStoreName, pubSub)
+            .WithStreaming(DigitalBrainResourceNames.StreamProviderName, streams);
+        var brain = new DigitalBrainBuilder(builder, name, orleans, journal, streams, pubSub);
 
         brain.RequireHealthyBeforeStart(storage.Resource);
         brain.RequireHealthyBeforeStart(clustering.Resource);
@@ -76,6 +80,8 @@ public static class DigitalBrainHostingExtensions
 
         builder.WithReference(brain.Orleans);
         builder.WithReference(brain.Journal, DigitalBrainResourceNames.JournalConnectionName);
+        builder.WithReference(brain.Streams);
+        builder.WithReference(brain.PubSub);
 
         foreach (var dependency in brain.StartupDependencies)
         {

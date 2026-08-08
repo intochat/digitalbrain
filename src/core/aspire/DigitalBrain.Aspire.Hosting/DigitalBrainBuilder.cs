@@ -22,19 +22,29 @@ public sealed class DigitalBrainBuilder
         IDistributedApplicationBuilder builder,
         string name,
         OrleansService orleans,
-        IResourceBuilder<AzureBlobStorageResource> journal)
+        IResourceBuilder<AzureBlobStorageResource> journal,
+        IResourceBuilder<AzureQueueStorageResource> streams,
+        IResourceBuilder<AzureTableStorageResource> pubSub)
     {
         ArgumentNullException.ThrowIfNull(journal);
+        ArgumentNullException.ThrowIfNull(streams);
+        ArgumentNullException.ThrowIfNull(pubSub);
 
         _builder = builder;
         Name = name;
         Orleans = orleans;
         Journal = journal;
+        Streams = streams;
+        PubSub = pubSub;
     }
 
     public string Name { get; }
 
     internal IResourceBuilder<AzureBlobStorageResource> Journal { get; }
+
+    internal IResourceBuilder<AzureQueueStorageResource> Streams { get; }
+
+    internal IResourceBuilder<AzureTableStorageResource> PubSub { get; }
 
     internal IReadOnlyList<ModuleId> Modules => _modules;
 

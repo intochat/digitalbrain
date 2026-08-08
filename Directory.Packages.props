@@ -22,6 +22,7 @@
     <PackageVersion Include="Aspire.Hosting.Qdrant" Version="13.5.0-preview.1.26405.3" />
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.5.0-preview.1.26376.5" />
     <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.5.0-preview.1.26405.3" />
+    <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.5.0-preview.1.26405.3" />
     <PackageVersion Include="Qdrant.Client" Version="1.19.0" />
     <PackageVersion Include="Testcontainers" Version="4.13.0" />
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.4.1-beta.687" />
@@ -43,11 +44,13 @@
     <PackageVersion Include="Microsoft.Orleans.Dashboard.Abstractions" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Journaling" Version="10.2.2-rc.2.alpha.1" />
     <PackageVersion Include="Microsoft.Orleans.Journaling.AzureStorage" Version="10.2.2-rc.2.alpha.1" />
+    <PackageVersion Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Serialization.SystemTextJson" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Streaming.AzureStorage" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.2.2" />
   </ItemGroup>
 </Project>
