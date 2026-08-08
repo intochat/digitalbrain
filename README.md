@@ -8,7 +8,7 @@ and method-scoped `TestBrain` fixtures fire real multi-silo traffic and assert o
 
 ```csharp
 // grain clients (mcp, scripting): builder.AddDigitalBrainClient(); inject IDigitalBrain
-// silo host only: builder.AddDigitalBrainSilo(silo => silo.AddDigitalBrain());
+// silo host only: builder.AddDigitalBrain();
 await brain.SendAsync<IAnalyst>(
     "incident-42",
     new SummaryRequested("Summarize the incident."));
@@ -76,9 +76,11 @@ on the northbound process. Gmail uses Gmail REST; Salesforce uses hosted MCP. No
 live in process `DigitalBrain.Mcp` (`AddDigitalBrainClient`). Docs that say MCP is co-hosted on the
 silo are stale.
 
-Aspire split: `DigitalBrain.Aspire.Hosting` is AppHost-only; `DigitalBrain.Aspire` owns
-`AddDigitalBrainClient` (grain clients) and `AddDigitalBrainSilo` (silo host). Resource names are
-shared via `DigitalBrainResourceNames` so hosting and client connection keys cannot drift.
+Aspire split: `DigitalBrain.Aspire.Hosting` is AppHost-only (`AddDigitalBrain` on
+`IDistributedApplicationBuilder`); `DigitalBrain.Aspire` owns `AddDigitalBrainClient` (grain
+clients) and `AddDigitalBrain` on `IHostApplicationBuilder` (silo host, modules-taking). The Kernel
+binds its compiled catalog via a zero-arg `AddDigitalBrain()`. Resource names are shared via
+`DigitalBrainResourceNames` so hosting and client connection keys cannot drift.
 
 Retired prototype generations live in git history — `git log --diff-filter=D --summary`, then
 `git show <sha>^:<path>`.

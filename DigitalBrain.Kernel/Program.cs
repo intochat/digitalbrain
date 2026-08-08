@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.AddDigitalBrainSilo(silo => silo.AddDigitalBrain());
+builder.AddDigitalBrain();
 builder.Services.TryAddSingleton(static services =>
     new OwnerSessionJournal(services.GetRequiredService<IDigitalBrain>()));
 

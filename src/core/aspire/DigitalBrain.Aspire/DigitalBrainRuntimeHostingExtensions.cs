@@ -5,13 +5,14 @@ using Microsoft.Extensions.Hosting;
 
 namespace DigitalBrain.Aspire;
 
-public static class DigitalBrainSiloHostingExtensions
+public static class DigitalBrainRuntimeHostingExtensions
 {
-    public static IHostApplicationBuilder AddDigitalBrainSilo(
+    public static IHostApplicationBuilder AddDigitalBrain(
         this IHostApplicationBuilder builder,
-        Action<ISiloBuilder>? configure = null)
+        IReadOnlyCollection<ICompiledModule> modules)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(modules);
 
         builder.AddServiceDefaults();
         builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.Clustering());
@@ -19,7 +20,7 @@ public static class DigitalBrainSiloHostingExtensions
         builder.UseOrleans(silo =>
         {
             silo.AddDigitalBrainJournalStorage(builder.Configuration);
-            configure?.Invoke(silo);
+            DigitalBrainRuntime.Add(silo, modules);
         });
         builder.AddDigitalBrainOwner(activateOnStart: false);
         return builder;
