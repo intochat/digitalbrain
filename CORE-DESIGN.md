@@ -1,8 +1,10 @@
-# DigitalBrain Core — architecture (2026-08-08, v2)
+# DigitalBrain Core — architecture (2026-08-08, v3 — post-panel)
 
 Two concepts. One verb. A brain is interconnected by **what exists**, not by what is wired
-in code. This document is architecture, not a prototype: every member below survives only
-because a law or a scenario forces it, and the proof suite is written **before** the runtime.
+in code. This spec was attacked by a seven-adversary panel (Orleans reality, concurrency,
+behavior mechanism, module author, physics consistency, test harness, self-awareness);
+all nine proven contradictions and every accepted fix are incorporated below. The paradigm
+survived every lens unchanged — only the law text bled.
 
 ---
 
@@ -13,47 +15,79 @@ because a law or a scenario forces it, and the proof suite is written **before**
 - **Synapse** — data type = data contract = data carrier. Immutable record. Journaled.
 
 DigitalBrain is the **compiler/runtime** — registry, routing, journal, discovery,
-inspection, and later the self-improvement rail. It is not a concept. Only things that
-handle synapses are neurons; everything else (time, models, transports, storage) is a
-service a neuron's constructor asks for.
+inspection, later the self-improvement rail. Not a concept. Only things that handle
+synapses are neurons; time, models, transports, storage are services a constructor asks for.
 
-## 2. Interconnection — how "when Musk posts, do X; when Vlad posts, do Y" works
+## 2. Interconnection — "when Musk posts do X, when Vlad posts do Y"
 
-There is no wiring registry, no subscription table, no connection objects.
-**Three mechanisms compose every flow in the system:**
+No wiring registry, no subscription API, no connection objects. Three mechanisms:
 
-1. **Kinds declare, instances exist.** `IHandle<XPosted>` on a kind puts it in the
-   broadcast receiver set. Creating an *instance* is the only wiring act — a behavior
-   exists, therefore it hears.
-2. **Selection is domain data, not routing.** `XPosted(Author, Text)` carries the author
-   *because the domain cares*. The runtime routes by type; the behavior selects by data.
-   Musk-vs-Vlad is a `record` field, not an infrastructure feature.
+1. **Kinds declare, instances exist.** `IHandle<XPosted>` on a compiled kind puts its
+   `"default"` instance in the receiver set. Creating an instance is wiring — and creation
+   is itself a **journaled fact**: the registry observes creations, never bare activations.
+2. **Selection is domain data.** `XPosted(Author, Text)` carries the author because the
+   domain cares. The runtime routes by exact type; the behavior selects by data.
 3. **A behavior is a neuron whose definition is durable state.** Compiled behaviors are
-   classes; runtime-created behaviors are *instances of one interpreter kind* whose state
-   says what to select and what to fire. Creating one is a conversation, not a deploy.
-
-The scenario, concretely — every arrow is a journaled synapse:
+   classes; runtime-created behaviors are named instances of **one compiled kind,
+   `Behavior`**, created and changed by conversation, not deploys.
 
 ```
-watcher x:elonmusk ──fires──> XPosted("elonmusk", "doge to the moon")     [broadcast fact]
-watcher x:vlad     ──fires──> XPosted("vlad", "shipped the kernel")       [broadcast fact]
-
-behavior:musk-chart   state: { when: XPosted.Author == "elonmusk",
-                               fire: ChartPointRequested at chart:btc }
-behavior:vlad-notes   state: { when: XPosted.Author == "vlad",
-                               fire: NoteFiled at notes:default }
-
-both behaviors hear both facts (they declare XPosted); each acts on its own selection;
-chart:btc answers ChartPointRequested with ChartPointAdded — which IS its UI update.
+x:elonmusk fires XPosted("elonmusk", "doge to the moon")      [broadcast fact]
+behavior:musk-chart   Where Author == "elonmusk"  → fires ChartPointRequested at chart:btc
+behavior:vlad-notes   Where Author == "vlad"      → fires NoteFiled at notes:default
+chart:btc answers ChartPointRequested with ChartPointAdded    [directed, typed result]
 ```
 
-Nothing was deployed. Two `XPosted` facts, two behavior instances, one directed
-request/result — the whole flow readable back from journals, one correlation per post.
-The same three mechanisms carry "monitor the dev blog at 10:00" (a clock neuron fires
-`TimerElapsed` facts; the behavior instance selects on its own schedule id) and every
-future automation: **new behavior = new instance = new data.**
+### The behavior mechanism, concretely
 
-## 3. The ABI — nothing that a law does not force
+The definition is closed, serializable data — never a script (Gate-0 law):
+
+```csharp
+record BehaviorDefinition(
+    string OnSynapse,                        // alias of the fact kind to react to
+    IReadOnlyList<FieldCondition> Where,     // selection over the triggering fact
+    IReadOnlyList<ActionStep> Fire);         // steps, in order
+
+record FieldCondition(string Field, ConditionOp Op, string Value);
+enum ConditionOp { Equals, NotEquals, Contains, GreaterThan, LessThan }   // closed set
+
+record ActionStep(
+    string SynapseAlias,
+    string? Target,
+    IReadOnlyList<FieldCondition> Where,     // step guard over trigger ∪ prior step results
+    IReadOnlyDictionary<string, ValueSource> With);
+// ValueSource = literal | field of the triggering fact | field of a prior step's result
+```
+
+Step guards make judgment flows expressible: *monitor the dev blog* = clock fact →
+step 1 fires `Assess(text)` at the assistant (directed, typed result) → step 2 fires
+`IssueProposed` **Where** `steps[1].Relevant == true`. The data tier wires; neurons think.
+
+**Creation and lifecycle are flows, not APIs.** `DefineBehavior(definition)` is a directed
+synapse handled by the target instance: it validates (unknown alias, field, target, or an
+ambiguous alias ⇒ typed refusal in the answer), persists the definition, and answers
+`BehaviorDefined` **only after** the interest `(owner, OnSynapse → instance)` is durably
+committed in the registry — write-through, so recovery is the registry replaying its own
+journal, and a restart can never leave a behavior silently deaf. Redefining replaces (the
+journal keeps every prior definition — versioning for free); `DisableBehavior` withdraws
+the interest through the same write-through; listing rides `Discover`. Definitions are
+stamped with the field shape of every alias they use — a fire-time mismatch after a
+redeploy journals a typed `BehaviorInvalidated` and withdraws the interest until redefined.
+After N consecutive retracted turns the runtime journals `BehaviorSuspended` and withdraws
+the interest — loud, typed, recoverable. Nothing about a behavior's death is telemetry-only.
+
+**Delivery — and the direct answer to "Orleans streams and implicit subscriptions?": no.**
+Memory streams *drop* broadcasts for subscribers not active at publish time — fatal
+precisely for behaviors born at runtime — and implicit subscriptions bind per kind, not
+per instance interest. Instead the committed outbox entry carries the fact, and **the
+drain expands the receiver set at delivery time** from the registry (compiled declarations
+∪ journaled instance interests): the registry sits outside the atomic commit path,
+retries ride the drain, duplicates are watermark-acked, and a behavior defined between
+commit and drain hears even the in-flight fact. The refused alternative — an interpreter
+kind declaring a catch-all `IHandle<Synapse>` — would multiply the durable outbox by the
+behavior count to deliver facts selection would discard.
+
+## 3. The ABI
 
 ```csharp
 // ── The two concepts ────────────────────────────────────────────────────────
@@ -62,36 +96,49 @@ public abstract record Synapse;                       // broadcast fact, one-way
 public abstract record Synapse<TResult> : Synapse     // directed request; the contract
     where TResult : Synapse;                          // declares its typed result
 
-public interface IHandle<in TSynapse> where TSynapse : Synapse
+public interface IHandle<TSynapse> where TSynapse : Synapse
 {
     Task HandleAsync(TSynapse synapse, CancellationToken cancellationToken);
 }
 
-public interface IHandle<in TSynapse, TResult>
+public interface IHandle<TSynapse, TResult>
     where TSynapse : Synapse<TResult> where TResult : Synapse
 {
     Task<TResult> HandleAsync(TSynapse synapse, CancellationToken cancellationToken);
 }
+// No variance: receiver matching is exact-type, never assignability — declared variance
+// would promise conversions the registry will not honor.
 
-// ── The neuron base — three members, complete ───────────────────────────────
+// ── The neuron base — one vocabulary member ─────────────────────────────────
 public abstract class Neuron : DurableGrain
 {
     public NeuronId Id { get; }                       // (Owner, Kind, Name)
-
-    protected Task FireSynapse(Synapse synapse, CancellationToken ct = default);
-    protected Task<TResult> FireSynapse<TResult>(Synapse<TResult> synapse, CancellationToken ct = default)
-        where TResult : Synapse;
 }
-// Everything else — time, models, MCP clients, durable state slots — arrives by
-// constructor injection. The base class carries no service a handler can ask for.
+// The wire is runtime-owned and invisible: INeuron { Task<Synapse?> Deliver(SynapseDelivery, ct); }
+// implemented explicitly and SEALED on Neuron — modules cannot intercept or re-implement
+// delivery. TResult is compile-checked at the fire and runtime-checked at the wire.
+// DurableGrain's inherited surface (ServiceProvider, GrainFactory) is machinery, never
+// vocabulary: the architecture guard forbids module code referencing either, or INeuron.
 
-// ── The facade — same verb, plus reading the brain ──────────────────────────
+// A neuron that fires declares the dependency like any other service:
+//
+//   class MuskChart(IDigitalBrain brain) : Neuron, IHandle<XPosted>
+//   {
+//       public async Task HandleAsync(XPosted post, CancellationToken ct)
+//       {
+//           if (post.Author != "elonmusk") return;
+//           await brain.FireSynapse(new ChartPointRequested(post.Text), ct);
+//       }
+//   }
+
+// ── The facade — one verb, plus reading the brain ───────────────────────────
 public interface IDigitalBrain
 {
     OwnerId Owner { get; }
 
     Task FireSynapse(Synapse synapse, CancellationToken ct = default);
-    Task<TResult> FireSynapse<TResult>(Synapse<TResult> synapse, CancellationToken ct = default)
+    Task<TResult> FireSynapse<TResult>(Synapse<TResult> synapse,
+        TimeSpan? deadline = null, CancellationToken ct = default)   // default deadline lives on the verb
         where TResult : Synapse;
 
     Task<IReadOnlyList<NeuronContract>> DiscoverAsync(string query, int limit = 8, CancellationToken ct = default);
@@ -103,138 +150,232 @@ public interface IDigitalBrain
 
 // Directed fire targets instance "default" unless the synapse carries its address:
 public interface IAddressed { string Neuron { get; } }
+// An addressed fire SELECTS among journaled identities; it never mints one. A directed
+// fire at a never-created named instance fails typed ("no such instance") — only
+// "default" exists by declaration.
 ```
 
-The envelope (`SynapseDelivery`: id, correlation, causation, source, sequence, timestamp)
-is runtime-stamped and journal-visible; authors never construct or read it in handlers —
-lineage questions are answered by `Trace`/`Recall`, not by ambient state.
+**The envelope** — runtime-stamped, journal-visible, never author-touched:
+`SynapseDelivery(Id, Correlation, Causation, Source, Origin, Sequence, Timestamp, Synapse)`
+where `Origin ∈ { Owner, Neuron }` — edge fires are owner-attributed, so journal exports
+carry roles mechanically. An edge fire lands on the **owner's session neuron** — a neuron
+like any other; it is the envelope Source and the fact's journal locus.
 
-A module is: synapse records + neuron classes. Nothing else exists to write.
+**Contract cards.** Every synapse contract statically carries its registry card: alias
+(derived from the namespace-qualified type name, unique per registry, round-trips to
+exactly one type — *identity is the qualified name, the alias is derived, never a lookup
+result*), one-line description, example utterances. `NeuronContract` = the card + request
+and result field schemas derived from the compiled records by the source-generated
+manifest (never hand-written) + observed instance names. Discovery quality is a Stage A
+scenario, not a hope.
 
-## 4. The laws
+**Protected fields.** Payloads are journal-visible unless a record field is declared
+protected, which journals a **reference**; the plaintext lives behind the payload
+protector (runtime machinery folded into Core). Gmail bodies never enter journals or
+training exports in the clear.
+
+**External authorization is a flow, not machinery.** An auth neuron owns pending states
+and journals `AuthorizationRequired` / `AuthorizationCompleted` as facts; a parkable
+request's *result record* carries a typed `AuthorizationRequired` branch (sign-in URL),
+with the resume key as caller-supplied domain data on the request record; the caller —
+assistant or a behavior selecting on `AuthorizationCompleted` — re-fires the request on
+hearing the completion fact. The browser callback is an edge fire like any other.
+
+**A module is:** synapse records + neuron classes + one composition entry (the existing
+`IModule` seat) registering the services its neurons' constructors ask for and the
+module's host resources. Nothing else exists to write — no verbs, no manifests, no wiring.
+
+## 4. The ten laws
 
 1. **Two concepts.** Not a neuron or a synapse ⇒ runtime machinery, never vocabulary.
-2. **One verb.** Routing lives in the contract: `Synapse` broadcasts, `Synapse<TResult>`
-   directs and returns. The registry is invisible.
-3. **The DAG law.** Directed calls flow down; results return only as return values;
-   facts flow one way. The runtime refuses a fire that would re-enter a turn already in
-   the call chain — typed failure before the call, never a deadlock, never interleaving.
-4. **Broadcast is journal-first, at-least-once, never awaited into handlers.** Receiver
-   set = the `"default"` instance of every declaring kind + every observed named instance:
-   *instance creation is wiring*. Zero receivers is legal. Duplicates are silently acked
+2. **One verb, one place.** `FireSynapse` exists only on `IDigitalBrain`; neurons fire
+   through their injected brain. Routing lives in the contract: `Synapse` broadcasts,
+   `Synapse<TResult>` directs and returns. The registry is invisible.
+3. **The DAG law.** Directed calls flow down; results return only as return values; facts
+   flow one way. The chain check refuses every cycle it can see (including self-fire)
+   before the call; chains are depth-bounded; **the chain dies at commit** — correlation
+   and causation persist through the outbox, the chain does not, so a drained broadcast
+   roots a fresh chain. Every directed fire carries a deadline; expiry is a typed,
+   journaled failure — deadlock degrades to typed failure, never a hang, never interleave.
+4. **Broadcast is one-way, journal-first, at-least-once.** Receiver set — one formula:
+   the `"default"` instance of every kind compiled with `IHandle<T>` ∪ every named
+   instance whose journaled interest names T, matched by exact type. Expansion happens at
+   **drain time**, outside the atomic commit path. Instance creation is wiring and is
+   itself a journaled fact. Zero receivers is legal; duplicates are silently acked
    (per-source watermark). Streams are refused as carrier.
-5. **The journal is the only truth.** Both planes on one timeline (directed calls entered
-   by the runtime's call filter). Telemetry is a projection. Unjournaled effects did not
-   happen — including failures.
-6. **The atomic turn.** Incoming synapse, emissions, state: one commit or full retraction.
-7. **The registry is observed, never computed.** Truth = `IHandle<>` declarations + live
-   instances; the source-generated manifest only accelerates it; degradation is loud.
-8. **Activation identity is declared.** Never correlation-keyed.
-9. **Directed failures are typed and journaled.** No handler, ambiguity, denial — typed to
-   the caller, facts in the journal. Silent drops do not exist.
-10. **Gates must be able to fail.** Unprovable = skipped-with-reason, never green.
+5. **The journal is the only truth — and truth never truncates silently.** One
+   interleaved journal per neuron (`JournalKind` is a read filter, not a second feed);
+   directed calls enter the same timeline via the runtime's call filter; every commit also
+   appends to a per-owner, day-keyed timeline on the brain (the "last Friday" substrate).
+   A feed compacts only behind a journaled, replayable archive — the retained window is a
+   cache; `Read`/`Recall` span both. Streaming deltas are an ephemeral, non-durable
+   projection of a directed fire in progress; nothing may be asserted from them. The
+   journal is the **audit floor**: nothing claimed without an entry — not a claim that the
+   world was reversed.
+6. **The atomic turn is per neuron.** Staged broadcasts and state commit or retract
+   together *at this neuron*; staged facts are invisible to everyone — including directed
+   callees — until commit. A directed fire is the **callee's own committed turn**: the
+   caller's retraction cannot unmake it and journals the orphaned request as a typed fact.
+   External effects are at-least-once under redelivery — idempotency keys are domain data
+   on the synapse. A fire is accepted only on the activation's scheduler: in an open turn
+   it joins that commit; in grain code outside a turn (activation, reminder, timer) it
+   opens its own; off-scheduler it fails typed.
+7. **The registry is observed, never computed.** Truth = compiled `IHandle<>`
+   declarations + journaled instance interests (written through at define-commit, never
+   scanned) + contract cards. The source-generated manifest accelerates; degradation is loud.
+8. **Activation identity is declared.** The kind by contract; the name by a journaled
+   creation fact; an addressed fire selects among declared identities and never mints one.
+   Never correlation-keyed.
+9. **Failures are typed and journaled.** No handler, no such instance, ambiguity, denial,
+   timeout, cycle, suspension — typed to the caller, facts in the journal. The directed
+   plane is **at-most-once per fire**, request and result on one correlation; a caller
+   that re-fires after a timeout recalls the receiver's journal first or carries a domain
+   attempt key — retries are never the runtime's job. Silent drops do not exist.
+10. **Gates must be able to fail.** Unprovable = skipped-with-reason, never green; red
+    features enter behind `@ignore("pending: law N")` and each runtime commit's first
+    change is the un-ignore — the root gate is never red, and no gate is theater.
 
 ## 5. BDD-first — the proof suite is the specification
 
-**Order of work: harness → features red → runtime until green.** Framework: **Reqnroll**
-(SpecFlow's continuation — already the lineage standard: `final/` runs Reqnroll over a real
-Orleans TestCluster; "extend Gherkin via tags, never invent a DSL" is settled prototype law).
+**Order of work: harness → features red (ignored-with-reason) → runtime green, law by law.**
+Framework: **Reqnroll** over a real TestCluster (the lineage standard — `final/`'s
+Os.Tests is the reference MTP wiring). Commit #1 pins the stack it stands on:
+Reqnroll.xunit.v3 + an xunit.v3 version proven by compiling one generated feature under
+the Microsoft.Testing.Platform gates this repo uses, shim carried into TestBrain.
 
-**TestBrain, mined from the prototypes, is Stage A commit #1:**
-- one-configurator real TestCluster harness — from IAW's `AgentTest<TAgent>`;
-- the session surface `s.Fire(...)` / `await s.Get(request)` / `s.Journal(neuron)` /
-  `s.Surface(panel)` — from ino's `NeuronE2ETest` + `s.Chat()/s.Last.Rfw`;
-- the honesty ratchet (no tolerant asserts; a scenario that cannot fail is a defect) —
-  from `final/`'s GateHonestyTests, and law 10.
+**TestBrain** (shaped like ino's session verbs, implemented over the TestCluster brain):
+- `s.Fire(fact)` / `await s.Get(request)` / `s.Journal(neuron)` / `s.Receivers<T>()`
+  (registry read) / `s.Quiesced(neuron)` (outbox drained) / `s.Surface(panel)`;
+- **three physics seams**: a restart-surviving journal store (process-static provider
+  covering feeds, outbox, and watermarks), a delivery gate (an incoming filter holding a
+  named synapse kind undelivered — "committed but undelivered" as a stable state), and
+  silo restart + reactivation choreography;
+- deterministic assertions only: typed results + journal tallies + receiver-set
+  enumeration — never wall clocks, never unbounded negatives. Hangs are caught by the
+  harness-level test timeout, not Gherkin.
 
-**UI is assertable in the same scenarios** — because surfaces are synapses, a UI change is
-a journal fact, and no browser is involved (ino proved this shape end-to-end):
+Stage A's surface vocabulary is one record — `SurfacePresented(string Panel, Synapse
+Content)` — fired like any fact; the full RFW widget vocabulary stays Stage D. UI changes
+are journal assertions with no renderer running.
 
 ```gherkin
 Feature: Physics
 Scenario: A failing handler retracts its whole turn
-  Given a Diary neuron whose handler fires Noted and then throws
+  Given a Diary neuron whose handler stages Noted and then throws
   When Remember is fired at diary:default
-  Then diary:default journals no Noted
-  And no neuron received Noted
+  Then diary:default's outgoing journal has no Noted
+  And every receiver of Noted journals zero Noted deliveries
+
+Scenario: A caller that fails after a directed result journals the orphan
+  Given a handler that gets a ChartPointAdded result and then throws
+  Then chart:btc's turn stays committed
+  And the caller journals the orphaned request as a typed fact
 
 Scenario: A broadcast survives a crash between commit and delivery
-  Given a Greeter that fires Greeted on hearing Hello
-  And the silo restarts after Greeted is committed but before delivery
-  Then every declaring listener journals Greeted exactly once
+  Given the delivery gate holds Greeted undelivered
+  And the silo restarts
+  Then every receiver journals Greeted exactly once after reactivation
 
 Feature: Routing
 Scenario: A directed synapse returns its typed result
   When GmailSearch "in:inbox" take 3 is fired
   Then the caller holds a GmailResult with 3 messages
-  And gmail:default journals the request and the result on one correlation
+  And gmail:default journals request and result on one correlation
 
-Scenario: A cycle is refused, not deadlocked
-  Given neuron A whose handler fires a directed synapse at B
-  And B's handler fires a directed synapse back at A
+Scenario: A cycle is refused before the callee runs
+  Given A's handler fires directed at B, and B's handler fires directed back at A
   When the chain is fired
-  Then the fire fails typed as a cycle within one second
+  Then the fire fails typed as a cycle
+  And b:default journals exactly one delivery
+
+Scenario: Cross-chain contention degrades to typed timeout, never a hang
+  Given A awaits a directed fire at B while B awaits a directed fire at A
+  Then both fires fail typed within their deadlines and both failures are journaled
 
 Feature: Interconnection
-Scenario: Two watchers, two behaviors, zero shared code       # §2, executable
-  Given a behavior musk-chart selecting XPosted where Author is "elonmusk", firing ChartPointRequested at chart:btc
-  And a behavior vlad-notes selecting XPosted where Author is "vlad", firing NoteFiled at notes:default
+Scenario: Two watchers, two behaviors, zero shared code
+  Given behavior musk-chart selecting XPosted Where Author Equals "elonmusk"
+  And behavior vlad-notes selecting XPosted Where Author Equals "vlad"
   When XPosted "elonmusk" "doge to the moon" is fired
   Then chart:btc journals ChartPointRequested
-  And notes:default journals nothing
+  And notes:default journals zero NoteFiled deliveries
 
-Scenario: A behavior created mid-run hears the next fact
-  Given XPosted was already fired once
-  When behavior musk-chart is created
-  And XPosted "elonmusk" "again" is fired
-  Then chart:btc journals exactly one ChartPointRequested
+Scenario: A behavior defined after commit still hears the in-flight fact
+  Given the delivery gate holds XPosted undelivered
+  When behavior musk-chart is defined and the gate releases
+  Then chart:btc journals ChartPointRequested
+
+Scenario: A misfiring behavior is suspended loudly, and a redefine revives it
+  Given a behavior whose action alias no longer matches its stamped shape
+  Then the instance journals BehaviorInvalidated and its interest is withdrawn
+  When DefineBehavior replaces the definition
+  Then the next matching fact is handled
 
 Feature: Inspection
 Scenario: The brain answers what happened
   Given the musk-chart flow has run once
   Then Trace of the post's correlation lists XPosted, ChartPointRequested, ChartPointAdded in order
-  And Recall LastN 1 OfType ChartPointAdded on chart:btc returns the point
+
+Scenario: The brain answers "what did you do on Friday"
+  Given facts from three neurons committed on Friday
+  Then Recall From Friday To Saturday for the owner lists them across neurons in order
+
+Scenario: Discovery finds the doer from the intent
+  Given the Gmail module's contract cards are registered
+  When Discover "summarize my last three emails" runs
+  Then the GmailSearch contract is the first result
 
 Feature: Surface
 Scenario: A UI change is a journal assertion
-  Given chart:btc declares its surface
-  When ChartPointRequested is handled
-  Then the surface synapse for panel chart:btc carries the new point
-  And the scenario asserted it without any renderer running
+  When chart:btc handles ChartPointRequested
+  Then SurfacePresented for panel "chart:btc" carries the new point
+  And no renderer was running
 ```
 
-Remaining scenarios (same features, listed to fix scope): duplicate-delivery ack,
-ambiguous/absent directed handler typed failures, broadcast-with-zero-receivers completes,
-journals survive restart byte-for-byte, registry-equals-journal observation, directed call
-on the shared timeline, architecture guard (every synapse serializable+aliased; no kind
-declares both `IHandle<T>` and `IHandle<T,R>` for one T; behaviors' selection state is
-serializable data).
+Remaining scenarios, named to fix scope: duplicate-delivery ack; ambiguous / absent /
+no-such-instance / busy-timeout typed failures; broadcast with zero receivers completes;
+journals survive restart byte-for-byte; registry-equals-journal observation; directed call
+on the shared timeline; staged-fact invisibility to directed callees; DefineBehavior
+refusals (unknown alias/field/target, ambiguous alias, step consuming a prior broadcast);
+DisableBehavior; architecture guard (every synapse serializable + aliased + unique alias;
+directed kinds declared only via `IHandle<T,R>`; no module symbol references
+`GrainFactory`, `ServiceProvider`, or `INeuron`; behavior definitions are closed data).
 
-Stage C acceptance (fixed now, executed later): the two live flows — Gmail last-3 summary
-via the official Gmail MCP, Salesforce profile via hosted MCP SOQL — driven through
-discover/fire/journal only, plus this Surface feature re-run against the real shell.
+Stage C acceptance (fixed now): Gmail last-3 summary via the official Gmail MCP and
+Salesforce profile via hosted MCP SOQL — driven through discover/fire/journal only
+(NeuronContract schemas are the named precondition), plus this Surface feature re-run
+against the real shell.
 
 ## 6. Stages and demolition
 
-- **A (this pass):** TestBrain harness → features red → §3 ABI + runtime green beside the
-  existing surface (same assemblies, new types; nothing else touched). Kept physics:
-  atomic turn, outbox drain, watermark dedup, feeds, session locus, owner filter.
-- **B:** all 12 modules + shell migrate; the demolition executes as green commits —
-  capability-interface plane, reification filters, second turn machine, poll loops,
-  hand-written manifests, `IEmit`, verb zoo, phantom Neuron surface, Guid-ring dedup,
-  Security project fold, ResourceNames out of Abstractions, streams/pubsub resources
-  (no consumer under law 4).
-- **C:** the two live flows. **D:** creation ladder (interpreter tier + Creator green-gate
-  toward the hot-install chain), RFW surface vocabulary, vector discovery from registry facts.
+- **A (this pass):** TestBrain (three seams, pinned stack) → features red behind
+  `@ignore` → §3 ABI + runtime green beside the existing surface, law by law. Kept
+  physics: atomic turn, outbox drain, watermark dedup, session locus, owner filter.
+  Includes the per-owner day-keyed timeline (same call-filter write path as Trace).
+- **B:** all 12 modules + shell migrate; demolition as green commits — capability
+  interfaces, reification filters, second turn machine, poll loops, hand manifests,
+  `IEmit`, verb zoo, phantom Neuron surface, Guid-ring dedup, ResourceNames out of
+  Abstractions; the Security project **folds into Core** (the payload protector is law-5
+  machinery, not demolition). Two named gates: every re-based synapse kind round-trips a
+  pre-migration journal fixture (or its feed re-encodes under pinned aliases before
+  cutover), and the journal archive tier lands before any feed's window is the only truth.
+  Token streaming survives explicitly as law 5's ephemeral delta projection over the
+  existing SSE surface. Streams/pubsub resources: removed (no consumer under law 4).
+- **C:** the two live flows (A1–A3 above).
+- **D:** creation ladder (Creator green-gate toward the hot-install chain), full RFW
+  surface vocabulary, vector-backed discovery over the same contract cards.
 
 ## 7. Open items — each resolves against the compiler in Stage A
 
-1. `Synapse<TResult>` closed-generic serialization shape (leaf `[GenerateSerializer]` +
-   alias policy) — commit #2, immediately after the harness.
-2. `NeuronContract` / `CausalChain` / `RecallQuery` records — shaped by their first red
-   scenario, not before.
-3. Delivery-context access (`CurrentDelivery` / authorization hook): **not in the ABI** —
-   added only if a Stage B consumer (Salesforce approval evidence, task caller gating)
-   proves undeniable, likely as handler-parameter overload rather than ambient state.
-4. Behavior-definition schema for the interpreter kind (selection + action as data):
-   fixed by the Interconnection feature, kept to a closed, serializable shape.
+1. `Synapse<TResult>` closed-generic serialization (leaf `[GenerateSerializer]` + alias
+   policy) — commit #2, immediately after the harness.
+2. `NeuronContract` / `CausalChain` / `RecallQuery` record shapes — content committed in
+   §3, shapes fixed by their first red scenario.
+3. Delivery-context access (`CurrentDelivery` / authorization hook): not in the ABI;
+   added only if a Stage B consumer proves undeniable, as a handler-parameter overload,
+   never ambient state.
+4. `BehaviorDefinition` validation completeness: refuse a step consuming state reachable
+   only through a prior broadcast (law 6 visibility); invariant-culture ordinal
+   comparisons; result-field references only on `Synapse<TResult>` aliases.
+5. The xunit.v3 pin that Reqnroll's generator provably compiles against under MTP —
+   verified before any feature is written, per §5 commit #1.
