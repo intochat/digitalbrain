@@ -10,13 +10,10 @@ namespace DigitalBrain.Aspire.Hosting;
 
 public sealed class DigitalBrainBuilder
 {
-    private readonly IDistributedApplicationBuilder _builder;
     private readonly List<ModuleId> _modules = [];
     private readonly List<DigitalBrainModuleProjection> _projections = [];
     private readonly List<IResource> _startupDependencies = [];
     private readonly Dictionary<Type, object> _states = [];
-    private IResourceBuilder<ParameterResource>? _stateProtectionKey;
-    private string? _localDevelopmentOAuthCallbackUri;
 
     internal DigitalBrainBuilder(
         IDistributedApplicationBuilder builder,
@@ -30,7 +27,7 @@ public sealed class DigitalBrainBuilder
         ArgumentNullException.ThrowIfNull(streams);
         ArgumentNullException.ThrowIfNull(pubSub);
 
-        _builder = builder;
+        ApplicationBuilder = builder;
         Name = name;
         Orleans = orleans;
         Journal = journal;
@@ -39,6 +36,8 @@ public sealed class DigitalBrainBuilder
     }
 
     public string Name { get; }
+
+    public IDistributedApplicationBuilder ApplicationBuilder { get; }
 
     internal IResourceBuilder<AzureBlobStorageResource> Journal { get; }
 
@@ -54,22 +53,20 @@ public sealed class DigitalBrainBuilder
 
     internal IReadOnlyList<IResource> StartupDependencies => _startupDependencies;
 
-    internal IResourceBuilder<ParameterResource>? StateProtectionKey => _stateProtectionKey;
+    internal IResourceBuilder<ParameterResource>? StateProtectionKey { get; private set; }
 
-    internal string? LocalDevelopmentOAuthCallbackUri => _localDevelopmentOAuthCallbackUri;
+    internal string? LocalDevelopmentOAuthCallbackUri { get; private set; }
 
     internal void UseLocalDevelopmentOAuthCallback(string callbackUri)
     {
-        if (_localDevelopmentOAuthCallbackUri is not null)
+        if (LocalDevelopmentOAuthCallbackUri is not null)
         {
             throw new InvalidOperationException(
                 $"A local-development OAuth callback is already configured on brain '{Name}'. Configure it exactly once.");
         }
 
-        _localDevelopmentOAuthCallbackUri = callbackUri;
+        LocalDevelopmentOAuthCallbackUri = callbackUri;
     }
-
-    public IDistributedApplicationBuilder ApplicationBuilder => _builder;
 
     public TState GetOrAddState<TState>(Func<DigitalBrainBuilder, TState> create, out bool added)
         where TState : class
@@ -113,15 +110,15 @@ public sealed class DigitalBrainBuilder
 
     internal void RequireStateProtection()
     {
-        if (_stateProtectionKey is not null)
+        if (StateProtectionKey is not null)
         {
             return;
         }
 
         var name = $"{Name}-state-protection-key";
-        _stateProtectionKey = (_builder.ExecutionContext.IsRunMode
-                ? _builder.AddParameter(name, new StateProtectionKeyParameterDefault(), secret: true, persist: true)
-                : _builder.AddParameter(name, secret: true))
+        StateProtectionKey = (ApplicationBuilder.ExecutionContext.IsRunMode
+                ? ApplicationBuilder.AddParameter(name, new StateProtectionKeyParameterDefault(), secret: true, persist: true)
+                : ApplicationBuilder.AddParameter(name, secret: true))
             .WithDescription(
                 "Base64-encoded 256-bit key shared by every silo that recovers encrypted durable module state.");
     }

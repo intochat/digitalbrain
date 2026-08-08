@@ -51,14 +51,14 @@ public abstract partial class Neuron
             _outgoing.Checkpoint(),
             [.. _turnRollbacks],
             _handling,
-            _handlingDepth,
+            CurrentDeliveryDepth,
             _turnCheckpoint);
 
         await CommitIncomingCapabilityRequestAsync(delivery).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await NotifyWatchersAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         _handling = delivery;
-        _handlingDepth = DeliveryPolicy.InboundDepth();
+        CurrentDeliveryDepth = DeliveryPolicy.InboundDepth();
         _turnCheckpoint = new(_outbox.Count, InboundCommitted: true, _incoming.Checkpoint(), _outgoing.Checkpoint());
         _turnRollbacks.Clear();
 

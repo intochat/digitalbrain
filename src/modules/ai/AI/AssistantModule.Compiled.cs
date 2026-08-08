@@ -16,8 +16,7 @@ public sealed partial class AssistantModule : ICompiledModule
             Id,
             "1.0.0",
             "AssistantModule module",
-            Array.Empty<string>(),
-            Array.Empty<NeuronCapabilityDescriptor>());
+            []);
 
     CapabilityManifest ICompiledModule.Capabilities => Capabilities;
 

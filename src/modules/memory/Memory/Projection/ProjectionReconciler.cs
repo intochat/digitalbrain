@@ -94,5 +94,5 @@ public sealed class ProjectionReconciler
     }
 
     private static bool IsReserved(VectorMemoryNamespace ns)
-        => ns == VectorMemoryNamespace.Capabilities || ns == VectorMemoryNamespace.Behaviors;
+        => ns == VectorMemoryNamespace.Capabilities;
 }

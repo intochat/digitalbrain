@@ -18,5 +18,4 @@ public sealed record TaskSnapshot(
     [property: Id(8)] Failure? Failure,
     [property: Id(9)] IReadOnlyList<FactReference> Evidence,
     [property: Id(10)] NeuronId? RetryOf,
-    [property: Id(11)] int AttemptCount,
-    [property: Id(12)] BehaviorTaskActivation? Activation) : Synapse;
+    [property: Id(11)] int AttemptCount) : Synapse;

@@ -51,7 +51,6 @@ public sealed class SynapseDelivery
         TimeProvider? timeProvider = null,
         CorrelationId? correlation = null)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sequence);
 
         return new(

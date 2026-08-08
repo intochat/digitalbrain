@@ -44,7 +44,7 @@ public sealed class ActiveModuleContractTypeMap
             }
             catch (ReflectionTypeLoadException exception)
             {
-                types = exception.Types.Where(static type => type is not null).Cast<Type>().ToArray();
+                types = [.. exception.Types.Where(static type => type is not null).Cast<Type>()];
             }
 
             foreach (var type in types.OrderBy(static item => item.FullName, StringComparer.Ordinal))

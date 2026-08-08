@@ -1,5 +1,3 @@
-using DigitalBrain.Abstractions;
-
 namespace DigitalBrain.AI;
 
 public sealed class ValidatedCapability
@@ -13,9 +11,7 @@ public sealed class ValidatedCapability
         string defaultInstanceName,
         string description,
         string jsonSchema,
-        IReadOnlyList<string> examples,
         string? moduleId = null,
-        string? behaviorId = null,
         string? artifactHash = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(kind);
@@ -26,7 +22,6 @@ public sealed class ValidatedCapability
         ArgumentException.ThrowIfNullOrWhiteSpace(defaultInstanceName);
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
         ArgumentException.ThrowIfNullOrWhiteSpace(jsonSchema);
-        ArgumentNullException.ThrowIfNull(examples);
 
         Kind = kind;
         ToolName = toolName;
@@ -36,9 +31,7 @@ public sealed class ValidatedCapability
         DefaultInstanceName = defaultInstanceName;
         Description = description;
         JsonSchema = jsonSchema;
-        Examples = examples;
         ModuleId = moduleId;
-        BehaviorId = behaviorId;
         ArtifactHash = artifactHash;
     }
 
@@ -58,11 +51,7 @@ public sealed class ValidatedCapability
 
     public string JsonSchema { get; }
 
-    public IReadOnlyList<string> Examples { get; }
-
     public string? ModuleId { get; }
-
-    public string? BehaviorId { get; }
 
     public string? ArtifactHash { get; }
 

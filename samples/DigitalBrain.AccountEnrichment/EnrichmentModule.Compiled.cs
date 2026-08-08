@@ -16,7 +16,6 @@ public sealed partial class EnrichmentModule : ICompiledModule
             Id,
             "1.0.0",
             "EnrichmentModule module",
-            Array.Empty<string>(),
             [
                 new NeuronCapabilityDescriptor(
                     "account-enrichment",
@@ -27,40 +26,34 @@ public sealed partial class EnrichmentModule : ICompiledModule
                             "db.account-enrichment.requested",
                             1,
                             "Request account enrichment from an email",
-                            CapabilitySchema.For(typeof(EnrichAccountFromEmail)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(EnrichAccountFromEmail))),
                         new SynapseCapabilityDescriptor(
                             "db.google.gmail-response",
                             1,
                             "Bounded typed Gmail result for an intent request",
-                            CapabilitySchema.For(typeof(DigitalBrain.Google.GmailResponse)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(DigitalBrain.Google.GmailResponse))),
                         new SynapseCapabilityDescriptor(
                             "db.salesforce.mutation-approval",
                             1,
                             "Approved Salesforce mutation",
-                            CapabilitySchema.For(typeof(DigitalBrain.Salesforce.SalesforceMutationApproval)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(DigitalBrain.Salesforce.SalesforceMutationApproval))),
                         new SynapseCapabilityDescriptor(
                             "db.salesforce.response",
                             1,
                             "Bounded typed Salesforce result for an intent or approval request",
-                            CapabilitySchema.For(typeof(DigitalBrain.Salesforce.SalesforceResponse)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(DigitalBrain.Salesforce.SalesforceResponse))),
                     ],
                     [
                         new SynapseCapabilityDescriptor(
                             "db.account-enrichment.completed",
                             1,
                             "Account enrichment completed",
-                            CapabilitySchema.For(typeof(AccountEnriched)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(AccountEnriched))),
                         new SynapseCapabilityDescriptor(
                             "db.account-enrichment.proposed",
                             1,
                             "Account enrichment was proposed",
-                            CapabilitySchema.For(typeof(AccountEnrichmentProposed)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(AccountEnrichmentProposed))),
                     ]),
             ]);
 

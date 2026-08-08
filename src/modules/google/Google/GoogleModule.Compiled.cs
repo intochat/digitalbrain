@@ -16,7 +16,6 @@ public sealed partial class GoogleModule : ICompiledModule
             Id,
             "1.0.0",
             "GoogleModule module",
-            Array.Empty<string>(),
             [
                 new NeuronCapabilityDescriptor(
                     "DigitalBrain.Google.IGmail",
@@ -27,40 +26,34 @@ public sealed partial class GoogleModule : ICompiledModule
                             "db.google.gmail-get-message-request",
                             1,
                             "Read-only fetch of one Gmail message by id; body is bounded by the handler",
-                            CapabilitySchema.For(typeof(GmailGetMessageRequest)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(GmailGetMessageRequest))),
                         new SynapseCapabilityDescriptor(
                             "db.google.gmail-request",
                             1,
                             "Intent-level Gmail request; provider tools stay inside GoogleModule",
-                            CapabilitySchema.For(typeof(GmailRequest)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(GmailRequest))),
                         new SynapseCapabilityDescriptor(
                             "db.google.gmail-search-request",
                             1,
                             "Read-only Gmail search by query syntax; MaxResults is 1..10",
-                            CapabilitySchema.For(typeof(GmailSearchRequest)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(GmailSearchRequest))),
                     ],
                     [
                         new SynapseCapabilityDescriptor(
                             "db.google.gmail-get-message-response",
                             1,
                             "Bounded read-only Gmail message fetch result",
-                            CapabilitySchema.For(typeof(GmailGetMessageResponse)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(GmailGetMessageResponse))),
                         new SynapseCapabilityDescriptor(
                             "db.google.gmail-response",
                             1,
                             "Bounded typed Gmail result for an intent request",
-                            CapabilitySchema.For(typeof(GmailResponse)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(GmailResponse))),
                         new SynapseCapabilityDescriptor(
                             "db.google.gmail-search-response",
                             1,
                             "Bounded read-only Gmail search headers (metadata only, no body)",
-                            CapabilitySchema.For(typeof(GmailSearchResponse)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(GmailSearchResponse))),
                     ]),
             ]);
 

@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Schema;
 using System.Text.Json.Serialization.Metadata;
 
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Core;
 
 public static class CapabilitySchema
 {

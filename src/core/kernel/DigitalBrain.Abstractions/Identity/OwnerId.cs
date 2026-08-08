@@ -1,6 +1,6 @@
-namespace DigitalBrain.Abstractions;
-
 using System.Text.Json.Serialization;
+
+namespace DigitalBrain.Abstractions;
 
 [GenerateSerializer]
 [Alias("db.owner-id")]

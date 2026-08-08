@@ -96,8 +96,7 @@ public sealed class ExactCapabilityValidator
                     }
 
                     if (!ContainsTerm(prompt, synapse.ContractId)
-                        && !ContainsTerm(prompt, synapse.Description)
-                        && !synapse.Examples.Any(example => ContainsTerm(prompt, example)))
+                        && !ContainsTerm(prompt, synapse.Description))
                     {
                         continue;
                     }
@@ -107,52 +106,12 @@ public sealed class ExactCapabilityValidator
             }
         }
 
-        foreach (var behavior in _catalog.Behaviors)
-        {
-            if (selected.Count >= limit)
-            {
-                break;
-            }
-
-            if (!ContainsTerm(prompt, behavior.BehaviorId)
-                && !ContainsTerm(prompt, behavior.DisplayName)
-                && !ContainsTerm(prompt, behavior.Description)
-                && !behavior.ScenarioTitles.Any(title => ContainsTerm(prompt, title)))
-            {
-                continue;
-            }
-
-            var capability = ToBehaviorCapability(behavior);
-            if (seenTools.Add(capability.ToolName))
-            {
-                selected.Add(capability);
-            }
-        }
-
         return selected;
     }
 
     private IEnumerable<ValidatedCapability> Expand(CapabilityCandidate candidate)
     {
         ArgumentNullException.ThrowIfNull(candidate);
-
-        if (string.Equals(candidate.Kind, CapabilityKinds.Behavior, StringComparison.Ordinal)
-            || !string.IsNullOrWhiteSpace(candidate.BehaviorId))
-        {
-            var behaviorId = candidate.BehaviorId ?? candidate.ContractId;
-            if (_catalog.TryGetBehavior(behaviorId, out var behavior) && behavior is not null)
-            {
-                if (!string.IsNullOrWhiteSpace(candidate.ArtifactHash)
-                    && !string.Equals(candidate.ArtifactHash, behavior.ArtifactHash, StringComparison.Ordinal))
-                {
-                    yield break;
-                }
-
-                yield return ToBehaviorCapability(behavior);
-            }
-
-            yield break;
-        }
 
         if (string.Equals(candidate.Kind, CapabilityKinds.Module, StringComparison.Ordinal))
         {
@@ -332,47 +291,9 @@ public sealed class ExactCapabilityValidator
             schemaVersion: synapse.SchemaVersion,
             neuronContractId: neuron.ContractId,
             defaultInstanceName: neuron.DefaultInstanceName,
-            description: BuildDescription(synapse),
+            description: synapse.Description,
             jsonSchema: synapse.JsonSchema,
-            examples: synapse.Examples,
             moduleId: module?.ModuleId.Value);
-    }
-
-    private static ValidatedCapability ToBehaviorCapability(ActiveBehaviorCapability behavior)
-    {
-        var description = behavior.Description;
-        if (behavior.ScenarioTitles.Count > 0)
-        {
-            description = string.Create(
-                CultureInfo.InvariantCulture,
-                $"{behavior.Description} Scenarios: {string.Join("; ", behavior.ScenarioTitles)}.");
-        }
-
-        return new ValidatedCapability(
-            kind: CapabilityKinds.Behavior,
-            toolName: ValidatedCapability.ToolNameFor(behavior.BehaviorId, schemaVersion: 1),
-            contractId: behavior.BehaviorId,
-            schemaVersion: 1,
-            neuronContractId: behavior.NeuronContractId,
-            defaultInstanceName: behavior.InstanceName,
-            description: description,
-            jsonSchema: behavior.JsonSchema,
-            examples: behavior.ScenarioTitles,
-            behaviorId: behavior.BehaviorId,
-            artifactHash: behavior.ArtifactHash);
-    }
-
-    private static string BuildDescription(SynapseCapabilityDescriptor synapse)
-    {
-        if (synapse.Examples.Count == 0)
-        {
-            return synapse.Description;
-        }
-
-        var examples = string.Join("; ", synapse.Examples.Where(static example => !string.IsNullOrWhiteSpace(example)));
-        return string.IsNullOrWhiteSpace(examples)
-            ? synapse.Description
-            : string.Create(CultureInfo.InvariantCulture, $"{synapse.Description} Examples: {examples}.");
     }
 
     private static readonly char[] TermSeparators =
@@ -388,19 +309,24 @@ public sealed class ExactCapabilityValidator
             return false;
         }
 
-        if (prompt.Contains(term, StringComparison.OrdinalIgnoreCase))
+        var haystack = prompt.AsSpan();
+        var needle = term.AsSpan().Trim();
+        if (needle.IsEmpty || haystack.Length < needle.Length)
         {
-            return true;
+            return false;
         }
 
-        foreach (var token in term.Split(TermSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        for (var index = 0; index <= haystack.Length - needle.Length; index++)
         {
-            if (token.Length < 4)
+            if (!haystack.Slice(index, needle.Length).Equals(needle, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            if (prompt.Contains(token, StringComparison.OrdinalIgnoreCase))
+            var beforeOk = index == 0 || TermSeparators.Contains(haystack[index - 1]);
+            var afterIndex = index + needle.Length;
+            var afterOk = afterIndex == haystack.Length || TermSeparators.Contains(haystack[afterIndex]);
+            if (beforeOk && afterOk)
             {
                 return true;
             }

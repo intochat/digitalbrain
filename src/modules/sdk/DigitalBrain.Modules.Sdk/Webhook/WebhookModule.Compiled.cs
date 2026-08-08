@@ -16,8 +16,7 @@ public sealed partial class WebhookModule : ICompiledModule
             Id,
             "1.0.0",
             "WebhookModule module",
-            Array.Empty<string>(),
-            Array.Empty<NeuronCapabilityDescriptor>());
+            []);
 
     CapabilityManifest ICompiledModule.Capabilities => Capabilities;
 

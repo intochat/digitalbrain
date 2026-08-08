@@ -13,7 +13,7 @@ public static class DigitalBrainClientHostingExtensions
 
     public static string OwnerConfigurationKey => DigitalBrainResourceNames.OwnerConfigurationKey;
 
-    public static string ClusteringConnectionName => DigitalBrainResourceNames.Clustering();
+    public static string ClusteringConnectionName => DigitalBrainResourceNames.Clustering;
 
     public static string ResolveOwner(IConfiguration configuration)
     {
@@ -40,7 +40,7 @@ public static class DigitalBrainClientHostingExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
 
         builder.AddServiceDefaults();
-        builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.Clustering());
+        builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.Clustering);
         builder.UseOrleansClient(client =>
         {
             client.Services.AddDigitalBrainClientWireSerializers();

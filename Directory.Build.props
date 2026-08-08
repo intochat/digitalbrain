@@ -5,11 +5,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <AnalysisLevel>10.0-all</AnalysisLevel>
+    <AnalysisLevel>preview-all</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <IsPackable>false</IsPackable>
     <AspireUseCliBundle>false</AspireUseCliBundle>
-    <NoWarn>$(NoWarn);ASPIRE010;CA1812;CA1040;CA1308;CA1030;CA1031;CA1054;CA1056;CA1716;CA2000;CA1001;CA2025;CA1724</NoWarn>
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
   </PropertyGroup>
   <PropertyGroup>
     <VersionPrefix>0.1.0</VersionPrefix>

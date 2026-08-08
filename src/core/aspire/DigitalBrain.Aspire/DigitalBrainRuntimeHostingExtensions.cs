@@ -26,10 +26,10 @@ public static class DigitalBrainRuntimeHostingExtensions
         ArgumentNullException.ThrowIfNull(modules);
 
         builder.AddServiceDefaults();
-        builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.Clustering());
-        builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.Reminders());
-        builder.AddKeyedAzureQueueServiceClient(DigitalBrainResourceNames.Streams());
-        builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.PubSub());
+        builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.Clustering);
+        builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.Reminders);
+        builder.AddKeyedAzureQueueServiceClient(DigitalBrainResourceNames.Streams);
+        builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.PubSub);
         builder.UseOrleans(silo =>
         {
             silo.AddDigitalBrainJournalStorage(builder.Configuration);

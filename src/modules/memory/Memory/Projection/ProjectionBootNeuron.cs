@@ -33,12 +33,5 @@ internal sealed class ProjectionBootNeuron :
             CapabilityProjection.FromCatalog(catalog),
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await EmitAsync(capabilities).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-        var behaviors = await reconciler.ReconcileAsync(
-            Id.Owner.Value,
-            VectorMemoryNamespace.Behaviors,
-            BehaviorProjection.FromActiveCatalog(catalog),
-            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        await EmitAsync(behaviors).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 }

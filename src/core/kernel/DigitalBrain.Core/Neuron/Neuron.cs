@@ -31,8 +31,6 @@ public abstract partial class Neuron :
     private readonly Serializer<OutboxEntry> _entries;
     private readonly Serializer<Synapse> _synapses;
     private SynapseDelivery? _handling;
-    private int _handlingDepth;
-    private CancellationToken _turnCancellation;
     private TurnCheckpoint? _turnCheckpoint;
     private IGrainTimer? _draining;
     private bool _wakeUpRegistered;
@@ -60,8 +58,8 @@ public abstract partial class Neuron :
 
     protected SynapseId? CurrentDeliverySynapseId => _handling?.SynapseId;
 
-    protected int CurrentDeliveryDepth => _handlingDepth;
+    protected int CurrentDeliveryDepth { get; private set; }
 
-    protected CancellationToken TurnCancellationToken => _turnCancellation;
+    protected CancellationToken TurnCancellationToken { get; private set; }
 
 }

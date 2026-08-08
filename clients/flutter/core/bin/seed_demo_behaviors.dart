@@ -1,25 +1,6 @@
-// Seeds 1–2 demo behaviors into a running DigitalBrain Kernel HTTP surface (legacy demo helper)
-// lists real grains (not Flutter fixtures).
-//
-// Why this exists:
-//   GET /behaviors only returns behaviorneuron grains already activated for the
-//   owner. A clean aspire run has zero — the Flutter UI then falls back to local
-//   demo fixtures. This script creates live grains via the same HTTP surface the
-//   shell uses (POST /behaviors/{id}/propose).
-//
-// Prerequisites:
-//   aspire run  (or any host that exposes Kernel HTTP maps)
-//   DIGITALBRAIN_UI_BASE=http://localhost:<ui-port>   # AppHost injects this for
-//                                                     # Flutter; set it for this
-//                                                     # script when running alone
-//
-// Usage (from clients/flutter/core):
-//   dart run bin/seed_demo_behaviors.dart
-//   dart run bin/seed_demo_behaviors.dart --base http://127.0.0.1:5080
-//   dart run bin/seed_demo_behaviors.dart --activate   # tests + approve + activate
-//
-// Default is propose-only (safe). --activate walks the full rail so the library
-// shows Active/Running-ready revisions when BehaviorHost is healthy.
+// DORMANT until a BehaviorHost HTTP surface ships again.
+// Product shell uses Behavior Studio fixtures (behaviorClient: null).
+// This script POSTs /behaviors/* when that API exists again.
 
 import 'dart:convert';
 import 'dart:io';

@@ -5,13 +5,12 @@ namespace DigitalBrain.Core;
 
 public abstract partial class Neuron
 {
-    private CorrelationId? _clientEntryCorrelation;
     private readonly ConcurrentDictionary<Guid, CorrelationId> _clientStreamCorrelations = new();
 
     internal ClientEntryCorrelationScope EnterClientEntryCorrelation(CorrelationId correlation)
     {
-        var previous = _clientEntryCorrelation;
-        _clientEntryCorrelation = correlation;
+        var previous = AmbientClientEntryCorrelation;
+        AmbientClientEntryCorrelation = correlation;
         return new ClientEntryCorrelationScope(this, previous);
     }
 
@@ -24,7 +23,7 @@ public abstract partial class Neuron
     internal void ForgetClientStreamCorrelation(Guid enumerationId)
         => _clientStreamCorrelations.TryRemove(enumerationId, out _);
 
-    internal CorrelationId? AmbientClientEntryCorrelation => _clientEntryCorrelation;
+    internal CorrelationId? AmbientClientEntryCorrelation { get; private set; }
 
     internal readonly struct ClientEntryCorrelationScope : IDisposable
     {
@@ -37,6 +36,6 @@ public abstract partial class Neuron
             _previous = previous;
         }
 
-        public void Dispose() => _neuron._clientEntryCorrelation = _previous;
+        public void Dispose() => _neuron.AmbientClientEntryCorrelation = _previous;
     }
 }

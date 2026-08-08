@@ -16,7 +16,6 @@ public sealed partial class ShellModule : ICompiledModule
             Id,
             "1.0.0",
             "ShellModule module",
-            Array.Empty<string>(),
             [
                 new NeuronCapabilityDescriptor(
                     "flutter.scene",
@@ -27,10 +26,9 @@ public sealed partial class ShellModule : ICompiledModule
                             "flutter.control-activated",
                             1,
                             "A shell control was activated",
-                            CapabilitySchema.For(typeof(ControlActivated)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(ControlActivated))),
                     ],
-                    Array.Empty<SynapseCapabilityDescriptor>()),
+                    []),
                 new NeuronCapabilityDescriptor(
                     "flutter.shell",
                     "Shell neuron",
@@ -40,16 +38,14 @@ public sealed partial class ShellModule : ICompiledModule
                             "flutter.open-scene",
                             1,
                             "Open a scene on the shell",
-                            CapabilitySchema.For(typeof(OpenScene)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(OpenScene))),
                     ],
                     [
                         new SynapseCapabilityDescriptor(
                             "flutter.scene-opened",
                             1,
                             "A shell scene was opened",
-                            CapabilitySchema.For(typeof(SceneOpened)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(SceneOpened))),
                     ]),
             ]);
 

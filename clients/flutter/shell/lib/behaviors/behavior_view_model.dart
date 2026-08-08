@@ -18,7 +18,7 @@ final class BehaviorStudioController extends ChangeNotifier {
       library = BehaviorDemoFixtures.library;
       showingDemoFixtures = true;
       statusMessage =
-          'Demo fixtures — offline. Seed live grains: dart run bin/seed_demo_behaviors.dart';
+          'Preview fixtures — Behavior host not in product composition yet.';
     }
   }
 
@@ -41,7 +41,7 @@ final class BehaviorStudioController extends ChangeNotifier {
       library = BehaviorDemoFixtures.library;
       showingDemoFixtures = true;
       statusMessage =
-          'Demo fixtures — offline. Seed live grains: dart run bin/seed_demo_behaviors.dart';
+          'Preview fixtures — Behavior host not in product composition yet.';
       notifyListeners();
       return;
     }
@@ -55,7 +55,7 @@ final class BehaviorStudioController extends ChangeNotifier {
         library = BehaviorDemoFixtures.library;
         showingDemoFixtures = true;
         statusMessage =
-            'Demo fixtures — edge has no behaviors yet. Seed: dart run bin/seed_demo_behaviors.dart';
+            'Preview fixtures — no live behaviors on edge.';
       } else {
         library = document.items;
         showingDemoFixtures = false;
@@ -64,7 +64,7 @@ final class BehaviorStudioController extends ChangeNotifier {
       library = BehaviorDemoFixtures.library;
       showingDemoFixtures = true;
       statusMessage =
-          'Demo fixtures — HTTP error ($error). Seed live when Kernel HTTP is up.';
+          'Preview fixtures — HTTP error ($error).';
     } finally {
       loading = false;
       notifyListeners();

@@ -47,8 +47,8 @@ public abstract partial class Neuron
         handling?.SetTag(SynapseTelemetry.CorrelationTag, delivery.CorrelationId.ToString());
 
         _handling = delivery;
-        _handlingDepth = DeliveryPolicy.InboundDepth();
-        _turnCancellation = cancellationToken;
+        CurrentDeliveryDepth = DeliveryPolicy.InboundDepth();
+        TurnCancellationToken = cancellationToken;
 
         var previousCheckpoint = _turnCheckpoint;
         _turnCheckpoint = new(_outbox.Count, InboundCommitted: false, _incoming.Checkpoint(), _outgoing.Checkpoint());
@@ -104,8 +104,8 @@ public abstract partial class Neuron
             _evictedWhileHandling.Clear();
             _turnRollbacks.Clear();
             _handling = null;
-            _handlingDepth = 0;
-            _turnCancellation = default;
+            CurrentDeliveryDepth = 0;
+            TurnCancellationToken = default;
             _turnCheckpoint = previousCheckpoint;
         }
 

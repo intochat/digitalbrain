@@ -6,6 +6,5 @@ public sealed record CapabilityCandidate(
     int? SchemaVersion,
     string? ModuleId,
     string? NeuronContractId,
-    string? BehaviorId,
     string? ArtifactHash,
     string SourceKey);

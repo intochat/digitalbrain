@@ -16,7 +16,6 @@ public sealed partial class MemoryModule : ICompiledModule
             Id,
             "1.0.0",
             "MemoryModule module",
-            Array.Empty<string>(),
             [
                 new NeuronCapabilityDescriptor(
                     "DigitalBrain.Memory.IVectorMemory",
@@ -27,40 +26,34 @@ public sealed partial class MemoryModule : ICompiledModule
                             "memory.remove-vector",
                             1,
                             "Remove a vector memory entry by key",
-                            CapabilitySchema.For(typeof(RemoveVectorMemory)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(RemoveVectorMemory))),
                         new SynapseCapabilityDescriptor(
                             "memory.search-vector",
                             1,
                             "Search vector memory by semantic similarity",
-                            CapabilitySchema.For(typeof(SearchVectorMemory)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(SearchVectorMemory))),
                         new SynapseCapabilityDescriptor(
                             "memory.store-vector",
                             1,
                             "Store a text entry in vector memory",
-                            CapabilitySchema.For(typeof(StoreVectorMemory)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(StoreVectorMemory))),
                     ],
                     [
                         new SynapseCapabilityDescriptor(
                             "memory.vector-matches",
                             1,
                             "Ordered vector memory search results",
-                            CapabilitySchema.For(typeof(VectorMemoryMatches)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(VectorMemoryMatches))),
                         new SynapseCapabilityDescriptor(
                             "memory.vector-removed",
                             1,
                             "Result of a vector memory remove request",
-                            CapabilitySchema.For(typeof(VectorMemoryRemoved)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(VectorMemoryRemoved))),
                         new SynapseCapabilityDescriptor(
                             "memory.vector-stored",
                             1,
                             "Result of a vector memory store request",
-                            CapabilitySchema.For(typeof(VectorMemoryStored)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(VectorMemoryStored))),
                     ]),
             ]);
 

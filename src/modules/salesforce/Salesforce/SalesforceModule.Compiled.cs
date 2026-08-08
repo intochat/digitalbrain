@@ -16,7 +16,6 @@ public sealed partial class SalesforceModule : ICompiledModule
             Id,
             "1.0.0",
             "SalesforceModule module",
-            Array.Empty<string>(),
             [
                 new NeuronCapabilityDescriptor(
                     "DigitalBrain.Salesforce.ISalesforce",
@@ -27,22 +26,19 @@ public sealed partial class SalesforceModule : ICompiledModule
                             "db.salesforce.approve-mutation",
                             1,
                             "Session-owned request to execute a previously proposed Salesforce mutation",
-                            CapabilitySchema.For(typeof(ApproveSalesforceMutation)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(ApproveSalesforceMutation))),
                         new SynapseCapabilityDescriptor(
                             "db.salesforce.request",
                             1,
                             "Intent-level Salesforce request; provider tools stay inside SalesforceModule",
-                            CapabilitySchema.For(typeof(SalesforceRequest)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(SalesforceRequest))),
                     ],
                     [
                         new SynapseCapabilityDescriptor(
                             "db.salesforce.response",
                             1,
                             "Bounded typed Salesforce result for an intent or approval request",
-                            CapabilitySchema.For(typeof(SalesforceResponse)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(SalesforceResponse))),
                     ]),
             ]);
 

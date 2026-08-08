@@ -21,8 +21,8 @@ internal static class SynapseDispatch
             .Where(candidate => candidate.IsGenericType && candidate.GetGenericTypeDefinition() == typeof(IHandle<>)))
         {
             var synapseType = handled.GetGenericArguments()[0];
-            var handleMethod = handled.GetMethod(nameof(IHandle<Synapse>.HandleAsync))
-                ?? throw new MissingMethodException(handled.FullName, nameof(IHandle<Synapse>.HandleAsync));
+            var handleMethod = handled.GetMethod(nameof(IHandle<>.HandleAsync))
+                ?? throw new MissingMethodException(handled.FullName, nameof(IHandle<>.HandleAsync));
 
             handlers[synapseType] = (neuron, synapse, cancellationToken) => (Task)handleMethod.Invoke(
                 neuron,

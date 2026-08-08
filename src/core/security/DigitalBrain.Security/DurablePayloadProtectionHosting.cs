@@ -92,9 +92,9 @@ file sealed class DurablePayloadProtector : IDurablePayloadProtector
         {
             using var encryption = new AesGcm(derivedKey, TagLength);
             encryption.Decrypt(
-                protectedPayload.Slice(1, NonceLength),
-                protectedPayload.Slice(HeaderLength),
-                protectedPayload.Slice(1 + NonceLength, TagLength),
+                protectedPayload[1..(1 + NonceLength)],
+                protectedPayload[HeaderLength..],
+                protectedPayload[(1 + NonceLength)..(1 + NonceLength + TagLength)],
                 plaintext,
                 purposeBytes);
             return plaintext;

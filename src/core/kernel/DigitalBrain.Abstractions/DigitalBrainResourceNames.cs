@@ -10,46 +10,13 @@ public static class DigitalBrainResourceNames
     public const string OwnerConfigurationKey = "DigitalBrain:Owner";
     public const string StateProtectionKeyConfigurationKey = "DigitalBrain:Security:StateProtectionKey";
 
-    public static string Storage(string brainName = DefaultBrainName)
-    {
-        RequireBrainName(brainName);
-        return "storage";
-    }
-
-    public static string Clustering(string brainName = DefaultBrainName)
-    {
-        RequireBrainName(brainName);
-        return "clustering";
-    }
-
-    public static string Reminders(string brainName = DefaultBrainName)
-    {
-        RequireBrainName(brainName);
-        return "reminders";
-    }
-
-    public static string JournalResource(string brainName = DefaultBrainName)
-    {
-        RequireBrainName(brainName);
-        return "journal";
-    }
-
-    public static string Streams(string brainName = DefaultBrainName)
-    {
-        RequireBrainName(brainName);
-        return "streams";
-    }
-
-    public static string PubSub(string brainName = DefaultBrainName)
-    {
-        RequireBrainName(brainName);
-        return "pubsub";
-    }
+    public const string Storage = "storage";
+    public const string Clustering = "clustering";
+    public const string Reminders = "reminders";
+    public const string JournalResource = "journal";
+    public const string Streams = "streams";
+    public const string PubSub = "pubsub";
 
     public const string StreamProviderName = "DigitalBrain";
-
     public const string PubSubStoreName = "PubSubStore";
-
-    private static void RequireBrainName(string brainName)
-        => ArgumentException.ThrowIfNullOrWhiteSpace(brainName);
 }

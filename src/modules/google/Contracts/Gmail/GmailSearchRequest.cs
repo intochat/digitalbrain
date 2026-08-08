@@ -50,7 +50,7 @@ public sealed record GmailSearchRequest : RequestSynapse<GmailSearchResponse>
     }
 
     [JsonConstructor]
-    private GmailSearchRequest(string query, CommandId commandId, int maxResults = DefaultMaxResults)
+    public GmailSearchRequest(string query, CommandId commandId, int maxResults = DefaultMaxResults)
         : this(query, maxResults, commandId)
     {
     }

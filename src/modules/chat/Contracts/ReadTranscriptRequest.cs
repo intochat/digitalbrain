@@ -61,7 +61,7 @@ public sealed record ReadTranscriptRequest : RequestSynapse<TranscriptRead>
     }
 
     [JsonConstructor]
-    private ReadTranscriptRequest(string chatName, CommandId commandId, int? maxTurns = null)
+    public ReadTranscriptRequest(string chatName, CommandId commandId, int? maxTurns = null)
         : this(chatName, maxTurns, commandId)
     {
     }

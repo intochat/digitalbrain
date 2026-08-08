@@ -18,8 +18,7 @@ internal sealed partial class TaskNeuron
                 if (!Equals(existing.Goal, command.Goal)
                     || existing.Worker != command.Worker
                     || existing.Policy != command.Policy
-                    || existing.RetryOf != command.RetryOf
-                    || existing.Activation != command.Activation)
+                    || existing.RetryOf != command.RetryOf)
                 {
                     throw new InvalidOperationException(
                         $"Task '{Id}' received CommandId '{command.CommandId}' with a different Start payload.");
@@ -57,7 +56,6 @@ internal sealed partial class TaskNeuron
             attemptCount: 1,
             receipts: new Dictionary<CommandId, TaskSnapshot>(),
             pendingDispatch: null,
-            activation: command.Activation,
             operations: new Dictionary<string, TaskOperationSnapshot>());
         data.PendingDispatch = new AcceptWorkerDispatch(Request(data));
         var snapshot = Snapshot(data);

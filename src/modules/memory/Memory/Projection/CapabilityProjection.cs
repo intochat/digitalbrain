@@ -99,15 +99,6 @@ public static class CapabilityProjection
             .Append(synapse.SchemaVersion.ToString(CultureInfo.InvariantCulture))
             .Append(' ')
             .Append(synapse.Description);
-        foreach (var example in synapse.Examples)
-        {
-            if (string.IsNullOrWhiteSpace(example))
-            {
-                continue;
-            }
-
-            text.Append(' ').Append(example);
-        }
 
         return new VectorProjectionEntry(key, text.ToString(), metadata);
     }

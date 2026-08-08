@@ -118,7 +118,7 @@ public sealed class VectorMemoryNeuron :
     }
 
     private static bool IsReserved(VectorMemoryNamespace ns) =>
-        ns == VectorMemoryNamespace.Capabilities || ns == VectorMemoryNamespace.Behaviors;
+        ns == VectorMemoryNamespace.Capabilities;
 
     private static void ValidateStore(StoreVectorMemory request)
     {

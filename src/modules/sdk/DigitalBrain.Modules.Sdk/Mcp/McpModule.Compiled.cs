@@ -16,32 +16,28 @@ public sealed partial class McpModule : ICompiledModule
             Id,
             "1.0.0",
             "McpModule module",
-            Array.Empty<string>(),
             [
                 new NeuronCapabilityDescriptor(
                     "mcp.authorization",
                     "MCP OAuth authorization neuron",
                     "default",
-                    Array.Empty<SynapseCapabilityDescriptor>(),
+                    [],
                     [
                         new SynapseCapabilityDescriptor(
                             "db.mcp.authorization-completed",
                             1,
                             "MCP authorization completed",
-                            CapabilitySchema.For(typeof(AuthorizationCompleted)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(AuthorizationCompleted))),
                         new SynapseCapabilityDescriptor(
                             "db.mcp.authorization-denied",
                             1,
                             "MCP authorization was denied",
-                            CapabilitySchema.For(typeof(AuthorizationDenied)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(AuthorizationDenied))),
                         new SynapseCapabilityDescriptor(
                             "db.mcp.authorization-required",
                             1,
                             "MCP server requires interactive authorization",
-                            CapabilitySchema.For(typeof(AuthorizationRequired)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(AuthorizationRequired))),
                     ]),
             ]);
 

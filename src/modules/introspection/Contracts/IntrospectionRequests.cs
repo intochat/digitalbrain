@@ -51,7 +51,7 @@ public sealed record TallyJournalRequest : RequestSynapse<JournalTallied>
     }
 
     [JsonConstructor]
-    private TallyJournalRequest(
+    public TallyJournalRequest(
         string neuronType,
         string neuronName,
         CommandId commandId,
@@ -126,7 +126,7 @@ public sealed record ReadJournalRequest : RequestSynapse<JournalPageRead>
     }
 
     [JsonConstructor]
-    private ReadJournalRequest(
+    public ReadJournalRequest(
         string neuronType,
         string neuronName,
         CommandId commandId,

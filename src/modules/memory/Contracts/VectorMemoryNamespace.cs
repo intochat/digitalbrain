@@ -6,8 +6,6 @@ public readonly struct VectorMemoryNamespace : IEquatable<VectorMemoryNamespace>
 {
     public static VectorMemoryNamespace Capabilities { get; } = new("digitalbrain.capabilities");
 
-    public static VectorMemoryNamespace Behaviors { get; } = new("digitalbrain.behaviors");
-
     public VectorMemoryNamespace(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);

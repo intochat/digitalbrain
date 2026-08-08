@@ -81,7 +81,7 @@ public abstract partial class Neuron
         _turnRollbacks.Clear();
         _turnRollbacks.AddRange(turn.PreviousRollbacks);
         _handling = turn.PreviousHandling;
-        _handlingDepth = turn.PreviousDepth;
+        CurrentDeliveryDepth = turn.PreviousDepth;
         _turnCheckpoint = turn.PreviousCheckpoint;
     }
 

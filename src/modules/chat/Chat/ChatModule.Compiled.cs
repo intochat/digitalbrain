@@ -16,7 +16,6 @@ public sealed partial class ChatModule : ICompiledModule
             Id,
             "1.0.0",
             "ChatModule module",
-            Array.Empty<string>(),
             [
                 new NeuronCapabilityDescriptor(
                     "chat",
@@ -27,28 +26,24 @@ public sealed partial class ChatModule : ICompiledModule
                             "chat.read-transcript-request",
                             1,
                             "Returns the durable transcript kept for one named conversation, optionally narrowed to recent entries",
-                            CapabilitySchema.For(typeof(ReadTranscriptRequest)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(ReadTranscriptRequest))),
                     ],
                     [
                         new SynapseCapabilityDescriptor(
                             "chat.assistant-responded",
                             1,
                             "Assistant response committed into a chat transcript",
-                            CapabilitySchema.For(typeof(AssistantResponded)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(AssistantResponded))),
                         new SynapseCapabilityDescriptor(
                             "chat.transcript-read",
                             1,
                             "A conversation's durable transcript, answering a chat.read-transcript-request",
-                            CapabilitySchema.For(typeof(TranscriptRead)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(TranscriptRead))),
                         new SynapseCapabilityDescriptor(
                             "chat.user-messaged",
                             1,
                             "User message accepted into a chat transcript",
-                            CapabilitySchema.For(typeof(UserMessaged)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(UserMessaged))),
                     ]),
             ]);
 

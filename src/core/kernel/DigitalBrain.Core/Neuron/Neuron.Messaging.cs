@@ -21,7 +21,7 @@ public abstract partial class Neuron
 
     protected CorrelationId ResolveEmissionCorrelation()
         => _handling?.CorrelationId
-            ?? _clientEntryCorrelation
+            ?? AmbientClientEntryCorrelation
             ?? CorrelationId.New();
 
     protected async Task EmitAsync(Synapse synapse, CorrelationId correlation)
@@ -65,15 +65,15 @@ public abstract partial class Neuron
 
         ArgumentOutOfRangeException.ThrowIfLessThan(deliveryDepth, 1);
 
-        var restored = _handlingDepth;
-        _handlingDepth = deliveryDepth - 1;
+        var restored = CurrentDeliveryDepth;
+        CurrentDeliveryDepth = deliveryDepth - 1;
         try
         {
             await EmitAsync(synapse, correlation).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         finally
         {
-            _handlingDepth = restored;
+            CurrentDeliveryDepth = restored;
         }
     }
 
@@ -101,7 +101,7 @@ public abstract partial class Neuron
 
         if (receivers.Length > 0)
         {
-            _outbox.Add(_entries.SerializeToArray(new OutboxEntry(delivery, receivers, _handlingDepth + 1, Attempts: 0)));
+            _outbox.Add(_entries.SerializeToArray(new OutboxEntry(delivery, receivers, CurrentDeliveryDepth + 1, Attempts: 0)));
         }
 
         if (_handling is null)

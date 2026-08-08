@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Core;
@@ -8,7 +7,6 @@ public sealed class ActiveCapabilityCatalog
     private readonly IReadOnlyDictionary<string, CapabilityManifest> _modules;
     private readonly IReadOnlyDictionary<string, NeuronCapabilityDescriptor> _neurons;
     private readonly IReadOnlyDictionary<(string ContractId, int SchemaVersion), SynapseCapabilityDescriptor> _synapses;
-    private readonly ConcurrentDictionary<string, ActiveBehaviorCapability> _behaviors = new(StringComparer.Ordinal);
 
     private ActiveCapabilityCatalog(
         IReadOnlyList<CapabilityManifest> modules,
@@ -24,13 +22,8 @@ public sealed class ActiveCapabilityCatalog
 
     public IReadOnlyList<CapabilityManifest> Modules { get; }
 
-    public IReadOnlyList<ActiveBehaviorCapability> Behaviors
-        => _behaviors.Values.OrderBy(static item => item.BehaviorId, StringComparer.Ordinal).ToArray();
-
     public static ActiveCapabilityCatalog Create(IEnumerable<ICompiledModule> selectedModules)
     {
-        ArgumentNullException.ThrowIfNull(selectedModules);
-
         var manifests = selectedModules
             .Select(module => module.Capabilities)
             .OrderBy(manifest => manifest.ModuleId.Value, StringComparer.Ordinal)
@@ -81,24 +74,6 @@ public sealed class ActiveCapabilityCatalog
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(contractId);
         return _synapses.TryGetValue((contractId, schemaVersion), out synapse);
-    }
-
-    public bool TryGetBehavior(string behaviorId, out ActiveBehaviorCapability? behavior)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(behaviorId);
-        return _behaviors.TryGetValue(behaviorId, out behavior);
-    }
-
-    public void PublishBehavior(ActiveBehaviorCapability behavior)
-    {
-        ArgumentNullException.ThrowIfNull(behavior);
-        _behaviors[behavior.BehaviorId] = behavior;
-    }
-
-    public bool UnpublishBehavior(string behaviorId)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(behaviorId);
-        return _behaviors.TryRemove(behaviorId, out _);
     }
 
     private static void IndexSynapses(

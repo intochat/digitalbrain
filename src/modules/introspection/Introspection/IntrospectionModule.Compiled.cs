@@ -16,7 +16,6 @@ public sealed partial class IntrospectionModule : ICompiledModule
             Id,
             "1.0.0",
             "IntrospectionModule module",
-            Array.Empty<string>(),
             [
                 new NeuronCapabilityDescriptor(
                     "introspection",
@@ -27,40 +26,34 @@ public sealed partial class IntrospectionModule : ICompiledModule
                             "introspection.read-journal-request",
                             1,
                             "Returns journaled causal facts for one neuron of the owning identity, bounded by cursor and limit; entries record synapse kinds and lineage, excluding argument and payload values",
-                            CapabilitySchema.For(typeof(ReadJournalRequest)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(ReadJournalRequest))),
                         new SynapseCapabilityDescriptor(
                             "introspection.read-topology-request",
                             1,
                             "Reports the runtime topology of the owning identity: modules the deployment composed and neurons currently activated",
-                            CapabilitySchema.For(typeof(ReadTopologyRequest)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(ReadTopologyRequest))),
                         new SynapseCapabilityDescriptor(
                             "introspection.tally-journal-request",
                             1,
                             "Counts journaled synapses by synapse kinds for one neuron of the owning identity, answering how often a conversation recorded owner messages",
-                            CapabilitySchema.For(typeof(TallyJournalRequest)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(TallyJournalRequest))),
                     ],
                     [
                         new SynapseCapabilityDescriptor(
                             "introspection.journal-page-read",
                             1,
                             "A page of causal facts from a neuron journal, or why the read was refused",
-                            CapabilitySchema.For(typeof(JournalPageRead)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(JournalPageRead))),
                         new SynapseCapabilityDescriptor(
                             "introspection.journal-tallied",
                             1,
                             "How many synapses of each type a neuron journal has recorded, or why the tally was refused",
-                            CapabilitySchema.For(typeof(JournalTallied)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(JournalTallied))),
                         new SynapseCapabilityDescriptor(
                             "introspection.topology-read",
                             1,
                             "The modules this deployment composed and the owner's currently activated neurons",
-                            CapabilitySchema.For(typeof(TopologyRead)),
-                            Array.Empty<string>()),
+                            CapabilitySchema.For(typeof(TopologyRead))),
                     ]),
             ]);
 

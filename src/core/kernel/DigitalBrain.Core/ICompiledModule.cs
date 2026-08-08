@@ -10,12 +10,7 @@ public interface ICompiledModule
     ModuleId Id { get; }
 
     CapabilityManifest Capabilities
-        => new(
-            Id,
-            "0.0.0",
-            "unspecified",
-            Array.Empty<string>(),
-            Array.Empty<NeuronCapabilityDescriptor>());
+        => new(Id, "0.0.0", "unspecified", []);
 
     void PrepareSerialization(IServiceCollection services);
 

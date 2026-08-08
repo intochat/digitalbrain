@@ -47,14 +47,6 @@ public sealed class VectorMemoryCapabilitySearch : ICapabilityCandidateSearch
                     perNamespace,
                     bound.Token)
                 .ConfigureAwait(false);
-            await AppendAsync(
-                    candidates,
-                    memory,
-                    VectorMemoryNamespace.Behaviors,
-                    prompt,
-                    perNamespace,
-                    bound.Token)
-                .ConfigureAwait(false);
 
             return candidates;
         }
@@ -89,7 +81,6 @@ public sealed class VectorMemoryCapabilitySearch : ICapabilityCandidateSearch
         match.Metadata.TryGetValue(VectorProjectionMetadataKeys.ContractId, out var contractId);
         match.Metadata.TryGetValue(VectorProjectionMetadataKeys.ModuleId, out var moduleId);
         match.Metadata.TryGetValue(VectorProjectionMetadataKeys.NeuronContractId, out var neuronContractId);
-        match.Metadata.TryGetValue(VectorProjectionMetadataKeys.BehaviorId, out var behaviorId);
         match.Metadata.TryGetValue(VectorProjectionMetadataKeys.ArtifactHash, out var artifactHash);
         match.Metadata.TryGetValue(VectorProjectionMetadataKeys.SchemaVersion, out var schemaText);
 
@@ -107,7 +98,6 @@ public sealed class VectorMemoryCapabilitySearch : ICapabilityCandidateSearch
             SchemaVersion: schemaVersion,
             ModuleId: moduleId,
             NeuronContractId: neuronContractId,
-            BehaviorId: behaviorId,
             ArtifactHash: artifactHash,
             SourceKey: match.Key);
     }

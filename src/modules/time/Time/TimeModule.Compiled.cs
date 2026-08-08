@@ -16,8 +16,7 @@ public sealed partial class TimeModule : ICompiledModule
             Id,
             "1.0.0",
             "TimeModule module",
-            Array.Empty<string>(),
-            Array.Empty<NeuronCapabilityDescriptor>());
+            []);
 
     CapabilityManifest ICompiledModule.Capabilities => Capabilities;
 

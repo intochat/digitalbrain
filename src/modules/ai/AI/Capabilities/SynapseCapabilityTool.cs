@@ -27,12 +27,6 @@ public static class SynapseCapabilityTool
         ArgumentNullException.ThrowIfNull(grains);
         ArgumentNullException.ThrowIfNull(typeMap);
 
-        if (string.Equals(capability.Kind, CapabilityKinds.Behavior, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                "Authored behavior capabilities are not loaded in this product composition.");
-        }
-
         if (!typeMap.TryGetSynapseType(capability.ContractId, capability.SchemaVersion, out var requestType)
             || requestType is null)
         {

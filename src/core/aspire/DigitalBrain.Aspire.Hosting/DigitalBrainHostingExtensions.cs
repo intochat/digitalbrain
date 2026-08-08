@@ -19,13 +19,13 @@ public static class DigitalBrainHostingExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         var storage = builder
-            .AddAzureStorage(DigitalBrainResourceNames.Storage(name))
+            .AddAzureStorage(DigitalBrainResourceNames.Storage)
             .RunAsEmulator();
-        var clustering = storage.AddTables(DigitalBrainResourceNames.Clustering(name));
-        var reminders = storage.AddTables(DigitalBrainResourceNames.Reminders(name));
-        var journal = storage.AddBlobs(DigitalBrainResourceNames.JournalResource(name));
-        var streams = storage.AddQueues(DigitalBrainResourceNames.Streams(name));
-        var pubSub = storage.AddTables(DigitalBrainResourceNames.PubSub(name));
+        var clustering = storage.AddTables(DigitalBrainResourceNames.Clustering);
+        var reminders = storage.AddTables(DigitalBrainResourceNames.Reminders);
+        var journal = storage.AddBlobs(DigitalBrainResourceNames.JournalResource);
+        var streams = storage.AddQueues(DigitalBrainResourceNames.Streams);
+        var pubSub = storage.AddTables(DigitalBrainResourceNames.PubSub);
         var orleans = builder
             .AddOrleans(name)
             .WithClustering(clustering)
