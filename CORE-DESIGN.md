@@ -87,6 +87,38 @@ commit and drain hears even the in-flight fact. The refused alternative — an i
 kind declaring a catch-all `IHandle<Synapse>` — would multiply the durable outbox by the
 behavior count to deliver facts selection would discard.
 
+### The code tier — how scripting introduces new neurons
+
+When intent needs **new vocabulary or logic** — not composition of existing contracts —
+the trust ladder climbs three rungs. Every rung is a journaled flow, and the same
+TestBrain harness that proves Stage A is the activation gate for generated code — one
+gate, law 10.
+
+1. **Compose** (instant, no code): `BehaviorDefinition` above. Always tried first.
+2. **Interpret** (seconds, the running silo): a scripted body executes inside the one
+   compiled interpreter machinery, addressable under a new neuron name via runtime
+   manifest decoration — proven live in the lineage (new names addressable with zero
+   restart; staged → promoted → retired lifecycle with rollback; loop-guard + watchdog
+   around untrusted code). New vocabulary at this rung rides the compiled **carrier
+   record** (contract id + schema-stamped payload) — a visible seam, priced consciously:
+   no `IHandle<HotType>`, schema versioning lives in data.
+3. **Compile** (minutes, real types): the Creator authors typed C# — records + neuron +
+   **its own scenario** — compiled *with the Orleans source generator* so the new records
+   carry their own serializers; the pack loads into a collectible ALC inside a
+   **disposable per-candidate quarantine brain** (TestBrain in production clothes — v3's
+   proven gate pattern), runs its scenario red → green, and green journals the approval
+   fact. Admission into the product is then one of exactly two doc-honest moves: **a new
+   silo joins carrying the pack** (heterogeneous silos — the brain grows new tissue as
+   new silos, an orchestration Aspire already owns) or **restart-and-load** (the floor —
+   durable journals make a restart a pause, never a loss). Orleans has no documented way
+   to grow a *running* silo's compiled type set; this spec does not pretend otherwise.
+
+Evidence grades, so nobody inherits theater: manifest-decoration admission and the
+Creator lifecycle are PROVEN-LIVE (single silo); the quarantine-gate mechanics are
+PROVEN-LIVE except two links — running the Orleans generator over runtime-compiled code,
+and asserting the gate ALC actually collects after disposal — open items 6 and 7, each a
+one-day spike with a crisp pass/fail. Until both pass, rung 3 ships restart-tier only.
+
 ## 3. The ABI
 
 ```csharp
@@ -362,8 +394,8 @@ against the real shell.
   Token streaming survives explicitly as law 5's ephemeral delta projection over the
   existing SSE surface. Streams/pubsub resources: removed (no consumer under law 4).
 - **C:** the two live flows (A1–A3 above).
-- **D:** creation ladder (Creator green-gate toward the hot-install chain), full RFW
-  surface vocabulary, vector-backed discovery over the same contract cards.
+- **D:** the code tier's rungs 2–3 (§2), gated on open items 6–7; full RFW surface
+  vocabulary; vector-backed discovery over the same contract cards.
 
 ## 7. Open items — each resolves against the compiler in Stage A
 
@@ -379,3 +411,10 @@ against the real shell.
    comparisons; result-field references only on `Synapse<TResult>` aliases.
 5. The xunit.v3 pin that Reqnroll's generator provably compiles against under MTP —
    verified before any feature is written, per §5 commit #1.
+6. **Generator-in-pack spike** (gates code-tier rung 3): drive the Orleans source
+   generator inside a Roslyn compilation of a `[GenerateSerializer]` record, ALC-load the
+   output, fire the record across a 2-silo `InProcessTestCluster`, assert the committed
+   journal round-trip.
+7. **Unload spike** (gates rung 3 in-process): after quarantine-cluster disposal, a
+   WeakReference/GC loop proves the gate ALC collects; failure means an Orleans-held root
+   to diagnose before rung 3 ever runs in-process — a leak here is permanent by design.
