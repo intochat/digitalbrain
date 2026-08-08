@@ -51,12 +51,12 @@ public static class AIHostingExtensions
     {
         private const string OllamaImageTag = "latest";
 
-        private static readonly Dictionary<Type, (string ResourceSuffix, string Tag, string Feature)> OllamaModelCatalog = new()
+        private static readonly Dictionary<Type, (string ResourceName, string Tag, string Feature)> OllamaModelCatalog = new()
         {
-            [typeof(Llama32)] = ("llama32", "llama3.2", Llama32Feature),
-            [typeof(Gemma4)] = ("gemma4", "gemma4:12b", Gemma4Feature),
-            [typeof(Qwen35)] = ("qwen35", "qwen3.5:9b", Qwen35Feature),
-            [typeof(Granite41)] = ("granite41", "granite4.1:8b", Granite41Feature),
+            [typeof(Llama32)] = ("llama32-3b", "llama3.2", Llama32Feature),
+            [typeof(Gemma4)] = ("gemma4-12b", "gemma4:12b", Gemma4Feature),
+            [typeof(Qwen35)] = ("qwen35-9b", "qwen3.5:9b", Qwen35Feature),
+            [typeof(Granite41)] = ("granite41-8b", "granite4.1:8b", Granite41Feature),
         };
 
         private readonly HashSet<Type> _models = [];
@@ -81,7 +81,7 @@ public static class AIHostingExtensions
 
             if (OllamaModelCatalog.TryGetValue(model, out var ollama))
             {
-                AddOllamaModel(model, ollama.ResourceSuffix, ollama.Tag);
+                AddOllamaModel(model, ollama.ResourceName, ollama.Tag);
                 return ollama.Feature;
             }
 
@@ -120,33 +120,35 @@ public static class AIHostingExtensions
             }
         }
 
-        private void AddOllamaModel(Type model, string resourceSuffix, string tag)
+        private void AddOllamaModel(Type model, string resourceName, string tag)
         {
             var builder = brain.ApplicationBuilder;
             _ollama ??= builder
-                .AddOllama($"{brain.Name}-ai-ollama")
+                .AddOllama("ollama")
                 .WithImageTag(OllamaImageTag)
                 .WithGPUSupport()
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent)
                 .WithEnvironment("OLLAMA_KEEP_ALIVE", "-1")
-                .WithOpenWebUI(uiContainer => uiContainer.WithLifetime(ContainerLifetime.Persistent));
+                .WithOpenWebUI(
+                    uiContainer => uiContainer.WithLifetime(ContainerLifetime.Persistent),
+                    containerName: "openwebui");
 
-            _ollamaModels[model] = _ollama.AddModel($"{brain.Name}-ai-{resourceSuffix}", tag);
+            _ollamaModels[model] = _ollama.AddModel(resourceName, tag);
         }
 
         private void AddGpt56()
         {
             var builder = brain.ApplicationBuilder;
             _openAIKey ??= builder
-                .AddParameter($"{brain.Name}-ai-openai-api-key", secret: true)
+                .AddParameter("openai-api-key", secret: true)
                 .WithDescription(
                     "Create or manage an API key at [OpenAI Platform](https://platform.openai.com/api-keys).",
                     enableMarkdown: true);
             _openAI ??= builder
-                .AddOpenAI($"{brain.Name}-ai-openai")
+                .AddOpenAI("openai")
                 .WithApiKey(_openAIKey);
-            _gpt56 = _openAI.AddModel($"{brain.Name}-ai-gpt56", "gpt-5.6");
+            _gpt56 = _openAI.AddModel("gpt56", "gpt-5.6");
         }
     }
 }

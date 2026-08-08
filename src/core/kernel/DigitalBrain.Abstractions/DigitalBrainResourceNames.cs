@@ -11,20 +11,29 @@ public static class DigitalBrainResourceNames
     public const string StateProtectionKeyConfigurationKey = "DigitalBrain:Security:StateProtectionKey";
 
     public static string Storage(string brainName = DefaultBrainName)
-        => $"{RequireBrainName(brainName)}-storage";
+    {
+        RequireBrainName(brainName);
+        return "storage";
+    }
 
     public static string Clustering(string brainName = DefaultBrainName)
-        => $"{RequireBrainName(brainName)}-clustering";
+    {
+        RequireBrainName(brainName);
+        return "clustering";
+    }
 
     public static string Reminders(string brainName = DefaultBrainName)
-        => $"{RequireBrainName(brainName)}-reminders";
+    {
+        RequireBrainName(brainName);
+        return "reminders";
+    }
 
     public static string JournalResource(string brainName = DefaultBrainName)
-        => $"{RequireBrainName(brainName)}-journal";
-
-    private static string RequireBrainName(string brainName)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(brainName);
-        return brainName;
+        RequireBrainName(brainName);
+        return "journal";
     }
+
+    private static void RequireBrainName(string brainName)
+        => ArgumentException.ThrowIfNullOrWhiteSpace(brainName);
 }

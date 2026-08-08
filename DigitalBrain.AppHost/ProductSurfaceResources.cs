@@ -4,7 +4,7 @@ internal static class ProductSurfaceResources
 {
     public const string Brain = "brain";
 
-    public const string Silo = "silo";
+    public const string Kernel = "kernel";
 
     public const string Scripting = "scripting";
 

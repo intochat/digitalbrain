@@ -42,7 +42,7 @@ brain.AddModule<TasksModule>();
 brain.AddModule<TimeModule>();
 brain.AddModule<IntrospectionModule>();
 
-var silo = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Silo)
+var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Kernel)
     .WithReference(brain)
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
@@ -62,7 +62,7 @@ var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.
         port: ProductSurfaceResources.McpHttpPort,
         name: ProductSurfaceResources.McpHttpEndpointName)
     .WithHttpHealthCheck("/health", endpointName: ProductSurfaceResources.McpHttpEndpointName)
-    .WaitFor(silo);
+    .WaitFor(kernel);
 
 #pragma warning disable ASPIREMCP001
 mcp.WithMcpServer(
@@ -75,6 +75,6 @@ builder.AddProject<Projects.DigitalBrain_Scripting>(ProductSurfaceResources.Scri
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
         ShellHostingExtensions.DefaultOwner)
-    .WaitFor(silo);
+    .WaitFor(kernel);
 
 builder.Build().Run();

@@ -6,7 +6,7 @@ namespace DigitalBrain.Shell.Aspire.Hosting;
 
 public static class ShellHostingExtensions
 {
-    public const string DefaultFlutterResourceName = "digitalbrain-flutter";
+    public const string DefaultFlutterResourceName = "flutter";
     public const string UIBaseEnvironmentVariable = "DIGITALBRAIN_UI_BASE";
     public const string ShellEnvironmentVariable = "DIGITALBRAIN_SHELL";
     public const string ChatEnvironmentVariable = "DIGITALBRAIN_CHAT";
