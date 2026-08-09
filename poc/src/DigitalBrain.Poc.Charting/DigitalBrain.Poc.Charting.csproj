@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="../DigitalBrain.Poc.Charting.Contracts/DigitalBrain.Poc.Charting.Contracts.csproj" />
-    <ProjectReference Include="../DigitalBrain.Poc.Runtime/DigitalBrain.Poc.Runtime.csproj" />
-  </ItemGroup>
-</Project>

@@ -1,5 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="BaseIntermediateOutputPath;BaseOutputPath">
-  <ItemGroup>
-    <ProjectReference Include="../DigitalBrain.Poc.Abstractions/DigitalBrain.Poc.Abstractions.csproj" />
-  </ItemGroup>
-</Project>

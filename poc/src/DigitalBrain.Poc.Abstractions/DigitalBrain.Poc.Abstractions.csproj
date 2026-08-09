@@ -1,5 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="BaseIntermediateOutputPath;BaseOutputPath">
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Sdk" />
-  </ItemGroup>
-</Project>
