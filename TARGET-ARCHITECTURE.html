@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DigitalBrain — Target Architecture (Product + POC Merge)</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --bg2: #111820;
+    --bg3: #17202a;
+    --panel: #141c26;
+    --line: #243041;
+    --text: #e7eef7;
+    --muted: #93a4b8;
+    --faint: #6b7c90;
+    --accent: #5b9fd4;
+    --accent2: #7dd3a7;
+    --warn: #e0b15c;
+    --danger: #e07a7a;
+    --purple: #b39ddb;
+    --orange: #f0a36b;
+    --trusted: #3d8f6e;
+    --candidate: #8b6cc1;
+    --product: #4a7fb5;
+    --poc: #c47a3a;
+    --trash: #8a4a4a;
+    --radius: 14px;
+    --shadow: 0 12px 40px rgba(0,0,0,.35);
+    --mono: "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, monospace;
+    --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    background:
+      radial-gradient(1200px 600px at 10% -10%, rgba(91,159,212,.12), transparent 55%),
+      radial-gradient(900px 500px at 90% 0%, rgba(125,211,167,.08), transparent 50%),
+      var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .top {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(14px);
+    background: rgba(11,15,20,.82);
+    border-bottom: 1px solid var(--line);
+  }
+  .top-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 14px 22px;
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .brand {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .mark {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    box-shadow: 0 0 24px rgba(91,159,212,.35);
+  }
+  .brand h1 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 650;
+    letter-spacing: .2px;
+  }
+  .brand p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  nav a {
+    color: var(--muted);
+    font-size: 12px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+  }
+  nav a:hover {
+    color: var(--text);
+    background: var(--bg3);
+    border-color: var(--line);
+    text-decoration: none;
+  }
+
+  main {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 28px 22px 80px;
+  }
+
+  section {
+    margin: 0 0 42px;
+    scroll-margin-top: 80px;
+  }
+
+  .hero {
+    display: grid;
+    grid-template-columns: 1.35fr .9fr;
+    gap: 22px;
+    margin-bottom: 36px;
+  }
+  @media (max-width: 960px) {
+    .hero { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: linear-gradient(180deg, rgba(255,255,255,.02), transparent 40%), var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 22px;
+  }
+  .card h2, .card h3 { margin-top: 0; }
+  h2 {
+    font-size: 22px;
+    letter-spacing: -.2px;
+    margin: 0 0 12px;
+  }
+  h3 {
+    font-size: 15px;
+    margin: 0 0 10px;
+    color: var(--text);
+  }
+  p.lead {
+    font-size: 16px;
+    color: var(--muted);
+    margin: 0 0 16px;
+    max-width: 70ch;
+  }
+  .muted { color: var(--muted); }
+  .faint { color: var(--faint); font-size: 12px; }
+
+  .pillrow { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+  .pill {
+    font-size: 11px;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    background: var(--bg2);
+  }
+  .pill.ok { color: #b7f0d2; border-color: rgba(125,211,167,.35); background: rgba(61,143,110,.15); }
+  .pill.poc { color: #ffd2a8; border-color: rgba(240,163,107,.35); background: rgba(196,122,58,.15); }
+  .pill.bad { color: #ffc9c9; border-color: rgba(224,122,122,.35); background: rgba(138,74,74,.18); }
+  .pill.phase { color: #cfe4ff; border-color: rgba(91,159,212,.35); background: rgba(74,127,181,.15); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 960px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+
+  .stat {
+    background: var(--bg2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .stat b {
+    display: block;
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat span { color: var(--muted); font-size: 12px; }
+
+  /* Layer stack */
+  .stack {
+    display: grid;
+    gap: 8px;
+  }
+  .layer {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    background: var(--bg2);
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+  .layer .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    padding: 6px 8px;
+    border-radius: 8px;
+    text-align: center;
+    align-self: center;
+  }
+  .layer .body strong { display: block; margin-bottom: 2px; }
+  .layer .body span { color: var(--muted); font-size: 13px; }
+  .tag.abs { background: rgba(91,159,212,.18); color: #9ec9ef; }
+  .tag.core { background: rgba(125,211,167,.14); color: #9fe0c0; }
+  .tag.cli { background: rgba(179,157,219,.16); color: #d2c2f0; }
+  .tag.auth { background: rgba(224,177,92,.14); color: #f0d29a; }
+  .tag.ker { background: rgba(240,163,107,.14); color: #f5c49a; }
+  .tag.mod { background: rgba(93,180,140,.12); color: #9fd8bb; }
+  .tag.scr { background: rgba(196,122,58,.16); color: #f0b888; }
+  .tag.surf { background: rgba(74,127,181,.14); color: #a8c8ea; }
+
+  /* Compare */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 40px 1fr;
+    gap: 10px;
+    align-items: stretch;
+  }
+  @media (max-width: 900px) {
+    .compare { grid-template-columns: 1fr; }
+    .compare .arrow { transform: rotate(90deg); justify-self: center; }
+  }
+  .compare .col {
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--bg2);
+    padding: 14px;
+  }
+  .compare .col h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; }
+  .compare .now h3 { color: var(--danger); }
+  .compare .then h3 { color: var(--accent2); }
+  .compare ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+  .compare li { margin: 6px 0; }
+  .arrow {
+    display: grid;
+    place-items: center;
+    color: var(--accent);
+    font-size: 28px;
+    font-weight: 700;
+  }
+
+  /* Flow boards */
+  .flow {
+    display: grid;
+    gap: 10px;
+  }
+  .flow-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .node {
+    border: 1px solid var(--line);
+    background: var(--bg3);
+    border-radius: 10px;
+    padding: 10px 12px;
+    min-width: 120px;
+    font-size: 12px;
+  }
+  .node b { display: block; font-size: 12px; margin-bottom: 2px; }
+  .node span { color: var(--muted); font-size: 11px; }
+  .node.trusted { border-color: rgba(61,143,110,.55); box-shadow: inset 0 0 0 1px rgba(61,143,110,.15); }
+  .node.candidate { border-color: rgba(139,108,193,.55); box-shadow: inset 0 0 0 1px rgba(139,108,193,.15); }
+  .node.runtime { border-color: rgba(91,159,212,.5); }
+  .node.surface { border-color: rgba(224,177,92,.45); }
+  .chev {
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: 16px;
+  }
+
+  /* Package map */
+  .pkg {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: #0a1018;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    white-space: pre;
+    color: #c9d7e8;
+    line-height: 1.45;
+  }
+  .pkg .c { color: var(--faint); }
+  .pkg .k { color: #9ec9ef; }
+  .pkg .g { color: #9fe0c0; }
+  .pkg .p { color: #d2c2f0; }
+  .pkg .o { color: #f0b888; }
+  .pkg .r { color: #ffb0b0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th, td {
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    padding: 10px 8px;
+    vertical-align: top;
+  }
+  th {
+    color: var(--faint);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    font-weight: 600;
+  }
+  tr:hover td { background: rgba(255,255,255,.015); }
+  .keep { color: #9fe0c0; }
+  .port { color: #f0b888; }
+  .kill { color: #ffb0b0; }
+  .new  { color: #d2c2f0; }
+  .thin { color: #9ec9ef; }
+
+  .phase {
+    border-left: 3px solid var(--accent);
+    padding-left: 14px;
+    margin: 0 0 18px;
+  }
+  .phase h3 { margin-bottom: 4px; }
+  .phase .meta {
+    font-size: 12px;
+    color: var(--faint);
+    margin-bottom: 8px;
+    font-family: var(--mono);
+  }
+  .checks {
+    margin: 8px 0 0;
+    padding-left: 18px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .checks li { margin: 4px 0; }
+
+  .callout {
+    border: 1px solid rgba(224,177,92,.35);
+    background: rgba(224,177,92,.08);
+    border-radius: 12px;
+    padding: 14px 16px;
+    color: #f0d29a;
+    font-size: 13px;
+  }
+  .callout strong { color: #ffe2a8; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 8px 0 14px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .legend i {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 3px;
+    margin-right: 6px;
+    vertical-align: -1px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .tabs button {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: var(--bg2);
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 8px 12px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .tabs button.active {
+    color: var(--text);
+    border-color: rgba(91,159,212,.5);
+    background: rgba(91,159,212,.12);
+  }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .seq {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.55;
+    background: #0a1018;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    overflow-x: auto;
+    color: #c9d7e8;
+  }
+  .seq .actor { color: #9ec9ef; }
+  .seq .msg { color: #9fe0c0; }
+  .seq .note { color: var(--faint); }
+  .seq .cand { color: #d2c2f0; }
+  .seq .trust { color: #f0b888; }
+
+  footer {
+    margin-top: 40px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    color: var(--faint);
+    font-size: 12px;
+  }
+
+  .decision {
+    display: grid;
+    grid-template-columns: 180px 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  .decision > div {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+  }
+  .decision > div:nth-child(3n) { border-right: none; }
+  .decision .head {
+    background: var(--bg3);
+    color: var(--faint);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    font-weight: 650;
+  }
+  .decision .q { color: var(--text); font-weight: 600; }
+  @media (max-width: 800px) {
+    .decision { grid-template-columns: 1fr; }
+    .decision > div { border-right: none; }
+  }
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand">
+        <div class="mark" aria-hidden="true"></div>
+        <div>
+          <h1>DigitalBrain — Target Architecture</h1>
+          <p>Product kernel cleaned + POC authoring/admission merged · plan only</p>
+        </div>
+      </div>
+      <nav>
+        <a href="#thesis">Thesis</a>
+        <a href="#now">Now vs After</a>
+        <a href="#layers">Layers</a>
+        <a href="#flows">How it works</a>
+        <a href="#packages">Packages</a>
+        <a href="#trash">What dies</a>
+        <a href="#plan">Refactor plan</a>
+        <a href="#gates">Gates</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <section class="card" style="margin:0">
+        <div class="pillrow" style="margin-top:0">
+          <span class="pill phase">Phase order locked</span>
+          <span class="pill ok">1 Abstractions</span>
+          <span class="pill ok">2 Core</span>
+          <span class="pill phase">3 Kernel / Client / Aspire</span>
+          <span class="pill poc">4 Scripting / Creator</span>
+        </div>
+        <h2 style="margin-top:16px">One brain. Two neuron classes. One turn physics.</h2>
+        <p class="lead">
+          Keep Orleans-durable product modules. Port POC’s proof that owner-reviewed ordinary C#
+          becomes normal durable neurons. Delete dual runtimes, dummy scripting, and prototype residue
+          from the mental model (and eventually from the tree).
+        </p>
+        <p class="muted" style="margin:0; max-width:70ch">
+          <strong style="color:var(--text)">Target claim:</strong>
+          a human programs the brain in ordinary C# (modules) <em>or</em> by approving generated C#
+          candidates; both ride the same journaled turn, outbox, owner scope, and trusted-effect boundary.
+        </p>
+      </section>
+
+      <aside class="card" style="margin:0">
+        <h3>Evidence snapshot</h3>
+        <div class="grid-2" style="gap:10px">
+          <div class="stat"><b>~343</b><span>product C# files</span></div>
+          <div class="stat"><b>~189</b><span>POC C# files (isolated)</span></div>
+          <div class="stat"><b>Built</b><span>chat · AI · shell · MCP · journals</span></div>
+          <div class="stat"><b>Proven in POC</b><span>creator · admit · restart · grants</span></div>
+        </div>
+        <p class="faint" style="margin:14px 0 0">
+          Sources: product README status table, CORE-DESIGN / CORE-PLAN (POC-0 charter),
+          current <code>src/core</code> neuron turn, POC <code>DurableTurn</code> + control plane.
+        </p>
+      </aside>
+    </div>
+
+    <!-- THESIS -->
+    <section id="thesis">
+      <div class="card">
+        <h2>Architecture thesis</h2>
+        <div class="grid-3">
+          <div class="stat">
+            <b style="font-size:15px;color:var(--accent2)">Keep product physics</b>
+            <span>Orleans <code>Neuron</code> grain · journals · outbox drain · owner session · modules</span>
+          </div>
+          <div class="stat">
+            <b style="font-size:15px;color:var(--purple)">Port POC seams</b>
+            <span>FireSynapse for candidates · grants · Creator · cold admit · control plane</span>
+          </div>
+          <div class="stat">
+            <b style="font-size:15px;color:var(--danger)">Do not port</b>
+            <span>POC file <code>RunStore</code> · dual journal · Prototypes InoLang / interpreters</span>
+          </div>
+        </div>
+
+        <div class="callout" style="margin-top:16px">
+          <strong>Strongest counterargument:</strong>
+          product neurons <em>are</em> grains with capability methods; POC neurons are plain classes
+          hosted by an activation grain. Unifying without an activation adapter re-leaks
+          <code>GrainFactory</code> / <code>IServiceProvider</code> into generated code.
+          <strong>Answer:</strong> two activation paths, one <code>Deliver</code>/commit/outbox pipeline.
+        </div>
+
+        <h3 style="margin-top:20px">Locked decisions (recommended defaults)</h3>
+        <div class="decision" style="margin-top:10px">
+          <div class="head">Decision</div>
+          <div class="head">Choice</div>
+          <div class="head">Why</div>
+
+          <div class="q">Activation</div>
+          <div>Trusted module = grain subclass of <code>Neuron</code>. Candidate = plain class hosted by <code>CandidateActivationGrain</code>.</div>
+          <div class="muted">POC isolation model; product modules stay natural Orleans grains.</div>
+
+          <div class="q">Domain verbs</div>
+          <div>Candidates: <code>FireSynapse</code> only. Trusted modules: Fire/Emit + capability methods.</div>
+          <div class="muted">Generated code never needs request/reply grain proxies.</div>
+
+          <div class="q">Durability</div>
+          <div>Single product journal/outbox (Orleans). Map POC turn semantics onto <code>Deliver</code> + commit.</div>
+          <div class="muted">No second store. Journals remain audit source.</div>
+
+          <div class="q">Routing</div>
+          <div>Trusted: broadcast catalog + directed <code>NeuronId</code>. Candidate: immutable route table + envelope fields runtime-owned.</div>
+          <div class="muted">FireSynapse does not expose owner/family/revision knobs.</div>
+
+          <div class="q">Admission</div>
+          <div>Cold restart only for v1 candidates.</div>
+          <div class="muted">Orleans serializers/application parts need host construction.</div>
+
+          <div class="q">First vertical</div>
+          <div>Trusted chart/projection sample (POC route) as integration gate; product modules unchanged until core is clean.</div>
+          <div class="muted">Proves authored C# → trusted effect without rewriting chat first.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- NOW VS AFTER -->
+    <section id="now">
+      <h2>Now vs after merge</h2>
+      <p class="lead">Same product surfaces; thinner core vocabulary; real authoring rail instead of dummy scripting.</p>
+      <div class="compare">
+        <div class="col now">
+          <h3>Current product (messy)</h3>
+          <ul>
+            <li>Working modules (Chat, AI, Shell, OAuth maps, MCP) on grain neurons</li>
+            <li>Dual mental model: synapses + capabilities + session + brain grain + client</li>
+            <li><code>DigitalBrain.Scripting</code> is a dummy generate+run proof</li>
+            <li>POC is a second full runtime under <code>poc/</code> (by charter)</li>
+            <li>Prototypes tree still shapes agent confusion via codegraph</li>
+            <li>Residual types (e.g. BehaviorId leftovers) without behaviors</li>
+            <li>README claims “ordinary C# / programs itself” ahead of the rail</li>
+          </ul>
+        </div>
+        <div class="arrow">→</div>
+        <div class="col then">
+          <h3>Target product</h3>
+          <ul>
+            <li>Same working modules, thinner abstractions surface</li>
+            <li>One turn law: receipt → handle → state/outbox commit → drain</li>
+            <li>Creator + admit + control plane as first-class product packages</li>
+            <li>Candidates are ordinary <code>Neuron</code>/<code>IHandle&lt;T&gt;</code> C#, not interpreters</li>
+            <li>Trusted modules own side effects; candidates fire contracts only</li>
+            <li><code>poc/</code> becomes reference oracle then retires</li>
+            <li>Prototypes stay archaeology (or leave the default workspace index)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- LAYERS -->
+    <section id="layers">
+      <div class="card">
+        <h2>Target layer stack</h2>
+        <p class="muted" style="margin-top:0">Refactor order is bottom-up. Surfaces and modules sit still until Abstractions + Core are honest.</p>
+        <div class="stack" style="margin-top:14px">
+          <div class="layer">
+            <div class="tag surf">Surfaces</div>
+            <div class="body">
+              <strong>Kernel HTTP/SSE · MCP · Flutter · AppHost</strong>
+              <span>Thin maps over <code>IDigitalBrain</code>. No domain rules. Phase 3 polish only.</span>
+            </div>
+          </div>
+          <div class="layer">
+            <div class="tag mod">Modules</div>
+            <div class="body">
+              <strong>Trusted domain packages</strong>
+              <span>Chat, AI, Shell, Memory, Google, Salesforce, Tasks, Time, Introspection, Chart sample. Own contracts + grain neurons.</span>
+            </div>
+          </div>
+          <div class="layer">
+            <div class="tag scr">Authoring</div>
+            <div class="body">
+              <strong>Creator · Policy · Control plane · Candidate catalog</strong>
+              <span>POC port. AST-first C#, hash-verified IL, quarantine, owner approval, pointer CAS, cold admit.</span>
+            </div>
+          </div>
+          <div class="layer">
+            <div class="tag cli">Client</div>
+            <div class="body">
+              <strong>IDigitalBrain · DigitalBrainClient</strong>
+              <span>Owner-scoped Send / Emit / Get / journals. Internal path for candidate FireSynapse proxy.</span>
+            </div>
+          </div>
+          <div class="layer">
+            <div class="tag core">Core</div>
+            <div class="body">
+              <strong>Neuron turn · outbox · dispatch · activation · routes · grants</strong>
+              <span>The merge heart. Trusted grain path + candidate activation path. One commit/drain.</span>
+            </div>
+          </div>
+          <div class="layer">
+            <div class="tag abs">Abstractions</div>
+            <div class="body">
+              <strong>Synapse · IHandle · IEmit · INeuron · ids · delivery · module · grant shapes</strong>
+              <span>Minimal public vocabulary. Phase 1: delete trash, add missing admission types carefully.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FLOWS -->
+    <section id="flows">
+      <h2>How the product works after merge</h2>
+      <p class="lead">Three concurrent stories on one runtime. Click a story.</p>
+
+      <div class="tabs" role="tablist">
+        <button class="active" data-tab="chat" type="button">1 · Owner chat turn</button>
+        <button data-tab="author" type="button">2 · Author + admit candidate</button>
+        <button data-tab="fire" type="button">3 · Trusted fact → generated neurons → trusted effect</button>
+        <button data-tab="verbs" type="button">4 · Verb map</button>
+      </div>
+
+      <div id="tab-chat" class="panel active card">
+        <h3>Owner chat (unchanged product path, cleaner core)</h3>
+        <div class="legend">
+          <span><i style="background:var(--warn)"></i>Surface</span>
+          <span><i style="background:var(--accent)"></i>Runtime</span>
+          <span><i style="background:var(--trusted)"></i>Trusted module</span>
+        </div>
+        <div class="flow">
+          <div class="flow-row">
+            <div class="node surface"><b>Flutter / HTTP / MCP</b><span>owner session</span></div>
+            <span class="chev">→</span>
+            <div class="node runtime"><b>IDigitalBrain</b><span>Activate · Get&lt;IChat&gt;</span></div>
+            <span class="chev">→</span>
+            <div class="node trusted"><b>ChatNeuron</b><span>capability SendStreaming</span></div>
+            <span class="chev">→</span>
+            <div class="node trusted"><b>IAssistant / Gemma</b><span>model + tools</span></div>
+          </div>
+          <div class="flow-row">
+            <div class="node trusted"><b>Emit UserMessaged</b><span>broadcast fact</span></div>
+            <span class="chev">→</span>
+            <div class="node runtime"><b>Outbox + Drain</b><span>Deliver / journals</span></div>
+            <span class="chev">→</span>
+            <div class="node trusted"><b>Emit AssistantResponded</b><span>directed / journaled</span></div>
+            <span class="chev">→</span>
+            <div class="node surface"><b>SSE / UI / MCP read</b><span>projection only</span></div>
+          </div>
+        </div>
+        <pre class="seq" style="margin-top:14px"><span class="note">// Capability call stays on trusted grains — not candidate surface</span>
+<span class="actor">Owner</span> ──SendMessage──▶ <span class="actor">ChatNeuron</span>
+<span class="actor">ChatNeuron</span> ──RespondStreaming──▶ <span class="actor">Assistant/Gemma</span>
+<span class="actor">ChatNeuron</span> ──Emit(UserMessaged)──▶ <span class="msg">journal + outbox</span>
+<span class="actor">ChatNeuron</span> ──Emit(AssistantResponded)──▶ <span class="msg">session/UI observers</span></pre>
+        <p class="faint">No reentrancy into the emitting neuron during drain (existing trap remains law).</p>
+      </div>
+
+      <div id="tab-author" class="panel card">
+        <h3>Authoring rail (POC ported into product packages)</h3>
+        <div class="legend">
+          <span><i style="background:var(--poc)"></i>Authoring</span>
+          <span><i style="background:var(--candidate)"></i>Candidate</span>
+          <span><i style="background:var(--trusted)"></i>Trusted</span>
+        </div>
+        <div class="flow">
+          <div class="flow-row">
+            <div class="node surface"><b>Owner prose / intent</b><span>not raw C#</span></div>
+            <span class="chev">→</span>
+            <div class="node" style="border-color:rgba(196,122,58,.55)"><b>Creator</b><span>Roslyn SyntaxFactory</span></div>
+            <span class="chev">→</span>
+            <div class="node candidate"><b>one .cs artifact</b><span>fixed header · family id</span></div>
+            <span class="chev">→</span>
+            <div class="node" style="border-color:rgba(196,122,58,.55)"><b>Policy + SDK build</b><span>allowlist symbols</span></div>
+          </div>
+          <div class="flow-row">
+            <div class="node" style="border-color:rgba(196,122,58,.55)"><b>Quarantine brain</b><span>no prod data</span></div>
+            <span class="chev">→</span>
+            <div class="node surface"><b>Owner approval</b><span>signed record</span></div>
+            <span class="chev">→</span>
+            <div class="node runtime"><b>Pointer CAS</b><span>control plane</span></div>
+            <span class="chev">→</span>
+            <div class="node runtime"><b>Cold restart admit</b><span>load IL + routes</span></div>
+          </div>
+        </div>
+        <pre class="seq" style="margin-top:14px"><span class="note">// Candidate lifecycle (product names)</span>
+Draft → Validated → Quarantined → AwaitingApproval
+     → ApprovedInactive → <span class="cand">Active after restart</span>
+     → RolledBack after restart
+
+<span class="note">// Candidate-visible surface (closed)</span>
+IDigitalBrain.FireSynapse(Synapse)
+IDurableState&lt;T&gt;  // only inside host-owned turn
+Neuron : IHandle&lt;TExact&gt;   // ordinary C#, no GrainFactory</pre>
+      </div>
+
+      <div id="tab-fire" class="panel card">
+        <h3>Generated neurons orchestrate trusted effects</h3>
+        <p class="muted" style="margin-top:0">POC elon-chart route becomes the first product integration gate — same physics, product packages.</p>
+        <div class="legend">
+          <span><i style="background:var(--trusted)"></i>Trusted</span>
+          <span><i style="background:var(--candidate)"></i>Candidate</span>
+          <span><i style="background:var(--accent)"></i>Runtime envelope</span>
+        </div>
+        <div class="flow">
+          <div class="flow-row">
+            <div class="node trusted"><b>SocialPostObserved</b><span>trusted ingress</span></div>
+            <span class="chev">→</span>
+            <div class="node runtime"><b>Route table fan-out</b><span>owner · family · rev pin</span></div>
+            <span class="chev">→</span>
+            <div class="node candidate"><b>ElonPostRuleNeuron</b><span>IHandle&lt;SocialPostObserved&gt;</span></div>
+            <span class="chev">→</span>
+            <div class="node candidate"><b>ElonPostMatched</b><span>local synapse</span></div>
+          </div>
+          <div class="flow-row">
+            <div class="node candidate"><b>ChartForwarderNeuron</b><span>IHandle&lt;ElonPostMatched&gt;</span></div>
+            <span class="chev">→</span>
+            <div class="node runtime"><b>Grant check</b><span>contract + target scope</span></div>
+            <span class="chev">→</span>
+            <div class="node trusted"><b>AddChartPoint</b><span>trusted contract</span></div>
+            <span class="chev">→</span>
+            <div class="node trusted"><b>ChartNeuron</b><span>state · projection</span></div>
+            <span class="chev">→</span>
+            <div class="node surface"><b>Flutter chart</b><span>owner-authenticated</span></div>
+          </div>
+        </div>
+        <pre class="seq" style="margin-top:14px"><span class="trust">Trusted ingress</span> assigns Owner on envelope  <span class="note">// never from source text</span>
+<span class="cand">Candidate</span> calls FireSynapse(localOrGranted)
+Runtime stamps: owner, family, producing/target revision, delivery id
+<span class="trust">ChartNeuron</span> re-validates owner + effect id → terminal ChartPointAdded fact
+Crash after commit / before ack → outbox retry → exactly-once chart point</pre>
+      </div>
+
+      <div id="tab-verbs" class="panel card">
+        <h3>Who may call what</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Caller</th>
+              <th>Verb</th>
+              <th>Sees</th>
+              <th>Forbidden</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Edge client (MCP, UI, Scripting worker)</td>
+              <td><code>IDigitalBrain</code> Activate / Get / Send / Emit / journals</td>
+              <td>Owner-scoped domain neurons</td>
+              <td>Session/Brain as Send targets; foreign owners</td>
+            </tr>
+            <tr>
+              <td>Trusted module neuron (grain)</td>
+              <td><code>SendAsync</code>, <code>EmitAsync</code>, capability methods, DI services</td>
+              <td>Full module surface + journals</td>
+              <td>Forging other owners; unbounded reentrancy</td>
+            </tr>
+            <tr>
+              <td>Candidate neuron (hosted class)</td>
+              <td><code>FireSynapse</code> only + <code>IDurableState&lt;T&gt;</code></td>
+              <td>Granted contracts / scopes / state schema</td>
+              <td>GrainFactory, IServiceProvider, FS/net/process, loops/Task.Run, raw C# admit</td>
+            </tr>
+            <tr>
+              <td>Runtime / activation grain</td>
+              <td><code>Deliver</code>, dispatch exact <code>IHandle&lt;T&gt;</code>, outbox drain</td>
+              <td>Envelope + route bindings</td>
+              <td>Interpreting behavior DSL; hot-load v1</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PACKAGES -->
+    <section id="packages">
+      <div class="card">
+        <h2>Target package map</h2>
+        <p class="muted" style="margin-top:0">Folders organize; namespaces carry meaning. Names below are target — exact renames are part of Phase 1–2.</p>
+        <pre class="pkg"><span class="c">// Framework (refactor first)</span>
+<span class="k">src/core/kernel/DigitalBrain.Abstractions/</span>   <span class="c">// vocabulary only</span>
+<span class="k">src/core/kernel/DigitalBrain.Core/</span>           <span class="c">// turn, outbox, activation, routes, grants</span>
+<span class="k">src/core/kernel/DigitalBrain.Client/</span>         <span class="c">// IDigitalBrain edge</span>
+<span class="k">src/core/security/DigitalBrain.Security/</span>     <span class="c">// payload protection</span>
+<span class="k">src/core/aspire/…</span>                           <span class="c">// hosting split stays</span>
+
+<span class="c">// Authoring (new product packages — port from poc/, replace dummy Scripting)</span>
+<span class="o">src/authoring/DigitalBrain.Creator/</span>          <span class="c">// AST → one .cs → IL</span>
+<span class="o">src/authoring/DigitalBrain.ControlPlane/</span>     <span class="c">// attest · approve · pointer · quiesce</span>
+<span class="o">src/authoring/DigitalBrain.Candidates/</span>       <span class="c">// catalog · loader · family id</span>
+
+<span class="c">// Trusted modules (mostly stay; chart sample added for gate)</span>
+<span class="g">src/modules/…</span>                              <span class="c">// AI Chat Shell Memory Google …</span>
+<span class="g">src/modules/chart/</span>                         <span class="c">// POC chart vertical as product sample module</span>
+
+<span class="c">// Processes</span>
+<span class="p">DigitalBrain.Kernel/</span>                       <span class="c">// silo + thin HTTP maps</span>
+<span class="p">DigitalBrain.Mcp/</span>                          <span class="c">// northbound tools</span>
+<span class="p">DigitalBrain.AppHost/</span>                      <span class="c">// Aspire composition</span>
+<span class="p">DigitalBrain.Scripting/</span>                    <span class="c">// becomes real Creator client OR dies</span>
+
+<span class="c">// Eventually</span>
+<span class="r">poc/</span>                                       <span class="c">// oracle → archive after product gates green</span>
+<span class="r">Prototypes/</span>                                <span class="c">// archaeology only; never product dep</span></pre>
+      </div>
+    </section>
+
+    <!-- TRASH -->
+    <section id="trash">
+      <div class="card">
+        <h2>What is trash vs gold</h2>
+        <div class="legend">
+          <span class="keep">keep</span> ·
+          <span class="thin">thin/simplify</span> ·
+          <span class="port">port from POC</span> ·
+          <span class="new">new</span> ·
+          <span class="kill">kill / do not merge</span>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Item</th><th>Action</th><th>Note</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Product <code>Neuron</code> Deliver/commit/outbox/drain</td>
+              <td class="keep">keep</td>
+              <td>Single durability spine. Map POC atomic turn rules here.</td>
+            </tr>
+            <tr>
+              <td><code>Synapse</code>, <code>IHandle&lt;T&gt;</code>, <code>IEmit&lt;T&gt;</code>, ids, journals</td>
+              <td class="thin">thin</td>
+              <td>Abstractions Phase 1: only types with consumers today.</td>
+            </tr>
+            <tr>
+              <td>Module catalog / compiled modules / broadcast catalog</td>
+              <td class="keep">keep</td>
+              <td>Trusted module wiring stays compile-time first.</td>
+            </tr>
+            <tr>
+              <td>Capability methods on trusted grains</td>
+              <td class="keep">keep</td>
+              <td>Chat/AI need them. Not exposed to candidates.</td>
+            </tr>
+            <tr>
+              <td>Owner session + <code>IDigitalBrain</code> client</td>
+              <td class="thin">thin</td>
+              <td>Clarify entry rules; drop dead API if any.</td>
+            </tr>
+            <tr>
+              <td>POC <code>FireSynapse</code> + grant-checked brain proxy</td>
+              <td class="port">port</td>
+              <td>Candidate-only facade over product outbox.</td>
+            </tr>
+            <tr>
+              <td>POC <code>NeuronActivationGrain</code> / exact handler catalog</td>
+              <td class="port">port</td>
+              <td>Becomes <code>CandidateActivationGrain</code> in Core.</td>
+            </tr>
+            <tr>
+              <td>POC immutable route table + envelope</td>
+              <td class="port">port</td>
+              <td>Runtime-owned; not on synapse payload for candidates.</td>
+            </tr>
+            <tr>
+              <td>POC Creator + closed C# profile + quarantine</td>
+              <td class="port">port</td>
+              <td>Replaces dummy Scripting rail.</td>
+            </tr>
+            <tr>
+              <td>POC control plane (attest/approve/pointer/quiesce)</td>
+              <td class="port">port</td>
+              <td>Product package; test authority first.</td>
+            </tr>
+            <tr>
+              <td>POC <code>RunStore</code> file document journal</td>
+              <td class="kill">kill</td>
+              <td>Do not dual-write. Orleans journals win.</td>
+            </tr>
+            <tr>
+              <td>Dummy <code>DigitalBrain.Scripting</code> as-is</td>
+              <td class="kill">kill / replace</td>
+              <td>Either becomes Creator worker client or deleted.</td>
+            </tr>
+            <tr>
+              <td>Behavior DSL / ScriptedNeuron / interpreters</td>
+              <td class="kill">kill</td>
+              <td>CORE-DESIGN rejects; Prototypes only.</td>
+            </tr>
+            <tr>
+              <td>InoLang, dynamic registries, stream-header synapses</td>
+              <td class="kill">kill</td>
+              <td>Prototype archaeology. Do not reintroduce.</td>
+            </tr>
+            <tr>
+              <td>Residual BehaviorId-only types without consumers</td>
+              <td class="kill">kill</td>
+              <td>Wire-compat only if a live consumer still needs them.</td>
+            </tr>
+            <tr>
+              <td>Product modules (Chat/AI/Shell/…)</td>
+              <td class="keep">keep</td>
+              <td>Do not rewrite while core is cleaned. Recompile against thinner abs.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PLAN -->
+    <section id="plan">
+      <h2>Refactor plan (order is load-bearing)</h2>
+      <p class="lead">No module rewrite, no UI churn, no POC deletion until lower layers are clean and the first admission gate is green.</p>
+
+      <div class="phase">
+        <h3>Phase 0 — Architecture lock</h3>
+        <div class="meta">output: this page + decision sheet · no code</div>
+        <ul class="checks">
+          <li>Confirm activation dual-path, FireSynapse-for-candidates, cold admit, Orleans-only durability</li>
+          <li>Name packages for Creator / ControlPlane / Candidates</li>
+          <li>Choose first vertical: chart sample module (POC route) as product integration gate</li>
+          <li>Freeze non-goals: hot load, InoLang, hostile-IL sandbox, dual journal</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <h3>Phase 1 — Abstractions cleanup</h3>
+        <div class="meta">DigitalBrain.Abstractions · tests that pin public surface</div>
+        <ul class="checks">
+          <li>Inventory every public type; mark keep / thin / delete with a live consumer</li>
+          <li>Keep core vocabulary: <code>Synapse</code>, <code>IHandle</code>, <code>IEmit</code>, <code>INeuron</code>, ids, <code>SynapseDelivery</code>, journal types, <code>IModule</code></li>
+          <li>Add only admission-facing types that Core will need soon (e.g. grant / family id shapes) — no speculative APIs</li>
+          <li>Delete residual behavior/script types with no consumer; update any wire-compat deliberately</li>
+          <li>Gate: product solution still builds; module contracts recompile without behavior leftovers</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <h3>Phase 2 — Core refactor + candidate activation</h3>
+        <div class="meta">DigitalBrain.Core · the merge heart</div>
+        <ul class="checks">
+          <li>Document turn law as code: Deliver → exact dispatch → commit journals/outbox → drain</li>
+          <li>Introduce <code>CandidateActivationGrain</code> hosting plain candidate neurons (POC seam)</li>
+          <li>Introduce grant-checked candidate <code>IDigitalBrain</code> proxy (<code>FireSynapse</code>)</li>
+          <li>Immutable route table from verified catalog; runtime-owned envelopes</li>
+          <li>Map POC durable-turn proofs onto Orleans journals (receipt dedupe, outbox pin to revision)</li>
+          <li>Do not import POC <code>RunStore</code></li>
+          <li>Gate: existing product module tests green; new Core facts for candidate dispatch + grant refuse</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <h3>Phase 3 — Kernel / Client / Aspire</h3>
+        <div class="meta">client entry · silo composition · hosting</div>
+        <ul class="checks">
+          <li>Align <code>IDigitalBrain</code> docs and implementation with Phase 1–2 surface</li>
+          <li>Kernel composition loads trusted modules + optional admitted candidate assemblies (restart)</li>
+          <li>Aspire resource names stay shared; no second brain process for candidates</li>
+          <li>MCP/Kernel HTTP remain thin; no creator logic in maps</li>
+          <li>Gate: <code>aspire run</code> healthy; chat/MCP smoke still works</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <h3>Phase 4 — Scripting → Creator rail</h3>
+        <div class="meta">replace dummy Scripting with real authoring packages</div>
+        <ul class="checks">
+          <li>Port Creator (AST-first, fixed header, semantic allowlist, SDK IL build)</li>
+          <li>Port control plane (attestation, approval, pointer CAS, quiesce/promote)</li>
+          <li>Port quarantine runner against product brain, not POC RunStore</li>
+          <li>Either rewrite <code>DigitalBrain.Scripting</code> as external worker client or delete it</li>
+          <li>Gate: CORE-DESIGN §10 acceptance items that matter productized (restart, grants, refuse, chart projection)</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <h3>Phase 5 — First vertical + retire dual runtime</h3>
+        <div class="meta">chart sample module · product proof · delete POC from default path</div>
+        <ul class="checks">
+          <li>Trusted chart contracts + ChartNeuron as product sample module</li>
+          <li>End-to-end: admit candidate → cold restart → SocialPostObserved → Flutter/projection</li>
+          <li>Keep <code>poc/</code> only until product gates supersede every required proof</li>
+          <li>Stop indexing Prototypes for agents (workspace / codegraph scope) when ready</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- GATES -->
+    <section id="gates">
+      <div class="card">
+        <h2>Definition of done (per phase)</h2>
+        <div class="grid-2">
+          <div>
+            <h3>Always true</h3>
+            <ul class="checks">
+              <li><code>dotnet build DigitalBrain.slnx -c Release</code></li>
+              <li><code>dotnet test DigitalBrain.slnx -c Release</code> (full root gate)</li>
+              <li>No product project references <code>poc/</code> or <code>Prototypes/</code></li>
+              <li>No new dual journal / interpreter / hot-load claims</li>
+              <li>Journals stay causal facts only (no prompts/secrets)</li>
+            </ul>
+          </div>
+          <div>
+            <h3>After Phase 4–5</h3>
+            <ul class="checks">
+              <li>Live <code>aspire run</code> resources Healthy</li>
+              <li>Chat turn still works (regression)</li>
+              <li>Candidate cold-restart admission works on product host</li>
+              <li>Grant refuse + foreign owner refuse proven</li>
+              <li>Crash/retry exactly-once on trusted effect proven</li>
+              <li>Dummy scripting gone or demoted to thin client</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3 style="margin-top:18px">Abstractions target surface (sketch)</h3>
+        <pre class="pkg"><span class="c">// Domain vocabulary — keep tiny</span>
+<span class="g">abstract record Synapse</span>
+<span class="g">interface IHandle&lt;TSynapse&gt;</span> <span class="c">// exact match only</span>
+<span class="g">interface IEmit&lt;TSynapse&gt;</span>
+<span class="g">interface INeuron</span> <span class="c">// Deliver + journal observe</span>
+<span class="g">SynapseDelivery</span> <span class="c">// runtime envelope projection into journals</span>
+<span class="g">OwnerId · NeuronId · SynapseId · CorrelationId · ModuleId</span>
+<span class="g">IModule</span>
+
+<span class="c">// Edge client (Client package, not Abstractions if possible)</span>
+<span class="p">interface IDigitalBrain</span> <span class="c">// owner Activate/Get/Send/Emit/journals</span>
+
+<span class="c">// Candidate-only (Core-internal or narrow Authoring contracts)</span>
+<span class="o">// FireSynapse facade · CapabilityGrant · CandidateFamilyId · RouteBinding</span>
+<span class="c">// Prefer not bloating public Abstractions with control-plane types</span></pre>
+
+        <div class="callout" style="margin-top:16px">
+          <strong>Next action when you approve:</strong>
+          Phase 0 decision sheet sign-off → Phase 1 Abstractions inventory PR (delete/thin only, no Creator yet).
+          No Core rewrite until Abstractions public surface is frozen for the merge.
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      Generated as a planning artifact for the product + POC merge.
+      Not product docs; do not treat as shipped capability.
+      Repo oracles remain: compiler, tests, live aspire, journals.
+    </footer>
+  </main>
+
+  <script>
+    const buttons = document.querySelectorAll('.tabs button');
+    const panels = {
+      chat: document.getElementById('tab-chat'),
+      author: document.getElementById('tab-author'),
+      fire: document.getElementById('tab-fire'),
+      verbs: document.getElementById('tab-verbs'),
+    };
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        Object.values(panels).forEach(p => p.classList.remove('active'));
+        panels[btn.dataset.tab].classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+<Solution>
+  <Project Path="src/DigitalBrain.Poc.Abstractions/DigitalBrain.Poc.Abstractions.csproj" />
+  <Project Path="src/DigitalBrain.Poc.Runtime/DigitalBrain.Poc.Runtime.csproj" />
+  <Project Path="src/DigitalBrain.Poc.Social.Contracts/DigitalBrain.Poc.Social.Contracts.csproj" />
+  <Project Path="src/DigitalBrain.Poc.Charting.Contracts/DigitalBrain.Poc.Charting.Contracts.csproj" />
+  <Project Path="src/DigitalBrain.Poc.Charting/DigitalBrain.Poc.Charting.csproj" />
+  <Project Path="src/DigitalBrain.Poc.Creator/DigitalBrain.Poc.Creator.csproj" />
+  <Project Path="src/DigitalBrain.Poc.ControlPlane/DigitalBrain.Poc.ControlPlane.csproj" />
+  <Project Path="src/DigitalBrain.Poc.Host/DigitalBrain.Poc.Host.csproj" />
+  <Project Path="tests/DigitalBrain.Poc.Foundation.Tests/DigitalBrain.Poc.Foundation.Tests.csproj" />
+  <Project Path="tests/DigitalBrain.Poc.Runtime.Tests/DigitalBrain.Poc.Runtime.Tests.csproj" />
+  <Project Path="tests/DigitalBrain.Poc.Creator.Tests/DigitalBrain.Poc.Creator.Tests.csproj" />
+  <Project Path="tests/DigitalBrain.Poc.Acceptance.Tests/DigitalBrain.Poc.Acceptance.Tests.csproj" />
+  <Project Path="tests/DigitalBrain.Poc.Acceptance.FixtureHost/DigitalBrain.Poc.Acceptance.FixtureHost.csproj" />
+  <Project Path="tests/DigitalBrain.Poc.Flutter.Fixture/DigitalBrain.Poc.Flutter.Fixture.csproj" />
+</Solution>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Poc.Acceptance.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Poc.Runtime.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../DigitalBrain.Poc.Runtime/DigitalBrain.Poc.Runtime.csproj" />
+  </ItemGroup>
+</Project>
