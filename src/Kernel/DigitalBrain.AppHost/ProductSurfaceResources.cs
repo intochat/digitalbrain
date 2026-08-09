@@ -6,7 +6,6 @@ internal static class ProductSurfaceResources
 
     public const string Kernel = "kernel";
 
-    public const string Scripting = "scripting";
 
     public const string Mcp = "mcp";
     public const string McpHttpEndpointName = "mcp";

@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <RootNamespace>DigitalBrain.Scripting</RootNamespace>
-    <NoWarn>$(NoWarn);CA2007;CA1812;CA1303</NoWarn>
-  </PropertyGroup>
-</Project>

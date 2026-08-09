@@ -13,7 +13,7 @@ public partial interface IChat :
     IEmit<UserMessaged>,
     IEmit<Responded>,
     IHandle<ReadTranscriptRequest>,
-    IHandle<ButtonClicked>,
+    IHandle<ShowTime>,
     IEmit<TranscriptRead>
 {
     [Alias(nameof(Send))]

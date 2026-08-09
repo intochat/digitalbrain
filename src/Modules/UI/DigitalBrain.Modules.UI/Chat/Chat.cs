@@ -62,6 +62,8 @@ internal sealed class Chat : Neuron, IChat
             {
                 new ChatButtonOffer(ShowTimeButtonId, "Show current time", ShowTimeAction),
             };
+            await ArmOfferedButtonAsync(message.CommandId, ShowTimeButtonId)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             Remember(new ChatTurn(FromUser: false, reply, buttons));
             await EmitAsync(new Responded(message.CommandId, Id, reply, buttons))
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
@@ -69,32 +71,10 @@ internal sealed class Chat : Neuron, IChat
             yield break;
         }
 
-        if (WantsChart(message.Text))
-        {
-            const string reply = "Here is a sample chart.";
-            var charts = new[]
-            {
-                new ChatChartOffer(
-                    "Weekly activity",
-                    [
-                        new ChatChartPoint("Mon", 42),
-                        new ChatChartPoint("Tue", 68),
-                        new ChatChartPoint("Wed", 51),
-                        new ChatChartPoint("Thu", 89),
-                        new ChatChartPoint("Fri", 74),
-                    ],
-                    "bar"),
-            };
-            Remember(new ChatTurn(FromUser: false, reply, Charts: charts));
-            await EmitAsync(new Responded(message.CommandId, Id, reply, Charts: charts))
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            yield return new ChatResponseUpdate(ChatRole.Assistant, reply);
-            yield break;
-        }
-
         var answer = new StringBuilder();
+        var responder = await ResponderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        await foreach (var chunk in DefaultResponder().RespondStreaming([.. Turns().Select(AsChatMessage)], cancellationToken).ConfigureAwait(true))
+        await foreach (var chunk in responder.RespondStreaming([.. Turns().Select(AsChatMessage)], cancellationToken).ConfigureAwait(true))
         {
             answer.Append(chunk.Text);
             yield return chunk;
@@ -128,23 +108,46 @@ internal sealed class Chat : Neuron, IChat
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    public async Task HandleAsync(ButtonClicked synapse, CancellationToken cancellationToken)
+    public async Task HandleAsync(ShowTime synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!string.Equals(synapse.Action, ShowTimeAction, StringComparison.Ordinal)
-            && !string.Equals(synapse.ButtonId, ShowTimeButtonId, StringComparison.Ordinal))
-        {
-            return;
-        }
-
         var when = TimeProvider.GetUtcNow().ToString("O");
         var text = $"Current UTC time: {when}";
-        var command = CommandId.New();
         Remember(new ChatTurn(FromUser: false, text));
-        await EmitAsync(new Responded(command, Id, text))
+        await EmitAsync(new Responded(CommandId.New(), Id, text))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    private async Task ArmOfferedButtonAsync(CommandId offer, string buttonId)
+    {
+        var button = NeuronId.For<IButton>(Id.Owner, ChatButtons.OfferedInstanceName(Id.Name, offer, buttonId));
+        var graphId = ISynapseGraph.ForOwner(Id.Owner);
+
+        await SendAsync(
+            graphId,
+            new Bind(
+                ChatButtons.ArmingBindingId(button),
+                button,
+                ButtonActivated.AliasName,
+                Id,
+                ButtonActivatedToShowTime.TransformName)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        // The offer must not reach the owner before the click route is live, or an
+        // immediate click emits an activation with no receiver and is lost.
+        using var arming = new CancellationTokenSource(DeliveryPolicy.RouteLookupTimeout);
+        await FlushOutboxAsync(arming.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        var routes = await GrainFactory
+            .GetGrain<ISynapseGraph>(graphId.ToGrainId())
+            .RoutesFor(button, ButtonActivated.AliasName)
+            .WaitAsync(arming.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        if (routes.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Chat '{Id}' could not arm button '{button}' before offering it.");
+        }
     }
 
     private static ChatTranscript Trimmed(ChatTranscript transcript, int? maxTurns)
@@ -164,17 +167,27 @@ internal sealed class Chat : Neuron, IChat
             && value.Contains("time", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool WantsChart(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return false;
-        }
-
-        return text.AsSpan().Trim().Contains("chart", StringComparison.OrdinalIgnoreCase);
-    }
-
     private IReadOnlyList<ChatTurn> Turns() => [.. _transcript.Select(_turns.Deserialize)];
+
+    private async Task<IAgent> ResponderAsync()
+    {
+        using var lookup = new CancellationTokenSource(DeliveryPolicy.RouteLookupTimeout);
+        try
+        {
+            var routes = await GrainFactory
+                .GetGrain<ISynapseGraph>(ISynapseGraph.ForOwner(Id.Owner).ToGrainId())
+                .RoutesFor(Id, ChatRoles.Responder)
+                .WaitAsync(lookup.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+            return routes.FirstOrDefault() is { } bound
+                ? GrainFactory.GetGrain<IAgent>(bound.Target.ToGrainId())
+                : DefaultResponder();
+        }
+        catch (OperationCanceledException) when (lookup.IsCancellationRequested)
+        {
+            return DefaultResponder();
+        }
+    }
 
     private IAssistant DefaultResponder()
         => GrainFactory.GetGrain<IAssistant>(NeuronId.For<IAssistant>(Id.Owner, AssistantName).ToGrainId());

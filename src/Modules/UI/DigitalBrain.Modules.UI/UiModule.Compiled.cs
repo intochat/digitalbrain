@@ -27,11 +27,6 @@ public sealed partial class UiModule : ICompiledModule
                             1,
                             "Returns the durable transcript kept for one named conversation",
                             CapabilitySchema.For(typeof(ReadTranscriptRequest))),
-                        new SynapseCapabilityDescriptor(
-                            "ui.button-clicked",
-                            1,
-                            "Owner activated a button offered in a chat turn",
-                            CapabilitySchema.For(typeof(ButtonClicked))),
                     ],
                     [
                         new SynapseCapabilityDescriptor(
@@ -74,11 +69,35 @@ public sealed partial class UiModule : ICompiledModule
                             CapabilitySchema.For(typeof(SurfaceOpened))),
                     ]),
                 new NeuronCapabilityDescriptor(
+                    "ui.chart",
+                    "Chart control with identity",
+                    "dashboard",
+                    [
+                        new SynapseCapabilityDescriptor(
+                            ChartPoint.AliasName,
+                            1,
+                            "Append one point to whatever chart receives it",
+                            CapabilitySchema.For(typeof(ChartPoint))),
+                    ],
+                    []),
+                new NeuronCapabilityDescriptor(
                     "ui.button",
                     "Interactive button control",
                     "default",
-                    [],
-                    []),
+                    [
+                        new SynapseCapabilityDescriptor(
+                            "ui.button-clicked",
+                            1,
+                            "Owner activated a button offered in a chat turn",
+                            CapabilitySchema.For(typeof(ButtonClicked))),
+                    ],
+                    [
+                        new SynapseCapabilityDescriptor(
+                            ButtonActivated.AliasName,
+                            1,
+                            "A button neuron was activated by its owner",
+                            CapabilitySchema.For(typeof(ButtonActivated))),
+                    ]),
             ]);
 
     CapabilityManifest ICompiledModule.Capabilities => Capabilities;

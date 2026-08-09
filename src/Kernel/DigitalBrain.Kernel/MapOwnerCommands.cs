@@ -62,8 +62,8 @@ internal static class OwnerCommandsHttpMaps
                         return;
                     }
 
-                    await brain.SendAsync<IChat>(
-                        request.ChatName,
+                    await brain.SendAsync<IButton>(
+                        ChatButtons.OfferedInstanceName(request.ChatName, offerCommandId, request.ButtonId),
                         new ButtonClicked(offerCommandId, request.ButtonId, request.Action),
                         cancellationToken).ConfigureAwait(false);
                     http.Response.StatusCode = StatusCodes.Status202Accepted;

@@ -37,6 +37,11 @@ public abstract partial class Neuron
         await DrainAsync(drainLifecycle.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
+    // A turn cannot wait for its own sends to land otherwise: the drain timer only
+    // fires between turns, so awaiting a delivery effect mid-turn starves forever.
+    protected Task FlushOutboxAsync(CancellationToken cancellationToken)
+        => DrainAsync(cancellationToken);
+
     private IOutboxWakeup Wakeup()
         => GrainFactory.GetGrain<IOutboxWakeup>(Id.ToString());
 

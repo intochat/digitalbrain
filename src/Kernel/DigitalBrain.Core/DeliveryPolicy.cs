@@ -14,7 +14,7 @@ public static class DeliveryPolicy
 
     public static readonly TimeSpan InnerDeliveryReadBound = DeliveryAttemptTimeout - TimeSpan.FromSeconds(5);
 
-    public static readonly TimeSpan SubscriptionRegistryTimeout = TimeSpan.FromSeconds(5);
+    public static readonly TimeSpan RouteLookupTimeout = InnerDeliveryReadBound;
 
     public static int InboundDepth() => RequestContext.Get(DepthKey) is int depth ? depth : 0;
 

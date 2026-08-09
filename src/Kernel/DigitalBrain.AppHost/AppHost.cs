@@ -73,11 +73,4 @@ mcp.WithMcpServer(
     ProductSurfaceResources.McpHttpEndpointName);
 #pragma warning restore ASPIREMCP001
 
-builder.AddProject<Projects.DigitalBrain_Scripting>(ProductSurfaceResources.Scripting)
-    .WithReference(brain.AsClient())
-    .WithEnvironment(
-        ShellHostingExtensions.OwnerEnvironmentVariable,
-        ShellHostingExtensions.DefaultOwner)
-    .WaitFor(kernel);
-
 builder.Build().Run();

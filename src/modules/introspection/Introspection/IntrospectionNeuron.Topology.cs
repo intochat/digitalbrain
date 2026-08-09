@@ -34,6 +34,10 @@ internal sealed partial class IntrospectionNeuron
     private async Task<TopologyRead> ReadTopologyAsync(CommandId commandId, CancellationToken cancellationToken)
     {
         var ownerStatistics = await ActivatedOwnerNeuronsAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        var bindings = await GrainFactory
+            .GetGrain<ISynapseGraph>(ISynapseGraph.ForOwner(Id.Owner).ToGrainId())
+            .Bindings()
+            .WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         var placements = ownerStatistics
             .Select(static neuron => neuron.Silo)
             .Distinct()
@@ -54,7 +58,19 @@ internal sealed partial class IntrospectionNeuron
                     .OrderBy(static neuron => neuron.GrainType, StringComparer.Ordinal)
                     .ThenBy(static neuron => neuron.Identity, StringComparer.Ordinal),
             ],
-            TimeProvider.GetUtcNow());
+            TimeProvider.GetUtcNow(),
+            [
+                .. bindings
+                    .Select(static binding => new TopologyBinding(
+                        binding.BindingId,
+                        binding.Source.ToString(),
+                        binding.SynapseAlias,
+                        binding.Target.ToString(),
+                        binding.Transform,
+                        binding.ExpiresAt))
+                    .OrderBy(static binding => binding.Source, StringComparer.Ordinal)
+                    .ThenBy(static binding => binding.SynapseAlias, StringComparer.Ordinal),
+            ]);
     }
 
     private sealed record ActivatedNeuron(string Type, string GrainKey, SiloAddress Silo);

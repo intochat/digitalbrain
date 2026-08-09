@@ -13,4 +13,7 @@ public sealed partial class UiModule : IModule
                     || type == typeof(Microsoft.Extensions.AI.ChatResponse)
                     || type == typeof(Microsoft.Extensions.AI.ChatResponseUpdate)
                     || typeof(Microsoft.Extensions.AI.AIContent).IsAssignableFrom(type)));
+
+    static partial void ConfigureRuntime(ISiloBuilder builder)
+        => builder.Services.AddSingleton<Core.ISynapseTransform>(new ButtonActivatedToShowTime());
 }

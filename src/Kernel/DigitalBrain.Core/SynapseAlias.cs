@@ -1,17 +1,8 @@
 using System.Collections.Concurrent;
 using System.Reflection;
-using DigitalBrain.Abstractions;
 using Orleans;
 
 namespace DigitalBrain.Core;
-
-public interface IBroadcastSubscribers
-{
-    ValueTask<IReadOnlyCollection<NeuronId>> ReceiversFor(
-        OwnerId owner,
-        string eventAlias,
-        CancellationToken cancellationToken);
-}
 
 public static class SynapseAlias
 {

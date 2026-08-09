@@ -33,29 +33,41 @@ public abstract partial class Neuron
 
         var receivers = catalog.HandlerGrainTypes(synapseType)
             .Select(grainType => NeuronId.BroadcastReceiver(grainType, Id.Owner, correlation))
-            .Concat(await SubscribedReceiversAsync(synapse).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext))
+            .Concat(await RoutedReceiversAsync(synapse).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext))
             .ToArray();
 
         await FireAsync(synapse, receivers, correlation).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    private async Task<IReadOnlyCollection<NeuronId>> SubscribedReceiversAsync(Synapse synapse)
+    private async Task<IReadOnlyCollection<NeuronId>> RoutedReceiversAsync(Synapse synapse)
     {
-        var subscribers = ServiceProvider.GetService<IBroadcastSubscribers>();
-        if (subscribers is null || SynapseAlias.Of(synapse.GetType()) is not { } alias)
+        if (SynapseAlias.Of(synapse.GetType()) is not { } alias)
         {
             return [];
         }
 
-        using var bound = new CancellationTokenSource(DeliveryPolicy.SubscriptionRegistryTimeout);
+        var graph = ISynapseGraph.ForOwner(Id.Owner);
+        if (graph == Id)
+        {
+            return [];
+        }
+
+        using var bound = new CancellationTokenSource(DeliveryPolicy.RouteLookupTimeout);
         try
         {
-            return await subscribers.ReceiversFor(Id.Owner, alias, bound.Token).ConfigureAwait(true);
+            var routes = await GrainFactory
+                .GetGrain<ISynapseGraph>(graph.ToGrainId())
+                .RoutesFor(Id, alias)
+                .WaitAsync(bound.Token).ConfigureAwait(true);
+
+            return [.. routes.Select(route => route.Transform is null
+                ? route.Target
+                : BindingRelay.ForBinding(Id.Owner, route.BindingId))];
         }
         catch (OperationCanceledException) when (bound.IsCancellationRequested)
         {
             throw new TimeoutException(
-                $"Broadcast subscriber lookup for '{alias}' did not answer within {DeliveryPolicy.SubscriptionRegistryTimeout}.");
+                $"Synapse graph route lookup for '{alias}' did not answer within {DeliveryPolicy.RouteLookupTimeout}.");
         }
     }
 

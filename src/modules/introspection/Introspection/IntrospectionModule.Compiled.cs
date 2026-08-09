@@ -55,6 +55,34 @@ public sealed partial class IntrospectionModule : ICompiledModule
                             "The modules this deployment composed and the owner's currently activated neurons",
                             CapabilitySchema.For(typeof(TopologyRead))),
                     ]),
+                new NeuronCapabilityDescriptor(
+                    "db.synapse-graph",
+                    "Owner synapse graph: durable runtime routes between neuron instances",
+                    ISynapseGraph.InstanceName,
+                    [
+                        new SynapseCapabilityDescriptor(
+                            "db.bind",
+                            1,
+                            "Create or replace a synapse route: deliver a source neuron's emitted synapses to a target neuron, optionally through a named transform, optionally until an expiry",
+                            CapabilitySchema.For(typeof(Bind))),
+                        new SynapseCapabilityDescriptor(
+                            "db.unbind",
+                            1,
+                            "Remove a synapse route by its binding identity",
+                            CapabilitySchema.For(typeof(Unbind))),
+                    ],
+                    [
+                        new SynapseCapabilityDescriptor(
+                            "db.bound",
+                            1,
+                            "A synapse route is live",
+                            CapabilitySchema.For(typeof(Bound))),
+                        new SynapseCapabilityDescriptor(
+                            "db.unbound",
+                            1,
+                            "A synapse route was removed",
+                            CapabilitySchema.For(typeof(Unbound))),
+                    ]),
             ]);
 
     CapabilityManifest ICompiledModule.Capabilities => Capabilities;
