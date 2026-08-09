@@ -1,420 +1,544 @@
-# DigitalBrain Core — architecture (2026-08-08, v3 — post-panel)
+# DigitalBrain Core — POC-0 architecture (2026-08-09, v5)
 
-Two concepts. One verb. A brain is interconnected by **what exists**, not by what is wired
-in code. This spec was attacked by a seven-adversary panel (Orleans reality, concurrency,
-behavior mechanism, module author, physics consistency, test harness, self-awareness);
-all nine proven contradictions and every accepted fix are incorporated below. The paradigm
-survived every lens unchanged — only the law text bled.
+> **Status:** approved greenfield proof charter. This replaces the rejected
+> behavior DSL, interpreter, and legacy-coexistence design. It makes no claim
+> that POC code already exists.
 
----
+## 1. The hypothesis
 
-## 1. The paradigm
+POC-0 must answer one falsifiable question:
 
-- **Neuron** — durable, addressable, owner-scoped actor. Declares the synapse kinds it
-  handles. Its life is its journal.
-- **Synapse** — data type = data contract = data carrier. Immutable record. Journaled.
+> Can owner intent become one reviewable C# source file which, after verified
+> owner approval and a cold restart, acts as ordinary durable DigitalBrain
+> neurons and updates a trusted Flutter chart through typed contracts?
 
-DigitalBrain is the **compiler/runtime** — registry, routing, journal, discovery,
-inspection, later the self-improvement rail. Not a concept. Only things that handle
-synapses are neurons; time, models, transports, storage are services a constructor asks for.
+The POC succeeds only if the generated file:
 
-## 2. Interconnection — "when Musk posts do X, when Vlad posts do Y"
+1. contains ordinary C# classes inheriting from **Neuron** and ordinary
+   **Synapse** records;
+2. sends a point through the trusted chart module rather than owning UI;
+3. survives a whole-process restart with state, journal, and undelivered work;
+4. is refused before admission when it requests ungranted authority.
 
-No wiring registry, no subscription API, no connection objects. Three mechanisms:
+“ScriptedNeuron” is authoring provenance only. It is not a runtime base type,
+an interpreter payload, a behavior definition, a special router path, or a
+catch-all receiver.
 
-1. **Kinds declare, instances exist.** `IHandle<XPosted>` on a compiled kind puts its
-   `"default"` instance in the receiver set. Creating an instance is wiring — and creation
-   is itself a **journaled fact**: the registry observes creations, never bare activations.
-2. **Selection is domain data.** `XPosted(Author, Text)` carries the author because the
-   domain cares. The runtime routes by exact type; the behavior selects by data.
-3. **A behavior is a neuron whose definition is durable state.** Compiled behaviors are
-   classes; runtime-created behaviors are named instances of **one compiled kind,
-   `Behavior`**, created and changed by conversation, not deploys.
+POC-0 is deliberately greenfield. It must not reference the current
+pet-project runtime, DigitalBrain.Scripting, its generated project-file flow,
+or any legacy implementation.
 
-```
-x:elonmusk fires XPosted("elonmusk", "doge to the moon")      [broadcast fact]
-behavior:musk-chart   Where Author == "elonmusk"  → fires ChartPointRequested at chart:btc
-behavior:vlad-notes   Where Author == "vlad"      → fires NoteFiled at notes:default
-chart:btc answers ChartPointRequested with ChartPointAdded    [directed, typed result]
-```
+## 2. Two concepts, one verb
 
-### The behavior mechanism, concretely
+DigitalBrain exposes only these domain concepts:
 
-The definition is closed, serializable data — never a script (Gate-0 law):
+- **Neuron** — a durable, addressable actor that handles declared synapse
+  types.
+- **Synapse** — immutable data carrying a typed fact or command. The runtime
+  journals it.
 
-```csharp
-record BehaviorDefinition(
-    string OnSynapse,                        // alias of the fact kind to react to
-    IReadOnlyList<FieldCondition> Where,     // selection over the triggering fact
-    IReadOnlyList<ActionStep> Fire);         // steps, in order
+The one action is **FireSynapse**. IHandle<T>, IDigitalBrain,
+IDurableState<T>, router, journal, outbox, compiler, and candidate catalog are
+runtime machinery, not a third domain vocabulary.
 
-record FieldCondition(string Field, ConditionOp Op, string Value);
-enum ConditionOp { Equals, NotEquals, Contains, GreaterThan, LessThan }   // closed set
+~~~csharp
+public abstract record Synapse;
 
-record ActionStep(
-    string SynapseAlias,
-    string? Target,
-    IReadOnlyList<FieldCondition> Where,     // step guard over trigger ∪ prior step results
-    IReadOnlyDictionary<string, ValueSource> With);
-// ValueSource = literal | field of the triggering fact | field of a prior step's result
-```
-
-Step guards make judgment flows expressible: *monitor the dev blog* = clock fact →
-step 1 fires `Assess(text)` at the assistant (directed, typed result) → step 2 fires
-`IssueProposed` **Where** `steps[1].Relevant == true`. The data tier wires; neurons think.
-
-**Creation and lifecycle are flows, not APIs.** `DefineBehavior(definition)` is a directed
-synapse handled by the target instance: it validates (unknown alias, field, target, or an
-ambiguous alias ⇒ typed refusal in the answer), persists the definition, and answers
-`BehaviorDefined` **only after** the interest `(owner, OnSynapse → instance)` is durably
-committed in the registry — write-through, so recovery is the registry replaying its own
-journal, and a restart can never leave a behavior silently deaf. Redefining replaces (the
-journal keeps every prior definition — versioning for free); `DisableBehavior` withdraws
-the interest through the same write-through; listing rides `Discover`. Definitions are
-stamped with the field shape of every alias they use — a fire-time mismatch after a
-redeploy journals a typed `BehaviorInvalidated` and withdraws the interest until redefined.
-After N consecutive retracted turns the runtime journals `BehaviorSuspended` and withdraws
-the interest — loud, typed, recoverable. Nothing about a behavior's death is telemetry-only.
-
-**Delivery — and the direct answer to "Orleans streams and implicit subscriptions?": no.**
-Memory streams *drop* broadcasts for subscribers not active at publish time — fatal
-precisely for behaviors born at runtime — and implicit subscriptions bind per kind, not
-per instance interest. Instead the committed outbox entry carries the fact, and **the
-drain expands the receiver set at delivery time** from the registry (compiled declarations
-∪ journaled instance interests): the registry sits outside the atomic commit path,
-retries ride the drain, duplicates are watermark-acked, and a behavior defined between
-commit and drain hears even the in-flight fact. The refused alternative — an interpreter
-kind declaring a catch-all `IHandle<Synapse>` — would multiply the durable outbox by the
-behavior count to deliver facts selection would discard.
-
-### The code tier — how scripting introduces new neurons
-
-When intent needs **new vocabulary or logic** — not composition of existing contracts —
-the trust ladder climbs three rungs. Every rung is a journaled flow, and the same
-TestBrain harness that proves Stage A is the activation gate for generated code — one
-gate, law 10.
-
-1. **Compose** (instant, no code): `BehaviorDefinition` above. Always tried first.
-2. **Interpret** (seconds, the running silo): a scripted body executes inside the one
-   compiled interpreter machinery, addressable under a new neuron name via runtime
-   manifest decoration — proven live in the lineage (new names addressable with zero
-   restart; staged → promoted → retired lifecycle with rollback; loop-guard + watchdog
-   around untrusted code). New vocabulary at this rung rides the compiled **carrier
-   record** (contract id + schema-stamped payload) — a visible seam, priced consciously:
-   no `IHandle<HotType>`, schema versioning lives in data.
-3. **Compile** (minutes, real types): the Creator authors typed C# — records + neuron +
-   **its own scenario** — compiled *with the Orleans source generator* so the new records
-   carry their own serializers; the pack loads into a collectible ALC inside a
-   **disposable per-candidate quarantine brain** (TestBrain in production clothes — v3's
-   proven gate pattern), runs its scenario red → green, and green journals the approval
-   fact. Admission into the product is then one of exactly two doc-honest moves: **a new
-   silo joins carrying the pack** (heterogeneous silos — the brain grows new tissue as
-   new silos, an orchestration Aspire already owns) or **restart-and-load** (the floor —
-   durable journals make a restart a pause, never a loss). Orleans has no documented way
-   to grow a *running* silo's compiled type set; this spec does not pretend otherwise.
-
-Evidence grades, so nobody inherits theater: manifest-decoration admission and the
-Creator lifecycle are PROVEN-LIVE (single silo); the quarantine-gate mechanics are
-PROVEN-LIVE except two links — running the Orleans generator over runtime-compiled code,
-and asserting the gate ALC actually collects after disposal — open items 6 and 7, each a
-one-day spike with a crisp pass/fail. Until both pass, rung 3 ships restart-tier only.
-
-## 3. The ABI
-
-```csharp
-// ── The two concepts ────────────────────────────────────────────────────────
-public abstract record Synapse;                       // broadcast fact, one-way
-
-public abstract record Synapse<TResult> : Synapse     // directed request; the contract
-    where TResult : Synapse;                          // declares its typed result
-
-public interface IHandle<TSynapse> where TSynapse : Synapse
+public interface IHandle<TSynapse>
+    where TSynapse : Synapse
 {
     Task HandleAsync(TSynapse synapse, CancellationToken cancellationToken);
 }
 
-public interface IHandle<TSynapse, TResult>
-    where TSynapse : Synapse<TResult> where TResult : Synapse
-{
-    Task<TResult> HandleAsync(TSynapse synapse, CancellationToken cancellationToken);
-}
-// No variance: receiver matching is exact-type, never assignability — declared variance
-// would promise conversions the registry will not honor.
-
-// ── The neuron base — one vocabulary member ─────────────────────────────────
-public abstract class Neuron : DurableGrain
-{
-    public NeuronId Id { get; }                       // (Owner, Kind, Name)
-}
-// The wire is runtime-owned and invisible: INeuron { Task<Synapse?> Deliver(SynapseDelivery, ct); }
-// implemented explicitly and SEALED on Neuron — modules cannot intercept or re-implement
-// delivery. TResult is compile-checked at the fire and runtime-checked at the wire.
-// DurableGrain's inherited surface (ServiceProvider, GrainFactory) is machinery, never
-// vocabulary: the architecture guard forbids module code referencing either, or INeuron.
-
-// A neuron that fires declares the dependency like any other service:
-//
-//   class MuskChart(IDigitalBrain brain) : Neuron, IHandle<XPosted>
-//   {
-//       public async Task HandleAsync(XPosted post, CancellationToken ct)
-//       {
-//           if (post.Author != "elonmusk") return;
-//           await brain.FireSynapse(new ChartPointRequested(post.Text), ct);
-//       }
-//   }
-
-// ── The facade — one verb, plus reading the brain ───────────────────────────
 public interface IDigitalBrain
 {
-    OwnerId Owner { get; }
-
-    Task FireSynapse(Synapse synapse, CancellationToken ct = default);
-    Task<TResult> FireSynapse<TResult>(Synapse<TResult> synapse,
-        TimeSpan? deadline = null, CancellationToken ct = default)   // default deadline lives on the verb
-        where TResult : Synapse;
-
-    Task<IReadOnlyList<NeuronContract>> DiscoverAsync(string query, int limit = 8, CancellationToken ct = default);
-    Task<JournalRead> ReadJournalAsync(NeuronId subject, JournalKind kind, long after = 0, CancellationToken ct = default);
-    Task<CausalChain> TraceAsync(CorrelationId correlation, CancellationToken ct = default);
-    Task<JournalRead> RecallAsync(RecallQuery query, CancellationToken ct = default);
-    IAsyncEnumerable<JournalRead> WatchAsync(NeuronId subject, JournalKind kind, long after = 0, CancellationToken ct = default);
+    Task FireSynapse(
+        Synapse synapse,
+        CancellationToken cancellationToken = default);
 }
 
-// Directed fire targets instance "default" unless the synapse carries its address:
-public interface IAddressed { string Neuron { get; } }
-// An addressed fire SELECTS among journaled identities; it never mints one. A directed
-// fire at a never-created named instance fails typed ("no such instance") — only
-// "default" exists by declaration.
-```
+public interface IDurableState<TState>
+{
+    TState Value { get; }
+    void Replace(TState next);
+}
+~~~
 
-**The envelope** — runtime-stamped, journal-visible, never author-touched:
-`SynapseDelivery(Id, Correlation, Causation, Source, Origin, Sequence, Timestamp, Synapse)`
-where `Origin ∈ { Owner, Neuron }` — edge fires are owner-attributed, so journal exports
-carry roles mechanically. An edge fire lands on the **owner's session neuron** — a neuron
-like any other; it is the envelope Source and the fact's journal locus.
+The runtime supplies IDurableState<T> only inside the owning neuron’s durable
+turn. It exposes no raw store, journal, provider, save operation, service
+provider, grain factory, or other neuron’s state. State replacement and
+outgoing synapses commit as one durable turn.
 
-**Contract cards.** Every synapse contract statically carries its registry card: alias
-(derived from the namespace-qualified type name, unique per registry, round-trips to
-exactly one type — *identity is the qualified name, the alias is derived, never a lookup
-result*), one-line description, example utterances. `NeuronContract` = the card + request
-and result field schemas derived from the compiled records by the source-generated
-manifest (never hand-written) + observed instance names. Discovery quality is a Stage A
-scenario, not a hope.
+Handler matching is exact. IHandle<SocialPostObserved> handles that one
+contract; it is not a subscription to a base type or arbitrary subtype.
+IHandle<Synapse> is invalid in generated code.
 
-**Protected fields.** Payloads are journal-visible unless a record field is declared
-protected, which journals a **reference**; the plaintext lives behind the payload
-protector (runtime machinery folded into Core). Gmail bodies never enter journals or
-training exports in the clear.
+### The durable activation seam
 
-**External authorization is a flow, not machinery.** An auth neuron owns pending states
-and journals `AuthorizationRequired` / `AuthorizationCompleted` as facts; a parkable
-request's *result record* carries a typed `AuthorizationRequired` branch (sign-in URL),
-with the resume key as caller-supplied domain data on the request record; the caller —
-assistant or a behavior selecting on `AuthorizationCompleted` — re-fires the request on
-hearing the completion fact. The browser callback is an edge fire like any other.
+Neuron is a normal compiled DigitalBrain base type, not a thin public wrapper
+over raw Orleans APIs. A trusted internal NeuronActivationGrain is the only
+Orleans-facing activator. It is keyed by an immutable route binding
+(owner, contract, candidate family/revision when applicable, trusted target
+scope when applicable, neuron type), owns the journal/outbox/state turn,
+constructs the selected normal Neuron with restricted dependencies, and invokes
+its exact IHandle<T> method.
 
-**A module is:** synapse records + neuron classes + one composition entry (the existing
-`IModule` seat) registering the services its neurons' constructors ask for and the
-module's host resources. Nothing else exists to write — no verbs, no manifests, no wiring.
+The same activation seam hosts trusted and generated Neuron subclasses. It
+does not interpret a behavior language or provide a ScriptedNeuron special
+case; it supplies durable activation to compiled C# selected by the route
+table. Candidate assemblies are application parts so their serializers are
+available at host construction. This avoids exposing a raw GrainFactory,
+service provider, or Orleans activation capability to generated code.
 
-## 4. The ten laws
+## 3. The real POC route
 
-1. **Two concepts.** Not a neuron or a synapse ⇒ runtime machinery, never vocabulary.
-2. **One verb, one place.** `FireSynapse` exists only on `IDigitalBrain`; neurons fire
-   through their injected brain. Routing lives in the contract: `Synapse` broadcasts,
-   `Synapse<TResult>` directs and returns. The registry is invisible.
-3. **The DAG law.** Directed calls flow down; results return only as return values; facts
-   flow one way. The chain check refuses every cycle it can see (including self-fire)
-   before the call; chains are depth-bounded; **the chain dies at commit** — correlation
-   and causation persist through the outbox, the chain does not, so a drained broadcast
-   roots a fresh chain. Every directed fire carries a deadline; expiry is a typed,
-   journaled failure — deadlock degrades to typed failure, never a hang, never interleave.
-4. **Broadcast is one-way, journal-first, at-least-once.** Receiver set — one formula:
-   the `"default"` instance of every kind compiled with `IHandle<T>` ∪ every named
-   instance whose journaled interest names T, matched by exact type. Expansion happens at
-   **drain time**, outside the atomic commit path. Instance creation is wiring and is
-   itself a journaled fact. Zero receivers is legal; duplicates are silently acked
-   (per-source watermark). Streams are refused as carrier.
-5. **The journal is the only truth — and truth never truncates silently.** One
-   interleaved journal per neuron (`JournalKind` is a read filter, not a second feed);
-   directed calls enter the same timeline via the runtime's call filter; every commit also
-   appends to a per-owner, day-keyed timeline on the brain (the "last Friday" substrate).
-   A feed compacts only behind a journaled, replayable archive — the retained window is a
-   cache; `Read`/`Recall` span both. Streaming deltas are an ephemeral, non-durable
-   projection of a directed fire in progress; nothing may be asserted from them. The
-   journal is the **audit floor**: nothing claimed without an entry — not a claim that the
-   world was reversed.
-6. **The atomic turn is per neuron.** Staged broadcasts and state commit or retract
-   together *at this neuron*; staged facts are invisible to everyone — including directed
-   callees — until commit. A directed fire is the **callee's own committed turn**: the
-   caller's retraction cannot unmake it and journals the orphaned request as a typed fact.
-   External effects are at-least-once under redelivery — idempotency keys are domain data
-   on the synapse. A fire is accepted only on the activation's scheduler: in an open turn
-   it joins that commit; in grain code outside a turn (activation, reminder, timer) it
-   opens its own; off-scheduler it fails typed.
-7. **The registry is observed, never computed.** Truth = compiled `IHandle<>`
-   declarations + journaled instance interests (written through at define-commit, never
-   scanned) + contract cards. The source-generated manifest accelerates; degradation is loud.
-8. **Activation identity is declared.** The kind by contract; the name by a journaled
-   creation fact; an addressed fire selects among declared identities and never mints one.
-   Never correlation-keyed.
-9. **Failures are typed and journaled.** No handler, no such instance, ambiguity, denial,
-   timeout, cycle, suspension — typed to the caller, facts in the journal. The directed
-   plane is **at-most-once per fire**, request and result on one correlation; a caller
-   that re-fires after a timeout recalls the receiver's journal first or carries a domain
-   attempt key — retries are never the runtime's job. Silent drops do not exist.
-10. **Gates must be able to fail.** Unprovable = skipped-with-reason, never green; red
-    features enter behind `@ignore("pending: law N")` and each runtime commit's first
-    change is the un-ignore — the root gate is never red, and no gate is theater.
+The generated module must not define either end of the real integration.
+Trusted modules own stable ingress and effect contracts. The generated file
+proves custom vocabulary only inside its own atomic module.
 
-## 5. BDD-first — the proof suite is the specification
+~~~mermaid
+flowchart LR
+    S["Trusted social module<br/>SocialPostObserved"]
+    R["Generated elon-chart.cs<br/>ElonPostRuleNeuron"]
+    M["Generated ElonPostMatched"]
+    F["Generated ChartForwarderNeuron"]
+    A["Trusted chart contract<br/>AddChartPoint"]
+    C["Trusted chart module<br/>ChartNeuron"]
+    U["Flutter chart"]
 
-**Order of work: harness → features red (ignored-with-reason) → runtime green, law by law.**
-Framework: **Reqnroll** over a real TestCluster (the lineage standard — `final/`'s
-Os.Tests is the reference MTP wiring). Commit #1 pins the stack it stands on:
-Reqnroll.xunit.v3 + an xunit.v3 version proven by compiling one generated feature under
-the Microsoft.Testing.Platform gates this repo uses, shim carried into TestBrain.
+    S --> R --> M --> F --> A --> C --> U
+~~~
 
-**TestBrain** (shaped like ino's session verbs, implemented over the TestCluster brain):
-- `s.Fire(fact)` / `await s.Get(request)` / `s.Journal(neuron)` / `s.Receivers<T>()`
-  (registry read) / `s.Quiesced(neuron)` (outbox drained) / `s.Surface(panel)`;
-- **three physics seams**: a restart-surviving journal store (process-static provider
-  covering feeds, outbox, and watermarks), a delivery gate (an incoming filter holding a
-  named synapse kind undelivered — "committed but undelivered" as a stable state), and
-  silo restart + reactivation choreography;
-- deterministic assertions only: typed results + journal tallies + receiver-set
-  enumeration — never wall clocks, never unbounded negatives. Hangs are caught by the
-  harness-level test timeout, not Gherkin.
+| Item | Owner | What generated code may do |
+| --- | --- | --- |
+| SocialPostObserved | trusted social-ingress module | Handle it; never redefine or spoof it. |
+| ElonPostMatched | generated candidate | Define it and route it between generated neurons. |
+| AddChartPoint and ChartPointAdded | trusted chart-contract module | Construct an allowed AddChartPoint only. |
+| ChartNeuron, chart state, Flutter bridge | trusted chart module | Never reference implementation types or UI capabilities. |
 
-Stage A's surface vocabulary is one record — `SurfacePresented(string Panel, Synapse
-Content)` — fired like any fact; the full RFW widget vocabulary stays Stage D. UI changes
-are journal assertions with no renderer running.
+The candidate contains one local synapse, generated state, and two ordinary
+neurons:
 
-```gherkin
-Feature: Physics
-Scenario: A failing handler retracts its whole turn
-  Given a Diary neuron whose handler stages Noted and then throws
-  When Remember is fired at diary:default
-  Then diary:default's outgoing journal has no Noted
-  And every receiver of Noted journals zero Noted deliveries
+- ElonPostMatched : Synapse;
+- ElonPostRuleState;
+- ElonPostRuleNeuron : Neuron, IHandle<SocialPostObserved>;
+- ChartForwarderNeuron : Neuron, IHandle<ElonPostMatched>.
 
-Scenario: A caller that fails after a directed result journals the orphan
-  Given a handler that gets a ChartPointAdded result and then throws
-  Then chart:btc's turn stays committed
-  And the caller journals the orphaned request as a typed fact
+For a valid social fact from author **elonmusk**, the rule neuron advances its
+private durable state and fires ElonPostMatched. The forwarder fires
+host-owned AddChartPoint. A fact from another author produces neither local
+nor chart output. ChartNeuron owns its durable point collection and publishes
+its Flutter projection.
 
-Scenario: A broadcast survives a crash between commit and delivery
-  Given the delivery gate holds Greeted undelivered
-  And the silo restarts
-  Then every receiver journals Greeted exactly once after reactivation
+The trusted social ingress derives a durable inbound identity from owner,
+contract, and source-post ID. Re-observing the same source post therefore
+reaches each matching generated family at most once; generated state only needs
+to track its family-local accepted ordinal.
 
-Feature: Routing
-Scenario: A directed synapse returns its typed result
-  When GmailSearch "in:inbox" take 3 is fired
-  Then the caller holds a GmailResult with 3 messages
-  And gmail:default journals request and result on one correlation
+The candidate sees the AddChartPoint contract, never ChartNeuron. Flutter
+widgets, channels, credentials, and rendering therefore remain behind a
+trusted deep module.
 
-Scenario: A cycle is refused before the callee runs
-  Given A's handler fires directed at B, and B's handler fires directed back at A
-  When the chain is fired
-  Then the fire fails typed as a cycle
-  And b:default journals exactly one delivery
+### The routing identity that FireSynapse does not expose
 
-Scenario: Cross-chain contention degrades to typed timeout, never a hang
-  Given A awaits a directed fire at B while B awaits a directed fire at A
-  Then both fires fail typed within their deadlines and both failures are journaled
+FireSynapse remains the sole candidate-visible verb, but it is not a bare type
+broadcast. The runtime owns an immutable SynapseEnvelope containing:
 
-Feature: Interconnection
-Scenario: Two watchers, two behaviors, zero shared code
-  Given behavior musk-chart selecting XPosted Where Author Equals "elonmusk"
-  And behavior vlad-notes selecting XPosted Where Author Equals "vlad"
-  When XPosted "elonmusk" "doge to the moon" is fired
-  Then chart:btc journals ChartPointRequested
-  And notes:default journals zero NoteFiled deliveries
+- owner identity from authenticated ingress;
+- contract alias;
+- candidate-family identity and a pinned target candidate revision whenever
+  delivery enters generated code; a candidate-local envelope also records its
+  producing candidate revision;
+- target scope when a trusted contract names an instance;
+- inbound identity, causation identity, and runtime-derived delivery/effect
+  identity;
+- capability origin and output ordinal.
 
-Scenario: A behavior defined after commit still hears the in-flight fact
-  Given the delivery gate holds XPosted undelivered
-  When behavior musk-chart is defined and the gate releases
-  Then chart:btc journals ChartPointRequested
+Candidate code receives a scoped IDigitalBrain proxy. It cannot construct,
+replace, or select envelope fields; FireSynapse derives them from the current
+durable turn and the approved route binding.
 
-Scenario: A misfiring behavior is suspended loudly, and a redefine revives it
-  Given a behavior whose action alias no longer matches its stamped shape
-  Then the instance journals BehaviorInvalidated and its interest is withdrawn
-  When DefineBehavior replaces the definition
-  Then the next matching fact is handled
+At cold boot the verified catalog creates these immutable bindings:
 
-Feature: Inspection
-Scenario: The brain answers what happened
-  Given the musk-chart flow has run once
-  Then Trace of the post's correlation lists XPosted, ChartPointRequested, ChartPointAdded in order
+| Inbound contract | Binding key | Selected activation |
+| --- | --- | --- |
+| SocialPostObserved | owner + each active candidate family/current revision whose grant permits that trigger | one binding pinned to that revision’s ElonPostRuleNeuron |
+| ElonPostMatched | owner + candidate family + producing revision/local alias | that same pinned revision’s ChartForwarderNeuron |
+| AddChartPoint | owner + trusted chart ID | that owner/chart’s ChartNeuron |
+| ChartPointAdded | owning ChartNeuron turn | terminal chart journal fact; no routing outbox entry |
 
-Scenario: The brain answers "what did you do on Friday"
-  Given facts from three neurons committed on Friday
-  Then Recall From Friday To Saturday for the owner lists them across neurons in order
+A trusted inbound fact is expanded by the immutable route table into one
+envelope per matching active family, each carrying the active pointer’s exact
+target revision at creation time. The inbound receipt is deduplicated once at
+trusted ingress; its per-family outgoing delivery identities are
+runtime-derived, so a duplicate source post creates no second turn in any
+family. A family whose trigger grant does not contain the contract receives no
+envelope.
 
-Scenario: Discovery finds the doer from the intent
-  Given the Gmail module's contract cards are registered
-  When Discover "summarize my last three emails" runs
-  Then the GmailSearch contract is the first result
+A candidate family is a host-minted opaque stable identity for one owner’s
+named rule. Its canonical grammar is cf_ followed by exactly 26 lowercase
+base32 characters (a-z and 2-7). The control plane normalizes and collision
+checks it before persistence. A friendly owner/rule display name is metadata
+only: it never enters C# identifiers, assembly names, namespaces, aliases, or
+route keys. Source namespace, assembly name, local aliases, and route bindings
+derive only from the canonical family ID. One active revision exists per
+family, while different owners may have different active families in one host
+without type or alias collision. A behavior-only revision keeps the
+family/local schema; an incompatible schema is rejected.
 
-Feature: Surface
-Scenario: A UI change is a journal assertion
-  When chart:btc handles ChartPointRequested
-  Then SurfacePresented for panel "chart:btc" carries the new point
-  And no renderer was running
-```
+## 4. Owner and capability are runtime facts
 
-Remaining scenarios, named to fix scope: duplicate-delivery ack; ambiguous / absent /
-no-such-instance / busy-timeout typed failures; broadcast with zero receivers completes;
-journals survive restart byte-for-byte; registry-equals-journal observation; directed call
-on the shared timeline; staged-fact invisibility to directed callees; DefineBehavior
-refusals (unknown alias/field/target, ambiguous alias, step consuming a prior broadcast);
-DisableBehavior; architecture guard (every synapse serializable + aliased + unique alias;
-directed kinds declared only via `IHandle<T,R>`; no module symbol references
-`GrainFactory`, `ServiceProvider`, or `INeuron`; behavior definitions are closed data).
+Authenticated ingress assigns every inbound envelope an owner. Source text,
+command-line arguments, a candidate-created OwnerId, and caller-chosen
+envelopes cannot establish or alter it.
 
-Stage C acceptance (fixed now): Gmail last-3 summary via the official Gmail MCP and
-Salesforce profile via hosted MCP SOQL — driven through discover/fire/journal only
-(NeuronContract schemas are the named precondition), plus this Surface feature re-run
-against the real shell.
+IDigitalBrain is invocation- and owner-scoped. Each candidate receives a
+finite grant:
 
-## 6. Stages and demolition
+- permitted trigger contracts;
+- permitted output contracts;
+- permitted target scopes, including that owner’s chart identities;
+- permitted state schema and a state-size limit.
 
-- **A (this pass):** TestBrain (three seams, pinned stack) → features red behind
-  `@ignore` → §3 ABI + runtime green beside the existing surface, law by law. Kept
-  physics: atomic turn, outbox drain, watermark dedup, session locus, owner filter.
-  Includes the per-owner day-keyed timeline (same call-filter write path as Trace).
-- **B:** all 12 modules + shell migrate; demolition as green commits — capability
-  interfaces, reification filters, second turn machine, poll loops, hand manifests,
-  `IEmit`, verb zoo, phantom Neuron surface, Guid-ring dedup, ResourceNames out of
-  Abstractions; the Security project **folds into Core** (the payload protector is law-5
-  machinery, not demolition). Two named gates: every re-based synapse kind round-trips a
-  pre-migration journal fixture (or its feed re-encodes under pinned aliases before
-  cutover), and the journal archive tier lands before any feed's window is the only truth.
-  Token streaming survives explicitly as law 5's ephemeral delta projection over the
-  existing SSE surface. Streams/pubsub resources: removed (no consumer under law 4).
-- **C:** the two live flows (A1–A3 above).
-- **D:** the code tier's rungs 2–3 (§2), gated on open items 6–7; full RFW surface
-  vocabulary; vector-backed discovery over the same contract cards.
+The runtime enforces the grant on every FireSynapse. ChartNeuron validates
+owner, target, schema, capability origin, and durable effect identity again.
+Constructing a foreign ChartId cannot update another owner’s chart.
 
-## 7. Open items — each resolves against the compiler in Stage A
+The POC control edge uses a trusted test owner authority that issues opaque
+owner-session tokens to the host-process harness. Tests may use readable names
+to seed that authority, but candidate code and public projection calls receive
+only an authenticated principal derived from a token. A forged owner name is
+not a principal.
 
-1. `Synapse<TResult>` closed-generic serialization (leaf `[GenerateSerializer]` + alias
-   policy) — commit #2, immediately after the harness.
-2. `NeuronContract` / `CausalChain` / `RecallQuery` record shapes — content committed in
-   §3, shapes fixed by their first red scenario.
-3. Delivery-context access (`CurrentDelivery` / authorization hook): not in the ABI;
-   added only if a Stage B consumer proves undeniable, as a handler-parameter overload,
-   never ambient state.
-4. `BehaviorDefinition` validation completeness: refuse a step consuming state reachable
-   only through a prior broadcast (law 6 visibility); invariant-culture ordinal
-   comparisons; result-field references only on `Synapse<TResult>` aliases.
-5. The xunit.v3 pin that Reqnroll's generator provably compiles against under MTP —
-   verified before any feature is written, per §5 commit #1.
-6. **Generator-in-pack spike** (gates code-tier rung 3): drive the Orleans source
-   generator inside a Roslyn compilation of a `[GenerateSerializer]` record, ALC-load the
-   output, fire the record across a 2-silo `InProcessTestCluster`, assert the committed
-   journal round-trip.
-7. **Unload spike** (gates rung 3 in-process): after quarantine-cluster disposal, a
-   WeakReference/GC loop proves the gate ALC collects; failure means an Orleans-held root
-   to diagnose before rung 3 ever runs in-process — a leak here is permanent by design.
+This is the general future pattern. A script does not open a file; it fires a
+contract toward a trusted FileSystemNeuron whose module owns paths,
+credentials, authorization, and actual I/O. POC-0 intentionally contains no
+filesystem module or arbitrary external effect.
+
+The POC social fact contains only what this rule needs: source-post ID, stable
+author identity, and occurrence time. It does not journal body text, prompts,
+credentials, OAuth material, or Flutter session data. POC storage is local,
+disposable test data. Each test has an isolated owner-data root and teardown
+must prove removal of its journal, outbox, snapshots, chart projection, and
+test sessions. Candidate source/evidence needed for that test’s restart proof
+may exist only until its final teardown, which also removes its disposable
+candidate and control-plane test roots. Retention, redaction, and a real
+owner-facing deletion contract are product gates before real owner data.
+
+## 5. One C# source artifact, not one generated project
+
+One candidate is exactly one persisted, owner-visible .cs file. It may declare
+a closed family of state records, local synapses, and normal neurons. All types
+in the file share a candidate identity and promote or roll back together.
+
+The Creator stamps, and admission later verifies, this fixed POC header:
+
+~~~csharp
+#:sdk Microsoft.NET.Sdk
+#:property TargetFramework=net11.0
+#:property OutputType=Library
+#:property PublishAot=false
+#:property ImplicitUsings=disable
+#:property AssemblyName=DigitalBrain.Poc.Candidate.<family-id>
+#:project ../../../src/DigitalBrain.Poc.Abstractions/DigitalBrain.Poc.Abstractions.csproj
+#:project ../../../src/DigitalBrain.Poc.Social.Contracts/DigitalBrain.Poc.Social.Contracts.csproj
+#:project ../../../src/DigitalBrain.Poc.Charting.Contracts/DigitalBrain.Poc.Charting.Contracts.csproj
+~~~
+
+The POC candidate is a normal managed IL library. It has no Main, top-level
+statements, ConnectAsync, static or module initialization, or arbitrary
+constructor injection. A one-file edge client using
+DigitalBrainClient.ConnectAsync(args) and FireSynapse(...) remains a valid
+future product shape, but it is a one-shot client rather than the durable
+neuron proof.
+
+The text #:DigitalBrain.Abstractions is not a legal file-app directive. POC-0
+uses legal, fixed local #:project directives. A later portable package may use
+pinned #:package directives. A candidate cannot choose its own SDK, project,
+package, include, or property directives.
+
+The candidate lives at poc/candidates/<run-id>/<sha256>/elon-chart.cs, so the
+fixed ../../../src references resolve against its disposable per-run root. The
+SDK may synthesize virtual-project metadata and build output. That is
+expected implementation detail, not a generated or retained candidate
+.csproj. The build command is dotnet build on the source file; publishing is
+prohibited. PublishAot=false is fixed because Native AOT cannot dynamically
+load the IL candidate into the restarted JIT host.
+
+The file-based model is documented in
+[Microsoft’s file-based apps documentation](https://learn.microsoft.com/dotnet/core/sdk/file-based-apps).
+The AOT limitation is documented in
+[Microsoft’s Native AOT limitations](https://learn.microsoft.com/dotnet/core/deploying/native-aot/#limitations-of-native-aot-deployment).
+
+## 6. Creator: AST first, C# second
+
+No owner or model supplies raw C# source for admission. Prose may become a
+schema-validated, compiler-private NeuronIntent. That is neither persistent
+behavior data nor a runtime interpreter.
+
+~~~text
+owner prose
+  → typed NeuronIntent
+  → Roslyn SyntaxFactory tree
+  → canonical elon-chart.cs
+  → syntax and semantic policy checks
+  → real SDK IL build
+  → isolated quarantine scenario
+  → explicit owner approval
+  → cold-restart admission
+~~~
+
+The Creator owns every declaration, expression, statement, directive, and
+formatting. It must:
+
+1. construct the complete tree with Roslyn syntax factories;
+2. reparse persisted source and verify the fixed header byte-for-byte;
+3. bind it against the exact trusted reference graph and a semantic allowlist;
+4. prove every generated receiver derives from Neuron and closes one exact
+   IHandle<T> interface;
+5. collect syntax, declaration, semantic, analyzer, and SDK-build diagnostics;
+6. persist canonical source and AST hashes; and
+7. refuse unknown symbols, duplicate aliases, collisions, or policy mismatch
+   before quarantine.
+
+The useful precedent in the old RoslynAgent is its use of syntax trees,
+compilations, semantic models, and diagnostics. It is not reused as product
+code: its workspace/editor assumptions and text-fragment fallback do not meet
+this boundary. Roslyn is fast preflight; the actual file-based SDK build is
+the final directive and source-generator oracle. See
+[the Roslyn compiler API model](https://learn.microsoft.com/dotnet/csharp/roslyn-sdk/compiler-api-model).
+
+## 7. The closed C# profile
+
+The Creator emits and admission accepts only bound symbols from this closed
+profile:
+
+- immutable values and approved record constructors;
+- declarative serializer metadata only: exact Orleans GenerateSerializer,
+  Alias, and member Id attributes on generated synapse/state declarations;
+- locals, comparisons, boolean expressions, if, and switch;
+- typed private durable state through IDurableState<T>;
+- awaited brain.FireSynapse calls;
+- runtime cancellation/time and declared approved pure helpers with an acyclic
+  call graph.
+
+Admission refuses before publication:
+
+- filesystem, network, process, environment, console, native interop, and
+  arbitrary external APIs;
+- reflection, typeof, GetType, object/dynamic escape hatches, activators,
+  assembly loading, ServiceProvider, GrainFactory, raw Orleans objects, and arbitrary
+  constructor dependencies;
+- loops, recursion, lambdas or delegates, threads, timers, locks, background
+  work, parallel tasks, Task.Run, and static mutable state;
+- top-level effects, static constructors, unsafe code, P/Invoke, preprocessor
+  indirection, unapproved directives, and names/aliases colliding with trusted
+  modules.
+
+This is an **allowlist of resolved symbols**, not a source-string blacklist.
+Admission checks both the AST and the built assembly reference set.
+The serializer attributes are the sole Orleans metadata exception. They do not
+expose a grain, serializer service, activation, stream, or runtime object to
+candidate behavior; their type/member Id values are host-generated and checked
+for the exact expected declaration shape.
+
+Honesty clause: this proves policy-enforced, owner-reviewed source. It is not
+an operating-system sandbox against malicious IL injected by an attacker.
+POC-0 admits only Creator-produced, hash-verified artifacts and makes no
+hostile-code-containment claim. A product-grade hostile-code guarantee needs a
+later restricted worker or process with filesystem, network, process, IPC, and
+credential permissions removed.
+
+## 8. Durable routing physics
+
+The fresh runtime owns routing, state, journal, and outbox. For every handler
+turn, one atomic commit contains:
+
+1. inbound envelope receipt and deduplication watermark;
+2. the typed state replacement; and
+3. every outgoing envelope in creation order.
+
+Only committed envelopes enter the outbox. Every envelope whose receiver is
+generated retains its target candidate revision; dispatch resolves that exact
+loaded revision, never whichever revision later becomes active for the family.
+On boot, the runtime verifies and loads the approved candidate before accepting
+input, restores state, and resumes undelivered envelopes. Delivery is at least
+once. Each receiver deduplicates using a runtime-derived delivery/effect
+identity; generated source does not invent that identity.
+
+ChartNeuron deduplicates AddChartPoint by that durable identity. It allocates
+the chart ordinal itself; generated code submits only source-post identity and
+time. A crash after the generated turn commits but before chart acknowledgement
+retries to exactly one point rather than losing or duplicating it.
+
+ChartPointAdded is a terminal chart fact. ChartNeuron journals it inside the
+same durable turn that stores the point, and that turn is its acknowledgement;
+the fact does not enter a routing outbox. The trusted chart projection endpoint
+reads the owner-matched ChartNeuron snapshot.
+
+There is no live type admission, subscription mutation, behavior registry,
+interpreter, or implicit catch-all receiver. Orleans application parts are
+configured as part of host construction, so POC-0 admits candidates only on
+cold restart. See [Orleans application-part configuration](https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/server-configuration).
+
+## 9. Candidate lifecycle
+
+Each content-addressed candidate record binds:
+
+- authenticated owner identity;
+- stable candidate-family identity;
+- source bytes and canonical AST hashes;
+- fixed-header, SDK, compiler, and reference hashes;
+- generated type identities, handled contracts, output contracts, and target
+  scopes;
+- state-schema/local-synapse aliases and policy version;
+- all diagnostics, IL hash, and quarantine evidence;
+- approval record and prior approved candidate hash.
+
+~~~text
+Draft → Validated → Quarantined → Awaiting owner approval
+      → Approved inactive → Active after restart
+      → Rolled back after restart
+~~~
+
+Candidate metadata stored beside source is evidence, not authority. A trusted
+control-plane store outside the candidate directory holds a signed immutable
+attestation over the record and a separately signed owner-approval record. The
+active/previous pointer lives there too. PointerSigner signs the canonical
+pointer payload (owner, family, current/previous hashes, parent payload hash,
+and version) with a P-256 control-plane key; CandidatePointerHead stores that
+canonical payload hash, not the detached signature. The POC test authority
+keeps all signing material outside candidate storage.
+
+Quarantine starts a disposable brain without production data, credentials, or
+live chart effects. Promotion needs an authenticated principal’s approval of
+the exact signed record. Promotion and rollback only move the trusted
+accepted-candidate pointer; they never modify a running host. Before either
+transition, the supervisor puts the current host into a **Quiescing** ingress
+state. Trusted ingress stops accepting new owner facts (it returns a retryable
+quiescing result). Admission atomically acquires an in-flight lease before it
+can enqueue a turn; closing the gate prevents new leases, then waits for every
+already-held lease, in-flight turn, and outbox envelope targeted at the current
+candidate revision (including a trusted-ingress fan-out envelope) to drain or
+refuses the transition. POC-0 never runs old and new revisions together merely
+to deliver stranded local work. At boot the host
+verifies source, IL, header, references, capability grant, scenario evidence,
+attestation, approval, and pointer before taking input.
+
+The control-plane store keeps a trusted per-(owner, family) pointer head:
+monotonic version, current canonical pointer-payload hash, and parent payload
+hash. A new
+promotion or rollback succeeds only through an atomic compare-and-swap from
+that head to a higher-version signed pointer. A rollback is a new higher
+version pointing at the prior artifact; it never restores an old pointer file.
+Boot first refuses an invalid pointer signature, then a signed pointer whose
+version/payload hash does not match the current trusted head. The POC assumes
+that head store is the trust root; defense
+against an attacker rolling back the entire trusted store is a production
+storage/attestation concern, not something a candidate-file signature can
+solve.
+
+The supervisor uses a two-phase handoff: after the old host is quiesced and
+drained, a new child loads and verifies the proposed module in a no-input ready
+state, then the control plane advances the pointer head, then the old host
+stops and the ready child opens ingress. A child failure before ready or before
+that compare-and-swap reopens the old host’s ingress and leaves the visible
+pointer unchanged.
+
+Local generated synapses use host-generated immutable aliases under the stable
+POC schema. POC-0 has no in-place state or synapse-schema evolution. Rollback
+selects a previously built immutable artifact, never regenerated source. If
+retained journal data requires an incompatible artifact, rollback refuses
+rather than dropping or guessing at data.
+
+Every serializable host or generated contract/state record receives an Orleans
+serializer declaration plus a host-owned immutable alias. The trusted POC
+aliases are db.poc.social.post-observed.v1, db.poc.chart.point.v1,
+db.poc.chart.point-draft.v1, db.poc.chart.add-point.v1, and
+db.poc.chart.point-added.v1. POC aliases are stable across behavior-only revisions of the
+elon-chart module, so a restarted host can read its retained journal. An
+attempt to reuse a trusted alias or change a local schema in place is refused.
+
+## 10. Acceptance gates
+
+POC-0 is accepted only when all of these have executable evidence:
+
+1. The Creator emits exactly one elon-chart.cs recursively within its
+   per-run candidate directory and no candidate .csproj; the actual SDK builds
+   managed IL and the configured Orleans serializer round-trips its generated
+   local synapse.
+2. The candidate has two ordinary durable Neuron subclasses and one generated
+   local Synapse; no ScriptedNeuron, interpreter, or special behavior runtime
+   exists.
+3. A trusted valid SocialPostObserved moves through both generated neurons,
+   host-owned AddChartPoint, and the trusted ChartNeuron, which exposes point
+   one through its Flutter projection.
+4. A non-Elon fact causes no AddChartPoint and no chart point.
+5. Killing the entire host, booting the same approved candidate against the
+   same durable store, and firing a second valid fact exposes point two,
+   generated state count two, and one globally ordered retained journal
+   history. Re-firing the original owner/source-post identity after restart
+   produces no new rule turn, state increment, or chart point.
+6. A forced crash after ChartNeuron commits AddChartPoint but before the
+   upstream outbox observes its acknowledgement recovers the first point
+   exactly once; replaying the delivery identity does not duplicate it.
+7. A separate crash after the rule commits ElonPostMatched but before its
+   forwarder receives it causes the next host to deserialize and deliver that
+   generated local synapse.
+8. Owner B cannot invoke Owner A’s candidate, route to Owner A’s chart, or read
+   Owner A’s projection through a forged owner name or token.
+9. File, HttpClient, reflection, ServiceProvider, GrainFactory, Task.Run,
+   loops, recursion, top-level statements, and unapproved contracts are all
+   refused before publication.
+10. Tampering with candidate source, IL, candidate metadata, fixed header or
+    references, capability grant, quarantine evidence, signed attestation,
+    signed approval, or active pointer prevents host startup and leaves the
+    last known-good candidate untouched. Replaying an older valid signed
+    pointer also fails against the trusted pointer head.
+11. A candidate remains absent until owner approval and a restart. Promotion
+    and rollback first quiesce ingress, wait in-flight turns and drain the
+    current revision’s candidate-targeted outbox (including trusted fan-out)
+    or refuse;
+    rollback selects the prior artifact only after another restart, and an
+    incompatible retained local schema makes it refuse. An approved-inactive
+    module on disk cannot be selected by normal boot.
+12. A Flutter integration run uses an authenticated owner projection request to
+    observe the chart point produced by the generated module, rather than a
+    fake projection.
+13. The POC solution has no project reference to the current runtime or
+    DigitalBrain.Scripting.
+14. Test teardown deletes the isolated owner-data root and verifies that no
+    journal, outbox, chart projection, session, candidate, or control-plane
+    test record remains for that run.
+15. A forced crash after trusted social fan-out commits but before the rule
+    acknowledges the envelope leaves it pinned to the old revision. Promotion
+    then refuses until a host booted from the old pointer drains that envelope;
+    it never delivers it to the proposed revision.
+16. Two active granted families for one owner each receive one delivery for
+    one trusted post, while an active family without that trigger grant receives
+    none; their family-qualified local aliases do not collide.
+
+## 11. Deliberate exclusions
+
+POC-0 does not build the legacy BehaviorDefinition system, a
+Compose/Interpret/Compile ladder, runtime-created subscriptions, hot type
+loading, collectible assembly contexts, schema migration, arbitrary code,
+dynamic package acquisition, external social OAuth, discovery/recall/watch,
+general UI generation, or a generated Flutter chart.
+
+It proves the narrow foundation first: one owner-reviewed C# module can be a
+normal durable brain module and safely orchestrate a trusted chart module.
+
+## 12. Decision log
+
+| Decision | Why |
+| --- | --- |
+| Generated code is a normal Neuron, not ScriptedNeuron | Durable custom logic should use the same compiled neuron model as trusted modules; ScriptedNeuron is provenance only. |
+| Candidate is exactly one authored C# library file | File-based C# supplies an SDK virtual project without persisting a generated candidate project. |
+| Admission is cold-restart only | Candidate serializers and application parts are configured during host construction; POC-0 makes no hot-load claim. |
+| ChartNeuron is trusted POC code, never generated | It owns Flutter/UI state, chart ordinals, projection, and effect deduplication. |
+| Creator emits Roslyn ASTs, not LLM text | It makes the admitted C# shape deterministic and semantically checkable. |
+| Capability policy is not a hostile-code sandbox | POC-0 protects the Creator path and rejects ungranted APIs, while a later restricted process is needed for malicious-IL containment. |
+| Candidate evidence is externally signed | A hash in a writable candidate directory cannot be the trust root. |
+| Active pointer advances through a trusted monotonic head | A valid old signature is not enough; promotion and rollback need replay-resistant ordering. |
+| POC owner data is disposable and teardown-proven | Deletion-first means no indefinitely retained test journals or artifacts while product deletion design is still out of scope. |
