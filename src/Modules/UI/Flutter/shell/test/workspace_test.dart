@@ -45,7 +45,7 @@ void main() {
     await tester.tap(find.byKey(const Key('destination_kit')));
     await tester.pump();
     await drainShellTimers(tester);
-    expect(find.byKey(const Key('kit_screen')), findsOneWidget);
+    expect(find.byKey(const Key('kit_gallery_screen')), findsOneWidget);
     expect(find.text('UI Kit'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('destination_windowing')));

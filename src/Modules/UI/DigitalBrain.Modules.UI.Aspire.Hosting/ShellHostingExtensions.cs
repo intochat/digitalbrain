@@ -1,8 +1,9 @@
+using DigitalBrain.UI;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
 
-namespace DigitalBrain.Shell.Aspire.Hosting;
+namespace DigitalBrain.UI.Aspire.Hosting;
 
 public static class ShellHostingExtensions
 {
@@ -22,23 +23,23 @@ public static class ShellHostingExtensions
     public const string WebPlatformDirectoryName = "web";
     public const string HttpEndpointName = "http";
 
-    public static DigitalBrainModuleBuilder<ShellModule> WithHeadlessHost(
-        this DigitalBrainModuleBuilder<ShellModule> module,
+    public static DigitalBrainModuleBuilder<UiModule> WithHeadlessHost(
+        this DigitalBrainModuleBuilder<UiModule> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Headless, configure);
 
-    public static DigitalBrainModuleBuilder<ShellModule> WithWindowHost(
-        this DigitalBrainModuleBuilder<ShellModule> module,
+    public static DigitalBrainModuleBuilder<UiModule> WithWindowHost(
+        this DigitalBrainModuleBuilder<UiModule> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Window, configure);
 
-    public static DigitalBrainModuleBuilder<ShellModule> WithWebHost(
-        this DigitalBrainModuleBuilder<ShellModule> module,
+    public static DigitalBrainModuleBuilder<UiModule> WithWebHost(
+        this DigitalBrainModuleBuilder<UiModule> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Web, configure);
 
-    private static DigitalBrainModuleBuilder<ShellModule> ConfigureFlutterHost(
-        DigitalBrainModuleBuilder<ShellModule> module,
+    private static DigitalBrainModuleBuilder<UiModule> ConfigureFlutterHost(
+        DigitalBrainModuleBuilder<UiModule> module,
         FlutterHostKind kind,
         Action<FlutterHostOptions>? configure)
     {
@@ -55,7 +56,7 @@ public static class ShellHostingExtensions
         return module;
     }
 
-    private static ShellHostingState GetOrCreateState(DigitalBrainModuleBuilder<ShellModule> module)
+    private static ShellHostingState GetOrCreateState(DigitalBrainModuleBuilder<UiModule> module)
     {
         var state = module.Brain.GetOrAddState(
             static brain => new ShellHostingState(brain),

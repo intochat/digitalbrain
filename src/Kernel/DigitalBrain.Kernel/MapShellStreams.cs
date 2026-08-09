@@ -1,49 +1,25 @@
 using System.Net.ServerSentEvents;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Client;
-using DigitalBrain.Shell;
+using DigitalBrain.UI;
 
 namespace DigitalBrain.Kernel;
 
-internal static class ShellStreamsHttpMaps
+internal static class SurfaceStreamsHttpMaps
 {
-    public static IEndpointRouteBuilder MapShellStreams(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapSurfaceStreams(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
-        endpoints.MapPost(
-            HttpSurfacePaths.OpenScenePath,
-            static async Task<IResult> (
-                string shellName,
-                OpenSceneRequest request,
-                IDigitalBrain brain,
-                CancellationToken cancellationToken) =>
-            {
-                ArgumentException.ThrowIfNullOrWhiteSpace(shellName);
-                ArgumentNullException.ThrowIfNull(request);
-                ArgumentNullException.ThrowIfNull(brain);
-                ArgumentException.ThrowIfNullOrWhiteSpace(request.SceneKey);
-                ArgumentException.ThrowIfNullOrWhiteSpace(request.Title);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                await brain.SendAsync<IShell>(
-                    shellName,
-                    new OpenScene(CommandId.New(), request.SceneKey, request.Title),
-                    cancellationToken).ConfigureAwait(false);
-
-                return Results.Accepted();
-            });
-
         endpoints.MapGet(
-            HttpSurfacePaths.ShellEventsPath,
+            HttpSurfacePaths.SurfaceEventsPath,
             static async Task (
                 HttpContext http,
-                string shellName,
+                string surfaceName,
                 long? afterSequence,
                 OwnerSessionJournal sessionJournal,
                 CancellationToken cancellationToken) =>
             {
-                ArgumentException.ThrowIfNullOrWhiteSpace(shellName);
+                ArgumentException.ThrowIfNullOrWhiteSpace(surfaceName);
                 ArgumentNullException.ThrowIfNull(http);
                 ArgumentNullException.ThrowIfNull(sessionJournal);
                 cancellationToken.ThrowIfCancellationRequested();
@@ -57,61 +33,31 @@ internal static class ShellStreamsHttpMaps
 
                 await SseResponse.WriteAsync(
                     http.Response,
-                    WatchSceneOpenedAsync(sessionJournal, shellName, cursor, cancellationToken),
+                    WatchSurfaceOpenedAsync(sessionJournal, surfaceName, cursor, cancellationToken),
                     cancellationToken).ConfigureAwait(false);
-            });
-
-        endpoints.MapPost(
-            HttpSurfacePaths.ActivateControlPath,
-            static async Task<IResult> (
-                string sceneKey,
-                string controlId,
-                ActivateControlRequest request,
-                IDigitalBrain brain,
-                CancellationToken cancellationToken) =>
-            {
-                ArgumentException.ThrowIfNullOrWhiteSpace(sceneKey);
-                ArgumentException.ThrowIfNullOrWhiteSpace(controlId);
-                ArgumentNullException.ThrowIfNull(request);
-                ArgumentNullException.ThrowIfNull(brain);
-                ArgumentException.ThrowIfNullOrWhiteSpace(request.Intent);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (!string.IsNullOrWhiteSpace(request.SceneKey)
-                    && !string.Equals(request.SceneKey, sceneKey, StringComparison.Ordinal))
-                {
-                    return Results.BadRequest();
-                }
-
-                await brain.SendAsync<IScene>(
-                    sceneKey,
-                    new ControlActivated(sceneKey, controlId, request.Intent),
-                    cancellationToken).ConfigureAwait(false);
-
-                return Results.Accepted();
             });
 
         return endpoints;
     }
 
-    private static IAsyncEnumerable<SseItem<SceneOpenedEvent>> WatchSceneOpenedAsync(
+    private static IAsyncEnumerable<SseItem<SurfaceOpenedEvent>> WatchSurfaceOpenedAsync(
         OwnerSessionJournal sessionJournal,
-        string shellName,
+        string surfaceName,
         long afterSequence,
         CancellationToken cancellationToken)
         => JournalProjection.WatchAsync(
-            token => sessionJournal.WatchShellOutgoingAsync(shellName, afterSequence, token),
-            HttpSurfacePaths.SceneOpenedEvent,
-            ProjectSceneOpened,
+            token => sessionJournal.WatchSurfaceOutgoingAsync(surfaceName, afterSequence, token),
+            HttpSurfacePaths.SurfaceOpenedEvent,
+            ProjectSurfaceOpened,
             cancellationToken);
 
-    private static SceneOpenedEvent? ProjectSceneOpened(SynapseDelivery delivery)
-        => delivery.Synapse is not SceneOpened opened
+    private static SurfaceOpenedEvent? ProjectSurfaceOpened(SynapseDelivery delivery)
+        => delivery.Synapse is not SurfaceOpened opened
             ? null
-            : new SceneOpenedEvent(
+            : new SurfaceOpenedEvent(
                 delivery.Sequence,
-                opened.SceneKey,
+                opened.SurfaceKey,
                 opened.Title,
                 opened.CommandId.ToString(),
-                opened.Shell.ToString());
+                opened.Surface.ToString());
 }

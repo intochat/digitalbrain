@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../brain_theme.dart';
+import '../kit/kit_analog_clock.dart';
 import '../kit/kit_chart.dart';
-import '../kit/kit_screen.dart';
 import 'panel_manager.dart';
 
 /// Offline windowing playground — drag, resize, minimize, tidy. No C# / edge.
@@ -358,9 +358,7 @@ final class _PanelBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (kind) {
-      WindowPanelKind.clock => const Center(
-          child: SizedBox(width: 150, height: 150, child: KitAnalogClock()),
-        ),
+      WindowPanelKind.clock => Center(child: SizedBox(width: 150, height: 150, child: KitAnalogClock())),
       WindowPanelKind.metrics => const _MetricsBody(),
       WindowPanelKind.notes => const _NotesBody(),
       WindowPanelKind.activity => const _ActivityBody(),

@@ -1,4 +1,4 @@
-namespace DigitalBrain.Shell.Aspire.Hosting;
+namespace DigitalBrain.UI.Aspire.Hosting;
 
 internal enum FlutterHostKind
 {

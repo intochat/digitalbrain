@@ -18,6 +18,7 @@ final class BrainChatApp extends StatelessWidget {
     this.onSend,
     this.onStream,
     this.onOpenSignIn,
+    this.onActivateButton,
     this.behaviorClient,
     this.userActions = const [],
     this.statusMessage,
@@ -30,6 +31,7 @@ final class BrainChatApp extends StatelessWidget {
   final SendMessage? onSend;
   final StreamMessage? onStream;
   final OpenUrl? onOpenSignIn;
+  final ActivateChatButton? onActivateButton;
   final BehaviorClient? behaviorClient;
   final List<UserActionCardModel> userActions;
   final String? statusMessage;
@@ -48,6 +50,7 @@ final class BrainChatApp extends StatelessWidget {
         onSend: onSend,
         onStream: onStream,
         onOpenSignIn: onOpenSignIn,
+        onActivateButton: onActivateButton,
         behaviorClient: behaviorClient,
         userActions: userActions,
         statusMessage: statusMessage,

@@ -26,4 +26,15 @@ internal sealed record ChatMessageResult(
     string CorrelationId,
     string Response,
     long Sequence,
-    DateTimeOffset Timestamp);
+    DateTimeOffset Timestamp,
+    IReadOnlyList<ChatButtonOfferResult>? Buttons = null,
+    IReadOnlyList<ChatChartOfferResult>? Charts = null);
+
+internal sealed record ChatButtonOfferResult(string ButtonId, string Label, string Action);
+
+internal sealed record ChatChartOfferResult(
+    string Title,
+    IReadOnlyList<ChatChartPointResult> Points,
+    string ChartKind);
+
+internal sealed record ChatChartPointResult(string Label, double Value);

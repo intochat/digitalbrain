@@ -96,6 +96,13 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  digitalbrain_ui_kit:
+    dependency: "direct main"
+    description:
+      path: "../kit"
+      relative: true
+    source: path
+    version: "0.1.0"
   dio:
     dependency: transitive
     description:

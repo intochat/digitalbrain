@@ -2,22 +2,22 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
 using DigitalBrain.Modules.Sdk.Mcp;
-using DigitalBrain.Shell;
+using DigitalBrain.UI;
 
 namespace DigitalBrain.Kernel;
 
 internal sealed class OwnerSessionJournal(IDigitalBrain brain)
 {
-    public IAsyncEnumerable<JournalRead> WatchShellOutgoingAsync(
-        string shellName,
+    public IAsyncEnumerable<JournalRead> WatchSurfaceOutgoingAsync(
+        string surfaceName,
         long afterSequence,
         CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(shellName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(surfaceName);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
         return brain.WatchJournalAsync(
-            NeuronId.For<IShell>(brain.Owner, shellName),
+            NeuronId.For<ISurface>(brain.Owner, surfaceName),
             JournalKind.Outgoing,
             afterSequence,
             cancellationToken);

@@ -29,6 +29,18 @@ void main() {
       onStream: edge == null
           ? null
           : (text) => edge.streamMessage(chatName: chat, text: text),
+      onActivateButton: edge == null
+          ? null
+          : ({
+              required offerCommandId,
+              required buttonId,
+              required action,
+            }) => edge.activateChatButton(
+              chatName: chat,
+              offerCommandId: offerCommandId,
+              buttonId: buttonId,
+              action: action,
+            ),
       onOpenSignIn: openExternalUrl,
       behaviorClient: null,
     ),

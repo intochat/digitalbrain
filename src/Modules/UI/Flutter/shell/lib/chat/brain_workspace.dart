@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 import '../activity_screen.dart';
 import '../behaviors/behavior_workspace.dart';
 import '../brain_screen.dart';
-import '../kit/kit_screen.dart';
+import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+
 import '../user_actions/user_action_card.dart';
 import '../windowing/windowing_screen.dart';
 import 'brain_chat_screen.dart';
@@ -23,6 +24,7 @@ final class BrainWorkspace extends StatefulWidget {
     this.onSend,
     this.onStream,
     this.onOpenSignIn,
+    this.onActivateButton,
     this.behaviorClient,
     this.userActions = const [],
     this.statusMessage,
@@ -35,6 +37,7 @@ final class BrainWorkspace extends StatefulWidget {
   final SendMessage? onSend;
   final StreamMessage? onStream;
   final OpenUrl? onOpenSignIn;
+  final ActivateChatButton? onActivateButton;
   final BehaviorClient? behaviorClient;
   final List<UserActionCardModel> userActions;
   final String? statusMessage;
@@ -192,6 +195,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
             onSend: widget.onSend,
             onStream: widget.onStream,
             onOpenSignIn: widget.onOpenSignIn,
+            onActivateButton: widget.onActivateButton,
           ),
           ActivityScreen(
             turns: _projectedTurns,
@@ -213,7 +217,23 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
       );
     }
     if (_destination == kitDestinationIndex) {
-      return const KitScreen();
+      return KitGalleryScreen(
+        onButtonPressed: widget.onActivateButton == null
+            ? null
+            : (part) {
+                final offer = part.offerCommandId;
+                if (offer == null) {
+                  return;
+                }
+                unawaited(
+                  widget.onActivateButton!(
+                    offerCommandId: offer,
+                    buttonId: part.buttonId,
+                    action: part.action,
+                  ),
+                );
+              },
+      );
     }
     return const WindowingScreen();
   }

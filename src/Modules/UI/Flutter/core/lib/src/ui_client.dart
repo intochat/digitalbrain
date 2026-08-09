@@ -36,40 +36,45 @@ final class DigitalBrainUiClient {
     required String sceneKey,
     required String title,
   }) async {
-    final uri = baseUri.replace(path: '/shells/$shellName/scenes');
+    final uri = baseUri.replace(path: '/owner/commands');
     final response = await _http.post(
       uri,
       headers: {'content-type': 'application/json'},
-      body: jsonEncode(
-        OpenSceneRequest(sceneKey: sceneKey, title: title).toJson(),
-      ),
+      body: jsonEncode({
+        'kind': 'surface.open',
+        'surfaceName': shellName,
+        'surfaceKey': sceneKey,
+        'title': title,
+      }),
     );
     if (response.statusCode != 202) {
       throw StateError(
-        'open-scene failed: ${response.statusCode} ${response.body}',
+        'surface.open failed: ${response.statusCode} ${response.body}',
       );
     }
   }
 
-  Future<void> activateControl({
-    required String sceneName,
-    required String controlId,
-    required String intent,
-    String? sceneKey,
+  Future<void> activateChatButton({
+    required String chatName,
+    required String offerCommandId,
+    required String buttonId,
+    required String action,
   }) async {
-    final uri = baseUri.replace(
-      path: '/scenes/$sceneName/controls/$controlId/activate',
-    );
+    final uri = baseUri.replace(path: '/owner/commands');
     final response = await _http.post(
       uri,
       headers: {'content-type': 'application/json'},
-      body: jsonEncode(
-        ActivateControlRequest(intent: intent, sceneKey: sceneKey).toJson(),
-      ),
+      body: jsonEncode({
+        'kind': 'chat.button',
+        'chatName': chatName,
+        'offerCommandId': offerCommandId,
+        'buttonId': buttonId,
+        'action': action,
+      }),
     );
     if (response.statusCode != 202) {
       throw StateError(
-        'activate-control failed: ${response.statusCode} ${response.body}',
+        'chat.button failed: ${response.statusCode} ${response.body}',
       );
     }
   }
@@ -79,7 +84,7 @@ final class DigitalBrainUiClient {
     int afterSequence = 0,
   }) async* {
     final uri = baseUri.replace(
-      path: '/shells/$shellName/events',
+      path: '/surfaces/$shellName/events',
       queryParameters: {'afterSequence': '$afterSequence'},
     );
     final request = http.Request('GET', uri);
@@ -107,14 +112,18 @@ final class DigitalBrainUiClient {
     required String chatName,
     required String text,
   }) async* {
-    final uri = baseUri.replace(path: '/chats/$chatName/messages/stream');
+    final uri = baseUri.replace(path: '/owner/commands');
     final request = http.Request('POST', uri)
       ..headers['content-type'] = 'application/json'
-      ..body = jsonEncode(SendMessageRequest(text: text).toJson());
+      ..body = jsonEncode({
+        'kind': 'chat.send',
+        'chatName': chatName,
+        'text': text,
+      });
     final response = await _http.send(request);
     if (response.statusCode != 200) {
       throw StateError(
-        'stream-message failed: ${response.statusCode}',
+        'chat.send failed: ${response.statusCode}',
       );
     }
 

@@ -7,12 +7,11 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
-    <ProjectReference Include="../../Modules/Chat/Chat/DigitalBrain.Modules.Chat.csproj" />
+    <ProjectReference Include="../../Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
     <ProjectReference Include="../../Modules/Tasks/Tasks/DigitalBrain.Modules.Tasks.csproj" />
     <ProjectReference Include="../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
     <ProjectReference Include="../../Modules/Introspection/Introspection/DigitalBrain.Modules.Introspection.csproj" />
     <ProjectReference Include="../../Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
-    <ProjectReference Include="../../Modules/UI/Shell/DigitalBrain.Modules.Shell.csproj" />
     <ProjectReference Include="../../Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
     <ProjectReference Include="../../Modules/SalesForce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />

@@ -110,6 +110,67 @@ final class ChatDeltaPart {
   }
 }
 
+final class ChatButtonOffer {
+  const ChatButtonOffer({
+    required this.buttonId,
+    required this.label,
+    required this.action,
+  });
+
+  final String buttonId;
+  final String label;
+  final String action;
+
+  factory ChatButtonOffer.fromJson(Map<String, Object?> json) {
+    return ChatButtonOffer(
+      buttonId: json['buttonId'] as String? ?? '',
+      label: json['label'] as String? ?? '',
+      action: json['action'] as String? ?? '',
+    );
+  }
+}
+
+final class ChatChartPoint {
+  const ChatChartPoint({required this.label, required this.value});
+
+  final String label;
+  final num value;
+
+  factory ChatChartPoint.fromJson(Map<String, Object?> json) {
+    return ChatChartPoint(
+      label: json['label'] as String? ?? '',
+      value: json['value'] as num? ?? 0,
+    );
+  }
+}
+
+final class ChatChartOffer {
+  const ChatChartOffer({
+    required this.title,
+    required this.points,
+    this.chartKind = 'bar',
+  });
+
+  final String title;
+  final List<ChatChartPoint> points;
+  final String chartKind;
+
+  factory ChatChartOffer.fromJson(Map<String, Object?> json) {
+    final raw = json['points'];
+    final points = raw is List
+        ? raw
+              .whereType<Map>()
+              .map((e) => ChatChartPoint.fromJson(Map<String, Object?>.from(e)))
+              .toList(growable: false)
+        : const <ChatChartPoint>[];
+    return ChatChartOffer(
+      title: json['title'] as String? ?? 'Chart',
+      points: points,
+      chartKind: json['chartKind'] as String? ?? 'bar',
+    );
+  }
+}
+
 final class ChatTurnEvent {
   const ChatTurnEvent({
     required this.sequence,
@@ -121,6 +182,8 @@ final class ChatTurnEvent {
     required this.caller,
     required this.correlationId,
     required this.timestamp,
+    this.buttons = const [],
+    this.charts = const [],
   });
 
   final int sequence;
@@ -132,8 +195,29 @@ final class ChatTurnEvent {
   final String caller;
   final String correlationId;
   final DateTime timestamp;
+  final List<ChatButtonOffer> buttons;
+  final List<ChatChartOffer> charts;
 
   factory ChatTurnEvent.fromJson(Map<String, Object?> json) {
+    final rawButtons = json['buttons'];
+    final buttons = rawButtons is List
+        ? rawButtons
+              .whereType<Map>()
+              .map(
+                (e) => ChatButtonOffer.fromJson(Map<String, Object?>.from(e)),
+              )
+              .toList(growable: false)
+        : const <ChatButtonOffer>[];
+    final rawCharts = json['charts'];
+    final charts = rawCharts is List
+        ? rawCharts
+              .whereType<Map>()
+              .map(
+                (e) => ChatChartOffer.fromJson(Map<String, Object?>.from(e)),
+              )
+              .toList(growable: false)
+        : const <ChatChartOffer>[];
+
     return ChatTurnEvent(
       sequence: (json['sequence'] as num).toInt(),
       fromUser: json['fromUser'] as bool,
@@ -144,6 +228,8 @@ final class ChatTurnEvent {
       caller: json['caller'] as String,
       correlationId: json['correlationId'] as String,
       timestamp: DateTime.parse(json['timestamp'] as String).toUtc(),
+      buttons: buttons,
+      charts: charts,
     );
   }
 }

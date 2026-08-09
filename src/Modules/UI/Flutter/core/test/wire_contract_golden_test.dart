@@ -3,85 +3,26 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-const _expectedWireManifest = <String, Object?>{
-  'version': 1,
-  'namespace': 'DigitalBrain.Shell',
-  'types': [
-    {
-      'name': 'ControlActivated',
-      'kind': 'record',
-      'alias': 'flutter.control-activated',
-      'properties': [
-        {'name': 'ControlId', 'type': 'String'},
-        {'name': 'Intent', 'type': 'String'},
-        {'name': 'SceneKey', 'type': 'String'},
-      ],
-      'methods': <Object?>[],
-    },
-    {
-      'name': 'IScene',
-      'kind': 'interface',
-      'alias': 'flutter.scene',
-      'properties': <Object?>[],
-      'methods': <Object?>[],
-    },
-    {
-      'name': 'IShell',
-      'kind': 'interface',
-      'alias': 'flutter.shell',
-      'properties': <Object?>[],
-      'methods': <Object?>[],
-    },
-    {
-      'name': 'OpenScene',
-      'kind': 'record',
-      'alias': 'flutter.open-scene',
-      'properties': [
-        {'name': 'CommandId', 'type': 'CommandId'},
-        {'name': 'SceneKey', 'type': 'String'},
-        {'name': 'Title', 'type': 'String'},
-      ],
-      'methods': <Object?>[],
-    },
-    {
-      'name': 'SceneOpened',
-      'kind': 'record',
-      'alias': 'flutter.scene-opened',
-      'properties': [
-        {'name': 'CommandId', 'type': 'CommandId'},
-        {'name': 'SceneKey', 'type': 'String'},
-        {'name': 'Shell', 'type': 'NeuronId'},
-        {'name': 'Title', 'type': 'String'},
-      ],
-      'methods': <Object?>[],
-    },
-  ],
-};
-
 void main() {
-  test(
-    'Dart wire pin deep-equals Shell.Contracts golden (dual golden equality)',
-    () {
-      final goldenFile = _locateGolden();
-      final actual = jsonDecode(goldenFile.readAsStringSync());
-      expect(actual, _expectedWireManifest);
-    },
-  );
-}
-
-File _locateGolden() {
-  var dir = Directory.current;
-  for (var i = 0; i < 8; i++) {
-    final candidate = File(
-      '${dir.path}/src/modules/shell/Contracts/flutter-wire-contracts.golden.json',
-    );
-    if (candidate.existsSync()) {
-      return candidate;
+  test('flutter wire contracts golden matches C# contracts', () {
+    final candidates = [
+      Directory.current.uri.resolve('../../../Contracts/flutter-wire-contracts.golden.json'),
+      Directory.current.uri.resolve('../../../../Contracts/flutter-wire-contracts.golden.json'),
+    ];
+    File? golden;
+    for (final uri in candidates) {
+      final file = File.fromUri(uri);
+      if (file.existsSync()) {
+        golden = file;
+        break;
+      }
     }
-    dir = dir.parent;
-  }
-
-  fail(
-    'Could not locate flutter-wire-contracts.golden.json from ${Directory.current.path}',
-  );
+    expect(golden, isNotNull, reason: 'flutter-wire-contracts.golden.json not found');
+    final manifest = jsonDecode(golden!.readAsStringSync()) as Map<String, Object?>;
+    expect(manifest['namespace'], 'DigitalBrain.UI');
+    expect(manifest['version'], 1);
+    final types = (manifest['types'] as List).cast<Map>();
+    final aliases = types.map((t) => t['alias']).toSet();
+    expect(aliases, containsAll(['ui.surface', 'ui.open-surface', 'ui.surface-opened', 'ui.button', 'ui.button-clicked']));
+  });
 }

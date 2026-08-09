@@ -1,10 +1,19 @@
+using System.Text.Json.Serialization;
+using DigitalBrain.UI;
+
 namespace DigitalBrain.Kernel;
 
-internal sealed record SendMessageRequest(string Text);
-
-internal sealed record OpenSceneRequest(string SceneKey, string Title);
-
-internal sealed record ActivateControlRequest(string Intent, string? SceneKey = null);
+internal sealed record OwnerCommandRequest(
+    [property: JsonPropertyName("kind")] string Kind,
+    [property: JsonPropertyName("chatName")] string? ChatName = null,
+    [property: JsonPropertyName("text")] string? Text = null,
+    [property: JsonPropertyName("commandId")] string? CommandId = null,
+    [property: JsonPropertyName("offerCommandId")] string? OfferCommandId = null,
+    [property: JsonPropertyName("buttonId")] string? ButtonId = null,
+    [property: JsonPropertyName("action")] string? Action = null,
+    [property: JsonPropertyName("surfaceName")] string? SurfaceName = null,
+    [property: JsonPropertyName("surfaceKey")] string? SurfaceKey = null,
+    [property: JsonPropertyName("title")] string? Title = null);
 
 internal sealed record ChatTurnEvent(
     long Sequence,
@@ -15,14 +24,16 @@ internal sealed record ChatTurnEvent(
     string NeuronId,
     string Caller,
     string CorrelationId,
-    DateTimeOffset Timestamp);
+    DateTimeOffset Timestamp,
+    ChatButtonOffer[]? Buttons = null,
+    ChatChartOffer[]? Charts = null);
 
-internal sealed record SceneOpenedEvent(
+internal sealed record SurfaceOpenedEvent(
     long Sequence,
-    string SceneKey,
+    string SurfaceKey,
     string Title,
     string CommandId,
-    string Shell);
+    string Surface);
 
 internal sealed record AuthorizationEvent(
     long Sequence,

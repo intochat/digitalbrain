@@ -3,7 +3,6 @@ using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Assistant;
-using DigitalBrain.Chat;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.Introspection;
@@ -11,10 +10,10 @@ using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
-using DigitalBrain.Shell;
-using DigitalBrain.Shell.Aspire.Hosting;
 using DigitalBrain.Tasks;
 using DigitalBrain.Time;
+using DigitalBrain.UI;
+using DigitalBrain.UI.Aspire.Hosting;
 using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -29,13 +28,9 @@ brain.AddModule<AIModule>(ai =>
     ai.WithLlm<Gemma4>();
     ai.WithLlm<Llama32>();
 });
-brain.AddModule<ChatModule>();
 brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
 brain.AddModule<AssistantModule>();
-brain.AddModule<ShellModule>(shell => shell
-
-    .WithWindowHost()
-    );
+brain.AddModule<UiModule>(ui => ui.WithWindowHost());
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 brain.AddModule<TasksModule>();

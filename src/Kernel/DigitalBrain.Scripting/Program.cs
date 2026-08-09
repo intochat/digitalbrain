@@ -56,7 +56,7 @@ internal static class BrainChatProbeGenerator
               <ItemGroup>
                 <ProjectReference Include="{{repoRoot}}\src\Kernel\Aspire\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
                 <ProjectReference Include="{{repoRoot}}\src\Kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
-                <ProjectReference Include="{{repoRoot}}\src\Modules\Chat\Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
+                <ProjectReference Include="{{repoRoot}}\src\Modules\UI\Contracts\DigitalBrain.Modules.UI.Contracts.csproj" />
               </ItemGroup>
             </Project>
             """,

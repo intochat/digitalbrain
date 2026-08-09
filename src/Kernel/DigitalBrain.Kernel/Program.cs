@@ -14,8 +14,9 @@ builder.Services.TryAddSingleton(static services =>
 
 var app = builder.Build();
 app.MapDefaultEndpoints();
+app.MapOwnerCommands();
 app.MapChatStreams();
-app.MapShellStreams();
+app.MapSurfaceStreams();
 app.MapAuthorizationStreams();
 app.MapBrainTopology();
 app.MapOAuthCallback();

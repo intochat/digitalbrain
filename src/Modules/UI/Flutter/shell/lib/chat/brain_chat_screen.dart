@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
+import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
@@ -22,6 +23,7 @@ final class BrainChatScreen extends StatefulWidget {
     this.onSend,
     this.onStream,
     this.onOpenSignIn,
+    this.onActivateButton,
   });
 
   final String chatName;
@@ -30,6 +32,7 @@ final class BrainChatScreen extends StatefulWidget {
   final SendMessage? onSend;
   final StreamMessage? onStream;
   final OpenUrl? onOpenSignIn;
+  final ActivateChatButton? onActivateButton;
 
   @override
   State<BrainChatScreen> createState() => _BrainChatScreenState();
@@ -69,8 +72,6 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
       return;
     }
 
-    // Empty journal snapshots must not clobber optimistic/stream bubbles.
-    // initState syncs [] and can finish after insertMessage without this guard.
     if (sequences.isEmpty &&
         (_pendingUserMessageId != null || _activeStreamId != null)) {
       return;
@@ -90,11 +91,12 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
 
     final messages = <Message>[
       for (final turn in turns)
-        TextMessage(
-          id: 'turn_${turn.sequence}',
-          authorId: turn.fromUser ? ownerUserId : assistantUserId,
-          createdAt: turn.timestamp.toUtc(),
+        ...KitMessageFactory.messagesForTurn(
+          sequence: turn.sequence,
+          fromUser: turn.fromUser,
           text: turn.text,
+          createdAt: turn.timestamp,
+          parts: turn.kitParts,
         ),
     ];
 
@@ -197,6 +199,28 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
     }
   }
 
+  Future<void> _onKitButton(KitButtonPart part) async {
+    final activate = widget.onActivateButton;
+    if (activate == null) {
+      return;
+    }
+    final offer = part.offerCommandId;
+    if (offer == null || offer.isEmpty) {
+      return;
+    }
+    try {
+      await activate(
+        offerCommandId: offer,
+        buttonId: part.buttonId,
+        action: part.action,
+      );
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() => _failure = '$error');
+      }
+    }
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -264,51 +288,57 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
                           showStatus: false,
                         );
                       },
+                  // Flyer Chat: CustomMessage + customMessageBuilder
+                  // https://pub.dev/packages/flutter_chat_ui
+                  customMessageBuilder:
+                      (
+                        context,
+                        message,
+                        index, {
+                        required bool isSentByMe,
+                        MessageGroupStatus? groupStatus,
+                      }) => KitChatBuilders.customMessageBuilder(
+                        context,
+                        message,
+                        index,
+                        isSentByMe: isSentByMe,
+                        groupStatus: groupStatus,
+                        onButtonPressed: widget.onActivateButton == null
+                            ? null
+                            : _onKitButton,
+                      ),
                 ),
               ),
             ),
           ),
-          if (_failure != null) FailureNotice(message: _failure!),
+          if (_failure != null)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(_failure!, style: BrainType.bodyMuted),
+            ),
         ],
       ),
     );
   }
 
-  static bool _sameJournal(List<ChatTurnEvent> left, List<ChatTurnEvent> right) {
-    if (identical(left, right)) {
+  bool _sameJournal(List<ChatTurnEvent> a, List<ChatTurnEvent> b) {
+    if (identical(a, b)) {
       return true;
     }
-    if (left.length != right.length) {
+    if (a.length != b.length) {
       return false;
     }
-    for (var index = 0; index < left.length; index++) {
-      if (left[index].sequence != right[index].sequence) {
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].sequence != b[i].sequence ||
+          a[i].text != b[i].text ||
+          a[i].buttons.length != b[i].buttons.length ||
+          a[i].charts.length != b[i].charts.length) {
         return false;
       }
     }
     return true;
   }
 }
-
-final class FailureNotice extends StatelessWidget {
-  const FailureNotice({super.key, required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 11),
-      color: BrainPalette.signal.withValues(alpha: 0.08),
-      child: Text(
-        message,
-        style: BrainType.meta.copyWith(color: BrainPalette.signal),
-      ),
-    );
-  }
-}
-
 final class SignInCardRail extends StatelessWidget {
   const SignInCardRail({
     super.key,
@@ -399,3 +429,4 @@ final class SignInCard extends StatelessWidget {
     );
   }
 }
+

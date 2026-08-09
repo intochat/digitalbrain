@@ -17,10 +17,6 @@
     <Project Path="src/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
     <Project Path="src/Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
   </Folder>
-  <Folder Name="/Modules/Chat/">
-    <Project Path="src/Modules/Chat/Contracts/DigitalBrain.Modules.Chat.Contracts.csproj" />
-    <Project Path="src/Modules/Chat/Chat/DigitalBrain.Modules.Chat.csproj" />
-  </Folder>
   <Folder Name="/Modules/Google/">
     <Project Path="src/Modules/Google/Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
     <Project Path="src/Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
@@ -41,9 +37,9 @@
     <Project Path="src/Modules/SalesForce/Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" />
   </Folder>
   <Folder Name="/Modules/UI/">
-    <Project Path="src/Modules/UI/Contracts/DigitalBrain.Modules.Shell.Contracts.csproj" />
-    <Project Path="src/Modules/UI/Shell/DigitalBrain.Modules.Shell.csproj" />
-    <Project Path="src/Modules/UI/DigitalBrain.Modules.UI.Aspire.Hosting/DigitalBrain.Modules.Shell.Aspire.Hosting.csproj" />
+    <Project Path="src/Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
+    <Project Path="src/Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
+    <Project Path="src/Modules/UI/DigitalBrain.Modules.UI.Aspire.Hosting/DigitalBrain.Modules.UI.Aspire.Hosting.csproj" />
   </Folder>
   <Folder Name="/Modules/Tasks/">
     <Project Path="src/Modules/Tasks/Contracts/DigitalBrain.Modules.Tasks.Contracts.csproj" />
