@@ -7,10 +7,10 @@
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\src\modules\chat\Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
-    <ProjectReference Include="..\src\modules\introspection\Contracts\DigitalBrain.Modules.Introspection.Contracts.csproj" />
-    <ProjectReference Include="..\src\core\aspire\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
-    <ProjectReference Include="..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
-    <ProjectReference Include="..\src\modules\sdk\DigitalBrain.Modules.Sdk\DigitalBrain.Modules.Sdk.csproj" />
+    <ProjectReference Include="../../Modules/Chat/Contracts/DigitalBrain.Modules.Chat.Contracts.csproj" />
+    <ProjectReference Include="../../Modules/Introspection/Contracts/DigitalBrain.Modules.Introspection.Contracts.csproj" />
+    <ProjectReference Include="../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
+    <ProjectReference Include="../DigitalBrain.Client/DigitalBrain.Client.csproj" />
+    <ProjectReference Include="../../Modules/SDK/DigitalBrain.Modules.Sdk/DigitalBrain.Modules.Sdk.csproj" />
   </ItemGroup>
 </Project>

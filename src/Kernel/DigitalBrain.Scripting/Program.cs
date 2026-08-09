@@ -54,9 +54,9 @@ internal static class BrainChatProbeGenerator
                 <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
               </PropertyGroup>
               <ItemGroup>
-                <ProjectReference Include="{{repoRoot}}\src\core\aspire\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
-                <ProjectReference Include="{{repoRoot}}\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
-                <ProjectReference Include="{{repoRoot}}\src\modules\chat\Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
+                <ProjectReference Include="{{repoRoot}}\src\Kernel\Aspire\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
+                <ProjectReference Include="{{repoRoot}}\src\Kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
+                <ProjectReference Include="{{repoRoot}}\src\Modules\Chat\Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
               </ItemGroup>
             </Project>
             """,

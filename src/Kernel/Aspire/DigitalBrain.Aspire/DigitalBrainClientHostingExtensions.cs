@@ -41,6 +41,7 @@ public static class DigitalBrainClientHostingExtensions
 
         builder.AddServiceDefaults();
         builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.Clustering);
+        builder.AddKeyedAzureQueueServiceClient(DigitalBrainResourceNames.Streams);
         builder.UseOrleansClient(client =>
         {
             client.Services.AddDigitalBrainClientWireSerializers();

@@ -90,7 +90,7 @@ public static class ShellHostingExtensions
             {
                 throw new InvalidOperationException(
                     $"Flutter host package was not found at '{packageRoot}'. " +
-                    "Pass FlutterHostOptions.WorkingDirectory or place clients/flutter/core in the repo.");
+                    "Pass FlutterHostOptions.WorkingDirectory or place src/Modules/UI/Flutter/core in the repo.");
             }
 
             var launch = FlutterHostLaunch.Resolve(kind, packageRoot, options, appHost.Configuration);
@@ -154,6 +154,8 @@ public static class ShellHostingExtensions
 
             var candidates = new[]
             {
+                Path.Combine(appHostDirectory, "..", "..", "Modules", "UI", "Flutter", "core"),
+                Path.Combine(appHostDirectory, "..", "..", "Modules", "UI", "Flutter", "shell"),
                 Path.Combine(appHostDirectory, "..", "..", "clients", "flutter", "core"),
                 Path.Combine(appHostDirectory, "..", "clients", "flutter", "core"),
             };

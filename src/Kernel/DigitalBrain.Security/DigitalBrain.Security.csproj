@@ -8,6 +8,6 @@
     <PackageReference Include="Microsoft.Orleans.Journaling" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\kernel\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
+    <ProjectReference Include="../DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
   </ItemGroup>
 </Project>

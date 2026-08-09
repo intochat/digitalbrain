@@ -9,8 +9,8 @@
     <PackageReference Include="Microsoft.Extensions.AI" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Contracts\DigitalBrain.Modules.Salesforce.Contracts.csproj" />
-    <ProjectReference Include="..\..\sdk\DigitalBrain.Modules.Sdk\DigitalBrain.Modules.Sdk.csproj" />
-    <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
+    <ProjectReference Include="../../SDK/DigitalBrain.Modules.Sdk/DigitalBrain.Modules.Sdk.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
 </Project>

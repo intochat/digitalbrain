@@ -17,8 +17,8 @@
     <PackageReference Include="Microsoft.Orleans.Streaming.AzureStorage" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
-    <ProjectReference Include="..\..\kernel\DigitalBrain.Core\DigitalBrain.Core.csproj" />
-    <ProjectReference Include="..\DigitalBrain.ServiceDefaults\DigitalBrain.ServiceDefaults.csproj" />
+    <ProjectReference Include="../../DigitalBrain.Client/DigitalBrain.Client.csproj" />
+    <ProjectReference Include="../../DigitalBrain.Core/DigitalBrain.Core.csproj" />
+    <ProjectReference Include="../DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
   </ItemGroup>
 </Project>

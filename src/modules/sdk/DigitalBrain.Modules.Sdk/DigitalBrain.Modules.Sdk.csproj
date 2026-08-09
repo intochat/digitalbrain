@@ -13,8 +13,8 @@
     <PackageReference Include="ModelContextProtocol.Core" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\core\kernel\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
-    <ProjectReference Include="..\..\..\core\kernel\DigitalBrain.Core\DigitalBrain.Core.csproj" />
-    <ProjectReference Include="..\..\..\core\security\DigitalBrain.Security\DigitalBrain.Security.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Security/DigitalBrain.Security.csproj" />
   </ItemGroup>
 </Project>

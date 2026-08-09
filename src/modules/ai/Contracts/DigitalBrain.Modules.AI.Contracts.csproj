@@ -6,7 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
-    <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
-    <ProjectReference Include="..\..\tasks\Contracts\DigitalBrain.Modules.Tasks.Contracts.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+    <ProjectReference Include="../../Tasks/Contracts/DigitalBrain.Modules.Tasks.Contracts.csproj" />
   </ItemGroup>
 </Project>

@@ -6,6 +6,6 @@
     <NoWarn>$(NoWarn);CA1700</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\core\kernel\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
   </ItemGroup>
 </Project>

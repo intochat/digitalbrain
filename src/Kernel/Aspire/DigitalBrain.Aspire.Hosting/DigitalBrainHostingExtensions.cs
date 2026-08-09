@@ -112,6 +112,7 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(client);
 
         builder.WithReference(client.Brain.Orleans.AsClient());
+        builder.WithReference(client.Brain.Streams);
         ProjectModuleManifest(builder, client.Brain);
         return builder;
     }

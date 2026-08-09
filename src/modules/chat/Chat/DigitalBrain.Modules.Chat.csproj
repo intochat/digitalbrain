@@ -9,8 +9,8 @@
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Contracts\DigitalBrain.Modules.Chat.Contracts.csproj" />
-    <ProjectReference Include="..\..\ai\Contracts\DigitalBrain.Modules.AI.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Chat.Contracts.csproj" />
+    <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
 </Project>

@@ -12,9 +12,9 @@
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Contracts\DigitalBrain.Modules.Google.Contracts.csproj" />
-    <ProjectReference Include="..\..\sdk\DigitalBrain.Modules.Sdk\DigitalBrain.Modules.Sdk.csproj" />
-    <ProjectReference Include="..\..\..\..\src\core\kernel\DigitalBrain.Core\DigitalBrain.Core.csproj" />
-    <ProjectReference Include="..\..\..\..\src\core\security\DigitalBrain.Security\DigitalBrain.Security.csproj" />
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
+    <ProjectReference Include="../../SDK/DigitalBrain.Modules.Sdk/DigitalBrain.Modules.Sdk.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Security/DigitalBrain.Security.csproj" />
   </ItemGroup>
 </Project>

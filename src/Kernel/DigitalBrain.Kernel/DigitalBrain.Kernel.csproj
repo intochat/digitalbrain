@@ -6,18 +6,18 @@
     <PackageReference Include="Microsoft.Extensions.AI" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\src\modules\ai\AI\DigitalBrain.Modules.AI.csproj" />
-    <ProjectReference Include="..\src\modules\chat\Chat\DigitalBrain.Modules.Chat.csproj" />
-    <ProjectReference Include="..\src\modules\tasks\Tasks\DigitalBrain.Modules.Tasks.csproj" />
-    <ProjectReference Include="..\src\modules\time\Time\DigitalBrain.Modules.Time.csproj" />
-    <ProjectReference Include="..\src\modules\introspection\Introspection\DigitalBrain.Modules.Introspection.csproj" />
-    <ProjectReference Include="..\src\modules\memory\Memory\DigitalBrain.Modules.Memory.csproj" />
-    <ProjectReference Include="..\src\modules\shell\Shell\DigitalBrain.Modules.Shell.csproj" />
-    <ProjectReference Include="..\src\modules\google\Google\DigitalBrain.Modules.Google.csproj" />
-    <ProjectReference Include="..\src\modules\salesforce\Salesforce\DigitalBrain.Modules.Salesforce.csproj" />
-    <ProjectReference Include="..\src\core\aspire\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" />
-    <ProjectReference Include="..\src\core\kernel\DigitalBrain.Core\DigitalBrain.Core.csproj" />
-    <ProjectReference Include="..\src\core\kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
-    <ProjectReference Include="..\src\modules\sdk\DigitalBrain.Modules.Sdk\DigitalBrain.Modules.Sdk.csproj" />
+    <ProjectReference Include="../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="../../Modules/Chat/Chat/DigitalBrain.Modules.Chat.csproj" />
+    <ProjectReference Include="../../Modules/Tasks/Tasks/DigitalBrain.Modules.Tasks.csproj" />
+    <ProjectReference Include="../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
+    <ProjectReference Include="../../Modules/Introspection/Introspection/DigitalBrain.Modules.Introspection.csproj" />
+    <ProjectReference Include="../../Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
+    <ProjectReference Include="../../Modules/UI/Shell/DigitalBrain.Modules.Shell.csproj" />
+    <ProjectReference Include="../../Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
+    <ProjectReference Include="../../Modules/SalesForce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
+    <ProjectReference Include="../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
+    <ProjectReference Include="../DigitalBrain.Core/DigitalBrain.Core.csproj" />
+    <ProjectReference Include="../DigitalBrain.Client/DigitalBrain.Client.csproj" />
+    <ProjectReference Include="../../Modules/SDK/DigitalBrain.Modules.Sdk/DigitalBrain.Modules.Sdk.csproj" />
   </ItemGroup>
 </Project>

@@ -9,7 +9,7 @@
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\AI\DigitalBrain.Modules.AI.csproj" />
-    <ProjectReference Include="..\..\..\..\src\core\aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../AI/DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="../../../Kernel/Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>
