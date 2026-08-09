@@ -79,12 +79,12 @@ internal static class ChatStreamsHttpMaps
         {
             UserMessaged messaged =>
                 Turn(true, messaged.Text, messaged.CommandId, nameof(UserMessaged), messaged.Chat, null),
-            AssistantResponded responded =>
+            Responded responded =>
                 Turn(
                     false,
                     responded.Text,
                     responded.CommandId,
-                    nameof(AssistantResponded),
+                    nameof(Responded),
                     responded.Chat,
                     responded.Buttons,
                     responded.Charts),

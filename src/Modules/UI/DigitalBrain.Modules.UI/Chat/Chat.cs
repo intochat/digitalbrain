@@ -13,14 +13,7 @@ using Orleans.Serialization;
 namespace DigitalBrain.UI;
 
 [GrainType("chat")]
-internal sealed class ChatNeuron :
-    Neuron,
-    IChat,
-    IEmit<UserMessaged>,
-    IEmit<AssistantResponded>,
-    IHandle<ReadTranscriptRequest>,
-    IHandle<ButtonClicked>,
-    IEmit<TranscriptRead>
+internal sealed class Chat : Neuron, IChat
 {
     private const string AssistantName = "assistant";
     private const string CommandLogName = "chat.command-log";
@@ -35,7 +28,7 @@ internal sealed class ChatNeuron :
     private readonly Serializer<OwnerCommand> _commands;
     private readonly Serializer<ChatTurn> _turns;
 
-    public ChatNeuron()
+    public Chat()
     {
         _commandLog = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(CommandLogName);
         _transcript = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(TranscriptName);
@@ -70,7 +63,7 @@ internal sealed class ChatNeuron :
                 new ChatButtonOffer(ShowTimeButtonId, "Show current time", ShowTimeAction),
             };
             Remember(new ChatTurn(FromUser: false, reply, buttons));
-            await EmitAsync(new AssistantResponded(message.CommandId, Id, reply, buttons))
+            await EmitAsync(new Responded(message.CommandId, Id, reply, buttons))
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             yield return new ChatResponseUpdate(ChatRole.Assistant, reply);
             yield break;
@@ -93,7 +86,7 @@ internal sealed class ChatNeuron :
                     "bar"),
             };
             Remember(new ChatTurn(FromUser: false, reply, Charts: charts));
-            await EmitAsync(new AssistantResponded(message.CommandId, Id, reply, Charts: charts))
+            await EmitAsync(new Responded(message.CommandId, Id, reply, Charts: charts))
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             yield return new ChatResponseUpdate(ChatRole.Assistant, reply);
             yield break;
@@ -101,7 +94,7 @@ internal sealed class ChatNeuron :
 
         var answer = new StringBuilder();
 
-        await foreach (var chunk in Assistant().RespondStreaming([.. Turns().Select(AsChatMessage)], cancellationToken).ConfigureAwait(true))
+        await foreach (var chunk in DefaultResponder().RespondStreaming([.. Turns().Select(AsChatMessage)], cancellationToken).ConfigureAwait(true))
         {
             answer.Append(chunk.Text);
             yield return chunk;
@@ -114,7 +107,7 @@ internal sealed class ChatNeuron :
         }
 
         Remember(new ChatTurn(FromUser: false, answered));
-        await EmitAsync(new AssistantResponded(message.CommandId, Id, answered))
+        await EmitAsync(new Responded(message.CommandId, Id, answered))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
@@ -150,7 +143,7 @@ internal sealed class ChatNeuron :
         var text = $"Current UTC time: {when}";
         var command = CommandId.New();
         Remember(new ChatTurn(FromUser: false, text));
-        await EmitAsync(new AssistantResponded(command, Id, text))
+        await EmitAsync(new Responded(command, Id, text))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
@@ -183,7 +176,7 @@ internal sealed class ChatNeuron :
 
     private IReadOnlyList<ChatTurn> Turns() => [.. _transcript.Select(_turns.Deserialize)];
 
-    private IAssistant Assistant()
+    private IAssistant DefaultResponder()
         => GrainFactory.GetGrain<IAssistant>(NeuronId.For<IAssistant>(Id.Owner, AssistantName).ToGrainId());
 
     private static ChatMessage AsChatMessage(ChatTurn turn)

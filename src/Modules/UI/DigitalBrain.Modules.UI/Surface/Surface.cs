@@ -4,12 +4,7 @@ using DigitalBrain.Core;
 namespace DigitalBrain.UI;
 
 [GrainType("surface")]
-internal sealed class SurfaceNeuron :
-    Neuron,
-    ISurface,
-    IHandle<OpenSurface>,
-    IHandle<ControlActivated>,
-    IEmit<SurfaceOpened>
+internal sealed class Surface : Neuron, ISurface
 {
     public Task HandleAsync(OpenSurface synapse, CancellationToken cancellationToken)
     {

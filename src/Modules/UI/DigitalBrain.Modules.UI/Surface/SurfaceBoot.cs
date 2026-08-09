@@ -4,7 +4,7 @@ using DigitalBrain.Core;
 namespace DigitalBrain.UI;
 
 [GrainType("surface-boot")]
-internal sealed class SurfaceBootNeuron :
+internal sealed class SurfaceBoot :
     Neuron,
     IHandle<DigitalBrainActivated>
 {

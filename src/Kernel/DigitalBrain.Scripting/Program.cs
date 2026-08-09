@@ -114,7 +114,7 @@ internal static class BrainChatProbeGenerator
         {
             foreach (var delivery in page.Delta)
             {
-                if (delivery.Synapse is AssistantResponded response && response.CommandId == command)
+                if (delivery.Synapse is Responded response && response.CommandId == command)
                 {
                     Console.WriteLine(response.Text);
                     await host.StopAsync().ConfigureAwait(false);

@@ -14,7 +14,7 @@ ChatTurnEvent shellTurn(
   fromUser: fromUser,
   text: text,
   commandId: 'c$sequence',
-  synapse: synapse ?? (fromUser ? 'UserMessaged' : 'AssistantResponded'),
+  synapse: synapse ?? (fromUser ? 'UserMessaged' : 'Responded'),
   neuronId: 'chat:owner/main',
   caller: 'chat:owner/main',
   correlationId: 'correlation-$sequence',

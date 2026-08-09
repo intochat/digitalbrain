@@ -69,7 +69,7 @@ void main() {
     turns.add(shellTurn(9, false, 'arrived while activity was open'));
     await tester.pumpAndSettle();
 
-    expect(find.text('AssistantResponded'), findsOneWidget);
+    expect(find.text('Responded'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('destination_chat')));
     await tester.pumpAndSettle();

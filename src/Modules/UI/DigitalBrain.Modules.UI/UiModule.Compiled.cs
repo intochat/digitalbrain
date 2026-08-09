@@ -35,10 +35,10 @@ public sealed partial class UiModule : ICompiledModule
                     ],
                     [
                         new SynapseCapabilityDescriptor(
-                            "chat.assistant-responded",
+                            "chat.responded",
                             1,
-                            "Assistant response committed into a chat transcript",
-                            CapabilitySchema.For(typeof(AssistantResponded))),
+                            "A response committed into a chat transcript",
+                            CapabilitySchema.For(typeof(Responded))),
                         new SynapseCapabilityDescriptor(
                             "chat.transcript-read",
                             1,

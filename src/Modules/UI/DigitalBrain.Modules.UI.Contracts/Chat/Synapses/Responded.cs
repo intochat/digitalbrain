@@ -5,9 +5,9 @@ using DigitalBrain.UI;
 namespace DigitalBrain.Chat;
 
 [GenerateSerializer]
-[Alias("chat.assistant-responded")]
-[Description("Assistant response committed into a chat transcript")]
-public sealed record AssistantResponded(
+[Alias("chat.responded")]
+[Description("A response committed into a chat transcript")]
+public sealed record Responded(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] NeuronId Chat,
     [property: Id(2)] string Text,

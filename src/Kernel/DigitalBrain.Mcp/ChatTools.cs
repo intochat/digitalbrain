@@ -139,7 +139,7 @@ internal sealed class ChatTools(IDigitalBrain brain)
 
             foreach (var delivery in page.Delta)
             {
-                if (delivery.Synapse is AssistantResponded response
+                if (delivery.Synapse is Responded response
                     && response.CommandId == commandId)
                 {
                     return ToResult(chatName, response, delivery);
@@ -178,7 +178,7 @@ internal sealed class ChatTools(IDigitalBrain brain)
 
             foreach (var delivery in page.Delta)
             {
-                if (delivery.Synapse is AssistantResponded response)
+                if (delivery.Synapse is Responded response)
                 {
                     return ToResult(chatName, response, delivery);
                 }
@@ -190,7 +190,7 @@ internal sealed class ChatTools(IDigitalBrain brain)
 
     private static ChatMessageResult ToResult(
         string chatName,
-        AssistantResponded response,
+        Responded response,
         SynapseDelivery delivery)
         => new(
             chatName,
