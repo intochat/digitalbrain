@@ -1,4 +1,6 @@
+using DigitalBrain.Abstractions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Google.Auth;
 
@@ -6,14 +8,31 @@ internal static class GoogleOAuthOptions
 {
     internal const string ConfigurationRoot = "DigitalBrain:Google:Gmail";
 
-    internal static GoogleOAuthClientSettings Read(IConfiguration configuration)
+    internal static GoogleOAuthClientSettings Read(IConfiguration configuration, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+
+        var redirectUri = RequiredUri(configuration, "RedirectUri");
+        if (!OAuthCallbackPaths.EndsWithCanonicalCallback(redirectUri))
+        {
+            var message =
+                $"Gmail RedirectUri is '{redirectUri}' but the kernel serves OAuth callbacks at paths ending with "
+                + $"'{OAuthCallbackPaths.RelativePath}'. Update configuration '{ConfigurationRoot}:RedirectUri' "
+                + $"(and the Google OAuth client) so both end with '{OAuthCallbackPaths.RelativePath}'.";
+            if (logger is not null)
+            {
+                logger.LogWarning("{Message}", message);
+            }
+            else
+            {
+                Console.Error.WriteLine($"warn: {message}");
+            }
+        }
 
         return new GoogleOAuthClientSettings(
             Required(configuration, "ClientId"),
             Required(configuration, "ClientSecret"),
-            RequiredUri(configuration, "RedirectUri"));
+            redirectUri);
     }
 
     private static string Required(IConfiguration configuration, string name)

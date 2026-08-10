@@ -13,7 +13,7 @@ internal static class ComposedModules
             typeof(DigitalBrain.Google.IGmail).Assembly,
             typeof(DigitalBrain.Introspection.ReadTopologyRequest).Assembly,
             typeof(DigitalBrain.Memory.IVectorMemory).Assembly,
-            typeof(DigitalBrain.Salesforce.ISalesforce).Assembly,
+
             typeof(DigitalBrain.Tasks.ITask).Assembly,
             typeof(DigitalBrain.Time.StartTimer).Assembly,
             typeof(DigitalBrain.Chat.SendMessage).Assembly,

@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Aspire.Hosting;
@@ -78,6 +79,8 @@ public static class OAuthProviderHosting
             }
 
             var localRun = _builder.ExecutionContext.IsRunMode;
+            // Prefer the product-composed callback over any persisted stale secret
+            // (historically /oauth/mcp/callback). Persist only when the operator must supply it.
             var localCallback = localRun ? localDevelopmentCallbackUri : null;
             var created = new OAuthProviderParameters(
                 definition,
@@ -85,19 +88,22 @@ public static class OAuthProviderHosting
                     $"{definition.ParameterPrefix}-client-id",
                     secret: false,
                     description: definition.ClientIdDescription,
-                    localValue: null),
+                    localValue: null,
+                    persist: true),
                 definition.ClientSecretDescription is { } clientSecretDescription
                     ? Parameter(
                         $"{definition.ParameterPrefix}-client-secret",
                         secret: true,
                         description: clientSecretDescription,
-                        localValue: null)
+                        localValue: null,
+                        persist: true)
                     : null,
                 Parameter(
                     $"{definition.ParameterPrefix}-redirect-uri",
                     secret: false,
                     description: RedirectUriDescription(definition, localCallback),
-                    localCallback));
+                    localCallback,
+                    persist: localCallback is null));
             _providers.Add(definition.Key, created);
             return created;
         }
@@ -105,31 +111,37 @@ public static class OAuthProviderHosting
         private static string RedirectUriDescription(
             OAuthProviderHostingDefinition definition,
             string? localCallbackUri)
-            => localCallbackUri is null
-                ? definition.RedirectUriDescription
-                : definition.RedirectUriDescription
-                + $" Local `aspire run` defaults this to `{localCallbackUri}` — the callback this product composition serves. "
-                + "Register that exact URI once, and override the parameter only if you host the callback elsewhere.";
+        {
+            var baseText = definition.RedirectUriDescription
+                + $" Must end with `{OAuthCallbackPaths.RelativePath}` — that is the path the DigitalBrain kernel serves.";
+            return localCallbackUri is null
+                ? baseText
+                : baseText
+                + $" Local `aspire run` defaults this to `{localCallbackUri}` (derived from the product composition, not a persisted secret). "
+                + "Register that exact URI on the provider app (Salesforce External Client App / Google OAuth client). "
+                + "Override only if you host the callback elsewhere — still ending with "
+                + $"`{OAuthCallbackPaths.RelativePath}`.";
+        }
 
         private IResourceBuilder<ParameterResource> Parameter(
             string name,
             bool secret,
             string description,
-            string? localValue)
+            string? localValue,
+            bool persist)
         {
-
             var resource = _builder.ExecutionContext.IsRunMode
                 ? localValue is null
                     ? _builder.AddParameter(
                         name,
                         new OperatorSuppliedParameterDefault(name),
                         secret: secret,
-                        persist: true)
+                        persist: persist)
                     : _builder.AddParameter(
                         name,
                         new ConstantParameterDefault(localValue),
                         secret: secret,
-                        persist: true)
+                        persist: persist)
                 : _builder.AddParameter(name, secret: secret);
 
             return resource.WithDescription(description, enableMarkdown: true);

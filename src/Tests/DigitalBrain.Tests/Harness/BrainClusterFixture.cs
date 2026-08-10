@@ -35,6 +35,7 @@ public sealed class BrainClusterFixture : IAsyncLifetime
                 typeof(DigitalBrain.Chat.SendMessage).Assembly,
                 typeof(DigitalBrain.Introspection.ReadTopologyRequest).Assembly,
                 typeof(DigitalBrain.Time.StartTimer).Assembly,
+                typeof(DigitalBrain.Modules.Sdk.Mcp.IMcp).Assembly,
             ],
             [
                 typeof(ProbeModule).Assembly,
@@ -42,6 +43,7 @@ public sealed class BrainClusterFixture : IAsyncLifetime
                 typeof(DigitalBrain.Introspection.IntrospectionNeuron).Assembly,
                 typeof(DigitalBrain.AI.Agent).Assembly,
                 typeof(DigitalBrain.Time.TimerNeuron).Assembly,
+                typeof(DigitalBrain.Modules.Sdk.Mcp.IMcp).Assembly,
             ]);
         var builder = new InProcessTestClusterBuilder(SiloCount);
         builder.ConfigureSilo((options, silo) =>
@@ -54,6 +56,15 @@ public sealed class BrainClusterFixture : IAsyncLifetime
             silo.Services.AddSingleton(_sharedJournalStorage);
             silo.Services.AddKeyedSingleton<Microsoft.Extensions.AI.IChatClient>(
                 typeof(DigitalBrain.AI.Ollama.Gemma4), (_, _) => new ScriptedGemmaChatClient());
+            silo.Services.AddSingleton<DigitalBrain.Modules.Sdk.Mcp.IMcpToolTransport>(
+                new FakeMcpTransport());
+            silo.Services.AddSingleton(new DigitalBrain.Modules.Sdk.Mcp.McpServerDefinition(
+                "crm",
+                "Test CRM",
+                new Uri("http://localhost:1/mcp"),
+                "DigitalBrain:TestCrm",
+                ["mcp_api"],
+                requiresClientSecret: false));
             silo.Services.Configure<SiloMessagingOptions>(
                 messaging => messaging.ResponseTimeout = SaturatedMachineResponseTimeout);
         });

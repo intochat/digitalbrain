@@ -54,10 +54,13 @@ public sealed class SystemTools(IGrainFactory grains, OwnerId owner, IServicePro
             cancellationToken).ConfigureAwait(false);
         if (hits.Count == 0)
         {
-            return "Nothing matched. Try different words for the same goal.";
+            var alone = new StringBuilder("Nothing matched. Try different words for the same goal.").AppendLine();
+            AppendExternalServers(alone);
+            return alone.ToString();
         }
 
         var lines = new StringBuilder();
+        AppendExternalServers(lines);
         foreach (var hit in hits)
         {
             if (hit.Kind == CapabilityHit.RequestKind)
@@ -74,6 +77,23 @@ public sealed class SystemTools(IGrainFactory grains, OwnerId owner, IServicePro
         }
 
         return lines.ToString();
+    }
+
+    private void AppendExternalServers(StringBuilder lines)
+    {
+        var servers = services.GetServices<ExternalServerCapability>().ToArray();
+        if (servers.Length == 0)
+        {
+            return;
+        }
+
+        lines.AppendLine(
+            "External servers (their live tool catalogs are the capabilities — fire "
+            + "db.mcp.list-tools at mcp:<key>, then db.mcp.call-tool):");
+        foreach (var server in servers)
+        {
+            lines.AppendLine($"  {server.Key} ({server.DisplayName}) — target mcp:{server.Key}");
+        }
     }
 
     private async Task<string> GetNeuronsAsync(CancellationToken cancellationToken, string? grainType = null)

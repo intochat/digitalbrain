@@ -3,6 +3,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using Orleans.Journaling;
@@ -47,7 +48,8 @@ public static class McpClientSessions
                 commit,
                 protector,
                 McpTokenPresence.Purpose(server.Key, durableIdentity));
-            var oauth = McpOAuthOptions.Create(server, configuration, tokens, session);
+            var logger = services.GetService<ILoggerFactory>()?.CreateLogger("DigitalBrain.Mcp.OAuth");
+            var oauth = McpOAuthOptions.Create(server, configuration, tokens, session, logger);
             var httpClient = httpClients.CreateClient(HttpClientName);
             var transport = new HttpClientTransport(
                 new HttpClientTransportOptions

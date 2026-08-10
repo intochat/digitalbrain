@@ -14,6 +14,7 @@ public static class ModelPayloadSerialization
                 static type => type == typeof(Microsoft.Extensions.AI.ChatMessage)
                     || type == typeof(Microsoft.Extensions.AI.ChatResponse)
                     || type == typeof(Microsoft.Extensions.AI.ChatResponseUpdate)
+                    || type == typeof(System.Text.Json.JsonElement)
                     || typeof(Microsoft.Extensions.AI.AIContent).IsAssignableFrom(type)
                     || typeof(Microsoft.Extensions.AI.AITool).IsAssignableFrom(type)));
     }

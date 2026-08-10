@@ -64,14 +64,42 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
 
         var tools = new List<AIFunction>();
 
-        if (ModelMentions.NamedIn(LatestOwnerText(messages)).Count >= SmallestTeam)
+        var named = ModelMentions.NamedIn(LatestOwnerText(messages));
+        if (named.Count >= SmallestTeam)
         {
             tools.Add(ConveneTool());
+        }
+
+        if (named.Any(static model => model.Contains("llama", StringComparison.OrdinalIgnoreCase)))
+        {
+            tools.Add(AskLlamaTool());
         }
 
         return tools;
     }
 
+
+    private AIFunction AskLlamaTool()
+        => Capability(
+            "ask_llama",
+            "Ask the local Llama model one question and return its answer. Offered only "
+            + "because the owner named llama; never consult it on your own.",
+            ([Description("The single question for Llama")] string question)
+                => AskLlamaAsync(question));
+
+    private async Task<string> AskLlamaAsync(string question)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(question);
+
+        var llama = ServiceProvider.GetRequiredKeyedService<IChatClient>(typeof(Llama32));
+        var answered = await llama
+            .GetResponseAsync([new ChatMessage(ChatRole.User, question)])
+            .ConfigureAwait(true);
+
+        return string.IsNullOrWhiteSpace(answered.Text)
+            ? "Llama returned no answer."
+            : answered.Text;
+    }
 
     private AIFunction ConveneTool()
         => Capability(

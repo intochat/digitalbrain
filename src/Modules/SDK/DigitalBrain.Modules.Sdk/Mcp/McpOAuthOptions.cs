@@ -1,4 +1,6 @@
+using DigitalBrain.Abstractions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Authentication;
 
 namespace DigitalBrain.Modules.Sdk.Mcp;
@@ -9,12 +11,16 @@ internal static class McpOAuthOptions
         McpServerDefinition server,
         IConfiguration configuration,
         ITokenCache tokenCache,
-        McpOAuthSession session)
+        McpOAuthSession session,
+        ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(tokenCache);
         ArgumentNullException.ThrowIfNull(session);
+
+        var redirectUri = RequiredUri(configuration, server, "RedirectUri");
+        WarnIfRedirectDoesNotMatchKernelCallback(server, redirectUri, logger);
 
         return new ClientOAuthOptions
         {
@@ -22,12 +28,38 @@ internal static class McpOAuthOptions
             ClientSecret = server.RequiresClientSecret
                 ? Required(configuration, server, "ClientSecret")
                 : Optional(configuration, server, "ClientSecret"),
-            RedirectUri = RequiredUri(configuration, server, "RedirectUri"),
+            RedirectUri = redirectUri,
             Scopes = server.Scopes,
             TokenCache = tokenCache,
             AuthorizationCallbackHandler = (context, cancellationToken) =>
                 McpOAuthCallback.AuthorizeAsync(context, session, cancellationToken),
         };
+    }
+
+    private static void WarnIfRedirectDoesNotMatchKernelCallback(
+        McpServerDefinition server,
+        Uri redirectUri,
+        ILogger? logger)
+    {
+        if (OAuthCallbackPaths.EndsWithCanonicalCallback(redirectUri))
+        {
+            return;
+        }
+
+        var message =
+            $"{server.DisplayName} RedirectUri is '{redirectUri}' but the kernel serves OAuth callbacks at "
+            + $"paths ending with '{OAuthCallbackPaths.RelativePath}'. Update configuration "
+            + $"'{server.ConfigurationRoot}:RedirectUri' (and the provider app registration) "
+            + $"so both end with '{OAuthCallbackPaths.RelativePath}'.";
+
+        if (logger is not null)
+        {
+            logger.LogWarning("{Message}", message);
+        }
+        else
+        {
+            Console.Error.WriteLine($"warn: {message}");
+        }
     }
 
     private static string? Optional(IConfiguration configuration, McpServerDefinition server, string name)

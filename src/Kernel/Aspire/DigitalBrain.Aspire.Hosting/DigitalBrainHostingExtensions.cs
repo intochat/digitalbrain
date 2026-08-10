@@ -52,6 +52,14 @@ public static class DigitalBrainHostingExtensions
                 nameof(callbackUri));
         }
 
+        if (!OAuthCallbackPaths.EndsWithCanonicalCallback(callbackUri))
+        {
+            throw new ArgumentException(
+                $"The local-development OAuth callback must end with '{OAuthCallbackPaths.RelativePath}' "
+                + $"(the path the kernel serves). Received '{callbackUri}'.",
+                nameof(callbackUri));
+        }
+
         brain.UseLocalDevelopmentOAuthCallback(callbackUri.AbsoluteUri);
         return brain;
     }
