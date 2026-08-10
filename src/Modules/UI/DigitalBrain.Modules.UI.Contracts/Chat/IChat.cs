@@ -14,6 +14,8 @@ public partial interface IChat :
     IEmit<Responded>,
     IHandle<ReadTranscriptRequest>,
     IHandle<ShowTime>,
+    IHandle<Note>,
+    IHandle<TimerCard>,
     IEmit<TranscriptRead>
 {
     [Alias(nameof(Send))]

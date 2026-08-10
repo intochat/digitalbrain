@@ -27,6 +27,16 @@ public sealed partial class UiModule : ICompiledModule
                             1,
                             "Returns the durable transcript kept for one named conversation",
                             CapabilitySchema.For(typeof(ReadTranscriptRequest))),
+                        new SynapseCapabilityDescriptor(
+                            "ui.note",
+                            1,
+                            "Post a line of text into a chat transcript",
+                            CapabilitySchema.For(typeof(Note))),
+                        new SynapseCapabilityDescriptor(
+                            "ui.timer-card",
+                            1,
+                            "Post a countdown clock card into a chat transcript",
+                            CapabilitySchema.For(typeof(TimerCard))),
                     ],
                     [
                         new SynapseCapabilityDescriptor(

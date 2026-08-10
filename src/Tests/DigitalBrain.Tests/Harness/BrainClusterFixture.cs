@@ -31,6 +31,7 @@ public sealed class BrainClusterFixture : IAsyncLifetime
             new DigitalBrain.UI.UiModule(),
             new DigitalBrain.Introspection.IntrospectionModule(),
             new DigitalBrain.Assistant.AssistantModule(),
+            new DigitalBrain.Time.TimeModule(),
         ];
         var builder = new InProcessTestClusterBuilder(SiloCount);
         builder.ConfigureSilo((options, silo) =>

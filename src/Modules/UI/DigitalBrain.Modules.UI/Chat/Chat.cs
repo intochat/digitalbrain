@@ -108,6 +108,37 @@ internal sealed class Chat : Neuron, IChat
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
+    public async Task HandleAsync(Note synapse, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(synapse.Text))
+        {
+            throw new NeuronAuthorizationException($"Chat '{Id}' refuses an empty note.");
+        }
+
+        Remember(new ChatTurn(FromUser: false, synapse.Text));
+        await EmitAsync(new Responded(CommandId.New(), Id, synapse.Text))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    public async Task HandleAsync(TimerCard synapse, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(synapse.Label))
+        {
+            throw new NeuronAuthorizationException($"Chat '{Id}' refuses a timer card without a label.");
+        }
+
+        ChatTimerOffer[] offers = [new ChatTimerOffer(synapse.Label, synapse.DueAt)];
+        Remember(new ChatTurn(FromUser: false, synapse.Label, Timers: offers));
+        await EmitAsync(new Responded(CommandId.New(), Id, synapse.Label, Timers: offers))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
     public async Task HandleAsync(ShowTime synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
