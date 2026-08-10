@@ -4,6 +4,7 @@ import 'package:flutter_chat_core/flutter_chat_core.dart';
 import '../components/button/kit_button.dart';
 import '../components/card/kit_card.dart';
 import '../components/chart/kit_chart.dart';
+import '../components/clock/kit_clock.dart';
 import '../models/kit_part.dart';
 import '../theme/kit_theme.dart';
 
@@ -51,6 +52,7 @@ abstract final class KitChatBuilders {
           ),
         KitChartPart() => KitChart(part: part, height: 180),
         KitCardPart() => KitCard(part: part),
+        KitTimerPart() => KitClock(part: part),
       },
     );
   }

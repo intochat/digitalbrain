@@ -1,7 +1,7 @@
+import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 import 'package:flutter/material.dart';
 
 import '../brain_theme.dart';
-import '../kit/kit_analog_clock.dart';
 import '../kit/kit_chart.dart';
 import 'panel_manager.dart';
 
@@ -358,7 +358,7 @@ final class _PanelBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (kind) {
-      WindowPanelKind.clock => Center(child: SizedBox(width: 150, height: 150, child: KitAnalogClock())),
+      WindowPanelKind.clock => const Center(child: SizedBox(width: 150, height: 150, child: KitClock())),
       WindowPanelKind.metrics => const _MetricsBody(),
       WindowPanelKind.notes => const _NotesBody(),
       WindowPanelKind.activity => const _ActivityBody(),

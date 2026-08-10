@@ -61,7 +61,8 @@ internal static class ChatStreamsHttpMaps
             string synapseName,
             NeuronId chat,
             ChatButtonOffer[]? buttons,
-            ChatChartOffer[]? charts = null)
+            ChatChartOffer[]? charts = null,
+            ChatTimerOffer[]? timers = null)
             => new(
                 delivery.Sequence,
                 fromUser,
@@ -73,7 +74,8 @@ internal static class ChatStreamsHttpMaps
                 delivery.CorrelationId.ToString(),
                 delivery.Timestamp,
                 buttons,
-                charts);
+                charts,
+                timers);
 
         return delivery.Synapse switch
         {
@@ -87,7 +89,8 @@ internal static class ChatStreamsHttpMaps
                     nameof(Responded),
                     responded.Chat,
                     responded.Buttons,
-                    responded.Charts),
+                    responded.Charts,
+                    responded.Timers),
             _ => null,
         };
     }

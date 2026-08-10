@@ -50,4 +50,16 @@ void main() {
     final custom = messages.last as CustomMessage;
     expect(custom.metadata?['kind'], 'button');
   });
+
+  test('KitTimerPart round-trips its due instant', () {
+    final part = KitTimerPart(
+      label: 'tea in five',
+      dueAt: DateTime.utc(2026, 8, 10, 12, 30),
+    );
+    final parsed = KitPart.tryParse(part.toMetadata());
+    expect(parsed, isA<KitTimerPart>());
+    final timer = parsed! as KitTimerPart;
+    expect(timer.label, 'tea in five');
+    expect(timer.dueAt, DateTime.utc(2026, 8, 10, 12, 30));
+  });
 }

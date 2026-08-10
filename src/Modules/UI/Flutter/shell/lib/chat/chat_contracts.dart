@@ -39,5 +39,7 @@ extension ChatTurnKitParts on ChatTurnEvent {
             ],
             chartKind: chart.chartKind,
           ),
+        for (final timer in timers)
+          KitTimerPart(label: timer.label, dueAt: timer.dueAt),
       ];
 }

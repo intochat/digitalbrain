@@ -2,6 +2,27 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('ChatTurnEvent parses timer offers', () {
+    final event = ChatTurnEvent.fromJson({
+      'sequence': 7,
+      'fromUser': false,
+      'text': 'tea in five',
+      'commandId': 'c',
+      'synapse': 'Responded',
+      'neuronId': 'n',
+      'caller': 'x',
+      'correlationId': 'y',
+      'timestamp': '2026-08-10T12:00:00Z',
+      'timers': [
+        {'label': 'tea in five', 'dueAt': '2026-08-10T12:05:00Z'},
+      ],
+    });
+
+    expect(event.timers, hasLength(1));
+    expect(event.timers.first.label, 'tea in five');
+    expect(event.timers.first.dueAt, DateTime.utc(2026, 8, 10, 12, 5));
+  });
+
   test('SceneOpenedEvent reads JSON field names used by UI HTTP', () {
     final event = SceneOpenedEvent.fromJson({
       'sequence': 7,

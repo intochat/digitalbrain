@@ -26,7 +26,8 @@ internal sealed record ChatTurnEvent(
     string CorrelationId,
     DateTimeOffset Timestamp,
     ChatButtonOffer[]? Buttons = null,
-    ChatChartOffer[]? Charts = null);
+    ChatChartOffer[]? Charts = null,
+    ChatTimerOffer[]? Timers = null);
 
 internal sealed record SurfaceOpenedEvent(
     long Sequence,

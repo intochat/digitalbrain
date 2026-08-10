@@ -184,6 +184,7 @@ final class ChatTurnEvent {
     required this.timestamp,
     this.buttons = const [],
     this.charts = const [],
+    this.timers = const [],
   });
 
   final int sequence;
@@ -197,6 +198,7 @@ final class ChatTurnEvent {
   final DateTime timestamp;
   final List<ChatButtonOffer> buttons;
   final List<ChatChartOffer> charts;
+  final List<ChatTimerOffer> timers;
 
   factory ChatTurnEvent.fromJson(Map<String, Object?> json) {
     final rawButtons = json['buttons'];
@@ -217,6 +219,13 @@ final class ChatTurnEvent {
               )
               .toList(growable: false)
         : const <ChatChartOffer>[];
+    final rawTimers = json['timers'];
+    final timers = rawTimers is List
+        ? rawTimers
+              .whereType<Map>()
+              .map((e) => ChatTimerOffer.fromJson(Map<String, Object?>.from(e)))
+              .toList(growable: false)
+        : const <ChatTimerOffer>[];
 
     return ChatTurnEvent(
       sequence: (json['sequence'] as num).toInt(),
@@ -230,6 +239,24 @@ final class ChatTurnEvent {
       timestamp: DateTime.parse(json['timestamp'] as String).toUtc(),
       buttons: buttons,
       charts: charts,
+      timers: timers,
+    );
+  }
+}
+
+final class ChatTimerOffer {
+  const ChatTimerOffer({required this.label, required this.dueAt});
+
+  final String label;
+  final DateTime dueAt;
+
+  factory ChatTimerOffer.fromJson(Map<String, Object?> json) {
+    final rawDueAt = json['dueAt'] as String?;
+    return ChatTimerOffer(
+      label: json['label'] as String? ?? 'Timer',
+      dueAt: rawDueAt == null
+          ? DateTime.now().toUtc()
+          : DateTime.parse(rawDueAt).toUtc(),
     );
   }
 }

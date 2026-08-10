@@ -16,9 +16,39 @@ sealed class KitPart {
       KitButtonPart.kindName => KitButtonPart.fromMetadata(metadata),
       KitChartPart.kindName => KitChartPart.fromMetadata(metadata),
       KitCardPart.kindName => KitCardPart.fromMetadata(metadata),
+      KitTimerPart.kindName => KitTimerPart.fromMetadata(metadata),
       _ => null,
     };
   }
+}
+
+final class KitTimerPart extends KitPart {
+  const KitTimerPart({required this.label, required this.dueAt});
+
+  static const kindName = 'timer';
+
+  final String label;
+  final DateTime dueAt;
+
+  @override
+  String get kind => kindName;
+
+  factory KitTimerPart.fromMetadata(Map<String, dynamic> metadata) {
+    final rawDueAt = metadata['dueAt'] as String?;
+    return KitTimerPart(
+      label: metadata['label'] as String? ?? 'Timer',
+      dueAt: rawDueAt == null
+          ? DateTime.now().toUtc()
+          : DateTime.parse(rawDueAt).toUtc(),
+    );
+  }
+
+  @override
+  Map<String, Object?> toMetadata() => {
+        'kind': kindName,
+        'label': label,
+        'dueAt': dueAt.toUtc().toIso8601String(),
+      };
 }
 
 final class KitButtonPart extends KitPart {

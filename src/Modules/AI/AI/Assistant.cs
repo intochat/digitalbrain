@@ -37,6 +37,14 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         (type 'chart') render 'ui.chart-point' synapses; connect a source to a chart to see
         its facts live on a dashboard.
 
+        Timer neurons (type 'timer') arm a countdown with the time.start-timer tool. When the
+        owner asks for a timer or reminder, first route the timer's facts into this chat:
+        connect the timer to the chat for alias 'time.timer-scheduled' with transform
+        'to:ui.timer-card{Label=Note,DueAt=DueAt}' so a live clock card appears, and for
+        alias 'time.timer-elapsed' with transform 'to:ui.note{Text=Note}' so the note lands
+        in chat when time is up. Then start the timer with the duration in seconds and the
+        note to deliver; cancel it with time.cancel-timer.
+
         You can provide general conversational help using the current chat context. External
         capabilities are discovered from the active capability catalog for this deployment —
         only call tools that are actually offered on the current turn. Provider modules own
