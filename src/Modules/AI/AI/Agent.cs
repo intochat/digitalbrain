@@ -47,6 +47,10 @@ public abstract class Agent : Neuron, IAgent
         {
             Tools = [.. tools.Select(tool => new TurnBoundFunction(tool, turnScheduler))],
             ToolMode = ChatToolMode.Auto,
+            // Ollama defaults to a 4096-token window; a tool turn needs room for the
+            // roster, several rounds, and thinking-model reasoning (num_ctx / num_predict).
+            MaxOutputTokens = 4096,
+            AdditionalProperties = new AdditionalPropertiesDictionary { ["num_ctx"] = 16384 },
         };
         var instructions = Instructions;
         IReadOnlyList<ChatMessage> request = string.IsNullOrWhiteSpace(instructions)

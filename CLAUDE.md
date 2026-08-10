@@ -48,9 +48,15 @@ saturated machine.
   tools; scheduling and elapse EMIT `time.timer-scheduled`/`time.timer-elapsed` — the graph
   routes them (assistant recipe: morph to `ui.timer-card`/`ui.note` into chat). Kit renders
   `KitTimerPart` with `KitClock` (countdown face; wall clock in windowing).
-- **Self-programming**: `db.connect`/`db.disconnect` + introspection requests are capabilities;
-  the Assistant (Gemma4/Ollama) always carries them as tools and its instructions explain the
-  graph. Proven live: a chat request wired `chat.responded → chart` end to end.
+- **Self-programming**: the Assistant (Gemma4/Ollama) carries exactly THREE constant tools
+  (`SystemTools`): `find_capabilities(intent)` — hybrid search over the in-process
+  `CapabilityIndex` (keyword floor, embeddings enrich when a generator exists, nothing can
+  stall); `get_neurons(type?)` — live instances + connections; `fire(contract, arguments,
+  target?)` — bind, validate, send via session, return the reply. Graph verbs are ordinary
+  contracts fired like everything else. Canonical choreography: wire the graph
+  (fire db.connect with a morph), THEN trigger the source — data never transits the model.
+  fire errors are correctable text (near-matches, real signatures, live instances on
+  guessed identities); unavailability refuses settled with the fix path in the message.
 - **Orleans Streams are deliberately unused** for the interconnect (provisioned only).
   Do not move delivery onto them — see the review's fit matrix.
 
