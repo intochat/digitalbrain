@@ -362,11 +362,13 @@ final class BrainTopologySnapshot {
     required this.modules,
     required this.neurons,
     required this.observedAt,
+    this.connections = const [],
   });
 
   final List<BrainModule> modules;
   final List<BrainNeuron> neurons;
   final DateTime observedAt;
+  final List<BrainConnection> connections;
 
   factory BrainTopologySnapshot.fromJson(Map<String, Object?> json) {
     return BrainTopologySnapshot(
@@ -383,6 +385,75 @@ final class BrainTopologySnapshot {
           )
           .toList(growable: false),
       observedAt: DateTime.parse(json['observedAt'] as String).toUtc(),
+      connections: (json['connections'] as List<Object?>? ?? const [])
+          .map(
+            (connection) => BrainConnection.fromJson(
+              Map<String, Object?>.from(connection! as Map),
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+}
+
+final class BrainConnection {
+  const BrainConnection({
+    required this.connectionId,
+    required this.source,
+    required this.synapseAlias,
+    required this.target,
+    this.transform,
+    this.expiresAt,
+  });
+
+  final String connectionId;
+  final String source;
+  final String synapseAlias;
+  final String target;
+  final String? transform;
+  final DateTime? expiresAt;
+
+  factory BrainConnection.fromJson(Map<String, Object?> json) {
+    final expiresAt = json['expiresAt'] as String?;
+    return BrainConnection(
+      connectionId: json['connectionId'] as String,
+      source: json['source'] as String,
+      synapseAlias: json['synapseAlias'] as String,
+      target: json['target'] as String,
+      transform: json['transform'] as String?,
+      expiresAt: expiresAt == null ? null : DateTime.parse(expiresAt).toUtc(),
+    );
+  }
+}
+
+final class GraphChangeEvent {
+  const GraphChangeEvent({
+    required this.sequence,
+    required this.kind,
+    required this.connectionId,
+    required this.timestamp,
+    this.source,
+    this.synapseAlias,
+    this.target,
+  });
+
+  final int sequence;
+  final String kind;
+  final String connectionId;
+  final String? source;
+  final String? synapseAlias;
+  final String? target;
+  final DateTime timestamp;
+
+  factory GraphChangeEvent.fromJson(Map<String, Object?> json) {
+    return GraphChangeEvent(
+      sequence: (json['sequence'] as num).toInt(),
+      kind: json['kind'] as String,
+      connectionId: json['connectionId'] as String,
+      source: json['source'] as String?,
+      synapseAlias: json['synapseAlias'] as String?,
+      target: json['target'] as String?,
+      timestamp: DateTime.parse(json['timestamp'] as String).toUtc(),
     );
   }
 }

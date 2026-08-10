@@ -48,8 +48,26 @@ internal sealed record AuthorizationEvent(
 internal sealed record BrainTopologySnapshot(
     IReadOnlyList<BrainModule> Modules,
     IReadOnlyList<BrainNeuron> Neurons,
-    DateTimeOffset ObservedAt);
+    DateTimeOffset ObservedAt,
+    IReadOnlyList<BrainConnection> Connections);
 
 internal sealed record BrainModule(string Id);
 
 internal sealed record BrainNeuron(string Id, string GrainType, string Identity, string Placement);
+
+internal sealed record BrainConnection(
+    Guid ConnectionId,
+    string Source,
+    string SynapseAlias,
+    string Target,
+    string? Transform,
+    DateTimeOffset? ExpiresAt);
+
+internal sealed record GraphEvent(
+    long Sequence,
+    string Kind,
+    Guid ConnectionId,
+    string? Source,
+    string? SynapseAlias,
+    string? Target,
+    DateTimeOffset Timestamp);

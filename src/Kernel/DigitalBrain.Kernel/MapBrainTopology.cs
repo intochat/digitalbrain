@@ -48,7 +48,16 @@ internal static class BrainTopologyHttpMaps
                             neuron.Identity,
                             neuron.Placement)),
                     ],
-                    read.ObservedAt));
+                    read.ObservedAt,
+                    [
+                        .. read.Connections.Select(static connection => new BrainConnection(
+                            connection.ConnectionId,
+                            connection.Source,
+                            connection.SynapseAlias,
+                            connection.Target,
+                            connection.Transform,
+                            connection.ExpiresAt)),
+                    ]));
             });
 
         return endpoints;

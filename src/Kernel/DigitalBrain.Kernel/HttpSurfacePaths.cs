@@ -6,6 +6,7 @@ internal static class HttpSurfacePaths
     public const string ChatEventsPath = "/chats/{chatName}/events";
     public const string SurfaceEventsPath = "/surfaces/{surfaceName}/events";
     public const string BrainTopologyPath = "/brain/topology";
+    public const string GraphEventsPath = "/graph/events";
     public const string McpOAuthCallbackPath = "/oauth/callback";
     public const string AuthorizationEventsPath = "/authorizations/events";
 
@@ -13,6 +14,7 @@ internal static class HttpSurfacePaths
     public const string CacheControlNoCache = "no-cache";
     public const string SurfaceOpenedEvent = "surface-opened";
     public const string ChatTurnEvent = "chat-turn";
+    public const string GraphChangeEvent = "graph-change";
     public const string ChatDeltaEvent = "chat-delta";
     public const string AuthorizationEvent = "authorization";
 

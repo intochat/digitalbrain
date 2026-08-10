@@ -12,12 +12,14 @@ final class BrainScreen extends StatefulWidget {
     required this.chatName,
     required this.turns,
     this.topology,
+    this.graphChange,
     this.statusMessage,
   });
 
   final String chatName;
   final List<ChatTurnEvent> turns;
   final BrainTopologySnapshot? topology;
+  final GraphChangeEvent? graphChange;
   final String? statusMessage;
 
   @override
@@ -68,6 +70,13 @@ final class _BrainScreenState extends State<BrainScreen> {
       BrainModuleSelection(:final module)
           when topology == null ||
               !topology.modules.any((candidate) => candidate.id == module.id) =>
+        null,
+      BrainConnectionSelection(:final connection)
+          when topology == null ||
+              !topology.connections.any(
+                (candidate) =>
+                    candidate.connectionId == connection.connectionId,
+              ) =>
         null,
       final selection => selection,
     };
@@ -125,6 +134,7 @@ final class _BrainScreenState extends State<BrainScreen> {
               TopologyPanel(
                 topology: widget.topology,
                 pulse: pulse,
+                graphChange: widget.graphChange,
                 selection: _selection,
                 onSelected: (selection) =>
                     setState(() => _selection = selection),

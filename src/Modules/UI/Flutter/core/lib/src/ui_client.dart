@@ -9,6 +9,7 @@ import 'sse_authorization_frames.dart';
 import 'sse_chat_delta_frames.dart';
 import 'sse_chat_frames.dart';
 import 'sse_frames.dart';
+import 'sse_graph_frames.dart';
 
 final class DigitalBrainUiClient {
   DigitalBrainUiClient({required this.baseUri, http.Client? httpClient})
@@ -161,6 +162,34 @@ final class DigitalBrainUiClient {
         .transform(const LineSplitter());
 
     final parser = SseChatTurnParser();
+    await for (final line in lines) {
+      for (final event in parser.addLine(line)) {
+        yield event;
+      }
+    }
+    for (final event in parser.flush()) {
+      yield event;
+    }
+  }
+
+  Stream<GraphChangeEvent> watchGraphChanges({
+    int afterSequence = 0,
+  }) async* {
+    final uri = baseUri.replace(
+      path: '/graph/events',
+      queryParameters: {'afterSequence': '$afterSequence'},
+    );
+    final request = http.Request('GET', uri);
+    final response = await _http.send(request);
+    if (response.statusCode != 200) {
+      throw StateError('graph events failed: ${response.statusCode}');
+    }
+
+    final lines = response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+
+    final parser = SseGraphChangeParser();
     await for (final line in lines) {
       for (final event in parser.addLine(line)) {
         yield event;

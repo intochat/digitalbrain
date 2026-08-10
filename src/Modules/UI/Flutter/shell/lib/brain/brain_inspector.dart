@@ -84,8 +84,10 @@ final class SelectionDetails extends StatelessWidget {
       BrainPulseSelection(:final turn) => PulseDetails(turn: turn),
       BrainNeuronSelection(:final neuron) => NeuronDetails(neuron: neuron),
       BrainModuleSelection(:final module) => ModuleDetails(module: module),
+      BrainConnectionSelection(:final connection) =>
+        ConnectionDetails(connection: connection),
       null => const Text(
-        'Select a module or neuron. New chat turns open their causal pulse automatically.',
+        'Select a module, neuron or connection. New chat turns open their causal pulse automatically.',
         style: BrainType.bodyMuted,
       ),
     };
@@ -114,6 +116,34 @@ final class PulseDetails extends StatelessWidget {
           label: 'timestamp',
           value: turn.timestamp.toIso8601String(),
         ),
+      ],
+    );
+  }
+}
+
+final class ConnectionDetails extends StatelessWidget {
+  const ConnectionDetails({super.key, required this.connection});
+
+  final BrainConnection connection;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const Key('brain_connection_details'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(connection.synapseAlias, style: BrainType.cardTitle),
+        const SizedBox(height: 10),
+        BrainInspectorField(label: 'source', value: connection.source),
+        BrainInspectorField(label: 'target', value: connection.target),
+        if (connection.transform case final transform?)
+          BrainInspectorField(label: 'transform', value: transform),
+        if (connection.expiresAt case final expiresAt?)
+          BrainInspectorField(
+            label: 'expires',
+            value: expiresAt.toIso8601String(),
+          ),
+        BrainInspectorField(label: 'id', value: connection.connectionId),
       ],
     );
   }
@@ -164,10 +194,12 @@ final class TopologyPanel extends StatelessWidget {
     required this.pulse,
     required this.selection,
     required this.onSelected,
+    this.graphChange,
   });
 
   final BrainTopologySnapshot? topology;
   final ChatTurnEvent? pulse;
+  final GraphChangeEvent? graphChange;
   final BrainTopologySelection? selection;
   final ValueChanged<BrainTopologySelection> onSelected;
 
@@ -194,6 +226,7 @@ final class TopologyPanel extends StatelessWidget {
           child: BrainTopologyCanvas(
             topology: snapshot,
             pulse: pulse,
+            graphChange: graphChange,
             onSelected: onSelected,
           ),
         );

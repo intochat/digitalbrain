@@ -25,6 +25,7 @@ void main() {
       statusMessage: status,
       turns: edge?.watchChatTurns(chatName: chat),
       authorizations: edge?.watchAuthorizations(),
+      graphChanges: edge?.watchGraphChanges(),
       onLoadTopology: edge?.readBrainTopology,
       onStream: edge == null
           ? null

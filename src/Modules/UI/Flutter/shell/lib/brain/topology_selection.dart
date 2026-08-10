@@ -22,6 +22,12 @@ final class BrainPulseSelection extends BrainTopologySelection {
   final ChatTurnEvent turn;
 }
 
+final class BrainConnectionSelection extends BrainTopologySelection {
+  const BrainConnectionSelection(this.connection);
+
+  final BrainConnection connection;
+}
+
 String brainModuleLabel(BrainModule module) {
   final type = module.id.split('.').last;
   return type.endsWith('Module')

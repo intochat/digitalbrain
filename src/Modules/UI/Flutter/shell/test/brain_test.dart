@@ -158,7 +158,7 @@ void main() {
     expect(find.text('cluster-1'), findsNothing);
     expect(
       find.text(
-        'Select a module or neuron. New chat turns open their causal pulse automatically.',
+        'Select a module, neuron or connection. New chat turns open their causal pulse automatically.',
       ),
       findsOneWidget,
     );
@@ -232,6 +232,40 @@ void main() {
     await tester.pumpAndSettle();
     expect(loads, 3);
 
+    await drainShellTimers(tester);
+  });
+
+  testWidgets('Brain draws live connections and synthesizes dormant endpoints', (
+    tester,
+  ) async {
+    final wired = BrainTopologySnapshot(
+      modules: shellTopology().modules,
+      neurons: shellTopology().neurons,
+      observedAt: DateTime.utc(2026, 8, 10, 8),
+      connections: const [
+        BrainConnection(
+          connectionId: '11111111-2222-3333-4444-555555555555',
+          source: 'chat:owner/main',
+          synapseAlias: 'chat.responded',
+          target: 'chart:owner/dashboard',
+          transform: 'to:ui.chart-point{Label=Text}',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      BrainChatApp(chatName: 'main', onLoadTopology: () async => wired),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('destination_brain')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(
+        const Key('graph_edge_11111111-2222-3333-4444-555555555555'),
+      ),
+      findsOneWidget,
+    );
     await drainShellTimers(tester);
   });
 }

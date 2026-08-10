@@ -195,5 +195,61 @@ void main() {
     expect(topology.neurons.single.grainType, 'chat');
     expect(topology.neurons.single.placement, 'cluster-1');
     expect(topology.observedAt, DateTime.utc(2026, 7, 28, 8));
+    expect(topology.connections, isEmpty);
+  });
+
+  test('BrainTopologySnapshot carries live synapse connections', () {
+    final topology = BrainTopologySnapshot.fromJson({
+      'modules': <Object?>[],
+      'neurons': <Object?>[],
+      'observedAt': '2026-08-10T08:00:00Z',
+      'connections': [
+        {
+          'connectionId': '11111111-2222-3333-4444-555555555555',
+          'source': 'chat:dev/main',
+          'synapseAlias': 'chat.responded',
+          'target': 'chart:dev/dashboard',
+          'transform': 'to:ui.chart-point{Label=Text}',
+          'expiresAt': null,
+        },
+      ],
+    });
+
+    final connection = topology.connections.single;
+    expect(connection.connectionId, '11111111-2222-3333-4444-555555555555');
+    expect(connection.source, 'chat:dev/main');
+    expect(connection.synapseAlias, 'chat.responded');
+    expect(connection.target, 'chart:dev/dashboard');
+    expect(connection.transform, 'to:ui.chart-point{Label=Text}');
+    expect(connection.expiresAt, isNull);
+  });
+
+  test('GraphChangeEvent parses connected and disconnected payloads', () {
+    final connected = GraphChangeEvent.fromJson({
+      'sequence': 7,
+      'kind': 'connected',
+      'connectionId': '11111111-2222-3333-4444-555555555555',
+      'source': 'chat:dev/main',
+      'synapseAlias': 'chat.responded',
+      'target': 'chart:dev/dashboard',
+      'timestamp': '2026-08-10T08:00:00Z',
+    });
+
+    expect(connected.sequence, 7);
+    expect(connected.kind, 'connected');
+    expect(connected.source, 'chat:dev/main');
+
+    final disconnected = GraphChangeEvent.fromJson({
+      'sequence': 8,
+      'kind': 'disconnected',
+      'connectionId': '11111111-2222-3333-4444-555555555555',
+      'source': null,
+      'synapseAlias': null,
+      'target': null,
+      'timestamp': '2026-08-10T08:01:00Z',
+    });
+
+    expect(disconnected.kind, 'disconnected');
+    expect(disconnected.target, isNull);
   });
 }

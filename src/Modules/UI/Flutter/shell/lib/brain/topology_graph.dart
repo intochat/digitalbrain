@@ -43,14 +43,10 @@ final class ProjectedNode {
 
 bool hasPulseTarget(ChatTurnEvent? pulse) => pulse != null;
 
-List<BrainNeuron> neuronsWithPulse(
+List<BrainNeuron> displayedNeurons(
   BrainTopologySnapshot topology,
   ChatTurnEvent? pulse,
 ) {
-  if (pulse == null) {
-    return topology.neurons;
-  }
-
   final neurons = List<BrainNeuron>.of(topology.neurons);
   void ensure(String id) {
     if (id.isEmpty || neurons.any((neuron) => neuron.id == id)) {
@@ -59,8 +55,16 @@ List<BrainNeuron> neuronsWithPulse(
     neurons.add(optimisticNeuron(id));
   }
 
-  ensure(pulse.neuronId);
-  ensure(pulse.caller);
+  if (pulse != null) {
+    ensure(pulse.neuronId);
+    ensure(pulse.caller);
+  }
+
+  for (final connection in topology.connections) {
+    ensure(connection.source);
+    ensure(connection.target);
+  }
+
   return neurons;
 }
 
@@ -92,7 +96,7 @@ List<ProjectedNode> projectTopology(
 }) {
   final graph = <GraphNode>[
     ...placeModules(topology.modules),
-    ...placeNeurons(neuronsWithPulse(topology, pulse)),
+    ...placeNeurons(displayedNeurons(topology, pulse)),
   ];
   final base = math.min(size.width, size.height) * 0.36;
   final center = Offset(size.width * 0.5, size.height * 0.51);
@@ -182,6 +186,73 @@ ProjectedNode? hitTestTopology(List<ProjectedNode> nodes, Offset position) {
   for (final node in nodes.reversed) {
     if ((node.center - position).distance <= node.radius + 8) {
       return node;
+    }
+  }
+  return null;
+}
+
+final class ProjectedEdge {
+  const ProjectedEdge({
+    required this.connection,
+    required this.from,
+    required this.to,
+  });
+
+  final BrainConnection connection;
+  final ProjectedNode from;
+  final ProjectedNode to;
+
+  double get depth => math.min(from.depth, to.depth);
+}
+
+List<ProjectedEdge> projectConnections(
+  BrainTopologySnapshot topology,
+  List<ProjectedNode> nodes,
+) {
+  final byId = {for (final node in nodes) node.node.id: node};
+  final edges = <ProjectedEdge>[];
+  for (final connection in topology.connections) {
+    final from = byId[connection.source];
+    final to = byId[connection.target];
+    if (from == null || to == null || identical(from, to)) {
+      continue;
+    }
+    edges.add(ProjectedEdge(connection: connection, from: from, to: to));
+  }
+  edges.sort((a, b) => a.depth.compareTo(b.depth));
+  return edges;
+}
+
+Offset connectionControl(ProjectedEdge edge, Offset canvasCenter) {
+  final mid = Offset(
+    (edge.from.center.dx + edge.to.center.dx) / 2,
+    (edge.from.center.dy + edge.to.center.dy) / 2,
+  );
+  return Offset.lerp(mid, canvasCenter, 0.18)! - const Offset(0, 14);
+}
+
+Offset quadraticPoint(Offset a, Offset control, Offset b, double t) {
+  final u = 1 - t;
+  return a * (u * u) + control * (2 * u * t) + b * (t * t);
+}
+
+ProjectedEdge? hitTestConnections(
+  List<ProjectedEdge> edges,
+  Offset position,
+  Offset canvasCenter,
+) {
+  for (final edge in edges.reversed) {
+    final control = connectionControl(edge, canvasCenter);
+    for (var step = 1; step < 10; step++) {
+      final sample = quadraticPoint(
+        edge.from.center,
+        control,
+        edge.to.center,
+        step / 10,
+      );
+      if ((sample - position).distance <= 9) {
+        return edge;
+      }
     }
   }
   return null;

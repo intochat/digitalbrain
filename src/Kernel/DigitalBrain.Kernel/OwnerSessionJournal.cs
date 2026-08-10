@@ -38,6 +38,19 @@ internal sealed class OwnerSessionJournal(IDigitalBrain brain)
             cancellationToken);
     }
 
+    public IAsyncEnumerable<JournalRead> WatchGraphOutgoingAsync(
+        long afterSequence,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
+
+        return brain.WatchJournalAsync(
+            ISynapseGraph.ForOwner(brain.Owner),
+            JournalKind.Outgoing,
+            afterSequence,
+            cancellationToken);
+    }
+
     public IAsyncEnumerable<JournalRead> WatchAuthorizationOutgoingAsync(
         long afterSequence,
         CancellationToken cancellationToken)

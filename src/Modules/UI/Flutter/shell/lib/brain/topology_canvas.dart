@@ -11,10 +11,12 @@ final class BrainTopologyCanvas extends StatefulWidget {
     required this.topology,
     required this.onSelected,
     this.pulse,
+    this.graphChange,
   });
 
   final BrainTopologySnapshot topology;
   final ChatTurnEvent? pulse;
+  final GraphChangeEvent? graphChange;
   final ValueChanged<BrainTopologySelection> onSelected;
 
   @override
@@ -95,6 +97,10 @@ final class _BrainTopologyCanvasState extends State<BrainTopologyCanvas>
                 _rotationY,
                 pulse: widget.pulse,
               );
+              final connections =
+                  projectConnections(widget.topology, projected);
+              final canvasCenter =
+                  Offset(size.width * 0.5, size.height * 0.51);
               final pulseValue = disableAnimations ? 1.0 : _pulse.value;
 
               return GestureDetector(
@@ -105,6 +111,17 @@ final class _BrainTopologyCanvasState extends State<BrainTopologyCanvas>
                       hitTestTopology(projected, details.localPosition);
                   if (selected != null) {
                     widget.onSelected(selected.selection);
+                    return;
+                  }
+                  final edge = hitTestConnections(
+                    connections,
+                    details.localPosition,
+                    canvasCenter,
+                  );
+                  if (edge != null) {
+                    widget.onSelected(
+                      BrainConnectionSelection(edge.connection),
+                    );
                   }
                 },
                 child: Stack(
@@ -113,10 +130,19 @@ final class _BrainTopologyCanvasState extends State<BrainTopologyCanvas>
                     CustomPaint(
                       painter: TopologyPainter(
                         nodes: projected,
+                        edges: connections,
                         pulse: widget.pulse,
                         pulseValue: pulseValue,
+                        recentConnectionId:
+                            widget.graphChange?.connectionId,
                       ),
                     ),
+                    for (final edge in connections)
+                      IgnorePointer(
+                        key: Key(
+                          'graph_edge_${edge.connection.connectionId}',
+                        ),
+                      ),
                     if (pulseReady)
                       const IgnorePointer(key: Key('brain_pulse')),
                     if (localPulse)

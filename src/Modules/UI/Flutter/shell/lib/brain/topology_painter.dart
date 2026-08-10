@@ -9,17 +9,22 @@ import 'topology_graph.dart';
 final class TopologyPainter extends CustomPainter {
   const TopologyPainter({
     required this.nodes,
+    required this.edges,
     required this.pulse,
     required this.pulseValue,
+    this.recentConnectionId,
   });
 
   final List<ProjectedNode> nodes;
+  final List<ProjectedEdge> edges;
   final ChatTurnEvent? pulse;
   final double pulseValue;
+  final String? recentConnectionId;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width * 0.5, size.height * 0.51);
+    _paintConnections(canvas, center);
     final hull = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1
@@ -120,9 +125,73 @@ final class TopologyPainter extends CustomPainter {
     }
   }
 
+  void _paintConnections(Canvas canvas, Offset center) {
+    for (final edge in edges) {
+      final control = connectionControl(edge, center);
+      final depthAlpha = (0.45 + (edge.depth + 1) * 0.2).clamp(0.3, 0.9);
+      final recent = edge.connection.connectionId == recentConnectionId;
+      final color = recent ? BrainPalette.signal : BrainPalette.line;
+
+      final path = Path()
+        ..moveTo(edge.from.center.dx, edge.from.center.dy)
+        ..quadraticBezierTo(
+          control.dx,
+          control.dy,
+          edge.to.center.dx,
+          edge.to.center.dy,
+        );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = recent ? 2.4 : 1.4
+          ..color = color.withValues(alpha: recent ? 0.95 : depthAlpha),
+      );
+
+      final tip = quadraticPoint(edge.from.center, control, edge.to.center, 0.86);
+      final tail = quadraticPoint(edge.from.center, control, edge.to.center, 0.78);
+      final direction = (tip - tail).direction;
+      const arrow = 6.0;
+      final head = Path()
+        ..moveTo(tip.dx, tip.dy)
+        ..lineTo(
+          tip.dx - arrow * math.cos(direction - 0.45),
+          tip.dy - arrow * math.sin(direction - 0.45),
+        )
+        ..lineTo(
+          tip.dx - arrow * math.cos(direction + 0.45),
+          tip.dy - arrow * math.sin(direction + 0.45),
+        )
+        ..close();
+      canvas.drawPath(
+        head,
+        Paint()..color = color.withValues(alpha: recent ? 0.95 : depthAlpha),
+      );
+
+      if (edge.connection.transform != null) {
+        final bead = quadraticPoint(edge.from.center, control, edge.to.center, 0.5);
+        canvas.drawCircle(
+          bead,
+          3.2,
+          Paint()..color = BrainPalette.owner.withValues(alpha: depthAlpha),
+        );
+        canvas.drawCircle(
+          bead,
+          3.2,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1
+            ..color = BrainPalette.textPrimary.withValues(alpha: 0.4),
+        );
+      }
+    }
+  }
+
   @override
   bool shouldRepaint(covariant TopologyPainter oldDelegate) =>
       oldDelegate.nodes != nodes ||
+      oldDelegate.edges != edges ||
       oldDelegate.pulse != pulse ||
-      oldDelegate.pulseValue != pulseValue;
+      oldDelegate.pulseValue != pulseValue ||
+      oldDelegate.recentConnectionId != recentConnectionId;
 }

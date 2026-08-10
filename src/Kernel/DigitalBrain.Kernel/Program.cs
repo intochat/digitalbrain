@@ -19,6 +19,7 @@ app.MapChatStreams();
 app.MapSurfaceStreams();
 app.MapAuthorizationStreams();
 app.MapBrainTopology();
+app.MapGraphStreams();
 app.MapOAuthCallback();
 app.MapOrleansDashboard("/orleans");
 app.Run();
