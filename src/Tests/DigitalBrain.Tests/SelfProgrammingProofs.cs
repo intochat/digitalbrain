@@ -20,14 +20,14 @@ public sealed class SelfProgrammingProofs(BrainClusterFixture fixture)
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(ChatRoles.ResponderBindingId(chat), chat, ChatRoles.Responder, planner),
+            new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, planner),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRouteTargetAsync(brain, chat, ChatRoles.Responder, planner);
+        await Graphs.WaitForConnectionTargetAsync(brain, chat, ChatRoles.Responder, planner);
 
         await brain.GetGrainProxy<IChat>("wiring").Send(
-            new SendMessage(CommandId.New(), "please db.bind elon's posts onto my dashboard chart"));
+            new SendMessage(CommandId.New(), "please db.connect elon's posts onto my dashboard chart"));
 
-        await Graphs.WaitForRouteTargetAsync(brain, feed, "probe.fact", chart);
+        await Graphs.WaitForConnectionTargetAsync(brain, feed, "probe.fact", chart);
         await Journals.WaitForAsync(
             brain, chat, JournalKind.Outgoing,
             delivery => delivery.Synapse is Responded answered

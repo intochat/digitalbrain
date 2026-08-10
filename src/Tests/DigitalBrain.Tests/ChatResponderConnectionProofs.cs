@@ -6,7 +6,7 @@ using Xunit;
 namespace DigitalBrain.Tests;
 
 [Collection(BrainCollection.Name)]
-public sealed class ChatResponderBindingProofs(BrainClusterFixture fixture)
+public sealed class ChatResponderConnectionProofs(BrainClusterFixture fixture)
 {
     [Fact]
     public async Task EachChatAnswersThroughItsOwnBoundResponder()
@@ -19,14 +19,14 @@ public sealed class ChatResponderBindingProofs(BrainClusterFixture fixture)
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(ChatRoles.ResponderBindingId(chatA), chatA, ChatRoles.Responder, alpha),
+            new Connect(ChatRoles.ResponderConnectionId(chatA), chatA, ChatRoles.Responder, alpha),
             TestContext.Current.CancellationToken);
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(ChatRoles.ResponderBindingId(chatB), chatB, ChatRoles.Responder, beta),
+            new Connect(ChatRoles.ResponderConnectionId(chatB), chatB, ChatRoles.Responder, beta),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRoutesAsync(brain, chatA, ChatRoles.Responder);
-        await Graphs.WaitForRoutesAsync(brain, chatB, ChatRoles.Responder);
+        await Graphs.WaitForConnectionsAsync(brain, chatA, ChatRoles.Responder);
+        await Graphs.WaitForConnectionsAsync(brain, chatB, ChatRoles.Responder);
 
         await brain.GetGrainProxy<IChat>("a").Send(new SendMessage(CommandId.New(), "hello a"));
         await brain.GetGrainProxy<IChat>("b").Send(new SendMessage(CommandId.New(), "hello b"));
@@ -40,7 +40,7 @@ public sealed class ChatResponderBindingProofs(BrainClusterFixture fixture)
     }
 
     [Fact]
-    public async Task RebindingAResponderReplacesInsteadOfAccumulating()
+    public async Task ReconnectingAResponderReplacesInsteadOfAccumulating()
     {
         var brain = fixture.BrainFor("rebind-responder");
         var chat = NeuronId.For<IChat>(brain.Owner, "main");
@@ -49,19 +49,19 @@ public sealed class ChatResponderBindingProofs(BrainClusterFixture fixture)
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(ChatRoles.ResponderBindingId(chat), chat, ChatRoles.Responder, alpha),
+            new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, alpha),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRouteTargetAsync(brain, chat, ChatRoles.Responder, alpha);
+        await Graphs.WaitForConnectionTargetAsync(brain, chat, ChatRoles.Responder, alpha);
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(ChatRoles.ResponderBindingId(chat), chat, ChatRoles.Responder, beta),
+            new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, beta),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRouteTargetAsync(brain, chat, ChatRoles.Responder, beta);
+        await Graphs.WaitForConnectionTargetAsync(brain, chat, ChatRoles.Responder, beta);
 
-        var routes = await Graphs.RoutesAsync(brain, chat, ChatRoles.Responder);
-        var route = Assert.Single(routes);
-        Assert.Equal(beta, route.Target);
+        var connections = await Graphs.ConnectionsAsync(brain, chat, ChatRoles.Responder);
+        var connection = Assert.Single(connections);
+        Assert.Equal(beta, connection.Target);
 
         await brain.GetGrainProxy<IChat>("main").Send(new SendMessage(CommandId.New(), "who answers now"));
         await Journals.WaitForAsync(

@@ -34,9 +34,9 @@ internal sealed partial class IntrospectionNeuron
     private async Task<TopologyRead> ReadTopologyAsync(CommandId commandId, CancellationToken cancellationToken)
     {
         var ownerStatistics = await ActivatedOwnerNeuronsAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        var bindings = await GrainFactory
+        var connections = await GrainFactory
             .GetGrain<ISynapseGraph>(ISynapseGraph.ForOwner(Id.Owner).ToGrainId())
-            .Bindings()
+            .Connections()
             .WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         var placements = ownerStatistics
             .Select(static neuron => neuron.Silo)
@@ -60,16 +60,16 @@ internal sealed partial class IntrospectionNeuron
             ],
             TimeProvider.GetUtcNow(),
             [
-                .. bindings
-                    .Select(static binding => new TopologyBinding(
-                        binding.BindingId,
-                        binding.Source.ToString(),
-                        binding.SynapseAlias,
-                        binding.Target.ToString(),
-                        binding.Transform,
-                        binding.ExpiresAt))
-                    .OrderBy(static binding => binding.Source, StringComparer.Ordinal)
-                    .ThenBy(static binding => binding.SynapseAlias, StringComparer.Ordinal),
+                .. connections
+                    .Select(static connection => new TopologyConnection(
+                        connection.ConnectionId,
+                        connection.Source.ToString(),
+                        connection.SynapseAlias,
+                        connection.Target.ToString(),
+                        connection.Transform,
+                        connection.ExpiresAt))
+                    .OrderBy(static connection => connection.Source, StringComparer.Ordinal)
+                    .ThenBy(static connection => connection.SynapseAlias, StringComparer.Ordinal),
             ]);
     }
 

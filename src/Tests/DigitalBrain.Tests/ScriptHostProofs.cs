@@ -4,7 +4,7 @@ using Xunit;
 
 namespace DigitalBrain.Tests;
 
-public sealed class ScriptConnectionProofs
+public sealed class ScriptHostProofs
 {
     [Fact]
     public void StreamsFallBackToTheClusteringConnection()
@@ -16,7 +16,7 @@ public sealed class ScriptConnectionProofs
             })
             .Build();
 
-        var storage = DigitalBrainScriptConnection.RequireStorage(configuration);
+        var storage = DigitalBrainScriptHost.RequireStorage(configuration);
 
         Assert.Equal("UseDevelopmentStorage=true", storage.Clustering);
         Assert.Equal("UseDevelopmentStorage=true", storage.Streams);
@@ -33,7 +33,7 @@ public sealed class ScriptConnectionProofs
             })
             .Build();
 
-        var storage = DigitalBrainScriptConnection.RequireStorage(configuration);
+        var storage = DigitalBrainScriptHost.RequireStorage(configuration);
 
         Assert.Equal("cluster-storage", storage.Clustering);
         Assert.Equal("stream-storage", storage.Streams);
@@ -45,7 +45,7 @@ public sealed class ScriptConnectionProofs
         var configuration = new ConfigurationBuilder().Build();
 
         var refusal = Assert.Throws<InvalidOperationException>(
-            () => DigitalBrainScriptConnection.RequireStorage(configuration));
+            () => DigitalBrainScriptHost.RequireStorage(configuration));
 
         Assert.Contains("ConnectionStrings:clustering", refusal.Message, StringComparison.Ordinal);
     }

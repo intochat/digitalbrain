@@ -8,33 +8,33 @@ namespace DigitalBrain.Core;
 [GrainType(ISynapseGraph.GrainTypeName)]
 internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
 {
-    private const string BindingLogName = "graph.bindings";
+    private const string ConnectionLogName = "graph.connections";
 
-    private readonly IDurableList<byte[]> _bindings;
-    private readonly Serializer<SynapseBinding> _records;
+    private readonly IDurableList<byte[]> _connections;
+    private readonly Serializer<SynapseConnection> _records;
 
     public SynapseGraphNeuron()
     {
-        _bindings = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(BindingLogName);
-        _records = ServiceProvider.GetRequiredService<Serializer<SynapseBinding>>();
+        _connections = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(ConnectionLogName);
+        _records = ServiceProvider.GetRequiredService<Serializer<SynapseConnection>>();
     }
 
-    public Task HandleAsync(Bind synapse, CancellationToken cancellationToken)
+    public Task HandleAsync(Connect synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
-        RequireRoutable(synapse.Source);
-        RequireRoutable(synapse.Target);
+        RequireConnectable(synapse.Source);
+        RequireConnectable(synapse.Target);
 
         if (string.IsNullOrWhiteSpace(synapse.SynapseAlias))
         {
             throw new NeuronAuthorizationException(
-                $"Graph '{Id}' refuses a route without a synapse alias.");
+                $"Graph '{Id}' refuses a connection without a synapse alias.");
         }
 
-        Remove(synapse.BindingId);
-        _bindings.Add(_records.SerializeToArray(new SynapseBinding(
-            synapse.BindingId,
+        Remove(synapse.ConnectionId);
+        _connections.Add(_records.SerializeToArray(new SynapseConnection(
+            synapse.ConnectionId,
             synapse.Source,
             synapse.SynapseAlias,
             synapse.Target,
@@ -42,101 +42,100 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
             synapse.ExpiresAt)));
 
         return ReplyAsync(
-            new Bound(synapse.BindingId, synapse.Source, synapse.SynapseAlias, synapse.Target),
+            new Connected(synapse.ConnectionId, synapse.Source, synapse.SynapseAlias, synapse.Target),
             cancellationToken);
     }
 
-    public Task HandleAsync(Unbind synapse, CancellationToken cancellationToken)
+    public Task HandleAsync(Disconnect synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
-        Remove(synapse.BindingId);
+        Remove(synapse.ConnectionId);
 
-        return ReplyAsync(new Unbound(synapse.BindingId), cancellationToken);
+        return ReplyAsync(new Disconnected(synapse.ConnectionId), cancellationToken);
     }
 
-    public Task<IReadOnlyCollection<SynapseRoute>> RoutesFor(NeuronId source, string synapseAlias)
+    public Task<IReadOnlyCollection<SynapseConnection>> ConnectionsFrom(NeuronId source, string synapseAlias)
     {
         var now = TimeProvider.GetUtcNow();
-        List<SynapseRoute> routes = [];
+        List<SynapseConnection> live = [];
 
-        foreach (var stored in _bindings)
+        foreach (var stored in _connections)
         {
-            var binding = _records.Deserialize(stored);
+            var connection = _records.Deserialize(stored);
 
-            if (binding.Source == source
-                && string.Equals(binding.SynapseAlias, synapseAlias, StringComparison.Ordinal)
-                && IsLive(binding, now))
+            if (connection.Source == source
+                && string.Equals(connection.SynapseAlias, synapseAlias, StringComparison.Ordinal)
+                && IsLive(connection, now))
             {
-                routes.Add(new SynapseRoute(binding.BindingId, binding.Target, binding.Transform));
+                live.Add(connection);
             }
         }
 
-        return Task.FromResult<IReadOnlyCollection<SynapseRoute>>(routes);
+        return Task.FromResult<IReadOnlyCollection<SynapseConnection>>(live);
     }
 
-    public Task<SynapseRoute?> RouteOf(Guid bindingId)
+    public Task<SynapseConnection?> ConnectionOf(Guid connectionId)
     {
         var now = TimeProvider.GetUtcNow();
 
-        foreach (var stored in _bindings)
+        foreach (var stored in _connections)
         {
-            var binding = _records.Deserialize(stored);
+            var connection = _records.Deserialize(stored);
 
-            if (binding.BindingId == bindingId && IsLive(binding, now))
+            if (connection.ConnectionId == connectionId && IsLive(connection, now))
             {
-                return Task.FromResult<SynapseRoute?>(
-                    new SynapseRoute(binding.BindingId, binding.Target, binding.Transform));
+                return Task.FromResult<SynapseConnection?>(connection);
             }
         }
 
-        return Task.FromResult<SynapseRoute?>(null);
+        return Task.FromResult<SynapseConnection?>(null);
     }
 
-    public Task<IReadOnlyCollection<SynapseBinding>> Bindings()
+    public Task<IReadOnlyCollection<SynapseConnection>> Connections()
     {
         var now = TimeProvider.GetUtcNow();
-        List<SynapseBinding> live = [];
+        List<SynapseConnection> live = [];
 
-        foreach (var stored in _bindings)
+        foreach (var stored in _connections)
         {
-            var binding = _records.Deserialize(stored);
+            var connection = _records.Deserialize(stored);
 
-            if (IsLive(binding, now))
+            if (IsLive(connection, now))
             {
-                live.Add(binding);
+                live.Add(connection);
             }
         }
 
-        return Task.FromResult<IReadOnlyCollection<SynapseBinding>>(live);
+        return Task.FromResult<IReadOnlyCollection<SynapseConnection>>(live);
     }
 
-    private static bool IsLive(SynapseBinding binding, DateTimeOffset now)
-        => binding.ExpiresAt is not { } expiry || expiry > now;
+    private static bool IsLive(SynapseConnection connection, DateTimeOffset now)
+        => connection.ExpiresAt is not { } expiry || expiry > now;
 
-    private void Remove(Guid bindingId)
+    private void Remove(Guid connectionId)
     {
-        for (var index = _bindings.Count - 1; index >= 0; index--)
+        for (var index = _connections.Count - 1; index >= 0; index--)
         {
-            if (_records.Deserialize(_bindings[index]).BindingId == bindingId)
+            if (_records.Deserialize(_connections[index]).ConnectionId == connectionId)
             {
-                _bindings.RemoveAt(index);
+                _connections.RemoveAt(index);
             }
         }
     }
 
-    private void RequireRoutable(NeuronId subject)
+    private void RequireConnectable(NeuronId subject)
     {
         if (subject.Owner != Id.Owner)
         {
             throw new NeuronAuthorizationException(
-                $"Graph '{Id}' cannot route for '{subject}', which belongs to owner '{subject.Owner}'.");
+                $"Graph '{Id}' cannot connect '{subject}', which belongs to owner '{subject.Owner}'.");
         }
 
         if (subject == Id)
         {
             throw new NeuronAuthorizationException(
-                $"Graph '{Id}' does not route its own synapses.");
+                $"Graph '{Id}' does not connect its own synapses.");
         }
     }
 }

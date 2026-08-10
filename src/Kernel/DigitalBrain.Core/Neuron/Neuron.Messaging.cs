@@ -33,13 +33,13 @@ public abstract partial class Neuron
 
         var receivers = catalog.HandlerGrainTypes(synapseType)
             .Select(grainType => NeuronId.BroadcastReceiver(grainType, Id.Owner, correlation))
-            .Concat(await RoutedReceiversAsync(synapse).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext))
+            .Concat(await ConnectedReceiversAsync(synapse).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext))
             .ToArray();
 
         await FireAsync(synapse, receivers, correlation).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    private async Task<IReadOnlyCollection<NeuronId>> RoutedReceiversAsync(Synapse synapse)
+    private async Task<IReadOnlyCollection<NeuronId>> ConnectedReceiversAsync(Synapse synapse)
     {
         if (SynapseAlias.Of(synapse.GetType()) is not { } alias)
         {
@@ -52,22 +52,22 @@ public abstract partial class Neuron
             return [];
         }
 
-        using var bound = new CancellationTokenSource(DeliveryPolicy.RouteLookupTimeout);
+        using var bound = new CancellationTokenSource(DeliveryPolicy.ConnectionLookupTimeout);
         try
         {
-            var routes = await GrainFactory
+            var connections = await GrainFactory
                 .GetGrain<ISynapseGraph>(graph.ToGrainId())
-                .RoutesFor(Id, alias)
+                .ConnectionsFrom(Id, alias)
                 .WaitAsync(bound.Token).ConfigureAwait(true);
 
-            return [.. routes.Select(route => route.Transform is null
-                ? route.Target
-                : BindingRelay.ForBinding(Id.Owner, route.BindingId))];
+            return [.. connections.Select(connection => connection.Transform is null
+                ? connection.Target
+                : ConnectionRelay.ForConnection(Id.Owner, connection.ConnectionId))];
         }
         catch (OperationCanceledException) when (bound.IsCancellationRequested)
         {
             throw new TimeoutException(
-                $"Synapse graph route lookup for '{alias}' did not answer within {DeliveryPolicy.RouteLookupTimeout}.");
+                $"Synapse graph connection lookup for '{alias}' did not answer within {DeliveryPolicy.ConnectionLookupTimeout}.");
         }
     }
 

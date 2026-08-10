@@ -5,21 +5,21 @@ using Xunit;
 namespace DigitalBrain.Tests;
 
 [Collection(BrainCollection.Name)]
-public sealed class RouteTeardownProofs(BrainClusterFixture fixture)
+public sealed class ConnectionTeardownProofs(BrainClusterFixture fixture)
 {
     [Fact]
-    public async Task UnboundRouteStopsDelivering()
+    public async Task DisconnectStopsDelivering()
     {
         var brain = fixture.BrainFor("teardown");
         var source = NeuronId.For<IProbeSource>(brain.Owner, "elon");
         var sink = NeuronId.For<IProbeSink>(brain.Owner, "dash");
-        var binding = Guid.NewGuid();
+        var connection = Guid.NewGuid();
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(binding, source, "probe.fact", sink),
+            new Connect(connection, source, "probe.fact", sink),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRoutesAsync(brain, source, "probe.fact");
+        await Graphs.WaitForConnectionsAsync(brain, source, "probe.fact");
         await brain.SendAsync<IProbeSource>(
             "elon", new Poke("before"), TestContext.Current.CancellationToken);
         await Journals.WaitForAsync(
@@ -27,8 +27,8 @@ public sealed class RouteTeardownProofs(BrainClusterFixture fixture)
             delivery => delivery.Synapse is ProbeFact { Text: "before" });
 
         await brain.SendAsync<ISynapseGraph>(
-            ISynapseGraph.InstanceName, new Unbind(binding), TestContext.Current.CancellationToken);
-        await Graphs.WaitForNoRoutesAsync(brain, source, "probe.fact");
+            ISynapseGraph.InstanceName, new Disconnect(connection), TestContext.Current.CancellationToken);
+        await Graphs.WaitForNoConnectionsAsync(brain, source, "probe.fact");
         await brain.SendAsync<IProbeSource>(
             "elon", new Poke("after"), TestContext.Current.CancellationToken);
 
@@ -41,7 +41,7 @@ public sealed class RouteTeardownProofs(BrainClusterFixture fixture)
     }
 
     [Fact]
-    public async Task ExpiredRouteNeverDelivers()
+    public async Task ExpiredConnectionNeverDelivers()
     {
         var brain = fixture.BrainFor("expiry");
         var source = NeuronId.For<IProbeSource>(brain.Owner, "elon");
@@ -51,13 +51,13 @@ public sealed class RouteTeardownProofs(BrainClusterFixture fixture)
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(Guid.NewGuid(), source, "probe.fact", sink, ExpiresAt: alreadyPast),
+            new Connect(Guid.NewGuid(), source, "probe.fact", sink, ExpiresAt: alreadyPast),
             TestContext.Current.CancellationToken);
         await Journals.WaitForAsync(
-            brain, graph, JournalKind.Incoming, delivery => delivery.Synapse is Bind);
+            brain, graph, JournalKind.Incoming, delivery => delivery.Synapse is Connect);
 
-        var routes = await Graphs.RoutesAsync(brain, source, "probe.fact");
-        Assert.Empty(routes);
+        var connections = await Graphs.ConnectionsAsync(brain, source, "probe.fact");
+        Assert.Empty(connections);
 
         await brain.SendAsync<IProbeSource>(
             "elon", new Poke("stale"), TestContext.Current.CancellationToken);

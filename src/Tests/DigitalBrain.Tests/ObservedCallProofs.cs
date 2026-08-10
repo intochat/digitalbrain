@@ -17,9 +17,9 @@ public sealed class ObservedCallProofs(BrainClusterFixture fixture)
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(ChatRoles.ResponderBindingId(chat), chat, ChatRoles.Responder, alpha),
+            new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, alpha),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRouteTargetAsync(brain, chat, ChatRoles.Responder, alpha);
+        await Graphs.WaitForConnectionTargetAsync(brain, chat, ChatRoles.Responder, alpha);
 
         await brain.GetGrainProxy<IChat>("main").Send(new SendMessage(CommandId.New(), "hello"));
         await Journals.WaitForAsync(

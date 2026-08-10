@@ -6,21 +6,21 @@ using Xunit;
 namespace DigitalBrain.Tests;
 
 [Collection(BrainCollection.Name)]
-public sealed class TopologyBindingProofs(BrainClusterFixture fixture)
+public sealed class TopologyConnectionProofs(BrainClusterFixture fixture)
 {
     [Fact]
-    public async Task TopologyAnswersWithTheLiveBindings()
+    public async Task TopologyAnswersWithTheLiveConnections()
     {
         var brain = fixture.BrainFor("topology");
         var source = NeuronId.For<IProbeSource>(brain.Owner, "elon");
         var sink = NeuronId.For<IProbeSink>(brain.Owner, "dash");
-        var binding = Guid.NewGuid();
+        var connection = Guid.NewGuid();
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(binding, source, "probe.fact", sink),
+            new Connect(connection, source, "probe.fact", sink),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRoutesAsync(brain, source, "probe.fact");
+        await Graphs.WaitForConnectionsAsync(brain, source, "probe.fact");
 
         var topology = (TopologyRead)await ((DigitalBrain.Client.DigitalBrainClient)brain).SendRequestAsync(
             NeuronId.For<IIntrospection>(brain.Owner, "default"),
@@ -28,8 +28,8 @@ public sealed class TopologyBindingProofs(BrainClusterFixture fixture)
             typeof(TopologyRead),
             TestContext.Current.CancellationToken);
 
-        var reported = Assert.Single(topology.Bindings);
-        Assert.Equal(binding, reported.BindingId);
+        var reported = Assert.Single(topology.Connections);
+        Assert.Equal(connection, reported.ConnectionId);
         Assert.Equal(source.ToString(), reported.Source);
         Assert.Equal("probe.fact", reported.SynapseAlias);
         Assert.Equal(sink.ToString(), reported.Target);

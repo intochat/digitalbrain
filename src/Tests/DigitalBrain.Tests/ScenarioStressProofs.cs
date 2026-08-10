@@ -17,13 +17,13 @@ public sealed class ScenarioStressProofs(BrainClusterFixture fixture)
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(Guid.NewGuid(), feed, "probe.fact", chart, ProbeFactToItemAppended.TransformName),
+            new Connect(Guid.NewGuid(), feed, "probe.fact", chart, ProbeFactToItemAppended.TransformName),
             TestContext.Current.CancellationToken);
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(Guid.NewGuid(), feed, "probe.fact", archive),
+            new Connect(Guid.NewGuid(), feed, "probe.fact", archive),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRoutesAsync(brain, feed, "probe.fact", routeCount: 2);
+        await Graphs.WaitForConnectionsAsync(brain, feed, "probe.fact", connectionCount: 2);
 
         await brain.SendAsync<IProbeSource>(
             "elon", new Poke("shipped it"), TestContext.Current.CancellationToken);
@@ -47,14 +47,14 @@ public sealed class ScenarioStressProofs(BrainClusterFixture fixture)
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(Guid.NewGuid(), elon, "probe.fact", elonSink),
+            new Connect(Guid.NewGuid(), elon, "probe.fact", elonSink),
             TestContext.Current.CancellationToken);
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(Guid.NewGuid(), sam, "probe.fact", samSink),
+            new Connect(Guid.NewGuid(), sam, "probe.fact", samSink),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRoutesAsync(brain, elon, "probe.fact");
-        await Graphs.WaitForRoutesAsync(brain, sam, "probe.fact");
+        await Graphs.WaitForConnectionsAsync(brain, elon, "probe.fact");
+        await Graphs.WaitForConnectionsAsync(brain, sam, "probe.fact");
 
         await brain.SendAsync<IProbeSource>(
             "elon", new Poke("from elon"), TestContext.Current.CancellationToken);
@@ -74,7 +74,7 @@ public sealed class ScenarioStressProofs(BrainClusterFixture fixture)
     }
 
     [Fact]
-    public async Task BindingsOfOneOwnerNeverRouteAnotherOwnersEmissions()
+    public async Task ConnectionsOfOneOwnerNeverRouteAnotherOwnersEmissions()
     {
         var alice = fixture.BrainFor("alice");
         var bob = fixture.BrainFor("bob");
@@ -83,13 +83,13 @@ public sealed class ScenarioStressProofs(BrainClusterFixture fixture)
 
         await alice.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(
+            new Connect(
                 Guid.NewGuid(),
                 NeuronId.For<IProbeSource>(alice.Owner, "elon"),
                 "probe.fact",
                 aliceSink),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRoutesAsync(
+        await Graphs.WaitForConnectionsAsync(
             alice, NeuronId.For<IProbeSource>(alice.Owner, "elon"), "probe.fact");
 
         await bob.SendAsync<IProbeSource>(
@@ -110,19 +110,19 @@ public sealed class ScenarioStressProofs(BrainClusterFixture fixture)
     }
 
     [Fact]
-    public async Task RebindingRedirectsSubsequentEmissions()
+    public async Task ReconnectingRedirectsSubsequentEmissions()
     {
         var brain = fixture.BrainFor("rebind");
         var feed = NeuronId.For<IProbeSource>(brain.Owner, "elon");
         var first = NeuronId.For<IProbeSink>(brain.Owner, "first");
         var second = NeuronId.For<IProbeSink>(brain.Owner, "second");
-        var binding = Guid.NewGuid();
+        var connection = Guid.NewGuid();
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(binding, feed, "probe.fact", first),
+            new Connect(connection, feed, "probe.fact", first),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRoutesAsync(brain, feed, "probe.fact");
+        await Graphs.WaitForConnectionsAsync(brain, feed, "probe.fact");
         await brain.SendAsync<IProbeSource>(
             "elon", new Poke("to first"), TestContext.Current.CancellationToken);
         await Journals.WaitForAsync(
@@ -131,9 +131,9 @@ public sealed class ScenarioStressProofs(BrainClusterFixture fixture)
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(binding, feed, "probe.fact", second),
+            new Connect(connection, feed, "probe.fact", second),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRouteTargetAsync(brain, feed, "probe.fact", second);
+        await Graphs.WaitForConnectionTargetAsync(brain, feed, "probe.fact", second);
         await brain.SendAsync<IProbeSource>(
             "elon", new Poke("to second"), TestContext.Current.CancellationToken);
 
@@ -156,12 +156,12 @@ public sealed class ScenarioStressProofs(BrainClusterFixture fixture)
 
         await alice.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(Guid.NewGuid(), bobsFeed, "probe.fact", aliceSink),
+            new Connect(Guid.NewGuid(), bobsFeed, "probe.fact", aliceSink),
             TestContext.Current.CancellationToken);
 
         await Journals.WaitForAsync(
-            alice, graph, JournalKind.Incoming, delivery => delivery.Synapse is Bind);
-        var routes = await Graphs.RoutesAsync(alice, bobsFeed, "probe.fact");
-        Assert.Empty(routes);
+            alice, graph, JournalKind.Incoming, delivery => delivery.Synapse is Connect);
+        var connections = await Graphs.ConnectionsAsync(alice, bobsFeed, "probe.fact");
+        Assert.Empty(connections);
     }
 }

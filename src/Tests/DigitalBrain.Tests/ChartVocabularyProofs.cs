@@ -17,9 +17,9 @@ public sealed class ChartVocabularyProofs(BrainClusterFixture fixture)
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(Guid.NewGuid(), session, ChartPoint.AliasName, chart),
+            new Connect(Guid.NewGuid(), session, ChartPoint.AliasName, chart),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRoutesAsync(brain, session, ChartPoint.AliasName);
+        await Graphs.WaitForConnectionsAsync(brain, session, ChartPoint.AliasName);
 
         await brain.EmitAsync(new ChartPoint("cpu", "12:00", 42), TestContext.Current.CancellationToken);
 

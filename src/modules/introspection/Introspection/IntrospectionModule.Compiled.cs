@@ -61,27 +61,27 @@ public sealed partial class IntrospectionModule : ICompiledModule
                     ISynapseGraph.InstanceName,
                     [
                         new SynapseCapabilityDescriptor(
-                            "db.bind",
+                            "db.connect",
                             1,
                             "Create or replace a synapse route: deliver a source neuron's emitted synapses to a target neuron, optionally through a named transform, optionally until an expiry",
-                            CapabilitySchema.For(typeof(Bind))),
+                            CapabilitySchema.For(typeof(Connect))),
                         new SynapseCapabilityDescriptor(
-                            "db.unbind",
+                            "db.disconnect",
                             1,
-                            "Remove a synapse route by its binding identity",
-                            CapabilitySchema.For(typeof(Unbind))),
+                            "Remove a synapse connection by its identity",
+                            CapabilitySchema.For(typeof(Disconnect))),
                     ],
                     [
                         new SynapseCapabilityDescriptor(
-                            "db.bound",
+                            "db.connected",
                             1,
                             "A synapse route is live",
-                            CapabilitySchema.For(typeof(Bound))),
+                            CapabilitySchema.For(typeof(Connected))),
                         new SynapseCapabilityDescriptor(
-                            "db.unbound",
+                            "db.disconnected",
                             1,
                             "A synapse route was removed",
-                            CapabilitySchema.For(typeof(Unbound))),
+                            CapabilitySchema.For(typeof(Disconnected))),
                     ]),
             ]);
 

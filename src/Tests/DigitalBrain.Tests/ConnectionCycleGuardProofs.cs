@@ -6,19 +6,19 @@ using Xunit;
 namespace DigitalBrain.Tests;
 
 [Collection(BrainCollection.Name)]
-public sealed class RoutingCycleGuardProofs(BrainClusterFixture fixture)
+public sealed class ConnectionCycleGuardProofs(BrainClusterFixture fixture)
 {
     [Fact]
-    public async Task SelfRoutedEchoCascadeStopsAtTheDeliveryDepthGuard()
+    public async Task SelfConnectedEchoCascadeStopsAtTheDeliveryDepthGuard()
     {
         var brain = fixture.BrainFor("cycle");
         var echo = NeuronId.For<IProbeEcho>(brain.Owner, "loop");
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(Guid.NewGuid(), echo, "probe.fact", echo),
+            new Connect(Guid.NewGuid(), echo, "probe.fact", echo),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRoutesAsync(brain, echo, "probe.fact");
+        await Graphs.WaitForConnectionsAsync(brain, echo, "probe.fact");
 
         await brain.SendAsync<IProbeEcho>(
             "loop", new Poke("around"), TestContext.Current.CancellationToken);

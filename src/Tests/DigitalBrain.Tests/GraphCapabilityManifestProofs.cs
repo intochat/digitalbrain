@@ -12,9 +12,9 @@ public sealed class GraphCapabilityManifestProofs
             IntrospectionModule.Capabilities.Neurons,
             neuron => neuron.ContractId == "db.synapse-graph");
 
-        Assert.Contains(graph.Accepted, synapse => synapse.ContractId == "db.bind");
-        Assert.Contains(graph.Accepted, synapse => synapse.ContractId == "db.unbind");
-        Assert.Contains(graph.Emitted, synapse => synapse.ContractId == "db.bound");
-        Assert.Contains(graph.Emitted, synapse => synapse.ContractId == "db.unbound");
+        Assert.Contains(graph.Accepted, synapse => synapse.ContractId == "db.connect");
+        Assert.Contains(graph.Accepted, synapse => synapse.ContractId == "db.disconnect");
+        Assert.Contains(graph.Emitted, synapse => synapse.ContractId == "db.connected");
+        Assert.Contains(graph.Emitted, synapse => synapse.ContractId == "db.disconnected");
     }
 }

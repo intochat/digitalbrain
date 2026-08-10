@@ -16,9 +16,9 @@ public sealed class DeclarativeTransformProofs(BrainClusterFixture fixture)
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(Guid.NewGuid(), source, "probe.fact", sink, "to:ui.item-appended{Title=Text}"),
+            new Connect(Guid.NewGuid(), source, "probe.fact", sink, "to:ui.item-appended{Title=Text}"),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRoutesAsync(brain, source, "probe.fact");
+        await Graphs.WaitForConnectionsAsync(brain, source, "probe.fact");
 
         await brain.SendAsync<IProbeSource>(
             "elon", new Poke("declared at runtime"), TestContext.Current.CancellationToken);

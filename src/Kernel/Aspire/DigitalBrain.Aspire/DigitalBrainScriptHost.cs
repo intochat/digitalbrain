@@ -6,7 +6,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace DigitalBrain.Aspire;
 
-public static class DigitalBrainScriptConnection
+public static class DigitalBrainScriptHost
 {
     public static (string Clustering, string Streams) RequireStorage(IConfiguration configuration)
     {

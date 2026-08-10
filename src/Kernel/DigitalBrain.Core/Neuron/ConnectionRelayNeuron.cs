@@ -3,52 +3,52 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Core;
 
-internal static class BindingRelay
+internal static class ConnectionRelay
 {
     internal const string GrainTypeName = "relay";
 
-    internal static NeuronId ForBinding(OwnerId owner, Guid bindingId)
-        => new(GrainTypeName, owner, bindingId.ToString("D"));
+    internal static NeuronId ForConnection(OwnerId owner, Guid connectionId)
+        => new(GrainTypeName, owner, connectionId.ToString("D"));
 }
 
-[GrainType(BindingRelay.GrainTypeName)]
-internal sealed class BindingRelayNeuron : Neuron
+[GrainType(ConnectionRelay.GrainTypeName)]
+internal sealed class ConnectionRelayNeuron : Neuron
 {
     protected override async Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(Id.Name, out var bindingId))
+        if (!Guid.TryParse(Id.Name, out var connectionId))
         {
             throw new NeuronAuthorizationException(
-                $"Relay '{Id}' is not named by a binding identity and refuses to carry synapses.");
+                $"Relay '{Id}' is not named by a connection identity and refuses to carry synapses.");
         }
 
-        var route = await LiveRouteAsync(bindingId).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext)
+        var connection = await LiveConnectionAsync(connectionId).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext)
             ?? throw new NeuronAuthorizationException(
-                $"Relay '{Id}' has no live binding and refuses '{synapse.GetType().Name}'.");
+                $"Relay '{Id}' has no live connection and refuses '{synapse.GetType().Name}'.");
 
-        var carried = route.Transform is not { } transformName
+        var carried = connection.Transform is not { } transformName
             ? synapse
             : Adapted(TransformFor(transformName), synapse);
 
-        await SendAsync(route.Target, carried).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await SendAsync(connection.Target, carried).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    private async Task<SynapseRoute?> LiveRouteAsync(Guid bindingId)
+    private async Task<SynapseConnection?> LiveConnectionAsync(Guid connectionId)
     {
         var graph = ISynapseGraph.ForOwner(Id.Owner);
 
-        using var bound = new CancellationTokenSource(DeliveryPolicy.RouteLookupTimeout);
+        using var bound = new CancellationTokenSource(DeliveryPolicy.ConnectionLookupTimeout);
         try
         {
             return await GrainFactory
                 .GetGrain<ISynapseGraph>(graph.ToGrainId())
-                .RouteOf(bindingId)
+                .ConnectionOf(connectionId)
                 .WaitAsync(bound.Token).ConfigureAwait(true);
         }
         catch (OperationCanceledException) when (bound.IsCancellationRequested)
         {
             throw new TimeoutException(
-                $"Relay '{Id}' binding lookup did not answer within {DeliveryPolicy.RouteLookupTimeout}.");
+                $"Relay '{Id}' connection lookup did not answer within {DeliveryPolicy.ConnectionLookupTimeout}.");
         }
     }
 

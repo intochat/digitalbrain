@@ -14,6 +14,6 @@ public static class ChatButtons
         return $"{chatName}.{offer.Value:D}.{buttonId}";
     }
 
-    public static Guid ArmingBindingId(NeuronId button)
+    public static Guid ArmingConnectionId(NeuronId button)
         => new(SHA256.HashData(Encoding.UTF8.GetBytes(button.ToString())).AsSpan(0, 16));
 }

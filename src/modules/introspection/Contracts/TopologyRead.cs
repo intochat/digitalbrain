@@ -12,9 +12,9 @@ public sealed record TopologyNeuron(
     [property: Id(3)] string Placement);
 
 [GenerateSerializer]
-[Alias("introspection.topology-binding")]
-public sealed record TopologyBinding(
-    [property: Id(0)] Guid BindingId,
+[Alias("introspection.topology-connection")]
+public sealed record TopologyConnection(
+    [property: Id(0)] Guid ConnectionId,
     [property: Id(1)] string Source,
     [property: Id(2)] string SynapseAlias,
     [property: Id(3)] string Target,
@@ -23,10 +23,10 @@ public sealed record TopologyBinding(
 
 [GenerateSerializer]
 [Alias("introspection.topology-read")]
-[Description("The modules this deployment composed, the owner's activated neurons, and the live synapse graph bindings")]
+[Description("The modules this deployment composed, the owner's activated neurons, and the live synapse connections")]
 public sealed record TopologyRead(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] IReadOnlyList<string> Modules,
     [property: Id(2)] IReadOnlyList<TopologyNeuron> Neurons,
     [property: Id(3)] DateTimeOffset ObservedAt,
-    [property: Id(4)] IReadOnlyList<TopologyBinding> Bindings) : Synapse;
+    [property: Id(4)] IReadOnlyList<TopologyConnection> Connections) : Synapse;

@@ -47,7 +47,7 @@ internal sealed class ScriptedBindingChatClient : IChatClient
         }
 
         var bindTool = options?.Tools?.OfType<AIFunction>()
-            .FirstOrDefault(tool => tool.Name == ValidatedCapability.ToolNameFor("db.bind", 1));
+            .FirstOrDefault(tool => tool.Name == ValidatedCapability.ToolNameFor("db.connect", 1));
         if (bindTool is null)
         {
             yield return new ChatResponseUpdate(ChatRole.Assistant, "no wiring tool was offered");
@@ -57,7 +57,7 @@ internal sealed class ScriptedBindingChatClient : IChatClient
         var owner = new OwnerId(Owner);
         var arguments = new Dictionary<string, object?>
         {
-            ["bindingId"] = Guid.NewGuid(),
+            ["connectionId"] = Guid.NewGuid(),
             ["source"] = new NeuronId("probesource", owner, "elon"),
             ["synapseAlias"] = "probe.fact",
             ["target"] = new NeuronId("chart", owner, "dashboard"),

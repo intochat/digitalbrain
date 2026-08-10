@@ -8,37 +8,37 @@ internal static class Graphs
     private static readonly TimeSpan DefaultPatience = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
 
-    internal static Task<IReadOnlyCollection<SynapseRoute>> RoutesAsync(
+    internal static Task<IReadOnlyCollection<SynapseConnection>> ConnectionsAsync(
         IDigitalBrain brain,
         NeuronId source,
         string synapseAlias)
-        => brain.GetGrainProxy<ISynapseGraph>(ISynapseGraph.InstanceName).RoutesFor(source, synapseAlias);
+        => brain.GetGrainProxy<ISynapseGraph>(ISynapseGraph.InstanceName).ConnectionsFrom(source, synapseAlias);
 
-    internal static async Task<IReadOnlyCollection<SynapseRoute>> WaitForRoutesAsync(
+    internal static async Task<IReadOnlyCollection<SynapseConnection>> WaitForConnectionsAsync(
         IDigitalBrain brain,
         NeuronId source,
         string synapseAlias,
-        int routeCount = 1,
+        int connectionCount = 1,
         TimeSpan? patience = null)
     {
         var deadline = DateTime.UtcNow + (patience ?? DefaultPatience);
 
         while (DateTime.UtcNow < deadline)
         {
-            var routes = await RoutesAsync(brain, source, synapseAlias);
-            if (routes.Count >= routeCount)
+            var connections = await ConnectionsAsync(brain, source, synapseAlias);
+            if (connections.Count >= connectionCount)
             {
-                return routes;
+                return connections;
             }
 
             await Task.Delay(PollInterval);
         }
 
         throw new TimeoutException(
-            $"The graph reported fewer than {routeCount} route(s) for ({source}, {synapseAlias}) within {patience ?? DefaultPatience}.");
+            $"The graph reported fewer than {connectionCount} connection(s) for ({source}, {synapseAlias}) within {patience ?? DefaultPatience}.");
     }
 
-    internal static async Task WaitForRouteTargetAsync(
+    internal static async Task WaitForConnectionTargetAsync(
         IDigitalBrain brain,
         NeuronId source,
         string synapseAlias,
@@ -49,8 +49,8 @@ internal static class Graphs
 
         while (DateTime.UtcNow < deadline)
         {
-            var routes = await RoutesAsync(brain, source, synapseAlias);
-            if (routes.Any(route => route.Target == target))
+            var connections = await ConnectionsAsync(brain, source, synapseAlias);
+            if (connections.Any(connection => connection.Target == target))
             {
                 return;
             }
@@ -62,7 +62,7 @@ internal static class Graphs
             $"The graph never routed ({source}, {synapseAlias}) at {target} within {patience ?? DefaultPatience}.");
     }
 
-    internal static async Task WaitForNoRoutesAsync(
+    internal static async Task WaitForNoConnectionsAsync(
         IDigitalBrain brain,
         NeuronId source,
         string synapseAlias,
@@ -72,8 +72,8 @@ internal static class Graphs
 
         while (DateTime.UtcNow < deadline)
         {
-            var routes = await RoutesAsync(brain, source, synapseAlias);
-            if (routes.Count == 0)
+            var connections = await ConnectionsAsync(brain, source, synapseAlias);
+            if (connections.Count == 0)
             {
                 return;
             }
@@ -82,6 +82,6 @@ internal static class Graphs
         }
 
         throw new TimeoutException(
-            $"The graph kept reporting routes for ({source}, {synapseAlias}) within {patience ?? DefaultPatience}.");
+            $"The graph kept reporting connections for ({source}, {synapseAlias}) within {patience ?? DefaultPatience}.");
     }
 }

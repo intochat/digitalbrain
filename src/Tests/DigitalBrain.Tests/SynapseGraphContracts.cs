@@ -8,51 +8,51 @@ namespace DigitalBrain.Tests;
 public sealed class SynapseGraphContracts(BrainClusterFixture fixture)
 {
     [Fact]
-    public async Task BoundRouteIsReturnedForItsSourceAndAlias()
+    public async Task ConnectionIsReturnedForItsSourceAndAlias()
     {
-        var brain = fixture.BrainFor("graph-bind");
+        var brain = fixture.BrainFor("graph-connect");
         var source = NeuronId.For<IProbeSource>(brain.Owner, "elon");
         var target = NeuronId.For<IProbeSink>(brain.Owner, "dash");
-        var binding = Guid.NewGuid();
+        var connectionId = Guid.NewGuid();
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(binding, source, "probe.fact", target),
+            new Connect(connectionId, source, "probe.fact", target),
             TestContext.Current.CancellationToken);
 
-        var routes = await Graphs.WaitForRoutesAsync(brain, source, "probe.fact");
-        var route = Assert.Single(routes);
-        Assert.Equal(target, route.Target);
-        Assert.Equal(binding, route.BindingId);
-        Assert.Null(route.Transform);
+        var connections = await Graphs.WaitForConnectionsAsync(brain, source, "probe.fact");
+        var connection = Assert.Single(connections);
+        Assert.Equal(target, connection.Target);
+        Assert.Equal(connectionId, connection.ConnectionId);
+        Assert.Null(connection.Transform);
     }
 
     [Fact]
-    public async Task BindIsAnsweredWithBound()
+    public async Task ConnectIsAnsweredWithConnected()
     {
         var brain = fixture.BrainFor("graph-ask");
         var source = NeuronId.For<IProbeSource>(brain.Owner, "elon");
         var target = NeuronId.For<IProbeSink>(brain.Owner, "dash");
-        var binding = Guid.NewGuid();
+        var connection = Guid.NewGuid();
 
-        var answer = (Bound)await ((DigitalBrain.Client.DigitalBrainClient)brain).SendRequestAsync(
+        var answer = (Connected)await ((DigitalBrain.Client.DigitalBrainClient)brain).SendRequestAsync(
             ISynapseGraph.ForOwner(brain.Owner),
-            new Bind(binding, source, "probe.fact", target),
-            typeof(Bound),
+            new Connect(connection, source, "probe.fact", target),
+            typeof(Connected),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(binding, answer.BindingId);
+        Assert.Equal(connection, answer.ConnectionId);
         Assert.Equal(target, answer.Target);
     }
 
     [Fact]
-    public async Task RoutesForUnknownSourceStayEmpty()
+    public async Task ConnectionsFromUnknownSourceStayEmpty()
     {
         var brain = fixture.BrainFor("graph-empty");
         var stranger = NeuronId.For<IProbeSource>(brain.Owner, "nobody");
 
-        var routes = await Graphs.RoutesAsync(brain, stranger, "probe.fact");
+        var connections = await Graphs.ConnectionsAsync(brain, stranger, "probe.fact");
 
-        Assert.Empty(routes);
+        Assert.Empty(connections);
     }
 }

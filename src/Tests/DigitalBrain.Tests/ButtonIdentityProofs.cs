@@ -29,17 +29,17 @@ public sealed class ButtonIdentityProofs(BrainClusterFixture fixture)
     }
 
     [Fact]
-    public async Task RoutedClickReachesTheBoundSink()
+    public async Task RoutedClickReachesTheConnectedSink()
     {
-        var brain = fixture.BrainFor("button-route");
+        var brain = fixture.BrainFor("button-connection");
         var button = NeuronId.For<IButton>(brain.Owner, "complete-task");
         var task = NeuronId.For<IProbeSink>(brain.Owner, "task");
 
         await brain.SendAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Bind(Guid.NewGuid(), button, ButtonActivated.AliasName, task),
+            new Connect(Guid.NewGuid(), button, ButtonActivated.AliasName, task),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForRoutesAsync(brain, button, ButtonActivated.AliasName);
+        await Graphs.WaitForConnectionsAsync(brain, button, ButtonActivated.AliasName);
 
         await brain.SendAsync<IButton>(
             "complete-task",

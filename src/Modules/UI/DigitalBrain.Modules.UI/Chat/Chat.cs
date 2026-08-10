@@ -127,8 +127,8 @@ internal sealed class Chat : Neuron, IChat
 
         await SendAsync(
             graphId,
-            new Bind(
-                ChatButtons.ArmingBindingId(button),
+            new Connect(
+                ChatButtons.ArmingConnectionId(button),
                 button,
                 ButtonActivated.AliasName,
                 Id,
@@ -136,12 +136,12 @@ internal sealed class Chat : Neuron, IChat
 
         // The offer must not reach the owner before the click route is live, or an
         // immediate click emits an activation with no receiver and is lost.
-        using var arming = new CancellationTokenSource(DeliveryPolicy.RouteLookupTimeout);
+        using var arming = new CancellationTokenSource(DeliveryPolicy.ConnectionLookupTimeout);
         await FlushOutboxAsync(arming.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var routes = await GrainFactory
             .GetGrain<ISynapseGraph>(graphId.ToGrainId())
-            .RoutesFor(button, ButtonActivated.AliasName)
+            .ConnectionsFrom(button, ButtonActivated.AliasName)
             .WaitAsync(arming.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         if (routes.Count == 0)
         {
@@ -171,12 +171,12 @@ internal sealed class Chat : Neuron, IChat
 
     private async Task<IAgent> ResponderAsync()
     {
-        using var lookup = new CancellationTokenSource(DeliveryPolicy.RouteLookupTimeout);
+        using var lookup = new CancellationTokenSource(DeliveryPolicy.ConnectionLookupTimeout);
         try
         {
             var routes = await GrainFactory
                 .GetGrain<ISynapseGraph>(ISynapseGraph.ForOwner(Id.Owner).ToGrainId())
-                .RoutesFor(Id, ChatRoles.Responder)
+                .ConnectionsFrom(Id, ChatRoles.Responder)
                 .WaitAsync(lookup.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             return routes.FirstOrDefault() is { } bound
