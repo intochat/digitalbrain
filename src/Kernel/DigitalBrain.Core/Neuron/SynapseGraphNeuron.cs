@@ -33,6 +33,7 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
                 $"Graph '{Id}' refuses a connection without a synapse alias.");
         }
 
+        RequireWorkingTransform(synapse);
         SweepExpired();
         Remove(synapse.ConnectionId);
         _connections.Add(_records.SerializeToArray(new SynapseConnection(
@@ -150,6 +151,59 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
             }
         }
     }
+
+    // A morph that names a field neither contract has would refuse every delivery
+    // silently later; a wiring typo must fail loudly at wiring time instead.
+    private void RequireWorkingTransform(Connect synapse)
+    {
+        if (synapse.Transform is not { } transformName
+            || !transformName.StartsWith("to:", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (DeclarativeSynapseTransform.TryParse(transformName) is not { } morph)
+        {
+            throw new NeuronAuthorizationException(
+                $"Graph '{Id}' cannot parse transform '{transformName}'. Write it as "
+                + "to:<synapse-alias>{TargetField=SourceField,...} with a known target alias.");
+        }
+
+        var sourceType = SynapseTypeIndex.FindByAlias(synapse.SynapseAlias);
+
+        foreach (var (target, source) in morph.Mappings)
+        {
+            if (morph.TargetType.GetProperty(
+                    target,
+                    System.Reflection.BindingFlags.Public
+                        | System.Reflection.BindingFlags.Instance
+                        | System.Reflection.BindingFlags.IgnoreCase) is null)
+            {
+                throw new NeuronAuthorizationException(
+                    $"Transform '{transformName}' writes '{target}', but "
+                    + $"'{morph.TargetType.Name}' has no such field. It has: "
+                    + $"{FieldList(morph.TargetType)}.");
+            }
+
+            if (sourceType is not null
+                && sourceType.GetProperty(
+                    source,
+                    System.Reflection.BindingFlags.Public
+                        | System.Reflection.BindingFlags.Instance
+                        | System.Reflection.BindingFlags.IgnoreCase) is null)
+            {
+                throw new NeuronAuthorizationException(
+                    $"Transform '{transformName}' reads '{source}', but "
+                    + $"'{sourceType.Name}' ({synapse.SynapseAlias}) has no such field. "
+                    + $"It has: {FieldList(sourceType)}.");
+            }
+        }
+    }
+
+    private static string FieldList(Type synapseType)
+        => string.Join(
+            ", ",
+            synapseType.GetProperties().Select(static property => property.Name));
 
     private void RequireConnectionId(Guid connectionId)
     {

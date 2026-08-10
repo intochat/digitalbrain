@@ -91,6 +91,74 @@ public sealed class ConnectionLifecycleProofs(BrainClusterFixture fixture)
     }
 
     [Fact]
+    public async Task AMorphNamingAMissingSourceFieldIsRefusedAtConnectTime()
+    {
+        var brain = fixture.BrainFor("lifecycle-morph-source");
+        var graph = ISynapseGraph.ForOwner(brain.Owner);
+        var timer = new NeuronId("timer", brain.Owner, "default");
+        var chat = NeuronId.For<IChat>(brain.Owner, "main");
+
+        await brain.FireAsync<ISynapseGraph>(
+            ISynapseGraph.InstanceName,
+            new Connect(
+                Guid.NewGuid(),
+                timer,
+                "time.timer-elapsed",
+                chat,
+                "to:ui.note{Text=Timer Finished}"),
+            TestContext.Current.CancellationToken);
+        await Journals.WaitForAsync(
+            brain, graph, JournalKind.Incoming,
+            delivery => delivery.Synapse is Connect { Transform: "to:ui.note{Text=Timer Finished}" });
+
+        Assert.Empty(await Graphs.ConnectionsAsync(brain, timer, "time.timer-elapsed"));
+    }
+
+    [Fact]
+    public async Task AMorphNamingAMissingTargetFieldIsRefusedAtConnectTime()
+    {
+        var brain = fixture.BrainFor("lifecycle-morph-target");
+        var graph = ISynapseGraph.ForOwner(brain.Owner);
+        var timer = new NeuronId("timer", brain.Owner, "default");
+        var chat = NeuronId.For<IChat>(brain.Owner, "main");
+
+        await brain.FireAsync<ISynapseGraph>(
+            ISynapseGraph.InstanceName,
+            new Connect(
+                Guid.NewGuid(),
+                timer,
+                "time.timer-elapsed",
+                chat,
+                "to:ui.note{Body=Note}"),
+            TestContext.Current.CancellationToken);
+        await Journals.WaitForAsync(
+            brain, graph, JournalKind.Incoming,
+            delivery => delivery.Synapse is Connect { Transform: "to:ui.note{Body=Note}" });
+
+        Assert.Empty(await Graphs.ConnectionsAsync(brain, timer, "time.timer-elapsed"));
+    }
+
+    [Fact]
+    public async Task AWellFormedMorphStillConnects()
+    {
+        var brain = fixture.BrainFor("lifecycle-morph-good");
+        var timer = new NeuronId("timer", brain.Owner, "default");
+        var chat = NeuronId.For<IChat>(brain.Owner, "main");
+
+        await brain.FireAsync<ISynapseGraph>(
+            ISynapseGraph.InstanceName,
+            new Connect(
+                Guid.NewGuid(),
+                timer,
+                "time.timer-elapsed",
+                chat,
+                "to:ui.note{Text=Note}"),
+            TestContext.Current.CancellationToken);
+
+        await Graphs.WaitForConnectionsAsync(brain, timer, "time.timer-elapsed");
+    }
+
+    [Fact]
     public async Task AnExpiredConnectionLeavesTheGraph()
     {
         var brain = fixture.BrainFor("lifecycle-expiry");

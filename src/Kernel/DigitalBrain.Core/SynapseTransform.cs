@@ -39,6 +39,10 @@ public sealed class DeclarativeSynapseTransform : ISynapseTransform
 
     public string Name { get; }
 
+    public Type TargetType => _targetType;
+
+    public IReadOnlyList<(string Target, string Source)> Mappings => _mappings;
+
     public static DeclarativeSynapseTransform? TryParse(string transformName)
     {
         if (string.IsNullOrWhiteSpace(transformName)
