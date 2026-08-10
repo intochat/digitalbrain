@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
+using DigitalBrain.Core;
 using DigitalBrain.AI.Ollama;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,9 +17,23 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
     private static readonly string ModelRoster = string.Join(", ", TeamLineUp.KnownModels);
 
     protected override string? Instructions =>
-        $"""
+        $$"""
         You are DigitalBrain, the AI assistant inside the DigitalBrain personal agent system.
         Be precise about your identity and never invent tools, integrations, or completed actions.
+
+        The system you live in is a graph of neurons. Every neuron has an identity written as
+        type:owner/name, and every neuron you can touch belongs to owner '{{Id.Owner.Value}}'.
+        Neurons emit facts called synapses, and the synapse graph decides which neurons hear
+        them: a connection routes one neuron's emitted synapse (matched by its alias, for
+        example 'chat.responded' or 'ui.chart-point') to a target neuron, optionally reshaped
+        by a transform. When the owner asks you to connect, route, track, or watch something,
+        use your tools: read the topology first to find real neuron identities and live
+        connections, then create or remove connections. A NeuronId argument is an object of
+        the form {"type": "chart", "owner": {"value": "{{Id.Owner.Value}}"}, "name": "dashboard"}.
+        Transforms can be named, or written as data: 'to:ui.chart-point{Label=Text}' reshapes
+        any synapse into a chart point by copying its Text field into Label. Chart neurons
+        (type 'chart') render 'ui.chart-point' synapses; connect a source to a chart to see
+        its facts live on a dashboard.
 
         You can provide general conversational help using the current chat context. External
         capabilities are discovered from the active capability catalog for this deployment —
@@ -27,7 +42,7 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         or claim actions that were not returned by a tool.
 
         A local action, convene_model_team, is offered to you only while the owner's latest
-        message names at least {SmallestTeam} of the models this deployment runs ({ModelRoster}).
+        message names at least {{SmallestTeam}} of the models this deployment runs ({{ModelRoster}}).
         When it is absent from your tools, ask the owner which models to compare instead of
         pretending you asked them. Never claim you convened a team you were not offered.
 
@@ -39,14 +54,60 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
     {
         ArgumentNullException.ThrowIfNull(messages);
 
-        if (ModelMentions.NamedIn(LatestOwnerText(messages)).Count < SmallestTeam)
+        var tools = new List<AIFunction>(CoreSystemTools());
+
+        if (ModelMentions.NamedIn(LatestOwnerText(messages)).Count >= SmallestTeam)
+        {
+            tools.Add(ConveneTool());
+        }
+
+        return tools;
+    }
+
+    private IReadOnlyList<AIFunction> CoreSystemTools()
+    {
+        var catalog = ServiceProvider.GetService<ActiveCapabilityCatalog>();
+        var typeMap = ServiceProvider.GetService<ActiveModuleContractTypeMap>();
+        if (catalog is null || typeMap is null)
         {
             return [];
         }
 
-        return
-        [
-            Capability(
+        List<AIFunction> tools = [];
+        foreach (var neuronContract in (string[])["db.synapse-graph", "introspection"])
+        {
+            if (!catalog.TryGetNeuron(neuronContract, out var neuron) || neuron is null)
+            {
+                continue;
+            }
+
+            foreach (var accepted in neuron.Accepted)
+            {
+                var capability = new ValidatedCapability(
+                    CapabilityKinds.Synapse,
+                    ValidatedCapability.ToolNameFor(accepted.ContractId, accepted.SchemaVersion),
+                    accepted.ContractId,
+                    accepted.SchemaVersion,
+                    neuron.ContractId,
+                    neuron.DefaultInstanceName,
+                    accepted.Description,
+                    accepted.JsonSchema);
+
+                try
+                {
+                    tools.Add(SynapseCapabilityTool.Materialize(capability, GrainFactory, Id.Owner, typeMap));
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+        }
+
+        return tools;
+    }
+
+    private AIFunction ConveneTool()
+        => Capability(
                 ConveneModelTeam,
                 "Put two or more named models in one room, ask them a single question, and return what "
                 + "they jointly answered. Use this only when the owner explicitly asks to compare, "
@@ -54,9 +115,7 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
                 + $"of: {ModelRoster}.",
                 ([Description("Two or more model names, each exactly as listed in this tool's description")] string[] models,
                  [Description("The single question all of those models should answer")] string question)
-                    => ConveneAsync(models, question)),
-        ];
-    }
+                    => ConveneAsync(models, question));
 
     private static string LatestOwnerText(IReadOnlyList<ChatMessage> messages)
     {

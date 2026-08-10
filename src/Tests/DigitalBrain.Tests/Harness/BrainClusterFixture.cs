@@ -30,6 +30,7 @@ public sealed class BrainClusterFixture : IAsyncLifetime
             new ProbeModule(),
             new DigitalBrain.UI.UiModule(),
             new DigitalBrain.Introspection.IntrospectionModule(),
+            new DigitalBrain.Assistant.AssistantModule(),
         ];
         var builder = new InProcessTestClusterBuilder(SiloCount);
         builder.ConfigureSilo((options, silo) =>
@@ -47,6 +48,8 @@ public sealed class BrainClusterFixture : IAsyncLifetime
             DigitalBrainRuntime.Add(silo, modules);
             silo.UseInMemoryReminderService();
             silo.Services.AddSingleton(_sharedJournalStorage);
+            silo.Services.AddKeyedSingleton<Microsoft.Extensions.AI.IChatClient>(
+                typeof(DigitalBrain.AI.Ollama.Gemma4), (_, _) => new ScriptedGemmaChatClient());
             silo.Services.Configure<SiloMessagingOptions>(
                 messaging => messaging.ResponseTimeout = SaturatedMachineResponseTimeout);
         });
