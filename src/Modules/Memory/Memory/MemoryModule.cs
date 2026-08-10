@@ -40,11 +40,6 @@ public sealed class MemoryModule : Core.IModule
 
             builder.Services.TryAddSingleton<IVectorMemoryStore, InMemoryVectorMemoryStore>();
         }
-
-        builder.Services.TryAddSingleton(static services =>
-            new ProjectionReconciler(
-                services.GetRequiredService<IVectorMemoryStore>(),
-                services.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>()));
     }
 
     private static string ResolveQdrantConnectionName(Microsoft.Extensions.Configuration.IConfiguration configuration)

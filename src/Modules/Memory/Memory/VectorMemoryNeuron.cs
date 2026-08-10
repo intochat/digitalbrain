@@ -13,14 +13,23 @@ public sealed class VectorMemoryNeuron :
     IHandle<SearchVectorMemory>,
     IHandle<RemoveVectorMemory>
 {
-    private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddings;
+    private readonly IEmbeddingGenerator<string, Embedding<float>>? _embeddings;
     private readonly IVectorMemoryStore _store;
 
     public VectorMemoryNeuron()
     {
-        _embeddings = ServiceProvider.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
+        _embeddings = ServiceProvider.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
         _store = ServiceProvider.GetRequiredService<IVectorMemoryStore>();
     }
+
+    // Missing configuration must refuse (settled), never crash-retry: an
+    // unconfigured capability is a conversation with the owner, not a storm.
+    private IEmbeddingGenerator<string, Embedding<float>> RequireEmbeddings()
+        => _embeddings
+            ?? throw new NeuronAuthorizationException(
+                $"Vector memory '{Id}' has no embedding model. Wire an "
+                + "IEmbeddingGenerator (an Ollama embedding model in the AppHost) "
+                + "and try again.");
 
     public async Task HandleAsync(StoreVectorMemory synapse, CancellationToken cancellationToken)
     {
@@ -107,7 +116,7 @@ public sealed class VectorMemoryNeuron :
 
     private async Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken)
     {
-        var generated = await _embeddings.GenerateAsync(
+        var generated = await RequireEmbeddings().GenerateAsync(
             [text],
             cancellationToken: cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 

@@ -14,7 +14,9 @@ public static class DigitalBrainRuntime
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(modules);
 
-        var capabilities = ActiveCapabilityCatalog.Create(ManifestsOf(modules));
+        var manifests = ManifestsOf(modules);
+        var capabilities = ActiveCapabilityCatalog.Create(manifests);
+        builder.Services.AddSingleton(CapabilityIndex.Build(manifests));
 
         builder.AddJournalStorage();
         builder.UseJsonJournalFormat(JournalJsonContext.Default);

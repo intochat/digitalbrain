@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
-using DigitalBrain.Memory;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -126,10 +125,9 @@ public abstract class Agent : Neuron, IAgent
         }
 
         var typeMap = ServiceProvider.GetService<ActiveModuleContractTypeMap>();
-        var search = ResolveCandidateSearch(catalog);
         var router = new CapabilityRouter(
             catalog,
-            search,
+            search: null,
             ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger<CapabilityRouter>());
         var prompt = LatestOwnerText(messages);
         if (string.IsNullOrWhiteSpace(prompt))
@@ -159,22 +157,6 @@ public abstract class Agent : Neuron, IAgent
         return tools;
     }
 
-    private ICapabilityCandidateSearch? ResolveCandidateSearch(ActiveCapabilityCatalog catalog)
-    {
-        var registered = ServiceProvider.GetService<ICapabilityCandidateSearch>();
-        if (registered is not null)
-        {
-            return registered;
-        }
-
-        var vectorMemoryContract = typeof(IVectorMemory).FullName;
-        if (vectorMemoryContract is not null && catalog.TryGetNeuron(vectorMemoryContract, out _))
-        {
-            return new VectorMemoryCapabilitySearch(GrainFactory);
-        }
-
-        return null;
-    }
 
     private static string LatestOwnerText(IReadOnlyList<ChatMessage> messages)
     {
