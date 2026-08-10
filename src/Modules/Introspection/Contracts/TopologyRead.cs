@@ -22,11 +22,18 @@ public sealed record TopologyConnection(
     [property: Id(5)] DateTimeOffset? ExpiresAt);
 
 [GenerateSerializer]
+[Alias("introspection.topology-broadcast-route")]
+public sealed record TopologyBroadcastRoute(
+    [property: Id(0)] string SynapseAlias,
+    [property: Id(1)] string HandlerGrainType);
+
+[GenerateSerializer]
 [Alias("introspection.topology-read")]
-[Description("The modules this deployment composed, the owner's activated neurons, and the live synapse connections")]
+[Description("The modules this deployment composed, the owner's activated neurons, the live synapse connections, and the compiled broadcast tier")]
 public sealed record TopologyRead(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] IReadOnlyList<string> Modules,
     [property: Id(2)] IReadOnlyList<TopologyNeuron> Neurons,
     [property: Id(3)] DateTimeOffset ObservedAt,
-    [property: Id(4)] IReadOnlyList<TopologyConnection> Connections) : Synapse;
+    [property: Id(4)] IReadOnlyList<TopologyConnection> Connections,
+    [property: Id(5)] IReadOnlyList<TopologyBroadcastRoute> BroadcastRoutes) : Synapse;

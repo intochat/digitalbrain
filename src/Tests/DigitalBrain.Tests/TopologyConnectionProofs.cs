@@ -35,4 +35,23 @@ public sealed class TopologyConnectionProofs(BrainClusterFixture fixture)
         Assert.Equal(sink.ToString(), reported.Target);
         Assert.Null(reported.Transform);
     }
+
+    [Fact]
+    public async Task TopologyReportsTheCompiledBroadcastTierAlongsideTheGraph()
+    {
+        var brain = fixture.BrainFor("topology-manifest");
+
+        var topology = (TopologyRead)await ((DigitalBrain.Client.DigitalBrainClient)brain).SendRequestAsync(
+            NeuronId.For<IIntrospection>(brain.Owner, "default"),
+            new ReadTopologyRequest(),
+            typeof(TopologyRead),
+            TestContext.Current.CancellationToken);
+
+        Assert.Contains(
+            topology.BroadcastRoutes,
+            route => route.SynapseAlias == "ui.chart-point" && route.HandlerGrainType == "chart");
+        Assert.Contains(
+            topology.BroadcastRoutes,
+            route => route.SynapseAlias == "ui.note" && route.HandlerGrainType == "chat");
+    }
 }

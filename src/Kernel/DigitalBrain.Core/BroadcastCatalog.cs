@@ -2,13 +2,22 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Reflection;
 using DigitalBrain.Abstractions;
+using System.Linq;
 
 namespace DigitalBrain.Core;
+
+public sealed record BroadcastRoute(string SynapseAlias, string HandlerGrainType);
+
+public sealed class BroadcastTopology(IReadOnlyCollection<BroadcastRoute> routes)
+{
+    public IReadOnlyCollection<BroadcastRoute> Routes { get; } = routes;
+}
 
 internal sealed class BroadcastCatalog
 {
     private readonly ConcurrentDictionary<string, ImmutableHashSet<string>> _handlers =
         new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<(string Alias, string GrainType), byte> _routes = new();
 
     internal void AddAssembly(Assembly assembly)
     {
@@ -31,9 +40,38 @@ internal sealed class BroadcastCatalog
                 entry.Synapse,
                 _ => ImmutableHashSet.Create(StringComparer.Ordinal, grainType),
                 (_, existing) => existing.Add(grainType));
+
+            if (AliasOf(neuronType, entry.Synapse) is { } alias)
+            {
+                _routes.TryAdd((alias, grainType), 0);
+            }
         }
     }
 
     internal IReadOnlyCollection<string> HandlerGrainTypes(string synapseType)
         => _handlers.TryGetValue(synapseType, out var handlers) ? handlers : [];
+
+    internal IReadOnlyCollection<BroadcastRoute> Routes()
+        =>
+        [
+            .. _routes.Keys
+                .Select(route => new BroadcastRoute(route.Alias, route.GrainType))
+                .OrderBy(route => route.SynapseAlias, StringComparer.Ordinal)
+                .ThenBy(route => route.HandlerGrainType, StringComparer.Ordinal),
+        ];
+
+    private static string? AliasOf(Type neuronType, string synapseTypeName)
+    {
+        foreach (var contract in neuronType.GetInterfaces())
+        {
+            if (contract.IsGenericType
+                && contract.GetGenericTypeDefinition() == typeof(IHandle<>)
+                && contract.GenericTypeArguments[0].FullName == synapseTypeName)
+            {
+                return SynapseAlias.Of(contract.GenericTypeArguments[0]);
+            }
+        }
+
+        return null;
+    }
 }

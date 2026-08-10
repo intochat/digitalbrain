@@ -70,6 +70,12 @@ internal sealed partial class IntrospectionNeuron
                         connection.ExpiresAt))
                     .OrderBy(static connection => connection.Source, StringComparer.Ordinal)
                     .ThenBy(static connection => connection.SynapseAlias, StringComparer.Ordinal),
+            ],
+            [
+                .. (ServiceProvider.GetService<BroadcastTopology>()?.Routes ?? [])
+                    .Select(static route => new TopologyBroadcastRoute(
+                        route.SynapseAlias,
+                        route.HandlerGrainType)),
             ]);
     }
 

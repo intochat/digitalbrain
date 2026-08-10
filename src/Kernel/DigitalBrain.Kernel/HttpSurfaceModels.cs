@@ -50,7 +50,10 @@ internal sealed record BrainTopologySnapshot(
     IReadOnlyList<BrainModule> Modules,
     IReadOnlyList<BrainNeuron> Neurons,
     DateTimeOffset ObservedAt,
-    IReadOnlyList<BrainConnection> Connections);
+    IReadOnlyList<BrainConnection> Connections,
+    IReadOnlyList<BrainBroadcastRoute> BroadcastRoutes);
+
+internal sealed record BrainBroadcastRoute(string SynapseAlias, string HandlerGrainType);
 
 internal sealed record BrainModule(string Id);
 

@@ -70,7 +70,7 @@ final class GraphPainter extends CustomPainter {
           edge.to.center.dy,
         );
       canvas.drawPath(
-        path,
+        edge.edge.dotted ? _dashed(path) : path,
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = recent ? 2.4 : 1.4
@@ -117,6 +117,19 @@ final class GraphPainter extends CustomPainter {
         );
       }
     }
+  }
+
+  static Path _dashed(Path path, {double dash = 5, double gap = 4}) {
+    final dashed = Path();
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final end = math.min(distance + dash, metric.length);
+        dashed.addPath(metric.extractPath(distance, end), Offset.zero);
+        distance = end + gap;
+      }
+    }
+    return dashed;
   }
 
   void _paintPulse(Canvas canvas, Offset center, Size size) {

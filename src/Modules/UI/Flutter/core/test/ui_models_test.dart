@@ -23,6 +23,22 @@ void main() {
     expect(event.timers.first.dueAt, DateTime.utc(2026, 8, 10, 12, 5));
   });
 
+  test('BrainTopologySnapshot parses the broadcast tier', () {
+    final snapshot = BrainTopologySnapshot.fromJson({
+      'modules': <Object?>[],
+      'neurons': <Object?>[],
+      'observedAt': '2026-08-10T12:00:00Z',
+      'connections': <Object?>[],
+      'broadcastRoutes': [
+        {'synapseAlias': 'ui.note', 'handlerGrainType': 'chat'},
+      ],
+    });
+
+    expect(snapshot.broadcastRoutes, hasLength(1));
+    expect(snapshot.broadcastRoutes.first.synapseAlias, 'ui.note');
+    expect(snapshot.broadcastRoutes.first.handlerGrainType, 'chat');
+  });
+
   test('SceneOpenedEvent reads JSON field names used by UI HTTP', () {
     final event = SceneOpenedEvent.fromJson({
       'sequence': 7,

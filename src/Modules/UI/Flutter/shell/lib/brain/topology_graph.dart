@@ -65,6 +65,8 @@ List<GraphNode> topologyGraphNodes(
       label: neuron.grainType,
       dimmed: neuron.placement == 'pending',
     ),
+  for (final alias in _visibleBroadcastAliases(topology))
+    GraphNode(id: 'broadcast:$alias', label: alias, dimmed: true),
 ];
 
 List<GraphEdge> topologyGraphEdges(BrainTopologySnapshot topology) => [
@@ -75,7 +77,25 @@ List<GraphEdge> topologyGraphEdges(BrainTopologySnapshot topology) => [
       targetId: connection.target,
       decorated: connection.transform != null,
     ),
+  for (final route in topology.broadcastRoutes)
+    for (final neuron in topology.neurons.where(
+      (neuron) => neuron.grainType == route.handlerGrainType,
+    ))
+      GraphEdge(
+        id: 'broadcast:${route.synapseAlias}:${neuron.id}',
+        sourceId: 'broadcast:${route.synapseAlias}',
+        targetId: neuron.id,
+        dotted: true,
+      ),
 ];
+
+Set<String> _visibleBroadcastAliases(BrainTopologySnapshot topology) => {
+  for (final route in topology.broadcastRoutes)
+    if (topology.neurons.any(
+      (neuron) => neuron.grainType == route.handlerGrainType,
+    ))
+      route.synapseAlias,
+};
 
 GraphPulse? topologyGraphPulse(ChatTurnEvent? pulse) => pulse == null
     ? null

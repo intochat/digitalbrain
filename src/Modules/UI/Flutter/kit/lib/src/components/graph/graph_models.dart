@@ -20,12 +20,14 @@ final class GraphEdge {
     required this.sourceId,
     required this.targetId,
     this.decorated = false,
+    this.dotted = false,
   });
 
   final String id;
   final String sourceId;
   final String targetId;
   final bool decorated;
+  final bool dotted;
 }
 
 final class GraphPulse {

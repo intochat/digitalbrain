@@ -390,12 +390,14 @@ final class BrainTopologySnapshot {
     required this.neurons,
     required this.observedAt,
     this.connections = const [],
+    this.broadcastRoutes = const [],
   });
 
   final List<BrainModule> modules;
   final List<BrainNeuron> neurons;
   final DateTime observedAt;
   final List<BrainConnection> connections;
+  final List<BrainBroadcastRoute> broadcastRoutes;
 
   factory BrainTopologySnapshot.fromJson(Map<String, Object?> json) {
     return BrainTopologySnapshot(
@@ -419,6 +421,30 @@ final class BrainTopologySnapshot {
             ),
           )
           .toList(growable: false),
+      broadcastRoutes: (json['broadcastRoutes'] as List<Object?>? ?? const [])
+          .map(
+            (route) => BrainBroadcastRoute.fromJson(
+              Map<String, Object?>.from(route! as Map),
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+}
+
+final class BrainBroadcastRoute {
+  const BrainBroadcastRoute({
+    required this.synapseAlias,
+    required this.handlerGrainType,
+  });
+
+  final String synapseAlias;
+  final String handlerGrainType;
+
+  factory BrainBroadcastRoute.fromJson(Map<String, Object?> json) {
+    return BrainBroadcastRoute(
+      synapseAlias: json['synapseAlias'] as String? ?? '',
+      handlerGrainType: json['handlerGrainType'] as String? ?? '',
     );
   }
 }

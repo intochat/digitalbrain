@@ -42,6 +42,8 @@ public static class DigitalBrainRuntime
 
             return catalog;
         });
+        builder.Services.AddSingleton(services =>
+            new BroadcastTopology(services.GetRequiredService<BroadcastCatalog>().Routes()));
 
         foreach (var module in availableModules)
         {

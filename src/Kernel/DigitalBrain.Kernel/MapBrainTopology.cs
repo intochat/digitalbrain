@@ -57,6 +57,11 @@ internal static class BrainTopologyHttpMaps
                             connection.Target,
                             connection.Transform,
                             connection.ExpiresAt)),
+                    ],
+                    [
+                        .. read.BroadcastRoutes.Select(static route => new BrainBroadcastRoute(
+                            route.SynapseAlias,
+                            route.HandlerGrainType)),
                     ]));
             });
 
