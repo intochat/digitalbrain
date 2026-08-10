@@ -131,6 +131,11 @@ saturated machine.
   scripting capability, with the assistant authoring single-file C# scripts that compile
   into installable behaviors. Needs a dedicated design session before any code.
 - Per-emission graph-call cache — measure under aspire before optimizing.
+- **Refusal visibility (top priority)**: settled refusals produce no reply, so a request
+  loop (fire tool) sees only a 15s timeout — the refusal REASON (e.g. connect-time morph
+  validation) never reaches the model. Decide: kernel refusal-replies for RequestSynapses
+  vs per-contract error-bearing responses (the Salesforce pattern). Live round 7 proved
+  the model reports such failures honestly but cannot self-correct without the reason.
 - Surface-events → windowing bridge (shell does not consume `SceneOpened` yet); unlocks
   diagram/graph windows and "show me my graph" via `OpenSurface`.
 - Flutter core has pre-existing `activateControl` test drift (spawned task).
