@@ -15,21 +15,21 @@ public sealed class ConnectionTeardownProofs(BrainClusterFixture fixture)
         var sink = NeuronId.For<IProbeSink>(brain.Owner, "dash");
         var connection = Guid.NewGuid();
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(connection, source, "probe.fact", sink),
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionsAsync(brain, source, "probe.fact");
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("before"), TestContext.Current.CancellationToken);
         await Journals.WaitForAsync(
             brain, sink, JournalKind.Incoming,
             delivery => delivery.Synapse is ProbeFact { Text: "before" });
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName, new Disconnect(connection), TestContext.Current.CancellationToken);
         await Graphs.WaitForNoConnectionsAsync(brain, source, "probe.fact");
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("after"), TestContext.Current.CancellationToken);
 
         await Journals.WaitForAsync(
@@ -49,7 +49,7 @@ public sealed class ConnectionTeardownProofs(BrainClusterFixture fixture)
         var graph = ISynapseGraph.ForOwner(brain.Owner);
         var alreadyPast = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(1);
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(Guid.NewGuid(), source, "probe.fact", sink, ExpiresAt: alreadyPast),
             TestContext.Current.CancellationToken);
@@ -59,7 +59,7 @@ public sealed class ConnectionTeardownProofs(BrainClusterFixture fixture)
         var connections = await Graphs.ConnectionsAsync(brain, source, "probe.fact");
         Assert.Empty(connections);
 
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("stale"), TestContext.Current.CancellationToken);
         await Journals.WaitForAsync(
             brain, source, JournalKind.Outgoing,

@@ -16,13 +16,13 @@ public sealed class TransformRelayProofs(BrainClusterFixture fixture)
         var connection = Guid.NewGuid();
         var relay = new NeuronId("relay", brain.Owner, connection.ToString("D"));
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(connection, source, "probe.fact", sink, ProbeFactToItemAppended.TransformName),
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionsAsync(brain, source, "probe.fact");
 
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("elon posted"), TestContext.Current.CancellationToken);
 
         var adapted = await Journals.WaitForAsync(
@@ -50,13 +50,13 @@ public sealed class TransformRelayProofs(BrainClusterFixture fixture)
         var connection = Guid.NewGuid();
         var relay = new NeuronId("relay", brain.Owner, connection.ToString("D"));
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(connection, source, "probe.fact", sink, PoisonTransform.TransformName),
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionsAsync(brain, source, "probe.fact");
 
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("toxic"), TestContext.Current.CancellationToken);
 
         await Journals.WaitForAsync(

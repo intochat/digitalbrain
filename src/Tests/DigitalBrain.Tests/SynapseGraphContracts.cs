@@ -15,7 +15,7 @@ public sealed class SynapseGraphContracts(BrainClusterFixture fixture)
         var target = NeuronId.For<IProbeSink>(brain.Owner, "dash");
         var connectionId = Guid.NewGuid();
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(connectionId, source, "probe.fact", target),
             TestContext.Current.CancellationToken);

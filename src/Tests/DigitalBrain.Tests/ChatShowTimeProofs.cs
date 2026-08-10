@@ -25,7 +25,7 @@ public sealed class ChatShowTimeProofs(BrainClusterFixture fixture)
         // Clicking immediately after seeing the offer is the real-world sequence: the
         // chat must have confirmed the arming before the offer became visible.
         var buttonName = ChatButtons.OfferedInstanceName("main", command, "show-time");
-        await brain.SendAsync<IButton>(
+        await brain.FireAsync<IButton>(
             buttonName,
             new ButtonClicked(command, "show-time", "show-time"),
             TestContext.Current.CancellationToken);

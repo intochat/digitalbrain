@@ -14,13 +14,13 @@ public sealed class ConnectionCycleGuardProofs(BrainClusterFixture fixture)
         var brain = fixture.BrainFor("cycle");
         var echo = NeuronId.For<IProbeEcho>(brain.Owner, "loop");
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(Guid.NewGuid(), echo, "probe.fact", echo),
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionsAsync(brain, echo, "probe.fact");
 
-        await brain.SendAsync<IProbeEcho>(
+        await brain.FireAsync<IProbeEcho>(
             "loop", new Poke("around"), TestContext.Current.CancellationToken);
 
         var settled = await Journals.SnapshotAfterQuietAsync(

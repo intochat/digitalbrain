@@ -16,14 +16,14 @@ public readonly struct NeuronReference<TNeuron> : IEquatable<NeuronReference<TNe
 
     public NeuronId Id => NeuronId.For<TNeuron>(_client.Owner, _name);
 
-    public Task SendAsync(Synapse synapse, CancellationToken cancellationToken = default)
+    public Task FireAsync(Synapse synapse, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
         return _client.SendToAsync(Id, synapse, cancellationToken);
     }
 
-    public Task<TResponse> SendAsync<TResponse>(
+    public Task<TResponse> FireAsync<TResponse>(
         RequestSynapse<TResponse> request,
         CancellationToken cancellationToken = default)
         where TResponse : Synapse

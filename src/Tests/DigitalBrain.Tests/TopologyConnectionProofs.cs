@@ -16,7 +16,7 @@ public sealed class TopologyConnectionProofs(BrainClusterFixture fixture)
         var sink = NeuronId.For<IProbeSink>(brain.Owner, "dash");
         var connection = Guid.NewGuid();
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(connection, source, "probe.fact", sink),
             TestContext.Current.CancellationToken);

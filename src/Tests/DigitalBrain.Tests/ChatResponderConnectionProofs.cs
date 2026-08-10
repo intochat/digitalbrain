@@ -17,11 +17,11 @@ public sealed class ChatResponderConnectionProofs(BrainClusterFixture fixture)
         var alpha = new NeuronId("scriptedagent", brain.Owner, "alpha");
         var beta = new NeuronId("scriptedagent", brain.Owner, "beta");
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(ChatRoles.ResponderConnectionId(chatA), chatA, ChatRoles.Responder, alpha),
             TestContext.Current.CancellationToken);
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(ChatRoles.ResponderConnectionId(chatB), chatB, ChatRoles.Responder, beta),
             TestContext.Current.CancellationToken);
@@ -47,13 +47,13 @@ public sealed class ChatResponderConnectionProofs(BrainClusterFixture fixture)
         var alpha = new NeuronId("scriptedagent", brain.Owner, "alpha");
         var beta = new NeuronId("scriptedagent", brain.Owner, "beta");
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, alpha),
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionTargetAsync(brain, chat, ChatRoles.Responder, alpha);
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, beta),
             TestContext.Current.CancellationToken);

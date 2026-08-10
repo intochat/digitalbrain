@@ -52,17 +52,17 @@ public sealed class DigitalBrainClient : IDigitalBrain
         return _grains.GetGrain<TNeuron>(NeuronId.For<TNeuron>(Owner, name).ToGrainId());
     }
 
-    public Task SendAsync<TNeuron>(string name, Synapse synapse, CancellationToken cancellationToken = default)
+    public Task FireAsync<TNeuron>(string name, Synapse synapse, CancellationToken cancellationToken = default)
         where TNeuron : INeuron
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         RequireDomainNeuronContract(typeof(TNeuron));
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
-        return Get<TNeuron>(name).SendAsync(synapse, cancellationToken);
+        return Get<TNeuron>(name).FireAsync(synapse, cancellationToken);
     }
 
-    public async Task SendAsync(NeuronId receiver, Synapse synapse, CancellationToken cancellationToken = default)
+    public async Task FireAsync(NeuronId receiver, Synapse synapse, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
@@ -77,13 +77,13 @@ public sealed class DigitalBrainClient : IDigitalBrain
             || string.Equals(receiver.Type, IDigitalBrainNeuron.GrainTypeName, StringComparison.Ordinal))
         {
             throw new NeuronAuthorizationException(
-                "The owner DigitalBrain and session are not Send targets. Use ActivateAsync, domain Get, SendAsync to domain neurons, and EmitAsync to broadcast.");
+                "The owner DigitalBrain and session are not Fire targets. Use ActivateAsync, domain Get, FireAsync to a named neuron, and FireAsync without a receiver to broadcast.");
         }
 
         await SendToAsync(receiver, synapse, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task EmitAsync(Synapse synapse, CancellationToken cancellationToken = default)
+    public async Task FireAsync(Synapse synapse, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
@@ -346,7 +346,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
             || typeof(IDigitalBrainNeuron).IsAssignableFrom(neuronType))
         {
             throw new NeuronAuthorizationException(
-                $"'{neuronType.Name}' is not addressable through IDigitalBrain.Get. Activate the brain with ActivateAsync; address domain neuron contracts with Get; fire and emit through SendAsync and EmitAsync; observe journals through ReadJournalAsync and WatchJournalAsync.");
+                $"'{neuronType.Name}' is not addressable through IDigitalBrain.Get. Activate the brain with ActivateAsync; address domain neuron contracts with Get; fire synapses through FireAsync; observe journals through ReadJournalAsync and WatchJournalAsync.");
         }
     }
 }

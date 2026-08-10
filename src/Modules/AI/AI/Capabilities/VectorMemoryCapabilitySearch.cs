@@ -66,7 +66,7 @@ public sealed class VectorMemoryCapabilitySearch : ICapabilityCandidateSearch
         CancellationToken cancellationToken)
     {
         var matches = await memory
-            .SendAsync(new SearchVectorMemory(@namespace, prompt, limit, Metadata: null), cancellationToken)
+            .FireAsync(new SearchVectorMemory(@namespace, prompt, limit, Metadata: null), cancellationToken)
             .ConfigureAwait(false);
 
         foreach (var match in matches.Matches)

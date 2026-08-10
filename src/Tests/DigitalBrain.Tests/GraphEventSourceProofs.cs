@@ -16,7 +16,7 @@ public sealed class GraphEventSourceProofs(BrainClusterFixture fixture)
         var sink = NeuronId.For<IProbeSink>(brain.Owner, "dash");
         var connectionId = Guid.NewGuid();
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(connectionId, source, "probe.fact", sink),
             TestContext.Current.CancellationToken);
@@ -26,7 +26,7 @@ public sealed class GraphEventSourceProofs(BrainClusterFixture fixture)
             delivery => delivery.Synapse is Connected live && live.ConnectionId == connectionId);
         Assert.Equal(sink, ((Connected)connected.Synapse).Target);
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Disconnect(connectionId),
             TestContext.Current.CancellationToken);

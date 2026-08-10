@@ -18,7 +18,7 @@ public sealed class SelfProgrammingProofs(BrainClusterFixture fixture)
         var feed = NeuronId.For<IProbeSource>(brain.Owner, "elon");
         var chart = NeuronId.For<IChart>(brain.Owner, "dashboard");
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, planner),
             TestContext.Current.CancellationToken);
@@ -33,7 +33,7 @@ public sealed class SelfProgrammingProofs(BrainClusterFixture fixture)
             delivery => delivery.Synapse is Responded answered
                 && answered.Text.Contains("wired", StringComparison.Ordinal));
 
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("shipped starship"), TestContext.Current.CancellationToken);
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);

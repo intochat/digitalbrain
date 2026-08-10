@@ -15,13 +15,13 @@ public sealed class ChartVocabularyProofs(BrainClusterFixture fixture)
         var session = ISessionNeuron.ForOwner(brain.Owner);
         var chart = NeuronId.For<IChart>(brain.Owner, "dashboard");
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(Guid.NewGuid(), session, ChartPoint.AliasName, chart),
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionsAsync(brain, session, ChartPoint.AliasName);
 
-        await brain.EmitAsync(new ChartPoint("cpu", "12:00", 42), TestContext.Current.CancellationToken);
+        await brain.FireAsync(new ChartPoint("cpu", "12:00", 42), TestContext.Current.CancellationToken);
 
         var charted = await Journals.WaitForAsync(
             brain, chart, JournalKind.Incoming,

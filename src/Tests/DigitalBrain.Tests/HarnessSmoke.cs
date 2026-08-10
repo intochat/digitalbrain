@@ -13,7 +13,7 @@ public sealed class HarnessSmoke(BrainClusterFixture fixture)
         var brain = fixture.BrainFor("smoke");
         var source = NeuronId.For<IProbeSource>(brain.Owner, "s1");
 
-        await brain.SendAsync<IProbeSource>("s1", new Poke("hello"), TestContext.Current.CancellationToken);
+        await brain.FireAsync<IProbeSource>("s1", new Poke("hello"), TestContext.Current.CancellationToken);
 
         var emitted = await Journals.WaitForAsync(
             brain, source, JournalKind.Outgoing, delivery => delivery.Synapse is ProbeFact);

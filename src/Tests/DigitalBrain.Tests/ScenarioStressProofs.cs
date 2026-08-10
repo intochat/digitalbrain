@@ -15,17 +15,17 @@ public sealed class ScenarioStressProofs(BrainClusterFixture fixture)
         var chart = NeuronId.For<IProbeSink>(brain.Owner, "chart");
         var archive = NeuronId.For<IProbeSink>(brain.Owner, "archive");
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(Guid.NewGuid(), feed, "probe.fact", chart, ProbeFactToItemAppended.TransformName),
             TestContext.Current.CancellationToken);
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(Guid.NewGuid(), feed, "probe.fact", archive),
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionsAsync(brain, feed, "probe.fact", connectionCount: 2);
 
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("shipped it"), TestContext.Current.CancellationToken);
 
         await Journals.WaitForAsync(
@@ -45,20 +45,20 @@ public sealed class ScenarioStressProofs(BrainClusterFixture fixture)
         var elonSink = NeuronId.For<IProbeSink>(brain.Owner, "elon-dash");
         var samSink = NeuronId.For<IProbeSink>(brain.Owner, "sam-dash");
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(Guid.NewGuid(), elon, "probe.fact", elonSink),
             TestContext.Current.CancellationToken);
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(Guid.NewGuid(), sam, "probe.fact", samSink),
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionsAsync(brain, elon, "probe.fact");
         await Graphs.WaitForConnectionsAsync(brain, sam, "probe.fact");
 
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("from elon"), TestContext.Current.CancellationToken);
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "sam", new Poke("from sam"), TestContext.Current.CancellationToken);
 
         await Journals.WaitForAsync(
@@ -81,7 +81,7 @@ public sealed class ScenarioStressProofs(BrainClusterFixture fixture)
         var aliceSink = NeuronId.For<IProbeSink>(alice.Owner, "dash");
         var bobSink = NeuronId.For<IProbeSink>(bob.Owner, "dash");
 
-        await alice.SendAsync<ISynapseGraph>(
+        await alice.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(
                 Guid.NewGuid(),
@@ -92,7 +92,7 @@ public sealed class ScenarioStressProofs(BrainClusterFixture fixture)
         await Graphs.WaitForConnectionsAsync(
             alice, NeuronId.For<IProbeSource>(alice.Owner, "elon"), "probe.fact");
 
-        await bob.SendAsync<IProbeSource>(
+        await bob.FireAsync<IProbeSource>(
             "elon", new Poke("bob speaking"), TestContext.Current.CancellationToken);
 
         await Journals.WaitForAsync(
@@ -118,23 +118,23 @@ public sealed class ScenarioStressProofs(BrainClusterFixture fixture)
         var second = NeuronId.For<IProbeSink>(brain.Owner, "second");
         var connection = Guid.NewGuid();
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(connection, feed, "probe.fact", first),
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionsAsync(brain, feed, "probe.fact");
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("to first"), TestContext.Current.CancellationToken);
         await Journals.WaitForAsync(
             brain, first, JournalKind.Incoming,
             delivery => delivery.Synapse is ProbeFact { Text: "to first" });
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(connection, feed, "probe.fact", second),
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionTargetAsync(brain, feed, "probe.fact", second);
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("to second"), TestContext.Current.CancellationToken);
 
         await Journals.WaitForAsync(
@@ -154,7 +154,7 @@ public sealed class ScenarioStressProofs(BrainClusterFixture fixture)
         var aliceSink = NeuronId.For<IProbeSink>(alice.Owner, "dash");
         var graph = ISynapseGraph.ForOwner(alice.Owner);
 
-        await alice.SendAsync<ISynapseGraph>(
+        await alice.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(Guid.NewGuid(), bobsFeed, "probe.fact", aliceSink),
             TestContext.Current.CancellationToken);

@@ -62,7 +62,7 @@ internal static class OwnerCommandsHttpMaps
                         return;
                     }
 
-                    await brain.SendAsync<IButton>(
+                    await brain.FireAsync<IButton>(
                         ChatButtons.OfferedInstanceName(request.ChatName, offerCommandId, request.ButtonId),
                         new ButtonClicked(offerCommandId, request.ButtonId, request.Action),
                         cancellationToken).ConfigureAwait(false);
@@ -80,7 +80,7 @@ internal static class OwnerCommandsHttpMaps
                         return;
                     }
 
-                    await brain.SendAsync<ISurface>(
+                    await brain.FireAsync<ISurface>(
                         request.SurfaceName,
                         new OpenSurface(CommandId.New(), request.SurfaceKey, request.Title),
                         cancellationToken).ConfigureAwait(false);

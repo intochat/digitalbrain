@@ -15,7 +15,7 @@ public sealed class ObservedCallProofs(BrainClusterFixture fixture)
         var chat = NeuronId.For<IChat>(brain.Owner, "main");
         var alpha = new NeuronId("scriptedagent", brain.Owner, "alpha");
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, alpha),
             TestContext.Current.CancellationToken);

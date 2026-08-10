@@ -17,7 +17,7 @@ var brain = await DigitalBrainClient.ConnectAsync(args);
 var chat = NeuronId.For<IChat>(brain.Owner, chatName);
 var responder = NeuronId.For<IGemma4>(brain.Owner, modelName);
 
-await brain.SendAsync<ISynapseGraph>(
+await brain.FireAsync<ISynapseGraph>(
     ISynapseGraph.InstanceName,
     new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, responder));
 

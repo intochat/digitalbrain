@@ -14,13 +14,13 @@ public sealed class RuntimeConnectionProofs(BrainClusterFixture fixture)
         var source = NeuronId.For<IProbeSource>(brain.Owner, "elon");
         var sink = NeuronId.For<IProbeSink>(brain.Owner, "dash");
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(Guid.NewGuid(), source, "probe.fact", sink),
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionsAsync(brain, source, "probe.fact");
 
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("routed"), TestContext.Current.CancellationToken);
 
         var delivered = await Journals.WaitForAsync(
@@ -38,12 +38,12 @@ public sealed class RuntimeConnectionProofs(BrainClusterFixture fixture)
         var source = NeuronId.For<IProbeSource>(brain.Owner, "elon");
         var sink = NeuronId.For<IProbeSink>(brain.Owner, "dash");
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(Guid.NewGuid(), source, "probe.fact", sink),
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionsAsync(brain, source, "probe.fact");
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("clean"), TestContext.Current.CancellationToken);
         await Journals.WaitForAsync(
             brain, sink, JournalKind.Incoming,

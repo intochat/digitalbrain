@@ -14,13 +14,13 @@ public sealed class DeclarativeTransformProofs(BrainClusterFixture fixture)
         var source = NeuronId.For<IProbeSource>(brain.Owner, "elon");
         var sink = NeuronId.For<IProbeSink>(brain.Owner, "feed");
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(Guid.NewGuid(), source, "probe.fact", sink, "to:ui.item-appended{Title=Text}"),
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionsAsync(brain, source, "probe.fact");
 
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("declared at runtime"), TestContext.Current.CancellationToken);
 
         await Journals.WaitForAsync(

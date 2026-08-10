@@ -14,10 +14,10 @@ public sealed class DiagramProofs(BrainClusterFixture fixture)
         var brain = fixture.BrainFor("diagram");
         var token = TestContext.Current.CancellationToken;
 
-        await brain.SendAsync<IDiagram>("main", new Node("a", "Alpha"), token);
-        await brain.SendAsync<IDiagram>("main", new Node("b", "Beta"), token);
-        await brain.SendAsync<IDiagram>("main", new Edge("a-b", "a", "b"), token);
-        await brain.SendAsync<IDiagram>("main", new Node("a", "Alpha v2"), token);
+        await brain.FireAsync<IDiagram>("main", new Node("a", "Alpha"), token);
+        await brain.FireAsync<IDiagram>("main", new Node("b", "Beta"), token);
+        await brain.FireAsync<IDiagram>("main", new Edge("a-b", "a", "b"), token);
+        await brain.FireAsync<IDiagram>("main", new Node("a", "Alpha v2"), token);
 
         var document = await WaitForDocumentAsync(
             brain,
@@ -35,7 +35,7 @@ public sealed class DiagramProofs(BrainClusterFixture fixture)
         var feed = NeuronId.For<IProbeSource>(brain.Owner, "elon");
         var diagram = NeuronId.For<IDiagram>(brain.Owner, "main");
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(
                 Guid.NewGuid(),
@@ -46,7 +46,7 @@ public sealed class DiagramProofs(BrainClusterFixture fixture)
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionsAsync(brain, feed, "probe.fact");
 
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("mars"), TestContext.Current.CancellationToken);
 
         await WaitForDocumentAsync(

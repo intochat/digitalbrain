@@ -49,7 +49,7 @@ public sealed class AssistantWiringProofs(BrainClusterFixture fixture)
             brain, chat, JournalKind.Outgoing,
             delivery => delivery.Synapse is Responded { Text: "wired" });
 
-        await brain.SendAsync<IProbeSource>(
+        await brain.FireAsync<IProbeSource>(
             "elon", new Poke("gm"), TestContext.Current.CancellationToken);
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);

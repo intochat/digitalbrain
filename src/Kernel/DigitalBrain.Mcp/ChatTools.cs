@@ -91,7 +91,7 @@ internal sealed class ChatTools(IDigitalBrain brain)
         var resume = cursor.ResumeSequence;
 
         await brain.ActivateAsync(cancellationToken);
-        await brain.SendAsync<IChat>(
+        await brain.FireAsync<IChat>(
             chatName,
             new ButtonClicked(new CommandId(offerId), buttonId, action),
             cancellationToken);

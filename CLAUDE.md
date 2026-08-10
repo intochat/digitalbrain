@@ -31,6 +31,9 @@ saturated machine.
   into its emitter.
 - **Emit vs Send**: `EmitAsync` = fact, receivers decided by data (broadcast catalog ghosts +
   synapse-graph connections). `SendAsync(receiver, …)` = directed, never consults the graph.
+  Those are the kernel-side `Neuron` verbs; the client (`IDigitalBrain`, `NeuronReference`)
+  speaks one verb: `FireAsync(synapse)` = emit semantics, `FireAsync(receiver, synapse)` /
+  `Get<T>(name).FireAsync(...)` = directed (F1, landed).
 - **Synapse graph** (`ISynapseGraph`, grain `synapsegraph:owner/graph`): durable `Connect`/
   `Disconnect` requests answered with `Connected`/`Disconnected`; one record `SynapseConnection`
   (ConnectionId, Source, SynapseAlias, Target, Transform?, ExpiresAt?). Transformed connections
@@ -103,7 +106,6 @@ saturated machine.
   to `Responded`, optional `Message`/`Reply` rename. W3: manifest-drift guard.
   W4 lifecycle: connection/offer expiry policy, expired-record sweep, refuse
   `Guid.Empty` connection ids, button-grain retention.
-- Client verb rename `EmitAsync`/`SendAsync` → `FireAsync` (option F1) — approved-pending.
 - Per-emission graph-call cache — measure under aspire before optimizing.
 - Surface-events → windowing bridge (shell does not consume `SceneOpened` yet); unlocks
   diagram/graph windows and "show me my graph" via `OpenSurface`.

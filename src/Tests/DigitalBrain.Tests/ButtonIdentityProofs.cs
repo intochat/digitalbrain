@@ -15,7 +15,7 @@ public sealed class ButtonIdentityProofs(BrainClusterFixture fixture)
         var button = NeuronId.For<IButton>(brain.Owner, "vote-yes");
         var offer = CommandId.New();
 
-        await brain.SendAsync<IButton>(
+        await brain.FireAsync<IButton>(
             "vote-yes",
             new ButtonClicked(offer, "vote-yes", "vote"),
             TestContext.Current.CancellationToken);
@@ -35,13 +35,13 @@ public sealed class ButtonIdentityProofs(BrainClusterFixture fixture)
         var button = NeuronId.For<IButton>(brain.Owner, "complete-task");
         var task = NeuronId.For<IProbeSink>(brain.Owner, "task");
 
-        await brain.SendAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
             new Connect(Guid.NewGuid(), button, ButtonActivated.AliasName, task),
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionsAsync(brain, button, ButtonActivated.AliasName);
 
-        await brain.SendAsync<IButton>(
+        await brain.FireAsync<IButton>(
             "complete-task",
             new ButtonClicked(CommandId.New(), "complete-task", "user-action"),
             TestContext.Current.CancellationToken);

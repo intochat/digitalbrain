@@ -19,7 +19,7 @@ internal sealed class IntrospectionTools(IDigitalBrain brain)
         CancellationToken cancellationToken = default)
     {
         var topology = await BoundedAsync(
-            token => brain.Get<IIntrospection>().SendAsync(new ReadTopologyRequest(), token),
+            token => brain.Get<IIntrospection>().FireAsync(new ReadTopologyRequest(), token),
             nameof(ReadTopologyRequest),
             cancellationToken);
 
@@ -45,7 +45,7 @@ internal sealed class IntrospectionTools(IDigitalBrain brain)
             ReadJournalRequest.MaximumMaxEntries,
             CommandId.New());
         var page = await BoundedAsync(
-            token => brain.Get<IIntrospection>().SendAsync(request, token),
+            token => brain.Get<IIntrospection>().FireAsync(request, token),
             nameof(ReadJournalRequest),
             cancellationToken);
         if (page.Error is { } refused)
@@ -77,7 +77,7 @@ internal sealed class IntrospectionTools(IDigitalBrain brain)
         ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
 
         var read = await BoundedAsync(
-            token => brain.Get<IChat>().SendAsync(new ReadTranscriptRequest(chatName), token),
+            token => brain.Get<IChat>().FireAsync(new ReadTranscriptRequest(chatName), token),
             nameof(ReadTranscriptRequest),
             cancellationToken);
 

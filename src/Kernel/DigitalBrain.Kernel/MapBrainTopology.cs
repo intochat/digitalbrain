@@ -28,7 +28,7 @@ internal static class BrainTopologyHttpMaps
                 {
                     read = await brain
                         .Get<IIntrospection>()
-                        .SendAsync(new ReadTopologyRequest(), deadline.Token)
+                        .FireAsync(new ReadTopologyRequest(), deadline.Token)
                         .ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
