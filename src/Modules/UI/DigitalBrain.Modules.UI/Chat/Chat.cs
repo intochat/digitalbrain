@@ -4,6 +4,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
+using DigitalBrain.Modules.Sdk.Mcp;
 using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -154,6 +155,33 @@ internal sealed class Chat : Neuron, IChat
         var text = $"Current UTC time: {when}";
         Remember(new ChatTurn(FromUser: false, text));
         await EmitAsync(new Responded(CommandId.New(), Id, text))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    // Directed AuthorizationRequired only (not IHandle — that would broadcast-ghost
+    // every chat). Opens a transcript button whose action is the sign-in URL.
+    protected override async Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
+    {
+        if (synapse is not AuthorizationRequired required)
+        {
+            await base.OnUnboundSynapseAsync(synapse, cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(required.ServerDisplayName))
+        {
+            throw new NeuronAuthorizationException($"Chat '{Id}' refuses a sign-in offer without a server name.");
+        }
+
+        var label = $"Sign in via {required.ServerDisplayName}";
+        var buttonId = $"sign-in-{required.ServerKey}";
+        var action = required.SignInUrl.AbsoluteUri;
+        ChatButtonOffer[] buttons = [new ChatButtonOffer(buttonId, label, action)];
+        var text = $"{required.ServerDisplayName} needs sign-in before that request can continue.";
+        Remember(new ChatTurn(FromUser: false, text, buttons));
+        await EmitAsync(new Responded(required.CommandId, Id, text, buttons))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 

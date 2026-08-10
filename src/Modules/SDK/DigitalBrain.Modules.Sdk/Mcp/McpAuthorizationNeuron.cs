@@ -113,6 +113,10 @@ public sealed class McpAuthorizationNeuron :
             request.SignInUrl,
             request.State);
         await EmitAsync(required).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        // Directed into the owner's main chat so the transcript shows a
+        // "Sign in via {server}" button (Emit alone only hits broadcast ghosts).
+        await SendAsync(new NeuronId("chat", Id.Owner, "main"), required)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return required;
     }
 

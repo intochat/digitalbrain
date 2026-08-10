@@ -38,7 +38,6 @@ public static class McpAuthorizationRail
         var authorization = grains.GetGrain<IMcpAuthorization>(
             NeuronId.For<IMcpAuthorization>(owner, McpAuthorizationNeuron.InstanceName).ToGrainId());
         var missingOrExpired = McpTokenPresence.IsMissingOrExpired(tokenState, protector, purpose, time);
-        var hadProtectedToken = tokenState.Value is { Length: > 0 };
 
         McpAuthorizationClaim? claim = null;
         try
@@ -62,7 +61,7 @@ public static class McpAuthorizationRail
                         claim.Denied
                         ?? throw new InvalidOperationException("Authorization claim is missing the denied fact."));
                 case McpAuthorizationClaimKind.Completed:
-
+                    // Code is ready for the MCP client OAuth exchange on the next CreateAsync.
                     return;
                 default:
                     throw new InvalidOperationException($"Authorization claim kind '{claim.Kind}' is unsupported.");
@@ -74,17 +73,15 @@ public static class McpAuthorizationRail
             return;
         }
 
-        var publicSignInBase = configuration[McpRuntimeHosting.PublicSignInBaseKey];
-        if (hadProtectedToken || !string.IsNullOrWhiteSpace(publicSignInBase))
-        {
-            var required = await BeginNewAsync(
-                authorization,
-                configuration,
-                commandId,
-                server,
-                cancellationToken).ConfigureAwait(false);
-            throw new McpAuthorizationRequiredException(required);
-        }
+        // No usable token: open a settled sign-in instead of falling through to a
+        // 401/retry storm. Begin emits AuthorizationRequired (SSE + main chat button).
+        var required = await BeginNewAsync(
+            authorization,
+            configuration,
+            commandId,
+            server,
+            cancellationToken).ConfigureAwait(false);
+        throw new McpAuthorizationRequiredException(required);
     }
 
     private static Task<AuthorizationRequired> BeginNewAsync(
@@ -108,7 +105,30 @@ public static class McpAuthorizationRail
 
     private static Uri SignInUrl(IConfiguration configuration, McpServerDefinition server, string state)
     {
+        var clientId = configuration[$"{server.ConfigurationRoot}:ClientId"];
+        var redirectUri = configuration[$"{server.ConfigurationRoot}:RedirectUri"];
+        if (!string.IsNullOrWhiteSpace(clientId)
+            && !string.IsNullOrWhiteSpace(redirectUri)
+            && string.Equals(server.Key, "salesforce", StringComparison.OrdinalIgnoreCase))
+        {
+            var scope = string.Join(' ', server.Scopes);
+            return new Uri(
+                "https://login.salesforce.com/services/oauth2/authorize"
+                + "?response_type=code"
+                + $"&client_id={Uri.EscapeDataString(clientId)}"
+                + $"&redirect_uri={Uri.EscapeDataString(redirectUri)}"
+                + $"&scope={Uri.EscapeDataString(scope)}"
+                + $"&state={Uri.EscapeDataString(state)}");
+        }
+
         var publicBase = configuration[McpRuntimeHosting.PublicSignInBaseKey];
+        if (string.IsNullOrWhiteSpace(publicBase)
+            && !string.IsNullOrWhiteSpace(redirectUri)
+            && Uri.TryCreate(redirectUri, UriKind.Absolute, out var redirect))
+        {
+            publicBase = redirect.GetLeftPart(UriPartial.Authority);
+        }
+
         if (!string.IsNullOrWhiteSpace(publicBase)
             && Uri.TryCreate(publicBase.TrimEnd('/') + "/", UriKind.Absolute, out var baseUri))
         {

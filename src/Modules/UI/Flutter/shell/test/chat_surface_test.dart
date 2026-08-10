@@ -79,6 +79,7 @@ void main() {
 
       expect(find.byKey(const Key('sign_in_card_rail')), findsOneWidget);
       expect(find.text('DigitalBrain Gmail'), findsOneWidget);
+      expect(find.text('Sign in via DigitalBrain Gmail'), findsOneWidget);
       await tester.tap(find.byKey(const Key('sign_in_open_s1')));
       await tester.pumpAndSettle();
       expect(opened, [Uri.parse('https://ui.test/oauth?state=s1')]);
