@@ -48,6 +48,16 @@ saturated machine.
   tools; scheduling and elapse EMIT `time.timer-scheduled`/`time.timer-elapsed` — the graph
   routes them (assistant recipe: morph to `ui.timer-card`/`ui.note` into chat). Kit renders
   `KitTimerPart` with `KitClock` (countdown face; wall clock in windowing).
+- **MCP gateway** (`IMcp`, grain `mcp`, instance = server key, e.g. `mcp:dev/salesforce`):
+  external SaaS is NEVER per-action contracts — the server's live catalog IS the surface.
+  `db.mcp.list-tools` answers it; `db.mcp.call-tool` invokes through the OAuth rail
+  (destructive tools refuse without approval; unauthorized refuses with sign-in).
+  `FireRowsAs` fires each tabular result row as a named synapse (shape rows in the query:
+  SOQL column aliases → `ui.chart-point` fields) so results flow through the graph.
+  A provider module (Salesforce) = McpServerDefinition + ExternalServerCapability + OAuth
+  params; the OAuth callback derives from `OAuthCallbackPaths` (`/oauth/callback`), never
+  persisted. The unkeyed `IChatClient` IS Gemma4 (the main model); `ask_llama` exists only
+  when the owner names llama.
 - **Self-programming**: the Assistant (Gemma4/Ollama) carries exactly THREE constant tools
   (`SystemTools`): `find_capabilities(intent)` — hybrid search over the in-process
   `CapabilityIndex` (keyword floor, embeddings enrich when a generator exists, nothing can
