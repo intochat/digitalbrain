@@ -1,11 +1,11 @@
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
+import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 import 'package:flutter/material.dart';
 
 import 'topology_graph.dart';
-import 'topology_painter.dart';
 import 'topology_selection.dart';
 
-final class BrainTopologyCanvas extends StatefulWidget {
+final class BrainTopologyCanvas extends StatelessWidget {
   const BrainTopologyCanvas({
     super.key,
     required this.topology,
@@ -20,142 +20,37 @@ final class BrainTopologyCanvas extends StatefulWidget {
   final ValueChanged<BrainTopologySelection> onSelected;
 
   @override
-  State<BrainTopologyCanvas> createState() => _BrainTopologyCanvasState();
-}
-
-final class _BrainTopologyCanvasState extends State<BrainTopologyCanvas>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse;
-  double _rotationX = -0.18;
-  double _rotationY = 0.42;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    );
-    if (hasPulseTarget(widget.pulse)) {
-      _pulse.forward();
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant BrainTopologyCanvas oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final pulseChanged =
-        widget.pulse?.sequence != oldWidget.pulse?.sequence ||
-        widget.pulse?.correlationId != oldWidget.pulse?.correlationId;
-    final hadTarget = hasPulseTarget(oldWidget.pulse);
-    final hasTarget = hasPulseTarget(widget.pulse);
-    if (!hasTarget) {
-      if (pulseChanged || hadTarget) {
-        _pulse.reset();
-      }
-    } else if (pulseChanged || !hadTarget) {
-      _pulse.forward(from: 0);
-    }
-  }
-
-  @override
-  void dispose() {
-    _pulse.dispose();
-    super.dispose();
-  }
-
-  void _rotate(DragUpdateDetails details) {
-    setState(() {
-      _rotationY += details.delta.dx * 0.008;
-      _rotationX = (_rotationX + details.delta.dy * 0.008).clamp(-1.0, 1.0);
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final disableAnimations = MediaQuery.disableAnimationsOf(context);
-    final pulseReady = hasPulseTarget(widget.pulse);
-    final localPulse =
-        pulseReady && widget.pulse!.caller == widget.pulse!.neuronId;
+    final pulseReady = hasPulseTarget(pulse);
+    final localPulse = pulseReady && pulse!.caller == pulse!.neuronId;
     final edgePulse = pulseReady && !localPulse;
 
-    return Semantics(
-      key: const Key('brain_topology_canvas'),
-      label:
-          'Interactive three-dimensional DigitalBrain topology. Drag to rotate; use the topology list to inspect accessible node details.',
-      image: true,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final size = Size(constraints.maxWidth, constraints.maxHeight);
-          return AnimatedBuilder(
-            animation: _pulse,
-            builder: (context, _) {
-              final projected = projectTopology(
-                widget.topology,
-                size,
-                _rotationX,
-                _rotationY,
-                pulse: widget.pulse,
-              );
-              final connections =
-                  projectConnections(widget.topology, projected);
-              final canvasCenter =
-                  Offset(size.width * 0.5, size.height * 0.51);
-              final pulseValue = disableAnimations ? 1.0 : _pulse.value;
+    void select({GraphNode? node, GraphEdge? edge}) {
+      final selection =
+          topologySelectionFor(topology, pulse, node: node, edge: edge);
+      if (selection != null) {
+        onSelected(selection);
+      }
+    }
 
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onPanUpdate: _rotate,
-                onTapUp: (details) {
-                  final selected =
-                      hitTestTopology(projected, details.localPosition);
-                  if (selected != null) {
-                    widget.onSelected(selected.selection);
-                    return;
-                  }
-                  final edge = hitTestConnections(
-                    connections,
-                    details.localPosition,
-                    canvasCenter,
-                  );
-                  if (edge != null) {
-                    widget.onSelected(
-                      BrainConnectionSelection(edge.connection),
-                    );
-                  }
-                },
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CustomPaint(
-                      painter: TopologyPainter(
-                        nodes: projected,
-                        edges: connections,
-                        pulse: widget.pulse,
-                        pulseValue: pulseValue,
-                        recentConnectionId:
-                            widget.graphChange?.connectionId,
-                      ),
-                    ),
-                    for (final edge in connections)
-                      IgnorePointer(
-                        key: Key(
-                          'graph_edge_${edge.connection.connectionId}',
-                        ),
-                      ),
-                    if (pulseReady)
-                      const IgnorePointer(key: Key('brain_pulse')),
-                    if (localPulse)
-                      const IgnorePointer(key: Key('brain_local_pulse')),
-                    if (edgePulse)
-                      const IgnorePointer(key: Key('brain_edge_pulse')),
-                  ],
-                ),
-              );
-            },
-          );
-        },
-      ),
+    return Stack(
+      key: const Key('brain_topology_canvas'),
+      fit: StackFit.expand,
+      children: [
+        KitGraph(
+          nodes: topologyGraphNodes(topology, pulse),
+          edges: topologyGraphEdges(topology),
+          pulse: topologyGraphPulse(pulse),
+          highlightEdgeId: graphChange?.connectionId,
+          onNodeTap: (node) => select(node: node),
+          onEdgeTap: (edge) => select(edge: edge),
+          semanticsLabel:
+              'Interactive three-dimensional DigitalBrain topology. Drag to rotate; use the topology list to inspect accessible node details.',
+        ),
+        if (pulseReady) const IgnorePointer(key: Key('brain_pulse')),
+        if (localPulse) const IgnorePointer(key: Key('brain_local_pulse')),
+        if (edgePulse) const IgnorePointer(key: Key('brain_edge_pulse')),
+      ],
     );
   }
 }

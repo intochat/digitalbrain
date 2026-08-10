@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../components/button/kit_button.dart';
 import '../components/card/kit_card.dart';
 import '../components/chart/kit_chart.dart';
+import '../components/graph/graph_models.dart';
+import '../components/graph/kit_graph.dart';
 import '../models/kit_part.dart';
 import '../theme/kit_theme.dart';
 
@@ -57,6 +59,40 @@ final class KitGalleryScreen extends StatelessWidget {
               Text('Chart', style: KitType.title),
               const SizedBox(height: 12),
               KitChart(part: _demoChart),
+              const SizedBox(height: 28),
+              Text('Graph', style: KitType.title),
+              const SizedBox(height: 12),
+              const SizedBox(
+                height: 320,
+                child: KitGraph(
+                  nodes: [
+                    GraphNode(
+                      id: 'feed',
+                      label: 'Feed',
+                      kind: GraphNodeKind.hub,
+                    ),
+                    GraphNode(
+                      id: 'relay',
+                      label: 'relay',
+                      dimmed: true,
+                    ),
+                    GraphNode(id: 'chart', label: 'chart'),
+                  ],
+                  edges: [
+                    GraphEdge(
+                      id: 'feed-to-relay',
+                      sourceId: 'feed',
+                      targetId: 'relay',
+                    ),
+                    GraphEdge(
+                      id: 'relay-to-chart',
+                      sourceId: 'relay',
+                      targetId: 'chart',
+                      decorated: true,
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 28),
               Text('Card', style: KitType.title),
               const SizedBox(height: 12),

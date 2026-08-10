@@ -81,6 +81,23 @@ public sealed partial class UiModule : ICompiledModule
                     ],
                     []),
                 new NeuronCapabilityDescriptor(
+                    "ui.diagram",
+                    "Diagram control with identity",
+                    "main",
+                    [
+                        new SynapseCapabilityDescriptor(
+                            Node.AliasName,
+                            1,
+                            "Place or update one node on whatever diagram receives it",
+                            CapabilitySchema.For(typeof(Node))),
+                        new SynapseCapabilityDescriptor(
+                            Edge.AliasName,
+                            1,
+                            "Draw or update one directed edge on whatever diagram receives it",
+                            CapabilitySchema.For(typeof(Edge))),
+                    ],
+                    []),
+                new NeuronCapabilityDescriptor(
                     "ui.button",
                     "Interactive button control",
                     "default",
