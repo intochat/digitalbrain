@@ -16,7 +16,7 @@ public abstract class Agent : Neuron, IAgent
         ArgumentNullException.ThrowIfNull(chatClient);
 
         _toolCallingClient = new ChatClientBuilder(chatClient)
-            .UseFunctionInvocation()
+            .UseFunctionInvocation(configure: static client => client.IncludeDetailedErrors = true)
             .Build();
     }
 
@@ -42,7 +42,7 @@ public abstract class Agent : Neuron, IAgent
         cancellationToken.ThrowIfCancellationRequested();
 
         var turnScheduler = TaskScheduler.Current;
-        var tools = await ResolveToolsAsync(messages, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        var tools = ResolveTools(messages);
         var options = new ChatOptions
         {
             Tools = [.. tools.Select(tool => new TurnBoundFunction(tool, turnScheduler))],
@@ -82,28 +82,18 @@ public abstract class Agent : Neuron, IAgent
         return RespondStreaming(messages, cancellationToken).ToChatResponseAsync(cancellationToken);
     }
 
-    private async Task<IReadOnlyList<AIFunction>> ResolveToolsAsync(
-        IReadOnlyList<ChatMessage> messages,
-        CancellationToken cancellationToken)
+    private IReadOnlyList<AIFunction> ResolveTools(IReadOnlyList<ChatMessage> messages)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
+        var constant = new SystemTools(GrainFactory, Id.Owner, ServiceProvider).All();
         var additional = AdditionalToolsFor(messages);
-        var discovered = await DiscoverCatalogToolsAsync(messages, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
         if (additional.Count == 0)
         {
-            return discovered;
+            return constant;
         }
 
-        if (discovered.Count == 0)
-        {
-            return additional;
-        }
-
-        var merged = new List<AIFunction>(additional.Count + discovered.Count);
+        var merged = new List<AIFunction>(constant.Count + additional.Count);
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var tool in additional.Concat(discovered))
+        foreach (var tool in constant.Concat(additional))
         {
             if (seen.Add(tool.Name))
             {
@@ -112,62 +102,5 @@ public abstract class Agent : Neuron, IAgent
         }
 
         return merged;
-    }
-
-    private async Task<IReadOnlyList<AIFunction>> DiscoverCatalogToolsAsync(
-        IReadOnlyList<ChatMessage> messages,
-        CancellationToken cancellationToken)
-    {
-        var catalog = ServiceProvider.GetService<ActiveCapabilityCatalog>();
-        if (catalog is null)
-        {
-            return [];
-        }
-
-        var typeMap = ServiceProvider.GetService<ActiveModuleContractTypeMap>();
-        var router = new CapabilityRouter(
-            catalog,
-            search: null,
-            ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger<CapabilityRouter>());
-        var prompt = LatestOwnerText(messages);
-        if (string.IsNullOrWhiteSpace(prompt))
-        {
-            return [];
-        }
-
-        var selected = await router.SelectAsync(Id.Owner, prompt, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        if (selected.Count == 0 || typeMap is null)
-        {
-            return [];
-        }
-
-        var tools = new List<AIFunction>(selected.Count);
-        foreach (var capability in selected)
-        {
-            try
-            {
-                tools.Add(SynapseCapabilityTool.Materialize(capability, GrainFactory, Id.Owner, typeMap));
-            }
-            catch (InvalidOperationException)
-            {
-
-            }
-        }
-
-        return tools;
-    }
-
-
-    private static string LatestOwnerText(IReadOnlyList<ChatMessage> messages)
-    {
-        for (var turn = messages.Count - 1; turn >= 0; turn--)
-        {
-            if (messages[turn].Role == ChatRole.User)
-            {
-                return messages[turn].Text;
-            }
-        }
-
-        return string.Empty;
     }
 }

@@ -15,7 +15,12 @@ public sealed class ActiveModuleContractTypeMap
     {
         _synapses = synapses;
         _neuronGrainTypes = neuronGrainTypes;
+        KnownGrainTypes = neuronGrainTypes.Values
+            .Select(static grainType => grainType.ToLowerInvariant())
+            .ToHashSet(StringComparer.Ordinal);
     }
+
+    public IReadOnlySet<string> KnownGrainTypes { get; }
 
     public static ActiveModuleContractTypeMap Create(
         IEnumerable<Assembly> moduleAssemblies,

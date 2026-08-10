@@ -25,12 +25,27 @@ public sealed class AssistantWiringProofs(BrainClusterFixture fixture)
                 && response.Text != "no tools offered");
         var offered = ((Responded)answered.Synapse).Text;
 
-        Assert.Contains(ValidatedCapability.ToolNameFor("db.connect", 1), offered, StringComparison.Ordinal);
-        Assert.Contains(ValidatedCapability.ToolNameFor("db.disconnect", 1), offered, StringComparison.Ordinal);
-        Assert.Contains(
-            ValidatedCapability.ToolNameFor("introspection.read-topology-request", 1),
-            offered,
-            StringComparison.Ordinal);
+        Assert.Contains(SystemTools.FindCapabilities, offered, StringComparison.Ordinal);
+        Assert.Contains(SystemTools.GetNeurons, offered, StringComparison.Ordinal);
+        Assert.Contains(SystemTools.Fire, offered, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AssistantStartsATimerThroughTheFireTool()
+    {
+        var brain = fixture.BrainFor("assistant-timer");
+        var chat = NeuronId.For<IChat>(brain.Owner, "main");
+
+        await brain.GetGrainProxy<IChat>("main").Send(
+            new SendMessage(CommandId.New(), "start my tea timer"));
+
+        await Journals.WaitForAsync(
+            brain, chat, JournalKind.Outgoing,
+            delivery => delivery.Synapse is Responded { Text: "wired" });
+
+        var snapshot = await brain.GetGrainProxy<DigitalBrain.Time.ITimer>().Read();
+        Assert.Equal(DigitalBrain.Time.TimerStatus.Scheduled, snapshot.Status);
+        Assert.Equal("tea", snapshot.Note);
     }
 
     [Fact]

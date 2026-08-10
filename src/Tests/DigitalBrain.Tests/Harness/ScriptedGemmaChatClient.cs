@@ -35,23 +35,45 @@ internal sealed partial class ScriptedGemmaChatClient : IChatClient
             yield break;
         }
 
-        var connect = tools.FirstOrDefault(
-            static tool => tool.Name == ValidatedCapability.ToolNameFor("db.connect", 1));
-        if (prompt.Contains("connect", StringComparison.OrdinalIgnoreCase) && connect is not null
+        var fire = tools.FirstOrDefault(static tool => tool.Name == SystemTools.Fire);
+        if (prompt.Contains("connect", StringComparison.OrdinalIgnoreCase) && fire is not null
             && OwnerFrom(turn) is { } owner)
         {
             var arguments = new Dictionary<string, object?>
             {
-                ["connectionId"] = Guid.NewGuid(),
-                ["source"] = new NeuronId("probesource", owner, "elon"),
-                ["synapseAlias"] = "probe.fact",
-                ["target"] = new NeuronId("chart", owner, "dashboard"),
-                ["transform"] = ProbeFactToChartPoint.TransformName,
+                ["contract"] = "db.connect",
+                ["arguments"] = new Dictionary<string, object?>
+                {
+                    ["connectionId"] = Guid.NewGuid(),
+                    ["source"] = new NeuronId("probesource", owner, "elon"),
+                    ["synapseAlias"] = "probe.fact",
+                    ["target"] = new NeuronId("chart", owner, "dashboard"),
+                    ["transform"] = ProbeFactToChartPoint.TransformName,
+                },
             };
 
             yield return new ChatResponseUpdate(
                 ChatRole.Assistant,
-                [new FunctionCallContent("wire-1", connect.Name, arguments)]);
+                [new FunctionCallContent("wire-1", SystemTools.Fire, arguments)]);
+            yield break;
+        }
+
+        if (prompt.Contains("tea timer", StringComparison.OrdinalIgnoreCase) && fire is not null)
+        {
+            var arguments = new Dictionary<string, object?>
+            {
+                ["contract"] = "time.start-timer",
+                ["arguments"] = new Dictionary<string, object?>
+                {
+                    ["durationSeconds"] = 300,
+                    ["note"] = "tea",
+                },
+                ["target"] = "timer",
+            };
+
+            yield return new ChatResponseUpdate(
+                ChatRole.Assistant,
+                [new FunctionCallContent("tea-1", SystemTools.Fire, arguments)]);
             yield break;
         }
 
@@ -97,6 +119,6 @@ internal sealed partial class ScriptedGemmaChatClient : IChatClient
         return null;
     }
 
-    [GeneratedRegex("belongs to owner '([^']+)'")]
+    [GeneratedRegex("owner '([^']+)'")]
     private static partial Regex OwnerLine();
 }

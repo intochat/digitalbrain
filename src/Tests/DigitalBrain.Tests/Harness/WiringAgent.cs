@@ -46,9 +46,9 @@ internal sealed class ScriptedBindingChatClient : IChatClient
             yield break;
         }
 
-        var bindTool = options?.Tools?.OfType<AIFunction>()
-            .FirstOrDefault(tool => tool.Name == ValidatedCapability.ToolNameFor("db.connect", 1));
-        if (bindTool is null)
+        var fire = options?.Tools?.OfType<AIFunction>()
+            .FirstOrDefault(static tool => tool.Name == SystemTools.Fire);
+        if (fire is null)
         {
             yield return new ChatResponseUpdate(ChatRole.Assistant, "no wiring tool was offered");
             yield break;
@@ -57,16 +57,20 @@ internal sealed class ScriptedBindingChatClient : IChatClient
         var owner = new OwnerId(Owner);
         var arguments = new Dictionary<string, object?>
         {
-            ["connectionId"] = Guid.NewGuid(),
-            ["source"] = new NeuronId("probesource", owner, "elon"),
-            ["synapseAlias"] = "probe.fact",
-            ["target"] = new NeuronId("chart", owner, "dashboard"),
-            ["transform"] = ProbeFactToChartPoint.TransformName,
+            ["contract"] = "db.connect",
+            ["arguments"] = new Dictionary<string, object?>
+            {
+                ["connectionId"] = Guid.NewGuid(),
+                ["source"] = new NeuronId("probesource", owner, "elon"),
+                ["synapseAlias"] = "probe.fact",
+                ["target"] = new NeuronId("chart", owner, "dashboard"),
+                ["transform"] = ProbeFactToChartPoint.TransformName,
+            },
         };
 
         yield return new ChatResponseUpdate(
             ChatRole.Assistant,
-            [new FunctionCallContent("wire-1", bindTool.Name, arguments)]);
+            [new FunctionCallContent("wire-1", SystemTools.Fire, arguments)]);
     }
 
     public Task<ChatResponse> GetResponseAsync(

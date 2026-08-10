@@ -106,11 +106,11 @@ public sealed class DeclarativeSynapseTransform : ISynapseTransform
     }
 }
 
-internal static class SynapseTypeIndex
+public static class SynapseTypeIndex
 {
     private static readonly ConcurrentDictionary<string, Type?> Resolved = new(StringComparer.Ordinal);
 
-    internal static Type? FindByAlias(string synapseAlias)
+    public static Type? FindByAlias(string synapseAlias)
     {
         if (string.IsNullOrWhiteSpace(synapseAlias))
         {
