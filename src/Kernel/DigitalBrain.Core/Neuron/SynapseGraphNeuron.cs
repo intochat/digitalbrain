@@ -23,7 +23,7 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
-        RequireIdentity(synapse.ConnectionId);
+        RequireConnectionId(synapse.ConnectionId);
         RequireConnectable(synapse.Source);
         RequireConnectable(synapse.Target);
 
@@ -52,9 +52,14 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
-        RequireIdentity(synapse.ConnectionId);
+        RequireConnectionId(synapse.ConnectionId);
         SweepExpired();
-        Remove(synapse.ConnectionId);
+
+        if (!Remove(synapse.ConnectionId))
+        {
+            throw new NeuronAuthorizationException(
+                $"Graph '{Id}' has no connection '{synapse.ConnectionId}' to disconnect.");
+        }
 
         return ReplyAsync(new Disconnected(synapse.ConnectionId), cancellationToken);
     }
@@ -117,15 +122,20 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
     private static bool IsLive(SynapseConnection connection, DateTimeOffset now)
         => connection.ExpiresAt is not { } expiry || expiry > now;
 
-    private void Remove(Guid connectionId)
+    private bool Remove(Guid connectionId)
     {
+        var removed = false;
+
         for (var index = _connections.Count - 1; index >= 0; index--)
         {
             if (_records.Deserialize(_connections[index]).ConnectionId == connectionId)
             {
                 _connections.RemoveAt(index);
+                removed = true;
             }
         }
+
+        return removed;
     }
 
     private void SweepExpired()
@@ -141,7 +151,7 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
         }
     }
 
-    private void RequireIdentity(Guid connectionId)
+    private void RequireConnectionId(Guid connectionId)
     {
         if (connectionId == Guid.Empty)
         {

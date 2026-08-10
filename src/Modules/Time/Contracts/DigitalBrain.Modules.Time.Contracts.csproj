@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Time module contracts: one-shot countdown commands, state, and elapsed fact vocabulary.</Description>
+    <Description>Time module contracts: timer commands, snapshot, and scheduled/elapsed fact vocabulary.</Description>
     <RootNamespace>DigitalBrain.Time</RootNamespace>
   </PropertyGroup>
   <ItemGroup>

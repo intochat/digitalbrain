@@ -42,7 +42,12 @@ saturated machine.
   `to:<alias>{Target=Source}` (JSON morph, parsed by the relay — no code needed).
 - **Vocabulary neurons** (UI module): `chart` (`ui.chart-point`), `diagram` (`ui.node`/`ui.edge`,
   upsert-by-identity), `button` (clicks → `ui.button-activated`, offers arm connections),
-  `chat` (responder resolved from graph role `role:responder`, fallback assistant).
+  `chat` (responder resolved from graph role `role:responder`, fallback assistant; also
+  handles `ui.note` → transcript line and `ui.timer-card` → clock offer in the turn).
+- **Timer** (Time module): `timer` neuron; `time.start-timer`/`time.cancel-timer` are model
+  tools; scheduling and elapse EMIT `time.timer-scheduled`/`time.timer-elapsed` — the graph
+  routes them (assistant recipe: morph to `ui.timer-card`/`ui.note` into chat). Kit renders
+  `KitTimerPart` with `KitClock` (countdown face; wall clock in windowing).
 - **Self-programming**: `db.connect`/`db.disconnect` + introspection requests are capabilities;
   the Assistant (Gemma4/Ollama) always carries them as tools and its instructions explain the
   graph. Proven live: a chat request wired `chat.responded → chart` end to end.
@@ -104,8 +109,14 @@ saturated machine.
 
 - W2 cleanup: delete the last keyword demo (`WantsTimeButton`/`ShowTime`), add `Author`
   to `Responded`, optional `Message`/`Reply` rename. W3: manifest-drift guard.
-  W4 lifecycle: connection/offer expiry policy, expired-record sweep, refuse
-  `Guid.Empty` connection ids, button-grain retention.
+  (W4 lifecycle landed 2026-08-10: offer expiry 24h, mutation-time sweep, `Guid.Empty`
+  refusal; button-grain state retention deliberately deferred until storage pressure is
+  measured. W5(b) landed: broadcast tier shown read-only in topology; full catalog/graph
+  unification (c) still needs its own review.)
+- Behavior Studio (Flutter shell + core BehaviorClient) renders demo fixtures against a
+  host that does not exist — kept on purpose. Direction: build the behavior host on the
+  scripting capability, with the assistant authoring single-file C# scripts that compile
+  into installable behaviors. Needs a dedicated design session before any code.
 - Per-emission graph-call cache — measure under aspire before optimizing.
 - Surface-events → windowing bridge (shell does not consume `SceneOpened` yet); unlocks
   diagram/graph windows and "show me my graph" via `OpenSurface`.

@@ -16,8 +16,7 @@ internal sealed record TimerState(
     [property: Id(3)] DateTimeOffset DueAt,
     [property: Id(4)] TimeSpan Duration,
     [property: Id(5)] string Note,
-    [property: Id(6)] bool OccurrenceCommitted,
-    [property: Id(7)] string? ActiveReminderName);
+    [property: Id(6)] string? ActiveReminderName);
 
 [GrainType("timer")]
 internal sealed class TimerNeuron : Neuron, ITimer, IRemindable
@@ -37,7 +36,7 @@ internal sealed class TimerNeuron : Neuron, ITimer, IRemindable
 
     public Task<TimerSnapshot> Read()
         => Task.FromResult(
-            LoadIfStartedBefore() is { } data
+            LoadRecorded() is { } data
                 ? new TimerSnapshot(data.Status, data.Generation, data.ScheduledAt, data.DueAt, data.Duration, data.Note)
                 : new TimerSnapshot(TimerStatus.Unscheduled, Generation: 0, null, null, null, null));
 
@@ -57,7 +56,7 @@ internal sealed class TimerNeuron : Neuron, ITimer, IRemindable
             throw new NeuronAuthorizationException($"Timer '{Id}' refuses to arm without a note to deliver.");
         }
 
-        var current = LoadIfStartedBefore();
+        var current = LoadRecorded();
         if (current is { Status: TimerStatus.Scheduled })
         {
             throw new NeuronAuthorizationException(
@@ -77,7 +76,6 @@ internal sealed class TimerNeuron : Neuron, ITimer, IRemindable
             dueAt,
             duration,
             synapse.Note,
-            OccurrenceCommitted: false,
             reminderName));
 
         await RegisterReminderAsync(reminderName, duration).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
@@ -95,7 +93,7 @@ internal sealed class TimerNeuron : Neuron, ITimer, IRemindable
         cancellationToken.ThrowIfCancellationRequested();
         RequireCommand(synapse.CommandId);
 
-        var current = LoadIfStartedBefore();
+        var current = LoadRecorded();
         if (current is not { Status: TimerStatus.Scheduled })
         {
             throw new NeuronAuthorizationException($"Timer '{Id}' has no scheduled timer to cancel.");
@@ -124,11 +122,10 @@ internal sealed class TimerNeuron : Neuron, ITimer, IRemindable
 
     private async Task ElapseIfDue(long generation, string reminderName)
     {
-        var data = LoadIfStartedBefore();
+        var data = LoadRecorded();
 
         if (data is null
             || data.Status != TimerStatus.Scheduled
-            || data.OccurrenceCommitted
             || data.Generation != generation
             || !string.Equals(data.ActiveReminderName, reminderName, StringComparison.Ordinal))
         {
@@ -147,7 +144,7 @@ internal sealed class TimerNeuron : Neuron, ITimer, IRemindable
             ? TimerResolution.Recovered
             : TimerResolution.OnTime;
         var rollbackState = SerializedState();
-        Stage(data with { Status = TimerStatus.Elapsed, OccurrenceCommitted = true, ActiveReminderName = null });
+        Stage(data with { Status = TimerStatus.Elapsed, ActiveReminderName = null });
 
         try
         {
@@ -170,7 +167,7 @@ internal sealed class TimerNeuron : Neuron, ITimer, IRemindable
         await RetireReminderAsync(reminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    private TimerState? LoadIfStartedBefore()
+    private TimerState? LoadRecorded()
         => _state.Value is { Length: > 0 } serialized
             ? _states.Deserialize(serialized)
             : null;

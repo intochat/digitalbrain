@@ -13,7 +13,16 @@ public sealed class ButtonIdentityProofs(BrainClusterFixture fixture)
     {
         var brain = fixture.BrainFor("button");
         var button = NeuronId.For<IButton>(brain.Owner, "vote-yes");
+        var tally = NeuronId.For<IProbeSink>(brain.Owner, "tally");
         var offer = CommandId.New();
+
+        // A click only emits while its route is live (an unrouted activation
+        // would journal and vanish), so the identity proof arms one first.
+        await brain.FireAsync<ISynapseGraph>(
+            ISynapseGraph.InstanceName,
+            new Connect(Guid.NewGuid(), button, ButtonActivated.AliasName, tally),
+            TestContext.Current.CancellationToken);
+        await Graphs.WaitForConnectionsAsync(brain, button, ButtonActivated.AliasName);
 
         await brain.FireAsync<IButton>(
             "vote-yes",

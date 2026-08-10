@@ -68,7 +68,7 @@ final class _KitClockState extends State<KitClock> {
             CustomPaint(
               size: const Size.square(120),
               painter: _CountdownRingPainter(
-                sweep: _sweepFor(part, left),
+                sweep: _sweepFor(left),
                 done: left == Duration.zero,
               ),
             ),
@@ -87,7 +87,7 @@ final class _KitClockState extends State<KitClock> {
 
   // Without the original duration on the wire, sweep one full turn per hour
   // remaining so near timers visibly drain and far ones barely move.
-  static double _sweepFor(KitTimerPart part, Duration left) {
+  static double _sweepFor(Duration left) {
     if (left == Duration.zero) {
       return 0;
     }

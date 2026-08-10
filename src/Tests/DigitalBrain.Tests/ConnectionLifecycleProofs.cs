@@ -50,6 +50,47 @@ public sealed class ConnectionLifecycleProofs(BrainClusterFixture fixture)
     }
 
     [Fact]
+    public async Task DisconnectOfAnUnknownConnectionIsRefused()
+    {
+        var brain = fixture.BrainFor("lifecycle-disconnect-unknown");
+        var graph = ISynapseGraph.ForOwner(brain.Owner);
+        var unknown = Guid.NewGuid();
+
+        await brain.FireAsync<ISynapseGraph>(
+            ISynapseGraph.InstanceName,
+            new Disconnect(unknown),
+            TestContext.Current.CancellationToken);
+        await Journals.WaitForAsync(
+            brain, graph, JournalKind.Incoming,
+            delivery => delivery.Synapse is Disconnect { ConnectionId: var id } && id == unknown);
+
+        var outgoing = await brain.ReadJournalAsync(
+            graph, JournalKind.Outgoing, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.DoesNotContain(
+            outgoing.Delta,
+            delivery => delivery.Synapse is Disconnected { ConnectionId: var id } && id == unknown);
+    }
+
+    [Fact]
+    public async Task UnroutedButtonClickIsRefusedInsteadOfVanishing()
+    {
+        var brain = fixture.BrainFor("lifecycle-dead-button");
+        var button = NeuronId.For<IButton>(brain.Owner, "orphan");
+
+        await brain.FireAsync(
+            button,
+            new ButtonClicked(CommandId.New(), "orphan", "noop"),
+            TestContext.Current.CancellationToken);
+        await Journals.WaitForAsync(
+            brain, button, JournalKind.Incoming,
+            delivery => delivery.Synapse is ButtonClicked);
+
+        var outgoing = await brain.ReadJournalAsync(
+            button, JournalKind.Outgoing, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.DoesNotContain(outgoing.Delta, delivery => delivery.Synapse is ButtonActivated);
+    }
+
+    [Fact]
     public async Task AnExpiredConnectionLeavesTheGraph()
     {
         var brain = fixture.BrainFor("lifecycle-expiry");
