@@ -31,6 +31,8 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         1. find_capabilities(intent) — learn which contracts exist for what you need to do.
         2. get_neurons(type?) — see the live neuron instances and current connections.
         3. fire(contract, arguments, target?) — send a request and read its reply.
+        Act by calling a tool immediately. Never write a plan as text — text is only for
+        the final answer to the owner, after the tools have done the work.
 
         To make data flow — charts filling, notes and timer cards landing in chat — first
         fire db.connect to wire source → target, then fire the request that triggers the

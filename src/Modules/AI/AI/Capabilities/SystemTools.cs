@@ -156,7 +156,7 @@ public sealed class SystemTools(IGrainFactory grains, OwnerId owner, IServicePro
         try
         {
             request = SynapseCapabilityTool.BindModelArguments(
-                requestType, contract, ArgumentPairs(arguments));
+                requestType, contract, ArgumentPairs(arguments), owner);
         }
         catch (Exception invalid) when (invalid is JsonException or InvalidOperationException or ArgumentException)
         {

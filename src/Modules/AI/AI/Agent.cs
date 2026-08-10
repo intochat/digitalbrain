@@ -50,7 +50,13 @@ public abstract class Agent : Neuron, IAgent
             // Ollama defaults to a 4096-token window; a tool turn needs room for the
             // roster, several rounds, and thinking-model reasoning (num_ctx / num_predict).
             MaxOutputTokens = 4096,
-            AdditionalProperties = new AdditionalPropertiesDictionary { ["num_ctx"] = 16384 },
+            AdditionalProperties = new AdditionalPropertiesDictionary
+            {
+                ["num_ctx"] = 16384,
+                // Thinking variants burn the whole budget deliberating instead of
+                // calling tools; tool discipline comes from the loop, not the monologue.
+                ["think"] = false,
+            },
         };
         var instructions = Instructions;
         IReadOnlyList<ChatMessage> request = string.IsNullOrWhiteSpace(instructions)

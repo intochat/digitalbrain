@@ -23,7 +23,8 @@ public static class SynapseCapabilityTool
     public static Synapse BindModelArguments(
         Type requestType,
         string contractId,
-        IEnumerable<KeyValuePair<string, object?>> arguments)
+        IEnumerable<KeyValuePair<string, object?>> arguments,
+        OwnerId? owner = null)
     {
         ArgumentNullException.ThrowIfNull(requestType);
         ArgumentException.ThrowIfNullOrWhiteSpace(contractId);
@@ -42,6 +43,7 @@ public static class SynapseCapabilityTool
         }
 
         DeriveIdentitiesFromStableNames(requestType, node);
+        ParseNeuronIdStrings(requestType, node, owner);
 
         if (requestType.GetProperty(nameof(CommandId))?.PropertyType == typeof(CommandId))
         {
@@ -58,6 +60,52 @@ public static class SynapseCapabilityTool
         }
 
         return synapse;
+    }
+
+    // Models speak identities the way get_neurons prints them — "timer:dev/default"
+    // or "chat:main" — never as nested owner objects.
+    private static void ParseNeuronIdStrings(Type requestType, JsonObject node, OwnerId? owner)
+    {
+        foreach (var property in requestType.GetProperties())
+        {
+            var propertyType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+            if (propertyType != typeof(NeuronId))
+            {
+                continue;
+            }
+
+            var key = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
+            if (!node.TryGetPropertyValue(key, out var value)
+                || value is not JsonValue named
+                || !named.TryGetValue<string>(out var text)
+                || string.IsNullOrWhiteSpace(text))
+            {
+                continue;
+            }
+
+            var separator = text.IndexOf(':', StringComparison.Ordinal);
+            if (separator <= 0 || separator == text.Length - 1)
+            {
+                throw new InvalidOperationException(
+                    $"'{text}' is not a neuron identity. Write it as type:name or type:owner/name.");
+            }
+
+            var type = text[..separator];
+            var rest = text[(separator + 1)..];
+            var slash = rest.IndexOf('/', StringComparison.Ordinal);
+            var (ownerPart, name) = slash > 0
+                ? (rest[..slash], rest[(slash + 1)..])
+                : (owner?.Value ?? throw new InvalidOperationException(
+                    $"'{text}' has no owner and no ambient owner was provided."), rest);
+
+            var identity = new NeuronId(type, new OwnerId(ownerPart), name);
+            node[key] = new JsonObject
+            {
+                ["type"] = identity.Type,
+                ["owner"] = new JsonObject { ["value"] = identity.Owner.Value },
+                ["name"] = identity.Name,
+            };
+        }
     }
 
     // Models name things; identity properties are GUIDs. A stable name maps to a
