@@ -19,6 +19,10 @@ public sealed class SystemTools(IGrainFactory grains, OwnerId owner, IServicePro
 
     private const int FindLimit = 8;
 
+    // In-process replies land in milliseconds; a long wait only slows the
+    // model's self-correction when a target refuses or is unconfigured.
+    private static readonly TimeSpan ReplyWait = TimeSpan.FromSeconds(15);
+
     public IReadOnlyList<AIFunction> All()
         =>
         [
@@ -169,6 +173,13 @@ public sealed class SystemTools(IGrainFactory grains, OwnerId owner, IServicePro
             return $"Target '{target}' names no known neuron. get_neurons lists the live instances.";
         }
 
+        if (!string.Equals(resolved.Type, grainType, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"'{contract}' is handled by '{grainType}', not by '{resolved}'. Omit target "
+                + $"to reach {grainType}:{host.DefaultInstanceName}; connection endpoints belong "
+                + "in the arguments (source/target), not in fire's target.";
+        }
+
         if (GuessedIdentity(request, activated, catalog, typeMap) is { } guessed)
         {
             return guessed;
@@ -198,7 +209,7 @@ public sealed class SystemTools(IGrainFactory grains, OwnerId owner, IServicePro
             return $"Delivered to {target}.";
         }
 
-        var abandonAfter = DateTimeOffset.UtcNow + SynapseCapabilityTool.ToolResponseWait;
+        var abandonAfter = DateTimeOffset.UtcNow + ReplyWait;
         while (true)
         {
             var read = await session
@@ -219,7 +230,7 @@ public sealed class SystemTools(IGrainFactory grains, OwnerId owner, IServicePro
             if (DateTimeOffset.UtcNow >= abandonAfter)
             {
                 return $"No {responseType.Name} reply from {target} within "
-                    + $"{SynapseCapabilityTool.ToolResponseWait.TotalSeconds:F0}s. The request is "
+                    + $"{ReplyWait.TotalSeconds:F0}s. The request is "
                     + "committed; the target may be unconfigured or refusing — tell the owner what "
                     + "you attempted rather than claiming it worked.";
             }
