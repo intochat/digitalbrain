@@ -23,6 +23,7 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
+        RequireIdentity(synapse.ConnectionId);
         RequireConnectable(synapse.Source);
         RequireConnectable(synapse.Target);
 
@@ -32,6 +33,7 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
                 $"Graph '{Id}' refuses a connection without a synapse alias.");
         }
 
+        SweepExpired();
         Remove(synapse.ConnectionId);
         _connections.Add(_records.SerializeToArray(new SynapseConnection(
             synapse.ConnectionId,
@@ -50,6 +52,8 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
+        RequireIdentity(synapse.ConnectionId);
+        SweepExpired();
         Remove(synapse.ConnectionId);
 
         return ReplyAsync(new Disconnected(synapse.ConnectionId), cancellationToken);
@@ -121,6 +125,28 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
             {
                 _connections.RemoveAt(index);
             }
+        }
+    }
+
+    private void SweepExpired()
+    {
+        var now = TimeProvider.GetUtcNow();
+
+        for (var index = _connections.Count - 1; index >= 0; index--)
+        {
+            if (!IsLive(_records.Deserialize(_connections[index]), now))
+            {
+                _connections.RemoveAt(index);
+            }
+        }
+    }
+
+    private void RequireIdentity(Guid connectionId)
+    {
+        if (connectionId == Guid.Empty)
+        {
+            throw new NeuronAuthorizationException(
+                $"Graph '{Id}' refuses an empty connection identity.");
         }
     }
 

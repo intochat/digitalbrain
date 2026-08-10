@@ -163,7 +163,8 @@ internal sealed class Chat : Neuron, IChat
                 button,
                 ButtonActivated.AliasName,
                 Id,
-                ButtonActivatedToShowTime.TransformName)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+                ButtonActivatedToShowTime.TransformName,
+                TimeProvider.GetUtcNow() + ChatButtons.OfferLifetime)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         // The offer must not reach the owner before the click route is live, or an
         // immediate click emits an activation with no receiver and is lost.

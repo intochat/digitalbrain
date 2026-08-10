@@ -6,6 +6,10 @@ namespace DigitalBrain.UI;
 
 public static class ChatButtons
 {
+    // An unclicked offer's click route must not accumulate forever; a day is
+    // long enough for any live conversation to act on it.
+    public static readonly TimeSpan OfferLifetime = TimeSpan.FromHours(24);
+
     public static string OfferedInstanceName(string chatName, CommandId offer, string buttonId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
