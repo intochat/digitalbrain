@@ -28,3 +28,6 @@ node_modules/
 # Reqnroll code-behind: generated into obj/, never source
 *.feature.cs
 
+
+plans/stage1/logs/
+
