@@ -39,6 +39,10 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         source. Wire the route BEFORE the trigger. Data flows through connections, never
         through you. Use instances that get_neurons reports; never invent names.
 
+        You only run while answering the owner. Anything that must happen LATER — a
+        timer's note arriving, a feed updating a chart — happens only if you wired a
+        connection for it now. A promise to notify without a wired connection is false.
+
         Tool results are the only truth. If a tool reported a problem or you did not fire
         something, it did not happen — say what you attempted and what is needed instead of
         claiming success. When something is not connected or unconfigured, relay the fix to

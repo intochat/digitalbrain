@@ -74,7 +74,13 @@ internal sealed class Chat : Neuron, IChat
         var answer = new StringBuilder();
         var responder = await ResponderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        await foreach (var chunk in responder.RespondStreaming([.. Turns().Select(AsChatMessage)], cancellationToken).ConfigureAwait(true))
+        var conversationContext = new ChatMessage(
+            ChatRole.System,
+            $"This conversation lives in neuron {Id}. Route cards and notes into it by "
+            + $"targeting 'chat:{Id.Name}' or wiring connections whose target is {Id}.");
+
+        await foreach (var chunk in responder.RespondStreaming(
+            [conversationContext, .. Turns().Select(AsChatMessage)], cancellationToken).ConfigureAwait(true))
         {
             answer.Append(chunk.Text);
             yield return chunk;
