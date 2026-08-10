@@ -11,10 +11,7 @@ public sealed class VectorMemoryNeuron :
     IVectorMemory,
     IHandle<StoreVectorMemory>,
     IHandle<SearchVectorMemory>,
-    IHandle<RemoveVectorMemory>,
-    IEmit<VectorMemoryStored>,
-    IEmit<VectorMemoryMatches>,
-    IEmit<VectorMemoryRemoved>
+    IHandle<RemoveVectorMemory>
 {
     private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddings;
     private readonly IVectorMemoryStore _store;

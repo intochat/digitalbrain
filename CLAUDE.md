@@ -72,10 +72,11 @@ saturated machine.
    commits the inbound cause).
 5. **Only `RequestSynapse<TResponse>` synapses materialize as model tools**
    (`SynapseCapabilityTool.Materialize`). Plain synapses are silently skipped.
-6. **Capability manifest neuron `ContractId` = the interface's `[Alias]`**
-   (e.g. `db.synapse-graph`), never the grain type string. Hand-written `*.Compiled.cs`
-   manifests drift — keep `GraphCapabilityManifestProofs`-style guards; a reflection
-   cross-check test is planned (W3).
+6. **Manifests are reflected, never written** (`ModuleReflection.ManifestOf(contractsAssembly)`).
+   A neuron's ContractId = its interface `[Alias]` (else trimmed name, lowercased); Accepted
+   from `IHandle<T>`, Emitted from `RequestSynapse<TReply>` replies, module vocabulary =
+   every synapse type in the assembly (`Facts`). Contracts carry no `[Description]` — names
+   ARE the documentation; `IEmit<>` is gone (nothing ever consumed it).
 7. **Models pass names where schemas want GUIDs.** `BindModelArguments` derives a
    deterministic GUID from any non-GUID string on a Guid property (stable name = stable
    identity → replace/disconnect by name). Missing value-type JSON fields bind silently
@@ -88,6 +89,12 @@ saturated machine.
 
 ## Conventions
 
+- **Modules are contracts + neurons, nothing else.** A module = its contracts assembly
+  (interfaces + synapses); implementations are separately-loaded assemblies Orleans
+  discovers itself. Composition (`DigitalBrainRuntime.Add(silo, ModuleAssemblies)`)
+  reflects manifests from contracts, scans implementations for broadcast handlers and
+  `Core.IModule` DI hooks (only AI/Google/Memory/Salesforce/UI have one). No module
+  classes, no Compiled manifests, no `DigitalBrain:Modules` gate.
 - **TDD is mandatory**: failing test first (or mutation-verify if code ran ahead), minimal
   green, then refactor. Two test kinds only: NeuronTest-style (one neuron's contract) and
   DigitalBrainTest-style (cross-neuron through the cluster) — one project,

@@ -1,40 +1,39 @@
-using DigitalBrain.AI;
-using DigitalBrain.Assistant;
 using DigitalBrain.Aspire;
 using DigitalBrain.Core;
-using DigitalBrain.Google;
-using DigitalBrain.Introspection;
-using DigitalBrain.Memory;
-using DigitalBrain.Modules.Sdk.Mcp;
-using DigitalBrain.Modules.Sdk.Webhook;
-using DigitalBrain.Salesforce;
-using DigitalBrain.Tasks;
-using DigitalBrain.Time;
-using DigitalBrain.UI;
 using Microsoft.Extensions.Hosting;
 
 namespace DigitalBrain.Kernel;
 
-internal static class CompiledModuleCatalog
+internal static class ComposedModules
 {
-    internal static IReadOnlyList<ICompiledModule> Modules { get; } =
-    [
-        new AIModule(),
-        new AssistantModule(),
-        new GoogleModule(),
-        new IntrospectionModule(),
-        new MemoryModule(),
-        new McpModule(),
-        new WebhookModule(),
-        new SalesforceModule(),
-        new TasksModule(),
-        new TimeModule(),
-        new UiModule(),
-    ];
+    internal static ModuleAssemblies Assemblies { get; } = new(
+        [
+            typeof(DigitalBrain.Abstractions.ISynapseGraph).Assembly,
+            typeof(DigitalBrain.AI.IAssistant).Assembly,
+            typeof(DigitalBrain.Google.IGmail).Assembly,
+            typeof(DigitalBrain.Introspection.ReadTopologyRequest).Assembly,
+            typeof(DigitalBrain.Memory.IVectorMemory).Assembly,
+            typeof(DigitalBrain.Salesforce.ISalesforce).Assembly,
+            typeof(DigitalBrain.Tasks.ITask).Assembly,
+            typeof(DigitalBrain.Time.StartTimer).Assembly,
+            typeof(DigitalBrain.Chat.SendMessage).Assembly,
+            typeof(DigitalBrain.Modules.Sdk.Mcp.McpAuthorizationNeuron).Assembly,
+        ],
+        [
+            typeof(DigitalBrain.AI.AIModule).Assembly,
+            typeof(DigitalBrain.Google.GoogleModule).Assembly,
+            typeof(DigitalBrain.Introspection.IntrospectionNeuron).Assembly,
+            typeof(DigitalBrain.Memory.MemoryModule).Assembly,
+            typeof(DigitalBrain.Salesforce.SalesforceModule).Assembly,
+            typeof(DigitalBrain.Tasks.TaskNeuron).Assembly,
+            typeof(DigitalBrain.Time.TimerNeuron).Assembly,
+            typeof(DigitalBrain.UI.UiModule).Assembly,
+            typeof(DigitalBrain.Modules.Sdk.Mcp.McpAuthorizationNeuron).Assembly,
+        ]);
 }
 
 internal static class DigitalBrainHost
 {
     internal static IHostApplicationBuilder AddDigitalBrain(this IHostApplicationBuilder builder)
-        => builder.AddDigitalBrain(CompiledModuleCatalog.Modules);
+        => builder.AddDigitalBrain(ComposedModules.Assemblies);
 }

@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Tasks;
 
-internal sealed partial class TaskNeuron
+public sealed partial class TaskNeuron
 {
     private Task<Orleans.Runtime.IGrainReminder> RegisterDispatchReminderAsync()
         => this.RegisterOrUpdateReminder(DispatchReminderName, TimeSpan.FromSeconds(1), ReminderPeriod);

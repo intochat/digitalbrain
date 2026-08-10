@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 
@@ -10,19 +9,12 @@ namespace DigitalBrain.Core;
 [EditorBrowsable(EditorBrowsableState.Never)]
 public static class DigitalBrainRuntime
 {
-    public static IReadOnlySet<ModuleId> Add(
-        ISiloBuilder builder,
-        IReadOnlyCollection<ICompiledModule> availableModules)
+    public static void Add(ISiloBuilder builder, ModuleAssemblies modules)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        ArgumentNullException.ThrowIfNull(availableModules);
+        ArgumentNullException.ThrowIfNull(modules);
 
-        var selectedModules = SelectModules(builder, availableModules);
-        var selected = availableModules
-            .Where(module => selectedModules.Contains(module.Id))
-            .OrderBy(module => module.Id.Value, StringComparer.Ordinal)
-            .ToArray();
-        var capabilities = ActiveCapabilityCatalog.Create(selected);
+        var capabilities = ActiveCapabilityCatalog.Create(ManifestsOf(modules));
 
         builder.AddJournalStorage();
         builder.UseJsonJournalFormat(JournalJsonContext.Default);
@@ -30,7 +22,10 @@ public static class DigitalBrainRuntime
         builder.AddIncomingGrainCallFilter<OwnerBoundCallFilter>();
         builder.AddOutgoingGrainCallFilter<OutgoingReificationFilter>();
         builder.Services.AddSingleton(capabilities);
-        builder.Services.AddSingleton(ActiveModuleContractTypeMap.Create(selected, capabilities));
+        builder.Services.AddSingleton(
+            ActiveModuleContractTypeMap.Create(
+                modules.Contracts.Concat(modules.Implementations),
+                capabilities));
         builder.Services.AddSingleton(services =>
         {
             var catalog = new BroadcastCatalog();
@@ -45,55 +40,38 @@ public static class DigitalBrainRuntime
         builder.Services.AddSingleton(services =>
             new BroadcastTopology(services.GetRequiredService<BroadcastCatalog>().Routes()));
 
-        foreach (var module in availableModules)
+        ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);
+
+        foreach (var implementation in modules.Implementations)
         {
-            module.PrepareSerialization(builder.Services);
+            builder.Services.AddSingleton<IConfigureBroadcastCatalog>(
+                new AssemblyBroadcastHandlers(implementation));
         }
 
-        foreach (var module in selected)
+        foreach (var hook in ModuleHooksOf(modules))
         {
-            module.Activate(builder);
+            hook.Configure(builder);
         }
-
-        return selectedModules;
     }
 
-    private static HashSet<ModuleId> SelectModules(ISiloBuilder builder, IReadOnlyCollection<ICompiledModule> availableModules)
+    public static IReadOnlyList<CapabilityManifest> ManifestsOf(ModuleAssemblies modules)
     {
-        var hostContext = builder.Services
-            .LastOrDefault(descriptor => descriptor.ServiceType == typeof(HostBuilderContext))
-            ?.ImplementationInstance as HostBuilderContext
-            ?? throw new InvalidOperationException(
-                "DigitalBrain requires the .NET Generic Host so the AppHost module manifest can be validated.");
-        var declared = hostContext.Configuration
-            .GetSection("DigitalBrain:Modules")
-            .GetChildren()
-            .Select(section => new ModuleId(section.Value
-                ?? throw new InvalidOperationException(
-                    "DigitalBrain:Modules contains an empty module identity.")))
-            .ToArray();
+        ArgumentNullException.ThrowIfNull(modules);
 
-        var selectedModules = declared.ToHashSet();
-
-        if (selectedModules.Count != declared.Length)
-        {
-            throw new InvalidOperationException(
-                "DigitalBrain:Modules contains a duplicate module. Configure each module exactly once.");
-        }
-
-        var unavailableModules = selectedModules
-            .Except(availableModules.Select(module => module.Id))
-            .OrderBy(module => module.Value, StringComparer.Ordinal)
-            .ToArray();
-
-        if (unavailableModules.Length > 0)
-        {
-            throw new InvalidOperationException(
-                "The AppHost selected module(s) absent from this silo's generated catalog: "
-                + string.Join(", ", unavailableModules)
-                + ". Add the corresponding runtime package reference to the silo.");
-        }
-
-        return selectedModules;
+        return
+        [
+            .. modules.Contracts
+                .Select(ModuleReflection.ManifestOf)
+                .OrderBy(static manifest => manifest.ModuleId.Value, StringComparer.Ordinal),
+        ];
     }
+
+    private static IEnumerable<IModule> ModuleHooksOf(ModuleAssemblies modules)
+        => modules.Implementations
+            .SelectMany(static assembly => assembly.GetTypes())
+            .Where(static type => type is { IsClass: true, IsAbstract: false }
+                && typeof(IModule).IsAssignableFrom(type)
+                && type.GetConstructor(Type.EmptyTypes) is not null)
+            .OrderBy(static type => type.FullName, StringComparer.Ordinal)
+            .Select(static type => (IModule)Activator.CreateInstance(type)!);
 }

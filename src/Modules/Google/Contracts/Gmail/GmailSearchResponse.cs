@@ -1,11 +1,9 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Google;
 
 [GenerateSerializer]
 [Alias("db.google.gmail-search-response")]
-[Description("Bounded read-only Gmail search headers (metadata only, no body)")]
 public sealed record GmailSearchResponse : Synapse
 {
     public GmailSearchResponse(

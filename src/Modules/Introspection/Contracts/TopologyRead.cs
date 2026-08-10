@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Introspection;
@@ -29,7 +28,6 @@ public sealed record TopologyBroadcastRoute(
 
 [GenerateSerializer]
 [Alias("introspection.topology-read")]
-[Description("The modules this deployment composed, the owner's activated neurons, the live synapse connections, and the compiled broadcast tier")]
 public sealed record TopologyRead(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] IReadOnlyList<string> Modules,

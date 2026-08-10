@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Tasks;
@@ -24,7 +23,6 @@ public sealed record TaskOperationEdge(
 
 [GenerateSerializer]
 [Alias("tasks.operation-snapshot")]
-[Description("Durable task operation phase snapshot")]
 public sealed record TaskOperationSnapshot(
     [property: Id(0)] AttemptId Attempt,
     [property: Id(1)] int Sequence,
@@ -36,7 +34,6 @@ public sealed record TaskOperationSnapshot(
 
 [GenerateSerializer]
 [Alias("tasks.prepare-operation")]
-[Description("Prepare a directed task operation at a deterministic attempt sequence")]
 public sealed record PrepareTaskOperation(
     [property: Id(0)] AttemptId Attempt,
     [property: Id(1)] int Sequence,
@@ -45,7 +42,6 @@ public sealed record PrepareTaskOperation(
 
 [GenerateSerializer]
 [Alias("tasks.transition-operation")]
-[Description("Transition a prepared or in-flight task operation to the next durable phase")]
 public sealed record TransitionTaskOperation(
     [property: Id(0)] AttemptId Attempt,
     [property: Id(1)] int Sequence,
@@ -61,7 +57,6 @@ public sealed record ReadTaskOperationResult(
 
 [GenerateSerializer]
 [Alias("tasks.read-operation")]
-[Description("Read a durable task operation snapshot by attempt sequence")]
 public sealed record ReadTaskOperation(
     [property: Id(0)] AttemptId Attempt,
     [property: Id(1)] int Sequence) : RequestSynapse<ReadTaskOperationResult>;

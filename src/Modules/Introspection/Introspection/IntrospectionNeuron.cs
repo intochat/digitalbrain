@@ -4,15 +4,12 @@ using DigitalBrain.Core;
 namespace DigitalBrain.Introspection;
 
 [GrainType("introspection")]
-internal sealed partial class IntrospectionNeuron :
+public sealed partial class IntrospectionNeuron :
     Neuron,
     IIntrospection,
     IHandle<TallyJournalRequest>,
     IHandle<ReadJournalRequest>,
-    IHandle<ReadTopologyRequest>,
-    IEmit<JournalTallied>,
-    IEmit<JournalPageRead>,
-    IEmit<TopologyRead>
+    IHandle<ReadTopologyRequest>
 {
     public async Task HandleAsync(TallyJournalRequest synapse, CancellationToken cancellationToken)
     {

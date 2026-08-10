@@ -4,13 +4,11 @@ using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
 using Aspire.Hosting.Publishing;
-using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Aspire.Hosting;
 
 public sealed class DigitalBrainBuilder
 {
-    private readonly List<ModuleId> _modules = [];
     private readonly List<DigitalBrainModuleProjection> _projections = [];
     private readonly List<IResource> _startupDependencies = [];
     private readonly Dictionary<Type, object> _states = [];
@@ -44,8 +42,6 @@ public sealed class DigitalBrainBuilder
     internal IResourceBuilder<AzureQueueStorageResource> Streams { get; }
 
     internal IResourceBuilder<AzureTableStorageResource> PubSub { get; }
-
-    internal IReadOnlyList<ModuleId> Modules => _modules;
 
     internal OrleansService Orleans { get; }
 
@@ -121,16 +117,6 @@ public sealed class DigitalBrainBuilder
                 : ApplicationBuilder.AddParameter(name, secret: true))
             .WithDescription(
                 "Base64-encoded 256-bit key shared by every silo that recovers encrypted durable module state.");
-    }
-
-    internal void Select(ModuleId module)
-    {
-        if (_modules.Contains(module))
-        {
-            throw new InvalidOperationException($"{module} is already configured on brain '{Name}'. Add each module exactly once.");
-        }
-
-        _modules.Add(module);
     }
 
     public ClientDigitalBrainReference AsClient() => new(this);

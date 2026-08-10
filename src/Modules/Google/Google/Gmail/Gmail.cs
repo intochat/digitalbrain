@@ -14,10 +14,7 @@ internal sealed partial class Gmail :
     IGmail,
     IHandle<GmailRequest>,
     IHandle<GmailSearchRequest>,
-    IHandle<GmailGetMessageRequest>,
-    IEmit<GmailResponse>,
-    IEmit<GmailSearchResponse>,
-    IEmit<GmailGetMessageResponse>
+    IHandle<GmailGetMessageRequest>
 {
     private const string TokensName = "google.gmail.oauth";
     private readonly IDurableValue<byte[]> _tokenState;

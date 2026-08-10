@@ -1,11 +1,9 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Tasks;
 
 [GenerateSerializer]
 [Alias("tasks.user-action-required")]
-[Description("Module-owned user action required before a task attempt can continue")]
 public sealed record UserActionRequired : Synapse
 {
     public UserActionRequired(
@@ -108,7 +106,6 @@ public sealed record UserActionRequired : Synapse
 
 [GenerateSerializer]
 [Alias("tasks.complete-user-action")]
-[Description("Bridge-owned completion of a parked module user action")]
 public sealed record CompleteUserAction(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] ProtectedPayloadReference ActionReference,
@@ -117,7 +114,6 @@ public sealed record CompleteUserAction(
 
 [GenerateSerializer]
 [Alias("tasks.deny-user-action")]
-[Description("Bridge-owned denial of a parked module user action")]
 public sealed record DenyUserAction(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] ProtectedPayloadReference ActionReference,
@@ -126,7 +122,6 @@ public sealed record DenyUserAction(
 
 [GenerateSerializer]
 [Alias("tasks.user-action-denied")]
-[Description("Stable failure when a required module user action is denied")]
 public sealed record UserActionDenied : Failure
 {
     public UserActionDenied(string moduleId)
@@ -141,7 +136,6 @@ public sealed record UserActionDenied : Failure
 
 [GenerateSerializer]
 [Alias("tasks.user-action-park-ready")]
-[Description("Task notifies the bound completer that the matching user-action park is durable")]
 public sealed record UserActionParkReady : Synapse
 {
     public UserActionParkReady(

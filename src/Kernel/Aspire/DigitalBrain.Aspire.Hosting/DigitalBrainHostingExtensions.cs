@@ -11,8 +11,6 @@ public static class DigitalBrainHostingExtensions
     public static string StateProtectionKeyConfigurationKey
         => DigitalBrainResourceNames.StateProtectionKeyConfigurationKey;
 
-    public static string ModulesConfigurationKey => DigitalBrainResourceNames.ModulesConfigurationKey;
-
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -59,15 +57,14 @@ public static class DigitalBrainHostingExtensions
     }
 
     public static DigitalBrainBuilder AddModule<TModule>(this DigitalBrainBuilder brain)
-        where TModule : class, IModule, new()
+        where TModule : class
         => brain.AddModule<TModule>(static _ => { });
 
     public static DigitalBrainBuilder AddModule<TModule>(this DigitalBrainBuilder brain, Action<DigitalBrainModuleBuilder<TModule>> configure)
-        where TModule : class, IModule, new()
+        where TModule : class
     {
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentNullException.ThrowIfNull(configure);
-        brain.Select(TModule.Id);
         configure(new DigitalBrainModuleBuilder<TModule>(brain));
         return brain;
     }
@@ -95,8 +92,6 @@ public static class DigitalBrainHostingExtensions
                 brain.StateProtectionKey);
         }
 
-        ProjectModuleManifest(builder, brain);
-
         foreach (var projection in brain.Projections)
         {
             projection.Apply(builder);
@@ -113,7 +108,6 @@ public static class DigitalBrainHostingExtensions
 
         builder.WithReference(client.Brain.Orleans.AsClient());
         builder.WithReference(client.Brain.Streams);
-        ProjectModuleManifest(builder, client.Brain);
         return builder;
     }
 
@@ -135,18 +129,6 @@ public static class DigitalBrainHostingExtensions
 
         return builder;
     }
-
-    private static void ProjectModuleManifest<TResource>(IResourceBuilder<TResource> builder, DigitalBrainBuilder brain)
-        where TResource : IResourceWithEnvironment
-        => builder.WithEnvironment(context =>
-        {
-            for (var index = 0; index < brain.Modules.Count; index++)
-            {
-                context.EnvironmentVariables[
-                    $"{ConfigurationEnvironment(DigitalBrainResourceNames.ModulesConfigurationKey)}__{index}"] =
-                    brain.Modules[index].Value;
-            }
-        });
 
     private static string ConfigurationEnvironment(string configurationKey)
         => configurationKey.Replace(":", "__", StringComparison.Ordinal);

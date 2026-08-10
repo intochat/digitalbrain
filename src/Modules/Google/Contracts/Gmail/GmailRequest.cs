@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 
@@ -6,7 +5,6 @@ namespace DigitalBrain.Google;
 
 [GenerateSerializer]
 [Alias("db.google.gmail-request")]
-[Description("Intent-level Gmail request; provider tools stay inside GoogleModule")]
 public sealed record GmailRequest : RequestSynapse<GmailResponse>
 {
     public GmailRequest(string intent)

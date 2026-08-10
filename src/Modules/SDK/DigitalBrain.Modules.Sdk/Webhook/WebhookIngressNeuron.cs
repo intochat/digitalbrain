@@ -9,10 +9,7 @@ namespace DigitalBrain.Modules.Sdk.Webhook;
 [GrainType("webhook-ingress")]
 internal sealed class WebhookIngressNeuron :
     Neuron,
-    IHandle<VerifiedWebhookDeliveryReceived>,
-    IEmit<WebhookDeliveryAccepted>,
-    IEmit<WebhookDeliveryDuplicate>,
-    IEmit<WebhookDeliveryConflict>
+    IHandle<VerifiedWebhookDeliveryReceived>
 {
     private const string StateName = "sdk.webhook.ingress";
 

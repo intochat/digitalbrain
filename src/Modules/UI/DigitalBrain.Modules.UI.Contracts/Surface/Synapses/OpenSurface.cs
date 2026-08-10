@@ -1,11 +1,9 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.UI;
 
 [GenerateSerializer]
 [Alias("ui.open-surface")]
-[Description("Open content on a UI surface")]
 public sealed record OpenSurface : Synapse
 {
     public OpenSurface(CommandId commandId, string surfaceKey, string title)

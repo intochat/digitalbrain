@@ -1,11 +1,9 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Introspection;
 
 [GenerateSerializer]
 [Alias("introspection.journal-tallied")]
-[Description("How many synapses of each type a neuron journal has recorded, or why the tally was refused")]
 public sealed record JournalTallied(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] NeuronId Subject,

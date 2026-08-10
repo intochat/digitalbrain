@@ -1,11 +1,9 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Salesforce;
 
 [GenerateSerializer]
 [Alias("db.salesforce.response")]
-[Description("Bounded typed Salesforce result for an intent or approval request")]
 public sealed record SalesforceResponse : Synapse
 {
     public SalesforceResponse(

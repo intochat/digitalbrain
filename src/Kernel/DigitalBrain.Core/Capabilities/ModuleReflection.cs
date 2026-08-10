@@ -28,7 +28,7 @@ public static class ModuleReflection
     }
 
     private static IEnumerable<Type> NeuronContracts(Assembly contracts)
-        => contracts.GetTypes()
+        => SafeTypes(contracts)
             .Where(static type => type is { IsInterface: true, IsPublic: true }
                 && type != typeof(INeuron)
                 && typeof(INeuron).IsAssignableFrom(type))
@@ -62,11 +62,23 @@ public static class ModuleReflection
             .OrderBy(static synapse => synapse.Name, StringComparer.Ordinal);
 
     private static IEnumerable<SynapseCapabilityDescriptor> FactVocabulary(Assembly contracts)
-        => contracts.GetTypes()
+        => SafeTypes(contracts)
             .Where(static type => type is { IsClass: true, IsAbstract: false }
                 && typeof(Synapse).IsAssignableFrom(type))
             .OrderBy(static type => type.Name, StringComparer.Ordinal)
             .Select(DescriptorFor);
+
+    private static IEnumerable<Type> SafeTypes(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException partiallyLoaded)
+        {
+            return partiallyLoaded.Types.OfType<Type>();
+        }
+    }
 
     private static SynapseCapabilityDescriptor DescriptorFor(Type synapse)
         => new(

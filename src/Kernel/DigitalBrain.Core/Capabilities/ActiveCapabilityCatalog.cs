@@ -22,19 +22,21 @@ public sealed class ActiveCapabilityCatalog
 
     public IReadOnlyList<CapabilityManifest> Modules { get; }
 
-    public static ActiveCapabilityCatalog Create(IEnumerable<ICompiledModule> selectedModules)
+    public static ActiveCapabilityCatalog Create(IReadOnlyList<CapabilityManifest> manifests)
     {
-        var manifests = selectedModules
-            .Select(module => module.Capabilities)
-            .OrderBy(manifest => manifest.ModuleId.Value, StringComparer.Ordinal)
-            .ToArray();
+        ArgumentNullException.ThrowIfNull(manifests);
+
+        CapabilityManifest[] ordered =
+        [
+            .. manifests.OrderBy(static manifest => manifest.ModuleId.Value, StringComparer.Ordinal),
+        ];
 
         var moduleIndex = new Dictionary<string, CapabilityManifest>(StringComparer.Ordinal);
         var neurons = new Dictionary<string, NeuronCapabilityDescriptor>(StringComparer.Ordinal);
         var neuronOwners = new Dictionary<string, ModuleId>(StringComparer.Ordinal);
         var synapses = new Dictionary<(string, int), SynapseCapabilityDescriptor>();
 
-        foreach (var manifest in manifests)
+        foreach (var manifest in ordered)
         {
             if (!moduleIndex.TryAdd(manifest.ModuleId.Value, manifest))
             {
@@ -58,7 +60,7 @@ public sealed class ActiveCapabilityCatalog
             }
         }
 
-        return new ActiveCapabilityCatalog(manifests, moduleIndex, neurons, synapses);
+        return new ActiveCapabilityCatalog(ordered, moduleIndex, neurons, synapses);
     }
 
     public bool TryGetModule(ModuleId moduleId, out CapabilityManifest? manifest)

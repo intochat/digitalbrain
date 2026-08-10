@@ -7,8 +7,7 @@ namespace DigitalBrain.Memory;
 [GrainType("memory-projection-boot")]
 internal sealed class ProjectionBootNeuron :
     Neuron,
-    IHandle<DigitalBrainActivated>,
-    IEmit<VectorProjectionReconciled>
+    IHandle<DigitalBrainActivated>
 {
     public async Task HandleAsync(DigitalBrainActivated synapse, CancellationToken cancellationToken)
     {

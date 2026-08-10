@@ -18,16 +18,16 @@ public sealed class ActiveModuleContractTypeMap
     }
 
     public static ActiveModuleContractTypeMap Create(
-        IEnumerable<ICompiledModule> selectedModules,
+        IEnumerable<Assembly> moduleAssemblies,
         ActiveCapabilityCatalog catalog)
     {
-        ArgumentNullException.ThrowIfNull(selectedModules);
+        ArgumentNullException.ThrowIfNull(moduleAssemblies);
         ArgumentNullException.ThrowIfNull(catalog);
 
         var assemblies = new HashSet<Assembly>();
-        foreach (var module in selectedModules)
+        foreach (var moduleAssembly in moduleAssemblies)
         {
-            CollectAssemblies(module.GetType().Assembly, assemblies);
+            CollectAssemblies(moduleAssembly, assemblies);
         }
 
         var catalogSynapses = IndexCatalogSynapses(catalog);
@@ -109,16 +109,12 @@ public sealed class ActiveModuleContractTypeMap
             }
         }
 
+        // An implementation's declared [GrainType] is authoritative; the interface-name
+        // convention is only a fallback for contracts without a mapped implementation.
         foreach (var (contractId, interfaceGrain) in interfaceGrainHints.OrderBy(static item => item.Key, StringComparer.Ordinal))
         {
-            if (neuronGrainTypes.TryGetValue(contractId, out var implementationGrain))
+            if (neuronGrainTypes.ContainsKey(contractId))
             {
-                if (!string.Equals(interfaceGrain, implementationGrain, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidOperationException(
-                        $"Neuron contract '{contractId}' grain type diverges: interface resolves to '{interfaceGrain}' but implementation [GrainType] is '{implementationGrain}'.");
-                }
-
                 continue;
             }
 

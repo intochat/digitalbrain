@@ -175,14 +175,16 @@ public sealed class TimerCapabilityManifestProofs
     [Fact]
     public void TimerVerbsAreDeclaredCapabilities()
     {
+        var manifest = DigitalBrain.Core.ModuleReflection.ManifestOf(typeof(StartTimer).Assembly);
+
         var timer = Assert.Single(
-            TimeModule.Capabilities.Neurons,
+            manifest.Neurons,
             neuron => neuron.ContractId == "timer");
 
         Assert.Contains(timer.Accepted, synapse => synapse.ContractId == "time.start-timer");
         Assert.Contains(timer.Accepted, synapse => synapse.ContractId == "time.cancel-timer");
         Assert.Contains(timer.Emitted, synapse => synapse.ContractId == "time.timer-scheduled");
-        Assert.Contains(timer.Emitted, synapse => synapse.ContractId == "time.timer-elapsed");
         Assert.Contains(timer.Emitted, synapse => synapse.ContractId == "time.timer-cancelled");
+        Assert.Contains(manifest.Facts, fact => fact.ContractId == "time.timer-elapsed");
     }
 }

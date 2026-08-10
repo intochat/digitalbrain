@@ -9,12 +9,9 @@ using Orleans.Serialization;
 namespace DigitalBrain.Modules.Sdk.Mcp;
 
 [GrainType("mcpauthorization")]
-internal sealed class McpAuthorizationNeuron :
+public sealed class McpAuthorizationNeuron :
     Neuron,
-    IMcpAuthorization,
-    IEmit<AuthorizationRequired>,
-    IEmit<AuthorizationCompleted>,
-    IEmit<AuthorizationDenied>
+    IMcpAuthorization
 {
     internal const string InstanceName = IMcpAuthorization.DefaultInstanceName;
     private const string PendingName = "mcp.authorization.pending";

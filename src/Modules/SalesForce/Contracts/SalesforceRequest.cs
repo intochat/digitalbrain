@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 
@@ -6,7 +5,6 @@ namespace DigitalBrain.Salesforce;
 
 [GenerateSerializer]
 [Alias("db.salesforce.request")]
-[Description("Intent-level Salesforce request; provider tools stay inside SalesforceModule")]
 public sealed record SalesforceRequest : RequestSynapse<SalesforceResponse>
 {
     public SalesforceRequest(string intent)

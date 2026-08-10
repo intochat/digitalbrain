@@ -1,11 +1,9 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Google;
 
 [GenerateSerializer]
 [Alias("db.google.gmail-response")]
-[Description("Bounded typed Gmail result for an intent request")]
 public sealed record GmailResponse : Synapse
 {
     public GmailResponse(

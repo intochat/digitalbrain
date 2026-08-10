@@ -3,7 +3,7 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Introspection;
 
-internal sealed partial class IntrospectionNeuron
+public sealed partial class IntrospectionNeuron
 {
 
     private const long BeyondJournalEnd = long.MaxValue;

@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Memory;
@@ -29,7 +28,6 @@ public sealed record VectorProjectionEntry(
 
 [GenerateSerializer]
 [Alias("memory.vector-projection-reconciled")]
-[Description("Result of reconciling a reserved vector projection namespace")]
 public sealed record VectorProjectionReconciled(
     [property: Id(0)] VectorMemoryNamespace Namespace,
     [property: Id(1)] int Upserted,

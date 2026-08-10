@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
@@ -7,16 +6,12 @@ namespace DigitalBrain.Chat;
 
 [ClientEntryPoint]
 [Alias("chat")]
-[Description("Owner conversation neuron — not bound to a single responder")]
 public partial interface IChat :
     INeuron,
-    IEmit<UserMessaged>,
-    IEmit<Responded>,
     IHandle<ReadTranscriptRequest>,
     IHandle<ShowTime>,
     IHandle<Note>,
-    IHandle<TimerCard>,
-    IEmit<TranscriptRead>
+    IHandle<TimerCard>
 {
     [Alias(nameof(Send))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]

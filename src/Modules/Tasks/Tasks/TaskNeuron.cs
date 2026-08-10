@@ -7,7 +7,7 @@ using Orleans.Serialization;
 namespace DigitalBrain.Tasks;
 
 [GrainType("task")]
-internal sealed partial class TaskNeuron :
+public sealed partial class TaskNeuron :
     Neuron,
     ITask,
     IHandle<StartTask>,
@@ -24,7 +24,6 @@ internal sealed partial class TaskNeuron :
     IHandle<AttemptFailed>,
     IHandle<AttemptCancelled>,
     IHandle<AttemptOutcomeUncertain>,
-    IEmit<TaskSnapshot>,
     IRemindable
 {
     private const string StateName = "tasks.task";

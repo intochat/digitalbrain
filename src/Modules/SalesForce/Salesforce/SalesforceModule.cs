@@ -1,12 +1,13 @@
-using DigitalBrain.Abstractions;
 using DigitalBrain.Modules.Sdk.Mcp;
 
 namespace DigitalBrain.Salesforce;
 
-public sealed partial class SalesforceModule : IModule
+public sealed class SalesforceModule : Core.IModule
 {
-    static partial void ConfigureRuntime(ISiloBuilder builder)
+    public void Configure(ISiloBuilder builder)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         McpRuntimeHosting.Configure(builder.Services, builder.Configuration);
     }
 }

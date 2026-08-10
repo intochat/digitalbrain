@@ -1,7 +1,7 @@
 
 namespace DigitalBrain.Tasks;
 
-internal sealed partial class TaskNeuron
+public sealed partial class TaskNeuron
 {
     public Task HandleAsync(AttemptAccepted fact, CancellationToken cancellationToken)
     {

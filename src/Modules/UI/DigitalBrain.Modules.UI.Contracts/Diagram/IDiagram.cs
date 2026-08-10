@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.UI;
@@ -11,7 +10,6 @@ public sealed record DiagramRead(
 
 [ClientEntryPoint]
 [Alias("ui.diagram")]
-[Description("Diagram control with identity; renders whatever nodes and edges are routed at it")]
 public partial interface IDiagram : INeuron, IHandle<Node>, IHandle<Edge>
 {
     [Alias(nameof(Read))]

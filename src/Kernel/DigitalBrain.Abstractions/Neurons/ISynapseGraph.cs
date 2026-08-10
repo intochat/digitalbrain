@@ -1,10 +1,8 @@
-using System.ComponentModel;
 
 namespace DigitalBrain.Abstractions;
 
 [ClientEntryPoint]
 [Alias("db.synapse-graph")]
-[Description("Owner synapse graph: durable runtime connections between neuron instances")]
 public partial interface ISynapseGraph :
     INeuron,
     IHandle<Connect>,

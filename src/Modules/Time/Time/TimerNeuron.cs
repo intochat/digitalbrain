@@ -19,7 +19,7 @@ internal sealed record TimerState(
     [property: Id(6)] string? ActiveReminderName);
 
 [GrainType("timer")]
-internal sealed class TimerNeuron : Neuron, ITimer, IRemindable
+public sealed class TimerNeuron : Neuron, ITimer, IRemindable
 {
     private const string StateName = "time.timer";
     private const string ReminderPrefix = "time.timer.";

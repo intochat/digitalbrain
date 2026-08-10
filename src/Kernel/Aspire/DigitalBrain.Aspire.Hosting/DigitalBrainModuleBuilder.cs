@@ -1,9 +1,7 @@
-using DigitalBrain.Abstractions;
-
 namespace DigitalBrain.Aspire.Hosting;
 
 public sealed class DigitalBrainModuleBuilder<TModule>
-    where TModule : class, IModule, new()
+    where TModule : class
 {
     internal DigitalBrainModuleBuilder(DigitalBrainBuilder brain) => Brain = brain;
 

@@ -1,11 +1,9 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Google;
 
 [GenerateSerializer]
 [Alias("db.google.gmail-get-message-response")]
-[Description("Bounded read-only Gmail message fetch result")]
 public sealed record GmailGetMessageResponse : Synapse
 {
     public GmailGetMessageResponse(

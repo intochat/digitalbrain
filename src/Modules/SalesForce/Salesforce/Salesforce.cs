@@ -12,8 +12,7 @@ internal sealed partial class Salesforce :
     Neuron,
     ISalesforce,
     IHandle<SalesforceRequest>,
-    IHandle<ApproveSalesforceMutation>,
-    IEmit<SalesforceResponse>
+    IHandle<ApproveSalesforceMutation>
 {
     private const string MutationsName = "salesforce.mutations";
     private const string QueryAccountName = "soqlQuery";

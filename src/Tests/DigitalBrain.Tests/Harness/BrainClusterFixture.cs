@@ -25,24 +25,27 @@ public sealed class BrainClusterFixture : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        ICompiledModule[] modules =
-        [
-            new ProbeModule(),
-            new DigitalBrain.UI.UiModule(),
-            new DigitalBrain.Introspection.IntrospectionModule(),
-            new DigitalBrain.Assistant.AssistantModule(),
-            new DigitalBrain.Time.TimeModule(),
-        ];
+        // The AI contracts assembly is deliberately absent from the contracts list: the harness
+        // runs two IAgent grains (scriptedagent, wiringagent), which a reflected IAgent catalog
+        // entry would turn into an ambiguous grain-type mapping.
+        var modules = new ModuleAssemblies(
+            [
+                typeof(ProbeModule).Assembly,
+                typeof(DigitalBrain.Abstractions.ISynapseGraph).Assembly,
+                typeof(DigitalBrain.Chat.SendMessage).Assembly,
+                typeof(DigitalBrain.Introspection.ReadTopologyRequest).Assembly,
+                typeof(DigitalBrain.Time.StartTimer).Assembly,
+            ],
+            [
+                typeof(ProbeModule).Assembly,
+                typeof(DigitalBrain.UI.UiModule).Assembly,
+                typeof(DigitalBrain.Introspection.IntrospectionNeuron).Assembly,
+                typeof(DigitalBrain.AI.Agent).Assembly,
+                typeof(DigitalBrain.Time.TimerNeuron).Assembly,
+            ]);
         var builder = new InProcessTestClusterBuilder(SiloCount);
         builder.ConfigureSilo((options, silo) =>
         {
-            var moduleIndex = 0;
-            foreach (var module in modules)
-            {
-                silo.Configuration[$"DigitalBrain:Modules:{moduleIndex}"] = module.Id.Value;
-                moduleIndex++;
-            }
-
             silo.Configuration["DigitalBrain:Security:StateProtectionKey"] =
                 Convert.ToBase64String(new byte[32]);
 
@@ -56,14 +59,14 @@ public sealed class BrainClusterFixture : IAsyncLifetime
         });
         builder.ConfigureClient(client =>
         {
-            foreach (var module in modules)
-            {
-                module.PrepareSerialization(client.Services);
-            }
+            ModelPayloadSerialization.AddModelPayloadSerialization(client.Services);
 
-            var capabilities = ActiveCapabilityCatalog.Create(modules);
+            var capabilities = ActiveCapabilityCatalog.Create(DigitalBrainRuntime.ManifestsOf(modules));
             client.Services.AddSingleton(capabilities);
-            client.Services.AddSingleton(ActiveModuleContractTypeMap.Create(modules, capabilities));
+            client.Services.AddSingleton(
+                ActiveModuleContractTypeMap.Create(
+                    modules.Contracts.Concat(modules.Implementations),
+                    capabilities));
             client.Services.Configure<ClientMessagingOptions>(
                 messaging => messaging.ResponseTimeout = SaturatedMachineResponseTimeout);
         });

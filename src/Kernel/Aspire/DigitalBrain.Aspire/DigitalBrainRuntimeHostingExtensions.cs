@@ -20,7 +20,7 @@ public static class DigitalBrainRuntimeHostingExtensions
 
     public static IHostApplicationBuilder AddDigitalBrain(
         this IHostApplicationBuilder builder,
-        IReadOnlyCollection<ICompiledModule> modules)
+        ModuleAssemblies modules)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(modules);

@@ -2,16 +2,12 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Assistant;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
-using DigitalBrain.Introspection;
 using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
-using DigitalBrain.Tasks;
-using DigitalBrain.Time;
 using DigitalBrain.UI;
 using DigitalBrain.UI.Aspire.Hosting;
 using Microsoft.Extensions.Hosting;
@@ -29,13 +25,9 @@ brain.AddModule<AIModule>(ai =>
     ai.WithLlm<Llama32>();
 });
 brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
-brain.AddModule<AssistantModule>();
 brain.AddModule<UiModule>(ui => ui.WithWindowHost());
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
-brain.AddModule<TasksModule>();
-brain.AddModule<TimeModule>();
-brain.AddModule<IntrospectionModule>();
 
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Kernel)
     .WithReference(brain)

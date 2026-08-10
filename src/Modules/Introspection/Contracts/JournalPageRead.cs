@@ -1,11 +1,9 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Introspection;
 
 [GenerateSerializer]
 [Alias("introspection.journal-page-read")]
-[Description("A page of causal facts from a neuron journal, or why the read was refused")]
 public sealed record JournalPageRead(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] NeuronId Subject,

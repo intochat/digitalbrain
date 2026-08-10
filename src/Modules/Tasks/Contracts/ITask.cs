@@ -1,11 +1,9 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Tasks;
 
 [ClientEntryPoint]
 [Alias("tasks.task")]
-[Description("Durable task lifecycle neuron")]
 public partial interface ITask : INeuron
 {
     [Alias(nameof(Start))]

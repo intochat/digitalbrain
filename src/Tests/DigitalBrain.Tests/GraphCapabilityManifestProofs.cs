@@ -1,4 +1,5 @@
-using DigitalBrain.Introspection;
+using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -8,8 +9,10 @@ public sealed class GraphCapabilityManifestProofs
     [Fact]
     public void GraphWiringVerbsAreDeclaredCapabilities()
     {
+        var manifest = ModuleReflection.ManifestOf(typeof(ISynapseGraph).Assembly);
+
         var graph = Assert.Single(
-            IntrospectionModule.Capabilities.Neurons,
+            manifest.Neurons,
             neuron => neuron.ContractId == "db.synapse-graph");
 
         Assert.Contains(graph.Accepted, synapse => synapse.ContractId == "db.connect");

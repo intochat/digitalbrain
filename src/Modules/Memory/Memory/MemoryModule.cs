@@ -1,4 +1,3 @@
-using DigitalBrain.Abstractions;
 using DigitalBrain.Memory.Qdrant;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
@@ -8,13 +7,15 @@ using Qdrant.Client;
 
 namespace DigitalBrain.Memory;
 
-public sealed partial class MemoryModule : IModule
+public sealed class MemoryModule : Core.IModule
 {
     public const string ProviderConfigurationKey = "DigitalBrain:Memory:Provider";
     public const string QdrantProviderName = "Qdrant";
 
-    static partial void ConfigureRuntime(ISiloBuilder builder)
+    public void Configure(ISiloBuilder builder)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         var provider = builder.Configuration[ProviderConfigurationKey];
         if (string.Equals(provider, QdrantProviderName, StringComparison.OrdinalIgnoreCase))
         {

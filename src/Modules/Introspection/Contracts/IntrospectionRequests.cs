@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 
@@ -27,9 +26,6 @@ internal static class IntrospectionIdentity
 
 [GenerateSerializer]
 [Alias("introspection.tally-journal-request")]
-[Description(
-    "Counts journaled synapses by synapse kinds for one neuron of the owning identity, "
-    + "answering how often a conversation recorded owner messages")]
 public sealed record TallyJournalRequest : RequestSynapse<JournalTallied>
 {
     public TallyJournalRequest(string neuronType, string neuronName)
@@ -61,15 +57,12 @@ public sealed record TallyJournalRequest : RequestSynapse<JournalTallied>
     }
 
     [Id(0)]
-    [Description("Grain type of the neuron to tally, for example 'chat' or 'shell'")]
     public string NeuronType { get; init; }
 
     [Id(1)]
-    [Description("Instance name of the neuron to tally, for example 'main'")]
     public string NeuronName { get; init; }
 
     [Id(2)]
-    [Description("Journal direction: 'incoming' or 'outgoing'. Facts a neuron produced live in its outgoing journal")]
     public string Direction { get; init; }
 
     [Id(3)]
@@ -81,9 +74,6 @@ public sealed record TallyJournalRequest : RequestSynapse<JournalTallied>
 
 [GenerateSerializer]
 [Alias("introspection.read-journal-request")]
-[Description(
-    "Returns journaled causal facts for one neuron of the owning identity, bounded by cursor "
-    + "and limit; entries record synapse kinds and lineage, excluding argument and payload values")]
 public sealed record ReadJournalRequest : RequestSynapse<JournalPageRead>
 {
     public const int DefaultMaxEntries = 50;
@@ -138,23 +128,18 @@ public sealed record ReadJournalRequest : RequestSynapse<JournalPageRead>
     }
 
     [Id(0)]
-    [Description("Grain type of the neuron to read, for example 'chat' or 'shell'")]
     public string NeuronType { get; init; }
 
     [Id(1)]
-    [Description("Instance name of the neuron to read, for example 'main'")]
     public string NeuronName { get; init; }
 
     [Id(2)]
-    [Description("Journal direction: 'incoming' or 'outgoing'")]
     public string Direction { get; init; }
 
     [Id(3)]
-    [Description("Resume after this journal sequence; 0 starts at the earliest retained entry")]
     public long AfterSequence { get; init; }
 
     [Id(4)]
-    [Description("Most entries to return, between 1 and 200")]
     public int MaxEntries { get; init; }
 
     [Id(5)]
@@ -166,9 +151,6 @@ public sealed record ReadJournalRequest : RequestSynapse<JournalPageRead>
 
 [GenerateSerializer]
 [Alias("introspection.read-topology-request")]
-[Description(
-    "Reports the runtime topology of the owning identity: modules the deployment composed and "
-    + "neurons currently activated")]
 public sealed record ReadTopologyRequest : RequestSynapse<TopologyRead>
 {
     public ReadTopologyRequest()

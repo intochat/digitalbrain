@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Introspection;
 
-internal sealed partial class IntrospectionNeuron
+public sealed partial class IntrospectionNeuron
 {
     private const string ModulesConfigurationSection = "DigitalBrain:Modules";
     private const char IdentityPartSeparator = '/';

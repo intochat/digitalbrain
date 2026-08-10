@@ -1,6 +1,5 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Aspire.Hosting;
@@ -17,7 +16,7 @@ public sealed record OAuthProviderHostingDefinition(
 public static class OAuthProviderHosting
 {
     public static void Register<TModule>(DigitalBrainModuleBuilder<TModule> module, OAuthProviderHostingDefinition definition)
-        where TModule : class, IModule, new()
+        where TModule : class
     {
         ArgumentNullException.ThrowIfNull(module);
         ArgumentNullException.ThrowIfNull(definition);

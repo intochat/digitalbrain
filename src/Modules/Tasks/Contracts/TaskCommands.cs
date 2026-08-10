@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Tasks;
@@ -12,7 +11,6 @@ public sealed record TaskPolicy(
 
 [GenerateSerializer]
 [Alias("tasks.start")]
-[Description("Start a durable owner-scoped task")]
 public sealed record StartTask(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] Goal Goal,

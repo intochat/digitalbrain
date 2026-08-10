@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 
@@ -6,7 +5,6 @@ namespace DigitalBrain.Google;
 
 [GenerateSerializer]
 [Alias("db.google.gmail-get-message-request")]
-[Description("Read-only fetch of one Gmail message by id; body is bounded by the handler")]
 public sealed record GmailGetMessageRequest : RequestSynapse<GmailGetMessageResponse>
 {
     public GmailGetMessageRequest(string messageId)

@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 
@@ -6,7 +5,6 @@ namespace DigitalBrain.Google;
 
 [GenerateSerializer]
 [Alias("db.google.gmail-search-request")]
-[Description("Read-only Gmail search by query syntax; MaxResults is 1..10")]
 public sealed record GmailSearchRequest : RequestSynapse<GmailSearchResponse>
 {
     public const int DefaultMaxResults = 10;

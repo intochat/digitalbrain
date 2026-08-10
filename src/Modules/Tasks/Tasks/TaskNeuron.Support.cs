@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Tasks;
 
-internal sealed partial class TaskNeuron
+public sealed partial class TaskNeuron
 {
     private AttemptCursor Cursor(TaskData data) => new(
         Id,

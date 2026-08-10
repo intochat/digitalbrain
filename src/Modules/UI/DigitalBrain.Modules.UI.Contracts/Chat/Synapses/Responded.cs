@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.UI;
 
@@ -6,7 +5,6 @@ namespace DigitalBrain.Chat;
 
 [GenerateSerializer]
 [Alias("chat.responded")]
-[Description("A response committed into a chat transcript")]
 public sealed record Responded(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] NeuronId Chat,

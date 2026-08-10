@@ -1,11 +1,9 @@
-using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Memory;
 
 [GenerateSerializer]
 [Alias("memory.store-vector")]
-[Description("Store a text entry in vector memory")]
 public sealed record StoreVectorMemory(
     [property: Id(0)] VectorMemoryNamespace Namespace,
     [property: Id(1)] string Key,
@@ -15,7 +13,6 @@ public sealed record StoreVectorMemory(
 
 [GenerateSerializer]
 [Alias("memory.vector-stored")]
-[Description("Result of a vector memory store request")]
 public sealed record VectorMemoryStored(
     [property: Id(0)] bool Stored,
     [property: Id(1)] VectorMemoryNamespace Namespace,
