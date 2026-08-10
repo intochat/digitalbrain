@@ -31,7 +31,9 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         connections, then create or remove connections. A NeuronId argument is an object of
         the form {"type": "chart", "owner": {"value": "{{Id.Owner.Value}}"}, "name": "dashboard"}.
         Transforms can be named, or written as data: 'to:ui.chart-point{Label=Text}' reshapes
-        any synapse into a chart point by copying its Text field into Label. Chart neurons
+        any synapse into a chart point by copying its Text field into Label. A connectionId
+        may be a short stable name such as 'chat-to-dashboard'; the same name always
+        addresses the same connection, so reusing it replaces, and disconnecting by it removes. Chart neurons
         (type 'chart') render 'ui.chart-point' synapses; connect a source to a chart to see
         its facts live on a dashboard.
 

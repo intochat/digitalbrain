@@ -111,6 +111,8 @@ public static class SynapseCapabilityTool
             };
         }
 
+        DeriveIdentitiesFromStableNames(requestType, node);
+
         if (requestType.GetProperty(nameof(CommandId))?.PropertyType == typeof(CommandId))
         {
             node[CommandIdProperty] = new JsonObject { ["value"] = CommandId.New().Value };
@@ -126,6 +128,31 @@ public static class SynapseCapabilityTool
         }
 
         return synapse;
+    }
+
+    // Models name things; identity properties are GUIDs. A stable name maps to a
+    // deterministic GUID so the same name always addresses the same identity.
+    private static void DeriveIdentitiesFromStableNames(Type requestType, JsonObject node)
+    {
+        foreach (var property in requestType.GetProperties())
+        {
+            var propertyType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+            if (propertyType != typeof(Guid))
+            {
+                continue;
+            }
+
+            var key = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
+            if (node.TryGetPropertyValue(key, out var value)
+                && value is JsonValue named
+                && named.TryGetValue<string>(out var text)
+                && !Guid.TryParse(text, out _)
+                && !string.IsNullOrWhiteSpace(text))
+            {
+                node[key] = new Guid(
+                    System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text)).AsSpan(0, 16));
+            }
+        }
     }
 
     private static bool TryGetResponseType(Type requestType, out Type? responseType)
