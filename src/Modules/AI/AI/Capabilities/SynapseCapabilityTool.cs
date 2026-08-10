@@ -42,6 +42,7 @@ public static class SynapseCapabilityTool
             };
         }
 
+        RequireDeclaredFields(requestType, node);
         DeriveIdentitiesFromStableNames(requestType, node);
         ParseNeuronIdStrings(requestType, node, owner);
 
@@ -60,6 +61,30 @@ public static class SynapseCapabilityTool
         }
 
         return synapse;
+    }
+
+    // Trap 7 inverted for the model path: a missing value-type field would bind
+    // silently to its default (Guid.Empty, 0) and be refused downstream with no
+    // reply. Require every parameter that has no default, and say which are missing.
+    private static void RequireDeclaredFields(Type requestType, JsonObject node)
+    {
+        var missing = requestType
+            .GetConstructors()
+            .OrderByDescending(static ctor => ctor.GetParameters().Length)
+            .FirstOrDefault()?
+            .GetParameters()
+            .Where(parameter => parameter.Name is { } name
+                && !parameter.HasDefaultValue
+                && !string.Equals(name, nameof(CommandId), StringComparison.OrdinalIgnoreCase)
+                && !node.ContainsKey(JsonNamingPolicy.CamelCase.ConvertName(name)))
+            .Select(static parameter => JsonNamingPolicy.CamelCase.ConvertName(parameter.Name!))
+            .ToArray() ?? [];
+
+        if (missing.Length > 0)
+        {
+            throw new InvalidOperationException(
+                $"Required field(s) missing: {string.Join(", ", missing)}.");
+        }
     }
 
     // Models speak identities the way get_neurons prints them — "timer:dev/default"
@@ -86,8 +111,12 @@ public static class SynapseCapabilityTool
             var separator = text.IndexOf(':', StringComparison.Ordinal);
             if (separator <= 0 || separator == text.Length - 1)
             {
+                var aliasHint = text.Contains('.', StringComparison.Ordinal)
+                    ? $" '{text}' looks like a contract id — that belongs in synapseAlias;"
+                    : string.Empty;
                 throw new InvalidOperationException(
-                    $"'{text}' is not a neuron identity. Write it as type:name or type:owner/name.");
+                    $"'{text}' is not a neuron identity.{aliasHint} "
+                    + "this field wants an instance written type:name or type:owner/name.");
             }
 
             var type = text[..separator];

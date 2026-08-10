@@ -45,6 +45,41 @@ public sealed class ModelArgumentBindingProofs
     }
 
     [Fact]
+    public void MissingRequiredFieldsAreNamedInsteadOfDefaultingSilently()
+    {
+        var owner = new OwnerId("dev");
+        Dictionary<string, object?> arguments = new()
+        {
+            ["source"] = "timer:default",
+            ["synapseAlias"] = "time.timer-elapsed",
+            ["target"] = "chat:main",
+        };
+
+        var refused = Assert.Throws<InvalidOperationException>(
+            () => SynapseCapabilityTool.BindModelArguments(typeof(Connect), "db.connect", arguments, owner));
+
+        Assert.Contains("connectionId", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AContractIdInAnIdentityFieldGetsTheAliasHint()
+    {
+        var owner = new OwnerId("dev");
+        Dictionary<string, object?> arguments = new()
+        {
+            ["connectionId"] = "timer-note",
+            ["source"] = "time.timer-elapsed",
+            ["synapseAlias"] = "time.timer-elapsed",
+            ["target"] = "chat:main",
+        };
+
+        var refused = Assert.Throws<InvalidOperationException>(
+            () => SynapseCapabilityTool.BindModelArguments(typeof(Connect), "db.connect", arguments, owner));
+
+        Assert.Contains("synapseAlias", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StableNameBindsToADeterministicConnectionId()
     {
         var owner = new OwnerId("dev");

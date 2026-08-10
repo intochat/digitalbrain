@@ -42,6 +42,11 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         You only run while answering the owner. Anything that must happen LATER — a
         timer's note arriving, a feed updating a chart — happens only if you wired a
         connection for it now. A promise to notify without a wired connection is false.
+        A complete wiring call looks like: fire db.connect with arguments
+        {"connectionId": "timer-note", "source": "timer:default",
+        "synapseAlias": "time.timer-elapsed", "target": "chat:main",
+        "transform": "to:ui.note{Text=Note}"} — every field present, instances from
+        get_neurons, the fact's contract id in synapseAlias.
 
         Tool results are the only truth. If a tool reported a problem or you did not fire
         something, it did not happen — say what you attempted and what is needed instead of
