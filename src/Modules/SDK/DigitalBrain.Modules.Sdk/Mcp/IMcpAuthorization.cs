@@ -24,5 +24,8 @@ public partial interface IMcpAuthorization : INeuron
         CancellationToken cancellationToken = default);
 
     [Alias(nameof(Claim))]
-    Task<McpAuthorizationClaim> Claim(CommandId commandId, CancellationToken cancellationToken = default);
+    Task<McpAuthorizationClaim> Claim(
+        CommandId commandId,
+        ActorContext actor,
+        CancellationToken cancellationToken = default);
 }

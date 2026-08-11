@@ -25,12 +25,19 @@ internal static class McpOAuthCallback
         var codes = session.Grains.GetGrain<IMcpAuthorizationCodes>(grainId);
 
         // Recover the single rail-minted transaction for this command (no second Begin).
+        if (session.Actor is not { } actor)
+        {
+            throw new InvalidOperationException(
+                $"{session.ServerDisplayName} authorization session has no actor for command '{session.CommandId}'.");
+        }
+
         McpAuthorizationClaim claim;
         try
         {
-            claim = await authorization.Claim(session.CommandId, cancellationToken).ConfigureAwait(true);
+            claim = await authorization.Claim(session.CommandId, actor, cancellationToken)
+                .ConfigureAwait(true);
         }
-        catch (InvalidOperationException)
+        catch (NeuronAuthorizationException)
         {
             throw new InvalidOperationException(
                 $"{session.ServerDisplayName} has no rail-minted authorization for command '{session.CommandId}'. "
@@ -46,19 +53,14 @@ internal static class McpOAuthCallback
         if (claim.Kind is McpAuthorizationClaimKind.Required && claim.Required is { } required)
         {
             McpAuthorizationCodeHub.RegisterSession(required.State, session);
-            return await AwaitDeliveredCodeAsync(required.State, session, authorization, codes, cancellationToken)
+            return await AwaitDeliveredCodeAsync(
+                required.State, session, actor, authorization, codes, cancellationToken)
                 .ConfigureAwait(true);
         }
 
         if (claim.Kind is McpAuthorizationClaimKind.Completed)
         {
             // Code already delivered; recover state via idempotent Begin return shape.
-            if (session.Actor is null)
-            {
-                throw new InvalidOperationException(
-                    $"{session.ServerDisplayName} completed authorization has no actor on the session.");
-            }
-
             var recovered = await authorization.Begin(
                 new BeginMcpAuthorization(
                     session.CommandId,
@@ -66,7 +68,7 @@ internal static class McpOAuthCallback
                     session.ServerDisplayName,
                     new Uri("https://auth.digitalbrain.local/oauth/completed"),
                     "unused-when-command-exists",
-                    session.Actor),
+                    actor),
                 cancellationToken).ConfigureAwait(true);
             var taken = await codes.TakeCompletedCode(recovered.State, cancellationToken).ConfigureAwait(true);
             if (taken is null)
@@ -85,6 +87,7 @@ internal static class McpOAuthCallback
     private static async Task<AuthorizationResult?> AwaitDeliveredCodeAsync(
         string state,
         McpOAuthSession session,
+        ActorContext actor,
         IMcpAuthorization authorization,
         IMcpAuthorizationCodes codes,
         CancellationToken cancellationToken)
@@ -95,7 +98,8 @@ internal static class McpOAuthCallback
             cancellationToken.ThrowIfCancellationRequested();
             session.Cancellation.ThrowIfCancellationRequested();
 
-            if (await IsDeniedAsync(authorization, session.CommandId, cancellationToken).ConfigureAwait(true))
+            if (await IsDeniedAsync(authorization, session.CommandId, actor, cancellationToken)
+                .ConfigureAwait(true))
             {
                 throw new OperationCanceledException(
                     "MCP authorization ended without a code; the pending session open was canceled.");
@@ -125,7 +129,8 @@ internal static class McpOAuthCallback
         {
         }
 
-        if (await IsDeniedAsync(authorization, session.CommandId, cancellationToken).ConfigureAwait(true))
+        if (await IsDeniedAsync(authorization, session.CommandId, actor, cancellationToken)
+            .ConfigureAwait(true))
         {
             throw new OperationCanceledException(
                 "MCP authorization ended without a code; the pending session open was canceled.");
@@ -144,14 +149,15 @@ internal static class McpOAuthCallback
     private static async Task<bool> IsDeniedAsync(
         IMcpAuthorization authorization,
         CommandId commandId,
+        ActorContext actor,
         CancellationToken cancellationToken)
     {
         try
         {
-            var claim = await authorization.Claim(commandId, cancellationToken).ConfigureAwait(true);
+            var claim = await authorization.Claim(commandId, actor, cancellationToken).ConfigureAwait(true);
             return claim.Kind is McpAuthorizationClaimKind.Denied;
         }
-        catch (InvalidOperationException)
+        catch (NeuronAuthorizationException)
         {
             return false;
         }

@@ -47,7 +47,11 @@ public sealed class McpAuthorizationNeuron :
         ArgumentException.ThrowIfNullOrWhiteSpace(request.ServerDisplayName);
         ArgumentNullException.ThrowIfNull(request.SignInUrl);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.State);
-        ArgumentNullException.ThrowIfNull(request.Actor);
+        if (request.Actor is null)
+        {
+            throw new NeuronAuthorizationException("Authorization requires a verified actor.");
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
 
         await SweepExpiredAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
@@ -272,21 +276,36 @@ public sealed class McpAuthorizationNeuron :
         return new McpAuthorizationCallbackDelivery(Accepted: true, Completed: true, Denied: false);
     }
 
-    public async Task<McpAuthorizationClaim> Claim(CommandId commandId, CancellationToken cancellationToken = default)
+    public async Task<McpAuthorizationClaim> Claim(
+        CommandId commandId,
+        ActorContext actor,
+        CancellationToken cancellationToken = default)
     {
         if (commandId.Value == Guid.Empty)
         {
             throw new ArgumentException("The command id cannot be empty.", nameof(commandId));
         }
 
+        if (actor is null)
+        {
+            throw new NeuronAuthorizationException("Authorization requires a verified actor.");
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
 
         if (!_commands.TryGetValue(commandId.Value, out var serialized))
         {
-            throw new InvalidOperationException($"Authorization command '{commandId}' is not pending.");
+            throw new NeuronAuthorizationException($"Authorization command '{commandId}' is not pending.");
         }
 
         var recorded = _commandsSerializer.Deserialize(serialized);
+        // Status must not leak existence / State to another principal.
+        if (recorded.Actor is null
+            || recorded.Actor.PrincipalId != actor.PrincipalId)
+        {
+            throw new NeuronAuthorizationException($"Authorization command '{commandId}' is not pending.");
+        }
+
         if (_pending.TryGetValue(recorded.State, out var pendingSerialized))
         {
             var pending = _serializer.Deserialize(pendingSerialized);
@@ -294,7 +313,7 @@ public sealed class McpAuthorizationNeuron :
             {
                 RemovePending(pending);
                 await WriteStateAsync(cancellationToken).ConfigureAwait(true);
-                throw new InvalidOperationException($"Authorization command '{commandId}' is not pending.");
+                throw new NeuronAuthorizationException($"Authorization command '{commandId}' is not pending.");
             }
         }
 

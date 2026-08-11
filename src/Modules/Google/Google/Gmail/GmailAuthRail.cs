@@ -53,13 +53,15 @@ internal static class GmailAuthRail
             DurableGoogleTokenStore.Purpose(ServerKey, durableIdentity));
         var authorization = grains.GetGrain<IMcpAuthorization>(
             NeuronId.For<IMcpAuthorization>(owner, IMcpAuthorization.DefaultInstanceName).ToGrainId());
+        // Same stable principal stamped at Begin — Claim is principal-bound like recovery.
+        var actor = new ActorContext(StablePrincipal(userKey), userKey);
 
         McpAuthorizationClaim? claim = null;
         try
         {
-            claim = await authorization.Claim(commandId, cancellationToken).ConfigureAwait(false);
+            claim = await authorization.Claim(commandId, actor, cancellationToken).ConfigureAwait(false);
         }
-        catch (InvalidOperationException)
+        catch (NeuronAuthorizationException)
         {
         }
 
@@ -110,7 +112,6 @@ internal static class GmailAuthRail
             state);
         // S1.6 deletes this typed Gmail path. Until then stamp a stable principal derived
         // from the grain user key so Begin can bind actor (MCP rail requires it).
-        var actor = new ActorContext(StablePrincipal(userKey), userKey);
         var required = await authorization.Begin(
             new BeginMcpAuthorization(
                 commandId,

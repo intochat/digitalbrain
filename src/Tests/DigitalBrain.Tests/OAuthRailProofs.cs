@@ -206,7 +206,7 @@ public sealed class OAuthRailNeuronProofs(BrainClusterFixture fixture)
         Assert.False(second.Completed);
         Assert.False(second.Denied);
 
-        var claim = await authorization.Claim(command, TestContext.Current.CancellationToken);
+        var claim = await authorization.Claim(command, actor, TestContext.Current.CancellationToken);
         Assert.Equal(McpAuthorizationClaimKind.Completed, claim.Kind);
 
         McpAuthorizationCodeHub.ResetForTests();

@@ -113,6 +113,50 @@ public sealed class OAuthBoundaryActorPipelineProofs(BrainClusterFixture fixture
     }
 
     [Fact]
+    public async Task ConcurrentChatTurnsDoNotBleedVerifiedActorAcrossRequestContext()
+    {
+        var brain = fixture.BrainFor("oauth-actor-bleed");
+        var agent = new NeuronId("scriptedagent", brain.Owner, "bleed-probe");
+        var chatAlice = NeuronId.For<IChat>(brain.Owner, "alice-main");
+        var chatBob = NeuronId.For<IChat>(brain.Owner, "bob-main");
+        var alice = new ActorContext(PrincipalId.New(), "alice");
+        var bob = new ActorContext(PrincipalId.New(), "bob");
+
+        ScriptedAgent.ObservedVerifiedActors.TryRemove("bleed-probe", out _);
+        ScriptedAgent.ObservedVerifiedActorTurns.TryRemove("bleed-probe", out _);
+
+        await brain.FireAsync<ISynapseGraph>(
+            ISynapseGraph.InstanceName,
+            new Connect(ChatRoles.ResponderConnectionId(chatAlice), chatAlice, ChatRoles.Responder, agent),
+            TestContext.Current.CancellationToken);
+        await brain.FireAsync<ISynapseGraph>(
+            ISynapseGraph.InstanceName,
+            new Connect(ChatRoles.ResponderConnectionId(chatBob), chatBob, ChatRoles.Responder, agent),
+            TestContext.Current.CancellationToken);
+        await Graphs.WaitForConnectionTargetAsync(brain, chatAlice, ChatRoles.Responder, agent);
+        await Graphs.WaitForConnectionTargetAsync(brain, chatBob, ChatRoles.Responder, agent);
+
+        await Task.WhenAll(
+            brain.GetGrainProxy<IChat>("alice-main").Send(
+                new SendMessage(CommandId.New(), "hello under alice", Actor: alice)),
+            brain.GetGrainProxy<IChat>("bob-main").Send(
+                new SendMessage(CommandId.New(), "hello under bob", Actor: bob)));
+
+        await Journals.WaitForAsync(
+            brain, chatAlice, JournalKind.Outgoing,
+            delivery => delivery.Synapse is Responded { Text: "scripted:bleed-probe" });
+        await Journals.WaitForAsync(
+            brain, chatBob, JournalKind.Outgoing,
+            delivery => delivery.Synapse is Responded { Text: "scripted:bleed-probe" });
+
+        Assert.True(ScriptedAgent.ObservedVerifiedActorTurns.TryGetValue("bleed-probe", out var turns));
+        Assert.Equal(2, turns.Count);
+        Assert.Contains(turns, actor => actor is not null && actor.PrincipalId == alice.PrincipalId && actor.Username == "alice");
+        Assert.Contains(turns, actor => actor is not null && actor.PrincipalId == bob.PrincipalId && actor.Username == "bob");
+        Assert.DoesNotContain(turns, actor => actor is null);
+    }
+
+    [Fact]
     public async Task ForgedActorThroughFirePathIsReplacedByVerifiedPrincipal()
     {
         var brain = fixture.BrainFor("oauth-actor-pipeline");
@@ -249,9 +293,85 @@ public sealed class OAuthBoundaryNeuronProofs(BrainClusterFixture fixture)
         Assert.False(second.Completed);
         Assert.False(second.Denied);
 
-        var claim = await authorization.Claim(command, TestContext.Current.CancellationToken);
+        var claim = await authorization.Claim(command, actor, TestContext.Current.CancellationToken);
         Assert.Equal(McpAuthorizationClaimKind.Completed, claim.Kind);
 
         McpAuthorizationCodeHub.ResetForTests();
+    }
+
+    [Fact]
+    public async Task CrossPrincipalClaimByStolenCommandIdRefusesLikeUnknown()
+    {
+        var brain = fixture.BrainFor("oauth-claim-actor");
+        var authorization = brain.GetGrainProxy<IMcpAuthorization>(IMcpAuthorization.DefaultInstanceName);
+        var command = CommandId.New();
+        const string state = "alice-claim-state";
+        var alice = new ActorContext(PrincipalId.New(), "alice");
+        var bob = new ActorContext(PrincipalId.New(), "bob");
+
+        var minted = await authorization.Begin(
+            new BeginMcpAuthorization(
+                command,
+                "salesforce",
+                "Salesforce",
+                new Uri("https://login.salesforce.com/services/oauth2/authorize?state=alice-claim-state&code_challenge=c&code_challenge_method=S256"),
+                state,
+                alice,
+                "c",
+                "v"),
+            TestContext.Current.CancellationToken);
+        Assert.Equal(state, minted.State);
+
+        var refusal = await Assert.ThrowsAsync<NeuronAuthorizationException>(async () =>
+            await authorization.Claim(command, bob, TestContext.Current.CancellationToken));
+
+        Assert.Contains("not pending", refusal.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(state, refusal.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(alice.Username, refusal.Message, StringComparison.OrdinalIgnoreCase);
+
+        var own = await authorization.Claim(command, alice, TestContext.Current.CancellationToken);
+        Assert.Equal(McpAuthorizationClaimKind.Required, own.Kind);
+        Assert.Equal(state, own.Required!.State);
+        Assert.Equal(alice.PrincipalId, own.Required.Actor!.PrincipalId);
+    }
+
+    [Fact]
+    public async Task NullActorOnBeginAndClaimRefusesSettled()
+    {
+        var brain = fixture.BrainFor("oauth-null-actor");
+        var authorization = brain.GetGrainProxy<IMcpAuthorization>(IMcpAuthorization.DefaultInstanceName);
+        var command = CommandId.New();
+        const string state = "null-actor-state";
+        var alice = new ActorContext(PrincipalId.New(), "alice");
+
+        var beginNull = await Assert.ThrowsAsync<NeuronAuthorizationException>(async () =>
+            await authorization.Begin(
+                new BeginMcpAuthorization(
+                    command,
+                    "salesforce",
+                    "Salesforce",
+                    new Uri("https://login.salesforce.com/services/oauth2/authorize?state=null-actor-state"),
+                    state,
+                    Actor: null!),
+                TestContext.Current.CancellationToken));
+        Assert.IsNotType<ArgumentNullException>(beginNull);
+        Assert.DoesNotContain(state, beginNull.Message, StringComparison.Ordinal);
+
+        await authorization.Begin(
+            new BeginMcpAuthorization(
+                command,
+                "salesforce",
+                "Salesforce",
+                new Uri("https://login.salesforce.com/services/oauth2/authorize?state=null-actor-state&code_challenge=c&code_challenge_method=S256"),
+                state,
+                alice,
+                "c",
+                "v"),
+            TestContext.Current.CancellationToken);
+
+        var claimNull = await Assert.ThrowsAsync<NeuronAuthorizationException>(async () =>
+            await authorization.Claim(command, null!, TestContext.Current.CancellationToken));
+        Assert.IsNotType<ArgumentNullException>(claimNull);
+        Assert.DoesNotContain(state, claimNull.Message, StringComparison.Ordinal);
     }
 }

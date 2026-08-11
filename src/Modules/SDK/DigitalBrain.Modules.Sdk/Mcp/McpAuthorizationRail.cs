@@ -45,9 +45,9 @@ public static class McpAuthorizationRail
         McpAuthorizationClaim? claim = null;
         try
         {
-            claim = await authorization.Claim(commandId, cancellationToken).ConfigureAwait(false);
+            claim = await authorization.Claim(commandId, actor, cancellationToken).ConfigureAwait(false);
         }
-        catch (InvalidOperationException)
+        catch (NeuronAuthorizationException)
         {
         }
 
