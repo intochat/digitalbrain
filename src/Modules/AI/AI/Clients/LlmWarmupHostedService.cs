@@ -8,13 +8,23 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.AI;
-internal sealed partial class LlmWarmupHostedService(
+internal sealed class LlmWarmupHostedService(
     IServiceProvider services,
     IConfiguration configuration,
     ILogger<LlmWarmupHostedService> logger) : IHostedService
 {
     private static readonly TimeSpan WarmBudget = TimeSpan.FromMinutes(3);
     private static readonly ChatMessage WarmPrompt = new(ChatRole.User, " ");
+    private static readonly Action<ILogger, string, long, Exception?> LogWarmed =
+        LoggerMessage.Define<string, long>(
+            LogLevel.Information,
+            new EventId(1, nameof(LogWarmed)),
+            "Warmed LLM {Model} in {ElapsedMs}ms.");
+    private static readonly Action<ILogger, string, Exception?> LogWarmFailed =
+        LoggerMessage.Define<string>(
+            LogLevel.Warning,
+            new EventId(2, nameof(LogWarmFailed)),
+            "LLM warmup failed for {Model}; first chat may still pay cold start.");
 
     private static readonly (Type Key, string ConfiguredModelKey)[] OllamaTargets =
     [
@@ -82,20 +92,12 @@ internal sealed partial class LlmWarmupHostedService(
 
             var clock = Stopwatch.StartNew();
             _ = await client.GetResponseAsync([WarmPrompt], cancellationToken: budget.Token).ConfigureAwait(false);
-            LogWarmed(logger, name, clock.ElapsedMilliseconds);
+            LogWarmed(logger, name, clock.ElapsedMilliseconds, null);
         }
         catch (Exception failure) when (failure is not OperationCanceledException
             || !cancellationToken.IsCancellationRequested)
         {
-            LogWarmFailed(logger, failure, name);
+            LogWarmFailed(logger, name, failure);
         }
     }
-
-    [LoggerMessage(LogLevel.Information, "Warmed LLM {Model} in {ElapsedMs}ms.")]
-    private static partial void LogWarmed(ILogger logger, string model, long elapsedMs);
-
-    [LoggerMessage(
-        LogLevel.Warning,
-        "LLM warmup failed for {Model}; first chat may still pay cold start.")]
-    private static partial void LogWarmFailed(ILogger logger, Exception failure, string model);
 }

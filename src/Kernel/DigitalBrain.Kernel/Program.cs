@@ -26,5 +26,3 @@ app.MapGraphStreams();
 app.MapOAuthCallback();
 app.MapOrleansDashboard("/orleans");
 app.Run();
-
-public partial class Program;
