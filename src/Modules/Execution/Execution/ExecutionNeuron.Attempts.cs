@@ -1,3 +1,6 @@
+using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
+
 namespace DigitalBrain.Execution;
 
 public sealed partial class ExecutionNeuron
@@ -18,10 +21,46 @@ public sealed partial class ExecutionNeuron
         // Keep the grain hot while the worker holds in-memory attempt progress.
         DelayDeactivation(TimeSpan.FromHours(2));
         // Liveness: if the worker dies after Accept, a later reminder fails the attempt.
-        await this.RegisterOrUpdateReminder(DispatchReminderName, TimeSpan.FromSeconds(15), ReminderPeriod)
+        await this.RegisterOrUpdateReminder(
+                DispatchReminderName,
+                ExecutionLiveness.WorkerLeaseTimeout,
+                ReminderPeriod)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         Stage(data);
+    }
+
+    public async Task RenewLease(AttemptCursor cursor)
+    {
+        ArgumentNullException.ThrowIfNull(cursor);
+
+        if (cursor.Execution != Id)
+        {
+            throw new NeuronAuthorizationException(
+                $"Worker lease for '{cursor.Execution}' cannot renew Execution '{Id}'.");
+        }
+
+        if (!GrainCallerContext.TryGetNeuronId(out var caller) || caller != cursor.Worker)
+        {
+            throw new NeuronAuthorizationException(
+                $"Only attributed worker '{cursor.Worker}' may renew its Execution lease.");
+        }
+
+        var data = LoadIfStarted();
+        if (data is null
+            || data.State != ExecutionState.Running
+            || data.Worker != caller
+            || data.ActiveAttempt != cursor.Attempt
+            || data.Revision != cursor.Revision)
+        {
+            return;
+        }
+
+        await this.RegisterOrUpdateReminder(
+                DispatchReminderName,
+                ExecutionLiveness.WorkerLeaseTimeout,
+                ReminderPeriod)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(AttemptWaiting fact, CancellationToken cancellationToken)

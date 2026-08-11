@@ -173,7 +173,7 @@ public sealed partial class ExecutionNeuron
         {
             await this.RegisterOrUpdateReminder(
                     DispatchReminderName,
-                    TimeSpan.FromSeconds(15),
+                    ExecutionLiveness.WorkerLeaseTimeout,
                     ReminderPeriod)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }

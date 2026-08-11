@@ -74,7 +74,7 @@ internal sealed class ChatTurnWorker : Neuron
                 new AttemptAccepted(request.Execution, request.Worker, request.Attempt, request.Revision))
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-            var (answer, author) = await RunResponderAsync(goal, attemptToken)
+            var (answer, author) = await RunResponderWithLeaseAsync(request, goal, attemptToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             if (string.IsNullOrWhiteSpace(answer))
@@ -171,6 +171,60 @@ internal sealed class ChatTurnWorker : Neuron
         }
 
         return (answer.ToString(), author);
+    }
+
+    private async Task<(string Answer, string Author)> RunResponderWithLeaseAsync(
+        AttemptRequest request,
+        ChatTurnGoal goal,
+        CancellationToken cancellationToken)
+    {
+        using var leaseStop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var responder = RunResponderAsync(goal, cancellationToken);
+        var lease = MaintainLeaseAsync(request, leaseStop.Token);
+
+        var completed = await Task.WhenAny(responder, lease)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        if (completed == lease)
+        {
+            await lease.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            throw new InvalidOperationException("Worker lease ended before the chat responder completed.");
+        }
+
+        try
+        {
+            return await responder.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+        finally
+        {
+            leaseStop.Cancel();
+            try
+            {
+                await lease.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+            catch (OperationCanceledException) when (leaseStop.IsCancellationRequested)
+            {
+                // Expected when the responder completes or the attempt is cancelled.
+            }
+        }
+    }
+
+    private async Task MaintainLeaseAsync(AttemptRequest request, CancellationToken cancellationToken)
+    {
+        var execution = GrainFactory.GetGrain<IExecutionWorkerLease>(request.Execution.ToGrainId());
+        var cursor = new AttemptCursor(
+            request.Execution,
+            request.Worker,
+            request.Attempt,
+            request.Revision);
+
+        while (true)
+        {
+            await Task.Delay(ExecutionLiveness.WorkerLeaseRenewalInterval, cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await execution.RenewLease(cursor)
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
     }
 
     private async Task<(IAgent Responder, string Author)> ResponderAsync(NeuronId chatId)

@@ -22,6 +22,12 @@ internal static class AuthorizationStreamsHttpMaps
                 ArgumentNullException.ThrowIfNull(sessionJournal);
                 cancellationToken.ThrowIfCancellationRequested();
 
+                if (!HttpActor.TryGet(http, out var actor))
+                {
+                    http.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return;
+                }
+
                 var cursor = afterSequence.GetValueOrDefault();
                 if (cursor < 0)
                 {
@@ -31,7 +37,11 @@ internal static class AuthorizationStreamsHttpMaps
 
                 await SseResponse.WriteAsync(
                     http.Response,
-                    WatchAuthorizationsAsync(sessionJournal, cursor, cancellationToken),
+                    WatchAuthorizationsAsync(
+                        sessionJournal,
+                        actor.PrincipalId,
+                        cursor,
+                        cancellationToken),
                     cancellationToken).ConfigureAwait(false);
             });
 
@@ -40,15 +50,18 @@ internal static class AuthorizationStreamsHttpMaps
 
     private static IAsyncEnumerable<SseItem<AuthorizationEvent>> WatchAuthorizationsAsync(
         OwnerSessionJournal sessionJournal,
+        PrincipalId principal,
         long afterSequence,
         CancellationToken cancellationToken)
         => JournalProjection.WatchAsync(
             token => sessionJournal.WatchAuthorizationOutgoingAsync(afterSequence, token),
             HttpSurfacePaths.AuthorizationEvent,
-            ProjectAuthorization,
+            delivery => ProjectAuthorization(delivery, principal),
             cancellationToken);
 
-    private static AuthorizationEvent? ProjectAuthorization(SynapseDelivery delivery)
+    private static AuthorizationEvent? ProjectAuthorization(
+        SynapseDelivery delivery,
+        PrincipalId principal)
     {
         AuthorizationEvent Authorization(
             string kind,
@@ -69,21 +82,24 @@ internal static class AuthorizationStreamsHttpMaps
 
         return delivery.Synapse switch
         {
-            AuthorizationRequired required => Authorization(
+            AuthorizationRequired { Actor: { } actor } required
+                when actor.PrincipalId == principal => Authorization(
                 nameof(AuthorizationRequired),
                 required.CommandId,
                 required.ServerKey,
                 required.ServerDisplayName,
                 required.SignInUrl.AbsoluteUri,
                 required.State),
-            AuthorizationCompleted completed => Authorization(
+            AuthorizationCompleted { Actor: { } actor } completed
+                when actor.PrincipalId == principal => Authorization(
                 nameof(AuthorizationCompleted),
                 completed.CommandId,
                 completed.ServerKey,
                 serverDisplayName: null,
                 signInUrl: null,
                 completed.State),
-            AuthorizationDenied denied => Authorization(
+            AuthorizationDenied { Actor: { } actor } denied
+                when actor.PrincipalId == principal => Authorization(
                 nameof(AuthorizationDenied),
                 denied.CommandId,
                 denied.ServerKey,

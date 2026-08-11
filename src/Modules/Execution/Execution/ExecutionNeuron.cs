@@ -10,6 +10,7 @@ namespace DigitalBrain.Execution;
 public sealed partial class ExecutionNeuron :
     Neuron,
     IExecution,
+    IExecutionWorkerLease,
     IHandle<ApplyExecution>,
     IHandle<PrepareOperation>,
     IHandle<TransitionOperation>,

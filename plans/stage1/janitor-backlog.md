@@ -21,10 +21,15 @@ until final hardening, where each module will own its own test project/framework
 - **Installation owner key:** replace/configure the internal `"dev"` owner during Stage-2
   composition consolidation. It is the one-workspace deployment key, never a caller identity.
 - **S1.5 riding debt:** POST observer starts at `afterSequence: 0`; MAF tool effects retain the
-  post-effect/pre-safe-point uncertainty window; `AttemptAccepted` can lag while the worker turn
-  is active.
+  post-effect/pre-safe-point uncertainty window; fire-and-return worker execution remains a
+  concurrency residual. Live workers now renew an attributed Execution lease, so slow calls are
+  not falsely abandoned at the 15-second liveness deadline.
 - **S1.3 riding debt:** add structured failure audit outcomes without token material; revisit pin
   strength when module-owned tests are designed.
+- **Salesforce operator configuration:** register the exact local callback
+  `http://localhost:5080/oauth/callback` in the Salesforce External Client App. The Stage-1 live
+  authorize request currently returns `redirect_uri_mismatch`; code-side callback composition is
+  already canonical.
 
 ## Resolved or deliberately kept
 
@@ -38,6 +43,8 @@ until final hardening, where each module will own its own test project/framework
   counter methods, the chat fault-injection branch, and fake `"worker"` allow-list seed are gone.
 - **Token presence resolved:** the typed Gmail path is gone; `McpTokenPresence` is now the one shared
   SDK implementation used by Salesforce and Gmail MCP integrations.
+- **Authorization-stream isolation resolved:** every authorization fact is projected only to its
+  stamped principal; actorless historical facts are not exposed.
 - **Orleans dashboard deliberately kept:** `/orleans` is covered by the Kernel fallback auth policy
   and is workspace-wide for the one-workspace MVP. Finer operator roles can follow in Stage 2.
 - **Webhook slice deliberately kept:** it is the ratified SDK webhook-ingress rail seed (§1.18).
