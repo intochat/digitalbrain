@@ -14,7 +14,7 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
 
 jobs:
-  framework:
+  source-build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -22,6 +22,6 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - name: test
-        run: dotnet test DigitalBrain.slnx -c Release --verbosity minimal
+      - name: build
+        run: dotnet build DigitalBrain.slnx -c Release -warnaserror --nologo
         timeout-minutes: 12

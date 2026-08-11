@@ -6,20 +6,25 @@ is data the owner and the assistant rewrite while it runs. Architecture record a
 decisions: [UNIFIED-ARCHITECTURE.md](UNIFIED-ARCHITECTURE.md) (current) and
 [INTERCONNECT-REVIEW.md](INTERCONNECT-REVIEW.md) (evidence base).
 
+> **Owner amendment — 2026-08-11:** production source is the current behavioral truth. The central
+> automated-test project was intentionally deleted; do not create or run .NET or Flutter tests
+> during this refit. Final hardening will design module-owned test projects/frameworks. Keep
+> Salesforce Contracts as the product boundary for neuron and synapse interfaces.
+
 ## Commands
 
 ```bash
-dotnet build DigitalBrain.slnx                                        # full solution, 0 warnings expected
-dotnet test src/Tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj    # .NET suite (in-memory 2-silo cluster)
+dotnet build DigitalBrain.slnx -warnaserror --nologo                  # full solution, 0 warnings expected
+pwsh scripts/gate.ps1                                                 # .NET source-build gate
+pwsh scripts/gate.ps1 -Flutter                                        # plus production Flutter lib analysis
 dotnet run --project src/Kernel/DigitalBrain.AppHost                  # full stack (Docker: Azurite, Qdrant, Ollama)
 ```
 
-Flutter (`src/Modules/UI/Flutter/{core,kit,shell}`): `flutter test` and `flutter analyze`
-per package. Owner scripts are .NET single-file apps in `src/Kernel/DigitalBrain.Scripting/*.cs`
+Flutter (`src/Modules/UI/Flutter/{core,kit,shell}`): `flutter analyze lib` per package. Do not run
+automated tests. Owner scripts are .NET single-file apps in `src/Kernel/DigitalBrain.Scripting/*.cs`
 (`#:project` directives, run with `dotnet run <file>.cs -- --ConnectionStrings:clustering "…"`).
 
-Run the .NET suite **without** the aspire stack up — the timing-window tests flake on a
-saturated machine.
+Stop AppHost before every build; running silos hold output files open.
 
 ## Architecture spine
 
@@ -98,8 +103,8 @@ saturated machine.
    identity → replace/disconnect by name). Missing value-type JSON fields bind silently
    to defaults — validate in handlers.
 8. **Declaring `IHandle<T>` on any class puts T in the broadcast catalog** (reflection
-   manifest) and spawns per-correlation ghost receivers on every Emit of T. In tests,
-   use `OnUnboundSynapseAsync` overrides for routed-only sinks.
+   manifest) and spawns per-correlation ghost receivers on every Emit of T. Routed-only sinks
+   must not accidentally become broadcast handlers.
 9. Keyword god-switches in handlers are banned — two were deleted after one silently
    swallowed any chat message containing "chart".
 
@@ -111,11 +116,10 @@ saturated machine.
   reflects manifests from contracts, scans implementations for broadcast handlers and
   `Core.IModule` DI hooks (only AI/Google/Memory/Salesforce/UI have one). No module
   classes, no Compiled manifests, no `DigitalBrain:Modules` gate.
-- **TDD is mandatory**: failing test first (or mutation-verify if code ran ahead), minimal
-  green, then refactor. Two test kinds only: NeuronTest-style (one neuron's contract) and
-  DigitalBrainTest-style (cross-neuron through the cluster) — one project,
-  `src/Tests/DigitalBrain.Tests` (fixture: `InProcessTestClusterBuilder` + shared
-  `VolatileJournalStorageProvider` + `UseInMemoryReminderService`).
+- **SOURCE → GREEN → GRILL → GATE → COMMIT**: inspect production implementations and routes,
+  make the smallest coherent change, adversarially review the diff against the kernel traps,
+  run the build/static gate, then commit on the Stage-1 branch. Automated testing is deferred
+  to a per-module framework in final hardening.
 - No `/// <summary>` boilerplate. Comments only for constraints the code cannot express.
   Naming carries the meaning; kernel vocabulary: Neuron, Synapse, journal, outbox, owner,
   Emit/Fire/Send/Deliver, Connect/Connected/Disconnect/Disconnected/connection.

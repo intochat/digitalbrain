@@ -1,10 +1,16 @@
-# Stage 1 owner-amendment conflict — 2026-08-11
+# Stage 1 owner-amendment resolution — 2026-08-11
+
+> **STATUS: RESOLVED by Vlad.** This amendment supersedes the conflicting historical brief and
+> test directives. Implementation continues under the amended source-first gate.
 
 ## Owner direction
 
 1. Keep `DigitalBrain.Modules.Salesforce.Contracts`; module neuron interfaces and synapses are
    product contracts, not janitor trash.
-2. Tests belong with their modules rather than in one central `DigitalBrain.Tests` project.
+2. The central automated-test project is intentionally deleted. Do not create or run automated
+   tests during the refit; production source is the current truth.
+3. Design the proper testing framework in final hardening, with tests owned by each module rather
+   than one central `DigitalBrain.Tests` project.
 
 ## Conflicting binding text
 
@@ -15,14 +21,25 @@
 - `plans/GROK-ORCHESTRATION-STAGE1.md` describes one merged test suite and excludes project
   consolidation from Stage 1; its remaining order is janitor → Flutter → docs → exit.
 
-## Safe reconciliation performed
+## Reconciliation performed
 
 - Stopped the active targeted test run before changing project structure.
 - Restored the Salesforce contracts project, its project reference, and its solution entry.
-- Made no commit and did not continue the gate under contradictory rules.
+- Vlad committed the reconciled source plus intentional central-suite deletion in
+  `4a52255361efded2c73e2e49d100baafeaea239c`.
+- Amended `GROK.md`, the ratified definition, Stage-1 plan, handoff, CI, and gate together so they
+  all use source characterization, adversarial review, build/static analysis, and live smoke.
 
-## Decision required before implementation resumes
+## Binding resolution
 
-The binding definition, standing orders, and stage plan must be amended together. In particular,
-the modular test-project migration must be placed either before the remaining Stage-1 Flutter lane
-or as the first Stage-2 structural seam. Silent placement would violate the ordered handoff.
+No test-project migration occurs in Stage 1 or as the opening Stage-2 seam. Testing architecture is
+deferred until final hardening, after product seams and module ownership stabilize. Existing Flutter
+test files are left untouched but are not current authority and are not executed.
+
+## Verification
+
+- Confirmed no grok, DigitalBrain, AppHost, or Aspire process was running before the build.
+- `pwsh -NoProfile -File scripts/gate.ps1` — PASS, 0 warnings, 0 errors.
+- The gate executed the full solution build only; no automated test command ran.
+- The build compiled `DigitalBrain.Modules.Salesforce.Contracts`, proving the retained project is
+  still part of the solution graph.

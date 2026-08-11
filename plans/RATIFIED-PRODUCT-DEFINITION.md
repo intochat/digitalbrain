@@ -6,6 +6,13 @@
 > Line references `[L…]` point into `Planning.txt`.
 > Status: **RATIFIED 2026-08-10 by Vlad** — approved as-is with one owner amendment (§1.18: SDK
 > common rails / webhook ingress) and all four open items of §4 ratified as recommended.
+>
+> **Owner amendment — 2026-08-11:** production source is the current behavioral truth. The central
+> automated-test project was intentionally deleted; no automated tests are to be created or run
+> during this refit. Final hardening will design a proper per-module testing framework. The
+> Salesforce Contracts project is a permanent product boundary containing module neuron and
+> synapse interfaces and must not be deleted. This amendment supersedes conflicting test-layout,
+> test-gate, and Salesforce-contract deletion text below.
 
 ---
 
@@ -165,9 +172,9 @@
 Chosen over big-bang rewrite and cosmetic consolidation [L8445–8447]. Ratified sequence [L8582]:
 
 1. **Define the supported product boundary** (done above, §1–§2).
-2. **Reproduce failures.**
-3. **Add characterization tests** around today's actual behavior.
-4. **Only then replace defective seams — one seam per iteration**, product stays runnable throughout.
+2. **Characterize the current production source, routes, and observable failures.**
+3. **Replace defective seams one at a time** with the smallest coherent production change.
+4. **Adversarially inspect every diff, then build/static-check it**, keeping the product runnable.
 
 Initial exclusions from the stabilization slice (ratified) [L8582]: Behavior build-out, Engineering
 module, graph renaming, project consolidation. They return as later strangle iterations.
@@ -187,7 +194,9 @@ module, graph renaming, project consolidation. They return as later strangle ite
 
 ### Known trash (delete/quarantine after characterization)
 - `WantsTimeButton`/`ShowTime` keyword god-switch in Chat (W2) — [multiple, CLAUDE.md].
-- Empty `DigitalBrain.Modules.Salesforce.Contracts` project; two ~25-line Salesforce Aspire projects.
+- ~~Empty `DigitalBrain.Modules.Salesforce.Contracts` project~~ **KEPT by owner amendment**: this
+  project is the durable module-contract boundary for Salesforce neuron and synapse interfaces.
+  The two small Salesforce Aspire projects remain independent cleanup candidates.
 - Stale `docker-compose.yml` module env vars (`DigitalBrain__Modules__0..9` naming classes that no longer exist).
 - Typed Gmail path (planner/token-store/auth-rail) — after Gmail MCP parity [L13012].
 - Unused Orleans Streams/PubSub provisioning — after proof of non-use [L8464].
@@ -211,9 +220,11 @@ module, graph renaming, project consolidation. They return as later strangle ite
 3. **RATIFIED — FIFO turn ordering**: one active Execution per Conversation, extra turns durably
    queued; each message = durable queued turn; cancel advances the queue; different Conversations
    run concurrently [L23676–23689].
-4. **RATIFIED — Prove-or-reject spike as Stage-1 exit test**: Orleans-backed execution walking one
-   conversation turn through restart / OAuth wait+resume / cancel / reconnect / duplicate
-   submission / uncertain Salesforce write [L23922–23932].
+4. **RATIFIED — Prove-or-reject spike as a Stage-1 exit scenario**: source-audit the Orleans-backed
+   execution path for restart / OAuth wait+resume / cancel / reconnect / duplicate submission /
+   uncertain Salesforce write, then live-smoke the observable path where the local stack permits.
+   Historical automated spike evidence is context only, not the current verification gate
+   [L23922–23932].
 5. Graph neuron rename: `ConnectionGraphNeuron` vs `TopologyGraphNeuron` [L31424] (rename itself is
    deferred out of Stage 1 anyway). — *open*
 6. Preview .NET 11/Aspire preview vs stable LTS channel [L8463] — *open; keep current channel
@@ -225,13 +236,13 @@ module, graph renaming, project consolidation. They return as later strangle ite
 
 ## 5. Current repo reality check (what the plan must operate on)
 
-- 33 C# projects (10 Kernel, 22 Modules, 1 Tests) + Flutter `core`/`kit`/`shell` + file-based C#
-  scripts in `src/Kernel/DigitalBrain.Scripting`.
-- `UNIFIED-ARCHITECTURE.md` records synapse-graph phases 0–5 as landed (30 tests green);
-  `CONTEXT.md` already holds the ratified domain vocabulary; `CLAUDE.md` documents build/test
-  commands, 9 kernel traps, mandatory TDD.
-- Massive characterization gap: CodeGraph flagged "no covering tests found" on nearly every
-  high-blast-radius symbol (OAuth rails, module composition, chat, MAF session, Execution).
-- CI is .NET-only today; Flutter tests exist but aren't gated [L8460].
+- 32 C# projects (10 Kernel, 22 Modules) + Flutter `core`/`kit`/`shell` + file-based C# scripts in
+  `src/Kernel/DigitalBrain.Scripting`; Salesforce Contracts remains among the module projects.
+- `UNIFIED-ARCHITECTURE.md` records synapse-graph phases 0–5 as landed; `CONTEXT.md` holds the
+  ratified domain vocabulary; `CLAUDE.md` documents current build/static verification and the
+  9 kernel traps.
+- Historical automated-test evidence remains in reports for archaeology, but production source,
+  route inspection, zero-warning builds, static analysis, and live smoke are current truth.
+- CI is .NET source-build-only today; Flutter production-source analysis is in the local gate.
 - Stack: net11.0 preview / C# 14, Orleans 10.2.2 (+Journaling rc), Aspire 13.5.0-preview,
   MAF 1.17.0, MCP 2.1.0, xunit.v3 + Reqnroll + Testcontainers.

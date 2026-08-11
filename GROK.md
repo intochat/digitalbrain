@@ -1,33 +1,34 @@
-# GROK.md — standing orders for grok sessions in the DigitalBrain refit
+# GROK.md — standing orders for the DigitalBrain refit
 
-You are ONE headless session in an orchestrated multi-session refit. An external orchestrator
-dispatches you with a brief, verifies your work with gates, and owns git. Your brief is in
-`plans/stage1/briefs/` — your launch prompt names the exact file. Scope authority:
-`plans/RATIFIED-PRODUCT-DEFINITION.md` (what the product IS / IS NOT) and
-`plans/GROK-ORCHESTRATION-STAGE1.md` (the stage plan). Never exceed your brief.
+Codex is the implementer on `stage1-stabilize-strangle`; no grok worker sessions are part of the
+current workflow. Scope authority is `plans/RATIFIED-PRODUCT-DEFINITION.md` (what the product IS /
+IS NOT) and `plans/GROK-ORCHESTRATION-STAGE1.md` (the stage plan).
+
+> **Owner amendment — 2026-08-11:** the central automated-test project was deleted intentionally.
+> Do not recreate tests or run any .NET or Flutter test command during this refit. Production source
+> is the current behavioral truth. A proper test framework will be designed during final hardening,
+> with tests owned by each module rather than one repository-wide test project. Salesforce Contracts
+> remains a permanent product boundary for neuron and synapse interfaces.
 
 ## Absolute rules
 
-1. **NO git.** Never run `git commit`, `git checkout`, `git branch`, `git reset`, `git stash`.
-   The orchestrator owns version control. You only edit files.
-2. **NO AppHost / aspire.** Never run `dotnet run --project src/Kernel/DigitalBrain.AppHost`
-   or docker compose. Running silos hold file locks that break builds.
-3. **Tests run WITHOUT the aspire stack** (timing-window tests flake on a saturated machine).
+1. **Commit only on `stage1-stabilize-strangle`.** Vlad remains merge authority for `master`.
+2. **AppHost is smoke-only.** Stop it before every build; running silos hold file locks.
+3. **No automated tests for now.** Never invoke `dotnet test`, a test executable, or
+   `flutter test`. Do not recreate deleted test projects or move Flutter tests in this stage.
 4. **No new NuGet packages** and no version changes in `Directory.Packages.props` unless your
    brief explicitly grants it. Never weaken `TreatWarningsAsErrors`.
 5. **Wire aliases are permanent** once real data exists: `db.*` kernel, `ui.*` vocabulary,
    `chat.*`/`probe.*` domains. Renaming an alias needs the orchestrator's explicit brief.
-6. **Your LAST action** is writing your report to the path named in your brief. If a rule or
-   reality conflicts with your brief, STOP, write the conflict into the report, and end — a
-   written refusal beats silent improvisation.
+6. If a rule or reality conflicts with the ratified scope, STOP and write the conflict into a
+   report before continuing — a written refusal beats silent improvisation.
 
 ## Commands
 
-- Build:   `dotnet build DigitalBrain.slnx`            → must end with 0 warnings, 0 errors
-- Test:    `& src/Tests/DigitalBrain.Tests/bin/Debug/net11.0/DigitalBrain.Tests.exe` (after build)
-  — do NOT use `dotnet test`: its testing-platform handshake fails against this xunit.v3 exe
-- Flutter: `flutter analyze` / `flutter test` per package under `src/Modules/UI/Flutter/{core,kit,shell}`
-- Full gate: `pwsh scripts/gate.ps1` (add `-Flutter` to include Flutter checks)
+- Build: `dotnet build DigitalBrain.slnx -warnaserror --nologo` → 0 warnings, 0 errors
+- Flutter production source: `flutter analyze lib` in each package under
+  `src/Modules/UI/Flutter/{core,kit,shell}`
+- Full source gate: `pwsh scripts/gate.ps1` (add `-Flutter` for production Flutter analysis)
 
 ## The 9 kernel traps (violating any = automatic rejection)
 
@@ -47,8 +48,8 @@ dispatches you with a brief, verifies your work with gates, and owns git. Your b
 7. Models pass names where schemas want GUIDs (deterministic GUID derivation); missing
    value-type JSON fields bind silently to defaults — validate in handlers.
 8. Declaring `IHandle<T>` on ANY class puts T in the broadcast catalog and spawns per-correlation
-   ghost receivers on every Emit of T. In tests, use `OnUnboundSynapseAsync` overrides for
-   routed-only sinks.
+   ghost receivers on every Emit of T. Routed-only sinks must not accidentally become broadcast
+   handlers.
 9. Keyword god-switches in handlers are banned.
 
 ## Banned forever (ratified)
@@ -60,26 +61,23 @@ the silo; client-trusted identity; keyword god-switches.
 
 ## Method
 
-- **TDD is mandatory**: failing test first, minimal green, then refactor. Two test kinds only:
-  NeuronTest-style (one neuron's contract) and DigitalBrainTest-style (cross-neuron through the
-  cluster) — both in `src/Tests/DigitalBrain.Tests` (fixture: `InProcessTestClusterBuilder` +
-  shared `VolatileJournalStorageProvider` + `UseInMemoryReminderService`).
-- Characterization pins that intentionally pin a KNOWN DEFECT carry a
-  `// PIN-DEFECT(P0-x): <one line>` comment. Only the seam session that fixes P0-x may flip
-  that pin, and must remove the marker when it does.
+- **SOURCE → GREEN → GRILL → GATE → COMMIT**: characterize the current production source and
+  routes; make the smallest coherent change; adversarially review the diff against the kernel
+  traps and ratified scope; run the build/static gate; then commit on the Stage-1 branch.
+- Do not treat deleted historical tests or their reports as current behavioral authority.
 - Grain-turn awaits use `ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext)`.
 - No `/// <summary>` boilerplate. Comments only for constraints the code cannot express.
 - C# 14 / net11.0 preview; preview analyzers are on; keep the build at 0 warnings.
 - Quality bar: idiomatic modern C#, small deep interfaces, no dead code, no TODO litter —
   this refit exists to REMOVE demo residue, never to add more.
 
-## Report format (write to the exact path your brief names)
+## Report format
 
 ```
 # <brief id> — <role> report
 ## What changed        (files + one line each)
-## Tests               (added / changed / flipped pins, with names)
-## Gate                (paste the tail of your final build+test run)
+## Source evidence     (symbols, routes, searches, and behavior inspected)
+## Gate                (paste the tail of the final build/static-analysis run)
 ## Conflicts & risks   (anything that blocked you or smells wrong — be specific)
 ## Out of scope        (things you noticed but did NOT touch)
 ```

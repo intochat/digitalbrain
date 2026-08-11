@@ -1,4 +1,8 @@
-# J-batch — janitor sweep + flake hardening   (role: JANITOR)
+# J-batch — janitor sweep + flake hardening (historical brief)
+
+> **SUPERSEDED 2026-08-11:** Vlad requires Salesforce Contracts to remain, intentionally deleted
+> the central automated-test suite, and deferred module-owned testing infrastructure to final
+> hardening. Do not execute the deletion or test instructions below; they remain for history only.
 
 Report path: `plans/stage1/reports/J-batch.md`
 

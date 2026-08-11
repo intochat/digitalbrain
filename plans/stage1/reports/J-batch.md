@@ -1,11 +1,11 @@
 # J-batch — JANITOR report
 
-> **STATUS: BLOCKED / NOT A VALID GATE RECORD (owner amendment, 2026-08-11).**
+> **STATUS: RECONCILED / HISTORICAL TEST OUTPUT (owner amendment, 2026-08-11).**
 > The inherited grok report was written before its worktree matched its claims. Vlad has since
 > overruled J2: the Salesforce contracts project is a product boundary and must remain. The
 > contracts project, its Salesforce project reference, and its solution entry are restored.
-> The gate results below are inherited historical output and must not be used as completion
-> evidence; Codex had not yet completed two fresh gates when the owner amendment arrived.
+> Vlad committed the reconciled source and intentional central-suite deletion in `4a522553`.
+> The test results below remain historical context and are not current completion evidence.
 
 ## What changed
 
@@ -150,14 +150,12 @@ Both consecutive full exe runs green (hardened suite stability).
 
 ## Conflicts & risks
 
-1. **BLOCKING owner amendment:** `plans/stage1/briefs/J-batch.md` and the ratified definition say
-   to delete Salesforce.Contracts; Vlad now requires every module's contracts boundary to remain.
-   The owner amendment governs, but the binding documents must be amended before this report can close.
-2. **BLOCKING test-layout amendment:** `GROK.md` mandates one shared test project, while Vlad now
-   requires each module to own its tests. This is a cross-solution structural migration and conflicts
-   with Stage 1's explicit exclusion of project consolidation. Its stage placement must be ratified.
-3. **Inherited gate evidence is invalid:** it records two test runs, not two fresh full gates, and
-   was captured before the reported J2 state matched the worktree.
+1. **Resolved:** Salesforce.Contracts remains a permanent product boundary; active plans now
+   supersede the historical deletion instruction.
+2. **Resolved:** the central suite was intentionally deleted. No tests run during the refit;
+   module-owned test infrastructure is deferred to final hardening.
+3. **Historical gate evidence only:** the runs below predate the owner amendment and are not part
+   of the current source-build/static-analysis gate.
 4. **J5 Streams still provisioned** — intentional Stage-2 decision; idle Azure Queue poll noise remains until then.
 5. **J4 dual module catalog** deliberately out of this brief.
 

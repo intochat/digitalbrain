@@ -4,55 +4,52 @@
 > Purpose: shape the codebase from demo residue into the ratified product using **multiple grok
 > CLI sessions** as the workforce, with Vlad as merge authority.
 > Stage 1 = **"Stabilize and strangle"** (ratified delivery strategy). Stages 2–4 outlined at the end.
+>
+> **Owner amendment — 2026-08-11:** grok orchestration has ended; Codex is the implementer. The
+> central automated-test project was intentionally deleted and no automated tests are created or
+> run during this refit. Production source is the current truth. Verification is source
+> characterization, adversarial diff review, zero-warning build/static analysis, and live smoke.
+> A per-module testing framework is deferred to final hardening. Salesforce Contracts is kept as
+> a permanent product boundary. This amendment supersedes conflicting historical protocol below.
 
 ---
 
 ## 1. Operating model
 
-Grok CLI sessions cannot talk to each other. All coordination happens through **the repository
-itself** — files are the message bus, git branches are the isolation, Vlad is the scheduler and
-the only merge authority.
+Codex implements one seam at a time on `stage1-stabilize-strangle`; Vlad remains the only merge
+authority for `master`. Plans and reports remain the durable decision log.
 
 ```
                        ┌────────────────────────────┐
                        │  plans/  (briefs, reports) │  ← the shared brain of the refit
                        └─────────────┬──────────────┘
-        reads brief                  │                   writes report
+        source characterization       │             report evidence
   ┌───────────────┐   ┌──────────────┼───────────────┐   ┌───────────────┐
-  │ RED session   │   │ GREEN session│               │   │ GRILL session │
-  │ (tests only)  │──►│ (one seam)   │──► gate.ps1 ──┼──►│ (adversary)   │──► Vlad merges
-  └───────────────┘   └──────────────┘               │   └───────────────┘
-        branch: s1x-red      branch: s1x-green       │        no branch (reads diff)
+  │ SOURCE        │──►│ GREEN         │──► self-GRILL ┼──►│ build/static  │──► commit
+  │ (read/routes) │   │ (one seam)    │              │   │ gate + smoke  │
+  └───────────────┘   └───────────────┘              │   └───────────────┘
 ```
 
 ### Protocol rules
 
-1. **One session = one role = one brief = one branch.** A session reads `GROK.md` + its brief
-   `plans/stage1/S1.x-brief.md`, works only inside its declared scope, and ends by writing
-   `plans/stage1/reports/S1.x-<role>.md` with the gate output pasted in.
-2. **Three roles per seam iteration**:
-   - **RED** — writes characterization/failing tests only. May add test seams (e.g.
-     `InternalsVisibleTo`) but never changes production behavior.
-   - **GREEN** — minimal production change to satisfy the new spec; TDD per `CLAUDE.md`; may adjust
-     the RED pins where the seam's *new* ratified behavior legitimately differs (each adjustment
-     listed in the report).
-   - **GRILL** — a **fresh** session with no prior context. Input: the diff + the ratified
-     definition + `GROK.md`. Job: try to refute the change — hunt for violated kernel traps, scope
-     creep, banned patterns, untested paths, silent behavior changes. Verdict: APPROVE / REJECT
-     with reasons. Rejected work goes back to a new GREEN session with the grill report.
-3. **Vlad merges to main only after**: gate green + GRILL approve. Sessions never merge, never
-   push to main, never touch branches they don't own.
-4. **One seam per iteration** (ratified). Seam iterations are **sequential** on Lane A. Only
-   additive/isolated work (tests, janitor deletions, Flutter, CI) runs in **parallel lanes** on
-   separate branches — ideally separate `git worktree`s so builds don't fight over `bin/obj`:
-   `git worktree add ..\digitalbrain-laneB laneB`.
+1. **One seam per iteration on one branch.** Read `GROK.md`, the ratified definition, the relevant
+   brief/report, and the production source before editing.
+2. **SOURCE → GREEN → GRILL → GATE → COMMIT**:
+   - **SOURCE** — characterize current implementations, routes, manifests, and observable behavior.
+   - **GREEN** — make the smallest coherent production change required by the ratified product.
+   - **GRILL** — adversarially inspect the complete diff for kernel traps, scope creep, banned
+     patterns, stale call sites, and silent behavior changes. Correct findings before proceeding.
+   - **GATE** — stop AppHost, then run the zero-warning .NET build and relevant production-source
+     static analysis. Live-stack work has its own smoke evidence and must be stopped afterward.
+3. **Vlad merges to main only after** the gate is green and self-review findings are resolved.
+4. No automated test commands or test-project recreation during this refit. The future test
+   architecture is per-module and belongs to final hardening.
 5. **Stop-and-ask rule**: if a brief conflicts with `GROK.md`, the ratified definition, or reality
    in the code, the session STOPS and writes the conflict into its report instead of improvising.
    (This is the lesson of the refusal-visibility trap: a blocked agent that can't see the reason
    can't self-correct — so we make every refusal loud and written.)
-6. **Session hygiene**: keep briefs small and file-pointed; sessions may use the CodeGraph MCP
-   (`.mcp.json`, version pinned in S1.0) for maps instead of dumping the whole repo into context.
-   Stop AppHost before building (P0-9: file locks). Run tests **without** the aspire stack up.
+6. **Implementation hygiene**: keep seams small and file-pointed. Stop AppHost before building
+   (P0-9: file locks). Never run a test command under the current owner amendment.
 
 ---
 
@@ -60,36 +57,36 @@ the only merge authority.
 
 Content spec (mirrors `CLAUDE.md`, adds orchestration law; full draft in Appendix A):
 
-- Build/test commands, "0 warnings expected", tests run without aspire.
+- Build/static commands, "0 warnings expected", and AppHost-stop preflight.
 - The **9 kernel traps** verbatim from `CLAUDE.md`.
 - **Banned forever**: keyword god-switches; provider/action-specific synapses
   (`SalesforceReadSynapse`-style); moving outbox traffic to Orleans Streams; second job
   frameworks; MAF types leaking outside AI/Behavior internals; MAF edges as Connections;
   hot-loading generated assemblies into the silo; new NuGet packages without owner approval;
   weakening `TreatWarningsAsErrors`; touching wire aliases (`db.*`, `ui.*`, `chat.*`, `probe.*`).
-- **TDD mandatory**; two test kinds (NeuronTest / DigitalBrainTest) in the single test project.
-- Orchestration law: roles, one-branch rule, report template, stop-and-ask rule, gate command.
+- Source-first method and the deferred per-module testing-framework decision.
+- Implementation law: one-seam rule, report template, stop-and-ask rule, gate command.
 - Pointer to `plans/RATIFIED-PRODUCT-DEFINITION.md` as the scope authority.
 
 ---
 
 ## 3. Stage 1 — "Stabilize and strangle"
 
-Ratified sequence: boundary (done — the definition) → reproduce failures → characterization tests
-→ replace one defective seam per iteration. Excluded from Stage 1 (return later): Behavior
+Ratified sequence as amended: boundary (done) → characterize production source/routes → replace
+one defective seam per iteration → adversarial review → build/static gate. Excluded from Stage 1: Behavior
 build-out, Engineering module, graph renaming, project consolidation.
 
 ### Lane map
 
 | Lane | Nature | Runs |
 |------|--------|------|
-| **A** | Seam surgery (sequential iterations S1.2 → S1.6) | one GREEN at a time |
+| **A** | Seam surgery (sequential iterations S1.2 → S1.6) | one seam at a time |
 | **B** | Janitor — characterize-then-delete trash | parallel, small branches |
-| **C** | Flutter — test drift fix, analyzer green | parallel |
+| **C** | Flutter — production-source cleanup, analyzer green | parallel |
 | **D** | Harness/CI — gates, baseline | first, then as-needed |
 
-Practical concurrency: **max 2–3 grok sessions at once** (1 Lane-A + 1–2 Lane-B/C), plus fresh
-GRILL sessions on demand. More parallelism than that just creates merge conflicts in one solution.
+Historical grok concurrency is closed. Codex now works the remaining list sequentially to keep one
+coherent solution and one reviewable diff per commit.
 
 ---
 
@@ -98,19 +95,18 @@ GRILL sessions on demand. More parallelism than that just creates merge conflict
 **Objective**: make every later session cheap to verify and impossible to silently break.
 
 - Create `GROK.md` (Appendix A), `plans/` scaffolding, report templates.
-- Create `scripts/gate.ps1`: `dotnet build DigitalBrain.slnx -warnaserror` → `dotnet test
-  src/Tests/DigitalBrain.Tests` → `flutter analyze` + `flutter test` for the three Flutter
-  packages → exit non-zero on any failure. Record a baseline run on `main`.
-- CI (`.github`): add Flutter analyze+test lane (CI is .NET-only today), add an AppHost smoke lane
-  (compose up → health endpoint → down), pin CodeGraph MCP version (stop `@latest`).
+- Create `scripts/gate.ps1`: `dotnet build DigitalBrain.slnx -warnaserror` → `flutter analyze lib`
+  for the three Flutter packages when `-Flutter` is requested → exit non-zero on failure.
+- CI (`.github`): gate the .NET source build. Flutter production-source analysis and the AppHost
+  smoke remain explicit local exit gates until CI infrastructure is intentionally added.
 - Reproduce and document P0-9 (rebuild-while-running file locks) in the report; the fix is simply
   gate discipline (stop AppHost first) — codify in `GROK.md`.
 - **Exit**: `gate.ps1` green on main; baseline report committed.
 
-### S1.1 — Characterization wave (RED sessions; Lanes A+B+C in parallel)
+### S1.1 — Historical characterization wave
 
-**Objective**: pin today's actual behavior around every P0 seam before touching anything.
-One RED session per area, additive-only branches:
+**Historical objective**: capture behavior around every P0 seam before replacement. Its deleted
+automated tests and reports are archaeology only; current truth is the production implementation.
 
 | Area | Pins to write (referencing P0s) |
 |------|--------------------------------|
@@ -123,7 +119,7 @@ One RED session per area, additive-only branches:
 | Webhook slice (**keep per amendment**) | characterize current webhook behavior as the seed of the SDK ingress rail — no deletion |
 | Flutter (Lane C) | fix pre-existing `activateControl` drift so Lane C is green before CI gates it |
 
-**Exit**: all pins green in one merged test suite; a one-page coverage map in the report.
+**Exit (amended)**: reports exist as historical evidence; current source is audited at Stage-1 exit.
 
 ### S1.2 — Seam: Identity boundary (Lane A; kills P0-3, P0-4)
 
@@ -138,8 +134,8 @@ The ratified identity-first slice:
   commands** (RequestContext alone doesn't survive reminders/retries/restarts).
 - Server derives chat/transcript identity from the authenticated principal — client-supplied
   `chatName` trust removed.
-- Tests: cross-workspace denial, role checks, SSE auth, OAuth-callback user binding (prep for
-  S1.3), audit stamps, two-users-two-private-transcripts.
+- Source/live evidence: cross-workspace denial, role checks, SSE auth, OAuth-callback user binding
+  (prep for S1.3), audit stamps, and two users with two private transcripts.
 - **Exit**: two local users, private chats, all endpoints authenticated; gate + GRILL green.
 
 ### S1.3 — Seam: OAuth/Integration rail (Lane A; kills P0-1, P0-5, P0-7)
@@ -152,8 +148,8 @@ The ratified identity-first slice:
 - **Remove the destructive-tool blanket rejection** (ratified allow-all): `tools/list` is the
   catalog; keep the generic invariants — never cross user integration boundaries, audit
   actor/integration/tool/correlation/outcome, time/size/call-count limits, never log tokens.
-- Tests: fake-provider e2e PKCE, replay, expiry, restart, multi-silo callback, per-user isolation
-  (user A can never reach user B's Salesforce).
+- Source/live evidence: trace fake-provider PKCE, replay, expiry, restart, multi-silo callback,
+  and per-user isolation paths (user A can never reach user B's Salesforce).
 - **Exit**: Salesforce MCP works per-user end-to-end through the new rail; gate + GRILL green.
 
 ### S1.4 — Seam: Execution kernel (Lane A; kills P0-8)
@@ -166,9 +162,10 @@ The ratified identity-first slice:
   **never auto-retries** a started non-idempotent operation; operation identity stable **across
   attempts** (drop AttemptId from it) so a retry can suppress the duplicate side effect; delete the
   unimplemented supervised `GroupChat` worker methods or implement them — no dead throws.
-- Build the **spike harness** (the ratified prove-or-reject test): one execution through restart /
-  OAuth wait+resume / cancel / reconnect / duplicate submission / uncertain external write.
-- **Exit**: spike harness green on the bare Execution kernel; gate + GRILL green.
+- Audit the **spike scenario**: one execution through restart / OAuth wait+resume / cancel /
+  reconnect / duplicate submission / uncertain external write.
+- **Exit**: source invariants for the scenario hold on the bare Execution kernel; build/static
+  gate + adversarial review green.
 
 ### S1.5 — Seam: Durable conversation turns (Lane A; kills P0-2, P0-6)
 
@@ -183,14 +180,14 @@ Conversation becomes Execution's **first production adapter** (ratified):
   clients resume from the conversation sequence and see real status.
 - Fix MAF session persistence (P0-6): persist at safe points, not only after stream completion;
   fingerprint drift handled by explicit reset/migration path.
-- **Exit**: full ratified spike matrix green **through the chat surface**; kill-the-silo demo:
+- **Exit**: full ratified spike matrix is source-audited **through the chat surface**; live smoke:
   send message → kill silo mid-turn → restart → turn completes or fails durably, never vanishes.
 
 ### S1.6 — Strangler: Gmail → official Google Gmail MCP (Lane A)
 
 Ratified 5-step sequence: (1) generic per-user MCP OAuth proven stable (S1.3), (2) Salesforce
 reconnected through it, (3) official Gmail MCP server connected, (4) the same user-isolation +
-OAuth test suite passes against Gmail MCP, (5) **delete the typed Gmail path**
+OAuth invariants are source-audited against Gmail MCP, (5) **delete the typed Gmail path**
 (planner/token-store/auth-rail) — parity first, deletion second.
 **Exit**: Gmail works per-user via MCP; typed path gone; gate + GRILL green.
 
@@ -199,7 +196,7 @@ OAuth test suite passes against Gmail MCP, (5) **delete the typed Gmail path**
 | # | Item | Rule |
 |---|------|------|
 | J1 | `WantsTimeButton`/`ShowTime` god-switch (W2) + add `Author` to `Responded` | after chat pins exist (S1.1) |
-| J2 | Empty `DigitalBrain.Modules.Salesforce.Contracts` project | delete (empty ≠ consolidation) |
+| J2 | `DigitalBrain.Modules.Salesforce.Contracts` project | **KEEP** — permanent boundary for module neuron and synapse interfaces (owner amendment) |
 | J3 | Stale `docker-compose.yml` `DigitalBrain__Modules__0..9` env vars naming dead classes | delete |
 | J4 | Dual module catalog (AppHost list vs `ComposedModules`) | collapse to one source **only if purely mechanical**; else park for Stage 2 (consolidation is excluded from Stage 1) |
 | J5 | Unused Orleans Streams/PubSub provisioning (idle-polling noise) | first **prove** non-use under aspire telemetry, then remove provisioning; interconnect never moves to Streams |
@@ -209,19 +206,22 @@ OAuth test suite passes against Gmail MCP, (5) **delete the typed Gmail path**
 
 ### Lane C — Flutter (parallel)
 
-Fix `activateControl` test drift; `flutter analyze` + `flutter test` green for core/kit/shell;
-kit stays standalone (never imports core/shell); then Lane C is gated by CI from S1.0 onward.
+Analyze production `lib/` source for core/kit/shell, remove show-time sample residue, and keep kit
+standalone (never imports core/shell). Existing Flutter tests are untouched and not executed.
 
 ### Stage 1 exit criteria (all must hold)
 
-1. All nine P0s closed, each with a test that would catch regression.
-2. Ratified spike matrix green through the chat surface (S1.5).
-3. `gate.ps1` green; CI gates .NET + Flutter + AppHost smoke.
+1. All nine P0 source implementations audited against the ratified behavior and seam reports.
+2. Ratified spike invariants source-audited through the chat surface (S1.5), with observable paths
+   included in the live AppHost smoke where local integrations permit.
+3. `gate.ps1 -Flutter` green; CI gates the .NET source build; AppHost smoke evidence is recorded.
 4. Two authenticated users on one workspace use private chats with per-user Salesforce **and**
    Gmail via MCP, locally.
 5. Janitor backlog resolved — deleted, or kept with a written reason (J6/J7).
 6. Zero keyword god-switches; zero unauthenticated endpoints; zero client-trusted identity.
 7. `plans/stage1/reports/` complete; open decisions log updated (LTS-vs-preview decided at exit).
+8. Automated tests remain explicitly deferred; final hardening will create module-owned test
+   projects/frameworks rather than restore one central suite.
 
 ---
 
@@ -242,6 +242,8 @@ kit stays standalone (never imports core/shell); then Lane C is gated by CI from
 - **Stage 4 — Self-aware (Engineering)**: read-only Engineering control plane over
   logs/traces/metrics; delivery-pulse event stream; Brain Map polish; refusal-visibility decision
   (kernel refusal-replies vs error-bearing responses) — the top-priority open item from `CLAUDE.md`.
+- **Final hardening**: design and implement the per-module automated-testing framework after
+  product seams and module ownership stabilize; never recreate one central test project.
 
 ---
 
@@ -252,15 +254,18 @@ kit stays standalone (never imports core/shell); then Lane C is gated by CI from
 | Grok hallucinates Orleans/MAF/Aspire APIs (preview stack) | `TreatWarningsAsErrors` + gate after every change; pinned package versions; no new packages; Microsoft Learn / Context7 lookups encouraged in briefs |
 | Context overflow → sessions "summarize" instead of reading | small file-pointed briefs; CodeGraph MCP for maps; forbid whole-repo dumps |
 | Two sessions collide in one solution | lane map; worktrees; Vlad merges sequentially; rebase-before-gate |
-| Timing-flaky tests poison verdicts | tests run **without** aspire up (CLAUDE.md rule); flaky test = its own janitor ticket, never "just rerun" |
+| Deleted historical tests are mistaken for current authority | owner amendment is repeated in active plans; current gates inspect/build production source only |
 | Windows file locks break builds (P0-9) | stop AppHost before building — in `GROK.md` and `gate.ps1` preflight |
-| Characterization pins the bug as the spec forever | every pin referencing a P0 carries a `// PIN-DEFECT(P0-x)` marker; GREEN sessions must flip exactly those markers, GRILL checks no marker survives its seam |
+| Historical characterization pins are mistaken for current behavior | source audit follows current routes and implementation; reports are archaeology only |
 | Agent deletes something load-bearing (trap 2: silent zero-receiver loss) | delete only after characterization; GRILL explicitly checks routes/receivers for anything removed |
 | Scope creep ("while I was here…") | one-seam rule + GRILL rejects out-of-scope diffs outright |
 
 ---
 
-## Appendix A — GROK.md draft (S1.0 commits this at repo root)
+## Appendix A — historical GROK.md draft (superseded)
+
+The following draft is retained only to explain old reports. It is not an executable instruction;
+the 2026-08-11 owner amendment and the root `GROK.md` govern current work.
 
 ```markdown
 # GROK.md — standing orders for grok CLI sessions

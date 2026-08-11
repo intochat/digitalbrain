@@ -5,33 +5,39 @@ You are taking over as orchestrator + implementer of an in-progress refit on bra
 of Stage 1 with a RED (characterize) → GREEN (replace) → GRILL (adversarial review) → gate →
 commit protocol. You continue with the same discipline.
 
+> **Owner amendment — 2026-08-11:** all grok sessions are terminated and Codex writes the code.
+> The central automated-test project was intentionally deleted. Do not restore or run .NET or
+> Flutter tests during this refit; production source is the current truth. Final hardening will
+> design module-owned test projects/frameworks. Keep Salesforce Contracts permanently: it is the
+> module boundary for neuron and synapse interfaces.
+
 ## Read first, in this order
 1. `GROK.md` (repo root) — standing orders: commands, the 9 kernel traps, banned patterns,
    report format. These are YOUR standing orders too — ignore the filename.
 2. `plans/RATIFIED-PRODUCT-DEFINITION.md` — binding scope (IS / IS-NOT, ratified decisions,
    §1.18 SDK webhook-rail amendment, §4 items 1–4 ratified: no-ambient-authority scripts,
-   replay-pinned-artifact recovery, FIFO turns, Orleans spike as exit test).
+   replay-pinned-artifact recovery, FIFO turns, Orleans spike as an exit scenario).
 3. `plans/GROK-ORCHESTRATION-STAGE1.md` — stage plan (§3 iteration map + exit criteria, §4 Stage 2–4 outline).
 4. `plans/stage1/janitor-backlog.md` — living backlog incl. deferred GRILL MAJORs + flake tickets.
 5. `plans/stage1/reports/` — every seam has RED/GREEN/GRILL reports; the newest truth is there.
 
 ## Hard rules that already burned sessions
-- Build: `dotnet build DigitalBrain.slnx` → must be 0 warnings (warnaserror).
-  Test: `& src/Tests/DigitalBrain.Tests/bin/Debug/net11.0/DigitalBrain.Tests.exe`.
-  **NEVER `dotnet test`** — its testing-platform handshake fails against this xunit.v3 exe.
-  Full gate: `pwsh scripts/gate.ps1` (`-Flutter` to include the Flutter packages).
-- Run tests WITHOUT the aspire stack. STOP any running AppHost before building (file locks).
-- Known ticketed flakes (single occurrence + clean rerun = not a failure):
-  `ChartVocabularyProofs.EmittedChartPointLandsOnItsBoundChart` (25s graph-lookup under load)
-  and the silo-restart proofs under parallel pressure.
-- Per change: pin current behavior → minimal green → ADVERSARIAL self-review of your own diff
+- Build: `dotnet build DigitalBrain.slnx -warnaserror --nologo` → 0 warnings, 0 errors.
+  Full source gate: `pwsh scripts/gate.ps1` (`-Flutter` analyzes production Flutter `lib/`).
+- Never invoke `dotnet test`, a test executable, or `flutter test`; never recreate the deleted
+  central suite. STOP any running AppHost before building (file locks).
+- Per change: characterize current production source/routes → minimal green → ADVERSARIAL self-review
   against GROK.md traps + the ratified constraints (independent grills rejected 3 of 5 seams on
   first try — hold that bar) → gate → commit on `stage1-stabilize-strangle`.
-- Never touch wire aliases; no new packages unless a brief explicitly grants it; TDD always.
+- Never touch wire aliases; no new packages unless the owner explicitly grants it.
 - Vlad is merge authority to master. If a rule conflicts with reality: STOP, write the conflict
   into a report — a written refusal beats silent improvisation.
 
-## State (all committed; last clean full run 165/165 green)
+## State
+
+Historical seam reports record a 165/165 automated run before the owner deleted the central suite.
+That result is context, not current gate evidence. Current verification is source review,
+zero-warning builds/static analysis, and live smoke.
 - **S1.0**: harness (GROK.md, `scripts/gate.ps1`, briefs/reports scaffolding); unrestorable
   Aspire pins fixed (26405.3 → cached 26376.5; `Aspire.Azure.Storage.Queues` → 13.4.6 stable).
 - **J1**: `WantsTimeButton`/`ShowTime` keyword god-switch + demo transform deleted;
@@ -66,26 +72,24 @@ commit protocol. You continue with the same discipline.
   `google.gmail` through the generic rail (Google PKCE defaults), dual-key parity theories green
   for salesforce + google.gmail, live-endpoint verification deferred to the exit smoke.
 
-## Step 0 — the in-flight janitor (DO THIS FIRST)
-A grok JANITOR session (brief `plans/stage1/briefs/J-batch.md`) was mid-flight at handoff with
-UNCOMMITTED working-tree changes (empty Salesforce.Contracts deletion + slnx edit, stale
-docker-compose module env vars, .gitignore hygiene, ChatButtons dead helpers, ChatTools
-'show-time' string, Streams-usage verdict, restart-proof/chart-lookup flake hardening, two
-`Responded.Author` coverage pins). Check `Get-Process grok`: if still running, let it finish
-writing `plans/stage1/reports/J-batch.md` (kill only if >20 min with zero file writes). Then
-audit `git status` / `git diff` against the brief, finish or correct whatever is incomplete
-YOURSELF, run the gate TWICE consecutively (stability proof), commit as `J-batch: ...`.
+## Step 0 — janitor reconciliation (complete)
+
+All grok sessions were terminated. Vlad committed the reconciled janitor/source state plus the
+intentional central-test deletion in `4a52255361efded2c73e2e49d100baafeaea239c`. Salesforce
+Contracts, its Salesforce project reference, and its solution entry remain. The stale compose
+module variables, dead Chat helpers, and show-time MCP string were removed. The old test hardening
+and test-output sections in `plans/stage1/reports/J-batch.md` are historical only.
 
 ## Remaining Stage-1 work (in order)
-1. **Flutter lane**: `flutter analyze` + `flutter test` for core/kit/shell; fix the
-   pre-existing core `activateControl` test drift; replace `show-time` sample ids in kit
-   fixtures; kit never imports core/shell.
-2. **Docs pass**: update `CLAUDE.md` (Tasks→Execution, W2 done, god-switch gone, test-exe
+1. **Flutter lane**: run `flutter analyze lib` for core/kit/shell; remove `show-time` sample ids
+   from production kit fixtures/gallery source; kit never imports core/shell. Do not execute or
+   repair Flutter tests in this stage.
+2. **Docs pass**: update `CLAUDE.md` (Tasks→Execution, W2 done, god-switch gone, source-build
    command + gate script, identity/auth reality, pointer to GROK.md + plans/) and stale
    `UNIFIED-ARCHITECTURE.md` mentions. Honest, short, current.
 3. **Stage-1 exit audit** against §3 exit criteria in `plans/GROK-ORCHESTRATION-STAGE1.md`:
-   all nine P0s closed with regression tests (grep `PIN-DEFECT` = zero), spike matrix green
-   through the chat surface, gate stable twice, backlog resolved-or-reasoned, zero
+   all nine P0 production paths source-audited, spike invariants traced through the chat surface,
+   gate stable twice, backlog resolved-or-reasoned, zero
    god-switches / unauthenticated endpoints / client-trusted identity.
 4. **AppHost smoke** (the one live-stack item): `dotnet run --project
    src/Kernel/DigitalBrain.AppHost` (Docker: Azurite/Qdrant/Ollama), verify health,
@@ -102,6 +106,8 @@ YOURSELF, run the gate TWICE consecutively (stability proof), commit as `J-batch
    rail** per amendment §1.18 — the kept webhook slice is its seed, X/Twitter is the eventual
    first consumer, Behavior work itself stays Stage 3), then the deferred consolidation and
    graph-rename decisions.
+7. **Final hardening, after product seams stabilize**: design and implement a proper per-module
+   testing framework. Never restore a single repository-wide test project.
 
 ## Backlog you must not lose (full list in janitor-backlog.md)
 S1.2 deferred MAJORs (bootstrap atomicity via ETag if-not-exists, invitations = admin-create
