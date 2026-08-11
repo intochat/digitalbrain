@@ -165,6 +165,19 @@ public sealed partial class ExecutionNeuron
         await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await TryDispatchPendingAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
+        // After cancel dispatch is sent, PendingDispatch is cleared and the dispatch
+        // reminder unregistered. Re-arm liveness so a dead worker (no AttemptCancelled)
+        // is failed by FailAbandoned rather than stuck Cancelling forever.
+        var afterDispatch = LoadIfStarted();
+        if (afterDispatch is { State: ExecutionState.Cancelling, PendingDispatch: null })
+        {
+            await this.RegisterOrUpdateReminder(
+                    DispatchReminderName,
+                    TimeSpan.FromSeconds(15),
+                    ReminderPeriod)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+
         return snapshot;
     }
 

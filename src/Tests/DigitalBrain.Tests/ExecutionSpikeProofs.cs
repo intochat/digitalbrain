@@ -139,6 +139,40 @@ public sealed class ExecutionSpikeProofs(BrainClusterFixture fixture)
     }
 
     [Fact]
+    public async Task StuckCancellingIsFailedByLivenessAsWorkerAbandoned()
+    {
+        var brain = fixture.BrainFor("exec-stuck-cancel");
+        var worker = WorkerId(brain, "ignore-cancel-worker");
+        HarnessWorkerControl.Configure("ignore-cancel-worker", HarnessWorkerScript.IgnoreCancel);
+
+        var started = await brain.Get<IExecution>("stuck-cancel-run").FireAsync(
+            new ApplyExecution(
+                CommandId.New(),
+                new StartExecution(
+                    new ProbeGoal("never-ack-cancel"),
+                    worker,
+                    new ExecutionPolicy(1, TimeSpan.FromSeconds(1), null))),
+            TestContext.Current.CancellationToken);
+
+        await WaitForStateAsync(brain, "stuck-cancel-run", ExecutionState.Running);
+
+        var cancelling = await brain.Get<IExecution>("stuck-cancel-run").FireAsync(
+            new ApplyExecution(
+                CommandId.New(),
+                new CancelExecution(),
+                ExpectedRevision: started.Revision),
+            TestContext.Current.CancellationToken);
+        Assert.Equal(ExecutionState.Cancelling, cancelling.State);
+
+        // 15s Cancelling liveness → FailAbandoned (no silo restart).
+        await WaitForAsync(async () =>
+        {
+            var snap = await brain.GetGrainProxy<IExecution>("stuck-cancel-run").Read();
+            return snap.State == ExecutionState.Failed && snap.Failure is WorkerAbandoned;
+        }, TimeSpan.FromSeconds(90));
+    }
+
+    [Fact]
     public async Task DispatchedRetryableFailForcesOutcomeUncertainWithoutAutoRetry()
     {
         var brain = fixture.BrainFor("exec-dispatch-fail");
@@ -287,9 +321,10 @@ public sealed class ExecutionSpikeProofs(BrainClusterFixture fixture)
         });
     }
 
-    private static async Task WaitForAsync(Func<Task<bool>> predicate)
+    private static async Task WaitForAsync(Func<Task<bool>> predicate, TimeSpan? patience = null)
     {
-        var deadline = DateTime.UtcNow + Patience;
+        var limit = patience ?? Patience;
+        var deadline = DateTime.UtcNow + limit;
         while (DateTime.UtcNow < deadline)
         {
             if (await predicate().ConfigureAwait(false))
@@ -300,6 +335,6 @@ public sealed class ExecutionSpikeProofs(BrainClusterFixture fixture)
             await Task.Delay(TimeSpan.FromMilliseconds(100));
         }
 
-        throw new TimeoutException($"Condition not met within {Patience}.");
+        throw new TimeoutException($"Condition not met within {limit}.");
     }
 }

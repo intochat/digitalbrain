@@ -160,16 +160,34 @@ public sealed partial class ExecutionNeuron
         }
     }
 
-    // Silo restart / worker death: fail a Running attempt that has no pending dispatch.
+    // Silo restart / worker death: fail a Running/Cancelling attempt that has no pending dispatch.
     // Invoked from the retry/dispatch reminder path only — never from origin re-Read activation.
     private async Task FailAbandonedRunningIfNeededAsync()
     {
         var data = LoadIfStarted();
         if (data is null
-            || data.State != ExecutionState.Running
             || data.ActiveAttempt is null
-            || data.PendingDispatch is not null)
+            || data.PendingDispatch is not null
+            || data.State is not (ExecutionState.Running or ExecutionState.Cancelling))
         {
+            return;
+        }
+
+        // Cancelling without a worker ack must not stick forever (PendingDispatch already cleared).
+        if (data.State == ExecutionState.Cancelling)
+        {
+            data.Revision++;
+            data.State = ExecutionState.Failed;
+            data.Failure = new WorkerAbandoned("worker-abandoned-while-cancelling");
+            data.ActiveAttempt = null;
+            data.Blocker = null;
+            data.Result = null;
+            data.Evidence = [];
+            data.PendingDispatch = null;
+            await UnregisterReminderAsync(RetryReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await UnregisterReminderAsync(DispatchReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await NotifyOriginOfStateAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 

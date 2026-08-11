@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
@@ -17,12 +18,28 @@ internal sealed class ChatTurnWorker : Neuron
 {
     internal const string GrainTypeName = "chat-turn-worker";
 
+    // Test seam: leave a Dispatched ledger row so FailAbandoned parks OutcomeUncertain (Waiting).
+    private static readonly ConcurrentDictionary<string, byte> LeaveDispatchedOnAccept =
+        new(StringComparer.Ordinal);
+
     private CancellationTokenSource? _attemptCts;
     private AttemptRequest? _active;
     private int _runGeneration;
 
     public static NeuronId ForChat(NeuronId chat)
         => new(GrainTypeName, chat.Owner, chat.Name);
+
+    internal static void ConfigureLeaveDispatchedOperation(string chatName, bool leave)
+    {
+        if (leave)
+        {
+            LeaveDispatchedOnAccept[chatName] = 0;
+        }
+        else
+        {
+            LeaveDispatchedOnAccept.TryRemove(chatName, out _);
+        }
+    }
 
     protected override Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
     {
@@ -72,6 +89,16 @@ internal sealed class ChatTurnWorker : Neuron
                 request.Execution,
                 new AttemptAccepted(request.Execution, request.Worker, request.Attempt, request.Revision))
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+            if (LeaveDispatchedOnAccept.ContainsKey(Id.Name))
+            {
+                // AttemptAccepted is outbox-drained asynchronously; wait until the kernel
+                // is Running before preparing the probe op so FailAbandoned can park Waiting.
+                await WaitUntilExecutionRunningAsync(request.Execution, attemptToken)
+                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+                await LeaveDispatchedExternalOpAsync(request)
+                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
 
             var (answer, author) = await RunResponderAsync(goal, attemptToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
@@ -242,6 +269,53 @@ internal sealed class ChatTurnWorker : Neuron
                 request.Revision,
                 new ChatTurnFailure(failureDetail ?? "turn failed"),
                 Retryable: false))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    private async Task WaitUntilExecutionRunningAsync(NeuronId execution, CancellationToken cancellationToken)
+    {
+        var grain = GrainFactory.GetGrain<IExecution>(execution.ToGrainId());
+        var deadline = TimeProvider.GetUtcNow() + TimeSpan.FromSeconds(10);
+        while (TimeProvider.GetUtcNow() < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var snapshot = await grain.Read()
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            if (snapshot.State == ExecutionState.Running)
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+    }
+
+    private async Task LeaveDispatchedExternalOpAsync(AttemptRequest request)
+    {
+        var edge = new OperationEdge(
+            Target: request.Execution,
+            RequestSynapseId: "chat.probe-external",
+            RequestSchemaVersion: 1,
+            ResponseSynapseId: "chat.probe-external-result",
+            ResponseSchemaVersion: 1);
+        var payload = new ProtectedPayloadReference(Guid.NewGuid());
+        const string operationKey = "chat-abandonment-probe";
+
+        await SendAsync(
+            request.Execution,
+            new PrepareOperation(request.Attempt, operationKey, edge, payload))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        await SendAsync(
+            request.Execution,
+            new TransitionOperation(
+                request.Attempt,
+                operationKey,
+                OperationPhase.Prepared,
+                OperationPhase.Dispatched,
+                ResponsePayload: null,
+                RedactedSummary: null))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 

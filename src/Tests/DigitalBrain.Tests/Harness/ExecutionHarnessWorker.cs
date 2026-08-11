@@ -30,6 +30,8 @@ public enum HarnessWorkerScript
     WaitForOauth,
     UncertainExternalWrite,
     CancelAware,
+    // Accept and stay Running; Cancel is a no-op (no AttemptCancelled) — stuck Cancelling proof.
+    IgnoreCancel,
     CompleteThenRetryableFail,
     // Dispatch external effect, then retryable AttemptFailed without Transition→Uncertain (messy fail).
     DispatchThenRetryableFail,
@@ -168,7 +170,8 @@ internal sealed class HarnessExecutionWorker :
                 break;
 
             case HarnessWorkerScript.CancelAware:
-                // Stay running until Cancel arrives.
+            case HarnessWorkerScript.IgnoreCancel:
+                // Stay running until Cancel arrives (IgnoreCancel never acks Cancel).
                 break;
 
             default:
@@ -222,6 +225,11 @@ internal sealed class HarnessExecutionWorker :
     public override async Task Cancel(AttemptCursor cursor)
     {
         ArgumentNullException.ThrowIfNull(cursor);
+        if (HarnessWorkerControl.ScriptFor(Id.Name) is HarnessWorkerScript.IgnoreCancel)
+        {
+            return;
+        }
+
         await SendAsync(
             cursor.Execution,
             new AttemptCancelled(cursor.Execution, cursor.Worker, cursor.Attempt, cursor.Revision))

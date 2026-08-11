@@ -557,23 +557,287 @@ public sealed class DurableTurnBehaviorProofs(BrainClusterFixture fixture)
         Assert.Null(after.Result);
     }
 
+    [Fact]
+    public async Task ForgedExecutionTerminalIsIgnoredWithoutKernelConfirmation()
+    {
+        var brain = fixture.BrainFor("forge-terminal");
+        var chat = NeuronId.For<IChat>(brain.Owner, "main");
+        var agent = new NeuronId("scriptedagent", brain.Owner, "forge-agent");
+        var actor = TestActors.Operator;
+
+        ScriptedAgent.ConfigureHold("forge-agent");
+        try
+        {
+            await brain.FireAsync<ISynapseGraph>(
+                ISynapseGraph.InstanceName,
+                new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, agent),
+                TestContext.Current.CancellationToken);
+            await Graphs.WaitForConnectionTargetAsync(brain, chat, ChatRoles.Responder, agent);
+
+            var accepted = await brain.GetGrainProxy<IChat>("main")
+                .Send(new SendMessage(CommandId.New(), "do not forge me", actor));
+            await ScriptedAgent.WaitUntilHeldAsync("forge-agent", Patience);
+
+            var running = Assert.Single(
+                await brain.GetGrainProxy<IChat>("main").ReadTurns(),
+                t => t.TurnId == accepted.TurnId);
+            Assert.Equal(ChatTurnStatus.Running, running.Status);
+            Assert.False(string.IsNullOrWhiteSpace(running.ExecutionName));
+
+            var realExecution = NeuronId.For<IExecution>(brain.Owner, running.ExecutionName!);
+            var real = await brain.GetGrainProxy<IExecution>(running.ExecutionName!).Read();
+
+            // Wrong ExecutionId — no matching turn / cannot confirm.
+            await brain.FireAsync(
+                chat,
+                new ExecutionTerminal(
+                    NeuronId.For<IExecution>(brain.Owner, "forged-other"),
+                    ExecutionState.Succeeded,
+                    Revision: 99,
+                    Result: new ChatTurnResult("FORGED-WRONG-ID", "evil")),
+                TestContext.Current.CancellationToken);
+
+            // Wrong revision / free-form Result while kernel is still Running.
+            await brain.FireAsync(
+                chat,
+                new ExecutionTerminal(
+                    realExecution,
+                    ExecutionState.Succeeded,
+                    Revision: real.Revision + 100,
+                    Result: new ChatTurnResult("FORGED-RESULT", "evil")),
+                TestContext.Current.CancellationToken);
+
+            await brain.FireAsync(
+                chat,
+                new ExecutionTerminal(
+                    realExecution,
+                    ExecutionState.Succeeded,
+                    Revision: real.Revision,
+                    Result: new ChatTurnResult("FORGED-STATE-MISMATCH", "evil")),
+                TestContext.Current.CancellationToken);
+
+            await Task.Delay(TimeSpan.FromMilliseconds(400), TestContext.Current.CancellationToken);
+
+            var afterForge = Assert.Single(
+                await brain.GetGrainProxy<IChat>("main").ReadTurns(),
+                t => t.TurnId == accepted.TurnId);
+            Assert.Equal(ChatTurnStatus.Running, afterForge.Status);
+
+            var transcript = await brain.GetGrainProxy<IChat>("main").Read();
+            Assert.DoesNotContain(transcript.Turns, t => !t.FromUser && t.Text.Contains("FORGED", StringComparison.Ordinal));
+
+            ScriptedAgent.ReleaseHold("forge-agent");
+            await WaitForTurnStatusAsync(brain, "main", accepted.TurnId, ChatTurnStatus.Completed);
+        }
+        finally
+        {
+            ScriptedAgent.ReleaseHold("forge-agent");
+            ScriptedAgent.ClearHold("forge-agent");
+        }
+    }
+
+    [Fact]
+    public async Task DuplicateExecutionTerminalIsIdempotentByRevision()
+    {
+        var brain = fixture.BrainFor("idempotent-terminal");
+        var chat = NeuronId.For<IChat>(brain.Owner, "main");
+        var agent = new NeuronId("scriptedagent", brain.Owner, "idem-agent");
+        var actor = TestActors.Operator;
+
+        await brain.FireAsync<ISynapseGraph>(
+            ISynapseGraph.InstanceName,
+            new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, agent),
+            TestContext.Current.CancellationToken);
+        await Graphs.WaitForConnectionTargetAsync(brain, chat, ChatRoles.Responder, agent);
+
+        var accepted = await brain.GetGrainProxy<IChat>("main")
+            .Send(new SendMessage(CommandId.New(), "once only", actor));
+        await WaitForTurnStatusAsync(brain, "main", accepted.TurnId, ChatTurnStatus.Completed);
+
+        var done = Assert.Single(
+            await brain.GetGrainProxy<IChat>("main").ReadTurns(),
+            t => t.TurnId == accepted.TurnId);
+        Assert.False(string.IsNullOrWhiteSpace(done.ExecutionName));
+
+        var executionId = NeuronId.For<IExecution>(brain.Owner, done.ExecutionName!);
+        var snapshot = await brain.GetGrainProxy<IExecution>(done.ExecutionName!).Read();
+        Assert.Equal(ExecutionState.Succeeded, snapshot.State);
+
+        var transcriptBefore = await brain.GetGrainProxy<IChat>("main").Read();
+        Assert.Equal(1, transcriptBefore.Turns.Count(t => !t.FromUser && t.Text == "scripted:idem-agent"));
+
+        var lifecycleBefore = await CountOutgoingAsync(
+            brain, chat, delivery => delivery.Synapse is TurnLifecycle life
+                && life.TurnId == accepted.TurnId
+                && life.Status == ChatTurnStatus.Completed);
+
+        // Legitimate wake-up payload matching kernel Read — must not re-emit Responded/lifecycle.
+        await brain.FireAsync(
+            chat,
+            new ExecutionTerminal(
+                executionId,
+                snapshot.State,
+                snapshot.Revision,
+                snapshot.Result,
+                snapshot.Failure),
+            TestContext.Current.CancellationToken);
+        await brain.FireAsync(
+            chat,
+            new ExecutionTerminal(
+                executionId,
+                snapshot.State,
+                snapshot.Revision,
+                snapshot.Result,
+                snapshot.Failure),
+            TestContext.Current.CancellationToken);
+
+        await Task.Delay(TimeSpan.FromMilliseconds(400), TestContext.Current.CancellationToken);
+
+        var transcriptAfter = await brain.GetGrainProxy<IChat>("main").Read();
+        Assert.Equal(1, transcriptAfter.Turns.Count(t => !t.FromUser && t.Text == "scripted:idem-agent"));
+
+        var lifecycleAfter = await CountOutgoingAsync(
+            brain, chat, delivery => delivery.Synapse is TurnLifecycle life
+                && life.TurnId == accepted.TurnId
+                && life.Status == ChatTurnStatus.Completed);
+        Assert.Equal(lifecycleBefore, lifecycleAfter);
+
+        var still = Assert.Single(
+            await brain.GetGrainProxy<IChat>("main").ReadTurns(),
+            t => t.TurnId == accepted.TurnId);
+        Assert.Equal(ChatTurnStatus.Completed, still.Status);
+    }
+
+    [Fact]
+    public async Task PureWorkerLivenessFailsWithWorkerAbandonedAndAdvancesQueue()
+    {
+        var brain = fixture.BrainFor("pure-liveness");
+        var chat = NeuronId.For<IChat>(brain.Owner, "main");
+        var agent = new NeuronId("scriptedagent", brain.Owner, "liveness-agent");
+        var actor = TestActors.Operator;
+        var longPatience = TimeSpan.FromSeconds(90);
+
+        ScriptedAgent.ConfigureHold("liveness-agent");
+        try
+        {
+            await brain.FireAsync<ISynapseGraph>(
+                ISynapseGraph.InstanceName,
+                new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, agent),
+                TestContext.Current.CancellationToken);
+            await Graphs.WaitForConnectionTargetAsync(brain, chat, ChatRoles.Responder, agent);
+
+            var head = await brain.GetGrainProxy<IChat>("main")
+                .Send(new SendMessage(CommandId.New(), "watchdog me", actor));
+            var next = await brain.GetGrainProxy<IChat>("main")
+                .Send(new SendMessage(CommandId.New(), "after abandon", actor));
+
+            await ScriptedAgent.WaitUntilHeldAsync("liveness-agent", Patience);
+            var running = Assert.Single(
+                await brain.GetGrainProxy<IChat>("main").ReadTurns(),
+                t => t.TurnId == head.TurnId);
+            Assert.Equal(ChatTurnStatus.Running, running.Status);
+            Assert.False(string.IsNullOrWhiteSpace(running.ExecutionName));
+
+            // No silo restart: kernel 15s liveness → FailAbandoned → WorkerAbandoned.
+            await WaitForAsync(async () =>
+            {
+                var exec = await brain.GetGrainProxy<IExecution>(running.ExecutionName!).Read();
+                return exec.State == ExecutionState.Failed && exec.Failure is WorkerAbandoned;
+            }, longPatience);
+
+            await WaitForTurnStatusAsync(brain, "main", head.TurnId, ChatTurnStatus.Failed, longPatience);
+
+            ScriptedAgent.ReleaseHold("liveness-agent");
+            await WaitForTurnStatusAsync(brain, "main", next.TurnId, ChatTurnStatus.Completed, longPatience);
+        }
+        finally
+        {
+            ScriptedAgent.ReleaseHold("liveness-agent");
+            ScriptedAgent.ClearHold("liveness-agent");
+        }
+    }
+
+    [Fact]
+    public async Task OutcomeUncertainSurfacesWaitingAndPolicyDeadlineUnfreezesFifo()
+    {
+        var brain = fixture.BrainFor("waiting-deadline");
+        var chat = NeuronId.For<IChat>(brain.Owner, "main");
+        var agent = new NeuronId("scriptedagent", brain.Owner, "wait-agent");
+        var actor = TestActors.Operator;
+        var longPatience = TimeSpan.FromSeconds(90);
+
+        ScriptedAgent.ConfigureHold("wait-agent");
+        DigitalBrain.UI.ChatTurnWorker.ConfigureLeaveDispatchedOperation("main", leave: true);
+        try
+        {
+            await brain.FireAsync<ISynapseGraph>(
+                ISynapseGraph.InstanceName,
+                new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, agent),
+                TestContext.Current.CancellationToken);
+            await Graphs.WaitForConnectionTargetAsync(brain, chat, ChatRoles.Responder, agent);
+
+            var head = await brain.GetGrainProxy<IChat>("main")
+                .Send(new SendMessage(CommandId.New(), "park me", actor));
+            var next = await brain.GetGrainProxy<IChat>("main")
+                .Send(new SendMessage(CommandId.New(), "after park", actor));
+
+            await ScriptedAgent.WaitUntilHeldAsync("wait-agent", Patience);
+            var running = Assert.Single(
+                await brain.GetGrainProxy<IChat>("main").ReadTurns(),
+                t => t.TurnId == head.TurnId);
+            Assert.False(string.IsNullOrWhiteSpace(running.ExecutionName));
+
+            // Liveness parks OutcomeUncertain (Dispatched op) → Chat surfaces Waiting.
+            await WaitForTurnStatusAsync(brain, "main", head.TurnId, ChatTurnStatus.Waiting, longPatience);
+
+            await Journals.WaitForAsync(
+                brain, chat, JournalKind.Outgoing,
+                delivery => delivery.Synapse is TurnLifecycle life
+                    && life.TurnId == head.TurnId
+                    && life.Status == ChatTurnStatus.Waiting,
+                patience: longPatience);
+
+            // Policy deadline → CancelExecution + bridge → terminal head; FIFO advances.
+            await WaitForAsync(async () =>
+            {
+                var turns = await brain.GetGrainProxy<IChat>("main").ReadTurns();
+                var turn = turns.FirstOrDefault(t => t.TurnId == head.TurnId);
+                return turn is
+                {
+                    Status: ChatTurnStatus.Failed or ChatTurnStatus.Cancelled
+                };
+            }, longPatience);
+
+            ScriptedAgent.ReleaseHold("wait-agent");
+            await WaitForTurnStatusAsync(brain, "main", next.TurnId, ChatTurnStatus.Completed, longPatience);
+        }
+        finally
+        {
+            DigitalBrain.UI.ChatTurnWorker.ConfigureLeaveDispatchedOperation("main", leave: false);
+            ScriptedAgent.ReleaseHold("wait-agent");
+            ScriptedAgent.ClearHold("wait-agent");
+        }
+    }
+
     private static async Task WaitForTurnStatusAsync(
         Client.IDigitalBrain brain,
         string chatName,
         TurnId turnId,
-        ChatTurnStatus expected)
+        ChatTurnStatus expected,
+        TimeSpan? patience = null)
     {
         await WaitForAsync(async () =>
         {
             var turns = await brain.GetGrainProxy<IChat>(chatName).ReadTurns();
             var turn = turns.FirstOrDefault(t => t.TurnId == turnId);
             return turn is not null && turn.Status == expected;
-        });
+        }, patience);
     }
 
-    private static async Task WaitForAsync(Func<Task<bool>> predicate)
+    private static async Task WaitForAsync(Func<Task<bool>> predicate, TimeSpan? patience = null)
     {
-        var deadline = DateTime.UtcNow + Patience;
+        var limit = patience ?? Patience;
+        var deadline = DateTime.UtcNow + limit;
         while (DateTime.UtcNow < deadline)
         {
             if (await predicate().ConfigureAwait(false))
@@ -584,6 +848,15 @@ public sealed class DurableTurnBehaviorProofs(BrainClusterFixture fixture)
             await Task.Delay(TimeSpan.FromMilliseconds(100));
         }
 
-        throw new TimeoutException($"Condition not met within {Patience}.");
+        throw new TimeoutException($"Condition not met within {limit}.");
+    }
+
+    private static async Task<int> CountOutgoingAsync(
+        Client.IDigitalBrain brain,
+        NeuronId subject,
+        Func<SynapseDelivery, bool> match)
+    {
+        var page = await brain.ReadJournalAsync(subject, JournalKind.Outgoing, afterSequence: 0);
+        return page.Delta.Count(match);
     }
 }
