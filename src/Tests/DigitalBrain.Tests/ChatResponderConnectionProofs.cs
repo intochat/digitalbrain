@@ -33,10 +33,10 @@ public sealed class ChatResponderConnectionProofs(BrainClusterFixture fixture)
 
         await Journals.WaitForAsync(
             brain, chatA, JournalKind.Outgoing,
-            delivery => delivery.Synapse is Responded { Text: "scripted:alpha" });
+            delivery => delivery.Synapse is Responded { Text: "scripted:alpha", Author: "alpha" });
         await Journals.WaitForAsync(
             brain, chatB, JournalKind.Outgoing,
-            delivery => delivery.Synapse is Responded { Text: "scripted:beta" });
+            delivery => delivery.Synapse is Responded { Text: "scripted:beta", Author: "beta" });
     }
 
     [Fact]
@@ -66,6 +66,6 @@ public sealed class ChatResponderConnectionProofs(BrainClusterFixture fixture)
         await brain.GetGrainProxy<IChat>("main").Send(new SendMessage(CommandId.New(), "who answers now"));
         await Journals.WaitForAsync(
             brain, chat, JournalKind.Outgoing,
-            delivery => delivery.Synapse is Responded { Text: "scripted:beta" });
+            delivery => delivery.Synapse is Responded { Text: "scripted:beta", Author: "beta" });
     }
 }

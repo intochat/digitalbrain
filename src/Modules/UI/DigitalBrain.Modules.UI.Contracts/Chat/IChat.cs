@@ -9,7 +9,6 @@ namespace DigitalBrain.Chat;
 public partial interface IChat :
     INeuron,
     IHandle<ReadTranscriptRequest>,
-    IHandle<ShowTime>,
     IHandle<Note>,
     IHandle<TimerCard>
 {

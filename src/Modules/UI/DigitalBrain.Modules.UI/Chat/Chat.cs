@@ -5,7 +5,6 @@ using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
 using DigitalBrain.Modules.Sdk.Mcp;
-using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
@@ -21,8 +20,6 @@ internal sealed class Chat : Neuron, IChat
     private const string TranscriptName = "chat.transcript";
     private const int RememberedCommands = 64;
     private const int RetainedTurns = 64;
-    private const string ShowTimeAction = "show-time";
-    private const string ShowTimeButtonId = "show-time";
 
     private readonly IDurableList<byte[]> _commandLog;
     private readonly IDurableList<byte[]> _transcript;
@@ -55,25 +52,8 @@ internal sealed class Chat : Neuron, IChat
 
         await RememberOwnerTurnAsync(message).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        if (WantsTimeButton(message.Text))
-        {
-            const string reply =
-                "Tap the button to show the current UTC time.";
-            var buttons = new[]
-            {
-                new ChatButtonOffer(ShowTimeButtonId, "Show current time", ShowTimeAction),
-            };
-            await ArmOfferedButtonAsync(message.CommandId, ShowTimeButtonId)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            Remember(new ChatTurn(FromUser: false, reply, buttons));
-            await EmitAsync(new Responded(message.CommandId, Id, reply, buttons))
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            yield return new ChatResponseUpdate(ChatRole.Assistant, reply);
-            yield break;
-        }
-
         var answer = new StringBuilder();
-        var responder = await ResponderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        var (responder, author) = await ResponderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var conversationContext = new ChatMessage(
             ChatRole.System,
@@ -94,7 +74,7 @@ internal sealed class Chat : Neuron, IChat
         }
 
         Remember(new ChatTurn(FromUser: false, answered));
-        await EmitAsync(new Responded(message.CommandId, Id, answered))
+        await EmitAsync(new Responded(message.CommandId, Id, answered, Author: author))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
@@ -126,7 +106,7 @@ internal sealed class Chat : Neuron, IChat
         }
 
         Remember(new ChatTurn(FromUser: false, synapse.Text));
-        await EmitAsync(new Responded(CommandId.New(), Id, synapse.Text))
+        await EmitAsync(new Responded(CommandId.New(), Id, synapse.Text, Author: Id.Name))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
@@ -142,19 +122,7 @@ internal sealed class Chat : Neuron, IChat
 
         ChatTimerOffer[] offers = [new ChatTimerOffer(synapse.Label, synapse.DueAt)];
         Remember(new ChatTurn(FromUser: false, synapse.Label, Timers: offers));
-        await EmitAsync(new Responded(CommandId.New(), Id, synapse.Label, Timers: offers))
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    public async Task HandleAsync(ShowTime synapse, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(synapse);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var when = TimeProvider.GetUtcNow().ToString("O");
-        var text = $"Current UTC time: {when}";
-        Remember(new ChatTurn(FromUser: false, text));
-        await EmitAsync(new Responded(CommandId.New(), Id, text))
+        await EmitAsync(new Responded(CommandId.New(), Id, synapse.Label, Timers: offers, Author: Id.Name))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
@@ -181,39 +149,8 @@ internal sealed class Chat : Neuron, IChat
         ChatButtonOffer[] buttons = [new ChatButtonOffer(buttonId, label, action)];
         var text = $"{required.ServerDisplayName} needs sign-in before that request can continue.";
         Remember(new ChatTurn(FromUser: false, text, buttons));
-        await EmitAsync(new Responded(required.CommandId, Id, text, buttons))
+        await EmitAsync(new Responded(required.CommandId, Id, text, buttons, Author: Id.Name))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    private async Task ArmOfferedButtonAsync(CommandId offer, string buttonId)
-    {
-        var button = NeuronId.For<IButton>(Id.Owner, ChatButtons.OfferedInstanceName(Id.Name, offer, buttonId));
-        var graphId = ISynapseGraph.ForOwner(Id.Owner);
-
-        await SendAsync(
-            graphId,
-            new Connect(
-                ChatButtons.ArmingConnectionId(button),
-                button,
-                ButtonActivated.AliasName,
-                Id,
-                ButtonActivatedToShowTime.TransformName,
-                TimeProvider.GetUtcNow() + ChatButtons.OfferLifetime)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-        // The offer must not reach the owner before the click route is live, or an
-        // immediate click emits an activation with no receiver and is lost.
-        using var arming = new CancellationTokenSource(DeliveryPolicy.ConnectionLookupTimeout);
-        await FlushOutboxAsync(arming.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-        var routes = await GrainFactory
-            .GetGrain<ISynapseGraph>(graphId.ToGrainId())
-            .ConnectionsFrom(button, ButtonActivated.AliasName)
-            .WaitAsync(arming.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        if (routes.Count == 0)
-        {
-            throw new InvalidOperationException(
-                $"Chat '{Id}' could not arm button '{button}' before offering it.");
-        }
     }
 
     private static ChatTranscript Trimmed(ChatTranscript transcript, int? maxTurns)
@@ -221,21 +158,9 @@ internal sealed class Chat : Neuron, IChat
             ? transcript
             : new ChatTranscript([.. transcript.Turns.Skip(transcript.Turns.Count - cap)]);
 
-    private static bool WantsTimeButton(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return false;
-        }
-
-        var value = text.AsSpan().Trim();
-        return value.Contains("button", StringComparison.OrdinalIgnoreCase)
-            && value.Contains("time", StringComparison.OrdinalIgnoreCase);
-    }
-
     private IReadOnlyList<ChatTurn> Turns() => [.. _transcript.Select(_turns.Deserialize)];
 
-    private async Task<IAgent> ResponderAsync()
+    private async Task<(IAgent Responder, string Author)> ResponderAsync()
     {
         using var lookup = new CancellationTokenSource(DeliveryPolicy.ConnectionLookupTimeout);
         try
@@ -245,13 +170,18 @@ internal sealed class Chat : Neuron, IChat
                 .ConnectionsFrom(Id, ChatRoles.Responder)
                 .WaitAsync(lookup.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-            return routes.FirstOrDefault() is { } bound
-                ? GrainFactory.GetGrain<IAgent>(bound.Target.ToGrainId())
-                : DefaultResponder();
+            if (routes.FirstOrDefault() is { } bound)
+            {
+                return (
+                    GrainFactory.GetGrain<IAgent>(bound.Target.ToGrainId()),
+                    bound.Target.Name);
+            }
+
+            return (DefaultResponder(), AssistantName);
         }
         catch (OperationCanceledException) when (lookup.IsCancellationRequested)
         {
-            return DefaultResponder();
+            return (DefaultResponder(), AssistantName);
         }
     }
 

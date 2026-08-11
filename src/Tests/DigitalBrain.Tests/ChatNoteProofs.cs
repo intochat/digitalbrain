@@ -18,7 +18,7 @@ public sealed class ChatNoteProofs(BrainClusterFixture fixture)
 
         await Journals.WaitForAsync(
             brain, chat, JournalKind.Outgoing,
-            delivery => delivery.Synapse is Responded { Text: "the tea is ready" });
+            delivery => delivery.Synapse is Responded { Text: "the tea is ready", Author: "main" });
 
         var transcript = await brain.GetGrainProxy<IChat>("main").Read();
         Assert.Contains(
@@ -37,7 +37,7 @@ public sealed class ChatNoteProofs(BrainClusterFixture fixture)
 
         await Journals.WaitForAsync(
             brain, chat, JournalKind.Outgoing,
-            delivery => delivery.Synapse is Responded { Timers.Length: > 0 } posted
+            delivery => delivery.Synapse is Responded { Timers.Length: > 0, Author: "main" } posted
                 && posted.Timers[0].Label == "tea in five"
                 && posted.Timers[0].DueAt == dueAt);
 

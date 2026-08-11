@@ -11,4 +11,5 @@ public sealed record Responded(
     [property: Id(2)] string Text,
     [property: Id(3)] ChatButtonOffer[]? Buttons = null,
     [property: Id(4)] ChatChartOffer[]? Charts = null,
-    [property: Id(5)] ChatTimerOffer[]? Timers = null) : Synapse;
+    [property: Id(5)] ChatTimerOffer[]? Timers = null,
+    [property: Id(6)] string Author = "") : Synapse;

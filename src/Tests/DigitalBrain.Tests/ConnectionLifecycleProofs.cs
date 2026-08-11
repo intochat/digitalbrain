@@ -179,29 +179,4 @@ public sealed class ConnectionLifecycleProofs(BrainClusterFixture fixture)
 
         await Graphs.WaitForNoConnectionsAsync(brain, source, "probe.fact");
     }
-
-    [Fact]
-    public async Task OfferedButtonConnectionsCarryAnExpiry()
-    {
-        var brain = fixture.BrainFor("lifecycle-offer");
-        var chat = NeuronId.For<IChat>(brain.Owner, "main");
-        var command = CommandId.New();
-
-        await brain.GetGrainProxy<IChat>("main").Send(new SendMessage(command, "show me a time button"));
-        await Journals.WaitForAsync(
-            brain, chat, JournalKind.Outgoing,
-            delivery => delivery.Synapse is Responded { Buttons.Length: > 0 } offer
-                && offer.CommandId == command);
-
-        var button = NeuronId.For<IButton>(
-            brain.Owner, ChatButtons.OfferedInstanceName("main", command, "show-time"));
-        var routes = await Graphs.ConnectionsAsync(brain, button, ButtonActivated.AliasName);
-
-        var armed = Assert.Single(routes);
-        Assert.NotNull(armed.ExpiresAt);
-        Assert.InRange(
-            armed.ExpiresAt!.Value,
-            DateTimeOffset.UtcNow.AddHours(23),
-            DateTimeOffset.UtcNow.AddHours(25));
-    }
 }
