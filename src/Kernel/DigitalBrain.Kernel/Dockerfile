@@ -48,7 +48,7 @@
 #     DigitalBrain__Modules__4=DigitalBrain.Shell.ShellModule
 #     DigitalBrain__Modules__5=DigitalBrain.Google.GoogleModule
 #     DigitalBrain__Modules__6=DigitalBrain.Salesforce.SalesforceModule
-#     DigitalBrain__Modules__7=DigitalBrain.Tasks.TasksModule
+#     DigitalBrain__Modules__7=DigitalBrain.Execution (module assemblies, not class gate)
 #     DigitalBrain__Modules__8=DigitalBrain.Time.TimeModule
 #     DigitalBrain__Modules__9=DigitalBrain.Introspection.IntrospectionModule
 #

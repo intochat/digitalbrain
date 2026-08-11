@@ -14,7 +14,7 @@ internal static class ComposedModules
             typeof(DigitalBrain.Introspection.ReadTopologyRequest).Assembly,
             typeof(DigitalBrain.Memory.IVectorMemory).Assembly,
 
-            typeof(DigitalBrain.Tasks.ITask).Assembly,
+            typeof(DigitalBrain.Execution.IExecution).Assembly,
             typeof(DigitalBrain.Time.StartTimer).Assembly,
             typeof(DigitalBrain.Chat.SendMessage).Assembly,
             typeof(DigitalBrain.Modules.Sdk.Mcp.McpAuthorizationNeuron).Assembly,
@@ -25,7 +25,7 @@ internal static class ComposedModules
             typeof(DigitalBrain.Introspection.IntrospectionNeuron).Assembly,
             typeof(DigitalBrain.Memory.MemoryModule).Assembly,
             typeof(DigitalBrain.Salesforce.SalesforceModule).Assembly,
-            typeof(DigitalBrain.Tasks.TaskNeuron).Assembly,
+            typeof(DigitalBrain.Execution.ExecutionNeuron).Assembly,
             typeof(DigitalBrain.Time.TimerNeuron).Assembly,
             typeof(DigitalBrain.UI.UiModule).Assembly,
             typeof(DigitalBrain.Modules.Sdk.Mcp.McpAuthorizationNeuron).Assembly,
