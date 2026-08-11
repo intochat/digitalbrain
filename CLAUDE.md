@@ -53,16 +53,28 @@ Stop AppHost before every build; running silos hold output files open.
   tools; scheduling and elapse EMIT `time.timer-scheduled`/`time.timer-elapsed` — the graph
   routes them (assistant recipe: morph to `ui.timer-card`/`ui.note` into chat). Kit renders
   `KitTimerPart` with `KitClock` (countdown face; wall clock in windowing).
+- **Identity/workspace boundary** (Kernel host): ASP.NET Core Identity cookie auth backed by
+  Azure Tables; the fallback policy requires authentication on product endpoints. The
+  bootstrap/login/logout/me lifecycle and OAuth callback are intentionally anonymous.
+  Development-only loopback bypass is explicit. The host derives `ActorContext` and
+  principal-scoped chat/surface names; client identity never crosses into durable commands
+  unverified.
+- **Durable conversation turns**: Chat queues one active turn per conversation and starts an
+  `IExecution`; additional turns remain FIFO. HTTP/SSE is an observer—disconnecting never cancels
+  work. Explicit versioned cancel advances the queue only after the Execution terminal bridge.
+  Execution owns attempts, blockers, liveness, bounded receipts/operations, and reconciliation of
+  `OutcomeUncertain`; the chat worker owns the AI stream and reports only Attempt facts.
 - **MCP gateway** (`IMcp`, grain `mcp`, instance = server key, e.g. `mcp:dev/salesforce`):
   external SaaS is NEVER per-action contracts — the server's live catalog IS the surface.
   `db.mcp.list-tools` answers it; `db.mcp.call-tool` invokes through the OAuth rail
-  (destructive tools refuse without approval; unauthorized refuses with sign-in).
+  (all catalog tools are callable; provider OAuth + verified per-principal integration is the
+  authority boundary, and destructive metadata remains visible for audit).
   `FireRowsAs` fires each tabular result row as a named synapse (shape rows in the query:
   SOQL column aliases → `ui.chart-point` fields) so results flow through the graph.
-  A provider module (Salesforce) = McpServerDefinition + ExternalServerCapability + OAuth
-  params; the OAuth callback derives from `OAuthCallbackPaths` (`/oauth/callback`), never
-  persisted. The unkeyed `IChatClient` IS Gemma4 (the main model); `ask_llama` exists only
-  when the owner names llama.
+  Salesforce and Gmail are `McpServerDefinition`s on the same bounded PKCE rail; tokens are
+  protected and keyed by verified principal. The OAuth callback is `/oauth/callback`; codes are
+  host-only and one-shot. The unkeyed `IChatClient` IS Gemma4 (the main model); `ask_llama`
+  exists only when the owner names llama.
 - **Self-programming**: the Assistant (Gemma4/Ollama) carries exactly THREE constant tools
   (`SystemTools`): `find_capabilities(intent)` — hybrid search over the in-process
   `CapabilityIndex` (keyword floor, embeddings enrich when a generator exists, nothing can
@@ -110,12 +122,13 @@ Stop AppHost before every build; running silos hold output files open.
 
 ## Conventions
 
-- **Modules are contracts + neurons, nothing else.** A module = its contracts assembly
-  (interfaces + synapses); implementations are separately-loaded assemblies Orleans
-  discovers itself. Composition (`DigitalBrainRuntime.Add(silo, ModuleAssemblies)`)
-  reflects manifests from contracts, scans implementations for broadcast handlers and
-  `Core.IModule` DI hooks (only AI/Google/Memory/Salesforce/UI have one). No module
-  classes, no Compiled manifests, no `DigitalBrain:Modules` gate.
+- **Modules expose contracts and implementations separately.** Contracts assemblies own neuron
+  interfaces and synapses; implementation assemblies own grains and optional `Core.IModule` DI
+  hooks (AI, Google, Memory, Salesforce, Execution, UI). Composition
+  (`DigitalBrainRuntime.Add(silo, ModuleAssemblies)`) reflects manifests and scans implementations;
+  there are no handwritten compiled manifests or `DigitalBrain:Modules` class-name gate.
+- **Salesforce Contracts stays.** It is the permanent module boundary for Salesforce neuron and
+  synapse interfaces even while the generic MCP rail supplies today's runtime surface.
 - **SOURCE → GREEN → GRILL → GATE → COMMIT**: inspect production implementations and routes,
   make the smallest coherent change, adversarially review the diff against the kernel traps,
   run the build/static gate, then commit on the Stage-1 branch. Automated testing is deferred
@@ -134,12 +147,10 @@ Stop AppHost before every build; running silos hold output files open.
 
 ## Open work (owner-gated)
 
-- W2 cleanup: delete the last keyword demo (`WantsTimeButton`/`ShowTime`), add `Author`
-  to `Responded`, optional `Message`/`Reply` rename. W3: manifest-drift guard.
-  (W4 lifecycle landed 2026-08-10: offer expiry 24h, mutation-time sweep, `Guid.Empty`
-  refusal; button-grain state retention deliberately deferred until storage pressure is
-  measured. W5(b) landed: broadcast tier shown read-only in topology; full catalog/graph
-  unification (c) still needs its own review.)
+- W2 is complete: `WantsTimeButton`/`ShowTime` and its transform are gone; `Responded.Author`
+  is populated. Optional Message/Reply naming and W3 manifest-drift guard remain separate work.
+  W4 offer expiry and W5(b) read-only broadcast topology landed; full catalog/graph unification
+  still needs its own review.
 - Behavior Studio (Flutter shell + core BehaviorClient) renders demo fixtures against a
   host that does not exist — kept on purpose. Direction: build the behavior host on the
   scripting capability, with the assistant authoring single-file C# scripts that compile
@@ -152,6 +163,10 @@ Stop AppHost before every build; running silos hold output files open.
   the model reports such failures honestly but cannot self-correct without the reason.
 - Surface-events → windowing bridge (shell does not consume `SceneOpened` yet); unlocks
   diagram/graph windows and "show me my graph" via `OpenSurface`.
-- Flutter core has pre-existing `activateControl` test drift (spawned task).
+- Automated testing is intentionally deferred. Final hardening must create module-owned test
+  projects/frameworks; do not restore one central suite.
 - `/brain/topology` + `/graph/events` exist; delivery-pulse event stream for edge
   animation does not yet.
+- Stage 2 starts with Conversation extraction (`UI → Conversations ← AI`), then formalizes SDK
+  OAuth/authorization and webhook-ingress rails. Project consolidation, the graph-neuron rename,
+  and the duplicated AppHost/Kernel module catalog remain explicit later decisions.
