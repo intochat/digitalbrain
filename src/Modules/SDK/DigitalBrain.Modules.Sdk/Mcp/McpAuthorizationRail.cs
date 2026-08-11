@@ -236,6 +236,25 @@ public static class McpAuthorizationRail
                 + $"&code_challenge_method={OAuthPkce.ChallengeMethodS256}");
         }
 
+        // Gmail / Google OAuth (official Gmail MCP). Same sole-mint PKCE shape as Salesforce.
+        if (!string.IsNullOrWhiteSpace(clientId)
+            && !string.IsNullOrWhiteSpace(redirectUri)
+            && IsGoogleGmailServer(server.Key))
+        {
+            var scope = string.Join(' ', server.Scopes);
+            return new Uri(
+                "https://accounts.google.com/o/oauth2/v2/auth"
+                + "?response_type=code"
+                + $"&client_id={Uri.EscapeDataString(clientId)}"
+                + $"&redirect_uri={Uri.EscapeDataString(redirectUri)}"
+                + $"&scope={Uri.EscapeDataString(scope)}"
+                + $"&state={Uri.EscapeDataString(state)}"
+                + $"&code_challenge={Uri.EscapeDataString(codeChallenge)}"
+                + $"&code_challenge_method={OAuthPkce.ChallengeMethodS256}"
+                + "&access_type=offline"
+                + "&prompt=consent");
+        }
+
         var authorizeBase = configuration[$"{server.ConfigurationRoot}:AuthorizeEndpoint"];
         if (!string.IsNullOrWhiteSpace(clientId)
             && !string.IsNullOrWhiteSpace(redirectUri)
@@ -283,6 +302,11 @@ public static class McpAuthorizationRail
             + $"&code_challenge={Uri.EscapeDataString(codeChallenge)}"
             + $"&code_challenge_method={OAuthPkce.ChallengeMethodS256}");
     }
+
+    internal static bool IsGoogleGmailServer(string serverKey)
+        => string.Equals(serverKey, "google.gmail", StringComparison.OrdinalIgnoreCase)
+            || (serverKey.Contains("gmail", StringComparison.OrdinalIgnoreCase)
+                && serverKey.Contains("google", StringComparison.OrdinalIgnoreCase));
 }
 
 // Test seam / DI override for token exchange without a live provider.

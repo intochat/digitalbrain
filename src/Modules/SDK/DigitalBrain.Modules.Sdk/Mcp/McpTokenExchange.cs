@@ -101,6 +101,11 @@ internal static class McpTokenExchange
             return new Uri("https://login.salesforce.com/services/oauth2/token");
         }
 
+        if (McpAuthorizationRail.IsGoogleGmailServer(server.Key))
+        {
+            return new Uri("https://oauth2.googleapis.com/token");
+        }
+
         throw new InvalidOperationException(
             $"{server.DisplayName} requires '{server.ConfigurationRoot}:TokenEndpoint' for authorization-code exchange.");
     }

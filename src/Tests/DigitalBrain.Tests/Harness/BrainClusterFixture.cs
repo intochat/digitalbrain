@@ -88,6 +88,17 @@ public sealed class BrainClusterFixture : IAsyncLifetime
             "DigitalBrain:TestCrm",
             ["mcp_api"],
             requiresClientSecret: false));
+        // S1.6: Gmail server key on the same generic gateway (parity with production GoogleModule).
+        silo.Services.AddSingleton(new DigitalBrain.Modules.Sdk.Mcp.McpServerDefinition(
+            "google.gmail",
+            "Gmail",
+            new Uri("http://localhost:1/mcp"),
+            "DigitalBrain:Google:Gmail",
+            [
+                "https://www.googleapis.com/auth/gmail.readonly",
+                "https://www.googleapis.com/auth/gmail.compose",
+            ],
+            requiresClientSecret: true));
         silo.Services.Configure<SiloMessagingOptions>(
             messaging => messaging.ResponseTimeout = SaturatedMachineResponseTimeout);
     }

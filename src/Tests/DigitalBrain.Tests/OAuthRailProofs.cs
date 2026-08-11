@@ -28,29 +28,49 @@ public sealed class OAuthRailCompositionProofs
         Assert.Contains("does not mint state", callback, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void SalesforceAuthorizeUrlAlwaysCarriesPkceS256()
+    [Theory]
+    [InlineData(
+        "salesforce",
+        "Salesforce",
+        "DigitalBrain:Salesforce",
+        "login.salesforce.com",
+        "api",
+        "refresh_token")]
+    [InlineData(
+        "google.gmail",
+        "Gmail",
+        "DigitalBrain:Google:Gmail",
+        "accounts.google.com",
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.compose")]
+    public void ProviderAuthorizeUrlAlwaysCarriesPkceS256(
+        string serverKey,
+        string displayName,
+        string configurationRoot,
+        string expectedHost,
+        string scopeA,
+        string scopeB)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["DigitalBrain:Salesforce:ClientId"] = "sf-client-id",
-                ["DigitalBrain:Salesforce:RedirectUri"] = "https://app.example/oauth/callback",
+                [$"{configurationRoot}:ClientId"] = $"{serverKey}-client-id",
+                [$"{configurationRoot}:RedirectUri"] = "https://app.example/oauth/callback",
             })
             .Build();
         var server = new McpServerDefinition(
-            "salesforce",
-            "Salesforce",
+            serverKey,
+            displayName,
             new Uri("https://example.com/mcp"),
-            "DigitalBrain:Salesforce",
-            ["api", "refresh_token"],
+            configurationRoot,
+            [scopeA, scopeB],
             requiresClientSecret: true);
         var state = Guid.NewGuid().ToString("N");
         var (_, challenge) = OAuthPkce.CreateS256Pair();
 
         var signInUrl = McpAuthorizationRail.BuildPkceAuthorizeUrl(configuration, server, state, challenge);
 
-        Assert.Equal("login.salesforce.com", signInUrl.Host);
+        Assert.Equal(expectedHost, signInUrl.Host);
         Assert.Contains("response_type=code", signInUrl.Query, StringComparison.Ordinal);
         Assert.Contains($"state={Uri.EscapeDataString(state)}", signInUrl.Query, StringComparison.Ordinal);
         Assert.Contains("code_challenge=", signInUrl.Query, StringComparison.OrdinalIgnoreCase);
@@ -76,18 +96,20 @@ public sealed class OAuthRailCompositionProofs
         McpAuthorizationCodeHub.ResetForTests();
     }
 
-    [Fact]
-    public void McpTokenPurposesKeyByPrincipalNotNeuronIdentity()
+    [Theory]
+    [InlineData("salesforce")]
+    [InlineData("google.gmail")]
+    public void McpTokenPurposesKeyByPrincipalNotNeuronIdentity(string serverKey)
     {
         var actor = new ActorContext(PrincipalId.New(), "alice");
-        var serverKey = "dev/salesforce";
         var purpose = McpTokenPresence.Purpose(serverKey, IntegrationScope.User, McpTokenPresence.SubjectKey(actor));
 
         Assert.Equal(
             $"integration/user/{serverKey}/{McpTokenPresence.SubjectKey(actor)}",
             purpose);
         Assert.Contains("integration/user/", purpose, StringComparison.Ordinal);
-        Assert.DoesNotContain("mcp:dev/salesforce", purpose, StringComparison.Ordinal);
+        Assert.DoesNotContain($"mcp:{serverKey}", purpose, StringComparison.Ordinal);
+        Assert.DoesNotContain("google/oauth/", purpose, StringComparison.Ordinal);
 
         var integration = McpTokenPresence.UserIntegration(serverKey, actor, ["api"]);
         Assert.Equal(IntegrationScope.User, integration.Scope);
@@ -167,23 +189,28 @@ public sealed class OAuthRailNeuronProofs(BrainClusterFixture fixture)
     private static ActorContext TestActor(string name = "alice")
         => new(PrincipalId.New(), name);
 
-    [Fact]
-    public async Task CompletedAuthorizationCodeIsOneShotAndReplayIsRefused()
+    [Theory]
+    [InlineData("salesforce", "Salesforce", "https://login.salesforce.com/services/oauth2/authorize")]
+    [InlineData("google.gmail", "Gmail", "https://accounts.google.com/o/oauth2/v2/auth")]
+    public async Task CompletedAuthorizationCodeIsOneShotAndReplayIsRefused(
+        string serverKey,
+        string displayName,
+        string authorizeBase)
     {
         McpAuthorizationCodeHub.ResetForTests();
-        var brain = fixture.BrainFor("oauth-replay");
+        var brain = fixture.BrainFor($"oauth-replay-{serverKey.Replace('.', '-')}");
         var authorization = brain.GetGrainProxy<IMcpAuthorization>(IMcpAuthorization.DefaultInstanceName);
         var command = CommandId.New();
-        const string state = "replay-state-1";
+        var state = $"replay-state-{serverKey}";
         const string code = "auth-code-once";
         var actor = TestActor();
 
         await authorization.Begin(
             new BeginMcpAuthorization(
                 command,
-                "salesforce",
-                "Salesforce",
-                new Uri("https://login.salesforce.com/services/oauth2/authorize?state=replay-state-1&code_challenge=abc&code_challenge_method=S256"),
+                serverKey,
+                displayName,
+                new Uri($"{authorizeBase}?state={Uri.EscapeDataString(state)}&code_challenge=abc&code_challenge_method=S256"),
                 state,
                 actor,
                 CodeChallenge: "abc",
@@ -232,21 +259,26 @@ public sealed class OAuthRailNeuronProofs(BrainClusterFixture fixture)
         McpAuthorizationCodeHub.ResetForTests();
     }
 
-    [Fact]
-    public async Task AuthorizationPendingBindsTheLocalUserPrincipal()
+    [Theory]
+    [InlineData("salesforce", "Salesforce", "https://login.salesforce.com/services/oauth2/authorize")]
+    [InlineData("google.gmail", "Gmail", "https://accounts.google.com/o/oauth2/v2/auth")]
+    public async Task AuthorizationPendingBindsTheLocalUserPrincipal(
+        string serverKey,
+        string displayName,
+        string authorizeBase)
     {
-        var brain = fixture.BrainFor("oauth-principal");
+        var brain = fixture.BrainFor($"oauth-principal-{serverKey.Replace('.', '-')}");
         var authorization = brain.GetGrainProxy<IMcpAuthorization>(IMcpAuthorization.DefaultInstanceName);
         var command = CommandId.New();
-        const string state = "principal-state";
+        var state = $"principal-state-{serverKey}";
         var actor = TestActor("bob");
 
         var required = await authorization.Begin(
             new BeginMcpAuthorization(
                 command,
-                "salesforce",
-                "Salesforce",
-                new Uri("https://login.salesforce.com/services/oauth2/authorize?state=principal-state&code_challenge=x&code_challenge_method=S256"),
+                serverKey,
+                displayName,
+                new Uri($"{authorizeBase}?state={Uri.EscapeDataString(state)}&code_challenge=x&code_challenge_method=S256"),
                 state,
                 actor,
                 CodeChallenge: "x",
@@ -254,7 +286,7 @@ public sealed class OAuthRailNeuronProofs(BrainClusterFixture fixture)
             TestContext.Current.CancellationToken);
 
         Assert.Equal(command, required.CommandId);
-        Assert.Equal("salesforce", required.ServerKey);
+        Assert.Equal(serverKey, required.ServerKey);
         Assert.Equal(state, required.State);
         Assert.NotNull(required.Actor);
         Assert.Equal(actor.PrincipalId, required.Actor!.PrincipalId);
@@ -268,13 +300,18 @@ public sealed class OAuthRailNeuronProofs(BrainClusterFixture fixture)
         Assert.Contains("Actor", names);
     }
 
-    [Fact]
-    public async Task PrincipalTokenSlotsIsolateUserAFromUserB()
+    [Theory]
+    [InlineData("salesforce", "Salesforce", "https://login.salesforce.com/services/oauth2/authorize")]
+    [InlineData("google.gmail", "Gmail", "https://accounts.google.com/o/oauth2/v2/auth")]
+    public async Task PrincipalTokenSlotsIsolateUserAFromUserB(
+        string serverKey,
+        string displayName,
+        string authorizeBase)
     {
         var alice = new ActorContext(PrincipalId.New(), "alice");
         var bob = new ActorContext(PrincipalId.New(), "bob");
-        var alicePurpose = McpTokenPresence.UserIntegration("salesforce", alice, ["api"]).ProtectedTokenReference;
-        var bobPurpose = McpTokenPresence.UserIntegration("salesforce", bob, ["api"]).ProtectedTokenReference;
+        var alicePurpose = McpTokenPresence.UserIntegration(serverKey, alice, ["api"]).ProtectedTokenReference;
+        var bobPurpose = McpTokenPresence.UserIntegration(serverKey, bob, ["api"]).ProtectedTokenReference;
 
         Assert.NotEqual(alicePurpose, bobPurpose);
         Assert.Contains(McpTokenPresence.SubjectKey(alice), alicePurpose, StringComparison.Ordinal);
@@ -282,15 +319,15 @@ public sealed class OAuthRailNeuronProofs(BrainClusterFixture fixture)
         Assert.Contains(McpTokenPresence.SubjectKey(bob), bobPurpose, StringComparison.Ordinal);
 
         // Live grain: Begin for alice; bob cannot claim alice's state via a different Begin on same state.
-        var brain = fixture.BrainFor("oauth-isolation");
+        var brain = fixture.BrainFor($"oauth-isolation-{serverKey.Replace('.', '-')}");
         var authorization = brain.GetGrainProxy<IMcpAuthorization>(IMcpAuthorization.DefaultInstanceName);
-        const string state = "iso-state";
+        var state = $"iso-state-{serverKey}";
         await authorization.Begin(
             new BeginMcpAuthorization(
                 CommandId.New(),
-                "salesforce",
-                "Salesforce",
-                new Uri("https://login.salesforce.com/services/oauth2/authorize?state=iso-state&code_challenge=c&code_challenge_method=S256"),
+                serverKey,
+                displayName,
+                new Uri($"{authorizeBase}?state={Uri.EscapeDataString(state)}&code_challenge=c&code_challenge_method=S256"),
                 state,
                 alice,
                 "c",
@@ -301,9 +338,9 @@ public sealed class OAuthRailNeuronProofs(BrainClusterFixture fixture)
             await authorization.Begin(
                 new BeginMcpAuthorization(
                     CommandId.New(),
-                    "salesforce",
-                    "Salesforce",
-                    new Uri("https://login.salesforce.com/services/oauth2/authorize?state=iso-state&code_challenge=c2&code_challenge_method=S256"),
+                    serverKey,
+                    displayName,
+                    new Uri($"{authorizeBase}?state={Uri.EscapeDataString(state)}&code_challenge=c2&code_challenge_method=S256"),
                     state,
                     bob,
                     "c2",

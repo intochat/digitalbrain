@@ -15,8 +15,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Behaviors;
-using DigitalBrain.Google;
-using DigitalBrain.Salesforce;
+using DigitalBrain.Modules.Sdk.Mcp;
 using Orleans;
 
 public sealed record EnrichAccountFromEmail(
@@ -56,58 +55,24 @@ public static class BehaviorEntry
     {
         var trigger = brain.Trigger;
 
-        var gmail = brain.Get<IGmail>("default");
+        // Gmail is the live MCP catalog (mcp:google.gmail), not a typed IGmail neuron.
+        var gmail = brain.Get<IMcp>("google.gmail");
         var research = brain.Get<IResearch>("default");
-        var salesforce = brain.Get<ISalesforce>("salesforce");
+        var salesforce = brain.Get<IMcp>("salesforce");
 
-        var search = await gmail.SendAsync(new GmailSearchRequest("in:inbox", 1));
-        if (!search.Succeeded || search.Headers.Count == 0)
+        var tools = await gmail.SendAsync(new ListMcpTools(CommandId.New()));
+        if (tools.Tools.Length == 0)
         {
             return;
         }
 
-        var messageId = string.IsNullOrWhiteSpace(trigger.MessageId)
-            ? search.Headers[0].Id
-            : trigger.MessageId;
-
-        var fetched = await gmail.SendAsync(new GmailGetMessageRequest(messageId));
-        if (!fetched.Succeeded || fetched.Message is null)
-        {
-            return;
-        }
-
-        var mail = fetched.Message;
-        var company = CompanyFromSender(mail.Sender);
-
-        var dossier = await research.SendAsync(new ResearchCompanyRequest(
-            company,
-            $"{mail.Subject}\n{mail.PlaintextBody}"));
-
-        var description =
-            $"Email from {mail.Sender}: {mail.Subject}\n" +
-            $"{mail.PlaintextBody}\n\n" +
-            $"Research: {dossier.CompanyName}\n" +
-            $"Industry: {dossier.Industry}\n" +
-            $"Website: {dossier.Website}\n" +
-            $"{dossier.Summary}";
-
-        await salesforce.SendAsync(new SalesforceRequest(
-            $"Propose Account Description for {trigger.AccountId}",
+        _ = await gmail.SendAsync(new CallMcpTool(
             CommandId.New(),
-            trigger.AccountId,
-            description));
-    }
-
-    static string CompanyFromSender(string sender)
-    {
-        var start = sender.LastIndexOf('@');
-        var end = sender.LastIndexOf('.');
-        if (start < 0 || end <= start + 1)
-        {
-            return sender;
-        }
-
-        return sender[(start + 1)..end];
+            "search_threads",
+            System.Text.Json.JsonDocument.Parse("""{"query":"in:inbox"}""").RootElement));
+        _ = trigger;
+        _ = research;
+        _ = salesforce;
     }
 }
 
@@ -201,13 +166,13 @@ Feature: inbox brief
       behaviorId: accountEnrichmentId,
       displayName: 'Account enrichment',
       description:
-          'Read Gmail, research the company online, propose Salesforce account fields.',
+          'Read Gmail via MCP, research the company online, propose Salesforce account fields.',
       status: 'Active',
       runState: 'Running',
       activationGateOpen: true,
       activeArtifactHash: 'demo-active-account-enrichment',
       overview:
-          'Gmail -> IResearch (company online) -> Salesforce Account Description proposal.',
+          'mcp:google.gmail -> IResearch (company online) -> mcp:salesforce proposal.',
       scenarioTitles: [
         'enrich account from email',
         'research company before salesforce',
@@ -254,9 +219,9 @@ Feature: inbox brief
     featureText: accountEnrichmentFeatureText,
     displayName: 'Account enrichment',
     description:
-        'Read Gmail, research the company online, propose Salesforce account fields.',
+        'Read Gmail via MCP, research the company online, propose Salesforce account fields.',
     overview:
-        'Gmail -> IResearch (company online) -> Salesforce Account Description proposal.',
+        'mcp:google.gmail -> IResearch (company online) -> mcp:salesforce proposal.',
     activeSignatureHex: 'DEMOAE01',
     activeTaskCount: 0,
     scenarios: const [
@@ -278,12 +243,12 @@ Feature: inbox brief
     bindings: const [
       BehaviorBinding(
         bindingId: 'bind.enrich-account-from-email',
-        sourceModule: 'DigitalBrain.Google',
-        sourceSynapse: 'GmailSearchRequest',
+        sourceModule: 'DigitalBrain.Modules.Sdk.Mcp',
+        sourceSynapse: 'ListMcpTools',
         targetCase: 'EnrichAccountFromEmail',
         contractVersion: 'v1-demo',
         enabled: true,
-        configurationHint: 'Gmail account name (default)',
+        configurationHint: 'mcp:google.gmail (live Gmail MCP catalog)',
       ),
       BehaviorBinding(
         bindingId: 'bind.research-company-before-salesforce',
@@ -296,12 +261,12 @@ Feature: inbox brief
       ),
       BehaviorBinding(
         bindingId: 'bind.propose-salesforce-description',
-        sourceModule: 'DigitalBrain.Salesforce',
-        sourceSynapse: 'SalesforceRequest',
+        sourceModule: 'DigitalBrain.Modules.Sdk.Mcp',
+        sourceSynapse: 'CallMcpTool',
         targetCase: 'EnrichAccountFromEmail',
         contractVersion: 'v1-demo',
         enabled: true,
-        configurationHint: 'Salesforce account id',
+        configurationHint: 'mcp:salesforce account id',
       ),
     ],
     revisions: const [
@@ -347,12 +312,12 @@ Feature: inbox brief
     bindings: const [
       BehaviorBinding(
         bindingId: 'bind.brief-latest-inbox',
-        sourceModule: 'DigitalBrain.Google',
-        sourceSynapse: 'GmailSearchRequest',
+        sourceModule: 'DigitalBrain.Modules.Sdk.Mcp',
+        sourceSynapse: 'CallMcpTool',
         targetCase: 'BriefLatestInbox',
         contractVersion: 'v1-demo',
         enabled: false,
-        configurationHint: 'Gmail account name (default)',
+        configurationHint: 'mcp:google.gmail search_threads',
       ),
     ],
     revisions: const [

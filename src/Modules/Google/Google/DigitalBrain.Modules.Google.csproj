@@ -1,20 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Google module: Gmail neuron backed by the official Gmail SDK facade.</Description>
+    <Description>Google module: official Gmail MCP server definition for the generic MCP gateway.</Description>
     <RootNamespace>DigitalBrain.Google</RootNamespace>
-    <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Google.Apis.Auth" />
-    <PackageReference Include="Google.Apis.Gmail.v1" />
-    <PackageReference Include="Microsoft.Extensions.AI" />
-    <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
-  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
     <ProjectReference Include="../../SDK/DigitalBrain.Modules.Sdk/DigitalBrain.Modules.Sdk.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
-    <ProjectReference Include="../../../Kernel/DigitalBrain.Security/DigitalBrain.Security.csproj" />
   </ItemGroup>
 </Project>

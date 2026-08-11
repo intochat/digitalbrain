@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Google module contracts: typed Gmail neuron vocabulary.</Description>
+    <Description>Google module contracts: empty (Gmail surface is the live MCP catalog, not typed synapses).</Description>
     <RootNamespace>DigitalBrain.Google</RootNamespace>
   </PropertyGroup>
   <ItemGroup>

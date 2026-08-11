@@ -10,7 +10,6 @@ internal static class ComposedModules
         [
             typeof(DigitalBrain.Abstractions.ISynapseGraph).Assembly,
             typeof(DigitalBrain.AI.IAssistant).Assembly,
-            typeof(DigitalBrain.Google.IGmail).Assembly,
             typeof(DigitalBrain.Introspection.ReadTopologyRequest).Assembly,
             typeof(DigitalBrain.Memory.IVectorMemory).Assembly,
 

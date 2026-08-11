@@ -123,4 +123,47 @@ public sealed class McpGatewayProofs(BrainClusterFixture fixture)
             gateway, JournalKind.Outgoing, cancellationToken: TestContext.Current.CancellationToken);
         Assert.DoesNotContain(outgoing.Delta, delivery => delivery.Synapse is McpToolsListed);
     }
+
+    [Fact]
+    public async Task GmailServerKeyListsTheFakeCatalog()
+    {
+        var brain = fixture.BrainFor("mcp-gmail-list");
+
+        var listed = await brain.Get<IMcp>("google.gmail").FireAsync(
+            new ListMcpTools(CommandId.New()),
+            TestContext.Current.CancellationToken);
+
+        Assert.Contains(listed.Tools, tool => tool.Name == "search_threads" && !tool.Destructive);
+        Assert.Contains(listed.Tools, tool => tool.Name == "create_draft" && tool.Destructive);
+        Assert.DoesNotContain(listed.Tools, tool => tool.Name == "soqlQuery");
+    }
+
+    [Fact]
+    public async Task GmailToolCallJournalsActorAndIntegrationSubject()
+    {
+        var brain = fixture.BrainFor("mcp-gmail-call");
+        var actor = new ActorContext(PrincipalId.New(), "gmail-user");
+        var gateway = new NeuronId("mcp", brain.Owner, "google.gmail");
+
+        var returned = await brain.Get<IMcp>("google.gmail").FireAsync(
+            new CallMcpTool(
+                CommandId.New(),
+                "search_threads",
+                Json("""{"query":"in:inbox"}"""),
+                FireRowsAs: null,
+                Actor: actor),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("search_threads", returned.Tool);
+        Assert.Equal(actor.PrincipalId, returned.Actor!.PrincipalId);
+        Assert.Equal(McpTokenPresence.SubjectKey(actor), returned.IntegrationSubject);
+
+        var inbound = await brain.ReadJournalAsync(
+            gateway, JournalKind.Incoming, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Contains(
+            inbound.Delta,
+            delivery => delivery.Synapse is CallMcpTool call
+                && call.Actor?.PrincipalId == actor.PrincipalId
+                && call.Tool == "search_threads");
+    }
 }
