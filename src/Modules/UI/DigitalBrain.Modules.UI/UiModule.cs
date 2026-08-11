@@ -10,7 +10,6 @@ public sealed class UiModule : Core.IModule
         ArgumentNullException.ThrowIfNull(builder);
 
         // Pin the adapter grain type on the worker allow-list registration surface.
-        // ExecutionModule seeds the registry with the same name at composition.
         builder.Services.AddSingleton<IWorkerTypeRegistration>(
             new WorkerTypeRegistration(ChatTurnWorker.GrainTypeName));
     }

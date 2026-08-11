@@ -19,7 +19,4 @@
     <ProjectReference Include="../DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <ProjectReference Include="../../Modules/SDK/DigitalBrain.Modules.Sdk/DigitalBrain.Modules.Sdk.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Tests" />
-  </ItemGroup>
 </Project>

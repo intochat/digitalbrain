@@ -1,36 +1,50 @@
-# Stage 1 janitor backlog (living document — orchestrator maintains)
+# Stage 1 janitor backlog
 
-## Open
-- J2: delete empty `DigitalBrain.Modules.Salesforce.Contracts` project (empty ≠ consolidation).
-- J3: delete stale `docker-compose.yml` `DigitalBrain__Modules__0..9` env vars naming dead classes.
-- J4: dual module catalog (AppHost vs `ComposedModules`) — collapse ONLY if purely mechanical, else park to Stage 2.
-- J5: prove Orleans Streams/PubSub non-use under aspire telemetry → then remove provisioning
-  (and with it the `Aspire.Azure.Storage.Queues` 13.4.6 mixed pin).
-- J8: repo hygiene — verify `bin`/`obj`/`.vs` ignored.
-- From J1-GRILL (all MINOR):
-  - `ChatButtons.OfferLifetime` / `ArmingConnectionId` — dead helpers, zero callers under src/.
-  - `DigitalBrain.Mcp/ChatTools.cs:71` — description string still cites 'show-time' example.
-  - Pin `Author` on sign-in offer path + default-assistant responder path (coverage nits).
-  - Flutter kit fixtures use `show-time` sample ids (Lane C).
-  - Docs (`CLAUDE.md`, `UNIFIED-ARCHITECTURE.md`) still describe the deleted demo — docs pass at Stage 1 exit.
-- Token-presence slice duplication (`McpTokenPresence`) — evaluate after S1.3 rail lands.
-- From S1.2-GRILL (deferred MAJORs, orchestrator-ruled):
-  - MAJOR-2: grain-level actor enforcement (Chat refuses durable command without stamp) → fold into S1.5 turn pipeline rework.
-  - MAJOR-4: bootstrap/user-create atomicity (ETag if-not-exists on marker row) → hardening pass.
-  - MAJOR-5: real invitation flow (admin-create IS the ratified MVP; email invites Stage 2).
-  - MAJOR-6: two-user isolation through the REAL host must be part of the Stage-1 exit AppHost smoke.
-  - MCP `ChatTools`/`ReadChatTranscript` still take bare chatName (principal scoping at MCP edge) → S1.3/S1.5.
-  - Orleans dashboard `/orleans` ACL stance → decide at Stage-1 exit.
-  - Installation owner constant "dev" remains (one-workspace MVP) → rename/config at Stage-2 consolidation.
+This is the source-of-truth backlog after the 2026-08-11 owner amendments. Historical test
+hardening and flake tickets are closed as archaeology: automated tests are intentionally deferred
+until final hardening, where each module will own its own test project/framework.
 
-- FLAKE ticket: `ChartVocabularyProofs.EmittedChartPointLandsOnItsBoundChart` timed out once (25s graph
-  connection lookup) under machine load; green on clean rerun. Widen/diagnose the lookup timeout
-  margin in the test fixture before Stage-1 exit — never just rerun.
+## Carried into Stage 2
 
-## Done
-- J1: `WantsTimeButton`/`ShowTime`/`ButtonActivatedToShowTime` deleted; `Responded.Author` added (W2). GRILL: APPROVE.
-- Version unblock: Aspire 26405.3→26376.5 (cache-satisfiable), Storage.Queues→13.4.6; AppHost Sdk aligned.
+- **J4 — duplicated module catalogs:** AppHost `AddModule<T>` and
+  `DigitalBrainComposition.ComposedModules` remain two composition lists. Consolidation is not a
+  mechanical Stage-1 cleanup; Stage 2 owns the module boundary decision.
+- **J5 — Orleans Streams/PubSub provisioning:** precise production-source search finds provisioning
+  only and no `GetStreamProvider`, `IAsyncStream`, `SubscribeAsync`, or implicit stream consumer.
+  Keep it through the Stage-1 AppHost smoke, then remove the unused queue/table rail in Stage 2.
+  Outbox traffic must never move onto Streams.
+- **Identity hardening:** make bootstrap/user-create atomic with storage ETags; retain admin-create
+  as the current invitation MVP and design email invitations in Stage 2.
+- **Northbound MCP boundary:** authenticate the HTTP MCP surface and principal-scope Chat tools;
+  owner-only introspection must not expose another user's private chat. This is a Stage-1 exit
+  blocker until resolved, not silently accepted debt.
+- **Installation owner key:** replace/configure the internal `"dev"` owner during Stage-2
+  composition consolidation. It is the one-workspace deployment key, never a caller identity.
+- **S1.5 riding debt:** POST observer starts at `afterSequence: 0`; MAF tool effects retain the
+  post-effect/pre-safe-point uncertainty window; `AttemptAccepted` can lag while the worker turn
+  is active.
+- **S1.3 riding debt:** add structured failure audit outcomes without token material; revisit pin
+  strength when module-owned tests are designed.
 
-## Deliberately kept
-- Webhook slice (`McpWebhook*` or equivalent) — ratified SDK ingress rail seed (owner amendment §1.18).
-- Behavior Studio fixtures — quarantined demo until Stage 3 builds the real host.
+## Resolved or deliberately kept
+
+- **J1 resolved:** keyword `WantsTimeButton`/`ShowTime` behavior and its transform are deleted;
+  reply author stamps are present; production Flutter gallery ids are neutral.
+- **J2 deliberately kept by owner:** `DigitalBrain.Modules.Salesforce.Contracts`, its Salesforce
+  project reference, and its solution entry are permanent neuron/synapse contract boundaries.
+- **J3 resolved:** stale `DigitalBrain__Modules__0..9` compose variables and Docker comments are gone.
+- **J8 resolved:** `bin/`, `obj/`, `.vs/`, `.codegraph/`, and `.grok/` are ignored.
+- **Deleted-suite residue resolved:** central-test `InternalsVisibleTo` grants, OAuth hub test reset/
+  counter methods, the chat fault-injection branch, and fake `"worker"` allow-list seed are gone.
+- **Token presence resolved:** the typed Gmail path is gone; `McpTokenPresence` is now the one shared
+  SDK implementation used by Salesforce and Gmail MCP integrations.
+- **Orleans dashboard deliberately kept:** `/orleans` is covered by the Kernel fallback auth policy
+  and is workspace-wide for the one-workspace MVP. Finer operator roles can follow in Stage 2.
+- **Webhook slice deliberately kept:** it is the ratified SDK webhook-ingress rail seed (§1.18).
+- **Behavior Studio fixtures deliberately kept:** visibly labelled preview data until Stage 3
+  provides the real Behavior host.
+
+## Final hardening
+
+- Design module-owned automated-test projects/frameworks after seams stabilize. Never restore one
+  repository-wide test project.

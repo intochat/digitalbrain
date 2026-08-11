@@ -10,7 +10,7 @@ public interface IWorkerTypeRegistration
 public sealed record WorkerTypeRegistration(string GrainType) : IWorkerTypeRegistration;
 
 // Allow-list of grain types that may receive worker-dispatch envelopes.
-// Seeded with the harness type; modules add domain adapters via IWorkerTypeRegistration.
+// Modules explicitly register their domain adapters via IWorkerTypeRegistration.
 public sealed class WorkerGrainTypeRegistry
 {
     private readonly ConcurrentDictionary<string, byte> _allowed =

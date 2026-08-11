@@ -17,7 +17,4 @@
     <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Security/DigitalBrain.Security.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Tests" />
-  </ItemGroup>
 </Project>

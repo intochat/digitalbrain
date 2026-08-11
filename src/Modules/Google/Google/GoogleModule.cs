@@ -12,8 +12,8 @@ public sealed class GoogleModule : IModule
     public const string GmailDisplayName = "Gmail";
     public const string GmailConfigurationRoot = "DigitalBrain:Google:Gmail";
 
-    // Official Developer Preview endpoint (Google Workspace MCP). Live reachability is not
-    // proven headless; tests never open this URI (FakeMcpTransport / in-process rail only).
+    // Official Developer Preview endpoint (Google Workspace MCP). Live OAuth and catalog
+    // reachability require operator-provided Google client credentials.
     public static readonly Uri GmailMcpEndpoint = new("https://gmailmcp.googleapis.com/mcp/v1");
 
     public static readonly IReadOnlyList<string> GmailScopes =

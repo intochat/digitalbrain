@@ -309,7 +309,7 @@ public static class McpAuthorizationRail
                 && serverKey.Contains("google", StringComparison.OrdinalIgnoreCase));
 }
 
-// Test seam / DI override for token exchange without a live provider.
+// Replaceable token-exchange boundary; production registers the HTTP implementation below.
 internal interface IMcpTokenExchanger
 {
     Task<TokenContainer> ExchangeAsync(

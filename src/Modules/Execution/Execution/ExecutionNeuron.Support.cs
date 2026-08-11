@@ -168,18 +168,21 @@ public sealed partial class ExecutionNeuron
         data.OperationOrder.Remove(key);
         data.OperationOrder.Add(key);
 
-        while (data.OperationOrder.Count > RememberedOperations)
+        while (operations.Count > RememberedOperations)
         {
-            var oldestKey = data.OperationOrder[0];
-            if (operations.TryGetValue(oldestKey, out var oldest)
-                && oldest.Phase is not (OperationPhase.Completed or OperationPhase.Failed))
+            var removableIndex = data.OperationOrder.FindIndex(candidate =>
+                !operations.TryGetValue(candidate, out var operation)
+                || operation.Phase is OperationPhase.Completed or OperationPhase.Failed);
+            if (removableIndex < 0)
             {
-                // Never drop live ledger rows; stop pruning.
-                break;
+                throw new NeuronAuthorizationException(
+                    $"Execution operation capacity ({RememberedOperations}) is full of unresolved effects; "
+                    + "complete or reconcile an existing operation before preparing another.");
             }
 
-            data.OperationOrder.RemoveAt(0);
-            operations.Remove(oldestKey);
+            var removableKey = data.OperationOrder[removableIndex];
+            data.OperationOrder.RemoveAt(removableIndex);
+            operations.Remove(removableKey);
         }
 
         data.Operations = operations;

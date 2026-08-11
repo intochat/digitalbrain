@@ -80,32 +80,6 @@ internal static class McpAuthorizationCodeHub
         }
     }
 
-    internal static void AbortAllOpenSessions()
-    {
-        foreach (var waiter in Waiters.Values.ToArray())
-        {
-            waiter.TrySetResult(CodeHubOutcome.AsNoCode());
-        }
-
-        Waiters.Clear();
-
-        foreach (var session in SessionsByCommand.Values.ToArray())
-        {
-            session.Cancel();
-        }
-
-        SessionsByCommand.Clear();
-        SessionsByState.Clear();
-    }
-
-    internal static void ResetForTests()
-    {
-        AbortAllOpenSessions();
-        Completions.Clear();
-    }
-
-    internal static int CompletionsCountForTests => Completions.Count;
-
     internal static async Task<McpAuthorizationCodeResult?> AwaitAsync(string state, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(state);
