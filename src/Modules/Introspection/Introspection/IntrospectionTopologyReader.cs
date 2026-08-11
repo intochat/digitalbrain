@@ -5,39 +5,26 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Introspection;
 
-public sealed partial class IntrospectionNeuron
+internal sealed class IntrospectionTopologyReader(
+    IGrainFactory grainFactory,
+    IServiceProvider services,
+    TimeProvider timeProvider,
+    OwnerId owner)
 {
     private const string ModulesConfigurationSection = "DigitalBrain:Modules";
-    private const char IdentityPartSeparator = '/';
+    private readonly OwnerNeuronInventory _inventory = new(grainFactory, owner);
 
-    private async Task<ActivatedNeuron[]> ActivatedOwnerNeuronsAsync(CancellationToken cancellationToken)
+    internal async Task<TopologyRead> ReadAsync(
+        CommandId commandId,
+        CancellationToken cancellationToken)
     {
-        var statistics = await GrainFactory
-            .GetGrain<IManagementGrain>(0)
-            .GetDetailedGrainStatistics()
-            .WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-        var ownerPrefix = $"{Id.Owner.Value}{IdentityPartSeparator}";
-
-        return
-        [
-            .. statistics
-                .Where(statistic => statistic.GrainId.Key.ToString()!
-                    .StartsWith(ownerPrefix, StringComparison.Ordinal))
-                .Select(static statistic => new ActivatedNeuron(
-                    statistic.GrainId.Type.ToString()!,
-                    statistic.GrainId.Key.ToString()!,
-                    statistic.SiloAddress)),
-        ];
-    }
-
-    private async Task<TopologyRead> ReadTopologyAsync(CommandId commandId, CancellationToken cancellationToken)
-    {
-        var ownerStatistics = await ActivatedOwnerNeuronsAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        var connections = await GrainFactory
-            .GetGrain<ISynapseGraph>(ISynapseGraph.ForOwner(Id.Owner).ToGrainId())
+        var ownerStatistics = await _inventory.ReadAsync(cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        var connections = await grainFactory
+            .GetGrain<ISynapseGraph>(ISynapseGraph.ForOwner(owner).ToGrainId())
             .Connections()
-            .WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         var placements = ownerStatistics
             .Select(static neuron => neuron.Silo)
             .Distinct()
@@ -58,7 +45,7 @@ public sealed partial class IntrospectionNeuron
                     .OrderBy(static neuron => neuron.GrainType, StringComparer.Ordinal)
                     .ThenBy(static neuron => neuron.Identity, StringComparer.Ordinal),
             ],
-            TimeProvider.GetUtcNow(),
+            timeProvider.GetUtcNow(),
             [
                 .. connections
                     .Select(static connection => new TopologyConnection(
@@ -72,18 +59,16 @@ public sealed partial class IntrospectionNeuron
                     .ThenBy(static connection => connection.SynapseAlias, StringComparer.Ordinal),
             ],
             [
-                .. (ServiceProvider.GetService<BroadcastTopology>()?.Routes ?? [])
+                .. (services.GetService<BroadcastTopology>()?.Routes ?? [])
                     .Select(static route => new TopologyBroadcastRoute(
                         route.SynapseAlias,
                         route.HandlerGrainType)),
             ]);
     }
 
-    private sealed record ActivatedNeuron(string Type, string GrainKey, SiloAddress Silo);
-
     private IReadOnlyList<string> ComposedModuleIds()
     {
-        if (ServiceProvider.GetService<ActiveCapabilityCatalog>() is { Modules.Count: > 0 } catalog)
+        if (services.GetService<ActiveCapabilityCatalog>() is { Modules.Count: > 0 } catalog)
         {
             return
             [
@@ -93,7 +78,7 @@ public sealed partial class IntrospectionNeuron
             ];
         }
 
-        if (ServiceProvider.GetService<IConfiguration>() is not { } configuration)
+        if (services.GetService<IConfiguration>() is not { } configuration)
         {
             return [];
         }
