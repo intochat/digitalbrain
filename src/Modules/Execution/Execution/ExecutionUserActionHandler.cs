@@ -1,20 +1,25 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Execution;
 
-public sealed partial class ExecutionNeuron
+internal sealed class ExecutionUserActionHandler(
+    ExecutionRuntime runtime,
+    ExecutionDispatcher dispatcher)
 {
-    public async Task HandleAsync(UserActionRequired control, CancellationToken cancellationToken)
+    internal async Task HandleRequiredAsync(
+        UserActionRequired control,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(control);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (control.Execution != Id)
+        if (control.Execution != runtime.Id)
         {
             return;
         }
 
-        var data = Load();
+        var data = runtime.Load();
 
         if (control.Attempt != data.ActiveAttempt
             || data.State is not (ExecutionState.Pending or ExecutionState.Running or ExecutionState.Waiting))
@@ -22,7 +27,7 @@ public sealed partial class ExecutionNeuron
             return;
         }
 
-        if (control.ExpiresAt <= TimeProvider.GetUtcNow())
+        if (control.ExpiresAt <= runtime.TimeProvider.GetUtcNow())
         {
             return;
         }
@@ -41,8 +46,8 @@ public sealed partial class ExecutionNeuron
                 && existing.ParkRevision == control.ParkRevision
                 && existing.Completer == control.Completer)
             {
-                await SendParkReadyAsync(control).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-                return;
+                await SendParkReadyAsync(control)
+                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
 
             return;
@@ -66,24 +71,27 @@ public sealed partial class ExecutionNeuron
             control.Completer);
         data.PendingDispatch = null;
 
-        StageForTurn(data);
-        await SendParkReadyAsync(control).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        runtime.StageForTurn(data);
+        await SendParkReadyAsync(control)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    public async Task HandleAsync(CompleteUserAction command, CancellationToken cancellationToken)
+    internal async Task CompleteAsync(
+        CompleteUserAction command,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         cancellationToken.ThrowIfCancellationRequested();
-        Validate(command.CommandId);
+        ExecutionModel.ValidateCommandId(command.CommandId);
 
-        var data = Load();
+        var data = runtime.Load();
 
         if (data.Receipts.TryGetValue(command.CommandId, out _))
         {
             return;
         }
 
-        RequireUserActionAuthority(
+        RequireAuthority(
             data,
             command.ActionReference,
             command.ActionEpoch,
@@ -92,31 +100,36 @@ public sealed partial class ExecutionNeuron
         data.Revision++;
         data.State = ExecutionState.Running;
         data.Blocker = null;
-        data.PendingDispatch = new ContinueWorkerDispatch(Cursor(data));
+        data.PendingDispatch = new ContinueWorkerDispatch(
+            ExecutionModel.Cursor(runtime.Id, data));
 
-        var snapshot = Snapshot(data);
-        RememberReceipt(data, command.CommandId, snapshot);
+        var snapshot = ExecutionModel.Snapshot(data);
+        ExecutionModel.RememberReceipt(data, command.CommandId, snapshot);
 
-        StageForTurn(data);
-        await RegisterDispatchReminderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        runtime.StageForTurn(data);
+        await dispatcher.RegisterDispatchReminderAsync()
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        await StagePendingDispatchForTurnAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await dispatcher.StagePendingDispatchForTurnAsync()
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    public async Task HandleAsync(DenyUserAction command, CancellationToken cancellationToken)
+    internal async Task DenyAsync(
+        DenyUserAction command,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         cancellationToken.ThrowIfCancellationRequested();
-        Validate(command.CommandId);
+        ExecutionModel.ValidateCommandId(command.CommandId);
 
-        var data = Load();
+        var data = runtime.Load();
 
         if (data.Receipts.TryGetValue(command.CommandId, out _))
         {
             return;
         }
 
-        var pending = RequireUserActionAuthority(
+        var pending = RequireAuthority(
             data,
             command.ActionReference,
             command.ActionEpoch,
@@ -130,15 +143,17 @@ public sealed partial class ExecutionNeuron
         data.Evidence = [];
         data.PendingDispatch = null;
 
-        var snapshot = Snapshot(data);
-        RememberReceipt(data, command.CommandId, snapshot);
+        var snapshot = ExecutionModel.Snapshot(data);
+        ExecutionModel.RememberReceipt(data, command.CommandId, snapshot);
 
-        StageForTurn(data);
-        await UnregisterReminderAsync(RetryReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        await UnregisterReminderAsync(DispatchReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        runtime.StageForTurn(data);
+        await dispatcher.UnregisterReminderAsync(ExecutionReminders.Retry)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await dispatcher.UnregisterReminderAsync(ExecutionReminders.Dispatch)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    private UserActionPending RequireUserActionAuthority(
+    private UserActionPending RequireAuthority(
         ExecutionData data,
         ProtectedPayloadReference actionReference,
         Guid actionEpoch,
@@ -147,44 +162,47 @@ public sealed partial class ExecutionNeuron
         if (data.State != ExecutionState.Waiting || data.Blocker is not UserActionPending pending)
         {
             throw new NeuronAuthorizationException(
-                $"Execution '{Id}' is not waiting on a module user action.");
+                $"Execution '{runtime.Id}' is not waiting on a module user action.");
         }
 
         if (data.ActiveAttempt is null)
         {
             throw new NeuronAuthorizationException(
-                $"Execution '{Id}' has no active attempt bound to the user action.");
+                $"Execution '{runtime.Id}' has no active attempt bound to the user action.");
         }
 
         if (pending.ParkRevision != expectedParkRevision)
         {
             throw new NeuronAuthorizationException(
-                $"Execution '{Id}' is parked at revision {pending.ParkRevision}, not expected park revision {expectedParkRevision}.");
+                $"Execution '{runtime.Id}' is parked at revision {pending.ParkRevision}, not "
+                + $"expected park revision {expectedParkRevision}.");
         }
 
         if (pending.ActionEpoch != actionEpoch)
         {
             throw new NeuronAuthorizationException(
-                $"Execution '{Id}' rejected an action epoch that does not match the parked user action.");
+                $"Execution '{runtime.Id}' rejected an action epoch that does not match the "
+                + "parked user action.");
         }
 
         if (pending.ActionReference != actionReference)
         {
             throw new NeuronAuthorizationException(
-                $"Execution '{Id}' rejected an action reference that does not match the parked user action.");
+                $"Execution '{runtime.Id}' rejected an action reference that does not match "
+                + "the parked user action.");
         }
 
-        if (pending.ExpiresAt <= TimeProvider.GetUtcNow())
+        if (pending.ExpiresAt <= runtime.TimeProvider.GetUtcNow())
         {
             throw new NeuronAuthorizationException(
-                $"Execution '{Id}' rejected an expired user-action reference.");
+                $"Execution '{runtime.Id}' rejected an expired user-action reference.");
         }
 
         return pending;
     }
 
     private Task<SynapseDelivery> SendParkReadyAsync(UserActionRequired control)
-        => SendAsync(
+        => runtime.SendAsync(
             control.Completer,
             new UserActionParkReady(
                 control.Execution,

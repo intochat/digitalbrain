@@ -7,7 +7,7 @@ using Orleans.Serialization;
 namespace DigitalBrain.Execution;
 
 [GrainType("execution")]
-public sealed partial class ExecutionNeuron :
+public sealed class ExecutionNeuron :
     Neuron,
     IExecution,
     IExecutionWorkerLease,
@@ -28,27 +28,44 @@ public sealed partial class ExecutionNeuron :
     IRemindable
 {
     private const string StateName = "db.execution.state";
-    private const string RetryReminderName = "db.execution.retry";
-    private const string DispatchReminderName = "db.execution.dispatch";
-    internal const int RememberedReceipts = 64;
-    internal const int RememberedOperations = 64;
-    private static readonly TimeSpan ReminderPeriod = TimeSpan.FromMinutes(1);
-
-    private readonly IDurableValue<byte[]> _state;
-    private readonly Serializer<ExecutionData> _states;
+    private readonly ExecutionAttemptHandler _attempts;
+    private readonly ExecutionCommandHandler _commands;
+    private readonly ExecutionDispatcher _dispatcher;
+    private readonly ExecutionOperationHandler _operations;
+    private readonly ExecutionRuntime _runtime;
+    private readonly ExecutionUserActionHandler _userActions;
 
     public ExecutionNeuron()
     {
-        _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
-        _states = ServiceProvider.GetRequiredService<Serializer<ExecutionData>>();
+        var state = new ExecutionStateStore(
+            ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName),
+            ServiceProvider.GetRequiredService<Serializer<ExecutionData>>());
+        _runtime = new ExecutionRuntime(this, state);
+        _dispatcher = new ExecutionDispatcher(_runtime);
+        _commands = new ExecutionCommandHandler(_runtime, _dispatcher);
+        _operations = new ExecutionOperationHandler(_runtime);
+        _userActions = new ExecutionUserActionHandler(_runtime, _dispatcher);
+        _attempts = new ExecutionAttemptHandler(_runtime, _dispatcher);
     }
 
-    public Task<ExecutionSnapshot> Read() => Task.FromResult(Snapshot(Load()));
+    internal IGrainFactory ExecutionGrainFactory => GrainFactory;
+
+    internal TimeProvider ExecutionTimeProvider => TimeProvider;
+
+    public Task<ExecutionSnapshot> Read()
+        => Task.FromResult(ExecutionModel.Snapshot(_runtime.Load()));
+
+    public Task<ExecutionSnapshot> Apply(ApplyExecution command)
+        => _commands.ApplyAsync(command);
+
+    public Task RenewLease(AttemptCursor cursor)
+        => _attempts.RenewLeaseAsync(cursor);
 
     protected override async Task OnNeuronActivatedAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await RecoverAfterActivationAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await _dispatcher.RecoverAfterActivationAsync()
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(ApplyExecution synapse, CancellationToken cancellationToken)
@@ -56,92 +73,131 @@ public sealed partial class ExecutionNeuron :
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var snapshot = await Apply(synapse).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        var snapshot = await _commands.ApplyAsync(synapse)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         cancellationToken.ThrowIfCancellationRequested();
-        await ReplyAsync(snapshot, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await ReplyAsync(snapshot, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
+
+    public async Task HandleAsync(ReadOperation synapse, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+        var response = _operations.Read(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+        await ReplyAsync(response, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    public async Task HandleAsync(PrepareOperation synapse, CancellationToken cancellationToken)
+    {
+        var response = await _operations.PrepareAsync(synapse, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        cancellationToken.ThrowIfCancellationRequested();
+        await ReplyAsync(response, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    public async Task HandleAsync(TransitionOperation synapse, CancellationToken cancellationToken)
+    {
+        var response = await _operations.TransitionAsync(synapse, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        cancellationToken.ThrowIfCancellationRequested();
+        await ReplyAsync(response, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    public async Task HandleAsync(UserActionRequired control, CancellationToken cancellationToken)
+        => await _userActions.HandleRequiredAsync(control, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+    public async Task HandleAsync(CompleteUserAction command, CancellationToken cancellationToken)
+        => await _userActions.CompleteAsync(command, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+    public async Task HandleAsync(DenyUserAction command, CancellationToken cancellationToken)
+        => await _userActions.DenyAsync(command, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+    public async Task HandleAsync(AttemptAccepted fact, CancellationToken cancellationToken)
+        => await _attempts.AcceptedAsync(fact)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+    public async Task HandleAsync(AttemptProgressed fact, CancellationToken cancellationToken)
+        => await _attempts.ProgressedAsync(fact)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+    public async Task HandleAsync(AttemptWaiting fact, CancellationToken cancellationToken)
+        => await _attempts.WaitingAsync(fact)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+    public async Task HandleAsync(AttemptSucceeded fact, CancellationToken cancellationToken)
+        => await _attempts.SucceededAsync(fact)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+    public async Task HandleAsync(AttemptFailed fact, CancellationToken cancellationToken)
+        => await _attempts.FailedAsync(fact)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+    public async Task HandleAsync(AttemptCancelled fact, CancellationToken cancellationToken)
+        => await _attempts.CancelledAsync(fact)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+    public async Task HandleAsync(
+        AttemptOutcomeUncertain fact,
+        CancellationToken cancellationToken)
+        => await _attempts.OutcomeUncertainAsync(fact)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+    async Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
+        => await _dispatcher.ReceiveReminderAsync(reminderName)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+    internal void EnlistExecutionRollback(Action rollback)
+        => EnlistTurnRollback(rollback);
+
+    internal ValueTask WriteExecutionStateAsync()
+        => WriteStateAsync();
+
+    internal Task<IGrainReminder> RegisterExecutionReminderAsync(
+        string name,
+        TimeSpan dueTime,
+        TimeSpan period)
+        => this.RegisterOrUpdateReminder(name, dueTime, period);
+
+    internal async Task UnregisterExecutionReminderAsync(string name)
+    {
+        if (await this.GetReminder(name)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext) is { } reminder)
+        {
+            await this.UnregisterReminder(reminder)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+    }
+
+    internal Task<SynapseDelivery> SendFromExecutionAsync(NeuronId receiver, Synapse synapse)
+        => SendAsync(receiver, synapse);
+
+    internal Task EmitFromExecutionAsync(Synapse synapse)
+        => EmitAsync(synapse);
+
+    internal void DelayExecutionDeactivation(TimeSpan duration)
+        => DelayDeactivation(duration);
+
+    private bool ShouldDeliver(SynapseDelivery delivery)
+        => ExecutionDeliveryAuthorizer.ShouldDeliver(
+            delivery,
+            Id,
+            _runtime.LoadIfStarted);
 
     Task INeuron.Deliver(SynapseDelivery delivery, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(delivery);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (delivery.Synapse is AttemptFact fact && delivery.Caller != fact.Worker)
-        {
-            return Task.CompletedTask;
-        }
-
-        if (delivery.Synapse is UserActionRequired)
-        {
-            var data = LoadIfStarted();
-            if (data is null || delivery.Caller != data.Worker)
-            {
-                return Task.CompletedTask;
-            }
-        }
-
-        if (delivery.Synapse is CompleteUserAction or DenyUserAction)
-        {
-            var data = LoadIfStarted();
-            if (data is null)
-            {
-                throw new NeuronAuthorizationException(
-                    $"Caller '{delivery.Caller}' is not the user-action completer for Execution '{Id}'.");
-            }
-
-            if (data.Blocker is not UserActionPending pending)
-            {
-                var expectedRevision = delivery.Synapse switch
-                {
-                    CompleteUserAction complete => complete.ExpectedParkRevision,
-                    DenyUserAction deny => deny.ExpectedParkRevision,
-                    _ => -1L,
-                };
-
-                // Intentional non-settled race: park may not have committed yet; delivery retries until Waiting.
-                if (data.State is ExecutionState.Running or ExecutionState.Pending
-                    && expectedRevision >= 0
-                    && data.Revision == expectedRevision)
-                {
-                    throw new InvalidOperationException(
-                        $"Execution '{Id}' is not waiting on a module user action yet.");
-                }
-
-                throw new NeuronAuthorizationException(
-                    $"Caller '{delivery.Caller}' is not the user-action completer for Execution '{Id}'.");
-            }
-
-            if (delivery.Caller != pending.Completer)
-            {
-                throw new NeuronAuthorizationException(
-                    $"Caller '{delivery.Caller}' is not the user-action completer for Execution '{Id}'.");
-            }
-        }
-
-        if (delivery.Synapse is PrepareOperation or TransitionOperation)
-        {
-            var data = LoadIfStarted();
-            if (data is null || delivery.Caller != data.Worker)
-            {
-                throw new NeuronAuthorizationException(
-                    $"Caller '{delivery.Caller}' is not authorized to submit operations for Execution '{Id}'.");
-            }
-        }
-        else if (delivery.Synapse is ReadOperation)
-        {
-            var data = LoadIfStarted();
-            if (data is null || !IsAuthorizedOperationReader(delivery.Caller, data.Worker))
-            {
-                throw new NeuronAuthorizationException(
-                    $"Caller '{delivery.Caller}' is not authorized to read operations for Execution '{Id}'.");
-            }
-        }
-
-        return base.Deliver(delivery, cancellationToken);
+        return ShouldDeliver(delivery)
+            ? base.Deliver(delivery, cancellationToken)
+            : Task.CompletedTask;
     }
-
-    private bool IsAuthorizedOperationReader(NeuronId caller, NeuronId worker)
-        => caller == worker
-            || (caller.Owner == Id.Owner
-                && string.Equals(caller.Type, ISessionNeuron.GrainTypeName, StringComparison.OrdinalIgnoreCase));
 }
