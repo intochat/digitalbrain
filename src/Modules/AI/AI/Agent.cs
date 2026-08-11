@@ -94,7 +94,7 @@ public abstract class Agent : Neuron, IAgent
 
     private IReadOnlyList<AIFunction> ResolveTools(IReadOnlyList<ChatMessage> messages)
     {
-        var constant = new SystemTools(GrainFactory, Id.Owner, ServiceProvider).All();
+        var constant = new SystemTools(GrainFactory, Id.Owner, ServiceProvider, VerifiedActor.Current).All();
         var additional = AdditionalToolsFor(messages);
         if (additional.Count == 0)
         {

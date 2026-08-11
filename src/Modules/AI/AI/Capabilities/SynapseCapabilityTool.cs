@@ -33,6 +33,12 @@ public static class SynapseCapabilityTool
         var node = new JsonObject();
         foreach (var (key, value) in arguments)
         {
+            // Model/client-supplied actor is never trusted — strip before bind.
+            if (string.Equals(key, "actor", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             node[key] = value switch
             {
                 null => null,
@@ -61,6 +67,36 @@ public static class SynapseCapabilityTool
         }
 
         return synapse;
+    }
+
+    // Host-side stamp: verified principal from the session/HTTP boundary overwrites
+    // any Actor property. Model- or client-supplied values never survive fire().
+    public static Synapse StampVerifiedActor(Synapse synapse, ActorContext? verifiedActor)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        if (verifiedActor is null)
+        {
+            return synapse;
+        }
+
+        var type = synapse.GetType();
+        var actorProperty = type.GetProperty("Actor");
+        if (actorProperty is null)
+        {
+            return synapse;
+        }
+
+        var actorType = Nullable.GetUnderlyingType(actorProperty.PropertyType) ?? actorProperty.PropertyType;
+        if (actorType != typeof(ActorContext))
+        {
+            return synapse;
+        }
+
+        var node = JsonSerializer.SerializeToNode(synapse, type, SerializerOptions) as JsonObject
+            ?? throw new InvalidOperationException($"Could not re-shape '{type.Name}' for actor stamp.");
+        node["actor"] = JsonSerializer.SerializeToNode(verifiedActor, SerializerOptions);
+        return JsonSerializer.Deserialize(node, type, SerializerOptions) as Synapse
+            ?? throw new InvalidOperationException($"Actor stamp failed for '{type.Name}'.");
     }
 
     // Trap 7 inverted for the model path: a missing value-type field would bind

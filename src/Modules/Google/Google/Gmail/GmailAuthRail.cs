@@ -77,7 +77,8 @@ internal static class GmailAuthRail
                         ?? throw new InvalidOperationException("Authorization claim is missing the denied fact."));
                 case McpAuthorizationClaimKind.Completed:
                     await ExchangeCompletedAsync(
-                        authorization,
+                        grains.GetGrain<IMcpAuthorizationCodes>(
+                            NeuronId.For<IMcpAuthorization>(owner, IMcpAuthorization.DefaultInstanceName).ToGrainId()),
                         configuration,
                         store,
                         pendingStates,
@@ -169,7 +170,7 @@ internal static class GmailAuthRail
     }
 
     private static async Task ExchangeCompletedAsync(
-        IMcpAuthorization authorization,
+        IMcpAuthorizationCodes codes,
         IConfiguration configuration,
         DurableGoogleTokenStore store,
         IDurableDictionary<Guid, string> pendingStates,
@@ -185,7 +186,7 @@ internal static class GmailAuthRail
                 "Gmail authorization completed without a stored OAuth state for the command.");
         }
 
-        var code = await authorization.TakeCompletedCode(state, cancellationToken).ConfigureAwait(false);
+        var code = await codes.TakeCompletedCode(state, cancellationToken).ConfigureAwait(false);
         if (code is null || string.IsNullOrWhiteSpace(code.Code))
         {
             throw new InvalidOperationException(

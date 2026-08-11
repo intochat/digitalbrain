@@ -11,7 +11,11 @@ namespace DigitalBrain.AI;
 
 // The assistant's whole surface: three constant tools, no matter how many
 // modules exist. find → get → fire, with correctable errors the model can act on.
-public sealed class SystemTools(IGrainFactory grains, OwnerId owner, IServiceProvider services)
+public sealed class SystemTools(
+    IGrainFactory grains,
+    OwnerId owner,
+    IServiceProvider services,
+    ActorContext? verifiedActor = null)
 {
     public const string FindCapabilities = "find_capabilities";
     public const string GetNeurons = "get_neurons";
@@ -181,6 +185,8 @@ public sealed class SystemTools(IGrainFactory grains, OwnerId owner, IServicePro
         {
             request = SynapseCapabilityTool.BindModelArguments(
                 requestType, contract, ArgumentPairs(arguments), owner);
+            // Verified principal from the chat/HTTP boundary overwrites any model Actor.
+            request = SynapseCapabilityTool.StampVerifiedActor(request, verifiedActor);
         }
         catch (Exception invalid) when (invalid is JsonException or InvalidOperationException or ArgumentException)
         {

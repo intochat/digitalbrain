@@ -37,8 +37,9 @@ public static class McpAuthorizationRail
         var protector = services.GetRequiredService<IDurablePayloadProtector>();
         var integration = McpTokenPresence.UserIntegration(server.Key, actor, [.. server.Scopes]);
         var purpose = integration.ProtectedTokenReference;
-        var authorization = grains.GetGrain<IMcpAuthorization>(
-            NeuronId.For<IMcpAuthorization>(owner, McpAuthorizationNeuron.InstanceName).ToGrainId());
+        var grainId = NeuronId.For<IMcpAuthorization>(owner, McpAuthorizationNeuron.InstanceName).ToGrainId();
+        var authorization = grains.GetGrain<IMcpAuthorization>(grainId);
+        var codes = grains.GetGrain<IMcpAuthorizationCodes>(grainId);
         var missingOrExpired = McpTokenPresence.IsMissingOrExpired(tokenSlot, protector, purpose, time);
 
         McpAuthorizationClaim? claim = null;
@@ -65,6 +66,7 @@ public static class McpAuthorizationRail
                 case McpAuthorizationClaimKind.Completed:
                     await ExchangeCompletedAsync(
                         authorization,
+                        codes,
                         services,
                         configuration,
                         server,
@@ -100,6 +102,7 @@ public static class McpAuthorizationRail
 
     private static async Task ExchangeCompletedAsync(
         IMcpAuthorization authorization,
+        IMcpAuthorizationCodes codes,
         IServiceProvider services,
         IConfiguration configuration,
         McpServerDefinition server,
@@ -132,7 +135,8 @@ public static class McpAuthorizationRail
                 actor),
             cancellationToken).ConfigureAwait(false);
 
-        var taken = await authorization.TakeCompletedCode(recovered.State, cancellationToken).ConfigureAwait(false);
+        // Host-only take — never on ClientEntryPoint.
+        var taken = await codes.TakeCompletedCode(recovered.State, cancellationToken).ConfigureAwait(false);
         if (taken is null || string.IsNullOrWhiteSpace(taken.Code))
         {
             throw new NeuronAuthorizationException(

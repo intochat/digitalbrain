@@ -60,11 +60,16 @@ internal sealed class Chat : Neuron, IChat
             $"This conversation lives in neuron {Id}. Route cards and notes into it by "
             + $"targeting 'chat:{Id.Name}' or wiring connections whose target is {Id}.");
 
-        await foreach (var chunk in responder.RespondStreaming(
-            [conversationContext, .. Turns().Select(AsChatMessage)], cancellationToken).ConfigureAwait(true))
+        // Authenticated Actor on SendMessage is the verified principal for this turn.
+        // Assistant fire() stamps it onto actor-bearing synapses — model-supplied Actor dies.
+        using (VerifiedActor.Enter(message.Actor))
         {
-            answer.Append(chunk.Text);
-            yield return chunk;
+            await foreach (var chunk in responder.RespondStreaming(
+                [conversationContext, .. Turns().Select(AsChatMessage)], cancellationToken).ConfigureAwait(true))
+            {
+                answer.Append(chunk.Text);
+                yield return chunk;
+            }
         }
 
         var answered = answer.ToString();

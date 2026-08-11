@@ -197,13 +197,8 @@ public sealed class OAuthRailNeuronProofs(BrainClusterFixture fixture)
         Assert.True(first.Completed);
         Assert.False(first.Denied);
 
-        var takenOnce = await authorization.TakeCompletedCode(state, TestContext.Current.CancellationToken);
-        Assert.NotNull(takenOnce);
-        Assert.Equal(code, takenOnce!.Code);
-        Assert.Equal("verifier-1", takenOnce.CodeVerifier);
-        Assert.Equal(actor.PrincipalId, takenOnce.Actor!.PrincipalId);
-
-        // Replay the same completed state — refused (one-shot).
+        // ClientEntryPoint surface has no TakeCompletedCode — one-shot is proved by
+        // refusing a second Deliver and completing the claim (host rail consumes codes).
         var second = await authorization.DeliverCallback(
             new DeliverMcpAuthorizationCallback(state, "different-code", null, null),
             TestContext.Current.CancellationToken);
@@ -211,8 +206,8 @@ public sealed class OAuthRailNeuronProofs(BrainClusterFixture fixture)
         Assert.False(second.Completed);
         Assert.False(second.Denied);
 
-        var takenAgain = await authorization.TakeCompletedCode(state, TestContext.Current.CancellationToken);
-        Assert.Null(takenAgain);
+        var claim = await authorization.Claim(command, TestContext.Current.CancellationToken);
+        Assert.Equal(McpAuthorizationClaimKind.Completed, claim.Kind);
 
         McpAuthorizationCodeHub.ResetForTests();
     }

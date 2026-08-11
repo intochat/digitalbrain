@@ -11,7 +11,8 @@ namespace DigitalBrain.Modules.Sdk.Mcp;
 [GrainType("mcpauthorization")]
 public sealed class McpAuthorizationNeuron :
     Neuron,
-    IMcpAuthorization
+    IMcpAuthorization,
+    IMcpAuthorizationCodes
 {
     internal const string InstanceName = IMcpAuthorization.DefaultInstanceName;
     internal const int MaxPendingStates = 64;
@@ -54,6 +55,16 @@ public sealed class McpAuthorizationNeuron :
         if (_commands.TryGetValue(request.CommandId.Value, out var commandSerialized))
         {
             var recorded = _commandsSerializer.Deserialize(commandSerialized);
+            // Recovery requires the same principal that minted the pending auth.
+            // Wrong principal refuses settled and looks like an unknown transaction
+            // (no state / actor leak).
+            if (recorded.Actor is null
+                || recorded.Actor.PrincipalId != request.Actor.PrincipalId)
+            {
+                throw new NeuronAuthorizationException(
+                    $"Authorization command '{request.CommandId}' is not pending.");
+            }
+
             if (recorded.Outcome is PendingAuthorizationOutcome.Denied)
             {
                 throw new McpAuthorizationDeniedException(

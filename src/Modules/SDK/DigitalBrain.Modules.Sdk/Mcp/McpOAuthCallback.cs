@@ -10,6 +10,7 @@ internal static class McpOAuthCallback
     // The authorization rail is the sole state mint (PKCE). When the MCP client library
     // still invokes this handler, we never mint a second state from AuthorizationUri —
     // we recover the rail's pending transaction for the command and await that state.
+    // Codes never cross ClientEntryPoint — hub (in-process) or host-only codes grain.
     internal static async Task<AuthorizationResult?> AuthorizeAsync(
         AuthorizationCallbackContext context,
         McpOAuthSession session,
@@ -19,8 +20,9 @@ internal static class McpOAuthCallback
         ArgumentNullException.ThrowIfNull(session);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var authorization = session.Grains.GetGrain<IMcpAuthorization>(
-            NeuronId.For<IMcpAuthorization>(session.Owner, McpAuthorizationNeuron.InstanceName).ToGrainId());
+        var grainId = NeuronId.For<IMcpAuthorization>(session.Owner, McpAuthorizationNeuron.InstanceName).ToGrainId();
+        var authorization = session.Grains.GetGrain<IMcpAuthorization>(grainId);
+        var codes = session.Grains.GetGrain<IMcpAuthorizationCodes>(grainId);
 
         // Recover the single rail-minted transaction for this command (no second Begin).
         McpAuthorizationClaim claim;
@@ -44,7 +46,7 @@ internal static class McpOAuthCallback
         if (claim.Kind is McpAuthorizationClaimKind.Required && claim.Required is { } required)
         {
             McpAuthorizationCodeHub.RegisterSession(required.State, session);
-            return await AwaitDeliveredCodeAsync(required.State, session, authorization, cancellationToken)
+            return await AwaitDeliveredCodeAsync(required.State, session, authorization, codes, cancellationToken)
                 .ConfigureAwait(true);
         }
 
@@ -66,7 +68,7 @@ internal static class McpOAuthCallback
                     "unused-when-command-exists",
                     session.Actor),
                 cancellationToken).ConfigureAwait(true);
-            var taken = await authorization.TakeCompletedCode(recovered.State, cancellationToken).ConfigureAwait(true);
+            var taken = await codes.TakeCompletedCode(recovered.State, cancellationToken).ConfigureAwait(true);
             if (taken is null)
             {
                 throw new OperationCanceledException(
@@ -84,6 +86,7 @@ internal static class McpOAuthCallback
         string state,
         McpOAuthSession session,
         IMcpAuthorization authorization,
+        IMcpAuthorizationCodes codes,
         CancellationToken cancellationToken)
     {
         var hubTask = McpAuthorizationCodeHub.AwaitAsync(state, cancellationToken);
@@ -98,7 +101,7 @@ internal static class McpOAuthCallback
                     "MCP authorization ended without a code; the pending session open was canceled.");
             }
 
-            var taken = await authorization.TakeCompletedCode(state, cancellationToken).ConfigureAwait(true);
+            var taken = await codes.TakeCompletedCode(state, cancellationToken).ConfigureAwait(true);
             if (taken is not null)
             {
                 return ToAuthorizationResult(taken, state);
@@ -128,7 +131,7 @@ internal static class McpOAuthCallback
                 "MCP authorization ended without a code; the pending session open was canceled.");
         }
 
-        var afterHub = await authorization.TakeCompletedCode(state, cancellationToken).ConfigureAwait(true);
+        var afterHub = await codes.TakeCompletedCode(state, cancellationToken).ConfigureAwait(true);
         if (afterHub is null)
         {
             throw new OperationCanceledException(
