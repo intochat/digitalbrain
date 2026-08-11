@@ -20,10 +20,22 @@ internal static class ChatStreamsHttpMaps
                 OwnerSessionJournal sessionJournal,
                 CancellationToken cancellationToken) =>
             {
-                ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
                 ArgumentNullException.ThrowIfNull(http);
                 ArgumentNullException.ThrowIfNull(sessionJournal);
                 cancellationToken.ThrowIfCancellationRequested();
+
+                if (!HttpActor.TryGet(http, out var actor))
+                {
+                    http.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(chatName)
+                    || !TryPrincipalResource(actor.PrincipalId, chatName, out var chatInstance))
+                {
+                    http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                    return;
+                }
 
                 var cursor = afterSequence.GetValueOrDefault();
                 if (cursor < 0)
@@ -34,20 +46,34 @@ internal static class ChatStreamsHttpMaps
 
                 await SseResponse.WriteAsync(
                     http.Response,
-                    WatchChatTurnsAsync(sessionJournal, chatName, cursor, cancellationToken),
+                    WatchChatTurnsAsync(sessionJournal, chatInstance, cursor, cancellationToken),
                     cancellationToken).ConfigureAwait(false);
             });
 
         return endpoints;
     }
 
+    private static bool TryPrincipalResource(PrincipalId principal, string localName, out string instanceName)
+    {
+        try
+        {
+            instanceName = PrincipalScoped.InstanceName(principal, localName);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            instanceName = "";
+            return false;
+        }
+    }
+
     private static IAsyncEnumerable<SseItem<ChatTurnEvent>> WatchChatTurnsAsync(
         OwnerSessionJournal sessionJournal,
-        string chatName,
+        string chatInstance,
         long afterSequence,
         CancellationToken cancellationToken)
         => JournalProjection.WatchAsync(
-            token => sessionJournal.WatchChatOutgoingAsync(chatName, afterSequence, token),
+            token => sessionJournal.WatchChatOutgoingAsync(chatInstance, afterSequence, token),
             HttpSurfacePaths.ChatTurnEvent,
             ProjectTurn,
             cancellationToken);

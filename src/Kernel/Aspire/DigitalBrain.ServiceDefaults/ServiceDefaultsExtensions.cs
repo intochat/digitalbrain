@@ -37,11 +37,11 @@ public static class ServiceDefaultsExtensions
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        app.MapHealthChecks(HealthPath);
+        app.MapHealthChecks(HealthPath).AllowAnonymous();
         app.MapHealthChecks(AlivePath, new HealthCheckOptions
         {
             Predicate = static registration => registration.Tags.Contains("live"),
-        });
+        }).AllowAnonymous();
 
         return app;
     }

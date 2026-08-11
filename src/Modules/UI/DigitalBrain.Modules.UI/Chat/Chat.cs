@@ -221,15 +221,15 @@ internal sealed class Chat : Neuron, IChat
 
     private Task RememberOwnerTurnAsync(SendMessage message)
     {
-        Remember(message.CommandId, message.Text);
+        Remember(message.CommandId, message.Text, message.Actor);
         Remember(new ChatTurn(FromUser: true, message.Text));
-        return EmitAsync(new UserMessaged(message.CommandId, Id, message.Text));
+        return EmitAsync(new UserMessaged(message.CommandId, Id, message.Text, message.Actor));
     }
 
-    private void Remember(CommandId commandId, string text)
+    private void Remember(CommandId commandId, string text, ActorContext? actor)
         => Append(
             _commandLog,
-            _commands.SerializeToArray(new OwnerCommand(commandId.Value, text)),
+            _commands.SerializeToArray(new OwnerCommand(commandId.Value, text, actor)),
             RememberedCommands);
 
     private void Remember(ChatTurn turn)
@@ -245,5 +245,8 @@ internal sealed class Chat : Neuron, IChat
     }
 
     [GenerateSerializer]
-    internal sealed record OwnerCommand([property: Id(0)] Guid CommandId, [property: Id(1)] string Text);
+    internal sealed record OwnerCommand(
+        [property: Id(0)] Guid CommandId,
+        [property: Id(1)] string Text,
+        [property: Id(2)] ActorContext? Actor = null);
 }

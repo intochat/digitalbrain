@@ -15,7 +15,6 @@ namespace DigitalBrain.Tests;
 public sealed class IdentityBoundaryCompositionProofs
 {
     [Fact]
-    // PIN-DEFECT(P0-3): host composes exactly one IDigitalBrain; default owner constant is "dev"
     public void HostComposesExactlyOneDigitalBrainSingletonDefaultingToDev()
     {
         Assert.Equal("dev", DigitalBrainClientHostingExtensions.DefaultOwner);
@@ -41,8 +40,7 @@ public sealed class IdentityBoundaryCompositionProofs
     }
 
     [Fact]
-    // PIN-DEFECT(P0-3): every Kernel HTTP surface path is unauthenticated (no auth middleware registered)
-    public void KernelHttpSurfaceIsTheUnauthenticatedInventoryWithoutAuthMiddleware()
+    public void KernelHttpSurfaceRequiresAuthenticationExceptAuthOauthAndHealth()
     {
         Assert.Equal("/owner/commands", HttpSurfacePaths.OwnerCommandsPath);
         Assert.Equal("/chats/{chatName}/events", HttpSurfacePaths.ChatEventsPath);
@@ -52,6 +50,11 @@ public sealed class IdentityBoundaryCompositionProofs
         Assert.Equal("/authorizations/events", HttpSurfacePaths.AuthorizationEventsPath);
         Assert.Equal("/oauth/callback", HttpSurfacePaths.McpOAuthCallbackPath);
         Assert.Equal(OAuthCallbackPaths.RelativePath, HttpSurfacePaths.McpOAuthCallbackPath);
+        Assert.Equal("/auth/bootstrap", HttpSurfacePaths.AuthBootstrapPath);
+        Assert.Equal("/auth/login", HttpSurfacePaths.AuthLoginPath);
+        Assert.Equal("/auth/logout", HttpSurfacePaths.AuthLogoutPath);
+        Assert.Equal("/auth/me", HttpSurfacePaths.AuthMePath);
+        Assert.Equal("/auth/users", HttpSurfacePaths.AuthUsersPath);
 
         var program = KernelProgramSource();
         Assert.Contains("MapOwnerCommands()", program, StringComparison.Ordinal);
@@ -61,17 +64,30 @@ public sealed class IdentityBoundaryCompositionProofs
         Assert.Contains("MapBrainTopology()", program, StringComparison.Ordinal);
         Assert.Contains("MapGraphStreams()", program, StringComparison.Ordinal);
         Assert.Contains("MapOAuthCallback()", program, StringComparison.Ordinal);
+        Assert.Contains("MapAuth()", program, StringComparison.Ordinal);
+        Assert.Contains("AddDigitalBrainAuth()", program, StringComparison.Ordinal);
+        Assert.Contains("UseDigitalBrainAuth()", program, StringComparison.Ordinal);
 
-        Assert.DoesNotContain("UseAuthentication", program, StringComparison.Ordinal);
-        Assert.DoesNotContain("AddAuthentication", program, StringComparison.Ordinal);
-        Assert.DoesNotContain("UseAuthorization", program, StringComparison.Ordinal);
-        Assert.DoesNotContain("AddAuthorization", program, StringComparison.Ordinal);
-        Assert.DoesNotContain("RequireAuthorization", program, StringComparison.Ordinal);
+        var authHosting = AuthHostingSource();
+        Assert.Contains("UseAuthentication", authHosting, StringComparison.Ordinal);
+        Assert.Contains("UseAuthorization", authHosting, StringComparison.Ordinal);
+        Assert.Contains("AddAuthentication", authHosting, StringComparison.Ordinal);
+        Assert.Contains("AddAuthorization", authHosting, StringComparison.Ordinal);
+        Assert.Contains("RequireAuthenticatedUser", authHosting, StringComparison.Ordinal);
+        Assert.Contains("HttpsStanceMiddleware", authHosting, StringComparison.Ordinal);
+        Assert.Contains("AllowAnonymous", OAuthCallbackSource(), StringComparison.Ordinal);
+        Assert.Contains("AllowAnonymous", AuthMapsSource(), StringComparison.Ordinal);
+
+        var ownerCommands = ReadRepoFile("src", "Kernel", "DigitalBrain.Kernel", "MapOwnerCommands.cs");
+        var surfaceStreams = ReadRepoFile("src", "Kernel", "DigitalBrain.Kernel", "MapShellStreams.cs");
+        Assert.Contains("PrincipalSurface.InstanceName", ownerCommands, StringComparison.Ordinal);
+        Assert.Contains("PrincipalSurface", surfaceStreams, StringComparison.Ordinal);
+        Assert.Contains("HttpActor.TryGet", ownerCommands, StringComparison.Ordinal);
+        Assert.Contains("HttpActor.TryGet", surfaceStreams, StringComparison.Ordinal);
     }
 
     [Fact]
-    // PIN-DEFECT(P0-4): owner-command body trusts client ChatName and carries no principal/actor
-    public void OwnerCommandRequestAcceptsClientChatNameAndCarriesNoActor()
+    public void OwnerCommandRequestAcceptsClientChatNameButNeverClientActor()
     {
         var properties = typeof(OwnerCommandRequest)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -99,39 +115,43 @@ public sealed class IdentityBoundaryCompositionProofs
         var request = new OwnerCommandRequest(
             Kind: HttpSurfacePaths.KindChatSend,
             ChatName: "main",
-            Text: "hello from an unauthenticated client");
+            Text: "hello from an authenticated client");
         Assert.Equal("main", request.ChatName);
         Assert.Equal(HttpSurfacePaths.KindChatSend, request.Kind);
+
+        var principal = new PrincipalId(Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"));
+        Assert.Equal(
+            "aaaaaaaabbbbccccddddeeeeeeeeeeee.main",
+            PrincipalChat.InstanceName(principal, "main"));
+        Assert.Equal(
+            "aaaaaaaabbbbccccddddeeeeeeeeeeee.desk",
+            PrincipalSurface.InstanceName(principal, "desk"));
+        Assert.NotEqual(
+            PrincipalSurface.InstanceName(principal, "desk"),
+            PrincipalSurface.InstanceName(new PrincipalId(Guid.Parse("11111111-2222-3333-4444-555555555555")), "desk"));
     }
 
     [Fact]
-    // Actor absence: durable chat command/fact shapes carry no actor principal today
-    public void DurableChatCommandsAndJournalFactsCarryNoActorIdentity()
+    public void DurableChatCommandsAndJournalFactsCarryActorStampOnUserPath()
     {
-        AssertNoCallerIdentityProperty(typeof(SendMessage));
+        Assert.Contains("Actor", PropertyNames(typeof(SendMessage)));
+        Assert.Contains("Actor", PropertyNames(typeof(UserMessaged)));
+        Assert.Contains("Actor", PropertyNames(typeof(global::DigitalBrain.UI.Chat.OwnerCommand)));
+
         Assert.Equal(
-            ["CommandId", "Text"],
+            ["CommandId", "Text", "Actor"],
             PropertyNames(typeof(SendMessage)));
-
-        AssertNoCallerIdentityProperty(typeof(UserMessaged));
         Assert.Equal(
-            ["CommandId", "Chat", "Text"],
+            ["CommandId", "Chat", "Text", "Actor"],
             PropertyNames(typeof(UserMessaged)));
+        Assert.Equal(
+            ["CommandId", "Text", "Actor"],
+            PropertyNames(typeof(global::DigitalBrain.UI.Chat.OwnerCommand)));
 
-        AssertNoCallerIdentityProperty(typeof(ChatTurn));
+        Assert.Contains("Author", PropertyNames(typeof(Responded)));
         Assert.Equal(
             ["FromUser", "Text", "Buttons", "Charts", "Timers"],
             PropertyNames(typeof(ChatTurn)));
-
-        AssertNoCallerIdentityProperty(typeof(Responded));
-        Assert.Equal(
-            ["CommandId", "Chat", "Text", "Buttons", "Charts", "Timers", "Author"],
-            PropertyNames(typeof(Responded)));
-
-        AssertNoCallerIdentityProperty(typeof(global::DigitalBrain.UI.Chat.OwnerCommand));
-        Assert.Equal(
-            ["CommandId", "Text"],
-            PropertyNames(typeof(global::DigitalBrain.UI.Chat.OwnerCommand)));
     }
 
     private static string[] PropertyNames(Type type)
@@ -153,12 +173,23 @@ public sealed class IdentityBoundaryCompositionProofs
         }
     }
 
-    private static string KernelProgramSource()
+    private static string KernelProgramSource() => ReadRepoFile("src", "Kernel", "DigitalBrain.Kernel", "Program.cs");
+
+    private static string AuthHostingSource()
+        => ReadRepoFile("src", "Kernel", "DigitalBrain.Kernel", "Auth", "AuthHostingExtensions.cs");
+
+    private static string AuthMapsSource()
+        => ReadRepoFile("src", "Kernel", "DigitalBrain.Kernel", "Auth", "MapAuth.cs");
+
+    private static string OAuthCallbackSource()
+        => ReadRepoFile("src", "Kernel", "DigitalBrain.Kernel", "MapOAuthCallback.cs");
+
+    private static string ReadRepoFile(params string[] relativeParts)
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null)
         {
-            var candidate = Path.Combine(dir.FullName, "src", "Kernel", "DigitalBrain.Kernel", "Program.cs");
+            var candidate = Path.Combine([dir.FullName, .. relativeParts]);
             if (File.Exists(candidate))
             {
                 return File.ReadAllText(candidate);
@@ -168,7 +199,7 @@ public sealed class IdentityBoundaryCompositionProofs
         }
 
         throw new InvalidOperationException(
-            "Could not locate src/Kernel/DigitalBrain.Kernel/Program.cs from the test base directory.");
+            $"Could not locate {string.Join('/', relativeParts)} from the test base directory.");
     }
 }
 
@@ -176,8 +207,7 @@ public sealed class IdentityBoundaryCompositionProofs
 public sealed class IdentityBoundaryChatProofs(BrainClusterFixture fixture)
 {
     [Fact]
-    // PIN-DEFECT(P0-3): session + chat grains resolve under the single composed owner
-    public void SessionAndChatIdentitiesResolveUnderTheClientOwner()
+    public void SessionAndChatIdentitiesResolveUnderTheClientOwnerWithPrincipalScopedChatNames()
     {
         var brain = fixture.BrainFor("dev");
         Assert.Equal(new OwnerId("dev"), brain.Owner);
@@ -187,49 +217,62 @@ public sealed class IdentityBoundaryChatProofs(BrainClusterFixture fixture)
         Assert.Equal(ISessionNeuron.InstanceName, session.Name);
         Assert.Equal(ISessionNeuron.GrainTypeName, session.Type);
 
-        var chat = NeuronId.For<IChat>(brain.Owner, "main");
+        var principal = new PrincipalId(Guid.Parse("11111111-2222-3333-4444-555555555555"));
+        var chatName = PrincipalChat.InstanceName(principal, "main");
+        var chat = NeuronId.For<IChat>(brain.Owner, chatName);
         Assert.Equal(new OwnerId("dev"), chat.Owner);
-        Assert.Equal("main", chat.Name);
+        Assert.Equal(chatName, chat.Name);
         Assert.Equal("chat", chat.Type);
-        Assert.Equal("dev/main", chat.GrainKey);
+        Assert.Equal($"dev/{chatName}", chat.GrainKey);
     }
 
     [Fact]
-    // PIN-DEFECT(P0-4): client-supplied chatName is the routing key — two clients share one transcript
-    public async Task TwoClientsSendingToTheSameChatNameShareOneTranscript()
+    public async Task TwoPrincipalsSendingToTheSameConversationNameGetIsolatedTranscripts()
     {
-        var owner = "p04-shared-chat";
-        var clientA = fixture.BrainFor(owner);
-        var clientB = fixture.BrainFor(owner);
-        const string chatName = "main";
-        var chat = NeuronId.For<IChat>(clientA.Owner, chatName);
-        var responder = new NeuronId("scriptedagent", clientA.Owner, "shared");
+        var owner = "p04-isolated-chat";
+        var brain = fixture.BrainFor(owner);
+        var principalA = new PrincipalId(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+        var principalB = new PrincipalId(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
+        var actorA = new ActorContext(principalA, "alice");
+        var actorB = new ActorContext(principalB, "bob");
+        var chatA = PrincipalChat.InstanceName(principalA, "main");
+        var chatB = PrincipalChat.InstanceName(principalB, "main");
+        var neuronA = NeuronId.For<IChat>(brain.Owner, chatA);
+        var neuronB = NeuronId.For<IChat>(brain.Owner, chatB);
+        var responderA = new NeuronId("scriptedagent", brain.Owner, "a");
+        var responderB = new NeuronId("scriptedagent", brain.Owner, "b");
 
-        await clientA.FireAsync<ISynapseGraph>(
+        await brain.FireAsync<ISynapseGraph>(
             ISynapseGraph.InstanceName,
-            new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, responder),
+            new Connect(ChatRoles.ResponderConnectionId(neuronA), neuronA, ChatRoles.Responder, responderA),
             TestContext.Current.CancellationToken);
-        await Graphs.WaitForConnectionsAsync(clientA, chat, ChatRoles.Responder);
+        await brain.FireAsync<ISynapseGraph>(
+            ISynapseGraph.InstanceName,
+            new Connect(ChatRoles.ResponderConnectionId(neuronB), neuronB, ChatRoles.Responder, responderB),
+            TestContext.Current.CancellationToken);
+        await Graphs.WaitForConnectionsAsync(brain, neuronA, ChatRoles.Responder);
+        await Graphs.WaitForConnectionsAsync(brain, neuronB, ChatRoles.Responder);
 
-        await clientA.GetGrainProxy<IChat>(chatName)
-            .Send(new SendMessage(CommandId.New(), "hello from client A"));
-        await clientB.GetGrainProxy<IChat>(chatName)
-            .Send(new SendMessage(CommandId.New(), "hello from client B"));
+        await brain.GetGrainProxy<IChat>(chatA)
+            .Send(new SendMessage(CommandId.New(), "hello from alice", actorA));
+        await brain.GetGrainProxy<IChat>(chatB)
+            .Send(new SendMessage(CommandId.New(), "hello from bob", actorB));
 
         await Journals.WaitForAsync(
-            clientA, chat, JournalKind.Outgoing,
-            delivery => delivery.Synapse is UserMessaged { Text: "hello from client A" });
+            brain, neuronA, JournalKind.Outgoing,
+            delivery => delivery.Synapse is UserMessaged { Text: "hello from alice", Actor: not null } messaged
+                && messaged.Actor!.PrincipalId == principalA);
         await Journals.WaitForAsync(
-            clientB, chat, JournalKind.Outgoing,
-            delivery => delivery.Synapse is UserMessaged { Text: "hello from client B" });
+            brain, neuronB, JournalKind.Outgoing,
+            delivery => delivery.Synapse is UserMessaged { Text: "hello from bob", Actor: not null } messaged
+                && messaged.Actor!.PrincipalId == principalB);
 
-        var fromA = await clientA.GetGrainProxy<IChat>(chatName).Read();
-        var fromB = await clientB.GetGrainProxy<IChat>(chatName).Read();
+        var fromA = await brain.GetGrainProxy<IChat>(chatA).Read();
+        var fromB = await brain.GetGrainProxy<IChat>(chatB).Read();
 
-        Assert.Contains(fromA.Turns, turn => turn.FromUser && turn.Text == "hello from client A");
-        Assert.Contains(fromA.Turns, turn => turn.FromUser && turn.Text == "hello from client B");
-        Assert.Equal(fromA.Turns.Count, fromB.Turns.Count);
-        Assert.Contains(fromB.Turns, turn => turn.FromUser && turn.Text == "hello from client A");
-        Assert.Contains(fromB.Turns, turn => turn.FromUser && turn.Text == "hello from client B");
+        Assert.Contains(fromA.Turns, turn => turn.FromUser && turn.Text == "hello from alice");
+        Assert.DoesNotContain(fromA.Turns, turn => turn.Text == "hello from bob");
+        Assert.Contains(fromB.Turns, turn => turn.FromUser && turn.Text == "hello from bob");
+        Assert.DoesNotContain(fromB.Turns, turn => turn.Text == "hello from alice");
     }
 }

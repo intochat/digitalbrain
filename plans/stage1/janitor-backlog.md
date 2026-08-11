@@ -14,6 +14,14 @@
   - Flutter kit fixtures use `show-time` sample ids (Lane C).
   - Docs (`CLAUDE.md`, `UNIFIED-ARCHITECTURE.md`) still describe the deleted demo — docs pass at Stage 1 exit.
 - Token-presence slice duplication (`McpTokenPresence`) — evaluate after S1.3 rail lands.
+- From S1.2-GRILL (deferred MAJORs, orchestrator-ruled):
+  - MAJOR-2: grain-level actor enforcement (Chat refuses durable command without stamp) → fold into S1.5 turn pipeline rework.
+  - MAJOR-4: bootstrap/user-create atomicity (ETag if-not-exists on marker row) → hardening pass.
+  - MAJOR-5: real invitation flow (admin-create IS the ratified MVP; email invites Stage 2).
+  - MAJOR-6: two-user isolation through the REAL host must be part of the Stage-1 exit AppHost smoke.
+  - MCP `ChatTools`/`ReadChatTranscript` still take bare chatName (principal scoping at MCP edge) → S1.3/S1.5.
+  - Orleans dashboard `/orleans` ACL stance → decide at Stage-1 exit.
+  - Installation owner constant "dev" remains (one-workspace MVP) → rename/config at Stage-2 consolidation.
 
 ## Done
 - J1: `WantsTimeButton`/`ShowTime`/`ButtonActivatedToShowTime` deleted; `Responded.Author` added (W2). GRILL: APPROVE.

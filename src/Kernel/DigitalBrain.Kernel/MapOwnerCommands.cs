@@ -30,6 +30,12 @@ internal static class OwnerCommandsHttpMaps
                 ArgumentNullException.ThrowIfNull(brain);
                 cancellationToken.ThrowIfCancellationRequested();
 
+                if (!HttpActor.TryGet(http, out var actor))
+                {
+                    http.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return;
+                }
+
                 if (string.IsNullOrWhiteSpace(request.Kind))
                 {
                     http.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -44,9 +50,15 @@ internal static class OwnerCommandsHttpMaps
                         return;
                     }
 
+                    if (!TryPrincipalResource(actor.PrincipalId, request.ChatName, out var chatInstance))
+                    {
+                        http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                        return;
+                    }
+
                     await SseResponse.WriteAsync(
                         http.Response,
-                        StreamDeltasAsync(brain, request.ChatName, request.Text, cancellationToken),
+                        StreamDeltasAsync(brain, chatInstance, request.Text, actor, cancellationToken),
                         cancellationToken).ConfigureAwait(false);
                     return;
                 }
@@ -62,8 +74,14 @@ internal static class OwnerCommandsHttpMaps
                         return;
                     }
 
+                    if (!TryPrincipalResource(actor.PrincipalId, request.ChatName, out var chatInstance))
+                    {
+                        http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                        return;
+                    }
+
                     await brain.FireAsync<IButton>(
-                        ChatButtons.OfferedInstanceName(request.ChatName, offerCommandId, request.ButtonId),
+                        ChatButtons.OfferedInstanceName(chatInstance, offerCommandId, request.ButtonId),
                         new ButtonClicked(offerCommandId, request.ButtonId, request.Action),
                         cancellationToken).ConfigureAwait(false);
                     http.Response.StatusCode = StatusCodes.Status202Accepted;
@@ -80,8 +98,19 @@ internal static class OwnerCommandsHttpMaps
                         return;
                     }
 
+                    string surfaceInstance;
+                    try
+                    {
+                        surfaceInstance = PrincipalSurface.InstanceName(actor.PrincipalId, request.SurfaceName);
+                    }
+                    catch (ArgumentException)
+                    {
+                        http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                        return;
+                    }
+
                     await brain.FireAsync<ISurface>(
-                        request.SurfaceName,
+                        surfaceInstance,
                         new OpenSurface(CommandId.New(), request.SurfaceKey, request.Title),
                         cancellationToken).ConfigureAwait(false);
                     http.Response.StatusCode = StatusCodes.Status202Accepted;
@@ -92,6 +121,20 @@ internal static class OwnerCommandsHttpMaps
             });
 
         return endpoints;
+    }
+
+    private static bool TryPrincipalResource(PrincipalId principal, string localName, out string instanceName)
+    {
+        try
+        {
+            instanceName = PrincipalScoped.InstanceName(principal, localName);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            instanceName = "";
+            return false;
+        }
     }
 
     private static bool TryParseCommandId(string? value, out CommandId commandId)
@@ -108,16 +151,17 @@ internal static class OwnerCommandsHttpMaps
 
     private static async IAsyncEnumerable<SseItem<ChatResponseUpdate>> StreamDeltasAsync(
         IDigitalBrain brain,
-        string chatName,
+        string chatInstance,
         string text,
+        ActorContext actor,
         [EnumeratorCancellation] CancellationToken requestAborted)
     {
         using var turn = CancellationTokenSource.CreateLinkedTokenSource(requestAborted);
         turn.CancelAfter(TurnBudget);
 
         var command = CommandId.New();
-        await foreach (var chunk in brain.GetGrainProxy<IChat>(chatName)
-            .SendStreaming(new SendMessage(command, text), turn.Token)
+        await foreach (var chunk in brain.GetGrainProxy<IChat>(chatInstance)
+            .SendStreaming(new SendMessage(command, text, actor), turn.Token)
             .ConfigureAwait(false))
         {
             turn.Token.ThrowIfCancellationRequested();

@@ -53,7 +53,7 @@ internal static class OAuthCallbackHttpMaps
                 return Results.Text(
                     "DigitalBrain authorization completed. You can close this window.",
                     "text/plain; charset=utf-8");
-            });
+            }).AllowAnonymous();
 
         return endpoints;
     }
