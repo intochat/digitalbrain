@@ -270,3 +270,111 @@ global.json: "test": { "runner": "Microsoft.Testing.Platform" }
   product is the declarative `to:` string, re-parsed on every single delivery.
 - **Orleans Streams: five provisioning sites, zero consumers** — confirmed by search, consistent
   with the recorded decision to keep them provisioned.
+
+---
+
+## Session 2 — 2026-08-12 — the architecture was grilled and it did not survive intact
+
+Still no production source changed. Deliverable: an explicit spec of the post-absorption
+architecture, fifty demanding user scenarios written against it, and an adversarial review that
+tried to break every one.
+
+Method: 19 agents. Five generators wrote ten scenarios each (dashboards/sharing, integrations/OAuth,
+agents/reasoning, behaviors/scripting, apps/memory/durability) as things a person would actually ask
+for. Ten hostile reviewers walked each scenario through the architecture on nine axes — identity,
+routing, concurrency, durability, authority, correlation, refusal, the three-tool constraint, and
+whether a human can see the result — required to cite file:line for every claim. Three judges with
+different lenses (correctness, authority, completeness) ruled on all 283 claimed breaks and added
+what the reviewers missed. One synthesizer deduplicated.
+
+**Result: 0 of 50 scenarios land on the architecture as I specified it.** 49 are carried by 17
+amendments; 1 (an OS window on a second monitor) is outside the stack and is recorded as an honest
+miss.
+
+### 7. Trust caveat on the review
+
+The judge panel returned **zero refutations across 639 rulings** despite being explicitly instructed
+that a review confirming everything is worthless. That is agreement bias, not a clean bill of health.
+The load-bearing findings were therefore checked by hand against source before being accepted. Four
+were verified directly and all four hold:
+
+- `VerifiedActor.Enter` has exactly ONE call site in the entire tree (`ChatTurnWorker.cs:163`).
+- `McpServerNeuron.AuthorizedAsync:241-246` throws `NeuronAuthorizationException` on a null actor.
+- `ChartNeuron` is one flat `IDurableList<byte[]>` capped at 256 with a global `RemoveAt(0)` and no
+  notion of `Series`; its `Read()` is a grain method, not a `RequestSynapse`, so `fire` cannot reach
+  it and no HTTP endpoint serves it (7 mapped endpoints, none reads a neuron).
+- `Responded` declares `[Id(4)] ChatChartOffer[]? Charts` and **all four** construction sites
+  (`Chat.cs:191,207,239,789`) omit it.
+
+That last pair means: **a chart cannot currently appear inside a conversation.** The single canonical
+example this migration is organised around — a chart in the chat — dies on a declared-but-never-
+populated field plus an unreachable read. Session 1's spec did not catch it.
+
+### 8. The four missing kernel facilities
+
+The routing plane held: fifty scenarios found no counterexample to the cell contract (journal-is-outbox,
+at-least-once + dedupe, serialized turns, bounded depth). Everything else failed on four absences,
+and they compound:
+
+1. **A verified principal that rides the delivery.** `SynapseDelivery`/`OutboxEntry` carry no
+   principal; `VerifiedActor` rides `RequestContext` and is entered once. So no schedule tick,
+   behavior run, button click or webhook can carry an actor — every concept the absorption adds is
+   born unable to reach an integration. The mirror defect is worse: `CallMcpTool.Actor` is a plain
+   wire field on a `[ClientEntryPoint]` interface while `McpTokenPresence.SubjectKey` is literally
+   that principal's id, so a payload-supplied principal selects another user's protected tokens.
+   `chat-probe.cs:15-18` forges exactly such an actor in committed source.
+2. **An outcome rail covering more than one exception type.** Only `NeuronAuthorizationException` is
+   recognised as settled at the outbox; other `[SettledDeliveryFailure]` types fall to the generic
+   catch and retry 1000×/30 min. Four outcomes produce nothing at all: zero-receiver emissions,
+   depth-16 abandonment, retry-horizon abandonment, connection expiry.
+3. **A root correlation that survives detached and reminder boundaries.** There is no
+   correlation-bearing directed send at all — `SendAsync` passes `correlation: null` and never
+   consults the ambient client correlation — so Session 1's "carry the correlation in durable state"
+   had nothing to spend it on. A sixth island was found (streamed capability dispatch never enters
+   a capability turn).
+4. **A way to read anything.** No vocabulary cell has a read the model or shell can reach; the
+   corpus as specified has no read side; and the refusal rail as I wrote it delivers the reason to
+   the cell that already knows it, not to the originating requester.
+
+### 9. Amendments (17) and what they do to the sequence
+
+Full text, per-scenario verdicts and the diagrams are in the published architecture document.
+Distribution across the nine slices: **01** three amendments (outcome rail, turn/delivery hardening,
+MCP rail repair) · **03** one (root correlation + a real action record) · **04** two (corpus as a
+resumable projection with a read rail; broadcast becomes opt-in per fact type) · **05** two (principal
+rides the delivery; connection provenance + connect-time completeness) · **06** two (wire language
+gains literals/predicates/coalescing + reducer cells; origination gains calendar/identity/ingress) ·
+**07** one (behavior host: durable runs, Execution-owned, compiled off-silo) · **08** three (cluster
+trust boundary; principals as a real partition; durable instance registry + atomic install) ·
+**09** three (read is vocabulary; capability surface tells the truth; client rail: resume, names,
+login). Fourteen are rated fatal.
+
+**Honest consequence: this is materially more work than Session 1's nine slices implied.** The spine
+survives — the ordering was right, and refusal-visibility-first was vindicated hard, because six of
+the seventeen amendments are refusal-shaped. But slices 01, 08 and 09 each grew from one change into
+three, and two amendments (a durable instance registry; read as kernel vocabulary) are new subsystems
+that were not in the plan at all.
+
+### 10. The central claim, corrected
+
+"Any behavior and any logic can be expressed as data" survives with two edges that must be stated
+rather than glossed:
+
+- **True of routing, origination, units and sharing** — once identity rides the delivery, and
+  provided reads, the corpus and inviting a person are *also* ordinary contracts (the spec forgot all
+  three, which quietly falsified "no fourth tool" since `POST /auth/users` is the only way to create
+  a principal).
+- **Not true of logic.** The wire language has exactly one operator: rename. With literals, a
+  predicate and a coalescing interval it has about four. Arithmetic, aggregation, comparison and
+  calendars all fall into a behavior, and a behavior is C# source. The honest form is: *any logic can
+  be expressed as a piece of data that names a program.* Still a strong claim; not the same claim.
+
+### 11. New owner decisions this raised
+
+D1 (owner vs principal) is now **forcing** rather than deferrable: the review's verdict is that
+principal-scoped names must extend beyond chat and surface, because chart, timer, diagram, mcp,
+synapsegraph and session are all currently shared inside owner `"dev"`. Two further decisions appear:
+whether behaviors compile at create-time into a stored artifact (so the SDK-less silo can load an
+assembly instead of shelling out), and whether the wire language gains literals and predicates at all
+— if it does not, §D must say plainly that the architecture expresses routing as data and computation
+as code.
