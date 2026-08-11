@@ -14,4 +14,7 @@
     <ProjectReference Include="../../SDK/DigitalBrain.Modules.Sdk/DigitalBrain.Modules.Sdk.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Tests" />
+  </ItemGroup>
 </Project>
