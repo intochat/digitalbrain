@@ -40,17 +40,8 @@
 #     DigitalBrain__Memory__Qdrant__ConnectionName=memory-qdrant
 #     ConnectionStrings__memory-qdrant             # Endpoint=http://qdrant:6334;Key=...
 #
-#   Module manifest (must match silo catalog; AppHost order for product)
-#     DigitalBrain__Modules__0=DigitalBrain.AI.AIModule
-#     DigitalBrain__Modules__1=DigitalBrain.Chat.ChatModule
-#     DigitalBrain__Modules__2=DigitalBrain.Memory.MemoryModule
-#     DigitalBrain__Modules__3=DigitalBrain.Assistant.AssistantModule
-#     DigitalBrain__Modules__4=DigitalBrain.Shell.ShellModule
-#     DigitalBrain__Modules__5=DigitalBrain.Google.GoogleModule
-#     DigitalBrain__Modules__6=DigitalBrain.Salesforce.SalesforceModule
-#     DigitalBrain__Modules__7=DigitalBrain.Execution (module assemblies, not class gate)
-#     DigitalBrain__Modules__8=DigitalBrain.Time.TimeModule
-#     DigitalBrain__Modules__9=DigitalBrain.Introspection.IntrospectionModule
+#   Module composition is reflected from ModuleAssemblies (ComposedModules /
+#   AppHost AddModule) — no DigitalBrain__Modules__N class-gate env vars.
 #
 # Ports: 8080 silo HTTP (broker + health), 5000 northbound MCP (/mcp)
 

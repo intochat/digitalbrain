@@ -58,16 +58,6 @@ services:
       DigitalBrain__Memory__Qdrant__ConnectionName: memory-qdrant
       # Point at external Qdrant (host or uncommented qdrant service):
       ConnectionStrings__memory-qdrant: "Endpoint=http://host.docker.internal:6334"
-      DigitalBrain__Modules__0: DigitalBrain.AI.AIModule
-      DigitalBrain__Modules__1: DigitalBrain.Chat.ChatModule
-      DigitalBrain__Modules__2: DigitalBrain.Memory.MemoryModule
-      DigitalBrain__Modules__3: DigitalBrain.Assistant.AssistantModule
-      DigitalBrain__Modules__4: DigitalBrain.Shell.ShellModule
-      DigitalBrain__Modules__5: DigitalBrain.Google.GoogleModule
-      DigitalBrain__Modules__6: DigitalBrain.Salesforce.SalesforceModule
-      DigitalBrain__Modules__7: DigitalBrain.Tasks.TasksModule
-      DigitalBrain__Modules__8: DigitalBrain.Time.TimeModule
-      DigitalBrain__Modules__9: DigitalBrain.Introspection.IntrospectionModule
     depends_on:
       - azurite
     extra_hosts:

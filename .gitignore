@@ -10,6 +10,7 @@ TestResults/
 .vs/
 logs/
 .codegraph/
+.grok/
 .digitalbrain/
 .agents/
 .superpowers/

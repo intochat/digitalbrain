@@ -10,7 +10,8 @@ public static class DeliveryPolicy
 
     public static readonly TimeSpan RetryHorizon = TimeSpan.FromMinutes(30);
 
-    public static readonly TimeSpan DeliveryAttemptTimeout = TimeSpan.FromSeconds(30);
+    // 45s attempt / 40s graph lookup: wider than the old 30/25 under dual-silo suite load.
+    public static readonly TimeSpan DeliveryAttemptTimeout = TimeSpan.FromSeconds(45);
 
     public static readonly TimeSpan InnerDeliveryReadBound = DeliveryAttemptTimeout - TimeSpan.FromSeconds(5);
 

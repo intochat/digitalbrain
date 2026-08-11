@@ -72,7 +72,7 @@ internal sealed class ChatTools(IDigitalBrain brain)
         [Description("Conversation name, for example 'main'")] string chatName,
         [Description("Command id of the assistant turn that offered the button")] string offerCommandId,
         [Description("Button id from the offer")] string buttonId,
-        [Description("Action from the offer, for example 'show-time'")] string action,
+        [Description("Action from the offer, for example a sign-in URL or command name")] string action,
         [Description("Maximum wait in seconds, from 1 through 300")]
         int timeoutSeconds = DefaultTimeoutSeconds,
         CancellationToken cancellationToken = default)

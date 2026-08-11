@@ -157,7 +157,20 @@ public sealed partial class ExecutionNeuron
         {
             await this.RegisterOrUpdateReminder(RetryReminderName, data.Policy.RetryDelay, ReminderPeriod)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return;
         }
+
+        // Silo recycle drops in-memory liveness reminders. Re-arm only — never
+        // FailAbandoned here (origin re-Read would nest-deadlock the chat turn).
+        if (data.State == ExecutionState.Running && data.ActiveAttempt is not null)
+        {
+            await this.RegisterOrUpdateReminder(
+                    DispatchReminderName,
+                    TimeSpan.FromSeconds(15),
+                    ReminderPeriod)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+
     }
 
     // Silo restart / worker death: fail a Running/Cancelling attempt that has no pending dispatch.
