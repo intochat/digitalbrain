@@ -18,7 +18,9 @@ public static class DigitalBrainHostingExtensions
 
         var storage = builder
             .AddAzureStorage(DigitalBrainResourceNames.Storage)
-            .RunAsEmulator();
+            .RunAsEmulator(static emulator => emulator
+                .WithDataVolume()
+                .WithLifetime(ContainerLifetime.Persistent));
         var clustering = storage.AddTables(DigitalBrainResourceNames.Clustering);
         var reminders = storage.AddTables(DigitalBrainResourceNames.Reminders);
         var journal = storage.AddBlobs(DigitalBrainResourceNames.JournalResource);
