@@ -1,11 +1,11 @@
-
-
 internal static class ProductSurfaceResources
 {
     public const string Brain = "brain";
 
     public const string Kernel = "kernel";
 
+    // Generates a single-file C# brain client, runs it, exits. Completed is expected.
+    public const string Scripting = "scripting";
 
     public const string Mcp = "mcp";
     public const string McpHttpEndpointName = "mcp";
