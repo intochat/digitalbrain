@@ -54,8 +54,11 @@ public sealed class ChatSignInOfferProofs(BrainClusterFixture fixture)
                 command,
                 "salesforce",
                 "Salesforce",
-                new Uri("https://login.salesforce.com/services/oauth2/authorize?state=begin1"),
-                "begin1"),
+                new Uri("https://login.salesforce.com/services/oauth2/authorize?state=begin1&code_challenge=x&code_challenge_method=S256"),
+                "begin1",
+                new ActorContext(PrincipalId.New(), "owner"),
+                CodeChallenge: "x",
+                CodeVerifier: "v"),
             TestContext.Current.CancellationToken);
 
         await Journals.WaitForAsync(

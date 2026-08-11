@@ -3,8 +3,13 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Modules.Sdk.Mcp;
 
+// In-process waiters for an in-flight OAuth redirect. Pending authorization
+// durability lives on McpAuthorizationNeuron — this hub must not accumulate
+// orphan states (P0-1).
 internal static class McpAuthorizationCodeHub
 {
+    private const int MaxCompletions = 64;
+
     private static readonly ConcurrentDictionary<string, TaskCompletionSource<CodeHubOutcome>> Waiters =
         new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, CodeHubOutcome> Completions =
@@ -38,30 +43,31 @@ internal static class McpAuthorizationCodeHub
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(state);
 
+        var hasWaiter = Waiters.ContainsKey(state);
+        var hasSession = SessionsByState.ContainsKey(state);
+        if (!hasWaiter && !hasSession)
+        {
+            // Orphan / unknown state: drop. Never grow Completions for garbage.
+            return;
+        }
+
         var outcome = result is null
             ? CodeHubOutcome.AsNoCode()
             : CodeHubOutcome.AsCompleted(result);
 
-        Completions[state] = outcome;
+        BoundInsertCompletion(state, outcome);
         if (Waiters.TryGetValue(state, out var waiter))
         {
             waiter.TrySetResult(outcome);
         }
 
-        if (result is null)
+        if (SessionsByState.TryRemove(state, out var session))
         {
-            if (SessionsByState.TryRemove(state, out var session))
+            SessionsByCommand.TryRemove(session.CommandId.Value, out _);
+            if (result is null)
             {
-                SessionsByCommand.TryRemove(session.CommandId.Value, out _);
                 session.Cancel();
             }
-
-            return;
-        }
-
-        if (SessionsByState.TryRemove(state, out var completed))
-        {
-            SessionsByCommand.TryRemove(completed.CommandId.Value, out _);
         }
     }
 
@@ -98,7 +104,6 @@ internal static class McpAuthorizationCodeHub
         Completions.Clear();
     }
 
-    // Characterization seam: Completions has no expiry/eviction (P0-1).
     internal static int CompletionsCountForTests => Completions.Count;
 
     internal static async Task<McpAuthorizationCodeResult?> AwaitAsync(string state, CancellationToken cancellationToken)
@@ -135,6 +140,28 @@ internal static class McpAuthorizationCodeHub
             finally
             {
                 Waiters.TryRemove(state, out _);
+            }
+        }
+    }
+
+    private static void BoundInsertCompletion(string state, CodeHubOutcome outcome)
+    {
+        Completions[state] = outcome;
+        if (Completions.Count <= MaxCompletions)
+        {
+            return;
+        }
+
+        foreach (var key in Completions.Keys.ToArray())
+        {
+            if (Completions.Count <= MaxCompletions)
+            {
+                break;
+            }
+
+            if (!Waiters.ContainsKey(key) && !SessionsByState.ContainsKey(key))
+            {
+                Completions.TryRemove(key, out _);
             }
         }
     }

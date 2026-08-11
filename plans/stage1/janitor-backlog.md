@@ -23,6 +23,10 @@
   - Orleans dashboard `/orleans` ACL stance → decide at Stage-1 exit.
   - Installation owner constant "dev" remains (one-workspace MVP) → rename/config at Stage-2 consolidation.
 
+- FLAKE ticket: `ChartVocabularyProofs.EmittedChartPointLandsOnItsBoundChart` timed out once (25s graph
+  connection lookup) under machine load; green on clean rerun. Widen/diagnose the lookup timeout
+  margin in the test fixture before Stage-1 exit — never just rerun.
+
 ## Done
 - J1: `WantsTimeButton`/`ShowTime`/`ButtonActivatedToShowTime` deleted; `Responded.Author` added (W2). GRILL: APPROVE.
 - Version unblock: Aspire 26405.3→26376.5 (cache-satisfiable), Storage.Queues→13.4.6; AppHost Sdk aligned.

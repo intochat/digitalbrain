@@ -14,9 +14,14 @@ public sealed class McpAuthorizationNeuron :
     IMcpAuthorization
 {
     internal const string InstanceName = IMcpAuthorization.DefaultInstanceName;
+    internal const int MaxPendingStates = 64;
+    internal static readonly TimeSpan AuthorizationTtl = TimeSpan.FromMinutes(15);
+
     private const string PendingName = "mcp.authorization.pending";
     private const string CommandsName = "mcp.authorization.commands";
     private const string CodeProtectionPurposePrefix = "mcp/authorization/code";
+    private const string VerifierProtectionPurposePrefix = "mcp/authorization/verifier";
+
     private readonly IDurableDictionary<string, byte[]> _pending;
     private readonly IDurableDictionary<Guid, byte[]> _commands;
     private readonly Serializer<PendingAuthorization> _serializer;
@@ -41,7 +46,10 @@ public sealed class McpAuthorizationNeuron :
         ArgumentException.ThrowIfNullOrWhiteSpace(request.ServerDisplayName);
         ArgumentNullException.ThrowIfNull(request.SignInUrl);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.State);
+        ArgumentNullException.ThrowIfNull(request.Actor);
         cancellationToken.ThrowIfCancellationRequested();
+
+        await SweepExpiredAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         if (_commands.TryGetValue(request.CommandId.Value, out var commandSerialized))
         {
@@ -49,17 +57,7 @@ public sealed class McpAuthorizationNeuron :
             if (recorded.Outcome is PendingAuthorizationOutcome.Denied)
             {
                 throw new McpAuthorizationDeniedException(
-                    new AuthorizationDenied(recorded.CommandId, recorded.ServerKey, recorded.State));
-            }
-
-            if (recorded.Outcome is PendingAuthorizationOutcome.Completed)
-            {
-                return new AuthorizationRequired(
-                    recorded.CommandId,
-                    recorded.ServerKey,
-                    recorded.ServerDisplayName,
-                    recorded.SignInUrl,
-                    recorded.State);
+                    new AuthorizationDenied(recorded.CommandId, recorded.ServerKey, recorded.State, recorded.Actor));
             }
 
             return new AuthorizationRequired(
@@ -67,26 +65,42 @@ public sealed class McpAuthorizationNeuron :
                 recorded.ServerKey,
                 recorded.ServerDisplayName,
                 recorded.SignInUrl,
-                recorded.State);
+                recorded.State,
+                recorded.Actor);
         }
 
         if (_pending.TryGetValue(request.State, out var existingSerialized))
         {
             var existing = _serializer.Deserialize(existingSerialized);
-            if (existing.CommandId != request.CommandId
+            if (IsExpired(existing))
+            {
+                RemovePending(existing);
+                await WriteStateAsync(cancellationToken).ConfigureAwait(true);
+            }
+            else if (existing.CommandId != request.CommandId
                 || !string.Equals(existing.ServerKey, request.ServerKey, StringComparison.Ordinal)
-                || existing.SignInUrl != request.SignInUrl)
+                || existing.SignInUrl != request.SignInUrl
+                || existing.Actor.PrincipalId != request.Actor.PrincipalId)
             {
                 throw new InvalidOperationException(
                     $"Authorization state '{request.State}' is already pending for a different request.");
             }
+            else
+            {
+                return new AuthorizationRequired(
+                    existing.CommandId,
+                    existing.ServerKey,
+                    existing.ServerDisplayName,
+                    existing.SignInUrl,
+                    existing.State,
+                    existing.Actor);
+            }
+        }
 
-            return new AuthorizationRequired(
-                existing.CommandId,
-                existing.ServerKey,
-                existing.ServerDisplayName,
-                existing.SignInUrl,
-                existing.State);
+        if (CountOpenPending() >= MaxPendingStates)
+        {
+            throw new NeuronAuthorizationException(
+                $"Authorization state capacity ({MaxPendingStates}) is full; complete or wait for expiry.");
         }
 
         var pending = new PendingAuthorization(
@@ -100,10 +114,14 @@ public sealed class McpAuthorizationNeuron :
             Iss: null,
             CompletionTarget: null,
             CompletionNotified: false,
-            RequestingNeuron: CaptureRequestingNeuron());
+            RequestingNeuron: CaptureRequestingNeuron(),
+            Actor: request.Actor,
+            CodeChallenge: request.CodeChallenge,
+            ProtectedCodeVerifier: ProtectVerifier(request.State, request.CodeVerifier),
+            ExpiresAt: TimeProvider.GetUtcNow().Add(AuthorizationTtl),
+            Consumed: false);
         _pending[request.State] = _serializer.SerializeToArray(pending);
-        _commands[request.CommandId.Value] = _commandsSerializer.SerializeToArray(
-            ToCommandRecord(pending));
+        _commands[request.CommandId.Value] = _commandsSerializer.SerializeToArray(ToCommandRecord(pending));
         await WriteStateAsync(cancellationToken).ConfigureAwait(true);
 
         var required = new AuthorizationRequired(
@@ -111,10 +129,9 @@ public sealed class McpAuthorizationNeuron :
             request.ServerKey,
             request.ServerDisplayName,
             request.SignInUrl,
-            request.State);
+            request.State,
+            request.Actor);
         await EmitAsync(required).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        // Directed into the owner's main chat so the transcript shows a
-        // "Sign in via {server}" button (Emit alone only hits broadcast ghosts).
         await SendAsync(new NeuronId("chat", Id.Owner, "main"), required)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return required;
@@ -152,6 +169,13 @@ public sealed class McpAuthorizationNeuron :
         }
 
         var pending = _serializer.Deserialize(pendingSerialized);
+        if (IsExpired(pending))
+        {
+            RemovePending(pending);
+            await WriteStateAsync(cancellationToken).ConfigureAwait(true);
+            throw new InvalidOperationException($"Authorization state '{recorded.State}' has expired.");
+        }
+
         RequireAuthorizedCompletionTargetBinder(pending, request.CommandId);
 
         if (pending.CompletionTarget is { } existing
@@ -182,46 +206,38 @@ public sealed class McpAuthorizationNeuron :
         ArgumentException.ThrowIfNullOrWhiteSpace(delivery.State);
         cancellationToken.ThrowIfCancellationRequested();
 
+        await SweepExpiredAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
         if (!_pending.TryGetValue(delivery.State, out var serialized))
         {
-
-            McpAuthorizationCodeHub.Complete(delivery.State, result: null);
+            // Unknown state: refuse. Do not park it in any static dictionary.
             return new McpAuthorizationCallbackDelivery(Accepted: false, Completed: false, Denied: false);
         }
 
         var pending = _serializer.Deserialize(serialized);
-        if (pending.Outcome is not PendingAuthorizationOutcome.Open)
+        if (IsExpired(pending))
         {
-            if (pending.Outcome is PendingAuthorizationOutcome.Completed
-                && !string.IsNullOrWhiteSpace(pending.Code))
-            {
-                McpAuthorizationCodeHub.Complete(
-                    delivery.State,
-                    new McpAuthorizationCodeResult(UnprotectCode(delivery.State, pending.Code), pending.Iss));
-            }
-            else if (pending.Outcome is PendingAuthorizationOutcome.Denied)
-            {
+            RemovePending(pending);
+            await WriteStateAsync(cancellationToken).ConfigureAwait(true);
+            return new McpAuthorizationCallbackDelivery(Accepted: false, Completed: false, Denied: false);
+        }
 
-                McpAuthorizationCodeHub.Complete(delivery.State, result: null);
-                McpAuthorizationCodeHub.AbortOpen(pending.CommandId);
-            }
-
-            await NotifyCompletionTargetAsync(pending, force: true).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-            return new McpAuthorizationCallbackDelivery(
-                Accepted: true,
-                Completed: pending.Outcome is PendingAuthorizationOutcome.Completed,
-                Denied: pending.Outcome is PendingAuthorizationOutcome.Denied);
+        // One-shot: completed or consumed states refuse a second presentation.
+        if (pending.Outcome is not PendingAuthorizationOutcome.Open || pending.Consumed)
+        {
+            return new McpAuthorizationCallbackDelivery(Accepted: false, Completed: false, Denied: false);
         }
 
         if (!string.IsNullOrWhiteSpace(delivery.Error)
             || string.IsNullOrWhiteSpace(delivery.Code))
         {
-            pending = await PersistOutcomeAsync(pending, PendingAuthorizationOutcome.Denied, code: null, iss: null).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            pending = await PersistOutcomeAsync(pending, PendingAuthorizationOutcome.Denied, code: null, iss: null)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             McpAuthorizationCodeHub.Complete(delivery.State, result: null);
             McpAuthorizationCodeHub.AbortOpen(pending.CommandId);
-            await EmitAsync(new AuthorizationDenied(pending.CommandId, pending.ServerKey, pending.State)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await EmitAsync(new AuthorizationDenied(pending.CommandId, pending.ServerKey, pending.State, pending.Actor))
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             await NotifyCompletionTargetAsync(pending).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return new McpAuthorizationCallbackDelivery(Accepted: true, Completed: false, Denied: true);
         }
@@ -234,13 +250,18 @@ public sealed class McpAuthorizationNeuron :
 
         McpAuthorizationCodeHub.Complete(
             delivery.State,
-            new McpAuthorizationCodeResult(delivery.Code, delivery.Iss));
-        await EmitAsync(new AuthorizationCompleted(pending.CommandId, pending.ServerKey, pending.State)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            new McpAuthorizationCodeResult(
+                delivery.Code,
+                delivery.Iss,
+                UnprotectVerifier(delivery.State, pending.ProtectedCodeVerifier),
+                pending.Actor));
+        await EmitAsync(new AuthorizationCompleted(pending.CommandId, pending.ServerKey, pending.State, pending.Actor))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await NotifyCompletionTargetAsync(pending).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return new McpAuthorizationCallbackDelivery(Accepted: true, Completed: true, Denied: false);
     }
 
-    public Task<McpAuthorizationClaim> Claim(CommandId commandId, CancellationToken cancellationToken = default)
+    public async Task<McpAuthorizationClaim> Claim(CommandId commandId, CancellationToken cancellationToken = default)
     {
         if (commandId.Value == Guid.Empty)
         {
@@ -255,7 +276,18 @@ public sealed class McpAuthorizationNeuron :
         }
 
         var recorded = _commandsSerializer.Deserialize(serialized);
-        return Task.FromResult(recorded.Outcome switch
+        if (_pending.TryGetValue(recorded.State, out var pendingSerialized))
+        {
+            var pending = _serializer.Deserialize(pendingSerialized);
+            if (IsExpired(pending))
+            {
+                RemovePending(pending);
+                await WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                throw new InvalidOperationException($"Authorization command '{commandId}' is not pending.");
+            }
+        }
+
+        return recorded.Outcome switch
         {
             PendingAuthorizationOutcome.Open => new McpAuthorizationClaim(
                 McpAuthorizationClaimKind.Required,
@@ -264,7 +296,8 @@ public sealed class McpAuthorizationNeuron :
                     recorded.ServerKey,
                     recorded.ServerDisplayName,
                     recorded.SignInUrl,
-                    recorded.State),
+                    recorded.State,
+                    recorded.Actor),
                 Denied: null),
             PendingAuthorizationOutcome.Completed => new McpAuthorizationClaim(
                 McpAuthorizationClaimKind.Completed,
@@ -273,12 +306,12 @@ public sealed class McpAuthorizationNeuron :
             PendingAuthorizationOutcome.Denied => new McpAuthorizationClaim(
                 McpAuthorizationClaimKind.Denied,
                 Required: null,
-                new AuthorizationDenied(recorded.CommandId, recorded.ServerKey, recorded.State)),
+                new AuthorizationDenied(recorded.CommandId, recorded.ServerKey, recorded.State, recorded.Actor)),
             _ => throw new InvalidOperationException($"Authorization command '{commandId}' has an unknown outcome."),
-        });
+        };
     }
 
-    public Task<McpAuthorizationCodeResult?> TakeCompletedCode(
+    public async Task<McpAuthorizationCodeResult?> TakeCompletedCode(
         string state,
         CancellationToken cancellationToken = default)
     {
@@ -287,23 +320,35 @@ public sealed class McpAuthorizationNeuron :
 
         if (!_pending.TryGetValue(state, out var serialized))
         {
-            return Task.FromResult<McpAuthorizationCodeResult?>(null);
+            return null;
         }
 
         var pending = _serializer.Deserialize(serialized);
-        if (pending.Outcome is PendingAuthorizationOutcome.Denied)
+        if (IsExpired(pending))
         {
-            return Task.FromResult<McpAuthorizationCodeResult?>(null);
+            RemovePending(pending);
+            await WriteStateAsync(cancellationToken).ConfigureAwait(true);
+            return null;
         }
 
-        if (pending.Outcome is not PendingAuthorizationOutcome.Completed
+        if (pending.Consumed
+            || pending.Outcome is PendingAuthorizationOutcome.Denied
+            || pending.Outcome is not PendingAuthorizationOutcome.Completed
             || string.IsNullOrWhiteSpace(pending.Code))
         {
-            return Task.FromResult<McpAuthorizationCodeResult?>(null);
+            return null;
         }
 
-        return Task.FromResult<McpAuthorizationCodeResult?>(
-            new McpAuthorizationCodeResult(UnprotectCode(state, pending.Code), pending.Iss));
+        var code = UnprotectCode(state, pending.Code);
+        var verifier = UnprotectVerifier(state, pending.ProtectedCodeVerifier);
+        var result = new McpAuthorizationCodeResult(code, pending.Iss, verifier, pending.Actor);
+
+        // One-shot: clear the code so a second take/replay yields nothing.
+        var consumed = pending with { Consumed = true, Code = null };
+        _pending[state] = _serializer.SerializeToArray(consumed);
+        _commands[pending.CommandId.Value] = _commandsSerializer.SerializeToArray(ToCommandRecord(consumed));
+        await WriteStateAsync(cancellationToken).ConfigureAwait(true);
+        return result;
     }
 
     private async Task NotifyCompletionTargetAsync(PendingAuthorization pending, bool force = false)
@@ -320,13 +365,15 @@ public sealed class McpAuthorizationNeuron :
         {
             await SendAsync(
                 target,
-                new AuthorizationCompleted(pending.CommandId, pending.ServerKey, pending.State)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+                new AuthorizationCompleted(pending.CommandId, pending.ServerKey, pending.State, pending.Actor))
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         else if (pending.Outcome is PendingAuthorizationOutcome.Denied)
         {
             await SendAsync(
                 target,
-                new AuthorizationDenied(pending.CommandId, pending.ServerKey, pending.State)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+                new AuthorizationDenied(pending.CommandId, pending.ServerKey, pending.State, pending.Actor))
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
         if (pending.CompletionNotified)
@@ -367,8 +414,78 @@ public sealed class McpAuthorizationNeuron :
         => Encoding.UTF8.GetString(
             _protector.Unprotect(CodePurpose(state), Convert.FromBase64String(protectedCode)));
 
+    private string? ProtectVerifier(string state, string? verifier)
+    {
+        if (string.IsNullOrWhiteSpace(verifier))
+        {
+            return null;
+        }
+
+        return Convert.ToBase64String(
+            _protector.Protect(VerifierPurpose(state), Encoding.UTF8.GetBytes(verifier)));
+    }
+
+    private string? UnprotectVerifier(string state, string? protectedVerifier)
+    {
+        if (string.IsNullOrWhiteSpace(protectedVerifier))
+        {
+            return null;
+        }
+
+        return Encoding.UTF8.GetString(
+            _protector.Unprotect(VerifierPurpose(state), Convert.FromBase64String(protectedVerifier)));
+    }
+
     private static string CodePurpose(string state)
         => $"{CodeProtectionPurposePrefix}/{state}";
+
+    private static string VerifierPurpose(string state)
+        => $"{VerifierProtectionPurposePrefix}/{state}";
+
+    private bool IsExpired(PendingAuthorization pending)
+        => pending.ExpiresAt <= TimeProvider.GetUtcNow();
+
+    private int CountOpenPending()
+    {
+        var count = 0;
+        foreach (var pair in _pending)
+        {
+            var pending = _serializer.Deserialize(pair.Value);
+            if (pending.Outcome is PendingAuthorizationOutcome.Open && !IsExpired(pending) && !pending.Consumed)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private async Task SweepExpiredAsync(CancellationToken cancellationToken)
+    {
+        var removed = false;
+        foreach (var pair in _pending.ToArray())
+        {
+            var pending = _serializer.Deserialize(pair.Value);
+            if (!IsExpired(pending))
+            {
+                continue;
+            }
+
+            RemovePending(pending);
+            removed = true;
+        }
+
+        if (removed)
+        {
+            await WriteStateAsync(cancellationToken).ConfigureAwait(true);
+        }
+    }
+
+    private void RemovePending(PendingAuthorization pending)
+    {
+        _pending.Remove(pending.State);
+        _commands.Remove(pending.CommandId.Value);
+    }
 
     private static NeuronId? CaptureRequestingNeuron()
     {
@@ -409,7 +526,10 @@ public sealed class McpAuthorizationNeuron :
             pending.Outcome,
             pending.CompletionTarget,
             pending.CompletionNotified,
-            pending.RequestingNeuron);
+            pending.RequestingNeuron,
+            pending.Actor,
+            pending.ExpiresAt,
+            pending.Consumed);
 }
 
 [GenerateSerializer]
@@ -425,7 +545,12 @@ internal sealed record PendingAuthorization(
     [property: Id(7)] string? Iss,
     [property: Id(8)] NeuronId? CompletionTarget,
     [property: Id(9)] bool CompletionNotified,
-    [property: Id(10)] NeuronId? RequestingNeuron = null);
+    [property: Id(10)] NeuronId? RequestingNeuron,
+    [property: Id(11)] ActorContext Actor,
+    [property: Id(12)] string? CodeChallenge = null,
+    [property: Id(13)] string? ProtectedCodeVerifier = null,
+    [property: Id(14)] DateTimeOffset ExpiresAt = default,
+    [property: Id(15)] bool Consumed = false);
 
 [GenerateSerializer]
 [Alias("db.mcp.pending-authorization-outcome")]
@@ -447,4 +572,7 @@ internal sealed record CommandAuthorizationRecord(
     [property: Id(5)] PendingAuthorizationOutcome Outcome,
     [property: Id(6)] NeuronId? CompletionTarget = null,
     [property: Id(7)] bool CompletionNotified = false,
-    [property: Id(8)] NeuronId? RequestingNeuron = null);
+    [property: Id(8)] NeuronId? RequestingNeuron = null,
+    [property: Id(9)] ActorContext? Actor = null,
+    [property: Id(10)] DateTimeOffset ExpiresAt = default,
+    [property: Id(11)] bool Consumed = false);

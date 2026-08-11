@@ -8,41 +8,29 @@ using Xunit;
 
 namespace DigitalBrain.Tests;
 
-// Characterization of today's OAuth/MCP authorization rail (S1.3-RED).
-// Defect pins carry // PIN-DEFECT(P0-x); only the seam session that fixes P0-x may flip them.
+// S1.3-GREEN: flipped P0-1 / P0-5 pins — PKCE single mint, bounded one-shot state, principal binding.
 public sealed class OAuthRailCompositionProofs
 {
     [Fact]
-    public void ManualRailAndLibraryCallbackMintSeparateOAuthStates()
+    public void AuthorizationRailIsTheSoleStateMintAndLibraryCallbackDoesNotMint()
     {
-        // PIN-DEFECT(P0-1): dual state — McpAuthorizationRail mints its own state for the
-        // human sign-in URL; the MCP client library later mints a different state that
-        // McpOAuthCallback extracts from AuthorizationUri. They are not the same flow/value.
         var rail = ReadRepoFile("src", "Modules", "SDK", "DigitalBrain.Modules.Sdk", "Mcp", "McpAuthorizationRail.cs");
         var callback = ReadRepoFile("src", "Modules", "SDK", "DigitalBrain.Modules.Sdk", "Mcp", "McpOAuthCallback.cs");
-        var sessions = ReadRepoFile("src", "Modules", "SDK", "DigitalBrain.Modules.Sdk", "Mcp", "McpClientSessions.cs");
 
-        Assert.Contains("var state = Guid.NewGuid().ToString(\"N\");", rail, StringComparison.Ordinal);
-        Assert.Contains("SignInUrl(configuration, server, state)", rail, StringComparison.Ordinal);
+        Assert.Contains("OAuthPkce.CreateS256Pair", rail, StringComparison.Ordinal);
+        Assert.Contains("BuildPkceAuthorizeUrl", rail, StringComparison.Ordinal);
         Assert.Contains("new BeginMcpAuthorization(", rail, StringComparison.Ordinal);
 
-        Assert.Contains("McpOAuthOptions.Create", sessions, StringComparison.Ordinal);
-        Assert.Contains("McpClient", sessions, StringComparison.Ordinal);
-        Assert.Contains("CreateAsync", sessions, StringComparison.Ordinal);
-
-        Assert.Contains("QueryValue(context.AuthorizationUri, \"state\")", callback, StringComparison.Ordinal);
-        Assert.Contains("McpAuthorizationCodeHub.RegisterSession(state, session)", callback, StringComparison.Ordinal);
-        Assert.Contains("new BeginMcpAuthorization(", callback, StringComparison.Ordinal);
-
-        // Distinct mint sites: rail synthesizes Guid state; callback consumes library URI state.
+        // Library callback recovers the rail transaction — no Guid mint, no AuthorizationUri state mint.
         Assert.DoesNotContain("Guid.NewGuid().ToString(\"N\")", callback, StringComparison.Ordinal);
-        Assert.DoesNotContain("context.AuthorizationUri", rail, StringComparison.Ordinal);
+        Assert.DoesNotContain("QueryValue(context.AuthorizationUri, \"state\")", callback, StringComparison.Ordinal);
+        Assert.Contains("Claim(session.CommandId", callback, StringComparison.Ordinal);
+        Assert.Contains("does not mint state", callback, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void ManuallyBuiltSalesforceAuthorizeUrlCarriesNoPkceChallenge()
+    public void SalesforceAuthorizeUrlAlwaysCarriesPkceS256()
     {
-        // PIN-DEFECT(P0-1): manual URL lacks PKCE (no code_challenge / code_challenge_method).
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -58,24 +46,24 @@ public sealed class OAuthRailCompositionProofs
             ["api", "refresh_token"],
             requiresClientSecret: true);
         var state = Guid.NewGuid().ToString("N");
+        var (_, challenge) = OAuthPkce.CreateS256Pair();
 
-        var signInUrl = InvokeSignInUrl(configuration, server, state);
+        var signInUrl = McpAuthorizationRail.BuildPkceAuthorizeUrl(configuration, server, state, challenge);
 
         Assert.Equal("login.salesforce.com", signInUrl.Host);
         Assert.Contains("response_type=code", signInUrl.Query, StringComparison.Ordinal);
         Assert.Contains($"state={Uri.EscapeDataString(state)}", signInUrl.Query, StringComparison.Ordinal);
-        Assert.DoesNotContain("code_challenge", signInUrl.Query, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("code_challenge_method", signInUrl.Query, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("code_challenge=", signInUrl.Query, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("code_challenge_method=S256", signInUrl.Query, StringComparison.OrdinalIgnoreCase);
 
         var rail = ReadRepoFile("src", "Modules", "SDK", "DigitalBrain.Modules.Sdk", "Mcp", "McpAuthorizationRail.cs");
-        Assert.DoesNotContain("code_challenge", rail, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("code_challenge", rail, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("OAuthPkce.ChallengeMethodS256", rail, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void CodeHubCompletionsAccumulateUnknownStatesWithoutExpiryOrEviction()
+    public void CodeHubDropsUnknownStatesInsteadOfAccumulatingOrphans()
     {
-        // PIN-DEFECT(P0-1): McpAuthorizationCodeHub.Completions is an unbounded static
-        // dictionary; Complete(state, null) for unknown/orphaned states never expires them.
         McpAuthorizationCodeHub.ResetForTests();
         Assert.Equal(0, McpAuthorizationCodeHub.CompletionsCountForTests);
 
@@ -83,98 +71,58 @@ public sealed class OAuthRailCompositionProofs
         McpAuthorizationCodeHub.Complete("orphan-state-b", result: null);
         McpAuthorizationCodeHub.Complete("orphan-state-c", result: null);
 
-        Assert.Equal(3, McpAuthorizationCodeHub.CompletionsCountForTests);
-
-        // Still held — no background sweep, no TTL, no eviction on Complete alone.
-        Assert.Equal(3, McpAuthorizationCodeHub.CompletionsCountForTests);
+        Assert.Equal(0, McpAuthorizationCodeHub.CompletionsCountForTests);
 
         McpAuthorizationCodeHub.ResetForTests();
-        Assert.Equal(0, McpAuthorizationCodeHub.CompletionsCountForTests);
     }
 
     [Fact]
-    public void McpAndGmailTokenPurposesKeyByServerAndNeuronIdentityNotPrincipal()
+    public void McpTokenPurposesKeyByPrincipalNotNeuronIdentity()
     {
-        // PIN-DEFECT(P0-5): tokens stored under server key + durable neuron identity, not a
-        // verified local user principal.
+        var actor = new ActorContext(PrincipalId.New(), "alice");
         var serverKey = "dev/salesforce";
-        var durableIdentity = new NeuronId("mcp", new OwnerId("dev"), "salesforce").ToString();
-        Assert.Equal("mcp:dev/salesforce", durableIdentity);
+        var purpose = McpTokenPresence.Purpose(serverKey, IntegrationScope.User, McpTokenPresence.SubjectKey(actor));
 
-        var purpose = McpTokenPresence.Purpose(serverKey, durableIdentity);
-        Assert.Equal($"mcp/oauth/{serverKey}/{durableIdentity}", purpose);
-        Assert.DoesNotContain("principal", purpose, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("user", purpose, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(
+            $"integration/user/{serverKey}/{McpTokenPresence.SubjectKey(actor)}",
+            purpose);
+        Assert.Contains("integration/user/", purpose, StringComparison.Ordinal);
+        Assert.DoesNotContain("mcp:dev/salesforce", purpose, StringComparison.Ordinal);
+
+        var integration = McpTokenPresence.UserIntegration(serverKey, actor, ["api"]);
+        Assert.Equal(IntegrationScope.User, integration.Scope);
+        Assert.Equal(McpTokenPresence.SubjectKey(actor), integration.SubjectId);
+        Assert.Equal(purpose, integration.ProtectedTokenReference);
 
         var mcpNeuron = ReadRepoFile("src", "Modules", "SDK", "DigitalBrain.Modules.Sdk", "Mcp", "McpServerNeuron.cs");
-        Assert.Contains("_durableIdentity = Id.ToString();", mcpNeuron, StringComparison.Ordinal);
-        Assert.Contains("McpAuthorizationRail.EnsureAuthorizedAsync", mcpNeuron, StringComparison.Ordinal);
-        Assert.Contains("McpClientSessions.RunAsync", mcpNeuron, StringComparison.Ordinal);
-        Assert.Contains("_durableIdentity", mcpNeuron, StringComparison.Ordinal);
+        Assert.Contains("PrincipalTokenSlot", mcpNeuron, StringComparison.Ordinal);
+        Assert.Contains("McpTokenPresence.SubjectKey", mcpNeuron, StringComparison.Ordinal);
+        Assert.Contains("mcp.gateway.oauth.principals", mcpNeuron, StringComparison.Ordinal);
 
         var rail = ReadRepoFile("src", "Modules", "SDK", "DigitalBrain.Modules.Sdk", "Mcp", "McpAuthorizationRail.cs");
-        Assert.Contains("McpTokenPresence.Purpose(server.Key, durableIdentity)", rail, StringComparison.Ordinal);
+        Assert.Contains("McpTokenPresence.UserIntegration", rail, StringComparison.Ordinal);
+        Assert.Contains("ActorContext actor", rail, StringComparison.Ordinal);
 
-        var sessions = ReadRepoFile("src", "Modules", "SDK", "DigitalBrain.Modules.Sdk", "Mcp", "McpClientSessions.cs");
-        Assert.Contains("McpTokenPresence.Purpose(server.Key, durableIdentity)", sessions, StringComparison.Ordinal);
-
-        var gmail = ReadRepoFile("src", "Modules", "Google", "Google", "Gmail", "Gmail.cs");
-        Assert.Contains("_durableIdentity = Id.ToString();", gmail, StringComparison.Ordinal);
-        Assert.Contains("_userKey = Id.Name;", gmail, StringComparison.Ordinal);
-
-        var googleStore = ReadRepoFile(
-            "src", "Modules", "Google", "Google", "Auth", "DurableGoogleTokenStore.cs");
-        Assert.Contains(
-            "google/oauth/{connectionName}/{durableIdentity}",
-            googleStore,
-            StringComparison.Ordinal);
-
-        // PendingAuthorization durable shape carries no principal stamp.
         var pendingNames = typeof(PendingAuthorization)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Select(property => property.Name)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
-        Assert.Equal(
-            [
-                "Code",
-                "CommandId",
-                "CompletionNotified",
-                "CompletionTarget",
-                "Iss",
-                "Outcome",
-                "RequestingNeuron",
-                "ServerDisplayName",
-                "ServerKey",
-                "SignInUrl",
-                "State",
-            ],
-            pendingNames);
-        foreach (var name in pendingNames)
-        {
-            Assert.False(
-                name.Contains("Principal", StringComparison.OrdinalIgnoreCase)
-                || name.Equals("UserId", StringComparison.OrdinalIgnoreCase)
-                || name.Equals("User", StringComparison.OrdinalIgnoreCase)
-                || name.Equals("Actor", StringComparison.OrdinalIgnoreCase),
-                $"PendingAuthorization unexpectedly carries caller-identity property '{name}'.");
-        }
+        Assert.Contains("Actor", pendingNames);
+        Assert.Contains("ExpiresAt", pendingNames);
+        Assert.Contains("Consumed", pendingNames);
+        Assert.Contains("CodeChallenge", pendingNames);
     }
 
     [Fact]
-    public void OAuthCallbackDeliveryIgnoresAuthenticatedPrincipal()
+    public void OAuthCallbackStaysAnonymousAtHttpAndResolvesOnlyThroughStateBinding()
     {
-        // PIN-DEFECT(P0-5): /oauth/callback does not bind state to any local user identity
-        // (AllowAnonymous; delivery carries only State/Code/Error/Iss).
         var callback = ReadRepoFile("src", "Kernel", "DigitalBrain.Kernel", "MapOAuthCallback.cs");
         Assert.Contains("HttpSurfacePaths.McpOAuthCallbackPath", callback, StringComparison.Ordinal);
         Assert.Contains("DeliverMcpAuthorizationCallback", callback, StringComparison.Ordinal);
         Assert.Contains("AllowAnonymous", callback, StringComparison.Ordinal);
         Assert.DoesNotContain("ClaimsPrincipal", callback, StringComparison.Ordinal);
-        Assert.DoesNotContain("HttpContext.User", callback, StringComparison.Ordinal);
-        Assert.DoesNotContain("PrincipalId", callback, StringComparison.Ordinal);
         Assert.DoesNotContain("HttpActor", callback, StringComparison.Ordinal);
-        Assert.DoesNotContain("User.Identity", callback, StringComparison.Ordinal);
 
         var deliveryNames = typeof(DeliverMcpAuthorizationCallback)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -185,15 +133,13 @@ public sealed class OAuthRailCompositionProofs
 
         Assert.Equal("/oauth/callback", HttpSurfacePaths.McpOAuthCallbackPath);
         Assert.Equal(OAuthCallbackPaths.RelativePath, HttpSurfacePaths.McpOAuthCallbackPath);
-    }
 
-    private static Uri InvokeSignInUrl(IConfiguration configuration, McpServerDefinition server, string state)
-    {
-        var method = typeof(McpAuthorizationRail).GetMethod(
-            "SignInUrl",
-            BindingFlags.Static | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("McpAuthorizationRail.SignInUrl is missing.");
-        return (Uri)method.Invoke(null, [configuration, server, state])!;
+        // Principal binding lives on the pending record (mint-time), not the HTTP surface.
+        Assert.Contains(
+            "Actor",
+            typeof(PendingAuthorization)
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Select(property => property.Name));
     }
 
     private static string ReadRepoFile(params string[] relativeParts)
@@ -218,25 +164,30 @@ public sealed class OAuthRailCompositionProofs
 [Collection(BrainCollection.Name)]
 public sealed class OAuthRailNeuronProofs(BrainClusterFixture fixture)
 {
+    private static ActorContext TestActor(string name = "alice")
+        => new(PrincipalId.New(), name);
+
     [Fact]
-    public async Task CompletedAuthorizationCodeCanBeReplayedWithoutRefusal()
+    public async Task CompletedAuthorizationCodeIsOneShotAndReplayIsRefused()
     {
-        // PIN-DEFECT(P0-1): completed state/code stays replayable — second DeliverCallback
-        // on a Completed pending entry is Accepted+Completed and TakeCompletedCode still yields.
         McpAuthorizationCodeHub.ResetForTests();
         var brain = fixture.BrainFor("oauth-replay");
         var authorization = brain.GetGrainProxy<IMcpAuthorization>(IMcpAuthorization.DefaultInstanceName);
         var command = CommandId.New();
         const string state = "replay-state-1";
         const string code = "auth-code-once";
+        var actor = TestActor();
 
         await authorization.Begin(
             new BeginMcpAuthorization(
                 command,
                 "salesforce",
                 "Salesforce",
-                new Uri("https://login.salesforce.com/services/oauth2/authorize?state=replay-state-1"),
-                state),
+                new Uri("https://login.salesforce.com/services/oauth2/authorize?state=replay-state-1&code_challenge=abc&code_challenge_method=S256"),
+                state,
+                actor,
+                CodeChallenge: "abc",
+                CodeVerifier: "verifier-1"),
             TestContext.Current.CancellationToken);
 
         var first = await authorization.DeliverCallback(
@@ -249,27 +200,26 @@ public sealed class OAuthRailNeuronProofs(BrainClusterFixture fixture)
         var takenOnce = await authorization.TakeCompletedCode(state, TestContext.Current.CancellationToken);
         Assert.NotNull(takenOnce);
         Assert.Equal(code, takenOnce!.Code);
+        Assert.Equal("verifier-1", takenOnce.CodeVerifier);
+        Assert.Equal(actor.PrincipalId, takenOnce.Actor!.PrincipalId);
 
-        // Replay the same completed state (even with a different presented code).
+        // Replay the same completed state — refused (one-shot).
         var second = await authorization.DeliverCallback(
             new DeliverMcpAuthorizationCallback(state, "different-code", null, null),
             TestContext.Current.CancellationToken);
-        Assert.True(second.Accepted);
-        Assert.True(second.Completed);
+        Assert.False(second.Accepted);
+        Assert.False(second.Completed);
         Assert.False(second.Denied);
 
         var takenAgain = await authorization.TakeCompletedCode(state, TestContext.Current.CancellationToken);
-        Assert.NotNull(takenAgain);
-        Assert.Equal(code, takenAgain!.Code);
+        Assert.Null(takenAgain);
 
         McpAuthorizationCodeHub.ResetForTests();
     }
 
     [Fact]
-    public async Task UnknownCallbackStatesAreRejectedAtTheGrainButStillFillTheCodeHub()
+    public async Task UnknownCallbackStatesAreRejectedAndDoNotFillTheCodeHub()
     {
-        // PIN-DEFECT(P0-1): DeliverCallback refuses unknown states at the grain, yet still
-        // parks them in the static Completions dictionary (no expiry).
         McpAuthorizationCodeHub.ResetForTests();
         var brain = fixture.BrainFor("oauth-unknown-state");
         var authorization = brain.GetGrainProxy<IMcpAuthorization>(IMcpAuthorization.DefaultInstanceName);
@@ -282,38 +232,87 @@ public sealed class OAuthRailNeuronProofs(BrainClusterFixture fixture)
         Assert.False(delivery.Accepted);
         Assert.False(delivery.Completed);
         Assert.False(delivery.Denied);
-        Assert.Equal(before + 1, McpAuthorizationCodeHub.CompletionsCountForTests);
+        Assert.Equal(before, McpAuthorizationCodeHub.CompletionsCountForTests);
 
         McpAuthorizationCodeHub.ResetForTests();
     }
 
     [Fact]
-    public async Task AuthorizationPendingShapeHasNoLocalUserBinding()
+    public async Task AuthorizationPendingBindsTheLocalUserPrincipal()
     {
-        // PIN-DEFECT(P0-5): Begin records server/state only — no principal on the emitted fact.
-        var brain = fixture.BrainFor("oauth-no-principal");
+        var brain = fixture.BrainFor("oauth-principal");
         var authorization = brain.GetGrainProxy<IMcpAuthorization>(IMcpAuthorization.DefaultInstanceName);
         var command = CommandId.New();
-        const string state = "no-principal-state";
+        const string state = "principal-state";
+        var actor = TestActor("bob");
 
         var required = await authorization.Begin(
             new BeginMcpAuthorization(
                 command,
                 "salesforce",
                 "Salesforce",
-                new Uri("https://login.salesforce.com/services/oauth2/authorize?state=no-principal-state"),
-                state),
+                new Uri("https://login.salesforce.com/services/oauth2/authorize?state=principal-state&code_challenge=x&code_challenge_method=S256"),
+                state,
+                actor,
+                CodeChallenge: "x",
+                CodeVerifier: "v"),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(command, required.CommandId);
         Assert.Equal("salesforce", required.ServerKey);
         Assert.Equal(state, required.State);
-        Assert.Equal(
-            ["CommandId", "ServerDisplayName", "ServerKey", "SignInUrl", "State"],
-            typeof(AuthorizationRequired)
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Select(property => property.Name)
-                .OrderBy(name => name, StringComparer.Ordinal)
-                .ToArray());
+        Assert.NotNull(required.Actor);
+        Assert.Equal(actor.PrincipalId, required.Actor!.PrincipalId);
+        Assert.Equal("bob", required.Actor.Username);
+
+        var names = typeof(AuthorizationRequired)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(property => property.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Contains("Actor", names);
+    }
+
+    [Fact]
+    public async Task PrincipalTokenSlotsIsolateUserAFromUserB()
+    {
+        var alice = new ActorContext(PrincipalId.New(), "alice");
+        var bob = new ActorContext(PrincipalId.New(), "bob");
+        var alicePurpose = McpTokenPresence.UserIntegration("salesforce", alice, ["api"]).ProtectedTokenReference;
+        var bobPurpose = McpTokenPresence.UserIntegration("salesforce", bob, ["api"]).ProtectedTokenReference;
+
+        Assert.NotEqual(alicePurpose, bobPurpose);
+        Assert.Contains(McpTokenPresence.SubjectKey(alice), alicePurpose, StringComparison.Ordinal);
+        Assert.DoesNotContain(McpTokenPresence.SubjectKey(alice), bobPurpose, StringComparison.Ordinal);
+        Assert.Contains(McpTokenPresence.SubjectKey(bob), bobPurpose, StringComparison.Ordinal);
+
+        // Live grain: Begin for alice; bob cannot claim alice's state via a different Begin on same state.
+        var brain = fixture.BrainFor("oauth-isolation");
+        var authorization = brain.GetGrainProxy<IMcpAuthorization>(IMcpAuthorization.DefaultInstanceName);
+        const string state = "iso-state";
+        await authorization.Begin(
+            new BeginMcpAuthorization(
+                CommandId.New(),
+                "salesforce",
+                "Salesforce",
+                new Uri("https://login.salesforce.com/services/oauth2/authorize?state=iso-state&code_challenge=c&code_challenge_method=S256"),
+                state,
+                alice,
+                "c",
+                "v"),
+            TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await authorization.Begin(
+                new BeginMcpAuthorization(
+                    CommandId.New(),
+                    "salesforce",
+                    "Salesforce",
+                    new Uri("https://login.salesforce.com/services/oauth2/authorize?state=iso-state&code_challenge=c2&code_challenge_method=S256"),
+                    state,
+                    bob,
+                    "c2",
+                    "v2"),
+                TestContext.Current.CancellationToken));
     }
 }

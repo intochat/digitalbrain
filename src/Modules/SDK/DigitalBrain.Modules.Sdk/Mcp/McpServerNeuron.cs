@@ -11,16 +11,14 @@ namespace DigitalBrain.Modules.Sdk.Mcp;
 [GrainType("mcp")]
 public sealed class McpServerNeuron : Neuron, IMcp
 {
-    private const string TokensName = "mcp.gateway.oauth";
+    private const string TokensName = "mcp.gateway.oauth.principals";
     private const int FiredRowCap = 200;
 
-    private readonly IDurableValue<byte[]> _tokenState;
-    private readonly string _durableIdentity;
+    private readonly IDurableDictionary<string, byte[]> _principalTokens;
 
     public McpServerNeuron()
     {
-        _tokenState = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(TokensName);
-        _durableIdentity = Id.ToString();
+        _principalTokens = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<string, byte[]>>(TokensName);
     }
 
     public async Task HandleAsync(ListMcpTools synapse, CancellationToken cancellationToken)
@@ -29,7 +27,7 @@ public sealed class McpServerNeuron : Neuron, IMcp
         cancellationToken.ThrowIfCancellationRequested();
 
         var server = RequireServer();
-        var tools = await ListAsync(server, synapse.CommandId, cancellationToken)
+        var tools = await ListAsync(server, synapse.CommandId, synapse.Actor, cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         await ReplyAsync(new McpToolsListed(synapse.CommandId, [.. tools]), cancellationToken)
@@ -48,7 +46,7 @@ public sealed class McpServerNeuron : Neuron, IMcp
         }
 
         var server = RequireServer();
-        var tools = await ListAsync(server, synapse.CommandId, cancellationToken)
+        var tools = await ListAsync(server, synapse.CommandId, synapse.Actor, cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         var tool = tools.FirstOrDefault(candidate =>
                 string.Equals(candidate.Name, synapse.Tool, StringComparison.Ordinal))
@@ -56,16 +54,26 @@ public sealed class McpServerNeuron : Neuron, IMcp
                 $"'{server.DisplayName}' has no tool '{synapse.Tool}'. It has: "
                 + string.Join(", ", tools.Select(static candidate => candidate.Name)) + ".");
 
-        if (tool.Destructive)
-        {
-            throw new NeuronAuthorizationException(
-                $"'{tool.Name}' writes to {server.DisplayName}; destructive tools require the "
-                + "owner approval flow, which the generic gateway does not carry yet.");
-        }
+        // P0-7: all tools are allowed. Provider OAuth + per-principal integration are the boundary.
 
         var rowType = RowTypeOf(synapse.FireRowsAs);
-        var content = await CallAsync(server, synapse, cancellationToken)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        string? integrationSubject = null;
+        JsonElement content;
+        try
+        {
+            content = await CallAsync(server, synapse, cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            if (synapse.Actor is { } actor)
+            {
+                integrationSubject = McpTokenPresence.SubjectKey(actor);
+            }
+        }
+        catch (Exception)
+        {
+            // Settled refusals and transport errors are already journaled via the inbound
+            // CallMcpTool (actor stamp) — rethrow without token leakage.
+            throw;
+        }
 
         var fired = 0;
         if (rowType is not null)
@@ -79,7 +87,13 @@ public sealed class McpServerNeuron : Neuron, IMcp
         }
 
         await ReplyAsync(
-            new McpToolReturned(synapse.CommandId, synapse.Tool, content, fired),
+            new McpToolReturned(
+                synapse.CommandId,
+                synapse.Tool,
+                content,
+                fired,
+                synapse.Actor,
+                integrationSubject),
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
@@ -128,8 +142,6 @@ public sealed class McpServerNeuron : Neuron, IMcp
         PropertyNameCaseInsensitive = true,
     };
 
-    // Tabular MCP results arrive as a root array or as the first array-valued
-    // property (records, rows, items — servers differ).
     private static IEnumerable<JsonElement> Rows(JsonElement content)
     {
         if (content.ValueKind == JsonValueKind.Array)
@@ -154,6 +166,7 @@ public sealed class McpServerNeuron : Neuron, IMcp
     private async Task<IReadOnlyList<McpToolDescription>> ListAsync(
         McpServerDefinition server,
         CommandId commandId,
+        ActorContext? actor,
         CancellationToken cancellationToken)
     {
         if (ServiceProvider.GetService<IMcpToolTransport>() is { } transport)
@@ -165,6 +178,7 @@ public sealed class McpServerNeuron : Neuron, IMcp
         return await AuthorizedAsync(
             server,
             commandId,
+            actor,
             static async ValueTask<IReadOnlyList<McpToolDescription>> (client, callbackCancellation) =>
             {
                 var listed = await client.ListToolsAsync(cancellationToken: callbackCancellation)
@@ -195,6 +209,7 @@ public sealed class McpServerNeuron : Neuron, IMcp
         return await AuthorizedAsync(
             server,
             synapse.CommandId,
+            synapse.Actor,
             async ValueTask<JsonElement> (client, callbackCancellation) =>
             {
                 var arguments = synapse.Arguments.ValueKind == JsonValueKind.Object
@@ -219,9 +234,20 @@ public sealed class McpServerNeuron : Neuron, IMcp
     private async Task<TResult> AuthorizedAsync<TResult>(
         McpServerDefinition server,
         CommandId commandId,
+        ActorContext? actor,
         Func<McpClient, CancellationToken, ValueTask<TResult>> session,
         CancellationToken cancellationToken)
     {
+        if (actor is null)
+        {
+            throw new NeuronAuthorizationException(
+                $"'{server.DisplayName}' requires an authenticated actor on db.mcp.* before calling tools. "
+                + "Sign in, then fire with Actor set to the verified principal.");
+        }
+
+        var subjectKey = McpTokenPresence.SubjectKey(actor);
+        var tokenSlot = new PrincipalTokenSlot(_principalTokens, subjectKey);
+
         await McpAuthorizationRail.EnsureAuthorizedAsync(
             GrainFactory,
             Id.Owner,
@@ -229,17 +255,17 @@ public sealed class McpServerNeuron : Neuron, IMcp
             TimeProvider,
             commandId,
             server,
-            _tokenState,
+            tokenSlot,
             () => WriteStateAsync(),
-            _durableIdentity,
+            actor,
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         return await McpClientSessions.RunAsync(
             server,
             ServiceProvider,
-            _tokenState,
+            tokenSlot,
             () => WriteStateAsync(),
-            _durableIdentity,
+            actor,
             commandId,
             Id.Owner,
             GrainFactory,

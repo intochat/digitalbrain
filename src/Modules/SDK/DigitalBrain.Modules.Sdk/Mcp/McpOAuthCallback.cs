@@ -7,6 +7,9 @@ internal static class McpOAuthCallback
 {
     private static readonly TimeSpan GrainPollInterval = TimeSpan.FromMilliseconds(50);
 
+    // The authorization rail is the sole state mint (PKCE). When the MCP client library
+    // still invokes this handler, we never mint a second state from AuthorizationUri —
+    // we recover the rail's pending transaction for the command and await that state.
     internal static async Task<AuthorizationResult?> AuthorizeAsync(
         AuthorizationCallbackContext context,
         McpOAuthSession session,
@@ -16,24 +19,65 @@ internal static class McpOAuthCallback
         ArgumentNullException.ThrowIfNull(session);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var state = QueryValue(context.AuthorizationUri, "state")
-            ?? throw new InvalidOperationException("The OAuth authorization URI contains no state value.");
-
-        McpAuthorizationCodeHub.RegisterSession(state, session);
-
         var authorization = session.Grains.GetGrain<IMcpAuthorization>(
             NeuronId.For<IMcpAuthorization>(session.Owner, McpAuthorizationNeuron.InstanceName).ToGrainId());
 
-        await authorization.Begin(
-            new BeginMcpAuthorization(
-                session.CommandId,
-                session.ServerKey,
-                session.ServerDisplayName,
-                context.AuthorizationUri,
-                state),
-            cancellationToken).ConfigureAwait(true);
+        // Recover the single rail-minted transaction for this command (no second Begin).
+        McpAuthorizationClaim claim;
+        try
+        {
+            claim = await authorization.Claim(session.CommandId, cancellationToken).ConfigureAwait(true);
+        }
+        catch (InvalidOperationException)
+        {
+            throw new InvalidOperationException(
+                $"{session.ServerDisplayName} has no rail-minted authorization for command '{session.CommandId}'. "
+                + "Complete McpAuthorizationRail.EnsureAuthorizedAsync first — the library path does not mint state.");
+        }
 
-        return await AwaitDeliveredCodeAsync(state, session, authorization, cancellationToken).ConfigureAwait(true);
+        if (claim.Kind is McpAuthorizationClaimKind.Denied)
+        {
+            throw new OperationCanceledException(
+                "MCP authorization ended without a code; the pending session open was canceled.");
+        }
+
+        if (claim.Kind is McpAuthorizationClaimKind.Required && claim.Required is { } required)
+        {
+            McpAuthorizationCodeHub.RegisterSession(required.State, session);
+            return await AwaitDeliveredCodeAsync(required.State, session, authorization, cancellationToken)
+                .ConfigureAwait(true);
+        }
+
+        if (claim.Kind is McpAuthorizationClaimKind.Completed)
+        {
+            // Code already delivered; recover state via idempotent Begin return shape.
+            if (session.Actor is null)
+            {
+                throw new InvalidOperationException(
+                    $"{session.ServerDisplayName} completed authorization has no actor on the session.");
+            }
+
+            var recovered = await authorization.Begin(
+                new BeginMcpAuthorization(
+                    session.CommandId,
+                    session.ServerKey,
+                    session.ServerDisplayName,
+                    new Uri("https://auth.digitalbrain.local/oauth/completed"),
+                    "unused-when-command-exists",
+                    session.Actor),
+                cancellationToken).ConfigureAwait(true);
+            var taken = await authorization.TakeCompletedCode(recovered.State, cancellationToken).ConfigureAwait(true);
+            if (taken is null)
+            {
+                throw new OperationCanceledException(
+                    "MCP authorization ended without a code; the pending session open was canceled.");
+            }
+
+            return ToAuthorizationResult(taken, recovered.State);
+        }
+
+        throw new InvalidOperationException(
+            $"{session.ServerDisplayName} authorization claim kind '{claim.Kind}' is unsupported in the library callback.");
     }
 
     private static async Task<AuthorizationResult?> AwaitDeliveredCodeAsync(
@@ -119,20 +163,4 @@ internal static class McpOAuthCallback
             State = state,
             Iss = delivered.Iss,
         };
-
-    private static string? QueryValue(Uri uri, string name)
-    {
-        foreach (var segment in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
-        {
-            var pair = segment.Split('=', 2);
-            if (string.Equals(Uri.UnescapeDataString(pair[0]), name, StringComparison.Ordinal))
-            {
-                return pair.Length == 2
-                    ? Uri.UnescapeDataString(pair[1].Replace('+', ' '))
-                    : string.Empty;
-            }
-        }
-
-        return null;
-    }
 }

@@ -9,7 +9,10 @@ public sealed record BeginMcpAuthorization(
     [property: Id(1)] string ServerKey,
     [property: Id(2)] string ServerDisplayName,
     [property: Id(3)] Uri SignInUrl,
-    [property: Id(4)] string State);
+    [property: Id(4)] string State,
+    [property: Id(5)] ActorContext Actor,
+    [property: Id(6)] string? CodeChallenge = null,
+    [property: Id(7)] string? CodeVerifier = null);
 
 [GenerateSerializer]
 [Alias("db.mcp.bind-authorization-completion-target")]
@@ -36,7 +39,9 @@ public sealed record McpAuthorizationCallbackDelivery(
 [Alias("db.mcp.authorization-code-result")]
 public sealed record McpAuthorizationCodeResult(
     [property: Id(0)] string Code,
-    [property: Id(1)] string? Iss);
+    [property: Id(1)] string? Iss,
+    [property: Id(2)] string? CodeVerifier = null,
+    [property: Id(3)] ActorContext? Actor = null);
 
 [GenerateSerializer]
 [Alias("db.mcp.authorization-claim")]

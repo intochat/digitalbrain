@@ -85,25 +85,24 @@ public sealed class McpGatewayProofs(BrainClusterFixture fixture)
     }
 
     [Fact]
-    public async Task DestructiveToolsRefuseWithoutTheApprovalFlow()
+    public async Task DestructiveToolsAreCallableWhenAuthorized()
     {
-        // PIN-DEFECT(P0-7): db.mcp.call-tool refuses all destructive tools without an approval flow.
+        // P0-7 flipped: all MCP tools allowed; provider OAuth + principal are the boundary.
         var brain = fixture.BrainFor("mcp-destructive");
-        var gateway = new NeuronId("mcp", brain.Owner, "crm");
+        var actor = new ActorContext(PrincipalId.New(), "owner");
 
-        await brain.FireAsync(
-            gateway,
-            new CallMcpTool(CommandId.New(), "updateSobjectRecord", Json("{}")),
+        var returned = await brain.Get<IMcp>("crm").FireAsync(
+            new CallMcpTool(
+                CommandId.New(),
+                "updateSobjectRecord",
+                Json("{}"),
+                FireRowsAs: null,
+                Actor: actor),
             TestContext.Current.CancellationToken);
-        await Journals.WaitForAsync(
-            brain, gateway, JournalKind.Incoming,
-            delivery => delivery.Synapse is CallMcpTool { Tool: "updateSobjectRecord" });
 
-        var outgoing = await brain.ReadJournalAsync(
-            gateway, JournalKind.Outgoing, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.DoesNotContain(
-            outgoing.Delta,
-            delivery => delivery.Synapse is McpToolReturned { Tool: "updateSobjectRecord" });
+        Assert.Equal("updateSobjectRecord", returned.Tool);
+        Assert.Equal(actor.PrincipalId, returned.Actor!.PrincipalId);
+        Assert.Equal(McpTokenPresence.SubjectKey(actor), returned.IntegrationSubject);
     }
 
     [Fact]

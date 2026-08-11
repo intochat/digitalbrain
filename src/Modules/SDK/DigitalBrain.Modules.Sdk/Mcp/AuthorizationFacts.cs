@@ -11,7 +11,8 @@ public sealed record AuthorizationRequired(
     [property: Id(1)] string ServerKey,
     [property: Id(2)] string ServerDisplayName,
     [property: Id(3)] Uri SignInUrl,
-    [property: Id(4)] string State) : Synapse;
+    [property: Id(4)] string State,
+    [property: Id(5)] ActorContext? Actor = null) : Synapse;
 
 [GenerateSerializer]
 [Alias("db.mcp.authorization-completed")]
@@ -19,7 +20,8 @@ public sealed record AuthorizationRequired(
 public sealed record AuthorizationCompleted(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] string ServerKey,
-    [property: Id(2)] string State) : Synapse;
+    [property: Id(2)] string State,
+    [property: Id(3)] ActorContext? Actor = null) : Synapse;
 
 [GenerateSerializer]
 [Alias("db.mcp.authorization-denied")]
@@ -27,4 +29,5 @@ public sealed record AuthorizationCompleted(
 public sealed record AuthorizationDenied(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] string ServerKey,
-    [property: Id(2)] string State) : Synapse;
+    [property: Id(2)] string State,
+    [property: Id(3)] ActorContext? Actor = null) : Synapse;

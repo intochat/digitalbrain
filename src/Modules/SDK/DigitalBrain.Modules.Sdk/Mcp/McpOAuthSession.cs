@@ -11,13 +11,15 @@ internal sealed class McpOAuthSession
         string serverKey,
         string serverDisplayName,
         OwnerId owner,
-        IGrainFactory grains)
+        IGrainFactory grains,
+        ActorContext? actor = null)
     {
         CommandId = commandId;
         ServerKey = serverKey;
         ServerDisplayName = serverDisplayName;
         Owner = owner;
         Grains = grains;
+        Actor = actor;
     }
 
     internal CommandId CommandId { get; }
@@ -25,6 +27,7 @@ internal sealed class McpOAuthSession
     internal string ServerDisplayName { get; }
     internal OwnerId Owner { get; }
     internal IGrainFactory Grains { get; }
+    internal ActorContext? Actor { get; }
     internal CancellationToken Cancellation => _lifetime.Token;
 
     internal void Cancel()

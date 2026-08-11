@@ -107,13 +107,17 @@ internal static class GmailAuthRail
             oauth.RedirectUri.AbsoluteUri,
             [ReadonlyScope],
             state);
+        // S1.6 deletes this typed Gmail path. Until then stamp a stable principal derived
+        // from the grain user key so Begin can bind actor (MCP rail requires it).
+        var actor = new ActorContext(StablePrincipal(userKey), userKey);
         var required = await authorization.Begin(
             new BeginMcpAuthorization(
                 commandId,
                 ServerKey,
                 ServerDisplayName,
                 signInUrl,
-                state),
+                state,
+                actor),
             cancellationToken).ConfigureAwait(false);
         throw new McpAuthorizationRequiredException(required);
     }
@@ -214,5 +218,12 @@ internal static class GmailAuthRail
     {
         var token = await store.GetAsync<TokenResponse>(userKey).ConfigureAwait(false);
         return token is not null && !string.IsNullOrWhiteSpace(token.RefreshToken);
+    }
+
+    private static PrincipalId StablePrincipal(string userKey)
+    {
+        var hash = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes("gmail-legacy:" + userKey));
+        return new PrincipalId(new Guid(hash.AsSpan(0, 16)));
     }
 }

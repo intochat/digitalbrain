@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Security;
 using ModelContextProtocol.Authentication;
 using Orleans.Journaling;
@@ -8,17 +9,17 @@ namespace DigitalBrain.Modules.Sdk.Mcp;
 internal static class McpTokenPresence
 {
     internal static bool IsMissingOrExpired(
-        IDurableValue<byte[]> tokenState,
+        Func<byte[]?> read,
         IDurablePayloadProtector protector,
         string purpose,
         TimeProvider time)
     {
-        ArgumentNullException.ThrowIfNull(tokenState);
+        ArgumentNullException.ThrowIfNull(read);
         ArgumentNullException.ThrowIfNull(protector);
         ArgumentException.ThrowIfNullOrWhiteSpace(purpose);
         ArgumentNullException.ThrowIfNull(time);
 
-        if (tokenState.Value is not { Length: > 0 } protectedTokens)
+        if (read() is not { Length: > 0 } protectedTokens)
         {
             return true;
         }
@@ -39,25 +40,75 @@ internal static class McpTokenPresence
         return expiresAt <= time.GetUtcNow();
     }
 
-    internal static string Purpose(string serverKey, string durableIdentity)
-        => $"mcp/oauth/{serverKey}/{durableIdentity}";
+    internal static bool IsMissingOrExpired(
+        IDurableValue<byte[]> tokenState,
+        IDurablePayloadProtector protector,
+        string purpose,
+        TimeProvider time)
+        => IsMissingOrExpired(
+            () => tokenState.Value is { Length: > 0 } bytes ? bytes : null,
+            protector,
+            purpose,
+            time);
+
+    internal static bool IsMissingOrExpired(
+        PrincipalTokenSlot slot,
+        IDurablePayloadProtector protector,
+        string purpose,
+        TimeProvider time)
+        => IsMissingOrExpired(slot.Read, protector, purpose, time);
+
+    // Integration-record purpose: tokens are keyed by verified principal (User scope)
+    // or workspace subject — never by bare neuron/server name alone.
+    internal static string Purpose(string provider, IntegrationScope scope, string subjectId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(provider);
+        ArgumentException.ThrowIfNullOrWhiteSpace(subjectId);
+        return $"integration/{scope.ToString().ToLowerInvariant()}/{provider}/{subjectId}";
+    }
+
+    internal static string SubjectKey(ActorContext actor)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        return actor.PrincipalId.Value.ToString("N");
+    }
+
+    internal static Integration UserIntegration(
+        string provider,
+        ActorContext actor,
+        string[] grantedScopes,
+        string? externalAccount = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(provider);
+        ArgumentNullException.ThrowIfNull(actor);
+        ArgumentNullException.ThrowIfNull(grantedScopes);
+
+        var subjectId = SubjectKey(actor);
+        return new Integration(
+            provider,
+            IntegrationScope.User,
+            subjectId,
+            externalAccount,
+            grantedScopes,
+            Purpose(provider, IntegrationScope.User, subjectId));
+    }
 
     internal static async ValueTask StoreAsync(
-        IDurableValue<byte[]> tokenState,
+        PrincipalTokenSlot slot,
         Func<ValueTask> commit,
         IDurablePayloadProtector protector,
         string purpose,
         TokenContainer tokens,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(tokenState);
+        ArgumentNullException.ThrowIfNull(slot);
         ArgumentNullException.ThrowIfNull(commit);
         ArgumentNullException.ThrowIfNull(protector);
         ArgumentException.ThrowIfNullOrWhiteSpace(purpose);
         ArgumentNullException.ThrowIfNull(tokens);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var cache = new DurableMcpTokenCache(tokenState, commit, protector, purpose);
+        var cache = new DurableMcpTokenCache(slot, commit, protector, purpose);
         await cache.StoreTokensAsync(tokens, cancellationToken).ConfigureAwait(false);
     }
 }

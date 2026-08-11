@@ -17,9 +17,9 @@ public static class McpClientSessions
     public static async ValueTask<T> RunAsync<T>(
         McpServerDefinition server,
         IServiceProvider services,
-        IDurableValue<byte[]> tokenState,
+        PrincipalTokenSlot tokenSlot,
         Func<ValueTask> commit,
-        string durableIdentity,
+        ActorContext actor,
         CommandId commandId,
         OwnerId owner,
         IGrainFactory grains,
@@ -28,26 +28,24 @@ public static class McpClientSessions
     {
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(tokenState);
+        ArgumentNullException.ThrowIfNull(tokenSlot);
         ArgumentNullException.ThrowIfNull(commit);
-        ArgumentException.ThrowIfNullOrWhiteSpace(durableIdentity);
+        ArgumentNullException.ThrowIfNull(actor);
         ArgumentNullException.ThrowIfNull(grains);
         ArgumentNullException.ThrowIfNull(callback);
 
         var configuration = services.GetRequiredService<IConfiguration>();
         var protector = services.GetRequiredService<IDurablePayloadProtector>();
         var httpClients = services.GetRequiredService<IHttpClientFactory>();
-        var session = new McpOAuthSession(commandId, server.Key, server.DisplayName, owner, grains);
+        var purpose = McpTokenPresence.UserIntegration(server.Key, actor, [.. server.Scopes])
+            .ProtectedTokenReference;
+        var session = new McpOAuthSession(commandId, server.Key, server.DisplayName, owner, grains, actor);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, session.Cancellation);
         var token = linked.Token;
 
         try
         {
-            var tokens = new DurableMcpTokenCache(
-                tokenState,
-                commit,
-                protector,
-                McpTokenPresence.Purpose(server.Key, durableIdentity));
+            var tokens = new DurableMcpTokenCache(tokenSlot, commit, protector, purpose);
             var logger = services.GetService<ILoggerFactory>()?.CreateLogger("DigitalBrain.Mcp.OAuth");
             var oauth = McpOAuthOptions.Create(server, configuration, tokens, session, logger);
             var httpClient = httpClients.CreateClient(HttpClientName);

@@ -15,7 +15,8 @@ public partial interface IMcp :
 [GenerateSerializer]
 [Alias("db.mcp.list-tools")]
 public sealed record ListMcpTools(
-    [property: Id(0)] CommandId CommandId) : RequestSynapse<McpToolsListed>;
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] ActorContext? Actor = null) : RequestSynapse<McpToolsListed>;
 
 [GenerateSerializer]
 [Alias("db.mcp.tools-listed")]
@@ -37,7 +38,8 @@ public sealed record CallMcpTool(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] string Tool,
     [property: Id(2)] JsonElement Arguments,
-    [property: Id(3)] string? FireRowsAs = null) : RequestSynapse<McpToolReturned>;
+    [property: Id(3)] string? FireRowsAs = null,
+    [property: Id(4)] ActorContext? Actor = null) : RequestSynapse<McpToolReturned>;
 
 [GenerateSerializer]
 [Alias("db.mcp.tool-returned")]
@@ -45,7 +47,9 @@ public sealed record McpToolReturned(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] string Tool,
     [property: Id(2)] JsonElement Content,
-    [property: Id(3)] int FiredRows) : Synapse;
+    [property: Id(3)] int FiredRows,
+    [property: Id(4)] ActorContext? Actor = null,
+    [property: Id(5)] string? IntegrationSubject = null) : Synapse;
 
 public interface IMcpToolTransport
 {
