@@ -87,6 +87,7 @@ public sealed class McpGatewayProofs(BrainClusterFixture fixture)
     [Fact]
     public async Task DestructiveToolsRefuseWithoutTheApprovalFlow()
     {
+        // PIN-DEFECT(P0-7): db.mcp.call-tool refuses all destructive tools without an approval flow.
         var brain = fixture.BrainFor("mcp-destructive");
         var gateway = new NeuronId("mcp", brain.Owner, "crm");
 

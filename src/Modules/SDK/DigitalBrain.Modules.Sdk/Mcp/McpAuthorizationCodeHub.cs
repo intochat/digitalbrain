@@ -98,6 +98,9 @@ internal static class McpAuthorizationCodeHub
         Completions.Clear();
     }
 
+    // Characterization seam: Completions has no expiry/eviction (P0-1).
+    internal static int CompletionsCountForTests => Completions.Count;
+
     internal static async Task<McpAuthorizationCodeResult?> AwaitAsync(string state, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(state);
