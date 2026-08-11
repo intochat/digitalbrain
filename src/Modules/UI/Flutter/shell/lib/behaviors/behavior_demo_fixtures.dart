@@ -69,7 +69,7 @@ public static class BehaviorEntry
         _ = await gmail.SendAsync(new CallMcpTool(
             CommandId.New(),
             "search_threads",
-            System.Text.Json.JsonDocument.Parse("""{"query":"in:inbox"}""").RootElement));
+            System.Text.Json.JsonDocument.Parse("{\"query\":\"in:inbox\"}").RootElement));
         _ = trigger;
         _ = research;
         _ = salesforce;

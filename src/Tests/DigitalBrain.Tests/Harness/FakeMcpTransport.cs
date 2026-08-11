@@ -20,7 +20,7 @@ internal sealed class FakeMcpTransport : IMcpToolTransport
                     """{"type":"object","properties":{"query":{"type":"string"}}}""",
                     Destructive: false),
                 new McpToolDescription(
-                    "get_thread_messages",
+                    "get_thread",
                     "Get messages in a thread",
                     """{"type":"object","properties":{"threadId":{"type":"string"}}}""",
                     Destructive: false),
