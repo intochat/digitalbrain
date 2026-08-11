@@ -31,12 +31,12 @@ abstract final class KitChatBuilders {
     );
 
     if (part == null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 4),
         child: Text(
           'Unsupported kit message',
           style: KitType.bodyMuted,
-          key: const Key('kit_custom_unsupported'),
+          key: Key('kit_custom_unsupported'),
         ),
       );
     }

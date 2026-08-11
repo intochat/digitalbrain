@@ -41,7 +41,9 @@ final class KitChart extends StatelessWidget {
             SizedBox(
               height: height,
               child: data.isEmpty
-                  ? Center(child: Text('No series', style: KitType.bodyMuted))
+                  ? const Center(
+                      child: Text('No series', style: KitType.bodyMuted),
+                    )
                   : Chart(
                       data: data,
                       variables: {

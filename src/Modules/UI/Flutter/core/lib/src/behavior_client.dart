@@ -160,8 +160,8 @@ final class BehaviorClient {
       body: {
         'proposalId': proposalId,
         'approved': approved,
-        if (featureText != null) 'featureText': featureText,
-        if (featureName != null) 'featureName': featureName,
+        'featureText': ?featureText,
+        'featureName': ?featureName,
       },
     );
     if (response['proposalId'] is String) {

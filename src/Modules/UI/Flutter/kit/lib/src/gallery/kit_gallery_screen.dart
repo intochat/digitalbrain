@@ -14,9 +14,9 @@ final class KitGalleryScreen extends StatelessWidget {
 
   final ValueChanged<KitButtonPart>? onButtonPressed;
 
-  static final _demoChart = KitChartPart(
+  static const _demoChart = KitChartPart(
     title: 'Weekly throughput',
-    points: const [
+    points: [
       KitChartPoint(label: 'Mon', value: 42),
       KitChartPoint(label: 'Tue', value: 68),
       KitChartPoint(label: 'Wed', value: 51),
@@ -37,30 +37,30 @@ final class KitGalleryScreen extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(32, 28, 32, 48),
             children: [
-              Text('UI Kit', style: KitType.heading),
+              const Text('UI Kit', style: KitType.heading),
               const SizedBox(height: 8),
-              Text(
+              const Text(
                 'Components shared by surfaces and chat CustomMessage bubbles.',
                 style: KitType.bodyMuted,
               ),
               const SizedBox(height: 28),
-              Text('Button', style: KitType.title),
+              const Text('Button', style: KitType.title),
               const SizedBox(height: 12),
               KitButton(
                 part: const KitButtonPart(
-                  buttonId: 'show-time',
-                  label: 'Show current time',
-                  action: 'show-time',
+                  buttonId: 'publish-summary',
+                  label: 'Publish summary',
+                  action: 'publish-summary',
                   offerCommandId: 'demo',
                 ),
                 onPressed: onButtonPressed,
               ),
               const SizedBox(height: 28),
-              Text('Chart', style: KitType.title),
+              const Text('Chart', style: KitType.title),
               const SizedBox(height: 12),
-              KitChart(part: _demoChart),
+              const KitChart(part: _demoChart),
               const SizedBox(height: 28),
-              Text('Graph', style: KitType.title),
+              const Text('Graph', style: KitType.title),
               const SizedBox(height: 12),
               const SizedBox(
                 height: 320,
@@ -94,7 +94,7 @@ final class KitGalleryScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 28),
-              Text('Card', style: KitType.title),
+              const Text('Card', style: KitType.title),
               const SizedBox(height: 12),
               const KitCard(
                 part: KitCardPart(
