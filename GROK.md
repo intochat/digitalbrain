@@ -20,7 +20,10 @@ IS NOT) and `plans/GROK-ORCHESTRATION-STAGE1.md` (the stage plan).
    brief explicitly grants it. Never weaken `TreatWarningsAsErrors`.
 5. **Wire aliases are permanent** once real data exists: `db.*` kernel, `ui.*` vocabulary,
    `chat.*`/`probe.*` domains. Renaming an alias needs the orchestrator's explicit brief.
-6. If a rule or reality conflicts with the ratified scope, STOP and write the conflict into a
+6. **No handwritten partial classes.** Keep source-generated partial wire interfaces, but when a
+   concrete class outgrows one responsibility, extract focused collaborators instead of splitting
+   the same class across files.
+7. If a rule or reality conflicts with the ratified scope, STOP and write the conflict into a
    report before continuing — a written refusal beats silent improvisation.
 
 ## Commands
@@ -57,7 +60,7 @@ IS NOT) and `plans/GROK-ORCHESTRATION-STAGE1.md` (the stage plan).
 Provider/action-specific synapses (`SalesforceReadSynapse`-style); moving outbox traffic onto
 Orleans Streams; second job frameworks beside Execution; MAF types leaking outside AI/Behavior
 internals; MAF workflow edges represented as Connections; hot-loading generated assemblies into
-the silo; client-trusted identity; keyword god-switches.
+the silo; client-trusted identity; keyword god-switches; handwritten partial classes.
 
 ## Method
 

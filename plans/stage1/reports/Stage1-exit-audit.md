@@ -17,6 +17,7 @@
 | Backlog | Reconciled every janitor item as resolved, deliberately kept, or carried with a reason. Salesforce Contracts remains permanent. |
 | Execution liveness | Added a worker-only lease protocol outside the public Apply/Read surface. A live chat worker renews the 15-second lease every 5 seconds; only the attributed active worker can renew it. |
 | Authorization SSE | Filters the installation journal by the authenticated principal so one user cannot receive another user's OAuth state or sign-in URL. |
+| Runtime class structure | Removed every handwritten partial class. Introspection, Execution, and the core Neuron runtime now delegate to focused journal, topology, authorization, command, operation, dispatch, recovery, turn, outbox, delivery-memory, capability, stream, and message collaborators. Source-generated partial wire interfaces remain unchanged. |
 
 ## P0 source evidence
 
@@ -47,6 +48,8 @@
 
 - Zero production matches for `WantsTimeButton`, `ShowTime`, `show-time`, provider/action-specific
   synapses, `NotImplementedException`, or central `DigitalBrain.Tests` visibility.
+- Zero handwritten `partial class` declarations in tracked C# source. The remaining `partial`
+  declarations are source-generated neuron wire interfaces and are permanent contract surfaces.
 - Zero Orleans Streams consumers (`GetStreamProvider`, `IAsyncStream`, `SubscribeAsync`, implicit
   subscriptions); provisioning-only references remain deliberately parked for Stage 2.
 - Kernel anonymous routes are only the necessary auth bootstrap/session probes, OAuth callback,
@@ -63,12 +66,16 @@
 - Removing the duplicate Execution-module chat worker seed is safe because `UiModule` registers
   `ChatTurnWorker.GrainTypeName` before the DI registry is materialized. The real public
   `WorkerNeuron` adapter boundary remains available to future modules.
+- The non-partial refit did not flatten former fragments into god classes: public grain adapters
+  retain their existing entry points and delegate state, journal, operation, dispatch, recovery,
+  turn, outbox, and delivery concerns to sealed collaborators. Durable state names, wire aliases,
+  receipt bounds, retry cadence, and delivery policies are unchanged.
 - No wire alias, package reference, Salesforce contract, webhook rail, or Behavior preview fixture
   changed.
 
 ## Gate
 
-`pwsh scripts/gate.ps1 -Flutter`:
+Two consecutive runs of `pwsh scripts/gate.ps1 -Flutter` at the non-partial refit head:
 
 ```text
 Build succeeded.
@@ -102,6 +109,15 @@ contract boundary remains in the solution and compiles. No test command ran.
 - An unauthenticated MCP `initialize` POST returned 200 with server info and no
   `WWW-Authenticate` challenge, confirming the remaining northbound blocker.
 - Aspire was stopped before the following source build/gate.
+
+### Non-partial refit smoke
+
+- After decomposing Execution, bootstrap returned 200 and a real chat SSE completed with the exact
+  marker `EXECUTION_REFACTOR_OK`.
+- After decomposing the core Neuron runtime, bootstrap returned 200 and a real chat SSE completed
+  with the exact marker `NEURON_REFACTOR_OK`; topology reported 8 modules, 14 neurons, and 0
+  connections.
+- Aspire was stopped before the final source gates.
 
 ## Conflicts & risks
 

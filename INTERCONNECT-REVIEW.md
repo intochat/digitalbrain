@@ -41,7 +41,9 @@ The owner's five success questions are answered directly: §6 (Q1, Q2, Q3), §5 
 | 8 | **Orleans Streams** | Provisioned only: Azure Queue provider `"DigitalBrain"`, 8 queues, `PubSubStore` tables ([DigitalBrainHostingExtensions.cs:27-34](src/Kernel/Aspire/DigitalBrain.Aspire.Hosting/DigitalBrainHostingExtensions.cs)) | **Zero production usage.** No `GetStream`, `SubscribeAsync`, or `[ImplicitStreamSubscription]` anywhere in `src` |
 | 9 | **MCP/authorization SSE** | `OwnerSessionJournal.WatchAuthorizationOutgoingAsync` | Projection of #5 |
 
-`IBroadcastSubscribers` (the "optional dynamic subscribers" leg of `EmitAsync`, [Neuron.Messaging.cs:44](src/Kernel/DigitalBrain.Core/Neuron/Neuron.Messaging.cs)) has **no implementation and no registration anywhere in `src`** — `GetService<IBroadcastSubscribers>()` returns null in every composition. It is a dead extension point today.
+The former unimplemented `IBroadcastSubscribers` extension point has been removed. `EmitAsync`
+now resolves only reflected handlers plus durable graph connections
+([NeuronMessagePipeline.cs:30](src/Kernel/DigitalBrain.Core/Neuron/NeuronMessagePipeline.cs)).
 
 ```mermaid
 flowchart LR
@@ -74,7 +76,7 @@ flowchart LR
 
 ### 2.2 Who receives an Emit (A2)
 
-[Neuron.Messaging.cs:34-37](src/Kernel/DigitalBrain.Core/Neuron/Neuron.Messaging.cs):
+[NeuronMessagePipeline.cs:34-44](src/Kernel/DigitalBrain.Core/Neuron/NeuronMessagePipeline.cs):
 
 ```csharp
 var receivers = catalog.HandlerGrainTypes(synapseType)
@@ -115,7 +117,7 @@ Compile-time constant; "chat C uses model M / agent A / prompt P" requires a cod
 
 ### 2.5 UI subscription binding (A5) — and a latent gap
 
-HTTP SSE → `OwnerSessionJournal.WatchChatOutgoingAsync` → `brain.WatchJournalAsync` → session grain → `chat.Watch(kind, cursor, observer)`. N surfaces on one chat = N observers; each re-`Watch` from the same observer replaces its old registration ([Neuron.Journals.cs:16](src/Kernel/DigitalBrain.Core/Neuron/Neuron.Journals.cs)).
+HTTP SSE → `OwnerSessionJournal.WatchChatOutgoingAsync` → `brain.WatchJournalAsync` → session grain → `chat.Watch(kind, cursor, observer)`. N surfaces on one chat = N observers; each re-`Watch` from the same observer replaces its old registration ([NeuronJournal.cs:27-43](src/Kernel/DigitalBrain.Core/Neuron/NeuronJournal.cs)).
 
 **Gap (affects S1/S6):** `_watchers` is in-memory per activation. If a watched neuron deactivates idle and later reactivates, the watcher list is empty and the SSE observer never hears again — the client has no periodic re-watch (the 100 ms polling loop is only the fallback when `CreateObjectReference` is unavailable, [DigitalBrainClient.cs:117-134](src/Kernel/DigitalBrain.Client/DigitalBrainClient.cs)). Orleans docs recommend exactly this remedy for observers: "Active clients should resubscribe on a timer to keep their subscriptions active" (learn.microsoft.com/dotnet/orleans/grains/observers). Fix belongs in Phase 1 regardless of topology choice.
 
@@ -244,7 +246,7 @@ flowchart LR
 **Q3 — button B receives a click without chat being a sink:**
 - Chat's reply offers controls → for each offer the chat **Sends `Arm(offerCommandId, label, target: NeuronId, payload: Synapse, expiry)`** to `button:owner/{deterministic id}` (recommended id: `{chatName}.{offerCommandId}.{buttonKey}` — idempotent re-offer, addressable teardown; see §9 decision 3).
 - HTTP `chat-button` kind is replaced by `control-activate` targeting the **button id**: `SendAsync<IButton>(buttonId, Activate(...))`.
-- The button's `HandleAsync(Activate)`: if disarmed/expired → throw `NeuronAuthorizationException` (the outbox records the delivery as `refused` and settles — teardown semantics for free, [Neuron.Outbox.cs:184-189](src/Kernel/DigitalBrain.Core/Neuron/Neuron.Outbox.cs)); if armed → emit `ButtonActivated` (audit in the button's own journal) and **Send the bound payload to the bound target**. For S3 that payload is a chat-declared domain synapse (`VoteCast`), for S4 it is `CompleteUserAction` to the task. Chat handles `VoteCast` and Replies into its transcript; it never sees a raw UI click. This is option **C2**; pure **B** (`ButtonActivated` only, someone else routes) just moves the god-switch, and **C1** (domain switch inside Button) makes the button know every module — both rejected.
+- The button's `HandleAsync(Activate)`: if disarmed/expired → throw `NeuronAuthorizationException` (the outbox records the delivery as `refused` and settles — teardown semantics for free, [NeuronOutbox.cs:200-233](src/Kernel/DigitalBrain.Core/Neuron/NeuronOutbox.cs)); if armed → emit `ButtonActivated` (audit in the button's own journal) and **Send the bound payload to the bound target**. For S3 that payload is a chat-declared domain synapse (`VoteCast`), for S4 it is `CompleteUserAction` to the task. Chat handles `VoteCast` and Replies into its transcript; it never sees a raw UI click. This is option **C2**; pure **B** (`ButtonActivated` only, someone else routes) just moves the god-switch, and **C1** (domain switch inside Button) makes the button know every module — both rejected.
 - Disarm: chat (or offer owner) Sends `Disarm` on expiry/close; the button zeroes its binding. No subscription registry exists, so nothing can leak (S6).
 
 **S5 — responder follows a chat:** a durable `subscribers: NeuronId[]` list on the chat, mutated by `Subscribe`/`Unsubscribe` synapses; after committing a turn the chat Sends `TurnPosted` to each subscriber via the normal outbox. Bounded fan-out (a handful of responders), durable, deduped, and teardown is deleting a record. This is deliberately *not* built until a concrete consumer exists (§8 Phase 3).
@@ -308,15 +310,15 @@ There are **no test projects at HEAD** (no `*Test*.csproj` under `src`), so Phas
 
 | Claim | Evidence |
 |---|---|
-| Outbox is durable, retried, abandoning, refusal-settling | [Neuron.Messaging.cs:104](src/Kernel/DigitalBrain.Core/Neuron/Neuron.Messaging.cs) (`_outbox.Add(...)`), [Neuron.Outbox.cs:72-198](src/Kernel/DigitalBrain.Core/Neuron/Neuron.Outbox.cs) (`DrainAsync`, `Exhausted`, `TryDeliverAsync` catching `NeuronAuthorizationException` → `"refused"`) |
-| Receiver dedupe by SynapseId | [Neuron.Lifecycle.cs:38-41](src/Kernel/DigitalBrain.Core/Neuron/Neuron.Lifecycle.cs) (`HasAlreadyHandled`), [Neuron.Turns.cs:20-31](src/Kernel/DigitalBrain.Core/Neuron/Neuron.Turns.cs) (4096 bound) |
-| Broadcast = per-type ghost keyed by correlation | [Neuron.Messaging.cs:34-37](src/Kernel/DigitalBrain.Core/Neuron/Neuron.Messaging.cs), [NeuronId.cs:34-35](src/Kernel/DigitalBrain.Abstractions/Identity/NeuronId.cs), [BroadcastCatalog.cs:37-38](src/Kernel/DigitalBrain.Core/BroadcastCatalog.cs) |
-| `IBroadcastSubscribers` unimplemented | Only two hits in `src`: the interface ([BroadcastSubscribers.cs:8](src/Kernel/DigitalBrain.Core/BroadcastSubscribers.cs)) and the null-tolerant lookup ([Neuron.Messaging.cs:44](src/Kernel/DigitalBrain.Core/Neuron/Neuron.Messaging.cs)) |
-| Reply targets the delivery's caller, same correlation | [Neuron.Replies.cs:18](src/Kernel/DigitalBrain.Core/Neuron/Neuron.Replies.cs) |
+| Outbox is durable, retried, abandoning, refusal-settling | [NeuronMessagePipeline.cs:125-157](src/Kernel/DigitalBrain.Core/Neuron/NeuronMessagePipeline.cs) (`outbox.Add(...)`), [NeuronOutbox.cs:109-243](src/Kernel/DigitalBrain.Core/Neuron/NeuronOutbox.cs) (`DrainAsync`, `Exhausted`, `TryDeliverAsync` catching `NeuronAuthorizationException` → `"refused"`) |
+| Receiver dedupe by SynapseId | [NeuronTurnCoordinator.cs:34-44](src/Kernel/DigitalBrain.Core/Neuron/NeuronTurnCoordinator.cs) (duplicate short-circuit), [NeuronDeliveryMemory.cs:39-49](src/Kernel/DigitalBrain.Core/Neuron/NeuronDeliveryMemory.cs), [Neuron.cs:15](src/Kernel/DigitalBrain.Core/Neuron/Neuron.cs) (4096 bound) |
+| Broadcast = per-type ghost keyed by correlation | [NeuronMessagePipeline.cs:30-47](src/Kernel/DigitalBrain.Core/Neuron/NeuronMessagePipeline.cs), [NeuronId.cs:34-35](src/Kernel/DigitalBrain.Abstractions/Identity/NeuronId.cs), [BroadcastCatalog.cs:37-38](src/Kernel/DigitalBrain.Core/BroadcastCatalog.cs) |
+| Dynamic broadcast subscribers removed | `EmitAsync` resolves reflected handler types and graph connections in [NeuronMessagePipeline.cs:30-44](src/Kernel/DigitalBrain.Core/Neuron/NeuronMessagePipeline.cs) |
+| Reply targets the delivery's caller, same correlation | [NeuronMessagePipeline.cs:71-85](src/Kernel/DigitalBrain.Core/Neuron/NeuronMessagePipeline.cs) |
 | Hardcoded chat→assistant binding | [Chat.cs:18,179-180](src/Modules/UI/DigitalBrain.Modules.UI/Chat/Chat.cs) |
 | Button is a stub; clicks routed to chat; god-switch | [Button.cs:6](src/Modules/UI/DigitalBrain.Modules.UI/Button/Button.cs), [MapOwnerCommands.cs:65-68](src/Kernel/DigitalBrain.Kernel/MapOwnerCommands.cs), [Chat.cs:131-148](src/Modules/UI/DigitalBrain.Modules.UI/Chat/Chat.cs) |
 | UI SSE = journal watch projection per chat name | [MapChatStreams.cs:44-53](src/Kernel/DigitalBrain.Kernel/MapChatStreams.cs), [OwnerSessionJournal.cs:26-39](src/Kernel/DigitalBrain.Kernel/OwnerSessionJournal.cs) |
-| Watchers volatile, drop-on-error, replace-on-rewatch | [Neuron.Journals.cs:14-21,47-62](src/Kernel/DigitalBrain.Core/Neuron/Neuron.Journals.cs) |
+| Watchers volatile, drop-on-error, replace-on-rewatch | [NeuronJournal.cs:27-49](src/Kernel/DigitalBrain.Core/Neuron/NeuronJournal.cs), [NeuronJournal.cs:64-77](src/Kernel/DigitalBrain.Core/Neuron/NeuronJournal.cs) |
 | Client watch has no re-subscribe heartbeat; polling only as fallback | [DigitalBrainClient.cs:107-149](src/Kernel/DigitalBrain.Client/DigitalBrainClient.cs) |
 | Concurrency gate forbids reentrancy attributes | [NeuronConcurrency.cs:9-43](src/Kernel/DigitalBrain.Core/Neuron/NeuronConcurrency.cs) |
 | Streams provisioned, never used; outbox-on-streams forbidden | [DigitalBrainHostingExtensions.cs:27-34](src/Kernel/Aspire/DigitalBrain.Aspire.Hosting/DigitalBrainHostingExtensions.cs), [DigitalBrainRuntimeHostingExtensions.cs:13-42](src/Kernel/Aspire/DigitalBrain.Aspire/DigitalBrainRuntimeHostingExtensions.cs); `grep GetStream|SubscribeAsync|ImplicitStreamSubscription` over `src` → only Microsoft.Extensions.AI `GetStreamingResponseAsync` hits |
