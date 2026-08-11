@@ -18,7 +18,7 @@ public sealed partial class ExecutionNeuron
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext),
             ResolveOperation resolve => await ResolveOperationAsync(command.CommandId, command.ExpectedRevision, resolve)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext),
-            _ => throw new InvalidOperationException(
+            _ => throw new NeuronAuthorizationException(
                 $"Execution '{Id}' does not understand apply command '{command.Command.GetType().Name}'."),
         };
     }
@@ -36,21 +36,21 @@ public sealed partial class ExecutionNeuron
                     || existing.Policy != command.Policy
                     || existing.RetryOf != command.RetryOf)
                 {
-                    throw new InvalidOperationException(
+                    throw new NeuronAuthorizationException(
                         $"Execution '{Id}' received CommandId '{commandId}' with a different Start payload.");
                 }
 
                 return received;
             }
 
-            throw new InvalidOperationException($"Execution '{Id}' has already been started.");
+            throw new NeuronAuthorizationException($"Execution '{Id}' has already been started.");
         }
 
         Validate(command);
 
         if (command.Worker.Owner != Id.Owner)
         {
-            throw new InvalidOperationException(
+            throw new NeuronAuthorizationException(
                 $"Worker '{command.Worker}' does not belong to Execution '{Id}'s owner.");
         }
 
@@ -97,12 +97,12 @@ public sealed partial class ExecutionNeuron
 
         if (expectedRevision is null)
         {
-            throw new ArgumentException("Cancel requires ExpectedRevision.", nameof(expectedRevision));
+            throw new NeuronAuthorizationException("Cancel requires ExpectedRevision.");
         }
 
         if (expectedRevision.Value != data.Revision)
         {
-            throw new InvalidOperationException(
+            throw new NeuronAuthorizationException(
                 $"Execution '{Id}' is at revision {data.Revision}, not expected revision {expectedRevision.Value}.");
         }
 
@@ -179,12 +179,12 @@ public sealed partial class ExecutionNeuron
 
         if (expectedRevision is null)
         {
-            throw new ArgumentException("ResolveOperation requires ExpectedRevision.", nameof(expectedRevision));
+            throw new NeuronAuthorizationException("ResolveOperation requires ExpectedRevision.");
         }
 
         if (expectedRevision.Value != data.Revision)
         {
-            throw new InvalidOperationException(
+            throw new NeuronAuthorizationException(
                 $"Execution '{Id}' is at revision {data.Revision}, not expected revision {expectedRevision.Value}.");
         }
 
@@ -213,7 +213,7 @@ public sealed partial class ExecutionNeuron
             case OperationResolution.Completed:
                 if (command.ResponsePayload is null || command.ResponsePayload.Value.Id == Guid.Empty)
                 {
-                    throw new InvalidOperationException(
+                    throw new NeuronAuthorizationException(
                         "ResolveOperation Completed requires a non-empty response payload reference.");
                 }
 
@@ -270,7 +270,7 @@ public sealed partial class ExecutionNeuron
                 break;
 
             default:
-                throw new InvalidOperationException(
+                throw new NeuronAuthorizationException(
                     $"Unknown operation resolution '{command.Resolution}'.");
         }
 
@@ -300,7 +300,7 @@ public sealed partial class ExecutionNeuron
     {
         blockerId = default;
         var operations = data.Operations;
-        if (operations is null || operations.Count == 0 || data.ActiveAttempt is null)
+        if (operations is null || operations.Count == 0)
         {
             return false;
         }
@@ -309,6 +309,7 @@ public sealed partial class ExecutionNeuron
         var changed = false;
         foreach (var (key, operation) in operations)
         {
+            // Started-without-terminal-outcome: external effect began, no Completed/Failed yet.
             if (operation.Phase != OperationPhase.Dispatched)
             {
                 continue;

@@ -118,6 +118,32 @@ public sealed partial class ExecutionNeuron
             return;
         }
 
+        var mayAutoRetry = fact.Retryable
+            && data.State != ExecutionState.Cancelling
+            && data.AttemptCount < data.Policy.MaximumAttempts
+            && (data.Policy.Deadline is null || data.Policy.Deadline > DateTimeOffset.UtcNow);
+
+        // Started non-idempotent work (Dispatched) must never auto-retry — force OutcomeUncertain.
+        if (mayAutoRetry && TryMarkDispatchedOperationsUncertain(data, out var uncertainBlocker))
+        {
+            data.State = ExecutionState.Waiting;
+            data.Blocker = new OutcomeUncertain(uncertainBlocker);
+            data.Result = null;
+            data.Failure = null;
+            data.Evidence = [];
+            data.PendingDispatch = null;
+
+            await UnregisterReminderAsync(RetryReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await EmitAsync(new AttemptOutcomeUncertain(
+                Id,
+                data.Worker,
+                fact.Attempt,
+                data.Revision,
+                uncertainBlocker)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return;
+        }
+
         data.ActiveAttempt = null;
         data.Blocker = null;
         data.Result = null;
@@ -125,10 +151,7 @@ public sealed partial class ExecutionNeuron
         data.Evidence = [];
         data.PendingDispatch = null;
 
-        if (fact.Retryable
-            && data.State != ExecutionState.Cancelling
-            && data.AttemptCount < data.Policy.MaximumAttempts
-            && (data.Policy.Deadline is null || data.Policy.Deadline > DateTimeOffset.UtcNow))
+        if (mayAutoRetry)
         {
             data.State = ExecutionState.Waiting;
             data.Blocker = new RetryScheduled(new BlockerId(Guid.NewGuid()));

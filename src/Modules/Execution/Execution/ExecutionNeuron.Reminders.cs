@@ -34,6 +34,27 @@ public sealed partial class ExecutionNeuron
             return;
         }
 
+        // Defense: never redispatch while any operation is started without a terminal outcome.
+        if (TryMarkDispatchedOperationsUncertain(data, out var uncertainBlocker))
+        {
+            data.State = ExecutionState.Waiting;
+            data.Blocker = new OutcomeUncertain(uncertainBlocker);
+            data.PendingDispatch = null;
+            await UnregisterReminderAsync(RetryReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            if (data.ActiveAttempt is { } attempt)
+            {
+                await EmitAsync(new AttemptOutcomeUncertain(
+                    Id,
+                    data.Worker,
+                    attempt,
+                    data.Revision,
+                    uncertainBlocker)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+
+            return;
+        }
+
         data.Revision++;
         data.State = ExecutionState.Pending;
         data.ActiveAttempt = new AttemptId(Guid.NewGuid());

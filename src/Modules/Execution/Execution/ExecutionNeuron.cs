@@ -91,6 +91,7 @@ public sealed partial class ExecutionNeuron :
                     _ => -1L,
                 };
 
+                // Intentional non-settled race: park may not have committed yet; delivery retries until Waiting.
                 if (data.State is ExecutionState.Running or ExecutionState.Pending
                     && expectedRevision >= 0
                     && data.Revision == expectedRevision)

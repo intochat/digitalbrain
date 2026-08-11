@@ -139,6 +139,44 @@ public sealed class ExecutionSpikeProofs(BrainClusterFixture fixture)
     }
 
     [Fact]
+    public async Task DispatchedRetryableFailForcesOutcomeUncertainWithoutAutoRetry()
+    {
+        var brain = fixture.BrainFor("exec-dispatch-fail");
+        var worker = WorkerId(brain, "dispatch-fail-worker");
+        HarnessWorkerControl.Configure("dispatch-fail-worker", HarnessWorkerScript.DispatchThenRetryableFail);
+
+        var started = await brain.Get<IExecution>("dispatch-fail-run").FireAsync(
+            new ApplyExecution(
+                CommandId.New(),
+                new StartExecution(
+                    new ProbeGoal("messy"),
+                    worker,
+                    new ExecutionPolicy(
+                        MaximumAttempts: 3,
+                        RetryDelay: TimeSpan.FromMilliseconds(50),
+                        Deadline: null))),
+            TestContext.Current.CancellationToken);
+
+        await WaitForStateAsync(brain, "dispatch-fail-run", ExecutionState.Waiting);
+        var blocked = await brain.GetGrainProxy<IExecution>("dispatch-fail-run").Read();
+        Assert.IsType<OutcomeUncertain>(blocked.Blocker);
+        Assert.Equal(started.AttemptCount, blocked.AttemptCount);
+
+        // Reminder must not open a new attempt while Dispatched work is unresolved.
+        await Task.Delay(TimeSpan.FromMilliseconds(300), TestContext.Current.CancellationToken);
+        var stillBlocked = await brain.GetGrainProxy<IExecution>("dispatch-fail-run").Read();
+        Assert.IsType<OutcomeUncertain>(stillBlocked.Blocker);
+        Assert.Equal(started.AttemptCount, stillBlocked.AttemptCount);
+        Assert.Equal(1, HarnessWorkerControl.AcceptCount("dispatch-fail-worker"));
+
+        var read = await brain.Get<IExecution>("dispatch-fail-run").FireAsync(
+            new ReadOperation("messy-write"),
+            TestContext.Current.CancellationToken);
+        Assert.NotNull(read.Operation);
+        Assert.Equal(OperationPhase.Uncertain, read.Operation!.Phase);
+    }
+
+    [Fact]
     public async Task OperationKeyIsAttemptStableAcrossRetryableFailure()
     {
         var brain = fixture.BrainFor("exec-stable-op");
@@ -158,13 +196,9 @@ public sealed class ExecutionSpikeProofs(BrainClusterFixture fixture)
             TestContext.Current.CancellationToken);
 
         // First attempt fails retryably after completing stable-write; reminder starts attempt 2.
-        await WaitForAsync(async () =>
-        {
-            var snap = await brain.GetGrainProxy<IExecution>("stable-run").Read();
-            return snap.AttemptCount >= 2 || snap.State == ExecutionState.Succeeded || snap.State == ExecutionState.Failed;
-        });
+        // Second accept re-Prepares the same key (adversarial) then succeeds without re-effect.
+        await WaitForStateAsync(brain, "stable-run", ExecutionState.Succeeded);
 
-        // Session is authorized to read operations.
         var read = await brain.Get<IExecution>("stable-run").FireAsync(
             new ReadOperation("stable-write"),
             TestContext.Current.CancellationToken);
@@ -173,11 +207,13 @@ public sealed class ExecutionSpikeProofs(BrainClusterFixture fixture)
         Assert.Equal("stable-write", read.Operation!.OperationKey);
         Assert.Equal(OperationPhase.Completed, read.Operation.Phase);
 
-        // Prepare was attempted once for the first completion; attempt-stable identity
-        // means a second accept does not need a second logical prepare of a completed key.
         Assert.True(
-            HarnessWorkerControl.PrepareCount("stable-worker") >= 1,
-            "Worker should prepare the stable operation at least once.");
+            HarnessWorkerControl.PrepareCount("stable-worker") >= 2,
+            "Second attempt must re-Prepare the Completed key (kernel short-circuits to recorded completion).");
+        Assert.Equal(1, HarnessWorkerControl.ExternalEffectCount("stable-worker"));
+        Assert.True(
+            HarnessWorkerControl.AcceptCount("stable-worker") >= 2,
+            "Retry must open a second Accept after Completed+retryable fail.");
     }
 
     [Fact]

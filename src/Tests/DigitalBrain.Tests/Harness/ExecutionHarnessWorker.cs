@@ -31,6 +31,8 @@ public enum HarnessWorkerScript
     UncertainExternalWrite,
     CancelAware,
     CompleteThenRetryableFail,
+    // Dispatch external effect, then retryable AttemptFailed without Transition→Uncertain (messy fail).
+    DispatchThenRetryableFail,
 }
 
 public static class HarnessWorkerControl
@@ -38,12 +40,14 @@ public static class HarnessWorkerControl
     private static readonly ConcurrentDictionary<string, HarnessWorkerScript> Scripts = new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, int> AcceptCounts = new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, int> PrepareCounts = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, int> ExternalEffectCounts = new(StringComparer.Ordinal);
 
     public static void Configure(string workerName, HarnessWorkerScript script)
     {
         Scripts[workerName] = script;
         AcceptCounts[workerName] = 0;
         PrepareCounts[workerName] = 0;
+        ExternalEffectCounts[workerName] = 0;
     }
 
     public static HarnessWorkerScript ScriptFor(string workerName)
@@ -55,11 +59,17 @@ public static class HarnessWorkerControl
     public static int PrepareCount(string workerName)
         => PrepareCounts.TryGetValue(workerName, out var count) ? count : 0;
 
+    public static int ExternalEffectCount(string workerName)
+        => ExternalEffectCounts.TryGetValue(workerName, out var count) ? count : 0;
+
     public static void IncrementAccept(string workerName)
         => AcceptCounts.AddOrUpdate(workerName, 1, static (_, current) => current + 1);
 
     public static void IncrementPrepare(string workerName)
         => PrepareCounts.AddOrUpdate(workerName, 1, static (_, current) => current + 1);
+
+    public static void IncrementExternalEffect(string workerName)
+        => ExternalEffectCounts.AddOrUpdate(workerName, 1, static (_, current) => current + 1);
 }
 
 // Grain type "worker" matches NeuronId.GrainTypeNameOf(typeof(IWorker)).
@@ -105,10 +115,11 @@ internal sealed class HarnessExecutionWorker :
 
             case HarnessWorkerScript.CompleteThenRetryableFail:
                 // First accept: complete stable-write then fail retryably.
-                // Later accepts: do not re-transition a completed attempt-stable op.
+                // Later accepts: adversarial re-Prepare of the same key (must short-circuit Completed)
+                // and must not re-drive the external effect.
                 if (HarnessWorkerControl.AcceptCount(Id.Name) == 1)
                 {
-                    await PrepareAndCompleteAsync(request, "stable-write")
+                    await PrepareDispatchCompleteAsync(request, "stable-write", executeExternalEffect: true)
                         .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                     await SendAsync(
                         request.Execution,
@@ -123,6 +134,8 @@ internal sealed class HarnessExecutionWorker :
                 }
                 else
                 {
+                    await PrepareDispatchCompleteAsync(request, "stable-write", executeExternalEffect: false)
+                        .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                     await SendAsync(
                         request.Execution,
                         new AttemptSucceeded(
@@ -135,6 +148,23 @@ internal sealed class HarnessExecutionWorker :
                         .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 }
 
+                break;
+
+            case HarnessWorkerScript.DispatchThenRetryableFail:
+                // Messy fail: Dispatched (external started) then retryable AttemptFailed
+                // without cooperative Transition→Uncertain.
+                await PrepareAndDispatchAsync(request, "messy-write")
+                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+                await SendAsync(
+                    request.Execution,
+                    new AttemptFailed(
+                        request.Execution,
+                        request.Worker,
+                        request.Attempt,
+                        request.Revision,
+                        new ProbeFailure("crashed-after-dispatch"),
+                        Retryable: true))
+                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 break;
 
             case HarnessWorkerScript.CancelAware:
@@ -273,23 +303,53 @@ internal sealed class HarnessExecutionWorker :
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    private async Task PrepareAndCompleteAsync(AttemptRequest request, string operationKey)
+    private async Task PrepareAndDispatchAsync(AttemptRequest request, string operationKey)
     {
         HarnessWorkerControl.IncrementPrepare(Id.Name);
-        var edge = new OperationEdge(
-            Target: request.Execution,
-            RequestSynapseId: "probe.external-write",
-            RequestSchemaVersion: 1,
-            ResponseSynapseId: "probe.external-write-result",
-            ResponseSchemaVersion: 1);
+        var edge = ExternalWriteEdge(request.Execution);
         var requestPayload = new ProtectedPayloadReference(Guid.NewGuid());
-        var responsePayload = new ProtectedPayloadReference(Guid.NewGuid());
 
         await SendAsync(
             request.Execution,
             new PrepareOperation(request.Attempt, operationKey, edge, requestPayload))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
+        HarnessWorkerControl.IncrementExternalEffect(Id.Name);
+        await SendAsync(
+            request.Execution,
+            new TransitionOperation(
+                request.Attempt,
+                operationKey,
+                OperationPhase.Prepared,
+                OperationPhase.Dispatched,
+                ResponsePayload: null,
+                RedactedSummary: null))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    private async Task PrepareDispatchCompleteAsync(
+        AttemptRequest request,
+        string operationKey,
+        bool executeExternalEffect)
+    {
+        HarnessWorkerControl.IncrementPrepare(Id.Name);
+        var edge = ExternalWriteEdge(request.Execution);
+        var requestPayload = new ProtectedPayloadReference(Guid.NewGuid());
+        var responsePayload = new ProtectedPayloadReference(Guid.NewGuid());
+
+        // Always re-Prepare: Completed keys must short-circuit to the recorded snapshot.
+        await SendAsync(
+            request.Execution,
+            new PrepareOperation(request.Attempt, operationKey, edge, requestPayload))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        if (!executeExternalEffect)
+        {
+            // Second attempt: kernel returned Completed; do not re-drive the external write.
+            return;
+        }
+
+        HarnessWorkerControl.IncrementExternalEffect(Id.Name);
         await SendAsync(
             request.Execution,
             new TransitionOperation(
@@ -312,4 +372,11 @@ internal sealed class HarnessExecutionWorker :
                 RedactedSummary: "done"))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
+
+    private static OperationEdge ExternalWriteEdge(NeuronId execution) => new(
+        Target: execution,
+        RequestSynapseId: "probe.external-write",
+        RequestSchemaVersion: 1,
+        ResponseSynapseId: "probe.external-write-result",
+        ResponseSchemaVersion: 1);
 }

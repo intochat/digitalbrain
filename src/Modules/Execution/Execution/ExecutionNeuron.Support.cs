@@ -75,17 +75,17 @@ public sealed partial class ExecutionNeuron
 
         if (command.Policy.MaximumAttempts <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(command), "An execution policy must allow at least one attempt.");
+            throw new NeuronAuthorizationException("An execution policy must allow at least one attempt.");
         }
 
         if (command.Policy.RetryDelay < TimeSpan.Zero)
         {
-            throw new ArgumentOutOfRangeException(nameof(command), "An execution retry delay cannot be negative.");
+            throw new NeuronAuthorizationException("An execution retry delay cannot be negative.");
         }
 
         if (command.Worker == default)
         {
-            throw new ArgumentException("An execution worker is required.", nameof(command));
+            throw new NeuronAuthorizationException("An execution worker is required.");
         }
     }
 
@@ -93,7 +93,7 @@ public sealed partial class ExecutionNeuron
     {
         if (commandId.Value == Guid.Empty)
         {
-            throw new ArgumentException("A command id is required.", nameof(commandId));
+            throw new NeuronAuthorizationException("A command id is required.");
         }
     }
 
@@ -106,7 +106,7 @@ public sealed partial class ExecutionNeuron
 
         if (predecessor == Id || predecessor.Value.Owner != Id.Owner)
         {
-            throw new InvalidOperationException(
+            throw new NeuronAuthorizationException(
                 $"Execution '{predecessor}' cannot be the predecessor of Execution '{Id}'.");
         }
 
@@ -116,7 +116,7 @@ public sealed partial class ExecutionNeuron
 
         if (!IsTerminal(snapshot.State))
         {
-            throw new InvalidOperationException(
+            throw new NeuronAuthorizationException(
                 $"Execution '{predecessor}' is not terminal, so Execution '{Id}' cannot retry it.");
         }
     }

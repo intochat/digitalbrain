@@ -53,7 +53,7 @@ public sealed partial class ExecutionNeuron
 
             if (!EdgesEqual(existing.Edge, synapse.Edge))
             {
-                throw new InvalidOperationException(
+                throw new NeuronAuthorizationException(
                     $"Execution '{Id}' operation '{key}' already exists with a different edge.");
             }
 
@@ -107,7 +107,7 @@ public sealed partial class ExecutionNeuron
         var operations = Operations(data);
         if (!operations.TryGetValue(key, out var existing))
         {
-            throw new InvalidOperationException(
+            throw new NeuronAuthorizationException(
                 $"Execution '{Id}' has no operation '{key}'.");
         }
 
@@ -122,7 +122,7 @@ public sealed partial class ExecutionNeuron
 
         if (existing.Phase != synapse.ExpectedPhase)
         {
-            throw new InvalidOperationException(
+            throw new NeuronAuthorizationException(
                 $"Execution '{Id}' operation '{key}' is in phase '{existing.Phase}', not expected '{synapse.ExpectedPhase}'.");
         }
 
@@ -179,17 +179,17 @@ public sealed partial class ExecutionNeuron
     {
         if (IsTerminal(data.State))
         {
-            throw new InvalidOperationException("A terminal execution cannot accept operation commands.");
+            throw new NeuronAuthorizationException("A terminal execution cannot accept operation commands.");
         }
 
         if (data.ActiveAttempt is null)
         {
-            throw new InvalidOperationException("An execution with no active attempt cannot accept operation commands.");
+            throw new NeuronAuthorizationException("An execution with no active attempt cannot accept operation commands.");
         }
 
         if (data.ActiveAttempt != attempt)
         {
-            throw new InvalidOperationException(
+            throw new NeuronAuthorizationException(
                 $"Operation attempt '{attempt.Value:N}' does not match active attempt '{data.ActiveAttempt.Value.Value:N}'.");
         }
     }
@@ -202,33 +202,27 @@ public sealed partial class ExecutionNeuron
             || string.IsNullOrWhiteSpace(edge.Target.Type)
             || string.IsNullOrWhiteSpace(edge.Target.Name))
         {
-            throw new ArgumentException("Operation edge requires a non-default target neuron id.", nameof(edge));
+            throw new NeuronAuthorizationException("Operation edge requires a non-default target neuron id.");
         }
 
         if (string.IsNullOrWhiteSpace(edge.RequestSynapseId))
         {
-            throw new ArgumentException("Operation edge requires a request synapse id.", nameof(edge));
+            throw new NeuronAuthorizationException("Operation edge requires a request synapse id.");
         }
 
         if (edge.RequestSchemaVersion <= 0)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(edge),
-                edge.RequestSchemaVersion,
-                "Request schema version must be positive.");
+            throw new NeuronAuthorizationException("Request schema version must be positive.");
         }
 
         if (string.IsNullOrWhiteSpace(edge.ResponseSynapseId))
         {
-            throw new ArgumentException("Operation edge requires a response synapse id.", nameof(edge));
+            throw new NeuronAuthorizationException("Operation edge requires a response synapse id.");
         }
 
         if (edge.ResponseSchemaVersion <= 0)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(edge),
-                edge.ResponseSchemaVersion,
-                "Response schema version must be positive.");
+            throw new NeuronAuthorizationException("Response schema version must be positive.");
         }
     }
 
@@ -236,7 +230,7 @@ public sealed partial class ExecutionNeuron
     {
         if (reference.Id == Guid.Empty)
         {
-            throw new ArgumentException("Protected payload reference cannot be empty.", paramName);
+            throw new NeuronAuthorizationException($"Protected payload reference cannot be empty ({paramName}).");
         }
     }
 
@@ -250,7 +244,7 @@ public sealed partial class ExecutionNeuron
             case (OperationPhase.Prepared, OperationPhase.Dispatched):
                 if (responsePayload is not null)
                 {
-                    throw new InvalidOperationException("Prepared→Dispatched cannot carry a response reference.");
+                    throw new NeuronAuthorizationException("Prepared→Dispatched cannot carry a response reference.");
                 }
 
                 break;
@@ -258,7 +252,7 @@ public sealed partial class ExecutionNeuron
             case (OperationPhase.Dispatched, OperationPhase.Completed):
                 if (responsePayload is null || responsePayload.Value.Id == Guid.Empty)
                 {
-                    throw new InvalidOperationException("Dispatched→Completed requires a non-empty response reference.");
+                    throw new NeuronAuthorizationException("Dispatched→Completed requires a non-empty response reference.");
                 }
 
                 break;
@@ -266,7 +260,7 @@ public sealed partial class ExecutionNeuron
             case (OperationPhase.Dispatched, OperationPhase.Uncertain):
                 if (responsePayload is not null)
                 {
-                    throw new InvalidOperationException("Dispatched→Uncertain cannot carry a response reference.");
+                    throw new NeuronAuthorizationException("Dispatched→Uncertain cannot carry a response reference.");
                 }
 
                 break;
@@ -275,7 +269,7 @@ public sealed partial class ExecutionNeuron
                 break;
 
             default:
-                throw new InvalidOperationException(
+                throw new NeuronAuthorizationException(
                     $"Transition from '{current}' to '{target}' is not allowed.");
         }
     }
