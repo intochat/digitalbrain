@@ -1,0 +1,12 @@
+using DigitalBrain.Abstractions;
+
+namespace DigitalBrain.Chat;
+
+[GenerateSerializer]
+[Alias("chat.turn-lifecycle")]
+public sealed record TurnLifecycle(
+    [property: Id(0)] TurnId TurnId,
+    [property: Id(1)] CommandId CommandId,
+    [property: Id(2)] NeuronId Chat,
+    [property: Id(3)] ChatTurnStatus Status,
+    [property: Id(4)] string? Detail = null) : Synapse;

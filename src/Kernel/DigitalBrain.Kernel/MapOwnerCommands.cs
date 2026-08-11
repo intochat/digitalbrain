@@ -63,6 +63,31 @@ internal static class OwnerCommandsHttpMaps
                     return;
                 }
 
+                if (string.Equals(request.Kind, HttpSurfacePaths.KindChatCancelTurn, StringComparison.Ordinal))
+                {
+                    if (string.IsNullOrWhiteSpace(request.ChatName)
+                        || !TryParseCommandId(request.CommandId, out var cancelCommandId)
+                        || string.IsNullOrWhiteSpace(request.TurnId)
+                        || !Guid.TryParse(request.TurnId, out var turnGuid)
+                        || turnGuid == Guid.Empty)
+                    {
+                        http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                        return;
+                    }
+
+                    if (!TryPrincipalResource(actor.PrincipalId, request.ChatName, out var chatInstance))
+                    {
+                        http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                        return;
+                    }
+
+                    await brain.GetGrainProxy<IChat>(chatInstance)
+                        .Cancel(new CancelTurn(cancelCommandId, new TurnId(turnGuid), actor))
+                        .ConfigureAwait(false);
+                    http.Response.StatusCode = StatusCodes.Status202Accepted;
+                    return;
+                }
+
                 if (string.Equals(request.Kind, HttpSurfacePaths.KindChatButton, StringComparison.Ordinal))
                 {
                     if (string.IsNullOrWhiteSpace(request.ChatName)
@@ -149,6 +174,8 @@ internal static class OwnerCommandsHttpMaps
         return true;
     }
 
+    // Observer-only SSE: durable Send starts the Execution; request abort detaches this
+    // watch without cancelling the turn (P0-2).
     private static async IAsyncEnumerable<SseItem<ChatResponseUpdate>> StreamDeltasAsync(
         IDigitalBrain brain,
         string chatInstance,
@@ -156,16 +183,39 @@ internal static class OwnerCommandsHttpMaps
         ActorContext actor,
         [EnumeratorCancellation] CancellationToken requestAborted)
     {
-        using var turn = CancellationTokenSource.CreateLinkedTokenSource(requestAborted);
-        turn.CancelAfter(TurnBudget);
-
+        using var budget = new CancellationTokenSource(TurnBudget);
         var command = CommandId.New();
-        await foreach (var chunk in brain.GetGrainProxy<IChat>(chatInstance)
-            .SendStreaming(new SendMessage(command, text, actor), turn.Token)
-            .ConfigureAwait(false))
+        var accepted = await brain.GetGrainProxy<IChat>(chatInstance)
+            .Send(new SendMessage(command, text, actor))
+            .ConfigureAwait(false);
+
+        // Budget bounds the observer wait; requestAborted only detaches the observer.
+        using var observer = CancellationTokenSource.CreateLinkedTokenSource(requestAborted, budget.Token);
+        var chatId = NeuronId.For<IChat>(brain.Owner, chatInstance);
+
+        await foreach (var page in brain.WatchJournalAsync(
+            chatId,
+            JournalKind.Outgoing,
+            afterSequence: 0,
+            observer.Token).ConfigureAwait(false))
         {
-            turn.Token.ThrowIfCancellationRequested();
-            yield return new SseItem<ChatResponseUpdate>(chunk, HttpSurfacePaths.ChatDeltaEvent);
+            foreach (var delivery in page.Delta)
+            {
+                if (delivery.Synapse is Responded responded && responded.CommandId == command)
+                {
+                    yield return new SseItem<ChatResponseUpdate>(
+                        new ChatResponseUpdate(ChatRole.Assistant, responded.Text),
+                        HttpSurfacePaths.ChatDeltaEvent);
+                    yield break;
+                }
+
+                if (delivery.Synapse is TurnLifecycle life
+                    && life.TurnId == accepted.TurnId
+                    && life.Status is ChatTurnStatus.Failed or ChatTurnStatus.Cancelled)
+                {
+                    yield break;
+                }
+            }
         }
     }
 }

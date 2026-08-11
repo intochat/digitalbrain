@@ -8,6 +8,7 @@ internal sealed record OwnerCommandRequest(
     [property: JsonPropertyName("chatName")] string? ChatName = null,
     [property: JsonPropertyName("text")] string? Text = null,
     [property: JsonPropertyName("commandId")] string? CommandId = null,
+    [property: JsonPropertyName("turnId")] string? TurnId = null,
     [property: JsonPropertyName("offerCommandId")] string? OfferCommandId = null,
     [property: JsonPropertyName("buttonId")] string? ButtonId = null,
     [property: JsonPropertyName("action")] string? Action = null,
@@ -27,7 +28,9 @@ internal sealed record ChatTurnEvent(
     DateTimeOffset Timestamp,
     ChatButtonOffer[]? Buttons = null,
     ChatChartOffer[]? Charts = null,
-    ChatTimerOffer[]? Timers = null);
+    ChatTimerOffer[]? Timers = null,
+    string? TurnId = null,
+    string? Status = null);
 
 internal sealed record SurfaceOpenedEvent(
     long Sequence,

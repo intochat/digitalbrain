@@ -25,6 +25,7 @@ internal static class HttpSurfacePaths
     public const string AuthorizationEvent = "authorization";
 
     public const string KindChatSend = "chat.send";
+    public const string KindChatCancelTurn = "chat.cancel-turn";
     public const string KindChatButton = "chat.button";
     public const string KindSurfaceOpen = "surface.open";
 }

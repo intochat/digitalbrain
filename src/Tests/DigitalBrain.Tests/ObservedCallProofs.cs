@@ -21,7 +21,7 @@ public sealed class ObservedCallProofs(BrainClusterFixture fixture)
             TestContext.Current.CancellationToken);
         await Graphs.WaitForConnectionTargetAsync(brain, chat, ChatRoles.Responder, alpha);
 
-        await brain.GetGrainProxy<IChat>("main").Send(new SendMessage(CommandId.New(), "hello"));
+        await brain.GetGrainProxy<IChat>("main").Send(new SendMessage(CommandId.New(), "hello", TestActors.Operator));
         await Journals.WaitForAsync(
             brain, chat, JournalKind.Outgoing,
             delivery => delivery.Synapse is Responded { Text: "scripted:alpha" });

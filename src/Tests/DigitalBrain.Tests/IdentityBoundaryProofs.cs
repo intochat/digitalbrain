@@ -107,6 +107,7 @@ public sealed class IdentityBoundaryCompositionProofs
                 "SurfaceName",
                 "Text",
                 "Title",
+                "TurnId",
             ],
             properties);
 

@@ -59,7 +59,15 @@ internal sealed class DirectAgentSession(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            yield return update.AsChatResponseUpdate();
+            var chatUpdate = update.AsChatResponseUpdate();
+            yield return chatUpdate;
+
+            // Safe point: after each completed tool round (function result), persist session
+            // so mid-stream crash retains progress (P0-6). Final persist still runs below.
+            if (IsToolRoundSafePoint(chatUpdate))
+            {
+                await PersistSessionAsync(agent, session, definition, cancellationToken).ConfigureAwait(false);
+            }
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -68,6 +76,9 @@ internal sealed class DirectAgentSession(
 
         await PersistSessionAsync(agent, session, definition, cancellationToken).ConfigureAwait(false);
     }
+
+    private static bool IsToolRoundSafePoint(ChatResponseUpdate update)
+        => update.Contents.OfType<FunctionResultContent>().Any();
 
     private async Task PersistSessionAsync(
         AIAgent agent,

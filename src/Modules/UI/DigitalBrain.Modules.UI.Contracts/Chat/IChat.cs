@@ -14,13 +14,19 @@ public partial interface IChat :
 {
     [Alias(nameof(Send))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
-    Task Send(SendMessage message);
+    Task<TurnAccepted> Send(SendMessage message);
 
     [Alias(nameof(SendStreaming))]
     IAsyncEnumerable<ChatResponseUpdate> SendStreaming(
         SendMessage message,
         CancellationToken cancellationToken = default);
 
+    [Alias(nameof(Cancel))]
+    Task Cancel(CancelTurn command);
+
     [Alias(nameof(Read))]
     Task<ChatTranscript> Read();
+
+    [Alias(nameof(ReadTurns))]
+    Task<IReadOnlyList<ChatTurnSnapshot>> ReadTurns();
 }

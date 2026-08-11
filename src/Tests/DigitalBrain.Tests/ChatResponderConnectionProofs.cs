@@ -28,8 +28,8 @@ public sealed class ChatResponderConnectionProofs(BrainClusterFixture fixture)
         await Graphs.WaitForConnectionsAsync(brain, chatA, ChatRoles.Responder);
         await Graphs.WaitForConnectionsAsync(brain, chatB, ChatRoles.Responder);
 
-        await brain.GetGrainProxy<IChat>("a").Send(new SendMessage(CommandId.New(), "hello a"));
-        await brain.GetGrainProxy<IChat>("b").Send(new SendMessage(CommandId.New(), "hello b"));
+        await brain.GetGrainProxy<IChat>("a").Send(new SendMessage(CommandId.New(), "hello a", TestActors.Operator));
+        await brain.GetGrainProxy<IChat>("b").Send(new SendMessage(CommandId.New(), "hello b", TestActors.Operator));
 
         await Journals.WaitForAsync(
             brain, chatA, JournalKind.Outgoing,
@@ -63,7 +63,7 @@ public sealed class ChatResponderConnectionProofs(BrainClusterFixture fixture)
         var connection = Assert.Single(connections);
         Assert.Equal(beta, connection.Target);
 
-        await brain.GetGrainProxy<IChat>("main").Send(new SendMessage(CommandId.New(), "who answers now"));
+        await brain.GetGrainProxy<IChat>("main").Send(new SendMessage(CommandId.New(), "who answers now", TestActors.Operator));
         await Journals.WaitForAsync(
             brain, chat, JournalKind.Outgoing,
             delivery => delivery.Synapse is Responded { Text: "scripted:beta", Author: "beta" });

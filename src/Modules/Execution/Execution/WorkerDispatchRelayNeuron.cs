@@ -67,13 +67,9 @@ internal sealed class WorkerDispatchRelayNeuron :
                 $"Relay '{Id}' cannot dispatch to worker '{worker}' owned by '{worker.Owner}'.");
         }
 
-        if (!string.Equals(
-                worker.Type,
-                NeuronId.GrainTypeNameOf(typeof(IWorker)),
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new NeuronAuthorizationException("invalid-worker-identity");
-        }
+        // Domain adapters (e.g. chat-turn-worker) are first-class workers. The legacy
+        // IWorker grain-type pin rejected every production adapter that is not the
+        // harness "worker" type — identity is owner + non-empty type/name only.
     }
 
     private void ValidateExecution(NeuronId execution)

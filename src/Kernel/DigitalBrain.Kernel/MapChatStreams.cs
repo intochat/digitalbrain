@@ -88,7 +88,9 @@ internal static class ChatStreamsHttpMaps
             NeuronId chat,
             ChatButtonOffer[]? buttons,
             ChatChartOffer[]? charts = null,
-            ChatTimerOffer[]? timers = null)
+            ChatTimerOffer[]? timers = null,
+            string? turnId = null,
+            string? status = null)
             => new(
                 delivery.Sequence,
                 fromUser,
@@ -101,7 +103,9 @@ internal static class ChatStreamsHttpMaps
                 delivery.Timestamp,
                 buttons,
                 charts,
-                timers);
+                timers,
+                turnId,
+                status);
 
         return delivery.Synapse switch
         {
@@ -117,6 +121,16 @@ internal static class ChatStreamsHttpMaps
                     responded.Buttons,
                     responded.Charts,
                     responded.Timers),
+            TurnLifecycle life =>
+                Turn(
+                    false,
+                    life.Detail ?? life.Status.ToString(),
+                    life.CommandId,
+                    nameof(TurnLifecycle),
+                    life.Chat,
+                    null,
+                    turnId: life.TurnId.ToString(),
+                    status: life.Status.ToString()),
             _ => null,
         };
     }

@@ -43,7 +43,11 @@ internal sealed class ChatTools(IDigitalBrain brain)
         var command = new CommandId(commandIdentity);
 
         await brain.ActivateAsync(cancellationToken);
-        await brain.GetGrainProxy<IChat>(chatName).Send(new SendMessage(command, text));
+        // Owner MCP path stamps a stable operator actor (Chat refuses unstamped durable commands).
+        var operatorActor = new ActorContext(
+            new PrincipalId(Guid.Parse("00000000-0000-0000-0000-0000000000a1")),
+            "operator");
+        await brain.GetGrainProxy<IChat>(chatName).Send(new SendMessage(command, text, operatorActor));
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));

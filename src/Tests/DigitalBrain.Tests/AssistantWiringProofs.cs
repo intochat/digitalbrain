@@ -17,7 +17,7 @@ public sealed class AssistantWiringProofs(BrainClusterFixture fixture)
         var chat = NeuronId.For<IChat>(brain.Owner, "main");
 
         await brain.GetGrainProxy<IChat>("main").Send(
-            new SendMessage(CommandId.New(), "which tools do you have"));
+            new SendMessage(CommandId.New(), "which tools do you have", TestActors.Operator));
 
         var answered = await Journals.WaitForAsync(
             brain, chat, JournalKind.Outgoing,
@@ -37,7 +37,7 @@ public sealed class AssistantWiringProofs(BrainClusterFixture fixture)
         var chat = NeuronId.For<IChat>(brain.Owner, "main");
 
         await brain.GetGrainProxy<IChat>("main").Send(
-            new SendMessage(CommandId.New(), "start my tea timer"));
+            new SendMessage(CommandId.New(), "start my tea timer", TestActors.Operator));
 
         await Journals.WaitForAsync(
             brain, chat, JournalKind.Outgoing,
@@ -57,7 +57,7 @@ public sealed class AssistantWiringProofs(BrainClusterFixture fixture)
         var chart = NeuronId.For<IChart>(brain.Owner, "dashboard");
 
         await brain.GetGrainProxy<IChat>("main").Send(
-            new SendMessage(CommandId.New(), "connect elon's posts to my dashboard chart"));
+            new SendMessage(CommandId.New(), "connect elon's posts to my dashboard chart", TestActors.Operator));
 
         await Graphs.WaitForConnectionTargetAsync(brain, feed, "probe.fact", chart);
         await Journals.WaitForAsync(

@@ -11,7 +11,11 @@ var brain = await DigitalBrainClient.ConnectAsync(args);
 
 const string chatName = "scripting-proof";
 var command = CommandId.New();
-await brain.GetGrainProxy<IChat>(chatName).Send(new SendMessage(command, "Who are you?"));
+// Owner scripts stamp an operator actor — Chat refuses durable commands without one.
+var operatorActor = new ActorContext(
+    new PrincipalId(Guid.Parse("00000000-0000-0000-0000-0000000000a1")),
+    "operator");
+await brain.GetGrainProxy<IChat>(chatName).Send(new SendMessage(command, "Who are you?", operatorActor));
 
 using var patience = new CancellationTokenSource(TimeSpan.FromMinutes(5));
 await foreach (var page in brain.WatchJournalAsync(

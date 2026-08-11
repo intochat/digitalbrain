@@ -25,7 +25,7 @@ public sealed class SelfProgrammingProofs(BrainClusterFixture fixture)
         await Graphs.WaitForConnectionTargetAsync(brain, chat, ChatRoles.Responder, planner);
 
         await brain.GetGrainProxy<IChat>("wiring").Send(
-            new SendMessage(CommandId.New(), "please db.connect elon's posts onto my dashboard chart"));
+            new SendMessage(CommandId.New(), "please db.connect elon's posts onto my dashboard chart", TestActors.Operator));
 
         await Graphs.WaitForConnectionTargetAsync(brain, feed, "probe.fact", chart);
         await Journals.WaitForAsync(
