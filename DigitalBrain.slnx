@@ -7,11 +7,9 @@
     <Project Path="src/Kernel/Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="src/Kernel/Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
     <Project Path="src/Kernel/Aspire/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
+    <Project Path="src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
   </Folder>
   <Folder Name="/Modules/" />
-  <Folder Name="/Modules/SDK/">
-    <Project Path="src/Modules/SDK/DigitalBrain.Modules.Sdk/DigitalBrain.Modules.Sdk.csproj" />
-  </Folder>
   <Folder Name="/Modules/AI/">
     <Project Path="src/Modules/AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <Project Path="src/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
