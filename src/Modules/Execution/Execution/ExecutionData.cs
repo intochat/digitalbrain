@@ -21,7 +21,8 @@ internal sealed class ExecutionData(
     List<CommandId> receiptOrder,
     PendingWorkerDispatch? pendingDispatch,
     Dictionary<string, OperationSnapshot> operations,
-    List<string> operationOrder)
+    List<string> operationOrder,
+    NeuronId? origin = null)
 {
     [Id(0)]
     public Goal Goal { get; set; } = goal;
@@ -74,4 +75,8 @@ internal sealed class ExecutionData(
 
     [Id(16)]
     public List<string> OperationOrder { get; set; } = operationOrder;
+
+    // Neuron that started this Execution; receives ExecutionTerminal on terminal/blocked.
+    [Id(17)]
+    public NeuronId? Origin { get; set; } = origin;
 }

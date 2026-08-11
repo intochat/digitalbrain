@@ -44,6 +44,12 @@ public sealed partial class ExecutionNeuron :
 
     public Task<ExecutionSnapshot> Read() => Task.FromResult(Snapshot(Load()));
 
+    protected override async Task OnNeuronActivatedAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await RecoverAfterActivationAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
     public async Task HandleAsync(ApplyExecution synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);

@@ -10,47 +10,40 @@ namespace DigitalBrain.UI;
 
 // One worker instance per chat (instance name = chat name). Runs the AI attempt
 // for a durable turn without the HTTP observer's cancellation token.
+// Directed dispatch only (OnUnbound) — no IHandle<> so DispatchWorker* stay off the broadcast catalog.
 // Does NOT implement IWorker — that contract maps 1:1 to a grain type (harness uses "worker").
 [GrainType(GrainTypeName)]
-internal sealed class ChatTurnWorker :
-    Neuron,
-    IHandle<DispatchWorkerAccept>,
-    IHandle<DispatchWorkerContinue>,
-    IHandle<DispatchWorkerCancel>
+internal sealed class ChatTurnWorker : Neuron
 {
     internal const string GrainTypeName = "chat-turn-worker";
 
     private CancellationTokenSource? _attemptCts;
     private AttemptRequest? _active;
+    private int _runGeneration;
 
     public static NeuronId ForChat(NeuronId chat)
         => new(GrainTypeName, chat.Owner, chat.Name);
 
-    public Task HandleAsync(DispatchWorkerAccept envelope, CancellationToken cancellationToken)
+    protected override Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(envelope);
+        ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
-        return Accept(envelope.Request);
+
+        return synapse switch
+        {
+            // Return immediately so DispatchWorkerCancel can interleave (Orleans
+            // non-reentrancy would otherwise serialize Cancel behind a long Accept).
+            DispatchWorkerAccept accept => BeginAccept(accept.Request),
+            DispatchWorkerContinue => Task.CompletedTask,
+            DispatchWorkerCancel cancel => Cancel(cancel.Cursor),
+            _ => base.OnUnboundSynapseAsync(synapse, cancellationToken),
+        };
     }
 
-    public Task HandleAsync(DispatchWorkerContinue envelope, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(envelope);
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.CompletedTask;
-    }
-
-    public Task HandleAsync(DispatchWorkerCancel envelope, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(envelope);
-        cancellationToken.ThrowIfCancellationRequested();
-        return Cancel(envelope.Cursor);
-    }
-
-    private async Task Accept(AttemptRequest request)
+    private Task BeginAccept(AttemptRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (request.Goal is not ChatTurnGoal goal)
+        if (request.Goal is not ChatTurnGoal)
         {
             throw new NeuronAuthorizationException(
                 $"Chat turn worker '{Id}' refuses goal type '{request.Goal?.GetType().Name}'.");
@@ -60,14 +53,26 @@ internal sealed class ChatTurnWorker :
         _attemptCts?.Dispose();
         _attemptCts = new CancellationTokenSource();
         var attemptToken = _attemptCts.Token;
+        var generation = Interlocked.Increment(ref _runGeneration);
+        DelayDeactivation(TimeSpan.FromHours(2));
+        _ = RunAcceptAsync(request, attemptToken, generation);
+        return Task.CompletedTask;
+    }
 
-        await SendAsync(
-            request.Execution,
-            new AttemptAccepted(request.Execution, request.Worker, request.Attempt, request.Revision))
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    private async Task RunAcceptAsync(AttemptRequest request, CancellationToken attemptToken, int generation)
+    {
+        if (request.Goal is not ChatTurnGoal goal)
+        {
+            return;
+        }
 
         try
         {
+            await SendAsync(
+                request.Execution,
+                new AttemptAccepted(request.Execution, request.Worker, request.Attempt, request.Revision))
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
             var (answer, author) = await RunResponderAsync(goal, attemptToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
@@ -75,46 +80,50 @@ internal sealed class ChatTurnWorker :
             {
                 await FinishAsync(
                     request,
-                    goal,
-                    ChatTurnStatus.Completed,
-                    text: null,
-                    author: null,
-                    detail: "empty-answer",
-                    succeeded: true).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+                    succeeded: true,
+                    cancelled: false,
+                    resultText: null,
+                    resultAuthor: null,
+                    failureDetail: "empty-answer").ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 return;
             }
 
             await FinishAsync(
                 request,
-                goal,
-                ChatTurnStatus.Completed,
-                answer,
-                author,
-                detail: null,
-                succeeded: true).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+                succeeded: true,
+                cancelled: false,
+                resultText: answer,
+                resultAuthor: author,
+                failureDetail: null).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (OperationCanceledException) when (attemptToken.IsCancellationRequested)
         {
             await FinishAsync(
                 request,
-                goal,
-                ChatTurnStatus.Cancelled,
-                text: null,
-                author: null,
-                detail: "cancelled",
                 succeeded: false,
-                cancelled: true).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+                cancelled: true,
+                resultText: null,
+                resultAuthor: null,
+                failureDetail: "cancelled").ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (Exception failure)
         {
             await FinishAsync(
                 request,
-                goal,
-                ChatTurnStatus.Failed,
-                text: null,
-                author: null,
-                detail: failure.Message,
-                succeeded: false).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+                succeeded: false,
+                cancelled: false,
+                resultText: null,
+                resultAuthor: null,
+                failureDetail: failure.Message).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+        finally
+        {
+            if (generation == _runGeneration && ReferenceEquals(_active, request))
+            {
+                _active = null;
+            }
+
+            DelayDeactivation(TimeSpan.FromMinutes(1));
         }
     }
 
@@ -123,13 +132,13 @@ internal sealed class ChatTurnWorker :
         ArgumentNullException.ThrowIfNull(cursor);
         _attemptCts?.Cancel();
 
-        if (_active is null || _active.Attempt != cursor.Attempt)
-        {
-            await SendAsync(
-                cursor.Execution,
-                new AttemptCancelled(cursor.Execution, cursor.Worker, cursor.Attempt, cursor.Revision))
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
+        // Always ack Cancel to the kernel. Waiting for the Accept task to observe the
+        // CTS can lose the race to a slow AI stream; AttemptCancelled while Cancelling
+        // is the honest terminal (AttemptSucceeded after Cancel is ignored if Cancelled first).
+        await SendAsync(
+            cursor.Execution,
+            new AttemptCancelled(cursor.Execution, cursor.Worker, cursor.Attempt, cursor.Revision))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private async Task<(string Answer, string Author)> RunResponderAsync(
@@ -191,21 +200,15 @@ internal sealed class ChatTurnWorker :
     private IAssistant DefaultResponder(OwnerId owner)
         => GrainFactory.GetGrain<IAssistant>(NeuronId.For<IAssistant>(owner, "assistant").ToGrainId());
 
+    // Kernel is truth: only Attempt* facts; Chat reconciles via ExecutionTerminal.
     private async Task FinishAsync(
         AttemptRequest request,
-        ChatTurnGoal goal,
-        ChatTurnStatus status,
-        string? text,
-        string? author,
-        string? detail,
         bool succeeded,
-        bool cancelled = false)
+        bool cancelled,
+        string? resultText,
+        string? resultAuthor,
+        string? failureDetail)
     {
-        await SendAsync(
-            goal.Chat,
-            new CompleteTurnWork(goal.TurnId, goal.CommandId, status, text, author, detail))
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
         if (cancelled)
         {
             await SendAsync(
@@ -224,7 +227,7 @@ internal sealed class ChatTurnWorker :
                     request.Worker,
                     request.Attempt,
                     request.Revision,
-                    new ChatTurnResult(text ?? string.Empty, author ?? string.Empty),
+                    new ChatTurnResult(resultText ?? string.Empty, resultAuthor ?? string.Empty),
                     Evidence: []))
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
@@ -237,7 +240,7 @@ internal sealed class ChatTurnWorker :
                 request.Worker,
                 request.Attempt,
                 request.Revision,
-                new ChatTurnFailure(detail ?? "turn failed"),
+                new ChatTurnFailure(failureDetail ?? "turn failed"),
                 Retryable: false))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }

@@ -122,4 +122,84 @@ public sealed partial class ExecutionNeuron
             WorkerDispatchRelay.GrainTypeName,
             Id.Owner,
             Guid.NewGuid().ToString("N"));
+
+    private async Task RecoverAfterActivationAsync()
+    {
+        var data = LoadIfStarted();
+        if (data is null || IsTerminal(data.State))
+        {
+            return;
+        }
+
+        // Only re-arm durable pending work. Do NOT re-dispatch Accept/Fail-on-Running
+        // here: Chat (and other origins) re-Read during terminal handling, and a nested
+        // Accept→worker→origin.Read deadlocks the origin grain turn.
+        if (data.PendingDispatch is not null)
+        {
+            await RegisterDispatchReminderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await TryDispatchPendingAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return;
+        }
+
+        if (data.State == ExecutionState.Cancelling && data.ActiveAttempt is not null)
+        {
+            data.PendingDispatch = new CancelWorkerDispatch(Cursor(data));
+            await RegisterDispatchReminderAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await TryDispatchPendingAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return;
+        }
+
+        if (data.State == ExecutionState.Waiting
+            && data.Blocker is RetryScheduled
+            && data.AttemptCount < data.Policy.MaximumAttempts
+            && (data.Policy.Deadline is null || data.Policy.Deadline > DateTimeOffset.UtcNow))
+        {
+            await this.RegisterOrUpdateReminder(RetryReminderName, data.Policy.RetryDelay, ReminderPeriod)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+    }
+
+    // Silo restart / worker death: fail a Running attempt that has no pending dispatch.
+    // Invoked from the retry/dispatch reminder path only — never from origin re-Read activation.
+    private async Task FailAbandonedRunningIfNeededAsync()
+    {
+        var data = LoadIfStarted();
+        if (data is null
+            || data.State != ExecutionState.Running
+            || data.ActiveAttempt is null
+            || data.PendingDispatch is not null)
+        {
+            return;
+        }
+
+        if (TryMarkDispatchedOperationsUncertain(data, out var uncertainBlocker))
+        {
+            data.State = ExecutionState.Waiting;
+            data.Blocker = new OutcomeUncertain(uncertainBlocker);
+            data.PendingDispatch = null;
+            await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await EmitAsync(new AttemptOutcomeUncertain(
+                Id,
+                data.Worker,
+                data.ActiveAttempt.Value,
+                data.Revision,
+                uncertainBlocker)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await NotifyOriginOfStateAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return;
+        }
+
+        data.Revision++;
+        data.State = ExecutionState.Failed;
+        data.Failure = new WorkerAbandoned("worker-abandoned");
+        data.ActiveAttempt = null;
+        data.Blocker = null;
+        data.Result = null;
+        data.Evidence = [];
+        data.PendingDispatch = null;
+        await UnregisterReminderAsync(RetryReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await UnregisterReminderAsync(DispatchReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await NotifyOriginOfStateAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
 }

@@ -2,7 +2,7 @@ namespace DigitalBrain.Execution;
 
 public sealed partial class ExecutionNeuron
 {
-    public Task HandleAsync(AttemptAccepted fact, CancellationToken cancellationToken)
+    public async Task HandleAsync(AttemptAccepted fact, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
 
@@ -10,23 +10,27 @@ public sealed partial class ExecutionNeuron
 
         if (!Matches(data, fact) || data.State != ExecutionState.Pending)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         data.State = ExecutionState.Running;
         AcknowledgePendingDispatch(data, fact);
+        // Keep the grain hot while the worker holds in-memory attempt progress.
+        DelayDeactivation(TimeSpan.FromHours(2));
+        // Liveness: if the worker dies after Accept, a later reminder fails the attempt.
+        await this.RegisterOrUpdateReminder(DispatchReminderName, TimeSpan.FromSeconds(15), ReminderPeriod)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         Stage(data);
-        return Task.CompletedTask;
     }
 
-    public Task HandleAsync(AttemptWaiting fact, CancellationToken cancellationToken)
+    public async Task HandleAsync(AttemptWaiting fact, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
 
         if (fact.Blocker is null)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         var data = Load();
@@ -35,7 +39,7 @@ public sealed partial class ExecutionNeuron
             || data.State is not (ExecutionState.Pending or ExecutionState.Running or ExecutionState.Waiting)
             || IsOutcomeUncertain(data))
         {
-            return Task.CompletedTask;
+            return;
         }
 
         data.State = ExecutionState.Waiting;
@@ -43,7 +47,7 @@ public sealed partial class ExecutionNeuron
         AcknowledgePendingDispatch(data, fact);
 
         Stage(data);
-        return Task.CompletedTask;
+        await NotifyOriginOfStateAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(AttemptProgressed fact, CancellationToken cancellationToken)
@@ -72,13 +76,13 @@ public sealed partial class ExecutionNeuron
         await TryDispatchPendingAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    public Task HandleAsync(AttemptSucceeded fact, CancellationToken cancellationToken)
+    public async Task HandleAsync(AttemptSucceeded fact, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
 
         if (fact.Result is null || fact.Evidence is null)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         var data = Load();
@@ -87,7 +91,7 @@ public sealed partial class ExecutionNeuron
             || data.State is ExecutionState.Succeeded or ExecutionState.Failed or ExecutionState.Cancelled
             || IsOutcomeUncertain(data))
         {
-            return Task.CompletedTask;
+            return;
         }
 
         data.State = ExecutionState.Succeeded;
@@ -97,9 +101,10 @@ public sealed partial class ExecutionNeuron
         data.Failure = null;
         data.Evidence = [.. fact.Evidence];
         data.PendingDispatch = null;
+        DelayDeactivation(TimeSpan.FromMinutes(1));
 
-        Stage(data);
-        return Task.CompletedTask;
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await NotifyOriginOfStateAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(AttemptFailed fact, CancellationToken cancellationToken)
@@ -141,6 +146,7 @@ public sealed partial class ExecutionNeuron
                 fact.Attempt,
                 data.Revision,
                 uncertainBlocker)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await NotifyOriginOfStateAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -158,15 +164,18 @@ public sealed partial class ExecutionNeuron
             await this.RegisterOrUpdateReminder(RetryReminderName, data.Policy.RetryDelay, ReminderPeriod)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             Stage(data);
+            await NotifyOriginOfStateAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
         data.State = ExecutionState.Failed;
+        DelayDeactivation(TimeSpan.FromMinutes(1));
 
-        Stage(data);
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await NotifyOriginOfStateAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    public Task HandleAsync(AttemptCancelled fact, CancellationToken cancellationToken)
+    public async Task HandleAsync(AttemptCancelled fact, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
 
@@ -174,32 +183,33 @@ public sealed partial class ExecutionNeuron
 
         if (!Matches(data, fact) || data.State != ExecutionState.Cancelling)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         data.State = ExecutionState.Cancelled;
         data.ActiveAttempt = null;
         data.Blocker = null;
         data.PendingDispatch = null;
+        DelayDeactivation(TimeSpan.FromMinutes(1));
 
-        Stage(data);
-        return Task.CompletedTask;
+        await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await NotifyOriginOfStateAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    public Task HandleAsync(AttemptOutcomeUncertain fact, CancellationToken cancellationToken)
+    public async Task HandleAsync(AttemptOutcomeUncertain fact, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fact);
 
         if (fact.Blocker.Value == Guid.Empty)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         var data = Load();
 
         if (!Matches(data, fact) || IsTerminal(data.State))
         {
-            return Task.CompletedTask;
+            return;
         }
 
         data.State = ExecutionState.Waiting;
@@ -207,6 +217,6 @@ public sealed partial class ExecutionNeuron
         data.PendingDispatch = null;
 
         Stage(data);
-        return Task.CompletedTask;
+        await NotifyOriginOfStateAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 }

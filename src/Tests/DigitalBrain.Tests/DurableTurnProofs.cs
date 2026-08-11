@@ -28,6 +28,29 @@ public sealed class DurableTurnCompositionProofs
         Assert.Contains("IExecution", source, StringComparison.Ordinal);
         Assert.Contains("RequireActor", source, StringComparison.Ordinal);
         Assert.Contains("chat-turn-", source, StringComparison.Ordinal);
+        Assert.Contains("Origin:", source, StringComparison.Ordinal);
+        Assert.Contains("ExecutionTerminal", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("CompleteTurnWork", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ChatTurnWorkerUsesDirectedDispatchWithoutBroadcastIHandle()
+    {
+        var source = ReadRepoFile(
+            "src", "Modules", "UI", "DigitalBrain.Modules.UI", "Chat", "ChatTurnWorker.cs");
+        Assert.Contains("OnUnboundSynapseAsync", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("IHandle<DispatchWorkerAccept>", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("IHandle<DispatchWorkerCancel>", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("CompleteTurnWork", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WorkerDispatchRelayValidatesAllowListedWorkerTypes()
+    {
+        var source = ReadRepoFile(
+            "src", "Modules", "Execution", "Execution", "WorkerDispatchRelayNeuron.cs");
+        Assert.Contains("WorkerGrainTypeRegistry", source, StringComparison.Ordinal);
+        Assert.Contains("worker-type-not-registered", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -332,18 +355,43 @@ public sealed class DurableTurnBehaviorProofs(BrainClusterFixture fixture)
 
             var accepted = await brain.GetGrainProxy<IChat>("main")
                 .Send(new SendMessage(CommandId.New(), "cancel me", actor));
+            var queued = await brain.GetGrainProxy<IChat>("main")
+                .Send(new SendMessage(CommandId.New(), "wait behind cancel", actor));
 
             await ScriptedAgent.WaitUntilHeldAsync("cancel-run", Patience);
+            var acceptsBeforeCancel = ScriptedAgent.AcceptCount("cancel-run");
 
             var cancelCommand = CommandId.New();
             await brain.GetGrainProxy<IChat>("main").Cancel(
                 new CancelTurn(cancelCommand, accepted.TurnId, actor));
-            // Idempotent replay of the same cancel command id is allowed via Execution receipts
-            // when ExpectedRevision matches; a second cancel with a new id is also a no-op once terminal.
+            // Idempotent: already Cancelling / terminal — second cancel is a no-op.
             await brain.GetGrainProxy<IChat>("main").Cancel(
                 new CancelTurn(CommandId.New(), accepted.TurnId, actor));
 
+            // Head stays Cancelling until the kernel terminal bridge advances the queue.
+            await WaitForAsync(async () =>
+            {
+                var turns = await brain.GetGrainProxy<IChat>("main").ReadTurns();
+                var head = turns.First(t => t.TurnId == accepted.TurnId);
+                var next = turns.First(t => t.TurnId == queued.TurnId);
+                return head.Status is ChatTurnStatus.Cancelling or ChatTurnStatus.Cancelled
+                    && next.Status == ChatTurnStatus.Pending
+                    && ScriptedAgent.AcceptCount("cancel-run") == acceptsBeforeCancel;
+            });
+
             await WaitForTurnStatusAsync(brain, "main", accepted.TurnId, ChatTurnStatus.Cancelled);
+            Assert.True(ScriptedAgent.WasCancelled("cancel-run"));
+
+            // Release the agent hold so the next turn (which only starts after the head
+            // is terminal) can finish its Accept.
+            ScriptedAgent.ReleaseHold("cancel-run");
+            await WaitForTurnStatusAsync(brain, "main", queued.TurnId, ChatTurnStatus.Completed);
+            Assert.True(ScriptedAgent.AcceptCount("cancel-run") > acceptsBeforeCancel);
+
+            var transcript = await brain.GetGrainProxy<IChat>("main").Read();
+            // Cancelled head must not leave a reply; the queued turn may reply once after.
+            var assistantReplies = transcript.Turns.Count(t => !t.FromUser && t.Text == "scripted:cancel-run");
+            Assert.Equal(1, assistantReplies);
         }
         finally
         {
@@ -380,6 +428,8 @@ public sealed class DurableTurnBehaviorProofs(BrainClusterFixture fixture)
 
             var accepted = await brain.GetGrainProxy<IChat>("main")
                 .Send(new SendMessage(CommandId.New(), "restart me", actor));
+            var queued = await brain.GetGrainProxy<IChat>("main")
+                .Send(new SendMessage(CommandId.New(), "after restart", actor));
 
             await ScriptedAgent.WaitUntilHeldAsync("restart-agent", Patience);
             var before = await brain.GetGrainProxy<IChat>("main").ReadTurns();
@@ -389,16 +439,17 @@ public sealed class DurableTurnBehaviorProofs(BrainClusterFixture fixture)
 
             await fixture.RestartSilosAsync();
 
-            // Durable turn must still be visible (not vanished).
-            ChatTurnSnapshot? after = null;
+            // After restart the head must reach a terminal status (not freeze Running forever).
             await WaitForAsync(async () =>
             {
                 try
                 {
                     var turns = await brain.GetGrainProxy<IChat>("main").ReadTurns();
-                    after = turns.FirstOrDefault(t => t.TurnId == accepted.TurnId);
-                    return after is not null
-                        && after.Status is ChatTurnStatus.Pending or ChatTurnStatus.Running or ChatTurnStatus.Completed;
+                    var head = turns.FirstOrDefault(t => t.TurnId == accepted.TurnId);
+                    return head is
+                    {
+                        Status: ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled
+                    };
                 }
                 catch
                 {
@@ -406,49 +457,104 @@ public sealed class DurableTurnBehaviorProofs(BrainClusterFixture fixture)
                 }
             });
 
-            Assert.NotNull(after);
-            Assert.NotEqual(ChatTurnStatus.Failed, after!.Status);
+            var finalHead = (await brain.GetGrainProxy<IChat>("main").ReadTurns())
+                .First(t => t.TurnId == accepted.TurnId);
+            Assert.True(
+                finalHead.Status is ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled,
+                $"Expected terminal head after restart, got {finalHead.Status}");
 
-            // Execution snapshot also survives.
-            if (!string.IsNullOrWhiteSpace(beforeTurn.ExecutionName))
-            {
-                ExecutionSnapshot? exec = null;
-                await WaitForAsync(async () =>
-                {
-                    try
-                    {
-                        exec = await brain.GetGrainProxy<IExecution>(beforeTurn.ExecutionName!).Read();
-                        return true;
-                    }
-                    catch
-                    {
-                        return false;
-                    }
-                });
-                Assert.NotNull(exec);
-            }
-
-            // Re-hold may have been lost on agent grain memory; release and allow completion
-            // if Execution re-dispatches Accept after restart.
-            ScriptedAgent.ReleaseHold("restart-agent");
+            // Queue must advance past the recovered head.
             ScriptedAgent.ConfigureHold("restart-agent");
             ScriptedAgent.ReleaseHold("restart-agent");
-
             await WaitForAsync(async () =>
             {
                 var turns = await brain.GetGrainProxy<IChat>("main").ReadTurns();
-                var turn = turns.FirstOrDefault(t => t.TurnId == accepted.TurnId);
-                return turn is { Status: ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled or ChatTurnStatus.Running or ChatTurnStatus.Pending };
+                var next = turns.FirstOrDefault(t => t.TurnId == queued.TurnId);
+                return next is
+                {
+                    Status: ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled
+                        or ChatTurnStatus.Running
+                };
             });
-
-            var finalTurns = await brain.GetGrainProxy<IChat>("main").ReadTurns();
-            Assert.Contains(finalTurns, t => t.TurnId == accepted.TurnId);
         }
         finally
         {
             ScriptedAgent.ReleaseHold("restart-agent");
             ScriptedAgent.ClearHold("restart-agent");
         }
+    }
+
+    [Fact]
+    public async Task KilledWorkerReachesFailedAndQueueAdvances()
+    {
+        var brain = fixture.BrainFor("killed-worker");
+        var chat = NeuronId.For<IChat>(brain.Owner, "main");
+        var agent = new NeuronId("scriptedagent", brain.Owner, "kill-agent");
+        var actor = TestActors.Operator;
+
+        ScriptedAgent.ConfigureHold("kill-agent");
+        try
+        {
+            await brain.FireAsync<ISynapseGraph>(
+                ISynapseGraph.InstanceName,
+                new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, agent),
+                TestContext.Current.CancellationToken);
+            await Graphs.WaitForConnectionTargetAsync(brain, chat, ChatRoles.Responder, agent);
+
+            var head = await brain.GetGrainProxy<IChat>("main")
+                .Send(new SendMessage(CommandId.New(), "will die", actor));
+            var next = await brain.GetGrainProxy<IChat>("main")
+                .Send(new SendMessage(CommandId.New(), "should run after fail", actor));
+
+            await ScriptedAgent.WaitUntilHeldAsync("kill-agent", Patience);
+            // Silo restart kills the in-flight worker without a cooperative finish.
+            await fixture.RestartSilosAsync();
+
+            // Head must leave Running: restart recovery cancels/fails the abandoned
+            // attempt so the FIFO can advance (Failed or Cancelled are both terminal).
+            await WaitForAsync(async () =>
+            {
+                var turns = await brain.GetGrainProxy<IChat>("main").ReadTurns();
+                var turn = turns.FirstOrDefault(t => t.TurnId == head.TurnId);
+                return turn is { Status: ChatTurnStatus.Failed or ChatTurnStatus.Cancelled };
+            });
+
+            ScriptedAgent.ConfigureHold("kill-agent");
+            ScriptedAgent.ReleaseHold("kill-agent");
+            await WaitForTurnStatusAsync(brain, "main", next.TurnId, ChatTurnStatus.Completed);
+        }
+        finally
+        {
+            ScriptedAgent.ReleaseHold("kill-agent");
+            ScriptedAgent.ClearHold("kill-agent");
+        }
+    }
+
+    [Fact]
+    public async Task UnregisteredWorkerTypeIsRefusedByDispatchRelay()
+    {
+        var brain = fixture.BrainFor("worker-allowlist");
+        var bogusWorker = new NeuronId("not-a-registered-worker", brain.Owner, "bogus");
+
+        var started = await brain.Get<IExecution>("allowlist-run").FireAsync(
+            new ApplyExecution(
+                CommandId.New(),
+                new StartExecution(
+                    new ProbeGoal("refuse-me"),
+                    bogusWorker,
+                    new ExecutionPolicy(1, TimeSpan.FromSeconds(1), null))),
+            TestContext.Current.CancellationToken);
+
+        // Start succeeds (worker identity is free-form); dispatch relay refuses settled.
+        Assert.Equal(ExecutionState.Pending, started.State);
+
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
+
+        var after = await brain.GetGrainProxy<IExecution>("allowlist-run").Read();
+        Assert.True(
+            after.State is ExecutionState.Pending or ExecutionState.Failed,
+            $"Expected still pending (refused dispatch) or failed, got {after.State}");
+        Assert.Null(after.Result);
     }
 
     private static async Task WaitForTurnStatusAsync(

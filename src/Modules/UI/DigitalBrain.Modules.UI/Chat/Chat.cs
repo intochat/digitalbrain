@@ -48,6 +48,12 @@ internal sealed class Chat : Neuron, IChat
         _queues = ServiceProvider.GetRequiredService<Serializer<TurnQueueState>>();
     }
 
+    protected override async Task OnNeuronActivatedAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await ReconcileActiveExecutionAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
     public async Task<TurnAccepted> Send(SendMessage message)
         => await EnqueueTurnAsync(message).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
@@ -86,6 +92,12 @@ internal sealed class Chat : Neuron, IChat
             return;
         }
 
+        if (record.Status == ChatTurnStatus.Cancelling)
+        {
+            // Already asked the kernel to cancel; wait for the terminal bridge.
+            return;
+        }
+
         if (record.Status == ChatTurnStatus.Pending)
         {
             turns[index] = record with { Status = ChatTurnStatus.Cancelled, Revision = record.Revision + 1 };
@@ -103,7 +115,7 @@ internal sealed class Chat : Neuron, IChat
             return;
         }
 
-        // Running: cancel the active Execution (versioned).
+        // Running: cancel the active Execution; stay head until the terminal bridge advances.
         if (string.IsNullOrWhiteSpace(record.ExecutionName))
         {
             throw new NeuronAuthorizationException(
@@ -119,22 +131,16 @@ internal sealed class Chat : Neuron, IChat
             new CancelExecution(),
             ExpectedRevision: expected)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        turns[index] = record with { Status = ChatTurnStatus.Cancelled, Revision = record.Revision + 1 };
+        turns[index] = record with { Status = ChatTurnStatus.Cancelling, Revision = record.Revision + 1 };
         SaveTurns(turns);
-        var activeQueue = LoadQueue();
-        if (activeQueue.ActiveTurnId == record.TurnId)
-        {
-            activeQueue = activeQueue with { ActiveTurnId = null, ActiveExecutionName = null };
-            SaveQueue(activeQueue);
-        }
 
         await EmitAsync(new TurnLifecycle(
             new TurnId(record.TurnId),
             new CommandId(record.CommandId),
             Id,
-            ChatTurnStatus.Cancelled,
+            ChatTurnStatus.Cancelling,
             "running-cancel")).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        // Do NOT clear ActiveTurnId and do NOT TryStartNext — bridge only.
     }
 
     public Task<ChatTranscript> Read() => Task.FromResult(new ChatTranscript(Turns()));
@@ -196,9 +202,10 @@ internal sealed class Chat : Neuron, IChat
 
     protected override async Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
     {
-        if (synapse is CompleteTurnWork complete)
+        if (synapse is ExecutionTerminal terminal)
         {
-            await CompleteTurnAsync(complete).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await ReconcileFromExecutionTerminalAsync(terminal)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -225,58 +232,290 @@ internal sealed class Chat : Neuron, IChat
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    private async Task CompleteTurnAsync(CompleteTurnWork complete)
+    private async Task ReconcileFromExecutionTerminalAsync(ExecutionTerminal terminal)
     {
+        ArgumentNullException.ThrowIfNull(terminal);
+
+        if (terminal.ExecutionId.Owner != Id.Owner)
+        {
+            return;
+        }
+
+        // Waiting is a durable park — do not advance the queue.
+        if (terminal.State is ExecutionState.Waiting)
+        {
+            return;
+        }
+
+        if (!IsExecutionTerminal(terminal.State))
+        {
+            return;
+        }
+
         var turns = LoadTurns();
-        var index = turns.FindIndex(turn => turn.TurnId == complete.TurnId);
+        var queue = LoadQueue();
+        var index = turns.FindIndex(turn =>
+            string.Equals(turn.ExecutionName, terminal.ExecutionId.Name, StringComparison.Ordinal));
+        if (index < 0
+            && queue.ActiveTurnId is { } activeId
+            && string.Equals(queue.ActiveExecutionName, terminal.ExecutionId.Name, StringComparison.Ordinal))
+        {
+            index = turns.FindIndex(turn => turn.TurnId == activeId);
+        }
+
         if (index < 0)
         {
+            // Unknown / mismatched ExecutionId — ignore settled.
+            return;
+        }
+
+        // Use the terminal payload as the authority snapshot. Re-Reading the Execution
+        // mid-handler can re-enter activation recovery and deadlock this grain turn.
+        var snapshot = new ExecutionSnapshot(
+            Goal: null!,
+            Worker: default,
+            Policy: default!,
+            State: terminal.State,
+            Revision: terminal.Revision,
+            ActiveAttempt: null,
+            Blocker: null,
+            Result: terminal.Result,
+            Failure: terminal.Failure,
+            Evidence: [],
+            RetryOf: null,
+            AttemptCount: 0);
+
+        await ApplyExecutionSnapshotToTurnAsync(turns, index, snapshot, terminal)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    private async Task ReconcileActiveExecutionAsync()
+    {
+        var queue = LoadQueue();
+        if (queue.ActiveTurnId is null || string.IsNullOrWhiteSpace(queue.ActiveExecutionName))
+        {
+            return;
+        }
+
+        var turns = LoadTurns();
+        var index = turns.FindIndex(turn => turn.TurnId == queue.ActiveTurnId.Value);
+        if (index < 0)
+        {
+            queue = queue with { ActiveTurnId = null, ActiveExecutionName = null };
+            SaveQueue(queue);
+            await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
         var record = turns[index];
         if (record.Status is ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled)
         {
-            // Idempotent completion after restart / duplicate delivery.
+            if (queue.ActiveTurnId == record.TurnId)
+            {
+                queue = queue with { ActiveTurnId = null, ActiveExecutionName = null };
+                SaveQueue(queue);
+            }
+
             await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return;
+        }
+
+        var executionId = NeuronId.For<IExecution>(Id.Owner, queue.ActiveExecutionName!);
+        ExecutionSnapshot snapshot;
+        try
+        {
+            snapshot = await GrainFactory.GetGrain<IExecution>(executionId.ToGrainId())
+                .Read()
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+        catch
+        {
+            turns[index] = record with
+            {
+                Status = ChatTurnStatus.Failed,
+                Revision = record.Revision + 1,
+            };
+            SaveTurns(turns);
+            queue = queue with { ActiveTurnId = null, ActiveExecutionName = null };
+            SaveQueue(queue);
+            DelayDeactivation(TimeSpan.FromMinutes(1));
+            await EmitAsync(new TurnLifecycle(
+                new TurnId(record.TurnId),
+                new CommandId(record.CommandId),
+                Id,
+                ChatTurnStatus.Failed,
+                "execution-unreadable")).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return;
+        }
+
+        if (IsExecutionTerminal(snapshot.State))
+        {
+            await ApplyExecutionSnapshotToTurnAsync(turns, index, snapshot, terminal: null)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return;
+        }
+
+        // After silo restart the worker's in-memory Accept is gone and in-memory
+        // reminders may not fire. Drive the kernel to terminal via Cancel so the
+        // bridge can advance the queue. Live turns stay warm via DelayDeactivation.
+        if (snapshot.State is ExecutionState.Running or ExecutionState.Pending or ExecutionState.Cancelling)
+        {
+            try
+            {
+                await GrainFactory.GetGrain<IExecution>(executionId.ToGrainId())
+                    .Apply(new ApplyExecution(
+                        CommandId.New(),
+                        new CancelExecution(),
+                        ExpectedRevision: snapshot.Revision))
+                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+            catch (NeuronAuthorizationException)
+            {
+                // Revision race or already terminal — re-Read below.
+            }
+
+            try
+            {
+                snapshot = await GrainFactory.GetGrain<IExecution>(executionId.ToGrainId())
+                    .Read()
+                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+            catch
+            {
+                return;
+            }
+
+            if (IsExecutionTerminal(snapshot.State))
+            {
+                await ApplyExecutionSnapshotToTurnAsync(turns, index, snapshot, terminal: null)
+                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+            else if (record.Status != ChatTurnStatus.Cancelling)
+            {
+                turns[index] = record with
+                {
+                    Status = ChatTurnStatus.Cancelling,
+                    Revision = record.Revision + 1,
+                };
+                SaveTurns(turns);
+            }
+        }
+    }
+
+    private async Task ApplyExecutionSnapshotToTurnAsync(
+        List<DurableTurnRecord> turns,
+        int index,
+        ExecutionSnapshot snapshot,
+        ExecutionTerminal? terminal)
+    {
+        var record = turns[index];
+        var result = terminal?.Result ?? snapshot.Result;
+        var failure = terminal?.Failure ?? snapshot.Failure;
+        var alreadyTerminal = record.Status is ChatTurnStatus.Completed
+            or ChatTurnStatus.Failed
+            or ChatTurnStatus.Cancelled;
+
+        // Prefer the bridge payload — it carries Result at transition time and avoids
+        // activation-reconcile races that mark Completed before transcript is written.
+        if (alreadyTerminal)
+        {
+            if (record.Status == ChatTurnStatus.Completed)
+            {
+                await TryEmitRespondedAsync(record, result)
+                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+
+            var queueDone = LoadQueue();
+            if (queueDone.ActiveTurnId == record.TurnId)
+            {
+                queueDone = queueDone with { ActiveTurnId = null, ActiveExecutionName = null };
+                SaveQueue(queueDone);
+            }
+
+            await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return;
+        }
+
+        var status = snapshot.State switch
+        {
+            ExecutionState.Succeeded => ChatTurnStatus.Completed,
+            ExecutionState.Failed => ChatTurnStatus.Failed,
+            ExecutionState.Cancelled => ChatTurnStatus.Cancelled,
+            _ => record.Status,
+        };
+
+        if (status is not (ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled))
+        {
             return;
         }
 
         turns[index] = record with
         {
-            Status = complete.Status,
+            Status = status,
             Revision = record.Revision + 1,
         };
         SaveTurns(turns);
 
-        if (complete.Status == ChatTurnStatus.Completed
-            && !string.IsNullOrWhiteSpace(complete.Text))
+        if (status == ChatTurnStatus.Completed)
         {
-            Remember(new ChatTurn(FromUser: false, complete.Text));
-            await EmitAsync(new Responded(
-                complete.CommandId,
-                Id,
-                complete.Text,
-                Author: complete.Author ?? string.Empty))
+            await TryEmitRespondedAsync(record, result)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
+        var detail = status switch
+        {
+            ChatTurnStatus.Failed when failure is ChatTurnFailure chatFailure => chatFailure.Reason,
+            ChatTurnStatus.Failed when failure is WorkerAbandoned abandoned => abandoned.Reason,
+            ChatTurnStatus.Failed => failure?.GetType().Name,
+            ChatTurnStatus.Cancelled => "cancelled",
+            _ => record.ExecutionName,
+        };
+
         await EmitAsync(new TurnLifecycle(
-            new TurnId(complete.TurnId),
-            complete.CommandId,
+            new TurnId(record.TurnId),
+            new CommandId(record.CommandId),
             Id,
-            complete.Status,
-            complete.Detail)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            status,
+            detail)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var queue = LoadQueue();
-        if (queue.ActiveTurnId == complete.TurnId)
+        if (queue.ActiveTurnId == record.TurnId)
         {
             queue = queue with { ActiveTurnId = null, ActiveExecutionName = null };
             SaveQueue(queue);
         }
 
+        DelayDeactivation(TimeSpan.FromMinutes(1));
         await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
+
+    private async Task TryEmitRespondedAsync(DurableTurnRecord record, Result? result)
+    {
+        if (result is not ChatTurnResult chatResult || string.IsNullOrWhiteSpace(chatResult.Answer))
+        {
+            return;
+        }
+
+        // Emit first: if Emit fails the delivery retries. Remembering before Emit left a
+        // transcript line that made retries skip the Emit forever (no Responded in journal).
+        await EmitAsync(new Responded(
+            new CommandId(record.CommandId),
+            Id,
+            chatResult.Answer,
+            Author: chatResult.Author ?? string.Empty))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        var existing = Turns();
+        if (!existing.Any(turn => !turn.FromUser
+            && string.Equals(turn.Text, chatResult.Answer, StringComparison.Ordinal)))
+        {
+            Remember(new ChatTurn(FromUser: false, chatResult.Answer));
+        }
+    }
+
+    private static bool IsExecutionTerminal(ExecutionState state)
+        => state is ExecutionState.Succeeded or ExecutionState.Failed or ExecutionState.Cancelled;
 
     private async Task<TurnAccepted> EnqueueTurnAsync(SendMessage message)
     {
@@ -373,7 +612,7 @@ internal sealed class Chat : Neuron, IChat
             NeuronId.For<IExecution>(Id.Owner, executionName).ToGrainId());
         await execution.Apply(new ApplyExecution(
             CommandId.New(),
-            new StartExecution(goal, worker, TurnPolicy)))
+            new StartExecution(goal, worker, TurnPolicy, RetryOf: null, Origin: Id)))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         turns[index] = record with
@@ -386,6 +625,9 @@ internal sealed class Chat : Neuron, IChat
 
         queue = queue with { ActiveTurnId = record.TurnId, ActiveExecutionName = executionName };
         SaveQueue(queue);
+        // Stay activated for the duration of the AI attempt so idle reactivation
+        // does not spuriously cancel a live head (see ReconcileActiveExecutionAsync).
+        DelayDeactivation(TimeSpan.FromHours(2));
 
         await EmitAsync(new TurnLifecycle(
             new TurnId(record.TurnId),

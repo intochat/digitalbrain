@@ -127,6 +127,24 @@ public sealed partial class ExecutionNeuron
     private static bool IsOutcomeUncertain(ExecutionData data)
         => data.State == ExecutionState.Waiting && data.Blocker is OutcomeUncertain;
 
+    // Wake the origin; Chat (or any origin) re-Reads Execution for authority.
+    private Task NotifyOriginOfStateAsync(ExecutionData data)
+    {
+        if (data.Origin is not { } origin || origin == default)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (!IsTerminal(data.State) && data.State != ExecutionState.Waiting)
+        {
+            return Task.CompletedTask;
+        }
+
+        return SendAsync(
+            origin,
+            new ExecutionTerminal(Id, data.State, data.Revision, data.Result, data.Failure));
+    }
+
     private static void RememberReceipt(ExecutionData data, CommandId commandId, ExecutionSnapshot snapshot)
     {
         data.Receipts[commandId] = snapshot;

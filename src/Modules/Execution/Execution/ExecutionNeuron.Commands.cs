@@ -34,7 +34,8 @@ public sealed partial class ExecutionNeuron
                 if (!Equals(existing.Goal, command.Goal)
                     || existing.Worker != command.Worker
                     || existing.Policy != command.Policy
-                    || existing.RetryOf != command.RetryOf)
+                    || existing.RetryOf != command.RetryOf
+                    || existing.Origin != command.Origin)
                 {
                     throw new NeuronAuthorizationException(
                         $"Execution '{Id}' received CommandId '{commandId}' with a different Start payload.");
@@ -74,7 +75,8 @@ public sealed partial class ExecutionNeuron
             receiptOrder: [],
             pendingDispatch: null,
             operations: new Dictionary<string, OperationSnapshot>(StringComparer.Ordinal),
-            operationOrder: []);
+            operationOrder: [],
+            origin: command.Origin);
         data.PendingDispatch = new AcceptWorkerDispatch(Request(data));
         var snapshot = Snapshot(data);
         RememberReceipt(data, commandId, snapshot);
@@ -125,6 +127,7 @@ public sealed partial class ExecutionNeuron
             await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             await UnregisterReminderAsync(RetryReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             await UnregisterReminderAsync(DispatchReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await NotifyOriginOfStateAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return cancelled;
         }
 
@@ -145,6 +148,7 @@ public sealed partial class ExecutionNeuron
                 data.Revision,
                 uncertainBlocker)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             await UnregisterReminderAsync(RetryReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await NotifyOriginOfStateAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             await TryDispatchPendingAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return uncertainSnapshot;
         }
@@ -152,6 +156,7 @@ public sealed partial class ExecutionNeuron
         data.State = ExecutionState.Cancelling;
         data.Blocker = null;
         data.PendingDispatch = new CancelWorkerDispatch(Cursor(data));
+        DelayDeactivation(TimeSpan.FromHours(2));
 
         var snapshot = Snapshot(data);
         RememberReceipt(data, commandId, snapshot);
@@ -292,6 +297,11 @@ public sealed partial class ExecutionNeuron
         }
 
         await SaveAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        if (data.State is ExecutionState.Failed or ExecutionState.Waiting)
+        {
+            await NotifyOriginOfStateAsync(data).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+
         await TryDispatchPendingAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return snapshot;
     }

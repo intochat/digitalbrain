@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Execution;
 
@@ -67,9 +68,12 @@ internal sealed class WorkerDispatchRelayNeuron :
                 $"Relay '{Id}' cannot dispatch to worker '{worker}' owned by '{worker.Owner}'.");
         }
 
-        // Domain adapters (e.g. chat-turn-worker) are first-class workers. The legacy
-        // IWorker grain-type pin rejected every production adapter that is not the
-        // harness "worker" type — identity is owner + non-empty type/name only.
+        var registry = ServiceProvider.GetRequiredService<WorkerGrainTypeRegistry>();
+        if (!registry.IsAllowed(worker.Type))
+        {
+            throw new NeuronAuthorizationException(
+                $"worker-type-not-registered:{worker.Type}");
+        }
     }
 
     private void ValidateExecution(NeuronId execution)

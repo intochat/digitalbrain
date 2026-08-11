@@ -7,7 +7,13 @@ public sealed partial class ExecutionNeuron
         if (string.Equals(reminderName, DispatchReminderName, StringComparison.Ordinal))
         {
             await TryDispatchPendingAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await FailAbandonedRunningIfNeededAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
+        }
+
+        if (string.Equals(reminderName, RetryReminderName, StringComparison.Ordinal))
+        {
+            await FailAbandonedRunningIfNeededAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
         if (!string.Equals(reminderName, RetryReminderName, StringComparison.Ordinal))
