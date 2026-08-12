@@ -626,18 +626,28 @@ public sealed class McpAuthorizationNeuron :
     private static string SlotKey(string serverKey, PrincipalId principal)
         => $"{serverKey.Trim().ToLowerInvariant()}/{principal.Value:N}";
 
+    // B4 / Seam 5.0: park on Abstractions NeuronId.ForPrincipal (conversation), not tip chat+main.
+    // IConversation type lives in Conversations.Contracts — Sdk must not ref it; grain type string is the Abstractions surface.
+    // Tip IChat may still initiate during extract — accept either grain type as requesting.
     private NeuronId ResolvePrincipalChat(ActorContext actor, NeuronId? requesting)
     {
-        if (requesting is { } chat
-            && string.Equals(chat.Type, "chat", StringComparison.OrdinalIgnoreCase)
-            && chat.Owner == Id.Owner)
+        if (requesting is { } subject
+            && subject.Owner == Id.Owner
+            && (string.Equals(subject.Type, ConversationGrainType, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(subject.Type, "chat", StringComparison.OrdinalIgnoreCase)))
         {
-            return chat;
+            return subject;
         }
 
-        // Principal-partitioned conversation (Wave 3 naming).
-        return new NeuronId("chat", Id.Owner, PrincipalPartition.InstanceName(actor.PrincipalId, "main"));
+        return NeuronId.ForPrincipal(
+            ConversationGrainType,
+            Id.Owner,
+            actor.PrincipalId,
+            ConversationDefaultLocalName);
     }
+
+    private const string ConversationGrainType = "conversation";
+    private const string ConversationDefaultLocalName = "main";
 
     private static NeuronId? CaptureRequestingNeuron()
     {
