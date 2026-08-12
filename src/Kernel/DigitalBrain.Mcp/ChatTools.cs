@@ -2,6 +2,7 @@ using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
+using DigitalBrain.Conversations;
 using DigitalBrain.Core;
 using DigitalBrain.Modules.Sdk.Mcp;
 using DigitalBrain.UI;
@@ -9,6 +10,8 @@ using ModelContextProtocol.Server;
 
 namespace DigitalBrain.Mcp;
 
+// Seam 5 done bar #5: northbound tools address IConversation (HTTP parity).
+// Tip Chat still owns durable Responded journal until Chat dissolves into Conversations.
 [McpServerToolType]
 internal sealed class ChatTools(IDigitalBrain brain, IHttpContextAccessor httpContextAccessor)
 {
@@ -40,8 +43,9 @@ internal sealed class ChatTools(IDigitalBrain brain, IHttpContextAccessor httpCo
         }
 
         var actor = McpActor.Require(httpContextAccessor);
-        var chatInstance = McpActor.Partition(actor, chatName);
-        var chatId = NeuronId.For<IChat>(brain.Owner, chatInstance);
+        var conversationInstance = McpActor.Partition(actor, chatName);
+        // Strangle: durable Responded still journals on tip IChat under the same instance name.
+        var chatJournalId = NeuronId.For<IChat>(brain.Owner, conversationInstance);
         var authorizationId = NeuronId.For<IMcpAuthorization>(
             brain.Owner,
             IMcpAuthorization.DefaultInstanceName);
@@ -50,7 +54,8 @@ internal sealed class ChatTools(IDigitalBrain brain, IHttpContextAccessor httpCo
         await brain.ActivateAsync(cancellationToken);
         using (VerifiedActor.Enter(actor))
         {
-            await brain.GetGrainProxy<IChat>(chatInstance).Send(new SendMessage(command, text, actor));
+            await brain.GetGrainProxy<IConversation>(conversationInstance)
+                .Send(new SendConversationMessage(command, text, actor));
         }
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -58,7 +63,7 @@ internal sealed class ChatTools(IDigitalBrain brain, IHttpContextAccessor httpCo
 
         try
         {
-            return await WaitForResponseAsync(chatId, authorizationId, chatName, command, timeout.Token);
+            return await WaitForResponseAsync(chatJournalId, authorizationId, chatName, command, timeout.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -94,20 +99,26 @@ internal sealed class ChatTools(IDigitalBrain brain, IHttpContextAccessor httpCo
         }
 
         var actor = McpActor.Require(httpContextAccessor);
-        var chatInstance = McpActor.Partition(actor, chatName);
-        var chatId = NeuronId.For<IChat>(brain.Owner, chatInstance);
+        var conversationInstance = McpActor.Partition(actor, chatName);
+        var chatJournalId = NeuronId.For<IChat>(brain.Owner, conversationInstance);
         var authorizationId = NeuronId.For<IMcpAuthorization>(
             brain.Owner,
             IMcpAuthorization.DefaultInstanceName);
-        var cursor = await brain.ReadJournalAsync(chatId, JournalKind.Outgoing, afterSequence: long.MaxValue, cancellationToken);
+        var offerCommand = new CommandId(offerId);
+        var cursor = await brain.ReadJournalAsync(
+            chatJournalId,
+            JournalKind.Outgoing,
+            afterSequence: long.MaxValue,
+            cancellationToken);
         var resume = cursor.ResumeSequence;
 
         await brain.ActivateAsync(cancellationToken);
         using (VerifiedActor.Enter(actor))
         {
-            await brain.FireAsync<IChat>(
-                chatInstance,
-                new ButtonClicked(new CommandId(offerId), buttonId, action),
+            // Match MapOwnerCommands KindChatButton — durable IButton grain, not IChat Fire.
+            await brain.FireAsync<IButton>(
+                ChatButtons.OfferedInstanceName(conversationInstance, offerCommand, buttonId),
+                new ButtonClicked(offerCommand, buttonId, action),
                 cancellationToken);
         }
 
@@ -116,7 +127,12 @@ internal sealed class ChatTools(IDigitalBrain brain, IHttpContextAccessor httpCo
 
         try
         {
-            return await WaitForResponseAfterAsync(chatId, authorizationId, chatName, resume, timeout.Token);
+            return await WaitForResponseAfterAsync(
+                chatJournalId,
+                authorizationId,
+                chatName,
+                resume,
+                timeout.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -127,7 +143,7 @@ internal sealed class ChatTools(IDigitalBrain brain, IHttpContextAccessor httpCo
     }
 
     private async Task<ChatMessageResult> WaitForResponseAsync(
-        NeuronId chatId,
+        NeuronId chatJournalId,
         NeuronId authorizationId,
         string chatName,
         CommandId commandId,
@@ -136,7 +152,7 @@ internal sealed class ChatTools(IDigitalBrain brain, IHttpContextAccessor httpCo
         long authorizationCursor = 0;
 
         await foreach (var page in brain.WatchJournalAsync(
-            chatId,
+            chatJournalId,
             JournalKind.Outgoing,
             afterSequence: 0,
             cancellationToken))
@@ -166,7 +182,7 @@ internal sealed class ChatTools(IDigitalBrain brain, IHttpContextAccessor httpCo
     }
 
     private async Task<ChatMessageResult> WaitForResponseAfterAsync(
-        NeuronId chatId,
+        NeuronId chatJournalId,
         NeuronId authorizationId,
         string chatName,
         long afterSequence,
@@ -175,7 +191,7 @@ internal sealed class ChatTools(IDigitalBrain brain, IHttpContextAccessor httpCo
         long authorizationCursor = 0;
 
         await foreach (var page in brain.WatchJournalAsync(
-            chatId,
+            chatJournalId,
             JournalKind.Outgoing,
             afterSequence,
             cancellationToken))

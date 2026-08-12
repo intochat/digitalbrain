@@ -8,6 +8,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
+    <ProjectReference Include="../../Modules/Conversations/Contracts/DigitalBrain.Modules.Conversations.Contracts.csproj" />
     <ProjectReference Include="../../Modules/Introspection/Contracts/DigitalBrain.Modules.Introspection.Contracts.csproj" />
     <ProjectReference Include="../../Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <ProjectReference Include="../DigitalBrain.Auth/DigitalBrain.Auth.csproj" />

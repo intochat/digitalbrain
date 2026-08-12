@@ -1,27 +1,18 @@
 # Seam 5 — done bar #5 (chat send/button leave MCP)
 
-**Tip:** `440f0a1a` · Integrations coordinates; Modules/UI own destination; Kernel owns HTTP maps.
+**Tip base:** `02e843f3` Conversation HTTP · Integrations slice lands Conversation addressing in MCP host.
 
 ## FINAL §11 destination
 | Tool | Tip file | Destination |
 |---|---|---|
-| `send_chat_message` / `activate_chat_button` | `DigitalBrain.Mcp/ChatTools.cs` | UI / Conversations module tools |
-| `read_chat_transcript` | `IntrospectionTools.cs` (related) | Introspection / Conversations (confirm with Modules) |
+| `send_chat_message` / `activate_chat_button` | `DigitalBrain.Mcp/ChatTools.cs` | UI / Conversations (module export later) |
+| `read_chat_transcript` | `IntrospectionTools.cs` | Conversations `IConversation.Read` |
 
-## Tip MCP shape (leave candidates)
-- `McpSurface.SendChatMessage` / `ActivateChatButton` / `ReadChatTranscript`
-- `ChatTools` → `NeuronId.For<IChat>` + `SendMessage` / `ButtonClicked`
-- Registered in `Program.cs` `.WithTools<ChatTools>()`
+## Integrations slice (this land)
+1. **Send** → `IConversation.Send(SendConversationMessage)` (HTTP `conversation.send` parity)
+2. **Watch** tip `IChat` outgoing journal for `Responded` (strangle — same as `MapOwnerCommands.StreamConversationDeltasAsync`)
+3. **Button** → `IButton` + `ChatButtons.OfferedInstanceName` (HTTP `chat.button` parity; was wrongly `FireAsync<IChat>`)
+4. **Transcript** → `IConversation.Read()`
+5. **Unblock tip:** `ConversationTranscript : Synapse` so `RequestSynapse<ConversationTranscript>` compiles (Modules Contracts hole on 02e843f3)
 
-## HTTP addressing (blocker honesty)
-- Paths declared: `HttpSurfacePaths.KindConversationSend` / `KindConversationCancelTurn`
-- **MapOwnerCommands tip still routes `chat.*` kinds via `IChat` only** — no `conversation.send` handler yet
-- Conversation streams paths exist (`/conversations/{conversationName}/…`)
-
-## Integrations hold
-Do **not** delete/move ChatTools until Modules+Kernel have tip-true Conversation HTTP (or module-exported MCP tools) addressing so northbound send/button has a non-IChat home. B4 park already ForPrincipal conversation.
-
-## Ask Modules
-1. Who owns MCP tool registration after leave (Conversations module export vs UI)?
-2. Rebind target: `IConversation.Send(SendConversationMessage)` + button path?
-3. Go/no-go when `conversation.send` lands on MapOwnerCommands (Kernel) — Integrations thins host then.
+Residual: tools still live in `DigitalBrain.Mcp` until Modules/UI export MCP tool types and host goes thin — addressing honesty first.

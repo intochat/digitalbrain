@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
+using DigitalBrain.Conversations;
 using DigitalBrain.Client;
 using DigitalBrain.Core;
 using DigitalBrain.Introspection;
@@ -84,18 +85,22 @@ internal sealed class IntrospectionTools(IDigitalBrain brain, IHttpContextAccess
 
         var actor = McpActor.Require(httpContextAccessor);
         using var _ = VerifiedActor.Enter(actor);
-        var chatInstance = McpActor.Partition(actor, chatName);
+        var conversationInstance = McpActor.Partition(actor, chatName);
 
-        var read = await BoundedAsync(
-            token => brain.Get<IChat>(chatInstance).FireAsync(new ReadTranscriptRequest(chatInstance), token),
-            nameof(ReadTranscriptRequest),
+        var page = await BoundedAsync(
+            async token =>
+            {
+                token.ThrowIfCancellationRequested();
+                return await brain.GetGrainProxy<IConversation>(conversationInstance).Read();
+            },
+            nameof(IConversation.Read),
             cancellationToken);
 
         return new ChatTranscriptPage(
             chatName,
             [
-                .. read.Transcript.Turns.Select(turn => new ChatTranscriptTurn(
-                    turn.FromUser ? "you" : "brain",
+                .. page.Turns.Select(turn => new ChatTranscriptTurn(
+                    string.Equals(turn.Role, "user", StringComparison.OrdinalIgnoreCase) ? "you" : "brain",
                     turn.Text)),
             ]);
     }
