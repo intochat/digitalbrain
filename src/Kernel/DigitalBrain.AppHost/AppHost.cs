@@ -23,13 +23,20 @@ var brain = builder
     .AddDigitalBrain(ProductSurfaceResources.Brain)
     .WithLocalDevelopmentOAuthCallback(new Uri(ProductSurfaceResources.LocalDevelopmentOAuthCallbackUri));
 
+// Grill / CPU boxes: launch profile "grill" sets DigitalBrain__AppHost__EnableVoiceToText=false
+// so AppHost composition does not load Foundry Local / Betalgo (missing on RID-only bring-up).
+var enableVoiceToText = builder.Configuration.GetValue("DigitalBrain:AppHost:EnableVoiceToText", defaultValue: true);
+
 brain.AddModule<AIModule>(ai =>
 {
     ai.EnableSensitiveData = builder.Environment.IsDevelopment();
     ai.WithLlm<Gemma4>();
     //ai.WithLlm<Llama32>();
     // Local Whisper STT (Foundry Local). Optional: swap IWhisperSmall / IWhisperTiny for weaker GPUs.
-    ai.WithVoiceToText<IWhisperLargeV3Turbo>();
+    if (enableVoiceToText)
+    {
+        ai.WithVoiceToText<IWhisperLargeV3Turbo>();
+    }
 });
 brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
 brain.AddModule<UiModule>(ui => ui.WithWindowHost());
