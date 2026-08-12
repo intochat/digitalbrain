@@ -517,3 +517,65 @@ APIs exist, no doc confirms the combination); whether `Microsoft.Orleans.Journal
 prerelease** that is the only durable record in the system) resolves keyed durable services the way
 production assumes; and whether an `@`-bearing grain key survives Azurite blobs plus Tables reminders
 and clustering end to end. Nothing on the critical path may depend on these until Stage 0 answers them.
+
+---
+
+## Session 4 — 2026-08-12 — the 50 re-simulated against the amended architecture
+
+Consolidated the target architecture into one authoritative document and re-ran all 50 scenarios
+against it: 10 simulators produced mechanical step traces, 3 skeptics (hand-waving, hard limits,
+identity) challenged every optimistic verdict, 1 reconciler applied the rulings.
+
+### 19. The number, both ways
+
+**30 WORKS · 20 WORKS_PARTIAL · 0 FAILS.**
+
+- **Carried: 100%.** No scenario dies architecturally; every one has a named mechanism for its substance.
+- **Exactly as asked: 60%.** Twenty scenarios lose something the person would notice.
+
+The owner asked for ≥90%. **It clears on the loose reading and does not on the strict one**, and the
+distinction is not pedantry — S10's literal ask (a native OS window on a second monitor) is unreachable
+and the user gets a docked pane instead. Reporting 100% without that sentence would be the easiest
+misrepresentation available here.
+
+The simulators returned 39/11/**0 FAILS** before challenge, which was not credible on its face — the
+prior round had already established S10 as unreachable. The skeptics raised 12 challenges, 11
+downgrades and 1 upgrade, and **16 of 50 traces needed correction**: wire-before-fire ordering (S01),
+three fires are not atomic (S02), `db.connected` is a reply and not a routable fact (S04), carrier
+versus compiled fact (S21), reset is a verb (S24), and a cursor cannot be spliced into SOQL by a wire
+literal (S48).
+
+### 20. Two gaps that are in NONE of the seventeen amendments
+
+**A18 — four stores are owner-scoped while the partition is principal.** `corpus:{owner}/log`, the
+per-owner refusals inbox, the instance registry and the single synapse-graph grain are all owner-scoped,
+but §K makes principals the partition. Consequences the simulation found: a refusal cannot reach a
+second principal's inbox (S16); a co-principal can `corpus.find` and read the owner's sentences (S07);
+and no stated rule permits *or refuses* a cross-principal connect (S50). I had spotted the inbox half
+of this by hand while the run was in flight; the skeptics generalised it to all four. **This is the
+single highest-leverage correction available** — it cleans S07, S16, S50 and most of S39/S44/S46.
+
+**A19 — chat's 15-second `WaitingPolicyDeadline` versus Stage 5's browser trip.** An OAuth sign-in
+parks the turn on an Execution blocker while chat's existing deadline force-cancels a parked FIFO head.
+Nothing in the seventeen amendments reconciles them, and it is load-bearing for S13 and S25.
+
+### 21. What would most raise the strict number
+
+In order: (1) principal-scope the four stores above; (2) state a connect-time cross-principal write
+rule; (3) bind a responder per conversation by default, so a second window of the *same* person is not
+blocked behind one assistant grain (S26); (4) add a date/bucket primitive or a cursor-splice step to
+the cell tier — without one, two feeds cannot share a week key (S03), a daily total straddles time
+zones between SOQL's `YESTERDAY` and the schedule's IANA zone (S28), and a recovered window cannot be
+rebuilt (S48); (5) reconcile A19.
+
+### 22. Honest residuals worth carrying forward
+
+`FireRowsAs` fans N rows as N independent turns — there is **no batch-complete signal**, so a `sum`
+reducer cell grows monotonically and any threshold computed off it is wrong (S29, S19). "When the
+nightly sync finishes" has **no completion fact** at all: the MCP result is a summary reply to the
+requester, so the nearest data trigger is `ui.chart-changed`, which a zero-row night never emits (S05).
+A behavior's allow-list is an authority boundary over the rail, **not an egress boundary** — a
+hardcoded webhook in model-authored source reaches the outside world without touching the brain (S37).
+Feedback lands but nothing puts it in front of the model next time (S45).
+
+Interactive artifact with all 50 traces playable: 462 trace steps across 17 components.
