@@ -233,7 +233,7 @@ internal sealed class ChatTurnWorker : Neuron
         try
         {
             var routes = await GrainFactory
-                .GetGrain<ISynapseGraph>(ISynapseGraph.ForOwner(chatId.Owner).ToGrainId())
+                .GetGrain<ISynapseGraph>(PrincipalGraph.ResolveFor(chatId).ToGrainId())
                 .ConnectionsFrom(chatId, ChatRoles.Responder)
                 .WaitAsync(lookup.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 

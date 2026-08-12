@@ -15,7 +15,7 @@ internal sealed class Button : Neuron, IButton
         // emission); the click must refuse visibly once its offer expired.
         using var lookup = new CancellationTokenSource(DeliveryPolicy.ConnectionLookupTimeout);
         var routes = await GrainFactory
-            .GetGrain<ISynapseGraph>(ISynapseGraph.ForOwner(Id.Owner).ToGrainId())
+            .GetGrain<ISynapseGraph>(PrincipalGraph.ResolveFor(Id).ToGrainId())
             .ConnectionsFrom(Id, ButtonActivated.AliasName)
             .WaitAsync(lookup.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 

@@ -133,9 +133,7 @@ public sealed class SystemTools(
         try
         {
             var session = grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(owner).ToGrainId());
-            var registryId = VerifiedActor.Current is { } actor
-                ? IRegistry.ForPrincipal(owner, actor.PrincipalId)
-                : IRegistry.ForOwner(owner);
+            var registryId = PrincipalRegistry.Resolve(owner);
             var opened = await session
                 .ReadNeuronJournal(ISessionNeuron.ForOwner(owner), JournalKind.Incoming, long.MaxValue)
                 .ConfigureAwait(false);
@@ -203,10 +201,7 @@ public sealed class SystemTools(
         }
 
         var connections = await grains
-            .GetGrain<ISynapseGraph>(
-                (VerifiedActor.Current is { } graphActor
-                    ? ISynapseGraph.ForPrincipal(owner, graphActor.PrincipalId)
-                    : ISynapseGraph.ForOwner(owner)).ToGrainId())
+            .GetGrain<ISynapseGraph>(PrincipalGraph.Resolve(owner).ToGrainId())
             .Connections()
             .WaitAsync(DeliveryPolicy.ConnectionLookupTimeout, cancellationToken).ConfigureAwait(false);
         lines.AppendLine(connections.Count == 0 ? "No connections yet." : "Connections:");

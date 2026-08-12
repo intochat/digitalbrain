@@ -21,7 +21,7 @@ internal sealed class IntrospectionTopologyReader(
         var ownerStatistics = await _inventory.ReadAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         var connections = await grainFactory
-            .GetGrain<ISynapseGraph>(ISynapseGraph.ForOwner(owner).ToGrainId())
+            .GetGrain<ISynapseGraph>(PrincipalGraph.Resolve(owner).ToGrainId())
             .Connections()
             .WaitAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
