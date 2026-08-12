@@ -105,7 +105,7 @@ internal static class OwnerCommandsHttpMaps
                     }
 
                     await brain.GetGrainProxy<IChat>(chatInstance)
-                        .Cancel(new CancelTurn(cancelCommandId, new TurnId(turnGuid), actor))
+                        .Cancel(new CancelTurn(cancelCommandId, new Chat.TurnId(turnGuid), actor))
                         .ConfigureAwait(false);
                     http.Response.StatusCode = StatusCodes.Status202Accepted;
                     return;
