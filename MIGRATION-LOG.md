@@ -761,3 +761,53 @@ AppHost restarted with the cell tier. MCP user simulation:
 
 Wave 0 gate for the kind decision is closed. Cell tier is living and MCP-verified for the calculator path.
 
+
+## Session 8 — 2026-08-12 — Wave 1: broadcast becomes opt-in
+
+### 37. Design
+
+`IHandle<T>` no longer enrolls `T` in the broadcast catalog. Only synapse types marked
+`[Broadcast]` mint per-correlation ghost receivers (`type:owner/{correlation}`) on `Emit`.
+
+Directed `Send` and the synapse graph remain the product delivery paths. Capability manifests
+and `fire` still reflect every `IHandle` — only the Emit fan-out catalog changed.
+
+### 38. Enumeration: product flows vs ghost delivery
+
+Catalog previously reflected every implementation-side `IHandle` (execution attempts, MCP tools,
+timer commands, chart points, chat notes, surface boot, etc.). **None** of those named product
+instances can receive a correlation-addressed ghost — the name is a GUID, not `main`/`default`.
+
+| Handler / fact | Product delivery | Needs ghost? |
+|---|---|---|
+| ChartPoint → chart | graph edge or directed fire to named chart | **No** — ghosts were pure cost (live `chart:dev/{guid}` observed pre-change) |
+| Note / TimerCard → chat | graph morph into `chat:…/main` | **No** |
+| StartTimer / CancelTimer | directed `fire` to `timer:…/default` | **No** |
+| Connect / Disconnect | directed to synapsegraph | **No** |
+| Execution / worker dispatches | directed / relays with connection ids | **No** |
+| MCP list/call tools | directed to `mcp:…` | **No** |
+| CellApply / CellReset | directed to `cell:…/kind@name` | **No** |
+| **DigitalBrainActivated → SurfaceBoot** | **was** ghost-only | **Was the sole product dependence** |
+
+SurfaceBoot fix: `DigitalBrainNeuron.Activate` now **directed `Send`s** to
+`surface-boot:{owner}/default` instead of `Emit`ing into the catalog. Zero `[Broadcast]` marks
+ship in this change — the catalog is empty.
+
+### 39. Runtime gate (digitalbrain-mcp)
+
+1. Chat turn: `PONG` / `READY` replies intact.
+2. Timer: `time.start-timer` 5s armed via `fire` (`TIMER_ARMED`, generation 1).
+3. Graph: `db.connect` timer-elapsed → chat via `to:ui.note{Text=Note}` returned `Connected`.
+4. Cell still works: `calculator@w1` apply after Wave 1.
+5. **Chart emit without ghosts:** AppHost `scripting` resource re-ran (session Emit of
+   `ChartPoint`). `get_neurons` after that showed **no** `chart:…/{guid}` instance — only
+   intentional UUID names on `execution` chat-turns and worker-dispatch relays.
+6. Build: `dotnet build DigitalBrain.slnx -warnaserror` → 0 warnings.
+
+### 40. Residuals
+
+- Pre-existing ghost activations in membership (if any) are not reclaimed; they die on idle.
+- `list_active_neurons` MCP tool intermittently failed this session while `get_neurons` via chat
+  and chat tools worked — recorded, not bisected here.
+- No synapse currently carries `[Broadcast]`; re-introduce only with a named product reason.
+
