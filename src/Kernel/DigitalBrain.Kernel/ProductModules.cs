@@ -1,12 +1,18 @@
-using DigitalBrain.Aspire;
 using DigitalBrain.Core;
-using Microsoft.Extensions.Hosting;
 
 namespace DigitalBrain.Kernel;
 
-internal static class ComposedModules
+// Single silo product catalog. AppHost Aspire projections live in
+// AppHost/ProductComposition.cs — keep AspireProjectedModuleNames in sync there.
+//
+// Adding a product surface:
+//   1) Contracts + implementation assemblies here
+//   2) ProductComposition.AddModule when the surface needs AppHost resources
+//      (LLM, Qdrant, Flutter, OAuth). Kernel-only surfaces (Time, Execution,
+//      Introspection, Sdk) stay silo-only.
+public static class ProductModules
 {
-    internal static ModuleAssemblies Assemblies { get; } = new(
+    public static ModuleAssemblies Assemblies { get; } = new(
         [
             typeof(DigitalBrain.Abstractions.Graph.ISynapseGraph).Assembly,
             typeof(DigitalBrain.AI.IAssistant).Assembly,
@@ -28,5 +34,14 @@ internal static class ComposedModules
             typeof(DigitalBrain.UI.UiModule).Assembly,
             typeof(DigitalBrain.Modules.Sdk.Mcp.McpAuthorizationNeuron).Assembly,
         ]);
-}
 
+    // Canonical names of modules that ProductComposition must AddModule.
+    public static IReadOnlyList<string> AspireProjectedModuleNames { get; } =
+    [
+        "DigitalBrain.AI.AIModule",
+        "DigitalBrain.Memory.MemoryModule",
+        "DigitalBrain.UI.UiModule",
+        "DigitalBrain.Google.GoogleModule",
+        "DigitalBrain.Salesforce.SalesforceModule",
+    ];
+}

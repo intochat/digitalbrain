@@ -1,14 +1,4 @@
-using DigitalBrain.AI;
-using DigitalBrain.AI.Aspire.Hosting;
-using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Google;
-using DigitalBrain.Google.Aspire.Hosting;
-using DigitalBrain.Memory;
-using DigitalBrain.Memory.Aspire.Hosting;
-using DigitalBrain.Salesforce;
-using DigitalBrain.Salesforce.Aspire.Hosting;
-using DigitalBrain.UI;
 using DigitalBrain.UI.Aspire.Hosting;
 using Microsoft.Extensions.Hosting;
 
@@ -16,18 +6,8 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var brain = builder
     .AddDigitalBrain(ProductSurfaceResources.Brain)
-    .WithLocalDevelopmentOAuthCallback(new Uri(ProductSurfaceResources.LocalDevelopmentOAuthCallbackUri));
-
-brain.AddModule<AIModule>(ai =>
-{
-    ai.EnableSensitiveData = builder.Environment.IsDevelopment();
-    ai.WithLlm<Gemma4>();
-    //ai.WithLlm<Llama32>();
-});
-brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
-brain.AddModule<UiModule>(ui => ui.WithWindowHost());
-brain.AddModule<GoogleModule>(google => google.WithGmail());
-brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
+    .WithLocalDevelopmentOAuthCallback(new Uri(ProductSurfaceResources.LocalDevelopmentOAuthCallbackUri))
+    .AddProductModules(builder.Environment);
 
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Kernel)
     .WithReference(brain)

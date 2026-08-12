@@ -5,15 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Aspire.Hosting;
 
-public sealed record OAuthProviderHostingDefinition(
-    string Key,
-    string DisplayName,
-    string ParameterPrefix,
-    string ConfigurationRoot,
-    string ClientIdDescription,
-    string? ClientSecretDescription,
-    string RedirectUriDescription);
-
 public static class OAuthProviderHosting
 {
     public static void Register<TModule>(DigitalBrainModuleBuilder<TModule> module, OAuthProviderHostingDefinition definition)
