@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Corpus;
 
 [GenerateSerializer]
 [Alias("db.corpus-state")]

@@ -26,6 +26,7 @@
     <Project Path="src/Modules/Introspection/Introspection/DigitalBrain.Modules.Introspection.csproj" />
   </Folder>
   <Folder Name="/Modules/Memory/">
+    <Project Path="src/Modules/Memory/Corpus/DigitalBrain.Modules.Corpus.csproj" />
     <Project Path="src/Modules/Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
     <Project Path="src/Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
     <Project Path="src/Modules/Memory/Aspire.Hosting/DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" />
