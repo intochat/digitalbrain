@@ -1005,3 +1005,44 @@ flutter analyze kit: No issues found
 ```
 
 Build: 0 warnings. AppHost living after full restart.
+
+## Session 14 - 2026-08-12 - Waves 7+8: library + behaviors
+
+### 53. Wave 7 — library share rail
+
+- **`library` grain**: publish (content-hash SHA-256, immutable name@version), discover, install
+  (disabled copy into principal registry), enable with principal-local ConfigJson
+- Installs arrive **disabled**; enable flips registry members + stores per-principal numbers
+- MCP: `publish_library`, `discover_library`, `install_library`, `enable_library_install`,
+  `list_library_installs`, `read_install_config`
+- `find_capabilities` surfaces library/behavior fire paths
+
+### 54. Wave 7 gate evidence
+
+```
+Alice publish sales-board@1.0.0 → id=sales-board-1.0.0-d9cf76c25e33 hash=d9cf76c25e33…
+Bob discover "sales board kpi" → same artifact
+Bob install → enabled=False
+Bob enable config numbers.baseline=42
+Alice install+enable numbers.baseline=99
+read_install_config bob  → baseline 42
+read_install_config alice → baseline 99
+bob list_registry → chart:…b0.sales-kpi bundle=lib:sales-board@1.0.0 enabled=true
+```
+
+### 55. Wave 8 — repo behavior rail
+
+- **`repository` grain**: open root, list/read files (bounded, no .. escape)
+- **`behavior` grain**: `db.start-repo-review` → up to N file stances → moderator rounds → written plan
+  Durable run store; corpus append for the run id
+- MCP: `start_repo_review`, `read_behavior_run`
+
+### 56. Wave 8 gate evidence
+
+```
+start_repo_review root=E:\intochat\digitalbrain intent=neuron reliability maxFiles=30 rounds=3
+→ RUN status=Completed files=30 stances=30 rounds=3
+read_behavior_run → plan with Recommended changes + Moderator fold Round 1..3
+```
+
+Build: 0 warnings.

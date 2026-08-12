@@ -60,15 +60,21 @@ public sealed class SystemTools(
             FindLimit,
             services.GetService<IEmbeddingGenerator<string, Embedding<float>>>(),
             cancellationToken).ConfigureAwait(false);
-        if (hits.Count == 0)
-        {
-            var alone = new StringBuilder("Nothing matched. Try different words for the same goal.").AppendLine();
-            AppendExternalServers(alone);
-            return alone.ToString();
-        }
 
         var lines = new StringBuilder();
         AppendExternalServers(lines);
+        lines.AppendLine(
+            "Library (Wave 7): fire db.discover-library with this intent, then "
+            + "db.install-library-artifact / db.enable-library-install for principal-local copies.");
+        lines.AppendLine(
+            "Behaviors (Wave 8): fire db.start-repo-review on behavior:main with RootPath + Intent.");
+
+        if (hits.Count == 0)
+        {
+            lines.AppendLine("No compiled contract matches. Try library discover or different words.");
+            return lines.ToString();
+        }
+
         foreach (var hit in hits)
         {
             if (hit.Kind == CapabilityHit.RequestKind)

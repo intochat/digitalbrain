@@ -11,7 +11,8 @@ builder.Services
     .WithTools<ChatTools>()
     .WithTools<IntrospectionTools>()
     .WithTools<RegistryTools>()
-    .WithTools<TimeTools>();
+    .WithTools<TimeTools>()
+    .WithTools<LibraryBehaviorTools>();
 
 var app = builder.Build();
 app.MapDefaultEndpoints();
