@@ -51,6 +51,7 @@ public static class MemoryHostingExtensions
                 return;
             }
 
+            // WaitAnnotation: Apply targets IResourceWithEnvironment (kernel), not always IResourceWithWaitSupport.
             builder
                 .WithReference(_qdrant, connectionName: QdrantVectorMemoryRegistration.DefaultConnectionName)
                 .WithAnnotation(new WaitAnnotation(_qdrant.Resource, WaitType.WaitUntilHealthy, exitCode: 0))

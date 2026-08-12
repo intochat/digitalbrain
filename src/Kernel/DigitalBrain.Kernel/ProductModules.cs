@@ -2,14 +2,9 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Kernel;
 
-// Single silo product catalog. AppHost Aspire projections live in
-// AppHost/ProductComposition.cs — keep AspireProjectedModuleNames in sync there.
-//
-// Adding a product surface:
-//   1) Contracts + implementation assemblies here
-//   2) ProductComposition.AddModule when the surface needs AppHost resources
-//      (LLM, Qdrant, Flutter, OAuth). Kernel-only surfaces (Time, Execution,
-//      Introspection, Sdk) stay silo-only.
+// Silo contracts + implementation assemblies. AppHost AddModule<> is the
+// product composition root (see AppHost.cs) — keep these lists aligned when
+// shipping a new module into the silo.
 public static class ProductModules
 {
     public static ModuleAssemblies Assemblies { get; } = new(
@@ -34,14 +29,4 @@ public static class ProductModules
             typeof(DigitalBrain.UI.UiModule).Assembly,
             typeof(DigitalBrain.Modules.Sdk.Mcp.McpAuthorizationNeuron).Assembly,
         ]);
-
-    // Canonical names of modules that ProductComposition must AddModule.
-    public static IReadOnlyList<string> AspireProjectedModuleNames { get; } =
-    [
-        "DigitalBrain.AI.AIModule",
-        "DigitalBrain.Memory.MemoryModule",
-        "DigitalBrain.UI.UiModule",
-        "DigitalBrain.Google.GoogleModule",
-        "DigitalBrain.Salesforce.SalesforceModule",
-    ];
 }

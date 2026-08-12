@@ -1,14 +1,37 @@
+using DigitalBrain.AI;
+using DigitalBrain.AI.Aspire.Hosting;
+using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Google;
+using DigitalBrain.Google.Aspire.Hosting;
+using DigitalBrain.Memory;
+using DigitalBrain.Memory.Aspire.Hosting;
+using DigitalBrain.Salesforce;
+using DigitalBrain.Salesforce.Aspire.Hosting;
+using DigitalBrain.UI;
 using DigitalBrain.UI.Aspire.Hosting;
 using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+// AppHost is the product composition root: brain fabric + modules + runtimes.
 var brain = builder
     .AddDigitalBrain(ProductSurfaceResources.Brain)
-    .WithLocalDevelopmentOAuthCallback(new Uri(ProductSurfaceResources.LocalDevelopmentOAuthCallbackUri))
-    .AddProductModules(builder.Environment);
+    .WithLocalDevelopmentOAuthCallback(new Uri(ProductSurfaceResources.LocalDevelopmentOAuthCallbackUri));
 
+brain.AddModule<AIModule>(ai =>
+{
+    ai.EnableSensitiveData = builder.Environment.IsDevelopment();
+    ai.WithLlm<Gemma4>();
+    //ai.WithLlm<Llama32>();
+});
+brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
+brain.AddModule<UiModule>(ui => ui.WithWindowHost());
+brain.AddModule<GoogleModule>(google => google.WithGmail());
+brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
+
+// Silo: waits for Azurite/Orleans fabric (+ module projections such as Ollama/Qdrant)
+// via WithReference(brain) → WaitUntilHealthy on brain startup dependencies.
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Kernel)
     .WithReference(brain)
     .WithEnvironment(
@@ -28,6 +51,7 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
             Endpoint = endpoint,
         });
 
+// Client processes share clustering/streams and must wait for a live silo.
 var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
     .WithReference(brain.AsClient())
     .WithEnvironment(
@@ -45,12 +69,11 @@ mcp.WithMcpServer(
     ProductSurfaceResources.McpHttpEndpointName);
 #pragma warning restore ASPIREMCP001
 
-// Do not WaitFor(kernel): membership prune must run against Azurite before a new silo
-// can join if a prior force-kill left an Active row. The probe waits on /health itself.
 builder.AddProject<Projects.DigitalBrain_Scripting>(ProductSurfaceResources.Scripting)
     .WithReference(brain.AsClient())
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
-        ShellHostingExtensions.DefaultOwner);
+        ShellHostingExtensions.DefaultOwner)
+    .WaitFor(kernel);
 
 builder.Build().Run();

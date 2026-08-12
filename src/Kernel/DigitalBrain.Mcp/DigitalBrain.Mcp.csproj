@@ -3,10 +3,7 @@
     <RootNamespace>DigitalBrain.Mcp</RootNamespace>
     <NoWarn>$(NoWarn);CA2007;CA1812</NoWarn>
   </PropertyGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Mcp.Tests" />
-  </ItemGroup>
-  <ItemGroup>
+<ItemGroup>
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
   </ItemGroup>
   <ItemGroup>

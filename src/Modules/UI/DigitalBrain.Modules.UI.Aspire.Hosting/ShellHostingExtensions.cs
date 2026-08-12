@@ -129,6 +129,7 @@ public static class ShellHostingExtensions
             }
 
             var uiEndpoint = builder.GetEndpoint(HttpEndpointName);
+            // Flutter executable waits until the kernel HTTP surface is healthy.
             _flutterHost
                 .WithEnvironment(UIBaseEnvironmentVariable, uiEndpoint)
                 .WithAnnotation(new WaitAnnotation(builder.Resource, WaitType.WaitUntilHealthy, exitCode: 0));

@@ -34,10 +34,13 @@ public static class DigitalBrainHostingExtensions
             .WithStreaming(DigitalBrainResourceNames.StreamProviderName, streams);
         var brain = new DigitalBrainBuilder(builder, name, orleans, journal, streams, pubSub);
 
+        // Silo and clients WaitUntilHealthy for the full fabric before starting.
         brain.RequireHealthyBeforeStart(storage.Resource);
         brain.RequireHealthyBeforeStart(clustering.Resource);
         brain.RequireHealthyBeforeStart(reminders.Resource);
         brain.RequireHealthyBeforeStart(journal.Resource);
+        brain.RequireHealthyBeforeStart(streams.Resource);
+        brain.RequireHealthyBeforeStart(pubSub.Resource);
         return brain;
     }
 
@@ -90,10 +93,7 @@ public static class DigitalBrainHostingExtensions
         builder.WithReference(brain.Streams);
         builder.WithReference(brain.PubSub);
 
-        foreach (var dependency in brain.StartupDependencies)
-        {
-            builder.WithAnnotation(new WaitAnnotation(dependency, WaitType.WaitUntilHealthy, exitCode: 0));
-        }
+        WaitUntilHealthy(builder, brain.StartupDependencies);
 
         if (brain.StateProtectionKey is not null)
         {
@@ -118,7 +118,20 @@ public static class DigitalBrainHostingExtensions
 
         builder.WithReference(client.Brain.Orleans.AsClient());
         builder.WithReference(client.Brain.Streams);
+        // Client processes need clustering tables + streams up before connecting.
+        WaitUntilHealthy(builder, client.Brain.StartupDependencies);
         return builder;
+    }
+
+    private static void WaitUntilHealthy<TResource>(
+        IResourceBuilder<TResource> builder,
+        IReadOnlyList<IResource> dependencies)
+        where TResource : IResourceWithEnvironment, IResourceWithEndpoints
+    {
+        foreach (var dependency in dependencies)
+        {
+            builder.WithAnnotation(new WaitAnnotation(dependency, WaitType.WaitUntilHealthy, exitCode: 0));
+        }
     }
 
     public static IResourceBuilder<TResource> WithStateProtectionKey<TResource>(
