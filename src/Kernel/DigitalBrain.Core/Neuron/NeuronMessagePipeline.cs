@@ -127,9 +127,8 @@ internal sealed class NeuronMessagePipeline(
         }
     }
 
-    // An outcome is journaled into this neuron's incoming feed, never delivered: the reader
-    // that fired the failed synapse is already polling that feed, and a delivered outcome
-    // could itself fail and produce another one.
+    // v1: journal into emitter incoming (Fire/tool pollers).
+    // R8 v2 also dual-addresses via StageOutcomeAddresses (Caller + principal inbox).
     internal SynapseDelivery StageIncomingOutcome(Synapse outcome, SynapseDelivery cause)
     {
         ArgumentNullException.ThrowIfNull(outcome);
@@ -145,6 +144,54 @@ internal sealed class NeuronMessagePipeline(
 
         journal.AppendIncoming(delivery);
         return delivery;
+    }
+
+
+    // R8 v2: directed send to Caller (if not self) + principal/owner inbox.
+    // Stages outbox entries only — never Commit/Fire from drain (nested commit hazard).
+    internal void StageOutcomeAddresses(Synapse outcome, SynapseDelivery cause)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        ArgumentNullException.ThrowIfNull(cause);
+
+        if (!IsOutcome(outcome))
+        {
+            return;
+        }
+
+        var receivers = new List<NeuronId>(2);
+        if (cause.Caller != neuron.Id)
+        {
+            receivers.Add(cause.Caller);
+        }
+
+        var inbox = cause.Principal is { } principal
+            ? IInbox.ForPrincipal(neuron.Id.Owner, principal)
+            : IInbox.ForOwner(neuron.Id.Owner);
+        if (inbox != neuron.Id && !receivers.Contains(inbox))
+        {
+            receivers.Add(inbox);
+        }
+
+        if (receivers.Count == 0)
+        {
+            return;
+        }
+
+        var delivery = SynapseDelivery.Create(
+            turn.Snapshot(outcome),
+            neuron.Id,
+            turn.NextOutgoingSequence,
+            cause,
+            neuron.NeuronTimeProvider,
+            principal: cause.Principal ?? VerifiedActor.Current?.PrincipalId);
+
+        turn.StageOutgoing(delivery);
+        outbox.Add(new OutboxEntry(
+            delivery,
+            [.. receivers],
+            Math.Max(1, turn.CurrentDepth + 1),
+            Attempts: 0));
     }
 
     internal static bool IsOutcome(Synapse synapse)
@@ -186,9 +233,10 @@ internal sealed class NeuronMessagePipeline(
             && !IsJournalProjection(synapse.GetType())
             && SynapseAlias.Of(synapse.GetType()) is { } unroutedAlias)
         {
-            StageIncomingOutcome(
-                new Unrouted(delivery.SynapseId, unroutedAlias, neuron.Id, delivery.CorrelationId),
-                delivery);
+            var unrouted = new Unrouted(
+                delivery.SynapseId, unroutedAlias, neuron.Id, delivery.CorrelationId);
+            StageIncomingOutcome(unrouted, delivery);
+            StageOutcomeAddresses(unrouted, delivery);
         }
 
         if (turn.Handling is null)

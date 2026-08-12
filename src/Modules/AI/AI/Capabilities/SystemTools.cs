@@ -335,7 +335,10 @@ public sealed class SystemTools(
                 if (journaled.Synapse is RouteOutcome outcome
                     && outcome.Correlation == delivery.CorrelationId)
                 {
-                    return $"{outcome.Kind} by {outcome.Receiver}: {outcome.Reason}";
+                    var fix = string.IsNullOrWhiteSpace(outcome.FixPath)
+                        ? ""
+                        : $" Fix: {outcome.FixPath}";
+                    return $"{outcome.Kind} by {outcome.Receiver}: {outcome.Reason}{fix}";
                 }
 
                 if (journaled.Synapse is Unrouted unrouted

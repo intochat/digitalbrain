@@ -5,6 +5,7 @@ global using DigitalBrain.Abstractions.Corpus;
 global using DigitalBrain.Abstractions.Graph;
 global using DigitalBrain.Abstractions.Grants;
 global using DigitalBrain.Abstractions.Identity;
+global using DigitalBrain.Abstractions.Inbox;
 global using DigitalBrain.Abstractions.Integrations;
 global using DigitalBrain.Abstractions.Journals;
 global using DigitalBrain.Abstractions.Library;

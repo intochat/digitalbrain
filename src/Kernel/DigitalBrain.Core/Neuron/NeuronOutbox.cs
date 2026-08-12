@@ -209,6 +209,7 @@ internal sealed class NeuronOutbox(
         foreach (var (cause, outcome) in _outcomes)
         {
             neuron.StageIncomingOutcome(outcome, cause);
+            neuron.StageOutcomeAddresses(outcome, cause);
         }
 
         _outcomes.Clear();

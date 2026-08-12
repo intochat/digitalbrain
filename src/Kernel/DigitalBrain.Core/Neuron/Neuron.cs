@@ -167,6 +167,9 @@ public abstract class Neuron :
     internal SynapseDelivery StageIncomingOutcome(Synapse outcome, SynapseDelivery cause)
         => _messages.StageIncomingOutcome(outcome, cause);
 
+    internal void StageOutcomeAddresses(Synapse outcome, SynapseDelivery cause)
+        => _messages.StageOutcomeAddresses(outcome, cause);
+
     internal Task NotifyJournalWatchersAsync()
         => _journal.NotifyWatchersAsync();
 
