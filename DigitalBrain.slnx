@@ -36,6 +36,9 @@
     <Project Path="src/Modules/SalesForce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <Project Path="src/Modules/SalesForce/Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" />
   </Folder>
+  <Folder Name="/Modules/Conversations/">
+    <Project Path="src/Modules/Conversations/Contracts/DigitalBrain.Modules.Conversations.Contracts.csproj" />
+  </Folder>
   <Folder Name="/Modules/UI/">
     <Project Path="src/Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
     <Project Path="src/Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />

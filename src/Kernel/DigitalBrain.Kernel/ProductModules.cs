@@ -16,6 +16,7 @@ public static class ProductModules
             typeof(DigitalBrain.Execution.IExecution).Assembly,
             typeof(DigitalBrain.Time.StartTimer).Assembly,
             typeof(DigitalBrain.Chat.SendMessage).Assembly,
+            typeof(DigitalBrain.Conversations.IConversation).Assembly,
             typeof(DigitalBrain.Modules.Sdk.Mcp.McpAuthorizationNeuron).Assembly,
         ],
         [

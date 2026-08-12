@@ -13,6 +13,7 @@
     <ProjectReference Include="../DigitalBrain.Auth/DigitalBrain.Auth.csproj" />
     <ProjectReference Include="../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="../../Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
+    <ProjectReference Include="../../Modules/Conversations/Contracts/DigitalBrain.Modules.Conversations.Contracts.csproj" />
     <ProjectReference Include="../../Modules/Execution/Execution/DigitalBrain.Modules.Execution.csproj" />
     <ProjectReference Include="../../Modules/Behavior/Behavior/DigitalBrain.Modules.Behavior.csproj" />
     <ProjectReference Include="../../Modules/Kinds/Kinds/DigitalBrain.Modules.Kinds.csproj" />
