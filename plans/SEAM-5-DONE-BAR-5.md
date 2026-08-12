@@ -1,18 +1,23 @@
 # Seam 5 — done bar #5 (chat send/button leave MCP)
 
-**Tip base:** `02e843f3` Conversation HTTP · Integrations slice lands Conversation addressing in MCP host.
+**Tip:** `500e6d9e` (MCP tools already address `IConversation`) · Flutter bind `ae4b43a3` · HTTP `02e843f3`.
 
 ## FINAL §11 destination
 | Tool | Tip file | Destination |
 |---|---|---|
-| `send_chat_message` / `activate_chat_button` | `DigitalBrain.Mcp/ChatTools.cs` | UI / Conversations (module export later) |
-| `read_chat_transcript` | `IntrospectionTools.cs` | Conversations `IConversation.Read` |
+| `send_chat_message` / `activate_chat_button` | `DigitalBrain.Mcp/ChatTools.cs` | **Conversations module export** (Modules lead; UI helps) |
+| `read_chat_transcript` | `IntrospectionTools.cs` | Conversations `IConversation.Read` (confirm Introspection) |
 
-## Integrations slice (this land)
-1. **Send** → `IConversation.Send(SendConversationMessage)` (HTTP `conversation.send` parity)
-2. **Watch** tip `IChat` outgoing journal for `Responded` (strangle — same as `MapOwnerCommands.StreamConversationDeltasAsync`)
-3. **Button** → `IButton` + `ChatButtons.OfferedInstanceName` (HTTP `chat.button` parity; was wrongly `FireAsync<IChat>`)
-4. **Transcript** → `IConversation.Read()`
-5. **Unblock tip:** `ConversationTranscript : Synapse` so `RequestSynapse<ConversationTranscript>` compiles (Modules Contracts hole on 02e843f3)
+## Tip honesty (addressing DONE)
+- Send → `IConversation.Send(SendConversationMessage)` + wait tip `IChat` outgoing `Responded` (strangle)
+- Button → `IButton` + `ChatButtons.OfferedInstanceName`
+- Host still registers `.WithTools<ChatTools>()` inside `DigitalBrain.Mcp`
 
-Residual: tools still live in `DigitalBrain.Mcp` until Modules/UI export MCP tool types and host goes thin — addressing honesty first.
+## Physical leave (in flight)
+1. Modules(+UI): export public tool types from Conversations (proposed `src/Modules/Conversations/McpTools`)
+2. Integrations: thin `DigitalBrain.Mcp` — drop local ChatTools; `WithTools` from module assembly
+3. Keep `McpActor` / path constants host- or Sdk-side initially (no circular Mcp↔module ref)
+
+## Non-goals
+- AppHost FREEZE files
+- Dissolving tip `IChat` journal in the same commit (strangle stays until Conversations owns Responded)
