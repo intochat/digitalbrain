@@ -34,7 +34,7 @@ public sealed class ConversationNeuron : Neuron, IConversation
         ArgumentNullException.ThrowIfNull(message);
         await foreach (var update in Chat.SendStreaming(
             new SendMessage(message.CommandId, message.Text, message.Actor),
-            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext))
+            cancellationToken))
         {
             yield return update;
         }
