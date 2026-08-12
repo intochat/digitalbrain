@@ -1,4 +1,5 @@
-namespace DigitalBrain.Core;
+using DigitalBrain.Core;
+namespace DigitalBrain.Behavior;
 
 [GenerateSerializer]
 [Alias("db.behavior-state")]

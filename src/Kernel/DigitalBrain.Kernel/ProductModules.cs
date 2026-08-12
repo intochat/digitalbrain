@@ -25,6 +25,7 @@ public static class ProductModules
             typeof(DigitalBrain.Memory.MemoryModule).Assembly,
             typeof(DigitalBrain.Salesforce.SalesforceModule).Assembly,
             typeof(DigitalBrain.Execution.ExecutionNeuron).Assembly,
+            typeof(DigitalBrain.Behavior.BehaviorNeuron).Assembly,
             typeof(DigitalBrain.Time.TimerNeuron).Assembly,
             typeof(DigitalBrain.UI.UiModule).Assembly,
             typeof(DigitalBrain.Os.WorkspaceNeuron).Assembly,

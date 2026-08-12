@@ -40,6 +40,9 @@
     <Project Path="src/Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
     <Project Path="src/Modules/UI/DigitalBrain.Modules.UI.Aspire.Hosting/DigitalBrain.Modules.UI.Aspire.Hosting.csproj" />
   </Folder>
+  <Folder Name="/Modules/Behavior/">
+    <Project Path="src/Modules/Behavior/Behavior/DigitalBrain.Modules.Behavior.csproj" />
+  </Folder>
   <Folder Name="/Modules/Execution/">
     <Project Path="src/Modules/Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
     <Project Path="src/Modules/Execution/Execution/DigitalBrain.Modules.Execution.csproj" />

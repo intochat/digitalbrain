@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Behavior module: durable repo-review runs (Studio host design still blocked — code seat only).</Description>
+    <RootNamespace>DigitalBrain.Behavior</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+  </ItemGroup>
+</Project>
