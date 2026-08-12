@@ -40,7 +40,16 @@ internal static class SynapseWiring
                     continue;
                 }
 
-                var synapseName = contract.GenericTypeArguments[0].FullName;
+                var synapseType = contract.GenericTypeArguments[0];
+                // Broadcast is opt-in per fact type. IHandle still dispatches on directed
+                // delivery and still appears in capability manifests; only [Broadcast]
+                // enrolls Emit-time ghost receivers.
+                if (synapseType.GetCustomAttribute<BroadcastAttribute>(inherit: false) is null)
+                {
+                    continue;
+                }
+
+                var synapseName = synapseType.FullName;
                 if (synapseName is null)
                 {
                     continue;

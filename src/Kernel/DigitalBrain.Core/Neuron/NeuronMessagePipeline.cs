@@ -33,6 +33,9 @@ internal sealed class NeuronMessagePipeline(
     {
         ArgumentNullException.ThrowIfNull(synapse);
 
+        // Catalog is empty unless a synapse type opts in with [Broadcast]. Product
+        // delivery is the synapse graph (plus directed Send). Ghost receivers are
+        // correlation-addressed and cannot be named instances — trap 8 / Wave 1.
         var synapseType = synapse.GetType().FullName!;
         var catalog = neuron.NeuronServices.GetRequiredService<BroadcastCatalog>();
 

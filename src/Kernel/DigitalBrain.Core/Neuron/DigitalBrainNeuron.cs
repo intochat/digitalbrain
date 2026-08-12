@@ -23,8 +23,18 @@ internal sealed class DigitalBrainNeuron : Neuron, IDigitalBrainNeuron
             return;
         }
 
-        await EmitAsync(new DigitalBrainActivated(Id.Owner)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        // Directed, not Emit: SurfaceBoot used to receive DigitalBrainActivated only as a
+        // per-correlation broadcast ghost. Broadcast is now opt-in and empty by default;
+        // the stable surface-boot instance is the real boot path.
+        await SendAsync(
+                new NeuronId(SurfaceBootGrainType, Id.Owner, SurfaceBootInstanceName),
+                new DigitalBrainActivated(Id.Owner))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         _activationPublished.Value = true;
         await WriteStateAsync().ConfigureAwait(true);
     }
+
+    // Grain type string matches SurfaceBoot's [GrainType]; name is the stable instance.
+    private const string SurfaceBootGrainType = "surface-boot";
+    private const string SurfaceBootInstanceName = "default";
 }
