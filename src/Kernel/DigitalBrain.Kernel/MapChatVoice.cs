@@ -4,6 +4,7 @@ using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
 using Microsoft.Extensions.AI;
+using DigitalBrain.Auth;
 
 namespace DigitalBrain.Kernel;
 

@@ -2,15 +2,15 @@ using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
+using DigitalBrain.Core;
 using DigitalBrain.Introspection;
 using ModelContextProtocol.Server;
 
 namespace DigitalBrain.Mcp;
 
 [McpServerToolType]
-internal sealed class IntrospectionTools(IDigitalBrain brain)
+internal sealed class IntrospectionTools(IDigitalBrain brain, IHttpContextAccessor httpContextAccessor)
 {
-
     internal static readonly TimeSpan ReplyBound = TimeSpan.FromSeconds(90);
 
     [McpServerTool(Name = McpSurface.ListActiveNeurons)]
@@ -18,6 +18,9 @@ internal sealed class IntrospectionTools(IDigitalBrain brain)
     public async Task<IReadOnlyList<ActiveNeuron>> ListActiveNeuronsAsync(
         CancellationToken cancellationToken = default)
     {
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
+
         var topology = await BoundedAsync(
             token => brain.Get<IIntrospection>().FireAsync(new ReadTopologyRequest(), token),
             nameof(ReadTopologyRequest),
@@ -32,11 +35,14 @@ internal sealed class IntrospectionTools(IDigitalBrain brain)
         + "never argument or payload content.")]
     public async Task<NeuronJournalPage> ReadNeuronJournalAsync(
         [Description("Grain type of the neuron, for example 'chat' or 'shell'")] string grainType,
-        [Description("Instance name of the neuron, for example 'main'")] string name,
+        [Description("Instance name of the neuron, for example a principal-partitioned chat id")] string name,
         [Description("Journal direction: incoming or outgoing")] string kind = "outgoing",
         [Description("Read entries after this sequence")] long afterSequence = 0,
         CancellationToken cancellationToken = default)
     {
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
+
         var request = new ReadJournalRequest(
             grainType,
             name,
@@ -69,15 +75,19 @@ internal sealed class IntrospectionTools(IDigitalBrain brain)
     }
 
     [McpServerTool(Name = McpSurface.ReadChatTranscript)]
-    [Description("Read the durable transcript of a conversation as the owner would see it.")]
+    [Description("Read the durable transcript of a conversation owned by the authenticated caller.")]
     public async Task<ChatTranscriptPage> ReadChatTranscriptAsync(
-        [Description("Conversation name, for example 'main'")] string chatName = "main",
+        [Description("Conversation local name, for example 'main'")] string chatName = "main",
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
 
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
+        var chatInstance = McpActor.Partition(actor, chatName);
+
         var read = await BoundedAsync(
-            token => brain.Get<IChat>().FireAsync(new ReadTranscriptRequest(chatName), token),
+            token => brain.Get<IChat>(chatInstance).FireAsync(new ReadTranscriptRequest(chatInstance), token),
             nameof(ReadTranscriptRequest),
             cancellationToken);
 

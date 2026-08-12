@@ -56,6 +56,7 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
 // Client processes share clustering/streams and must wait for a live silo.
 var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
     .WithReference(brain.AsClient())
+    .WithStateProtectionKey(brain)
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
         ShellHostingExtensions.DefaultOwner)

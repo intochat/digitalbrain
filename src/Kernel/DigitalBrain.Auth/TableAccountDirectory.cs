@@ -1,9 +1,9 @@
 using Azure;
 using Azure.Data.Tables;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Auth;
 
-internal sealed class TableAccountDirectory(TableClient users) : IAccountDirectory
+public sealed class TableAccountDirectory(TableClient users) : IAccountDirectory
 {
     private const string NamePartition = "name";
     private const string IdPartition = "id";

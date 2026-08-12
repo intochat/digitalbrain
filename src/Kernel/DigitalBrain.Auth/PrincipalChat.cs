@@ -1,8 +1,8 @@
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Auth;
 
-internal static class PrincipalChat
+public static class PrincipalChat
 {
     public static string InstanceName(PrincipalId principal, string conversationName)
         => PrincipalScoped.InstanceName(principal, conversationName);

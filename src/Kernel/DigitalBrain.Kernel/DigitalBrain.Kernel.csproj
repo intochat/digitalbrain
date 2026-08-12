@@ -10,6 +10,7 @@
     <PackageReference Include="Microsoft.AI.Foundry.Local" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../DigitalBrain.Auth/DigitalBrain.Auth.csproj" />
     <ProjectReference Include="../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="../../Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
     <ProjectReference Include="../../Modules/Execution/Execution/DigitalBrain.Modules.Execution.csproj" />

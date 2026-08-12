@@ -1,5 +1,6 @@
 using System.Net.ServerSentEvents;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Auth;
 
 namespace DigitalBrain.Kernel;
 

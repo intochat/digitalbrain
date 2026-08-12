@@ -1,9 +1,9 @@
 using System.Security.Claims;
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Auth;
 
-internal static class HttpActor
+public static class HttpActor
 {
     public static ActorContext Require(HttpContext http)
     {

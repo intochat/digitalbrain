@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Auth;
 
-internal sealed class MemoryAccountDirectory : IAccountDirectory
+public sealed class MemoryAccountDirectory : IAccountDirectory
 {
     private readonly ConcurrentDictionary<string, DigitalBrainUser> _byId = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string> _idByNormalizedName = new(StringComparer.Ordinal);

@@ -8,23 +8,21 @@ using ModelContextProtocol.Server;
 namespace DigitalBrain.Mcp;
 
 [McpServerToolType]
-internal sealed class LibraryBehaviorTools(IDigitalBrain brain)
+internal sealed class LibraryBehaviorTools(IDigitalBrain brain, IHttpContextAccessor httpContextAccessor)
 {
     private static readonly TimeSpan Bound = TimeSpan.FromSeconds(90);
 
     [McpServerTool(Name = McpSurface.PublishLibrary)]
-    [Description("Publish an immutable library artifact (content-hashed). principalKey is the publisher.")]
+    [Description("Publish an immutable library artifact (content-hashed) as the authenticated caller.")]
     public async Task<string> PublishLibraryAsync(
         [Description("Artifact name")] string name,
         [Description("Version, e.g. 1.0.0")] string version,
         [Description("Description for discover")] string description,
         [Description("JSON structure with members array and optional numbers map")] string structureJson,
-        [Description("Publisher principal: alice|bob|operator")] string principalKey = "alice",
         CancellationToken cancellationToken = default)
     {
-        var (principal, username) = ChatTools.ResolvePrincipal(principalKey);
-        using var _ = VerifiedActor.Enter(new ActorContext(principal, username));
-        var actor = new ActorContext(principal, username);
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
 
         var published = await brain
             .Get<ILibrary>(ILibrary.InstanceName)
@@ -46,6 +44,9 @@ internal sealed class LibraryBehaviorTools(IDigitalBrain brain)
         [Description("Max hits")] int limit = 8,
         CancellationToken cancellationToken = default)
     {
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
+
         var page = await brain
             .Get<ILibrary>(ILibrary.InstanceName)
             .FireAsync<LibraryDiscoveries>(
@@ -66,15 +67,13 @@ internal sealed class LibraryBehaviorTools(IDigitalBrain brain)
     }
 
     [McpServerTool(Name = McpSurface.InstallLibrary)]
-    [Description("Install a library artifact into the caller's principal partition (disabled).")]
+    [Description("Install a library artifact into the authenticated caller's principal partition (disabled).")]
     public async Task<string> InstallLibraryAsync(
         [Description("Artifact id from discover")] string artifactId,
-        [Description("Installer principal")] string principalKey = "bob",
         CancellationToken cancellationToken = default)
     {
-        var (principal, username) = ChatTools.ResolvePrincipal(principalKey);
-        using var _ = VerifiedActor.Enter(new ActorContext(principal, username));
-        var actor = new ActorContext(principal, username);
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
 
         var recorded = await brain
             .Get<ILibrary>(ILibrary.InstanceName)
@@ -89,16 +88,14 @@ internal sealed class LibraryBehaviorTools(IDigitalBrain brain)
     }
 
     [McpServerTool(Name = McpSurface.EnableLibraryInstall)]
-    [Description("Enable a principal's library install with optional config JSON (e.g. numbers).")]
+    [Description("Enable the authenticated caller's library install with optional config JSON (e.g. numbers).")]
     public async Task<string> EnableLibraryInstallAsync(
         [Description("Install id")] string installId,
-        [Description("Principal who installed")] string principalKey = "bob",
         [Description("Optional principal-local config JSON")] string? configJson = null,
         CancellationToken cancellationToken = default)
     {
-        var (principal, username) = ChatTools.ResolvePrincipal(principalKey);
-        using var _ = VerifiedActor.Enter(new ActorContext(principal, username));
-        var actor = new ActorContext(principal, username);
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
 
         var enabled = await brain
             .Get<ILibrary>(ILibrary.InstanceName)
@@ -113,14 +110,12 @@ internal sealed class LibraryBehaviorTools(IDigitalBrain brain)
     }
 
     [McpServerTool(Name = McpSurface.ListLibraryInstalls)]
-    [Description("List library installs for a principal.")]
+    [Description("List library installs for the authenticated caller.")]
     public async Task<string> ListLibraryInstallsAsync(
-        [Description("Principal key")] string principalKey = "bob",
         CancellationToken cancellationToken = default)
     {
-        var (principal, username) = ChatTools.ResolvePrincipal(principalKey);
-        using var _ = VerifiedActor.Enter(new ActorContext(principal, username));
-        var actor = new ActorContext(principal, username);
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
 
         var listed = await brain
             .Get<ILibrary>(ILibrary.InstanceName)
@@ -151,6 +146,9 @@ internal sealed class LibraryBehaviorTools(IDigitalBrain brain)
         [Description("Moderator rounds")] int moderatorRounds = 3,
         CancellationToken cancellationToken = default)
     {
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
+
         var started = await brain
             .Get<IBehavior>(IBehavior.InstanceName)
             .FireAsync<BehaviorRunStarted>(
@@ -170,6 +168,9 @@ internal sealed class LibraryBehaviorTools(IDigitalBrain brain)
         [Description("Run id from start_repo_review")] string runId,
         CancellationToken cancellationToken = default)
     {
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
+
         var snap = await brain
             .Get<IBehavior>(IBehavior.InstanceName)
             .FireAsync<BehaviorRunSnapshot>(
@@ -187,14 +188,12 @@ internal sealed class LibraryBehaviorTools(IDigitalBrain brain)
     }
 
     [McpServerTool(Name = McpSurface.ReadInstallConfig)]
-    [Description("Read enabled install config for a principal (shows principal-local numbers).")]
+    [Description("Read enabled install config for the authenticated caller (shows principal-local numbers).")]
     public async Task<string> ReadInstallConfigAsync(
-        [Description("Principal key")] string principalKey,
         CancellationToken cancellationToken = default)
     {
-        var (principal, username) = ChatTools.ResolvePrincipal(principalKey);
-        using var _ = VerifiedActor.Enter(new ActorContext(principal, username));
-        var actor = new ActorContext(principal, username);
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
 
         var listed = await brain
             .Get<ILibrary>(ILibrary.InstanceName)
@@ -225,7 +224,7 @@ internal sealed class LibraryBehaviorTools(IDigitalBrain brain)
                             numbers = n.GetRawText();
                         }
                     }
-                    catch
+                    catch (JsonException)
                     {
                         numbers = i.ConfigJson;
                     }

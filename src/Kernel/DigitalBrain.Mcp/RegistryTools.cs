@@ -8,22 +8,21 @@ using ModelContextProtocol.Server;
 namespace DigitalBrain.Mcp;
 
 [McpServerToolType]
-internal sealed class RegistryTools(IDigitalBrain brain)
+internal sealed class RegistryTools(IDigitalBrain brain, IHttpContextAccessor httpContextAccessor)
 {
     private static readonly TimeSpan Bound = TimeSpan.FromSeconds(60);
 
     [McpServerTool(Name = McpSurface.ListRegistry)]
-    [Description("List registered instances for a principal partition (alice|bob|operator).")]
+    [Description("List registered instances for the authenticated caller's principal partition.")]
     public async Task<IReadOnlyList<RegistryEntry>> ListRegistryAsync(
-        [Description("Principal key: operator, alice, or bob")] string principalKey = "operator",
         CancellationToken cancellationToken = default)
     {
-        var (principal, username) = ChatTools.ResolvePrincipal(principalKey);
-        using var _ = VerifiedActor.Enter(new ActorContext(principal, username));
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(Bound);
 
-        var registryName = PrincipalPartition.InstanceName(principal, IRegistry.InstanceName);
+        var registryName = McpActor.Partition(actor, IRegistry.InstanceName);
         var listed = await brain
             .Get<IRegistry>(registryName)
             .FireAsync<InstancesListed>(new ListInstances(CommandId.New()), timeout.Token)
@@ -45,13 +44,12 @@ internal sealed class RegistryTools(IDigitalBrain brain)
 
     [McpServerTool(Name = McpSurface.RegisterInstance)]
     [Description(
-        "Register a principal-scoped instance. localName is the short name (e.g. sales); "
-        + "grainType is chart|timer|…; principalKey scopes the instance.")]
+        "Register an instance in the authenticated caller's principal partition. "
+        + "localName is the short name (e.g. sales); grainType is chart|timer|…")]
     public async Task<RegistryEntry> RegisterInstanceAsync(
         [Description("Grain type, e.g. chart or timer")] string grainType,
         [Description("Local instance name without principal prefix, e.g. sales")] string localName,
         [Description("Role label: chart, schedule, …")] string role,
-        [Description("Principal key: operator, alice, or bob")] string principalKey = "operator",
         [Description("Optional note")] string? note = null,
         [Description("Whether enabled")] bool enabled = true,
         CancellationToken cancellationToken = default)
@@ -60,12 +58,12 @@ internal sealed class RegistryTools(IDigitalBrain brain)
         ArgumentException.ThrowIfNullOrWhiteSpace(localName);
         ArgumentException.ThrowIfNullOrWhiteSpace(role);
 
-        var (principal, username) = ChatTools.ResolvePrincipal(principalKey);
-        using var _ = VerifiedActor.Enter(new ActorContext(principal, username));
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
 
-        var instanceName = PrincipalPartition.InstanceName(principal, localName.Trim());
+        var instanceName = McpActor.Partition(actor, localName.Trim());
         var subject = new NeuronId(grainType.Trim(), brain.Owner, instanceName);
-        var registryName = PrincipalPartition.InstanceName(principal, IRegistry.InstanceName);
+        var registryName = McpActor.Partition(actor, IRegistry.InstanceName);
 
         var registered = await brain
             .Get<IRegistry>(registryName)
@@ -86,18 +84,17 @@ internal sealed class RegistryTools(IDigitalBrain brain)
     }
 
     [McpServerTool(Name = McpSurface.InstallBundle)]
-    [Description("Install a disabled bundle into a principal's registry partition.")]
+    [Description("Install a disabled bundle into the authenticated caller's registry partition.")]
     public async Task<BundleInstallResult> InstallBundleAsync(
         [Description("Bundle name")] string name,
         [Description("JSON array of members: [{grainType,name,role,note?},…] — name is local")] string membersJson,
-        [Description("Principal key: operator, alice, or bob")] string principalKey = "operator",
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(membersJson);
 
-        var (principal, username) = ChatTools.ResolvePrincipal(principalKey);
-        using var _ = VerifiedActor.Enter(new ActorContext(principal, username));
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
 
         var members = System.Text.Json.JsonSerializer.Deserialize<BundleMemberDto[]>(
                 membersJson,
@@ -109,7 +106,7 @@ internal sealed class RegistryTools(IDigitalBrain brain)
             throw new ArgumentException("Bundle needs at least one member.");
         }
 
-        var registryName = PrincipalPartition.InstanceName(principal, IRegistry.InstanceName);
+        var registryName = McpActor.Partition(actor, IRegistry.InstanceName);
         var installed = await brain
             .Get<IRegistry>(registryName)
             .FireAsync<BundleInstalled>(
@@ -118,7 +115,7 @@ internal sealed class RegistryTools(IDigitalBrain brain)
                     name.Trim(),
                     [.. members.Select(m => new BundleMember(
                         m.GrainType ?? throw new ArgumentException("grainType required"),
-                        PrincipalPartition.InstanceName(principal, m.Name ?? throw new ArgumentException("name required")),
+                        McpActor.Partition(actor, m.Name ?? throw new ArgumentException("name required")),
                         m.Role ?? throw new ArgumentException("role required"),
                         m.Note))],
                     Wires: [],
@@ -135,24 +132,25 @@ internal sealed class RegistryTools(IDigitalBrain brain)
     }
 
     [McpServerTool(Name = McpSurface.GrantAccess)]
-    [Description("Grant read access on a principal-owned subject to another principal (alice|bob|operator).")]
+    [Description(
+        "Grant read access on a subject owned by the authenticated caller to another principal "
+        + "(granteePrincipalId is a GUID).")]
     public async Task<string> GrantAccessAsync(
-        [Description("Grantor principal key")] string grantorKey,
-        [Description("Grantee principal key")] string granteeKey,
+        [Description("Grantee principal id (GUID)")] string granteePrincipalId,
         [Description("Subject grain type, e.g. chart")] string subjectType,
-        [Description("Subject local name owned by grantor, e.g. sales")] string subjectLocalName,
+        [Description("Subject local name owned by the caller, e.g. sales")] string subjectLocalName,
         [Description("Intent for the grant")] string? intent = null,
         CancellationToken cancellationToken = default)
     {
-        var (grantor, grantorName) = ChatTools.ResolvePrincipal(grantorKey);
-        var (grantee, _) = ChatTools.ResolvePrincipal(granteeKey);
-        using var _ = VerifiedActor.Enter(new ActorContext(grantor, grantorName));
+        var actor = McpActor.Require(httpContextAccessor);
+        var grantee = McpActor.ParsePrincipalId(granteePrincipalId, nameof(granteePrincipalId));
+        using var _ = VerifiedActor.Enter(actor);
 
         var subject = new NeuronId(
             subjectType.Trim(),
             brain.Owner,
-            PrincipalPartition.InstanceName(grantor, subjectLocalName.Trim()));
-        var grantsName = PrincipalPartition.InstanceName(grantor, IGrants.InstanceName);
+            McpActor.Partition(actor, subjectLocalName.Trim()));
+        var grantsName = McpActor.Partition(actor, IGrants.InstanceName);
 
         var granted = await brain
             .Get<IGrants>(grantsName)
@@ -166,23 +164,22 @@ internal sealed class RegistryTools(IDigitalBrain brain)
     }
 
     [McpServerTool(Name = McpSurface.RevokeAccess)]
-    [Description("Revoke a previously granted read access.")]
+    [Description("Revoke a previously granted read access on a subject owned by the authenticated caller.")]
     public async Task<string> RevokeAccessAsync(
-        [Description("Grantor principal key")] string grantorKey,
-        [Description("Grantee principal key")] string granteeKey,
+        [Description("Grantee principal id (GUID)")] string granteePrincipalId,
         [Description("Subject grain type")] string subjectType,
         [Description("Subject local name")] string subjectLocalName,
         CancellationToken cancellationToken = default)
     {
-        var (grantor, grantorName) = ChatTools.ResolvePrincipal(grantorKey);
-        var (grantee, _) = ChatTools.ResolvePrincipal(granteeKey);
-        using var _ = VerifiedActor.Enter(new ActorContext(grantor, grantorName));
+        var actor = McpActor.Require(httpContextAccessor);
+        var grantee = McpActor.ParsePrincipalId(granteePrincipalId, nameof(granteePrincipalId));
+        using var _ = VerifiedActor.Enter(actor);
 
         var subject = new NeuronId(
             subjectType.Trim(),
             brain.Owner,
-            PrincipalPartition.InstanceName(grantor, subjectLocalName.Trim()));
-        var grantsName = PrincipalPartition.InstanceName(grantor, IGrants.InstanceName);
+            McpActor.Partition(actor, subjectLocalName.Trim()));
+        var grantsName = McpActor.Partition(actor, IGrants.InstanceName);
 
         var revoked = await brain
             .Get<IGrants>(grantsName)
@@ -197,19 +194,20 @@ internal sealed class RegistryTools(IDigitalBrain brain)
 
     [McpServerTool(Name = McpSurface.ReadChart)]
     [Description(
-        "Read a chart as a principal. subjectLocalName is the chart's local name; "
-        + "ownerPrincipalKey is who owns the chart partition; readerPrincipalKey is who reads.")]
+        "Read a chart as the authenticated caller. subjectLocalName is the chart's local name; "
+        + "ownerPrincipalId defaults to the caller when omitted.")]
     public async Task<string> ReadChartAsync(
         [Description("Chart local name, e.g. sales")] string subjectLocalName,
-        [Description("Owner principal key of the chart")] string ownerPrincipalKey,
-        [Description("Reader principal key")] string readerPrincipalKey = "operator",
+        [Description("Owner principal id (GUID); omit to use the caller")] string? ownerPrincipalId = null,
         CancellationToken cancellationToken = default)
     {
-        var (ownerPrincipal, _) = ChatTools.ResolvePrincipal(ownerPrincipalKey);
-        var (reader, readerName) = ChatTools.ResolvePrincipal(readerPrincipalKey);
-        using var _ = VerifiedActor.Enter(new ActorContext(reader, readerName));
+        var actor = McpActor.Require(httpContextAccessor);
+        var owner = string.IsNullOrWhiteSpace(ownerPrincipalId)
+            ? actor.PrincipalId
+            : McpActor.ParsePrincipalId(ownerPrincipalId, nameof(ownerPrincipalId));
+        using var _ = VerifiedActor.Enter(actor);
 
-        var chartName = PrincipalPartition.InstanceName(ownerPrincipal, subjectLocalName.Trim());
+        var chartName = PrincipalPartition.InstanceName(owner, subjectLocalName.Trim());
         try
         {
             var points = await brain
@@ -225,7 +223,6 @@ internal sealed class RegistryTools(IDigitalBrain brain)
         }
         catch (Exception ex)
         {
-            // Orleans may wrap settled refusals.
             if (ex.InnerException is NeuronAuthorizationException inner)
             {
                 return $"DENIED {inner.Message}";

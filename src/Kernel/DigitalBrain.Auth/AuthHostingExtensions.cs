@@ -2,12 +2,13 @@ using Azure.Data.Tables;
 using DigitalBrain.Abstractions;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Auth;
 
-internal static class AuthHostingExtensions
+public static class AuthHostingExtensions
 {
     public const string AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
 
@@ -21,7 +22,6 @@ internal static class AuthHostingExtensions
             return tables.GetTableClient(AuthOptions.UsersTableName);
         });
         builder.Services.TryAddSingleton<IAccountDirectory, TableAccountDirectory>();
-        builder.Services.TryAddSingleton<IWorkspaceMembershipGateway, WorkspaceMembershipGateway>();
         builder.Services.AddHttpContextAccessor();
 
         builder.Services
@@ -38,6 +38,17 @@ internal static class AuthHostingExtensions
             .AddUserStore<DigitalBrainUserStore>();
 
         builder.Services.AddScoped<IUserClaimsPrincipalFactory<DigitalBrainUser>, DigitalBrainClaimsPrincipalFactory>();
+
+        var protectionKey = builder.Configuration[DigitalBrainResourceNames.StateProtectionKeyConfigurationKey];
+        if (string.IsNullOrWhiteSpace(protectionKey))
+        {
+            throw new InvalidOperationException(
+                $"Missing shared auth/data-protection key '{DigitalBrainResourceNames.StateProtectionKeyConfigurationKey}'.");
+        }
+
+        // Replace the default ephemeral provider so Kernel and MCP share cookie tickets.
+        builder.Services.AddSingleton<IDataProtectionProvider>(
+            new SharedSecretDataProtectionProvider(protectionKey));
 
         builder.Services
             .AddAuthentication(AuthenticationScheme)
@@ -76,7 +87,6 @@ internal static class AuthHostingExtensions
             return new LoopbackDevAuthOptions(
                 AuthOptions.ResolveAllowLoopbackDev(configuration, environment));
         });
-        builder.Services.AddHostedService<DevelopmentBootstrapSeeder>();
 
         return builder;
     }

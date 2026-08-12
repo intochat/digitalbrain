@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Identity;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Auth;
 
-internal sealed class DigitalBrainUserStore(IAccountDirectory accounts) :
+public sealed class DigitalBrainUserStore(IAccountDirectory accounts) :
     IUserStore<DigitalBrainUser>,
     IUserPasswordStore<DigitalBrainUser>,
     IUserSecurityStampStore<DigitalBrainUser>

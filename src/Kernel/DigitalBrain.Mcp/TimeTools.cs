@@ -8,19 +8,18 @@ using ModelContextProtocol.Server;
 namespace DigitalBrain.Mcp;
 
 [McpServerToolType]
-internal sealed class TimeTools(IDigitalBrain brain)
+internal sealed class TimeTools(IDigitalBrain brain, IHttpContextAccessor httpContextAccessor)
 {
     private static readonly TimeSpan Bound = TimeSpan.FromSeconds(60);
 
     [McpServerTool(Name = McpSurface.ArmSchedule)]
     [Description(
-        "Arm a recurring schedule (Wave 5). periodSeconds is the cadence; "
-        + "use 5 for a live catch-up gate (20s downtime → CollapsedPeriods=4).")]
+        "Arm a recurring schedule in the authenticated caller's partition (Wave 5). "
+        + "periodSeconds is the cadence; use 5 for a live catch-up gate.")]
     public async Task<string> ArmScheduleAsync(
-        [Description("Schedule instance name, e.g. board-refresh")] string name,
+        [Description("Schedule local name, e.g. board-refresh")] string name,
         [Description("Period in seconds")] int periodSeconds = 300,
         [Description("Note carried on each tick")] string note = "tick",
-        [Description("Principal key: operator, alice, or bob")] string principalKey = "operator",
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -29,11 +28,10 @@ internal sealed class TimeTools(IDigitalBrain brain)
             throw new ArgumentOutOfRangeException(nameof(periodSeconds));
         }
 
-        var (principal, username) = ChatTools.ResolvePrincipal(principalKey);
-        using var _ = VerifiedActor.Enter(new ActorContext(principal, username));
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
 
-        var instance = PrincipalPartition.InstanceName(principal, name.Trim());
-        var actor = new ActorContext(principal, username);
+        var instance = McpActor.Partition(actor, name.Trim());
         var armed = await brain
             .Get<ISchedule>(instance)
             .FireAsync<ScheduleArmed>(
@@ -53,14 +51,13 @@ internal sealed class TimeTools(IDigitalBrain brain)
     public async Task<string> ForceScheduleCatchUpAsync(
         [Description("Schedule local name")] string name,
         [Description("Missed periods to collapse")] int missedPeriods = 4,
-        [Description("Principal key")] string principalKey = "operator",
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        var (principal, username) = ChatTools.ResolvePrincipal(principalKey);
-        using var _ = VerifiedActor.Enter(new ActorContext(principal, username));
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
 
-        var instance = PrincipalPartition.InstanceName(principal, name.Trim());
+        var instance = McpActor.Partition(actor, name.Trim());
         var tick = await brain
             .Get<ISchedule>(instance)
             .FireAsync<ScheduleTick>(
@@ -77,14 +74,13 @@ internal sealed class TimeTools(IDigitalBrain brain)
     [Description("Read schedule snapshot including last catch-up Resolution/CollapsedPeriods.")]
     public async Task<string> ReadScheduleAsync(
         [Description("Schedule local name")] string name,
-        [Description("Principal key")] string principalKey = "operator",
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        var (principal, username) = ChatTools.ResolvePrincipal(principalKey);
-        using var _ = VerifiedActor.Enter(new ActorContext(principal, username));
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
 
-        var instance = PrincipalPartition.InstanceName(principal, name.Trim());
+        var instance = McpActor.Partition(actor, name.Trim());
         var snap = await brain
             .GetGrainProxy<ISchedule>(instance)
             .Read()
@@ -104,6 +100,8 @@ internal sealed class TimeTools(IDigitalBrain brain)
         [Description("Max entries")] int limit = 50,
         CancellationToken cancellationToken = default)
     {
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(Bound);
 
@@ -130,6 +128,9 @@ internal sealed class TimeTools(IDigitalBrain brain)
         ArgumentException.ThrowIfNullOrWhiteSpace(identity);
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
+
         var snap = await brain
             .Get<ICell>(identity.Trim())
             .FireAsync<CellSnapshot>(
@@ -149,6 +150,9 @@ internal sealed class TimeTools(IDigitalBrain brain)
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(identity);
+
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
 
         var snap = await brain
             .Get<ICell>(identity.Trim())

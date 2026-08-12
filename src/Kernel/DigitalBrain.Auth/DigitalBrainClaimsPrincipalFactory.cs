@@ -2,9 +2,9 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Auth;
 
-internal sealed class DigitalBrainClaimsPrincipalFactory(
+public sealed class DigitalBrainClaimsPrincipalFactory(
     UserManager<DigitalBrainUser> users,
     IOptions<IdentityOptions> optionsAccessor)
     : UserClaimsPrincipalFactory<DigitalBrainUser>(users, optionsAccessor)

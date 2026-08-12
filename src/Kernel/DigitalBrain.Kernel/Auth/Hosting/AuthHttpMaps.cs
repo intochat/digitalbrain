@@ -2,6 +2,7 @@ using System.Security.Claims;
 using DigitalBrain.Abstractions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
+using DigitalBrain.Auth;
 
 namespace DigitalBrain.Kernel;
 

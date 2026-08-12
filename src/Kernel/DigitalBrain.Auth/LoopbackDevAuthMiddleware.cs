@@ -1,8 +1,8 @@
 using System.Security.Claims;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Auth;
 
-internal sealed class LoopbackDevAuthMiddleware(
+public sealed class LoopbackDevAuthMiddleware(
     RequestDelegate next,
     LoopbackDevAuthOptions options,
     IHostEnvironment environment,

@@ -2,6 +2,7 @@ using System.Net.ServerSentEvents;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.UI;
+using DigitalBrain.Auth;
 
 namespace DigitalBrain.Kernel;
 

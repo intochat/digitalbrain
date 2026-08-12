@@ -1,8 +1,8 @@
 using System.Net;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Auth;
 
-internal static class RequestNetwork
+public static class RequestNetwork
 {
     public static bool IsLoopback(HttpContext context)
     {

@@ -1,6 +1,6 @@
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Auth;
 
-internal interface IAccountDirectory
+public interface IAccountDirectory
 {
     Task<bool> IsEmptyAsync(CancellationToken cancellationToken);
 

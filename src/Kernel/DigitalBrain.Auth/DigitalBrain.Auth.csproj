@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DigitalBrain.Auth</RootNamespace>
+    <Description>Shared ASP.NET Identity cookie auth, loopback dev bypass, and principal surfaces for Kernel and northbound MCP.</Description>
+    <NoWarn>$(NoWarn);CA1812</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Azure.Data.Tables" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

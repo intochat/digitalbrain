@@ -1,6 +1,7 @@
 using DigitalBrain.Aspire;
 using DigitalBrain.Client;
 using DigitalBrain.Core;
+using DigitalBrain.Auth;
 using DigitalBrain.Kernel;
 using DigitalBrain.ServiceDefaults;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -10,6 +11,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddDigitalBrain();
 builder.AddDigitalBrainAuth();
+builder.Services.TryAddSingleton<IWorkspaceMembershipGateway, WorkspaceMembershipGateway>();
+builder.Services.AddHostedService<DevelopmentBootstrapSeeder>();
 builder.Services.TryAddSingleton(static services =>
     new OwnerSessionJournal(services.GetRequiredService<IDigitalBrain>()));
 

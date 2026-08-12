@@ -1,6 +1,6 @@
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Auth;
 
-internal sealed class DigitalBrainUser
+public sealed class DigitalBrainUser
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
 

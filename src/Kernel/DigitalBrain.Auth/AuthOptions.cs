@@ -1,6 +1,6 @@
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Auth;
 
-internal static class AuthOptions
+public static class AuthOptions
 {
     public const string AllowLoopbackDevKey = "DigitalBrain:Auth:AllowLoopbackDev";
     public const string UsersTableName = "identityusers";

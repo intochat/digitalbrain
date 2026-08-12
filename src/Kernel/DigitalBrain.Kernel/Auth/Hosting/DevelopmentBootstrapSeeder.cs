@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using Microsoft.AspNetCore.Identity;
+using DigitalBrain.Auth;
 
 namespace DigitalBrain.Kernel;
 

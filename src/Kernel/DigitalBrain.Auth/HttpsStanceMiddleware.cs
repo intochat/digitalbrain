@@ -1,6 +1,6 @@
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Auth;
 
-internal sealed class HttpsStanceMiddleware(RequestDelegate next)
+public sealed class HttpsStanceMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context)
     {
