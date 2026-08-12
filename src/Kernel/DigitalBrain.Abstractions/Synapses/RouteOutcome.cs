@@ -1,18 +1,5 @@
 namespace DigitalBrain.Abstractions;
 
-[GenerateSerializer]
-[Alias("db.route-outcome-kind")]
-public enum RouteOutcomeKind
-{
-    Delivered,
-    Refused,
-    Failed,
-    Abandoned,
-    Unrouted,
-    Expired,
-    Disabled,
-}
-
 // Correlation is carried in the payload because the outcome is journaled under its own
 // envelope: readers match on this field, never on the envelope's CorrelationId.
 [GenerateSerializer]
@@ -51,3 +38,4 @@ public sealed record RouteOutcome(
             ? string.Empty
             : reason.Length <= MaximumReasonLength ? reason : reason[..MaximumReasonLength];
 }
+

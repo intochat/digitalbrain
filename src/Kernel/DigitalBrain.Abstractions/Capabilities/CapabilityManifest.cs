@@ -10,15 +10,3 @@ public sealed record CapabilityManifest(
     public IReadOnlyList<SynapseCapabilityDescriptor> Facts { get; init; } = Facts ?? [];
 }
 
-public sealed record NeuronCapabilityDescriptor(
-    string ContractId,
-    string Description,
-    string DefaultInstanceName,
-    IReadOnlyList<SynapseCapabilityDescriptor> Accepted,
-    IReadOnlyList<SynapseCapabilityDescriptor> Emitted);
-
-public sealed record SynapseCapabilityDescriptor(
-    string ContractId,
-    int SchemaVersion,
-    string Description,
-    string JsonSchema);

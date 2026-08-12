@@ -9,14 +9,3 @@ internal static class PrincipalScoped
         => PrincipalPartition.InstanceName(principal, localName);
 }
 
-internal static class PrincipalChat
-{
-    public static string InstanceName(PrincipalId principal, string conversationName)
-        => PrincipalScoped.InstanceName(principal, conversationName);
-}
-
-internal static class PrincipalSurface
-{
-    public static string InstanceName(PrincipalId principal, string surfaceName)
-        => PrincipalScoped.InstanceName(principal, surfaceName);
-}

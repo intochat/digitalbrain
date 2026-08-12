@@ -5,13 +5,6 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Core;
 
-public sealed record BroadcastRoute(string SynapseAlias, string HandlerGrainType);
-
-public sealed class BroadcastTopology(IReadOnlyCollection<BroadcastRoute> routes)
-{
-    public IReadOnlyCollection<BroadcastRoute> Routes { get; } = routes;
-}
-
 internal sealed class BroadcastCatalog
 {
     private readonly ConcurrentDictionary<string, ImmutableHashSet<string>> _handlers =
@@ -74,3 +67,4 @@ internal sealed class BroadcastCatalog
         return null;
     }
 }
+

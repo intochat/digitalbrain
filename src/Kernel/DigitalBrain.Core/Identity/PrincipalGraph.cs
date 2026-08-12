@@ -11,18 +11,3 @@ internal static class PrincipalGraph
             : ISynapseGraph.ForOwner(owner);
 }
 
-internal static class PrincipalRegistry
-{
-    internal static NeuronId Resolve(OwnerId owner)
-        => VerifiedActor.Current is { } actor
-            ? IRegistry.ForPrincipal(owner, actor.PrincipalId)
-            : IRegistry.ForOwner(owner);
-}
-
-internal static class PrincipalGrants
-{
-    internal static NeuronId Resolve(OwnerId owner)
-        => VerifiedActor.Current is { } actor
-            ? IGrants.ForPrincipal(owner, actor.PrincipalId)
-            : IGrants.ForOwner(owner);
-}

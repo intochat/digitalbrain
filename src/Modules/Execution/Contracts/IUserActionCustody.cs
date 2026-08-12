@@ -2,8 +2,6 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Execution;
 
-public sealed record IssuedUserAction(UserActionRequired Requirement);
-
 public interface IUserActionCustody
 {
     ValueTask<IssuedUserAction> IssueAsync(
