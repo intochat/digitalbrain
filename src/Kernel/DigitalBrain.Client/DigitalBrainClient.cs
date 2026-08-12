@@ -259,6 +259,23 @@ public sealed class DigitalBrainClient : IDigitalBrain
         }
     }
 
+    // A settled refusal never produces the awaited reply, so without this the caller waits
+    // out its own token on a request the kernel has already declined.
+    private static void RequireNoRefusal(Synapse candidate, CorrelationId correlation)
+    {
+        if (candidate is RouteOutcome outcome && outcome.Correlation == correlation)
+        {
+            throw new NeuronAuthorizationException(
+                $"{outcome.Kind} by {outcome.Receiver}: {outcome.Reason}");
+        }
+
+        if (candidate is Unrouted unrouted && unrouted.Correlation == correlation)
+        {
+            throw new NeuronAuthorizationException(
+                $"Nothing is connected to receive '{unrouted.Alias}' from {unrouted.Source}.");
+        }
+    }
+
     private static async Task<Synapse> WaitForResponseAsync(
         ChannelJournalObserver observer,
         CorrelationId correlation,
@@ -269,6 +286,8 @@ public sealed class DigitalBrainClient : IDigitalBrain
         {
             foreach (var delivery in page.Delta)
             {
+                RequireNoRefusal(delivery.Synapse, correlation);
+
                 if (delivery.CorrelationId == correlation
                     && responseType.IsInstanceOfType(delivery.Synapse))
                 {
@@ -294,6 +313,8 @@ public sealed class DigitalBrainClient : IDigitalBrain
             var read = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, cursor).ConfigureAwait(false);
             foreach (var candidate in read.Delta)
             {
+                RequireNoRefusal(candidate.Synapse, correlation);
+
                 if (candidate.CorrelationId == correlation
                     && responseType.IsInstanceOfType(candidate.Synapse))
                 {

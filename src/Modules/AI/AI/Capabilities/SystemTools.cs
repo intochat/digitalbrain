@@ -27,6 +27,10 @@ public sealed class SystemTools(
     // model's self-correction when a target refuses or is unconfigured.
     private static readonly TimeSpan ReplyWait = TimeSpan.FromSeconds(15);
 
+    // Long enough for the 50ms outbox drain to attempt the hop and report a settled
+    // refusal, short enough that firing a fact still feels immediate.
+    private static readonly TimeSpan FactOutcomeWait = TimeSpan.FromSeconds(2);
+
     public IReadOnlyList<AIFunction> All()
         =>
         [
@@ -230,12 +234,10 @@ public sealed class SystemTools(
         var cursor = opened.ResumeSequence;
         var delivery = await session.Fire(target, request).ConfigureAwait(false);
 
-        if (responseType is null)
-        {
-            return $"Delivered to {target}.";
-        }
-
-        var abandonAfter = DateTimeOffset.UtcNow + ReplyWait;
+        // A plain fact has no reply to wait for, but the hop has not been attempted yet either:
+        // the outbox drains after this call returns. Waiting briefly turns a settled refusal
+        // into a reason instead of a confident "Delivered" the model would repeat to the owner.
+        var abandonAfter = DateTimeOffset.UtcNow + (responseType is null ? FactOutcomeWait : ReplyWait);
         while (true)
         {
             var read = await session
@@ -244,21 +246,44 @@ public sealed class SystemTools(
 
             foreach (var journaled in read.Delta)
             {
-                if (journaled.CorrelationId == delivery.CorrelationId
+                if (journaled.Synapse is RouteOutcome outcome
+                    && outcome.Correlation == delivery.CorrelationId)
+                {
+                    return $"{outcome.Kind} by {outcome.Receiver}: {outcome.Reason}";
+                }
+
+                if (journaled.Synapse is Unrouted unrouted
+                    && unrouted.Correlation == delivery.CorrelationId)
+                {
+                    return $"Unrouted: nothing is connected to receive '{unrouted.Alias}' from "
+                        + $"{unrouted.Source}. Wire it with db.connect first, then trigger the source.";
+                }
+
+                if (responseType is not null
+                    && journaled.CorrelationId == delivery.CorrelationId
                     && responseType.IsInstanceOfType(journaled.Synapse))
                 {
                     return JsonSerializer.Serialize(journaled.Synapse, responseType);
                 }
             }
 
+            if (read.ResetSnapshot is not null)
+            {
+                return $"The session journal compacted past sequence {cursor} before an outcome for "
+                    + $"{target} arrived. The request is committed but its result is unknown — say so.";
+            }
+
             cursor = read.ResumeSequence;
 
             if (DateTimeOffset.UtcNow >= abandonAfter)
             {
-                return $"No {responseType.Name} reply from {target} within "
-                    + $"{ReplyWait.TotalSeconds:F0}s. The request is "
-                    + "committed; the target may be unconfigured or refusing — tell the owner what "
-                    + "you attempted rather than claiming it worked.";
+                return responseType is null
+                    ? $"Committed for delivery to {target}; no failure reported within "
+                        + $"{FactOutcomeWait.TotalSeconds:F0}s."
+                    : $"No {responseType.Name} reply from {target} within "
+                        + $"{ReplyWait.TotalSeconds:F0}s. The request is "
+                        + "committed; the target may be unconfigured or refusing — tell the owner what "
+                        + "you attempted rather than claiming it worked.";
             }
 
             await Task.Delay(TimeSpan.FromMilliseconds(25), cancellationToken).ConfigureAwait(false);

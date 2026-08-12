@@ -151,10 +151,17 @@ public abstract class Neuron :
     protected void EnlistTurnRollback(Action rollback)
         => _turn.EnlistRollback(rollback);
 
+    // Refusing an unhandled synapse here is correct in principle but is NOT this slice's work:
+    // ReplyAsync addresses the caller, and callers routinely have no IHandle for the reply
+    // type, so refusing breaks every request/reply in the product. It belongs to the turn and
+    // delivery hardening, with an explicit accept-list for reply sinks.
     protected virtual Task OnUnboundSynapseAsync(
         Synapse synapse,
         CancellationToken cancellationToken)
         => Task.CompletedTask;
+
+    internal SynapseDelivery StageIncomingOutcome(Synapse outcome, SynapseDelivery cause)
+        => _messages.StageIncomingOutcome(outcome, cause);
 
     protected new IDisposable RegisterTimer(
         Func<object, Task> callback,

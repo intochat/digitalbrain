@@ -122,6 +122,28 @@ internal sealed class NeuronMessagePipeline(
         }
     }
 
+    // An outcome is journaled into this neuron's incoming feed, never delivered: the reader
+    // that fired the failed synapse is already polling that feed, and a delivered outcome
+    // could itself fail and produce another one.
+    internal SynapseDelivery StageIncomingOutcome(Synapse outcome, SynapseDelivery cause)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        ArgumentNullException.ThrowIfNull(cause);
+
+        var delivery = SynapseDelivery.Create(
+            turn.Snapshot(outcome),
+            neuron.Id,
+            turn.NextOutgoingSequence,
+            cause,
+            neuron.NeuronTimeProvider);
+
+        journal.AppendIncoming(delivery);
+        return delivery;
+    }
+
+    internal static bool IsOutcome(Synapse synapse)
+        => synapse is RouteOutcome or Unrouted;
+
     private async Task<SynapseDelivery> FireAsync(
         Synapse synapse,
         NeuronId[] receivers,
@@ -145,6 +167,12 @@ internal sealed class NeuronMessagePipeline(
                 receivers,
                 turn.CurrentDepth + 1,
                 Attempts: 0));
+        }
+        else if (!IsOutcome(synapse) && SynapseAlias.Of(synapse.GetType()) is { } unroutedAlias)
+        {
+            StageIncomingOutcome(
+                new Unrouted(delivery.SynapseId, unroutedAlias, neuron.Id, delivery.CorrelationId),
+                delivery);
         }
 
         if (turn.Handling is null)

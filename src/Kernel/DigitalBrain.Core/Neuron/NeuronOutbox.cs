@@ -12,6 +12,10 @@ internal sealed class NeuronOutbox(
 {
     private static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(50);
 
+    // Outcomes are staged here and journaled only after the drain loop finishes: the loop
+    // indexes and mutates `entries`, so appending mid-iteration would corrupt the cursor.
+    private readonly List<(SynapseDelivery Cause, Synapse Outcome)> _outcomes = [];
+
     private IGrainTimer? _draining;
     private bool _wakeUpRegistered;
 
@@ -109,6 +113,7 @@ internal sealed class NeuronOutbox(
     private async Task DrainAsync(CancellationToken cancellationToken)
     {
         var blockedTargets = new HashSet<NeuronId>();
+        _outcomes.Clear();
 
         for (var index = 0; index < entries.Count;)
         {
@@ -186,10 +191,37 @@ internal sealed class NeuronOutbox(
             index++;
         }
 
+        FlushOutcomes();
+
         await CommitAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         StopDrainingWhenEmpty();
+    }
+
+    private void FlushOutcomes()
+    {
+        foreach (var (cause, outcome) in _outcomes)
+        {
+            neuron.StageIncomingOutcome(outcome, cause);
+        }
+
+        _outcomes.Clear();
+    }
+
+    private void StageOutcome(
+        SynapseDelivery delivery,
+        NeuronId receiver,
+        RouteOutcomeKind kind,
+        string reason)
+    {
+        if (NeuronMessagePipeline.IsOutcome(delivery.Synapse))
+        {
+            return;
+        }
+
+        var alias = SynapseAlias.Of(delivery.Synapse.GetType()) ?? delivery.Synapse.GetType().Name;
+        _outcomes.Add((delivery, RouteOutcome.For(delivery, alias, receiver, kind, reason)));
     }
 
     private bool Exhausted(OutboxEntry entry)
@@ -227,14 +259,16 @@ internal sealed class NeuronOutbox(
 
             return true;
         }
-        catch (NeuronAuthorizationException refusal)
-        {
-            Record("refused", entry.Delivery, receiver, refusal.Message);
-            return true;
-        }
+        // An attempt timeout is a retry, not a settled outcome, so it is caught first.
         catch (OperationCanceledException) when (attemptToken.IsCancellationRequested)
         {
             return false;
+        }
+        catch (Exception failure) when (NeuronDeliveryMemory.Settles(failure))
+        {
+            Record("refused", entry.Delivery, receiver, failure.Message);
+            StageOutcome(entry.Delivery, receiver, RouteOutcomeKind.Refused, failure.Message);
+            return true;
         }
         catch (Exception)
         {
@@ -242,12 +276,19 @@ internal sealed class NeuronOutbox(
         }
     }
 
-    private static void Abandon(OutboxEntry entry, string reason)
+    private void Abandon(OutboxEntry entry, string reason)
     {
         foreach (var receiver in entry.Pending)
         {
             Record("abandoned", entry.Delivery, receiver, reason);
         }
+
+        // One outcome per abandoned entry, naming every receiver it never reached.
+        StageOutcome(
+            entry.Delivery,
+            entry.Pending[0],
+            RouteOutcomeKind.Abandoned,
+            $"{reason} (receivers: {string.Join(", ", entry.Pending)})");
     }
 
     private static void Record(
