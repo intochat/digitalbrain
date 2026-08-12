@@ -35,11 +35,11 @@ public sealed class GrantsNeuron : Neuron, IGrants
                 $"Grants '{Id}' cannot grant access to '{synapse.Subject}' owned by '{synapse.Subject.Owner}'.");
         }
 
-        if (!PrincipalPartition.OwnsInstance(grantor.PrincipalId, synapse.Subject.Name))
+        if (!CanGrantSubject(grantor.PrincipalId, synapse.Subject))
         {
             throw new NeuronAuthorizationException(
                 $"Grants '{Id}' refuses grant of '{synapse.Subject}': only the principal who owns "
-                + "that instance name may grant access.");
+                + "that instance name may grant access (library catalog grants use owner grants book).");
         }
 
         if (synapse.Grantee == grantor.PrincipalId)
@@ -190,6 +190,21 @@ public sealed class GrantsNeuron : Neuron, IGrants
         }
 
         return removed;
+    }
+
+
+    // Principal-partitioned subjects: grantor must own the instance name.
+    // Library 2b (a): shared owner catalog grants live on IGrants.ForOwner for subject library/main.
+    private bool CanGrantSubject(PrincipalId grantor, NeuronId subject)
+    {
+        if (PrincipalPartition.OwnsInstance(grantor, subject.Name))
+        {
+            return true;
+        }
+
+        return string.Equals(Id.Name, IGrants.InstanceName, StringComparison.Ordinal)
+            && string.Equals(subject.Type, ILibrary.GrainTypeName, StringComparison.Ordinal)
+            && string.Equals(subject.Name, ILibrary.InstanceName, StringComparison.Ordinal);
     }
 
     private static void RequireCommand(CommandId commandId)

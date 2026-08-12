@@ -20,16 +20,15 @@ public sealed class LibraryNeuron : Neuron, ILibrary
         _states = ServiceProvider.GetRequiredService<Serializer<LibraryState>>();
     }
 
-    public Task HandleAsync(PublishLibraryArtifact synapse, CancellationToken cancellationToken)
+    public async Task HandleAsync(PublishLibraryArtifact synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
         RequireCommand(synapse.CommandId);
 
-        var publisher = synapse.Publisher
-            ?? VerifiedActor.Current
-            ?? throw new NeuronAuthorizationException(
-                $"Library '{Id}' refuses publish without a verified publisher.");
+        // Host mints via VerifiedActor.Enter; payload Publisher is untrusted (Library 2b (a)).
+        var publisher = await RequireCatalogAccessAsync("publish", cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         if (string.IsNullOrWhiteSpace(synapse.Name)
             || string.IsNullOrWhiteSpace(synapse.Version)
@@ -65,14 +64,18 @@ public sealed class LibraryNeuron : Neuron, ILibrary
 
         state.Artifacts.Add(artifact);
         Save(state);
-        return ReplyAsync(new LibraryArtifactPublished(synapse.CommandId, artifact), cancellationToken);
+        await ReplyAsync(new LibraryArtifactPublished(synapse.CommandId, artifact), cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    public Task HandleAsync(DiscoverLibrary synapse, CancellationToken cancellationToken)
+    public async Task HandleAsync(DiscoverLibrary synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
         RequireCommand(synapse.CommandId);
+
+        await RequireCatalogAccessAsync("discover", cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var intent = (synapse.Intent ?? "").Trim();
         var limit = synapse.Limit <= 0 ? 8 : Math.Min(synapse.Limit, 32);
@@ -93,7 +96,8 @@ public sealed class LibraryNeuron : Neuron, ILibrary
             hits = [.. artifacts.OrderByDescending(a => a.PublishedAt).Take(limit)];
         }
 
-        return ReplyAsync(new LibraryDiscoveries(synapse.CommandId, hits), cancellationToken);
+        await ReplyAsync(new LibraryDiscoveries(synapse.CommandId, hits), cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(InstallLibraryArtifact synapse, CancellationToken cancellationToken)

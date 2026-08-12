@@ -1,7 +1,8 @@
 namespace DigitalBrain.Abstractions.Library;
 
-// Owner-wide published artifact catalog. Installs land in the caller's principal
-// partition (disabled until enable). Content-hashed, immutable versions.
+// Owner-wide published artifact catalog (Library 2b (a): grant-gated publish/discover residual).
+// Installs land in the caller's principal partition (disabled until enable).
+// Content-hashed, immutable versions. Do not principal-partition the catalog grain.
 [ClientEntryPoint]
 [Alias("db.library")]
 public partial interface ILibrary :
