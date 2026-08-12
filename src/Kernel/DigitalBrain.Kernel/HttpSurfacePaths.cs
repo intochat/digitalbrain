@@ -35,5 +35,4 @@ internal static class HttpSurfacePaths
     public const string KindSurfaceOpen = "surface.open";
 
     // Multipart voice note → STT → same durable chat.send path.
-    public const string ChatVoicePath = "/chats/{chatName}/voice";
 }

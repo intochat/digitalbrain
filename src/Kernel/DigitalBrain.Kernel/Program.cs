@@ -21,7 +21,6 @@ app.UseDigitalBrainAuth();
 app.MapDefaultEndpoints();
 app.MapAuth();
 app.MapOwnerCommands();
-app.MapChatVoice();
 app.MapChatStreams();
 app.MapConversationVoice();
 app.MapConversationStreams();
