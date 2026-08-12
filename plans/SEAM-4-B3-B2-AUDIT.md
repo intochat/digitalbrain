@@ -33,3 +33,13 @@
 
 D1: `dotnet build DigitalBrain.slnx -warnaserror` (no FREEZE file edits)  
 D3: Product Grill rails smoke after D1 green
+
+## D1 — gate build
+
+**PASS** 2026-08-12: `dotnet build DigitalBrain.slnx -c Debug -warnaserror -p:RuntimeIdentifier= -p:SelfContained=false` → 0 Warning(s) / 0 Error(s).
+
+Gate fixes landed (not FREEZE):
+- `WhisperModel.cs` remove redundant cast (IDE0004 under TreatWarningsAsErrors)
+- `DigitalBrain.Modules.AI.csproj` `RuntimeIdentifiers=win-x64;linux-x64` so Linux box restore has `net11.0/linux-x64` when RID is ambient
+
+B4 residual unchanged.

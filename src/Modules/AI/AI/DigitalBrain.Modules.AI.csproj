@@ -4,8 +4,8 @@
     <Description>AI module: typed LLM neurons and direct Concurrent/GroupChat MAF orchestration outside the kernel.</Description>
     <RootNamespace>DigitalBrain.AI</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
-    <!-- Kernel host builds this library with -r win-x64 for Foundry natives. -->
-    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <!-- Kernel host builds this library with -r win-x64 for Foundry natives; linux-x64 for box/CI restore. -->
+    <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />

@@ -9,7 +9,6 @@ public abstract class WhisperModel
     // Explicit catalog — do not Assembly.GetTypes() (that loads FoundryLocalTranscriptionService
     // and requires Microsoft.AI.Foundry.Local at AppHost compose time).
     private static readonly Lazy<IReadOnlyList<WhisperModel>> AllLazy = new(static () =>
-        (IReadOnlyList<WhisperModel>)
         [
             new WhisperLargeV3Turbo(),
             new WhisperSmall(),
