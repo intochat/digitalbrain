@@ -1,10 +1,10 @@
 using System.Text.Json;
 using DigitalBrain.Modules.Sdk;
 using ModelContextProtocol.Authentication;
-using Orleans.Journaling;
 
 namespace DigitalBrain.Modules.Sdk.Mcp;
 
+// R10 honesty: only PrincipalTokenSlot-backed cache. Dead IDurableValue ctor removed (Seam 4).
 internal sealed class DurableMcpTokenCache : ITokenCache
 {
     private readonly Func<byte[]?> _read;
@@ -12,20 +12,6 @@ internal sealed class DurableMcpTokenCache : ITokenCache
     private readonly Func<ValueTask> _commit;
     private readonly IDurablePayloadProtector _protector;
     private readonly string _purpose;
-
-    internal DurableMcpTokenCache(
-        IDurableValue<byte[]> state,
-        Func<ValueTask> commit,
-        IDurablePayloadProtector protector,
-        string purpose)
-        : this(
-            () => state.Value is { Length: > 0 } bytes ? bytes : null,
-            value => state.Value = value ?? [],
-            commit,
-            protector,
-            purpose)
-    {
-    }
 
     internal DurableMcpTokenCache(
         PrincipalTokenSlot slot,

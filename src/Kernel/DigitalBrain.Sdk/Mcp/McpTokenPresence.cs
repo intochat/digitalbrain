@@ -2,7 +2,6 @@ using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Modules.Sdk;
 using ModelContextProtocol.Authentication;
-using Orleans.Journaling;
 
 namespace DigitalBrain.Modules.Sdk.Mcp;
 
@@ -39,17 +38,6 @@ internal static class McpTokenPresence
         var expiresAt = tokens.ObtainedAt.AddSeconds(lifetimeSeconds);
         return expiresAt <= time.GetUtcNow();
     }
-
-    internal static bool IsMissingOrExpired(
-        IDurableValue<byte[]> tokenState,
-        IDurablePayloadProtector protector,
-        string purpose,
-        TimeProvider time)
-        => IsMissingOrExpired(
-            () => tokenState.Value is { Length: > 0 } bytes ? bytes : null,
-            protector,
-            purpose,
-            time);
 
     internal static bool IsMissingOrExpired(
         PrincipalTokenSlot slot,
