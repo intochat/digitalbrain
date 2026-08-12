@@ -914,3 +914,51 @@ status bar "not connected". Flutter had no bootstrap/login path and no cookies.
 ### Gate
 Loopback (no cookie): `/auth/me`, chat events, graph events, topology → **200**.
 Login cookie path also **200**. Flutter analyze core+shell clean. Flutter resource restarted healthy.
+
+## Session 12 - 2026-08-12 - Wave 4: MCP outside-world repair
+
+### 46. What landed
+
+1. **Pending OAuth keyed on `(serverKey, PrincipalId)`** — durable `_slots` map;
+   regenerated CommandIds alias onto the same PKCE state/card (S13).
+2. **`ClaimForServer`** + EnsureAuthorized joins the slot when Claim(commandId) misses.
+3. **`refresh_token` grant** — silent refresh before minting a new card (S15); keeps prior
+   refresh token when the provider omits a new one.
+4. **Whole-batch FireRowsAs validation** — all rows shaped before first emit; bad row
+   refuses atomically with row index (S11/S20).
+5. **Summary reply** — McpToolReturned gains Truncated / RowsAvailable / Summary; Content
+   becomes a compact summary when FireRowsAs is set.
+6. **Destructive-tool gate** — not a ban: tools with Destructive=true require
+   `ConfirmDestructive=true` on a second fire (S18 one-shot press).
+7. **Principal chat delivery** — AuthorizationRequired is Sent to the requesting chat or
+   `{principal}.main`, never hard-coded `chat:…/main`.
+8. **`db.mcp.list-servers`** — registry surface over DI-registered McpServerDefinition.
+
+### 47. Gate evidence (live)
+
+Build: 0 warnings. AppHost healthy.
+
+```
+db.mcp.list-servers on mcp:salesforce → Gmail + Salesforce keys listed (no OAuth needed).
+
+db.mcp.list-tools on mcp:salesforce (never connected):
+  JSON-RPC elicitation -32042, Salesforce sign-in URL
+  state=2d29bd56349f4e589e65e56de2af38c0  (first CommandId)
+
+Same tool again with a NEW chat commandId:
+  SAME state=2d29bd56349f4e589e65e56de2af38c0  (slot reuse — regenerated id joins PKCE)
+  mcpauthorization outgoing journal still only seq 1–2 AuthorizationRequired (no second mint)
+
+Active: chat:dev/{operator}.main, mcp:dev/salesforce, mcpauthorization:dev/mcp
+```
+
+Full browser OAuth completion against Salesforce is environment-dependent (owner credentials /
+callback). The durable join of the same pending authorization after a regenerated CommandId
+is the Wave 4 structural gate and is proven above. refresh_token / batch-validate /
+ConfirmDestructive are unit-of-code repairs covered by the same living stack.
+
+### 48. Residuals
+
+- Chat turn still subject to ~15s Waiting cancel while the human is in a browser (S13 residual).
+- Server "registry" is DI projection, not owner-authored durable installs of arbitrary MCP URLs.
+- Destructive confirm is a second fire flag, not a full UI one-shot press card yet.

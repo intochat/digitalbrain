@@ -58,6 +58,41 @@ internal static class McpTokenPresence
         TimeProvider time)
         => IsMissingOrExpired(slot.Read, protector, purpose, time);
 
+    // Read tokens even when access is expired — needed for refresh_token grant (S15).
+    internal static bool TryReadTokens(
+        PrincipalTokenSlot slot,
+        IDurablePayloadProtector protector,
+        string purpose,
+        out TokenContainer tokens)
+    {
+        ArgumentNullException.ThrowIfNull(slot);
+        ArgumentNullException.ThrowIfNull(protector);
+        ArgumentException.ThrowIfNullOrWhiteSpace(purpose);
+        tokens = null!;
+
+        if (slot.Read() is not { Length: > 0 } protectedTokens)
+        {
+            return false;
+        }
+
+        try
+        {
+            var serialized = protector.Unprotect(purpose, protectedTokens);
+            var parsed = JsonSerializer.Deserialize<TokenContainer>(serialized);
+            if (parsed is null || string.IsNullOrWhiteSpace(parsed.AccessToken))
+            {
+                return false;
+            }
+
+            tokens = parsed;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     // Integration-record purpose: tokens are keyed by verified principal (User scope)
     // or workspace subject — never by bare neuron/server name alone.
     internal static string Purpose(string provider, IntegrationScope scope, string subjectId)

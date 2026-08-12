@@ -20,11 +20,14 @@ public sealed class McpAuthorizationNeuron :
 
     private const string PendingName = "mcp.authorization.pending";
     private const string CommandsName = "mcp.authorization.commands";
+    // Wave 4: (serverKey, PrincipalId) → PKCE state so regenerated CommandIds still join.
+    private const string SlotsName = "mcp.authorization.slots";
     private const string CodeProtectionPurposePrefix = "mcp/authorization/code";
     private const string VerifierProtectionPurposePrefix = "mcp/authorization/verifier";
 
     private readonly IDurableDictionary<string, byte[]> _pending;
     private readonly IDurableDictionary<Guid, byte[]> _commands;
+    private readonly IDurableDictionary<string, string> _slots;
     private readonly Serializer<PendingAuthorization> _serializer;
     private readonly Serializer<CommandAuthorizationRecord> _commandsSerializer;
     private readonly IDurablePayloadProtector _protector;
@@ -33,6 +36,7 @@ public sealed class McpAuthorizationNeuron :
     {
         _pending = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<string, byte[]>>(PendingName);
         _commands = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, byte[]>>(CommandsName);
+        _slots = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<string, string>>(SlotsName);
         _serializer = ServiceProvider.GetRequiredService<Serializer<PendingAuthorization>>();
         _commandsSerializer = ServiceProvider.GetRequiredService<Serializer<CommandAuthorizationRecord>>();
         _protector = ServiceProvider.GetRequiredService<IDurablePayloadProtector>();
@@ -82,6 +86,33 @@ public sealed class McpAuthorizationNeuron :
                 recorded.SignInUrl,
                 recorded.State,
                 recorded.Actor);
+        }
+
+        // (serverKey, PrincipalId) slot: reuse open PKCE so a new CommandId joins the same card.
+        var slotKey = SlotKey(request.ServerKey, request.Actor.PrincipalId);
+        if (_slots.TryGetValue(slotKey, out var slottedState)
+            && _pending.TryGetValue(slottedState, out var slottedSerialized))
+        {
+            var slotted = _serializer.Deserialize(slottedSerialized);
+            if (IsExpired(slotted))
+            {
+                RemovePending(slotted);
+                await WriteStateAsync(cancellationToken).ConfigureAwait(true);
+            }
+            else if (slotted.Actor.PrincipalId == request.Actor.PrincipalId
+                && string.Equals(slotted.ServerKey, request.ServerKey, StringComparison.OrdinalIgnoreCase)
+                && slotted.Outcome is not PendingAuthorizationOutcome.Denied)
+            {
+                _commands[request.CommandId.Value] = _commandsSerializer.SerializeToArray(ToCommandRecord(slotted));
+                await WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                return new AuthorizationRequired(
+                    slotted.CommandId,
+                    slotted.ServerKey,
+                    slotted.ServerDisplayName,
+                    slotted.SignInUrl,
+                    slotted.State,
+                    slotted.Actor);
+            }
         }
 
         if (_pending.TryGetValue(request.State, out var existingSerialized))
@@ -137,6 +168,7 @@ public sealed class McpAuthorizationNeuron :
             Consumed: false);
         _pending[request.State] = _serializer.SerializeToArray(pending);
         _commands[request.CommandId.Value] = _commandsSerializer.SerializeToArray(ToCommandRecord(pending));
+        _slots[slotKey] = request.State;
         await WriteStateAsync(cancellationToken).ConfigureAwait(true);
 
         var required = new AuthorizationRequired(
@@ -147,7 +179,7 @@ public sealed class McpAuthorizationNeuron :
             request.State,
             request.Actor);
         await EmitAsync(required).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        await SendAsync(new NeuronId("chat", Id.Owner, "main"), required)
+        await SendAsync(ResolvePrincipalChat(request.Actor, pending.RequestingNeuron), required)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return required;
     }
@@ -298,12 +330,64 @@ public sealed class McpAuthorizationNeuron :
             throw new NeuronAuthorizationException($"Authorization command '{commandId}' is not pending.");
         }
 
+        return await ClaimRecordedAsync(serialized, commandId.ToString(), actor, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    public async Task<McpAuthorizationClaim> ClaimForServer(
+        string serverKey,
+        ActorContext actor,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serverKey);
+        if (actor is null)
+        {
+            throw new NeuronAuthorizationException("Authorization requires a verified actor.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        await SweepExpiredAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        var slotKey = SlotKey(serverKey, actor.PrincipalId);
+        if (!_slots.TryGetValue(slotKey, out var state)
+            || !_pending.TryGetValue(state, out var pendingSerialized))
+        {
+            throw new NeuronAuthorizationException(
+                $"Authorization for server '{serverKey}' is not pending for this principal.");
+        }
+
+        var pending = _serializer.Deserialize(pendingSerialized);
+        if (IsExpired(pending))
+        {
+            RemovePending(pending);
+            await WriteStateAsync(cancellationToken).ConfigureAwait(true);
+            throw new NeuronAuthorizationException(
+                $"Authorization for server '{serverKey}' is not pending for this principal.");
+        }
+
+        if (pending.Actor.PrincipalId != actor.PrincipalId
+            || !string.Equals(pending.ServerKey, serverKey, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NeuronAuthorizationException(
+                $"Authorization for server '{serverKey}' is not pending for this principal.");
+        }
+
+        var recorded = ToCommandRecord(pending);
+        return ClaimFromRecord(recorded);
+    }
+
+    private async Task<McpAuthorizationClaim> ClaimRecordedAsync(
+        byte[] serialized,
+        string label,
+        ActorContext actor,
+        CancellationToken cancellationToken)
+    {
         var recorded = _commandsSerializer.Deserialize(serialized);
         // Status must not leak existence / State to another principal.
         if (recorded.Actor is null
             || recorded.Actor.PrincipalId != actor.PrincipalId)
         {
-            throw new NeuronAuthorizationException($"Authorization command '{commandId}' is not pending.");
+            throw new NeuronAuthorizationException($"Authorization command '{label}' is not pending.");
         }
 
         if (_pending.TryGetValue(recorded.State, out var pendingSerialized))
@@ -313,11 +397,18 @@ public sealed class McpAuthorizationNeuron :
             {
                 RemovePending(pending);
                 await WriteStateAsync(cancellationToken).ConfigureAwait(true);
-                throw new NeuronAuthorizationException($"Authorization command '{commandId}' is not pending.");
+                throw new NeuronAuthorizationException($"Authorization command '{label}' is not pending.");
             }
+
+            // Prefer live pending outcome over a stale command alias snapshot.
+            recorded = ToCommandRecord(pending);
         }
 
-        return recorded.Outcome switch
+        return ClaimFromRecord(recorded);
+    }
+
+    private static McpAuthorizationClaim ClaimFromRecord(CommandAuthorizationRecord recorded)
+        => recorded.Outcome switch
         {
             PendingAuthorizationOutcome.Open => new McpAuthorizationClaim(
                 McpAuthorizationClaimKind.Required,
@@ -337,9 +428,9 @@ public sealed class McpAuthorizationNeuron :
                 McpAuthorizationClaimKind.Denied,
                 Required: null,
                 new AuthorizationDenied(recorded.CommandId, recorded.ServerKey, recorded.State, recorded.Actor)),
-            _ => throw new InvalidOperationException($"Authorization command '{commandId}' has an unknown outcome."),
+            _ => throw new InvalidOperationException(
+                $"Authorization command '{recorded.CommandId}' has an unknown outcome."),
         };
-    }
 
     public async Task<McpAuthorizationCodeResult?> TakeCompletedCode(
         string state,
@@ -514,7 +605,38 @@ public sealed class McpAuthorizationNeuron :
     private void RemovePending(PendingAuthorization pending)
     {
         _pending.Remove(pending.State);
-        _commands.Remove(pending.CommandId.Value);
+        // Drop every command alias that pointed at this PKCE state.
+        foreach (var pair in _commands.ToArray())
+        {
+            var recorded = _commandsSerializer.Deserialize(pair.Value);
+            if (string.Equals(recorded.State, pending.State, StringComparison.Ordinal))
+            {
+                _commands.Remove(pair.Key);
+            }
+        }
+
+        var slotKey = SlotKey(pending.ServerKey, pending.Actor.PrincipalId);
+        if (_slots.TryGetValue(slotKey, out var slotted)
+            && string.Equals(slotted, pending.State, StringComparison.Ordinal))
+        {
+            _slots.Remove(slotKey);
+        }
+    }
+
+    private static string SlotKey(string serverKey, PrincipalId principal)
+        => $"{serverKey.Trim().ToLowerInvariant()}/{principal.Value:N}";
+
+    private NeuronId ResolvePrincipalChat(ActorContext actor, NeuronId? requesting)
+    {
+        if (requesting is { } chat
+            && string.Equals(chat.Type, "chat", StringComparison.OrdinalIgnoreCase)
+            && chat.Owner == Id.Owner)
+        {
+            return chat;
+        }
+
+        // Principal-partitioned conversation (Wave 3 naming).
+        return new NeuronId("chat", Id.Owner, PrincipalPartition.InstanceName(actor.PrincipalId, "main"));
     }
 
     private static NeuronId? CaptureRequestingNeuron()

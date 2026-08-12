@@ -49,6 +49,16 @@ public static class McpAuthorizationRail
         }
         catch (NeuronAuthorizationException)
         {
+            // Regenerated CommandId: join the (serverKey, PrincipalId) PKCE slot.
+            try
+            {
+                claim = await authorization
+                    .ClaimForServer(server.Key, actor, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (NeuronAuthorizationException)
+            {
+            }
         }
 
         if (claim is not null)
@@ -88,8 +98,23 @@ public static class McpAuthorizationRail
             return;
         }
 
-        // Single PKCE mint path. Tokens are exchanged on the Completed claim above so the
-        // MCP client library never opens a second authorization transaction.
+        // S15: access expired but refresh_token still good — silent refresh before a new card.
+        if (await TryRefreshAsync(
+                services,
+                configuration,
+                server,
+                tokenSlot,
+                commit,
+                protector,
+                purpose,
+                time,
+                cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        // Single PKCE mint path. Begin may re-join a Completed (server, principal) slot
+        // when CommandId was regenerated after the human signed in — exchange then.
         var required = await BeginNewAsync(
             authorization,
             configuration,
@@ -97,7 +122,94 @@ public static class McpAuthorizationRail
             server,
             actor,
             cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var afterBegin = await authorization.Claim(commandId, actor, cancellationToken)
+                .ConfigureAwait(false);
+            if (afterBegin.Kind is McpAuthorizationClaimKind.Completed)
+            {
+                await ExchangeCompletedAsync(
+                    authorization,
+                    codes,
+                    services,
+                    configuration,
+                    server,
+                    tokenSlot,
+                    commit,
+                    protector,
+                    purpose,
+                    commandId,
+                    actor,
+                    cancellationToken).ConfigureAwait(false);
+                return;
+            }
+        }
+        catch (NeuronAuthorizationException)
+        {
+        }
+
         throw new McpAuthorizationRequiredException(required);
+    }
+
+    private static async Task<bool> TryRefreshAsync(
+        IServiceProvider services,
+        IConfiguration configuration,
+        McpServerDefinition server,
+        PrincipalTokenSlot tokenSlot,
+        Func<ValueTask> commit,
+        IDurablePayloadProtector protector,
+        string purpose,
+        TimeProvider time,
+        CancellationToken cancellationToken)
+    {
+        if (!McpTokenPresence.TryReadTokens(tokenSlot, protector, purpose, out var existing)
+            || string.IsNullOrWhiteSpace(existing.RefreshToken))
+        {
+            return false;
+        }
+
+        try
+        {
+            TokenContainer refreshed;
+            if (services.GetService<IMcpTokenExchanger>() is { } exchanger
+                && exchanger is IMcpTokenRefresher refresher)
+            {
+                refreshed = await refresher
+                    .RefreshAsync(server, existing.RefreshToken, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            else
+            {
+                var httpClients = services.GetRequiredService<IHttpClientFactory>();
+                refreshed = await McpTokenExchange.RefreshAsync(
+                    server,
+                    configuration,
+                    httpClients,
+                    existing.RefreshToken,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            // Provider may omit a new refresh_token — keep the one that worked.
+            if (string.IsNullOrWhiteSpace(refreshed.RefreshToken))
+            {
+                refreshed.RefreshToken = existing.RefreshToken;
+            }
+
+            await McpTokenPresence.StoreAsync(
+                tokenSlot,
+                commit,
+                protector,
+                purpose,
+                refreshed,
+                cancellationToken).ConfigureAwait(false);
+            return !McpTokenPresence.IsMissingOrExpired(tokenSlot, protector, purpose, time);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // invalid_grant and friends: fall through to interactive sign-in.
+            return false;
+        }
     }
 
     private static async Task ExchangeCompletedAsync(
@@ -124,14 +236,15 @@ public static class McpAuthorizationRail
             return;
         }
 
-        // Recover the rail-minted state via idempotent Begin (command already recorded).
+        // Recover PKCE state: command alias first, else (serverKey, PrincipalId) slot via Begin
+        // which re-aliases a regenerated CommandId onto the completed transaction.
         var recovered = await authorization.Begin(
             new BeginMcpAuthorization(
                 commandId,
                 server.Key,
                 server.DisplayName,
                 new Uri("https://auth.digitalbrain.local/oauth/completed"),
-                "unused-when-command-exists",
+                Guid.NewGuid().ToString("N"),
                 actor),
             cancellationToken).ConfigureAwait(false);
 
@@ -316,5 +429,13 @@ internal interface IMcpTokenExchanger
         McpServerDefinition server,
         string code,
         string codeVerifier,
+        CancellationToken cancellationToken);
+}
+
+internal interface IMcpTokenRefresher
+{
+    Task<TokenContainer> RefreshAsync(
+        McpServerDefinition server,
+        string refreshToken,
         CancellationToken cancellationToken);
 }

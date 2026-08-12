@@ -28,4 +28,12 @@ public partial interface IMcpAuthorization : INeuron
         CommandId commandId,
         ActorContext actor,
         CancellationToken cancellationToken = default);
+
+    // Wave 4: pending OAuth is keyed by (serverKey, PrincipalId) so a regenerated
+    // CommandId still finds the same PKCE transaction mid-conversation.
+    [Alias(nameof(ClaimForServer))]
+    Task<McpAuthorizationClaim> ClaimForServer(
+        string serverKey,
+        ActorContext actor,
+        CancellationToken cancellationToken = default);
 }

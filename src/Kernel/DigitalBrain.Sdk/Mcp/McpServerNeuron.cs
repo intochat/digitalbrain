@@ -34,6 +34,25 @@ public sealed class McpServerNeuron : Neuron, IMcp
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
+    public Task HandleAsync(ListMcpServers synapse, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Durable catalog is DI-registered McpServerDefinition instances (module-owned).
+        // Per-server grain instance answers with the full known registry for discovery.
+        var servers = ServiceProvider.GetServices<McpServerDefinition>()
+            .OrderBy(static s => s.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(static s => new McpServerInfo(
+                s.Key,
+                s.DisplayName,
+                s.Endpoint.AbsoluteUri,
+                [.. s.Scopes]))
+            .ToArray();
+
+        return ReplyAsync(new McpServersListed(synapse.CommandId, servers), cancellationToken);
+    }
+
     public async Task HandleAsync(CallMcpTool synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
@@ -54,7 +73,13 @@ public sealed class McpServerNeuron : Neuron, IMcp
                 $"'{server.DisplayName}' has no tool '{synapse.Tool}'. It has: "
                 + string.Join(", ", tools.Select(static candidate => candidate.Name)) + ".");
 
-        // P0-7: all tools are allowed. Provider OAuth + per-principal integration are the boundary.
+        // S18: destructive tools are callable but require an explicit confirm press (not a ban).
+        if (tool.Destructive && !synapse.ConfirmDestructive)
+        {
+            throw new NeuronAuthorizationException(
+                $"'{server.DisplayName}' tool '{tool.Name}' is destructive. "
+                + "Re-fire db.mcp.call-tool with ConfirmDestructive=true after the owner presses once.");
+        }
 
         var rowType = RowTypeOf(synapse.FireRowsAs);
         string? integrationSubject = null;
@@ -76,24 +101,55 @@ public sealed class McpServerNeuron : Neuron, IMcp
         }
 
         var fired = 0;
+        var truncated = false;
+        var rowsAvailable = 0;
+        string? summary = null;
+        JsonElement replyContent = content;
+
         if (rowType is not null)
         {
-            foreach (var row in Rows(content).Take(FiredRowCap))
+            var allRows = Rows(content).ToArray();
+            rowsAvailable = allRows.Length;
+            truncated = rowsAvailable > FiredRowCap;
+            var batch = allRows.Take(FiredRowCap).ToArray();
+
+            // S11/S20: validate the WHOLE batch before the first emit — atomic refuse.
+            var shaped = new Synapse[batch.Length];
+            for (var i = 0; i < batch.Length; i++)
             {
-                await EmitAsync(RowSynapse(rowType, row, synapse.FireRowsAs!))
-                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+                shaped[i] = RowSynapse(rowType, batch[i], synapse.FireRowsAs!, rowIndex: i);
+            }
+
+            foreach (var row in shaped)
+            {
+                await EmitAsync(row).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 fired++;
             }
+
+            summary = truncated
+                ? $"Fired {fired} of {rowsAvailable} rows as '{synapse.FireRowsAs}' (cap {FiredRowCap}; truncated)."
+                : $"Fired {fired} rows as '{synapse.FireRowsAs}'.";
+            replyContent = JsonSerializer.SerializeToElement(new
+            {
+                summary,
+                firedRows = fired,
+                rowsAvailable,
+                truncated,
+                fireRowsAs = synapse.FireRowsAs,
+            });
         }
 
         await ReplyAsync(
             new McpToolReturned(
                 synapse.CommandId,
                 synapse.Tool,
-                content,
+                replyContent,
                 fired,
                 synapse.Actor,
-                integrationSubject),
+                integrationSubject,
+                truncated,
+                rowsAvailable,
+                summary),
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
@@ -111,13 +167,13 @@ public sealed class McpServerNeuron : Neuron, IMcp
                 + ".");
     }
 
-    private static Type RowTypeOf(string? fireRowsAs) => fireRowsAs is null
-        ? null!
+    private static Type? RowTypeOf(string? fireRowsAs) => fireRowsAs is null
+        ? null
         : SynapseTypeIndex.FindByAlias(fireRowsAs)
             ?? throw new NeuronAuthorizationException(
                 $"'{fireRowsAs}' names no synapse; rows can only fire as a known contract.");
 
-    private static Synapse RowSynapse(Type rowType, JsonElement row, string fireRowsAs)
+    private static Synapse RowSynapse(Type rowType, JsonElement row, string fireRowsAs, int rowIndex = 0)
     {
         Synapse? shaped;
         try
@@ -127,14 +183,14 @@ public sealed class McpServerNeuron : Neuron, IMcp
         catch (JsonException misshapen)
         {
             throw new NeuronAuthorizationException(
-                $"A result row does not fit '{fireRowsAs}' "
+                $"Result row {rowIndex} does not fit '{fireRowsAs}' "
                 + $"({ContractSignature.Of(rowType)}): {misshapen.Message} "
-                + "Shape the query so its columns match those fields.");
+                + "No rows were fired. Shape the query so every column matches those fields.");
         }
 
         return shaped
             ?? throw new NeuronAuthorizationException(
-                $"A result row produced no '{fireRowsAs}' value.");
+                $"Result row {rowIndex} produced no '{fireRowsAs}' value. No rows were fired.");
     }
 
     private static readonly JsonSerializerOptions RowShaping = new()
