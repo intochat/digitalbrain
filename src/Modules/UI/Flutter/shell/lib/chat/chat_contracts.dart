@@ -3,6 +3,10 @@ import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 
 typedef SendMessage = Future<void> Function(String text);
 typedef StreamMessage = Stream<ChatDelta> Function(String text);
+typedef StreamVoice = Stream<ChatDelta> Function(
+  List<int> audioBytes, {
+  String fileName,
+});
 typedef LoadTopology = Future<BrainTopologySnapshot> Function();
 typedef OpenUrl = Future<void> Function(Uri url);
 typedef ActivateChatButton = Future<void> Function({

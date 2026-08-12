@@ -10,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddDigitalBrain();
 builder.AddDigitalBrainAuth();
+builder.AddWhisperIfConfigured();
 builder.Services.TryAddSingleton(static services =>
     new OwnerSessionJournal(services.GetRequiredService<IDigitalBrain>()));
 
@@ -18,6 +19,7 @@ app.UseDigitalBrainAuth();
 app.MapDefaultEndpoints();
 app.MapAuth();
 app.MapOwnerCommands();
+app.MapChatVoice();
 app.MapChatStreams();
 app.MapSurfaceStreams();
 app.MapAuthorizationStreams();

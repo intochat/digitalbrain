@@ -14,6 +14,7 @@ public sealed class AIModule : Core.IModule
 
         DurablePayloadProtectionHosting.Configure(builder.Services, builder.Configuration);
         AIClients.Add(builder.Services);
+        VoiceToTextHosting.Add(builder.Services, builder.Configuration);
 
         // The unkeyed IChatClient IS the main model. Every other model use is an
         // explicit keyed choice (ask_llama, convene_model_team).
@@ -21,3 +22,4 @@ public sealed class AIModule : Core.IModule
             services.GetRequiredKeyedService<IChatClient>(typeof(Gemma4)));
     }
 }
+

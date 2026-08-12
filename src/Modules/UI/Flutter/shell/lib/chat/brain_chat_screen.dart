@@ -7,12 +7,16 @@ import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flyer_chat_text_message/flyer_chat_text_message.dart';
 import 'package:flyer_chat_text_stream_message/flyer_chat_text_stream_message.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:record/record.dart';
 import 'package:uuid/uuid.dart';
 
 import '../brain_theme.dart';
 import 'chat_contracts.dart';
 import 'stream_state_store.dart';
+import 'voice_file_io.dart' if (dart.library.html) 'voice_file_web.dart'
+    as voice_file;
 
 final class BrainChatScreen extends StatefulWidget {
   const BrainChatScreen({
@@ -22,6 +26,7 @@ final class BrainChatScreen extends StatefulWidget {
     this.signInCards = const [],
     this.onSend,
     this.onStream,
+    this.onStreamVoice,
     this.onOpenSignIn,
     this.onActivateButton,
   });
@@ -31,6 +36,7 @@ final class BrainChatScreen extends StatefulWidget {
   final List<SignInCardProjection> signInCards;
   final SendMessage? onSend;
   final StreamMessage? onStream;
+  final StreamVoice? onStreamVoice;
   final OpenUrl? onOpenSignIn;
   final ActivateChatButton? onActivateButton;
 
@@ -42,14 +48,18 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
   static const _owner = User(id: ownerUserId, name: 'you');
   static const _assistant = User(id: assistantUserId, name: 'brain');
   static const _uuid = Uuid();
+  static const _voicePlaceholder = '🎤 …';
 
   final _controller = InMemoryChatController();
   final _streamStates = StreamStateStore();
   final _appliedSequences = <int>{};
+  final _recorder = AudioRecorder();
   String? _pendingUserMessageId;
   String? _pendingUserText;
   String? _activeStreamId;
   String? _failure;
+  bool _recording = false;
+  bool _voiceBusy = false;
 
   @override
   void initState() {
@@ -77,10 +87,19 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
       return;
     }
 
-    if (_pendingUserText != null &&
-        turns.any((turn) => turn.fromUser && turn.text == _pendingUserText)) {
-      _pendingUserMessageId = null;
-      _pendingUserText = null;
+    if (_pendingUserMessageId != null) {
+      final matchedExact = turns.any(
+        (turn) => turn.fromUser && turn.text == _pendingUserText,
+      );
+      // Voice path: server text arrives only after STT; clear on any new user turn.
+      final matchedNewUser = turns.any(
+        (turn) =>
+            turn.fromUser && !_appliedSequences.contains(turn.sequence),
+      );
+      if (matchedExact || matchedNewUser) {
+        _pendingUserMessageId = null;
+        _pendingUserText = null;
+      }
     }
 
     final journalHasAssistant = turns.any((turn) => !turn.fromUser);
@@ -199,6 +218,114 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
     }
   }
 
+  Future<void> _toggleVoice() async {
+    final streamVoice = widget.onStreamVoice;
+    if (streamVoice == null || _voiceBusy) {
+      return;
+    }
+
+    if (_recording) {
+      await _stopAndSendVoice(streamVoice);
+      return;
+    }
+
+    await _startRecording();
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      if (!await _recorder.hasPermission()) {
+        if (mounted) {
+          setState(() => _failure = 'Microphone permission denied.');
+        }
+        return;
+      }
+
+      // Whisper expects a container (WAV); raw PCM is refused server-side quality.
+      if (!await _recorder.isEncoderSupported(AudioEncoder.wav)) {
+        if (mounted) {
+          setState(
+            () => _failure = 'WAV recording is not supported on this device.',
+          );
+        }
+        return;
+      }
+
+      final dir = await getTemporaryDirectory();
+      final path = voice_file.joinVoicePath(dir.path, 'voice_${_uuid.v4()}.wav');
+
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: path,
+      );
+
+      if (mounted) {
+        setState(() {
+          _recording = true;
+          _failure = null;
+        });
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() => _failure = 'Record failed: $error');
+      }
+    }
+  }
+
+  Future<void> _stopAndSendVoice(StreamVoice streamVoice) async {
+    setState(() {
+      _recording = false;
+      _voiceBusy = true;
+      _failure = null;
+    });
+
+    String? path;
+    try {
+      path = await _recorder.stop();
+      if (path == null || path.isEmpty) {
+        throw StateError('Recording produced no audio file.');
+      }
+
+      final bytes = await voice_file.readVoiceBytes(path);
+      if (bytes.isEmpty) {
+        throw StateError('Recording is empty.');
+      }
+
+      final localId = _uuid.v4();
+      _pendingUserMessageId = localId;
+      _pendingUserText = _voicePlaceholder;
+      await _controller.insertMessage(
+        TextMessage(
+          id: localId,
+          authorId: ownerUserId,
+          createdAt: DateTime.now().toUtc(),
+          text: _voicePlaceholder,
+        ),
+      );
+
+      await _drainStream(streamVoice(bytes, fileName: 'voice.wav'));
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() => _failure = '$error');
+      }
+    } finally {
+      if (path != null) {
+        try {
+          await voice_file.deleteVoiceFile(path);
+        } on Object {
+          // best-effort temp cleanup
+        }
+      }
+      if (mounted) {
+        setState(() => _voiceBusy = false);
+      }
+    }
+  }
+
   Future<void> _onKitButton(KitButtonPart part) async {
     final action = part.action;
     final openUrl = Uri.tryParse(action);
@@ -238,6 +365,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
 
   @override
   void dispose() {
+    unawaited(_recorder.dispose());
     _controller.dispose();
     _streamStates.dispose();
     super.dispose();
@@ -246,6 +374,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
   @override
   Widget build(BuildContext context) {
     final canSend = widget.onSend != null || widget.onStream != null;
+    final canVoice = widget.onStreamVoice != null;
 
     return ColoredBox(
       color: BrainPalette.surface,
@@ -255,6 +384,42 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
             SignInCardRail(
               cards: widget.signInCards,
               onOpenSignIn: widget.onOpenSignIn,
+            ),
+          if (_recording || _voiceBusy)
+            Material(
+              color: _recording
+                  ? BrainPalette.signal.withValues(alpha: 0.12)
+                  : BrainPalette.surfaceRaised,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _recording ? Icons.mic : Icons.hourglass_top,
+                      size: 18,
+                      color: _recording
+                          ? BrainPalette.signal
+                          : BrainPalette.textMuted,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _recording
+                            ? 'Recording… tap 📎 to stop and send'
+                            : 'Transcribing voice…',
+                        style: BrainType.meta.copyWith(
+                          color: _recording
+                              ? BrainPalette.signal
+                              : BrainPalette.textMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           Expanded(
             child: ChangeNotifierProvider.value(
@@ -270,6 +435,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
                 },
                 theme: BrainChatTheme.dark(),
                 onMessageSend: canSend ? _handleSend : null,
+                onAttachmentTap: canVoice ? () => unawaited(_toggleVoice()) : null,
                 builders: Builders(
                   textMessageBuilder:
                       (

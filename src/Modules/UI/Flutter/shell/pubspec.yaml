@@ -24,6 +24,9 @@ dependencies:
   provider: ^6.1.5+1
   web: ^1.1.1
   graphic: ^2.7.0
+  record: ^7.1.1
+  path_provider: ^2.1.6
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

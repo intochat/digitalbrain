@@ -28,4 +28,7 @@ internal static class HttpSurfacePaths
     public const string KindChatCancelTurn = "chat.cancel-turn";
     public const string KindChatButton = "chat.button";
     public const string KindSurfaceOpen = "surface.open";
+
+    // Multipart voice note → STT → same durable chat.send path.
+    public const string ChatVoicePath = "/chats/{chatName}/voice";
 }

@@ -285,6 +285,61 @@ final class DigitalBrainUiClient {
       throw StateError('chat.send failed: ${response.statusCode}');
     }
 
+    yield* _parseChatDeltas(response);
+  }
+
+  // Multipart voice note → server Whisper → same durable chat turn SSE as streamMessage.
+  Stream<ChatDelta> streamVoice({
+    required String chatName,
+    required List<int> audioBytes,
+    String fileName = 'voice.wav',
+  }) async* {
+    if (audioBytes.isEmpty) {
+      throw StateError('voice upload requires non-empty audio');
+    }
+
+    await _requireSession();
+    final uri = baseUri.replace(path: '/chats/$chatName/voice');
+
+    Future<http.StreamedResponse> postOnce() {
+      final request = http.MultipartRequest('POST', uri)
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'audio',
+            audioBytes,
+            filename: fileName,
+          ),
+        );
+      return _http.send(request);
+    }
+
+    var response = await postOnce();
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      _session = null;
+      _sessionReady = false;
+      await ensureSession();
+      response = await postOnce();
+    }
+
+    if (response.statusCode == 503) {
+      final body = await response.stream.bytesToString();
+      throw StateError('voice unavailable: $body');
+    }
+    if (response.statusCode == 422) {
+      final body = await response.stream.bytesToString();
+      throw StateError('transcription failed: $body');
+    }
+    if (response.statusCode != 200) {
+      final body = await response.stream.bytesToString();
+      throw StateError(
+        'chat.voice failed: ${response.statusCode} $body',
+      );
+    }
+
+    yield* _parseChatDeltas(response);
+  }
+
+  Stream<ChatDelta> _parseChatDeltas(http.StreamedResponse response) async* {
     final lines = response.stream
         .transform(utf8.decoder)
         .transform(const LineSplitter());

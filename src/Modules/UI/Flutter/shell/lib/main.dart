@@ -38,6 +38,13 @@ Future<void> main() async {
       onStream: edge == null
           ? null
           : (text) => edge.streamMessage(chatName: chat, text: text),
+      onStreamVoice: edge == null
+          ? null
+          : (audioBytes, {fileName = 'voice.wav'}) => edge.streamVoice(
+              chatName: chat,
+              audioBytes: audioBytes,
+              fileName: fileName,
+            ),
       onActivateButton: edge == null
           ? null
           : ({

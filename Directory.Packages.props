@@ -51,5 +51,9 @@
     <PackageVersion Include="Microsoft.Orleans.Serialization.SystemTextJson" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Streaming.AzureStorage" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.AI.Foundry.Local" Version="0.9.0" />
+    <PackageVersion Include="Concentus" Version="2.2.2" />
+    <PackageVersion Include="Concentus.Oggfile" Version="1.0.7" />
+    <PackageVersion Include="NAudio" Version="2.3.0" />
   </ItemGroup>
 </Project>

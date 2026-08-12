@@ -34,6 +34,28 @@ public static class AIHostingExtensions
         return module;
     }
 
+    // Local Whisper STT (Foundry Local). Marker types: IWhisperTiny / IWhisperSmall / IWhisperLargeV3Turbo.
+    public static DigitalBrainModuleBuilder<AIModule> WithVoiceToText<TModel>(
+        this DigitalBrainModuleBuilder<AIModule> module)
+        where TModel : class
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        var marker = typeof(TModel);
+        var whisper = WhisperModel.FindByMarker(marker)
+            ?? throw new NotSupportedException(
+                $"{marker.FullName} is not a known Whisper model marker. "
+                + "Use IWhisperTiny, IWhisperSmall, or IWhisperLargeV3Turbo.");
+
+        var voice = module.Brain.GetOrAddState(static brain => new VoiceToTextHostingState(brain), out var added);
+        if (added)
+        {
+            module.AddProjection(voice);
+        }
+
+        voice.SetModel(whisper);
+        return module;
+    }
+
     private static AIHostingState State(DigitalBrainModuleBuilder<AIModule> module)
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -149,6 +171,36 @@ public static class AIHostingExtensions
                 .AddOpenAI("openai")
                 .WithApiKey(_openAIKey);
             _gpt56 = _openAI.AddModel("gpt56", "gpt-5.6");
+        }
+    }
+
+    private sealed class VoiceToTextHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
+    {
+        private const string ModelIdEnvironmentKey = "DigitalBrain__AI__Whisper__ModelId";
+        private WhisperModel? _model;
+
+        internal void SetModel(WhisperModel model)
+        {
+            ArgumentNullException.ThrowIfNull(model);
+            if (_model is not null && !string.Equals(_model.Id, model.Id, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Voice-to-text is already configured on brain '{brain.Name}' as '{_model.Id}'. "
+                    + "Call WithVoiceToText once.");
+            }
+
+            _model = model;
+        }
+
+        public override void Apply<TResource>(IResourceBuilder<TResource> builder)
+        {
+            ArgumentNullException.ThrowIfNull(builder);
+            if (_model is null)
+            {
+                return;
+            }
+
+            builder.WithEnvironment(ModelIdEnvironmentKey, _model.Id);
         }
     }
 }
