@@ -1,7 +1,8 @@
+using DigitalBrain.Core;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Library;
 
 // Content-addressed library hashes (immutable once published).
 public static class LibraryContent

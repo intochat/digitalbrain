@@ -1,10 +1,11 @@
 using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Library;
 
 [GrainType(ILibrary.GrainTypeName)]
 public sealed class LibraryNeuron : Neuron, ILibrary
