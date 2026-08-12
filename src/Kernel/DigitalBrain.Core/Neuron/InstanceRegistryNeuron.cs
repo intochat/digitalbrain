@@ -137,7 +137,7 @@ internal sealed class InstanceRegistryNeuron : Neuron, IRegistry
         var wireCount = 0;
         if (synapse.Wires is { Length: > 0 })
         {
-            var graph = ISynapseGraph.ForOwner(Id.Owner);
+            var graph = PrincipalGraph.Resolve(Id.Owner);
             var intent = string.IsNullOrWhiteSpace(synapse.Intent)
                 ? $"bundle install '{bundleName}' (disabled)"
                 : synapse.Intent.Trim();

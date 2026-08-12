@@ -97,7 +97,7 @@ internal sealed class NeuronMessagePipeline(
             return [];
         }
 
-        var graph = ISynapseGraph.ForOwner(neuron.Id.Owner);
+        var graph = PrincipalGraph.Resolve(neuron.Id.Owner);
         if (graph == neuron.Id)
         {
             return [];
@@ -140,7 +140,8 @@ internal sealed class NeuronMessagePipeline(
             neuron.Id,
             turn.NextOutgoingSequence,
             cause,
-            neuron.NeuronTimeProvider);
+            neuron.NeuronTimeProvider,
+            principal: VerifiedActor.Current?.PrincipalId ?? cause.Principal);
 
         journal.AppendIncoming(delivery);
         return delivery;
@@ -168,7 +169,8 @@ internal sealed class NeuronMessagePipeline(
             turn.NextOutgoingSequence,
             causation,
             neuron.NeuronTimeProvider,
-            correlation);
+            correlation,
+            principal: VerifiedActor.Current?.PrincipalId ?? causation?.Principal);
 
         turn.StageOutgoing(delivery);
 

@@ -12,4 +12,7 @@ internal static class McpSurface
     public const string ListRegistry = "list_registry";
     public const string RegisterInstance = "register_instance";
     public const string InstallBundle = "install_bundle";
+    public const string GrantAccess = "grant_access";
+    public const string RevokeAccess = "revoke_access";
+    public const string ReadChart = "read_chart";
 }

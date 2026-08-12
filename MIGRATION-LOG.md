@@ -846,3 +846,53 @@ Walk-through names: **idle schedule** `timer:dev/nightly`, **disabled bundle** `
 
 Build: 0 warnings. AppHost living after prune.
 
+
+## Session 10 - 2026-08-12 - Wave 3: two people, one brain
+
+### 43. What landed
+
+- **`PrincipalPartition`** (`{principal:N}.{local}`) in Abstractions; host `PrincipalScoped` is a thin alias.
+- **`SynapseDelivery.Principal` [Id(7)]** rides every fire/outbox hop; turn delivery re-enters
+  `VerifiedActor` so grants/graph partition survive the outbox hop (username is `_delivery` on re-entry).
+- **A18 partitions**: `ISynapseGraph.ForPrincipal`, `IRegistry.ForPrincipal`, `IGrants.ForPrincipal`;
+  emit path and `get_neurons` resolve graph/registry via `VerifiedActor.Current`.
+- **`IGrants` / `GrantsNeuron`**: `db.grant-access`, `db.revoke-access`, `db.list-grants`;
+  `HasAccess` + `RequireReadAccessAsync` (ownership wins; else Read grant on subject owner partition).
+- **Chart** `HandleAsync(ChartPoint)` and `Read()` both require read access.
+- **MCP** multi-principal tools: `principalKey` on chat/registry; `grant_access`, `revoke_access`,
+  `read_chart` for the isolation gate (alice|bob|operator stable GUIDs).
+
+### 44. Gate evidence (digitalbrain-mcp HTTP tools/call)
+
+Stable principals:
+- alice = `00000000-0000-4000-8000-0000000000a2`
+- bob   = `00000000-0000-4000-8000-0000000000b0`
+
+```
+register_instance alice chart sales → chart:dev/000000000000400080000000000000a2.sales
+register_instance bob   chart sales → chart:dev/000000000000400080000000000000b0.sales
+list_registry alice → only a2.sales
+list_registry bob   → only b0.sales
+read_chart alice/sales as bob → DENIED (no ownership and no Read grant)
+grant_access alice→bob chart sales → Granted Read …
+read_chart alice/sales as bob → OK count=0
+revoke_access alice→bob chart sales → Revoked Read …
+read_chart alice/sales as bob → DENIED
+read_chart alice/sales as alice → OK count=0
+```
+
+Journal (`grants:dev/{alice}.main` incoming): durable `GrantAccess` + `RevokeAccess` entries
+(sessionneuron caller) interleaved with chart `CapabilityRequested` from access checks.
+
+Build: `dotnet build DigitalBrain.slnx -warnaserror` → 0 warnings. AppHost living (kernel+mcp healthy).
+
+### 45. Residuals (honest)
+
+- Quotas and cluster trust boundary depth not implemented this wave.
+- Delivery re-entry stamps username `"_delivery"` — PrincipalId is authoritative; product
+  display names still come from the host login path.
+- `GrantKind.Watch` exists; chart enforces **Read** only (Watch is bookkeeping for later surfaces).
+- Unattributed turns still fall back to owner-wide graph/registry (`ForOwner`) for bootstrap.
+- Full two-browser cookie logins not exercised; MCP principal simulation is the verified gate.
+
+Wave 3 isolation + grant/revoke gate closed for product path.

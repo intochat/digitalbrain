@@ -21,20 +21,24 @@ internal sealed class ChartNeuron : Neuron, IChart
         _serializer = ServiceProvider.GetRequiredService<Serializer<ChartPoint>>();
     }
 
-    public Task HandleAsync(ChartPoint synapse, CancellationToken cancellationToken)
+    public async Task HandleAsync(ChartPoint synapse, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
+        await GrantsNeuron.RequireReadAccessAsync(GrainFactory, Id, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         _points.Add(_serializer.SerializeToArray(synapse));
         while (_points.Count > RetainedPoints)
         {
             _points.RemoveAt(0);
         }
-
-        return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<ChartPoint>> Read()
-        => Task.FromResult<IReadOnlyList<ChartPoint>>([.. _points.Select(_serializer.Deserialize)]);
+    public async Task<IReadOnlyList<ChartPoint>> Read()
+    {
+        await GrantsNeuron.RequireReadAccessAsync(GrainFactory, Id, CancellationToken.None)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        return [.. _points.Select(_serializer.Deserialize)];
+    }
 }

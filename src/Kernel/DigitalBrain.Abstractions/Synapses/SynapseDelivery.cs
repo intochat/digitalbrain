@@ -11,7 +11,8 @@ public sealed class SynapseDelivery
         SynapseId? causationId,
         NeuronId caller,
         long sequence,
-        DateTimeOffset timestamp)
+        DateTimeOffset timestamp,
+        PrincipalId? principal = null)
     {
         Synapse = synapse;
         SynapseId = synapseId;
@@ -20,6 +21,7 @@ public sealed class SynapseDelivery
         Caller = caller;
         Sequence = sequence;
         Timestamp = timestamp;
+        Principal = principal;
     }
 
     [Id(0)]
@@ -43,13 +45,19 @@ public sealed class SynapseDelivery
     [Id(6)]
     public DateTimeOffset Timestamp { get; }
 
+    // Trailing: rides the delivery so outbox drain and receivers can re-enter VerifiedActor.
+    // Null = system/unattributed (timer ticks, bootstrap). Append-only — never renumber.
+    [Id(7)]
+    public PrincipalId? Principal { get; }
+
     public static SynapseDelivery Create(
         Synapse synapse,
         NeuronId caller,
         long sequence,
         SynapseDelivery? cause = null,
         TimeProvider? timeProvider = null,
-        CorrelationId? correlation = null)
+        CorrelationId? correlation = null,
+        PrincipalId? principal = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sequence);
 
@@ -60,6 +68,7 @@ public sealed class SynapseDelivery
             cause?.SynapseId,
             caller,
             sequence,
-            (timeProvider ?? TimeProvider.System).GetUtcNow());
+            (timeProvider ?? TimeProvider.System).GetUtcNow(),
+            principal ?? cause?.Principal);
     }
 }

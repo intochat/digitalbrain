@@ -35,7 +35,7 @@ internal sealed class ConnectionRelayNeuron : Neuron
 
     private async Task<SynapseConnection?> LiveConnectionAsync(Guid connectionId)
     {
-        var graph = ISynapseGraph.ForOwner(Id.Owner);
+        var graph = PrincipalGraph.Resolve(Id.Owner);
 
         using var bound = new CancellationTokenSource(DeliveryPolicy.ConnectionLookupTimeout);
         try

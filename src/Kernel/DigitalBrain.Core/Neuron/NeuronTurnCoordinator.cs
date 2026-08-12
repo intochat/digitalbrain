@@ -64,6 +64,13 @@ internal sealed class NeuronTurnCoordinator(
         deliveries.BeginTurn();
         _turnRollbacks.Clear();
 
+        // Re-enter the verified principal that rode the delivery so grants, graph
+        // partition, and stamps apply without RequestContext surviving the outbox hop.
+        using var principalScope = VerifiedActor.Enter(
+            delivery.Principal is { } principal
+                ? new ActorContext(principal, "_delivery")
+                : null);
+
         try
         {
             await neuron.DispatchSynapseAsync(Snapshot(delivery.Synapse), cancellationToken)

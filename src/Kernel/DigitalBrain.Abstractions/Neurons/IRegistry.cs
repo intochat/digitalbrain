@@ -18,4 +18,8 @@ public partial interface IRegistry :
 
     static NeuronId ForOwner(OwnerId owner)
         => new(GrainTypeName, owner, InstanceName);
+
+    // A18: registry partition per principal (cold charts/schedules stay private).
+    static NeuronId ForPrincipal(OwnerId owner, PrincipalId principal)
+        => new(GrainTypeName, owner, PrincipalPartition.InstanceName(principal, InstanceName));
 }

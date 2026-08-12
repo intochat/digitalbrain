@@ -14,15 +14,27 @@ internal sealed class ChatTools(IDigitalBrain brain)
     private const int DefaultTimeoutSeconds = 300;
     private const int MaximumTimeoutSeconds = 300;
 
+    // Stable MCP operator principal (legacy default).
+    internal static readonly PrincipalId OperatorPrincipal =
+        new(Guid.Parse("00000000-0000-0000-0000-0000000000a1"));
+
+    // Second principal for Wave 3 isolation tests.
+    internal static readonly PrincipalId AlicePrincipal =
+        new(Guid.Parse("00000000-0000-4000-8000-0000000000a2"));
+
+    internal static readonly PrincipalId BobPrincipal =
+        new(Guid.Parse("00000000-0000-4000-8000-0000000000b0"));
+
     [McpServerTool(Name = McpSurface.SendChatMessage)]
     [Description(
-        "Send a message through the owner's DigitalBrain conversation and wait for the assistant "
-        + "response journaled under this command id. This is the same durable chat path used by the product UI.")]
+        "Send a message through a principal-partitioned conversation and wait for the assistant "
+        + "response. principalKey selects alice|bob|operator (default operator).")]
     public async Task<ChatMessageResult> SendChatMessageAsync(
         [Description("Message to send to DigitalBrain")] string text,
         [Description("Caller-generated command id used to resume an interrupted call")]
         string commandId,
         [Description("Conversation name, for example 'main'")] string chatName = "main",
+        [Description("Principal key: operator, alice, or bob")] string principalKey = "operator",
         [Description("Maximum wait in seconds, from 1 through 300")]
         int timeoutSeconds = DefaultTimeoutSeconds,
         CancellationToken cancellationToken = default)
@@ -38,16 +50,17 @@ internal sealed class ChatTools(IDigitalBrain brain)
             throw new ArgumentException("The command id must be a non-empty GUID.", nameof(commandId));
         }
 
-        var chatId = NeuronId.For<IChat>(brain.Owner, chatName);
-        var authorizationId = NeuronId.For<IMcpAuthorization>(brain.Owner, IMcpAuthorization.DefaultInstanceName);
+        var (principal, username) = ResolvePrincipal(principalKey);
+        var chatInstance = PrincipalPartition.InstanceName(principal, chatName);
+        var chatId = NeuronId.For<IChat>(brain.Owner, chatInstance);
+        var authorizationId = NeuronId.For<IMcpAuthorization>(
+            brain.Owner,
+            IMcpAuthorization.DefaultInstanceName);
         var command = new CommandId(commandIdentity);
 
         await brain.ActivateAsync(cancellationToken);
-        // Owner MCP path stamps a stable operator actor (Chat refuses unstamped durable commands).
-        var operatorActor = new ActorContext(
-            new PrincipalId(Guid.Parse("00000000-0000-0000-0000-0000000000a1")),
-            "operator");
-        await brain.GetGrainProxy<IChat>(chatName).Send(new SendMessage(command, text, operatorActor));
+        var actor = new ActorContext(principal, username);
+        await brain.GetGrainProxy<IChat>(chatInstance).Send(new SendMessage(command, text, actor));
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
@@ -60,7 +73,7 @@ internal sealed class ChatTools(IDigitalBrain brain)
         {
             throw new TimeoutException(
                 $"DigitalBrain did not answer command '{commandId}' in conversation "
-                + $"'{chatName}' within {timeoutSeconds} seconds.");
+                + $"'{chatName}' for principal '{principalKey}' within {timeoutSeconds} seconds.");
         }
     }
 
@@ -73,6 +86,7 @@ internal sealed class ChatTools(IDigitalBrain brain)
         [Description("Command id of the assistant turn that offered the button")] string offerCommandId,
         [Description("Button id from the offer")] string buttonId,
         [Description("Action from the offer, for example a sign-in URL or command name")] string action,
+        [Description("Principal key: operator, alice, or bob")] string principalKey = "operator",
         [Description("Maximum wait in seconds, from 1 through 300")]
         int timeoutSeconds = DefaultTimeoutSeconds,
         CancellationToken cancellationToken = default)
@@ -89,14 +103,18 @@ internal sealed class ChatTools(IDigitalBrain brain)
             throw new ArgumentException("The offer command id must be a non-empty GUID.", nameof(offerCommandId));
         }
 
-        var chatId = NeuronId.For<IChat>(brain.Owner, chatName);
-        var authorizationId = NeuronId.For<IMcpAuthorization>(brain.Owner, IMcpAuthorization.DefaultInstanceName);
-        var cursor = await brain.ReadJournalAsync(chatId, JournalKind.Outgoing, afterSequence: 0, cancellationToken);
+        var (principal, _) = ResolvePrincipal(principalKey);
+        var chatInstance = PrincipalPartition.InstanceName(principal, chatName);
+        var chatId = NeuronId.For<IChat>(brain.Owner, chatInstance);
+        var authorizationId = NeuronId.For<IMcpAuthorization>(
+            brain.Owner,
+            IMcpAuthorization.DefaultInstanceName);
+        var cursor = await brain.ReadJournalAsync(chatId, JournalKind.Outgoing, afterSequence: long.MaxValue, cancellationToken);
         var resume = cursor.ResumeSequence;
 
         await brain.ActivateAsync(cancellationToken);
         await brain.FireAsync<IChat>(
-            chatName,
+            chatInstance,
             new ButtonClicked(new CommandId(offerId), buttonId, action),
             cancellationToken);
 
@@ -114,6 +132,17 @@ internal sealed class ChatTools(IDigitalBrain brain)
                 + $"'{chatName}' within {timeoutSeconds} seconds.");
         }
     }
+
+    internal static (PrincipalId Principal, string Username) ResolvePrincipal(string? principalKey)
+        => (principalKey ?? "operator").Trim().ToLowerInvariant() switch
+        {
+            "alice" => (AlicePrincipal, "alice"),
+            "bob" => (BobPrincipal, "bob"),
+            "operator" or "" => (OperatorPrincipal, "operator"),
+            _ => throw new ArgumentException(
+                "principalKey must be operator, alice, or bob.",
+                nameof(principalKey)),
+        };
 
     private async Task<ChatMessageResult> WaitForResponseAsync(
         NeuronId chatId,
