@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Auth;
 using DigitalBrain.Client;
 using DigitalBrain.Core;
 using DigitalBrain.UI;

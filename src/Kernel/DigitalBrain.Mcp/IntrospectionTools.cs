@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Chat;
-using DigitalBrain.Conversations;
+using DigitalBrain.Auth;
 using DigitalBrain.Client;
 using DigitalBrain.Core;
 using DigitalBrain.Introspection;
@@ -72,36 +71,6 @@ internal sealed class IntrospectionTools(IDigitalBrain brain, IHttpContextAccess
                     entry.Caller,
                     entry.Correlation,
                     entry.Timestamp)),
-            ]);
-    }
-
-    [McpServerTool(Name = McpSurface.ReadChatTranscript)]
-    [Description("Read the durable transcript of a conversation owned by the authenticated caller.")]
-    public async Task<ChatTranscriptPage> ReadChatTranscriptAsync(
-        [Description("Conversation local name, for example 'main'")] string chatName = "main",
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
-
-        var actor = McpActor.Require(httpContextAccessor);
-        using var _ = VerifiedActor.Enter(actor);
-        var conversationInstance = McpActor.Partition(actor, chatName);
-
-        var page = await BoundedAsync(
-            async token =>
-            {
-                token.ThrowIfCancellationRequested();
-                return await brain.GetGrainProxy<IConversation>(conversationInstance).Read();
-            },
-            nameof(IConversation.Read),
-            cancellationToken);
-
-        return new ChatTranscriptPage(
-            chatName,
-            [
-                .. page.Turns.Select(turn => new ChatTranscriptTurn(
-                    string.Equals(turn.Role, "user", StringComparison.OrdinalIgnoreCase) ? "you" : "brain",
-                    turn.Text)),
             ]);
     }
 

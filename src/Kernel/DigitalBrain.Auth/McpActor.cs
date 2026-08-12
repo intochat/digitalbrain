@@ -1,9 +1,10 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Auth;
+using Microsoft.AspNetCore.Http;
 
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.Auth;
 
-internal static class McpActor
+// Shared MCP / northbound tool principal helper (was DigitalBrain.Mcp-internal).
+public static class McpActor
 {
     public static ActorContext Require(IHttpContextAccessor httpContextAccessor)
     {

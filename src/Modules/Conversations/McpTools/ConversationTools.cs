@@ -1,24 +1,26 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Auth;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
 using DigitalBrain.Conversations;
 using DigitalBrain.Core;
 using DigitalBrain.Modules.Sdk.Mcp;
 using DigitalBrain.UI;
+using Microsoft.AspNetCore.Http;
 using ModelContextProtocol.Server;
 
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.Conversations.Mcp;
 
-// Seam 5 done bar #5: northbound tools address IConversation (HTTP parity).
+// Seam 5 done bar #5: Conversations-exported MCP tools (thin host WithTools).
 // Tip Chat still owns durable Responded journal until Chat dissolves into Conversations.
 [McpServerToolType]
-internal sealed class ChatTools(IDigitalBrain brain, IHttpContextAccessor httpContextAccessor)
+public sealed class ConversationTools(IDigitalBrain brain, IHttpContextAccessor httpContextAccessor)
 {
     private const int DefaultTimeoutSeconds = 300;
     private const int MaximumTimeoutSeconds = 300;
 
-    [McpServerTool(Name = McpSurface.SendChatMessage)]
+    [McpServerTool(Name = ConversationMcpSurface.SendChatMessage)]
     [Description(
         "Send a message through the authenticated caller's principal-partitioned conversation "
         + "and wait for the assistant response.")]
@@ -73,7 +75,7 @@ internal sealed class ChatTools(IDigitalBrain brain, IHttpContextAccessor httpCo
         }
     }
 
-    [McpServerTool(Name = McpSurface.ActivateChatButton)]
+    [McpServerTool(Name = ConversationMcpSurface.ActivateChatButton)]
     [Description(
         "Activate a button previously offered on an assistant chat turn. "
         + "Uses the same durable ButtonClicked path as the product UI command bus.")]
@@ -252,4 +254,28 @@ internal sealed class ChatTools(IDigitalBrain brain, IHttpContextAccessor httpCo
             }
         }
     }
+
+    [McpServerTool(Name = ConversationMcpSurface.ReadChatTranscript)]
+    [Description("Read the durable transcript of a conversation owned by the authenticated caller.")]
+    public async Task<ChatTranscriptPage> ReadChatTranscriptAsync(
+        [Description("Conversation local name, for example 'main'")] string chatName = "main",
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
+
+        var actor = McpActor.Require(httpContextAccessor);
+        using var _ = VerifiedActor.Enter(actor);
+        var conversationInstance = McpActor.Partition(actor, chatName);
+        cancellationToken.ThrowIfCancellationRequested();
+        var page = await brain.GetGrainProxy<IConversation>(conversationInstance).Read();
+
+        return new ChatTranscriptPage(
+            chatName,
+            [
+                .. page.Turns.Select(turn => new ChatTranscriptTurn(
+                    string.Equals(turn.Role, "user", StringComparison.OrdinalIgnoreCase) ? "you" : "brain",
+                    turn.Text)),
+            ]);
+    }
+
 }

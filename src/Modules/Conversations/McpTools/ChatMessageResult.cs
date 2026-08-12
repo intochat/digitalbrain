@@ -1,6 +1,6 @@
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.Conversations.Mcp;
 
-internal sealed record ChatMessageResult(
+public sealed record ChatMessageResult(
     string Chat,
     string CommandId,
     string CorrelationId,

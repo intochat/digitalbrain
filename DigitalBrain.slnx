@@ -39,6 +39,7 @@
   <Folder Name="/Modules/Conversations/">
     <Project Path="src/Modules/Conversations/Contracts/DigitalBrain.Modules.Conversations.Contracts.csproj" />
     <Project Path="src/Modules/Conversations/Conversations/DigitalBrain.Modules.Conversations.csproj" />
+    <Project Path="src/Modules/Conversations/McpTools/DigitalBrain.Modules.Conversations.McpTools.csproj" />
   </Folder>
   <Folder Name="/Modules/UI/">
     <Project Path="src/Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />

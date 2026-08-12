@@ -1,23 +1,17 @@
 # Seam 5 — done bar #5 (chat send/button leave MCP)
 
-**Tip:** `500e6d9e` (MCP tools already address `IConversation`) · Flutter bind `ae4b43a3` · HTTP `02e843f3`.
+## Physical leave (landed)
+| Item | Location |
+|---|---|
+| Conversation MCP tools | `src/Modules/Conversations/McpTools` (`ConversationTools`) |
+| Tool names | `ConversationMcpSurface` |
+| Shared principal helper | `DigitalBrain.Auth.McpActor` (was Mcp-internal) |
+| Thin host registration | `DigitalBrain.Mcp` → `.WithTools<ConversationTools>()` only |
 
-## FINAL §11 destination
-| Tool | Tip file | Destination |
-|---|---|---|
-| `send_chat_message` / `activate_chat_button` | `DigitalBrain.Mcp/ChatTools.cs` | **Conversations module export** (Modules lead; UI helps) |
-| `read_chat_transcript` | `IntrospectionTools.cs` | Conversations `IConversation.Read` (confirm Introspection) |
+Host no longer contains `ChatTools` / chat DTOs / `read_chat_transcript`.
 
-## Tip honesty (addressing DONE)
-- Send → `IConversation.Send(SendConversationMessage)` + wait tip `IChat` outgoing `Responded` (strangle)
-- Button → `IButton` + `ChatButtons.OfferedInstanceName`
-- Host still registers `.WithTools<ChatTools>()` inside `DigitalBrain.Mcp`
+## Addressing (prior `500e6d9e`)
+Send → `IConversation`; button → `IButton`; Responded watch tip `IChat` journal (strangle).
 
-## Physical leave (in flight)
-1. Modules(+UI): export public tool types from Conversations (proposed `src/Modules/Conversations/McpTools`)
-2. Integrations: thin `DigitalBrain.Mcp` — drop local ChatTools; `WithTools` from module assembly
-3. Keep `McpActor` / path constants host- or Sdk-side initially (no circular Mcp↔module ref)
-
-## Non-goals
-- AppHost FREEZE files
-- Dissolving tip `IChat` journal in the same commit (strangle stays until Conversations owns Responded)
+## Residual (not #5)
+Other tool families (Registry/Time/Library/Introspection) still host-resident until their seams.

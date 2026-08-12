@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Conversations northbound MCP tools (Seam 5 leave from DigitalBrain.Mcp).</Description>
+    <RootNamespace>DigitalBrain.Conversations.Mcp</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="ModelContextProtocol.Core" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Conversations.Contracts.csproj" />
+    <ProjectReference Include="../../UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Auth/DigitalBrain.Auth.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,6 +1,6 @@
-namespace DigitalBrain.Mcp;
+namespace DigitalBrain.Conversations.Mcp;
 
-internal sealed record ChatChartOfferResult(
+public sealed record ChatChartOfferResult(
     string Title,
     IReadOnlyList<ChatChartPointResult> Points,
     string ChartKind);

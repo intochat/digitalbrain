@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Auth;
 using DigitalBrain.Client;
 using DigitalBrain.Core;
 using ModelContextProtocol.Server;
