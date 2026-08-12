@@ -70,3 +70,5 @@ Do **not** start Seam 3 folder moves before A18 delivery Principal + Connect ref
 - Seam 2 → Kernel lead; Integrations on MCP slots/webhooks; Modules on corpus/library stores  
 - Seam 4 → Integrations lead; Kernel callback edge only  
 - Seam 3 → classify first (Architect signoff on table), then Modules/Kernel-OS movers; Kernel keeps interconnect  
+
+**Acceptance (tighter):** `plans/SEAM-4-ACCEPTANCE.md`
