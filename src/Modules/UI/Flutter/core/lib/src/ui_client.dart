@@ -292,7 +292,9 @@ final class DigitalBrainUiClient {
     yield* _parseChatDeltas(response);
   }
 
-  // Multipart voice → Whisper → durable conversation turn SSE (same as streamMessage).
+  // Seam 6: mic → /conversations/{local}/voice (NeuronId.ForPrincipal conversation).
+  // Never /chats/…/voice — that host map is leftover IChat-only.
+  // chatName is the conversation local name (same as DIGITALBRAIN_CONVERSATION).
   Stream<ChatDelta> streamVoice({
     required String chatName,
     required List<int> audioBytes,

@@ -7,6 +7,7 @@ import 'open_url_io.dart' if (dart.library.html) 'open_url_web.dart' as open_url
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Seam 6: local conversation name → ForPrincipal conversation (not tip-only IChat).
   final chat = DigitalBrainHostEnv.resolveChat();
 
   DigitalBrainUiClient? client;
