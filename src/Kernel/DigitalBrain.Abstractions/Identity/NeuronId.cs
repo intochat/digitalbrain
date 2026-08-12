@@ -31,6 +31,17 @@ public readonly record struct NeuronId
         where TNeuron : INeuron
         => new(GrainTypeNameOf(typeof(TNeuron)), owner, name);
 
+    // A18 / Abstractions 5.0 — preferred product addressing. Modules must not reinvent this.
+    public static NeuronId ForPrincipal<TNeuron>(OwnerId owner, PrincipalId principal, string localName)
+        where TNeuron : INeuron
+        => new(
+            GrainTypeNameOf(typeof(TNeuron)),
+            owner,
+            PrincipalPartition.InstanceName(principal, localName));
+
+    public static NeuronId ForPrincipal(string grainType, OwnerId owner, PrincipalId principal, string localName)
+        => new(grainType, owner, PrincipalPartition.InstanceName(principal, localName));
+
     public static NeuronId BroadcastReceiver(string type, OwnerId owner, CorrelationId correlation)
         => new(type, owner, correlation.Value.ToString("D"));
 

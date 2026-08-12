@@ -16,14 +16,8 @@ public partial interface IConversation :
     static NeuronId ForOwner(OwnerId owner, string localName = DefaultLocalName)
         => new(GrainTypeName, owner, ConversationIdentity.Validated(localName, nameof(localName)));
 
-    // A18 — preferred product addressing.
-    static NeuronId ForPrincipal(OwnerId owner, PrincipalId principal, string localName = DefaultLocalName)
-        => new(
-            GrainTypeName,
-            owner,
-            PrincipalPartition.InstanceName(
-                principal,
-                ConversationIdentity.Validated(localName, nameof(localName))));
+    // A18: use NeuronId.ForPrincipal<IConversation>(owner, principal, localName)
+    // — ForPrincipal lives in Abstractions 5.0, not module contracts.
 
     [Alias(nameof(Send))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
