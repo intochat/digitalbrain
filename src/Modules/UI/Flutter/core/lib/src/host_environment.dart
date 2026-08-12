@@ -7,6 +7,8 @@ abstract final class DigitalBrainHostEnv {
   static const uiBaseVariable = 'DIGITALBRAIN_UI_BASE';
   static const shellVariable = 'DIGITALBRAIN_SHELL';
   static const defaultShellName = 'desk';
+  // Local conversation name (Seam 5). Prefer DIGITALBRAIN_CONVERSATION; DIGITALBRAIN_CHAT remains alias.
+  static const conversationVariable = 'DIGITALBRAIN_CONVERSATION';
   static const chatVariable = 'DIGITALBRAIN_CHAT';
   static const defaultChatName = 'main';
   static const usernameVariable = 'DIGITALBRAIN_USERNAME';
@@ -72,19 +74,34 @@ abstract final class DigitalBrainHostEnv {
   }
 
   static String resolveChat({
-    String fromDefine = const String.fromEnvironment(chatVariable),
+    String fromDefine = const String.fromEnvironment(conversationVariable),
+    String fromChatDefine = const String.fromEnvironment(chatVariable),
     Map<String, String>? processEnvironment,
   }) {
     if (fromDefine.isNotEmpty) {
       return fromDefine;
     }
+    if (fromChatDefine.isNotEmpty) {
+      return fromChatDefine;
+    }
     final process = processEnvironment ?? process_env.readProcessEnvironment();
-    final raw = process[chatVariable] ?? '';
+    final raw = process[conversationVariable] ?? process[chatVariable] ?? '';
     if (raw.isEmpty) {
       return defaultChatName;
     }
     return raw;
   }
+
+  static String resolveConversation({
+    String fromDefine = const String.fromEnvironment(conversationVariable),
+    String fromChatDefine = const String.fromEnvironment(chatVariable),
+    Map<String, String>? processEnvironment,
+  }) =>
+      resolveChat(
+        fromDefine: fromDefine,
+        fromChatDefine: fromChatDefine,
+        processEnvironment: processEnvironment,
+      );
 
   static String resolveUsername({
     String fromDefine = const String.fromEnvironment(usernameVariable),

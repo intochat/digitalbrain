@@ -6,7 +6,7 @@ final class SendMessageRequest {
   Map<String, Object?> toJson() => {'text': text};
 }
 
-/// One [ChatResponseUpdate] frame from POST /chats/{name}/messages/stream.
+/// One [ChatResponseUpdate] frame from conversation send SSE (owner commands /messages/stream).
 ///
 /// Unknown content `$type` values are retained as [ChatDeltaPart] with raw
 /// fields so older clients do not crash when the edge starts emitting data/uri.

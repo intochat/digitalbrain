@@ -268,6 +268,8 @@ final class DigitalBrainUiClient {
     }
   }
 
+  // Seam 5: Conversations is domain owner. chatName is the local conversation name
+  // (OwnerCommandRequest still wires it as chatName JSON).
   Stream<ChatDelta> streamMessage({
     required String chatName,
     required String text,
@@ -276,19 +278,21 @@ final class DigitalBrainUiClient {
     final request = http.Request('POST', uri)
       ..headers['content-type'] = 'application/json'
       ..body = jsonEncode({
-        'kind': 'chat.send',
+        'kind': 'conversation.send',
         'chatName': chatName,
         'text': text,
       });
     final response = await _sendAuthed(request);
     if (response.statusCode != 200) {
-      throw StateError('chat.send failed: ${response.statusCode}');
+      throw StateError(
+        'conversation.send failed: ${response.statusCode}',
+      );
     }
 
     yield* _parseChatDeltas(response);
   }
 
-  // Multipart voice note → server Whisper → same durable chat turn SSE as streamMessage.
+  // Multipart voice → Whisper → durable conversation turn SSE (same as streamMessage).
   Stream<ChatDelta> streamVoice({
     required String chatName,
     required List<int> audioBytes,
@@ -299,7 +303,7 @@ final class DigitalBrainUiClient {
     }
 
     await _requireSession();
-    final uri = baseUri.replace(path: '/chats/$chatName/voice');
+    final uri = baseUri.replace(path: '/conversations/$chatName/voice');
 
     Future<http.StreamedResponse> postOnce() {
       final request = http.MultipartRequest('POST', uri)
@@ -332,7 +336,7 @@ final class DigitalBrainUiClient {
     if (response.statusCode != 200) {
       final body = await response.stream.bytesToString();
       throw StateError(
-        'chat.voice failed: ${response.statusCode} $body',
+        'conversation.voice failed: ${response.statusCode} $body',
       );
     }
 
@@ -360,12 +364,14 @@ final class DigitalBrainUiClient {
     int afterSequence = 0,
   }) async* {
     final uri = baseUri.replace(
-      path: '/chats/$chatName/events',
+      path: '/conversations/$chatName/events',
       queryParameters: {'afterSequence': '$afterSequence'},
     );
     final response = await _sendAuthed(http.Request('GET', uri));
     if (response.statusCode != 200) {
-      throw StateError('chat events failed: ${response.statusCode}');
+      throw StateError(
+        'conversation events failed: ${response.statusCode}',
+      );
     }
 
     final lines = response.stream

@@ -195,7 +195,7 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
           expect(request.method, 'POST');
           expect(
             request.url.toString(),
-            'http://ui.example:5080/chats/pulse/messages/stream',
+            'http://ui.example:5080/conversations/pulse/messages/stream',
           );
           expect(jsonDecode(request.body), {'text': 'hello'});
           return http.Response(
