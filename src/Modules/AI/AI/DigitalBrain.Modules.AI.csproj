@@ -4,6 +4,8 @@
     <Description>AI module: typed LLM neurons and direct Concurrent/GroupChat MAF orchestration outside the kernel.</Description>
     <RootNamespace>DigitalBrain.AI</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
+    <!-- Kernel host builds this library with -r win-x64 for Foundry natives. -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />
@@ -12,6 +14,8 @@
     <PackageReference Include="Microsoft.Orleans.Journaling" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
     <PackageReference Include="OllamaSharp" />
+    <!-- Private so Foundry native RID does not force AppHost/Aspire.Hosting to win-x64. -->
+    <PackageReference Include="Microsoft.AI.Foundry.Local" PrivateAssets="all" />
     <PackageReference Include="Concentus" />
     <PackageReference Include="Concentus.Oggfile" />
     <PackageReference Include="NAudio" />

@@ -10,7 +10,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddDigitalBrain();
 builder.AddDigitalBrainAuth();
-builder.AddWhisperIfConfigured();
 builder.Services.TryAddSingleton(static services =>
     new OwnerSessionJournal(services.GetRequiredService<IDigitalBrain>()));
 

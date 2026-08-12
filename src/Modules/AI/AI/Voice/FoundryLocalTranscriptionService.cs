@@ -1,20 +1,18 @@
 using System.Text;
-using DigitalBrain.AI;
 using Microsoft.AI.Foundry.Local;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.AI;
 
-// Local Whisper via Microsoft Foundry Local (IAW port). Lives on the Windows kernel host
-// so native Foundry assets do not force win-x64 on every AI consumer.
+// Local Whisper via Microsoft Foundry Local (IAW port). Owned by the AI module.
 public sealed class FoundryLocalTranscriptionService :
     IAudioTranscriptionService,
     IHostedService,
     IAsyncDisposable
 {
-    public const string ModelIdConfigurationKey = "DigitalBrain:AI:Whisper:ModelId";
+    public const string ModelIdConfigurationKey = VoiceToTextHosting.ModelIdConfigurationKey;
 
     private static readonly string[] OggExtensions = [".ogg", ".opus", ".oga"];
     private static readonly TimeSpan DownloadTimeout = TimeSpan.FromMinutes(5);

@@ -15,11 +15,15 @@ internal static class VoiceToTextHosting
 
         services.TryAddSingleton<IAudioConverter, OggOpusToWavConverter>();
 
-        // Foundry Local is registered by the Windows kernel host when ModelId is set.
-        // Without it, STT refuses settled with a clear fix path.
         if (string.IsNullOrWhiteSpace(configuration[ModelIdConfigurationKey]))
         {
             services.TryAddSingleton<IAudioTranscriptionService, UnavailableTranscriptionService>();
+            return;
         }
+
+        services.TryAddSingleton<FoundryLocalTranscriptionService>();
+        services.TryAddSingleton<IAudioTranscriptionService>(static sp =>
+            sp.GetRequiredService<FoundryLocalTranscriptionService>());
+        services.AddHostedService(static sp => sp.GetRequiredService<FoundryLocalTranscriptionService>());
     }
 }
