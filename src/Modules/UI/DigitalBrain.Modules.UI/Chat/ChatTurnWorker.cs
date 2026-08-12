@@ -237,6 +237,12 @@ internal sealed class ChatTurnWorker : Neuron
                 .ConnectionsFrom(chatId, ChatRoles.Responder)
                 .WaitAsync(lookup.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
+            if (routes.Count > 1)
+            {
+                throw new InvalidOperationException(
+                    $"Chat '{chatId}' has {routes.Count} {ChatRoles.Responder} bindings (D6: exactly one).");
+            }
+
             if (routes.FirstOrDefault() is { } bound)
             {
                 return (
@@ -244,6 +250,8 @@ internal sealed class ChatTurnWorker : Neuron
                     bound.Target.Name);
             }
 
+            // Seam5: ConversationNeuron.Send auto-binds before enqueue; tip Chat path may still
+            // fall back to the default assistant when no connection exists yet.
             return (DefaultResponder(chatId.Owner), "assistant");
         }
         catch (OperationCanceledException) when (lookup.IsCancellationRequested)

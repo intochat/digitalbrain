@@ -9,6 +9,7 @@
     <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Conversations.Contracts.csproj" />
     <ProjectReference Include="../../UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
+    <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
 </Project>

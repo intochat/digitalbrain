@@ -1,7 +1,7 @@
 namespace DigitalBrain.Conversations;
 
-// D5: Conversations.Contracts owns the provider-neutral responder; AI implements.
+// D5: Conversations.Contracts owns the provider-neutral responder role; AI implements IAgent.
 public interface IConversationResponder
 {
-    const string RoleName = "responder";
+    const string RoleName = ConversationRoles.Responder;
 }
