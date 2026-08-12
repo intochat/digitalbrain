@@ -25,7 +25,8 @@ var brain = builder
 
 // Grill / CPU boxes: launch profile "grill" sets DigitalBrain__AppHost__EnableVoiceToText=false
 // so AppHost composition does not load Foundry Local / Betalgo (missing on RID-only bring-up).
-var enableVoiceToText = builder.Configuration.GetValue("DigitalBrain:AppHost:EnableVoiceToText", defaultValue: true);
+var enableVoiceRaw = builder.Configuration["DigitalBrain:AppHost:EnableVoiceToText"];
+var enableVoiceToText = !string.Equals(enableVoiceRaw, "false", StringComparison.OrdinalIgnoreCase);
 
 brain.AddModule<AIModule>(ai =>
 {
