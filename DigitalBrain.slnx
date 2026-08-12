@@ -46,30 +46,6 @@
     <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
   </Folder>
-  <Folder Name="/Modules/Registry/">
-    <Project Path="src/Modules/Registry/Registry/DigitalBrain.Modules.Registry.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Grants/">
-    <Project Path="src/Modules/Grants/Grants/DigitalBrain.Modules.Grants.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Workspace/">
-    <Project Path="src/Modules/Workspace/Workspace/DigitalBrain.Modules.Workspace.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Library/">
-    <Project Path="src/Modules/Library/Library/DigitalBrain.Modules.Library.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Corpus/">
-    <Project Path="src/Modules/Corpus/Corpus/DigitalBrain.Modules.Corpus.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Repository/">
-    <Project Path="src/Modules/Repository/Repository/DigitalBrain.Modules.Repository.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Behavior/">
-    <Project Path="src/Modules/Behavior/Behavior/DigitalBrain.Modules.Behavior.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Cell/">
-    <Project Path="src/Modules/Cell/Cell/DigitalBrain.Modules.Cell.csproj" />
-  </Folder>
   <Project Path="src/Kernel/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
   <Project Path="src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   <Project Path="src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />

@@ -1036,27 +1036,4 @@ internal sealed class Chat : Neuron, IChat, IRemindable
         }
     }
 
-    [GenerateSerializer]
-    internal sealed record OwnerCommand(
-        [property: Id(0)] Guid CommandId,
-        [property: Id(1)] string Text,
-        [property: Id(2)] ActorContext? Actor = null);
-
-    [GenerateSerializer]
-    internal sealed record DurableTurnRecord(
-        [property: Id(0)] Guid TurnId,
-        [property: Id(1)] Guid CommandId,
-        [property: Id(2)] string Text,
-        [property: Id(3)] ActorContext Actor,
-        [property: Id(4)] ChatTurnStatus Status,
-        [property: Id(5)] string? ExecutionName,
-        [property: Id(6)] long Revision,
-        // Kernel Execution.Revision last applied to this turn — duplicate wake-ups with same revision are no-ops.
-        [property: Id(7)] long? AppliedExecutionRevision = null);
-
-    [GenerateSerializer]
-    internal sealed record TurnQueueState(
-        [property: Id(0)] List<Guid> PendingTurnIds,
-        [property: Id(1)] Guid? ActiveTurnId,
-        [property: Id(2)] string? ActiveExecutionName);
 }

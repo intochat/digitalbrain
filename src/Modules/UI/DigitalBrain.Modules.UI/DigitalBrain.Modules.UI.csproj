@@ -12,9 +12,7 @@
     <ProjectReference Include="../DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
     <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
-    <ProjectReference Include="../../Execution/Execution/DigitalBrain.Modules.Execution.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
-    <ProjectReference Include="../../Grants/Grants/DigitalBrain.Modules.Grants.csproj" />
   </ItemGroup>
 </Project>
