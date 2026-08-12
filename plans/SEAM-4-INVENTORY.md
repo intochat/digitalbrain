@@ -1,52 +1,80 @@
 # Seam 4 — tip inventory (complete-refactoring)
 
-**Date:** 2026-08-12 · Tip at inventory: `38b6055d` ancestry (Sdk rails present under `src/Kernel/DigitalBrain.Sdk`)  
+**Date:** 2026-08-12 PT · Tip ancestry: `7f8d9778` + prior Sdk rails under `src/Kernel/DigitalBrain.Sdk`  
 **Bound to:** `plans/SEAM-4-ACCEPTANCE.md` order A → B → C → D  
-**Freeze:** do not touch AppHost.cs / AIHostingExtensions / appsettings.Development.json
+**Freeze:** do not touch AppHost.cs / AIHostingExtensions / appsettings.Development.json  
+**Vocab:** Neuron / Synapse / Connection / `ISynapseGraph`
 
-## A. Ownership honesty (tip greps)
+## Tip rail map
+
+| Rail | Path |
+|---|---|
+| MCP list/call | `src/Kernel/DigitalBrain.Sdk/Mcp/McpServerNeuron.cs` (`[GrainType("mcp")]`, instance = serverKey) |
+| OAuth/PKCE | `OAuthPkce.cs`, `McpAuthorizationRail.cs`, `McpAuthorizationNeuron.cs` |
+| Token slot | `PrincipalTokenSlot.cs` + `McpTokenPresence.SubjectKey` (= PrincipalId `N`) |
+| Protect | `Protection/DurablePayloadProtector.cs` (`DigitalBrain:Security:StateProtectionKey`) |
+| Integration descriptor | `Abstractions/Integrations/Integration.cs` (`ProtectedTokenReference` only) |
+| Webhook | `Sdk/Webhook/WebhookIngressNeuron.cs` + Accepted\|Duplicate\|Conflict |
+| Kernel host | `DigitalBrain.Kernel/MapOAuthCallback.cs` (+ `Program.cs`) |
+| Module call-sites | Salesforce/Google: `McpServerDefinition` + Aspire `OAuthProviderHosting.Register` only |
+
+**Folder note:** path `DigitalBrain.Sdk`, AssemblyName/RootNamespace `DigitalBrain.Modules.Sdk` — Integrations-owned rails, not Core interconnect. Rename non-goal this seam.
+
+---
+
+## A. Ownership honesty
 
 | ID | Status | Evidence |
 |---|---|---|
-| **A1** MCP list/call on Sdk | **DONE tip** | `src/Kernel/DigitalBrain.Sdk/Mcp/McpServerNeuron.cs` (`ListToolsAsync` / `CallToolAsync` via `IMcpToolTransport` + `McpClientSessions`). No second module MCP client stack found under `src/Modules` for same serverKey. |
-| **A2** OAuth/PKCE + TokenSlot in Sdk | **DONE tip** | `McpAuthorizationRail.cs`, `McpOAuthSession.cs`, `PrincipalTokenSlot.cs`, `McpTokenExchange.cs`. Modules register OAuth **hosting definitions** only (e.g. Salesforce Aspire) — call rails, do not reimplement PKCE. |
-| **A3** WebhookIngress Sdk rail | **DONE tip** | `WebhookIngressNeuron` + `VerifiedWebhookDeliveryReceived` + Accepted/Duplicate/Conflict under `src/Kernel/DigitalBrain.Sdk/Webhook/`. No module ingress clones found. |
-| **A4** Kernel MapOAuthCallback only | **DONE tip** | `src/Kernel/DigitalBrain.Kernel/MapOAuthCallback.cs` + `Program.cs` `app.MapOAuthCallback()`. Sdk `McpOAuthCallback` joins auth neuron — does not mint `ActorContext`. |
-
-**Folder note:** Sdk project path is `src/Kernel/DigitalBrain.Sdk` with namespace `DigitalBrain.Modules.Sdk.*` — ownership is Sdk rails (Integrations), not Core interconnect. Residual: consider path/namespace honesty doc in PR (no rename required this seam unless Eng Desk asks).
+| **A1** | **DONE tip** | Sole outbound MCP neuron: `McpServerNeuron`. Modules only `AddSingleton(new McpServerDefinition(` (Salesforce/Google). No module `McpClient` stack. `DigitalBrain.Mcp` = northbound host tools, not parallel outbound client. |
+| **A2** | **DONE tip** | PKCE/token/slot under Sdk/Mcp. Modules do not reimplement PKCE/callback. |
+| **A3** | **DONE tip** | Webhook rail only under Sdk/Webhook. `rg Webhook` in Core + Modules → empty. |
+| **A4** | **DONE tip** | `MapOAuthCallback` Kernel-only. Sdk: no `new ActorContext` / `HttpActor` mint. |
 
 ## B. Principal-keyed slots (R10)
 
 | ID | Status | Evidence |
 |---|---|---|
-| **B1** `(serverKey, PrincipalId)` slot | **DONE tip** | `McpAuthorizationNeuron.SlotKey` → `{serverKey}/{principal:N}`; `PrincipalTokenSlot` addresses one subject key in durable dict. |
-| **B2** Tokens protected / not journaled as secrets | **LIKELY DONE** | Protection helpers under `Sdk/Protection`; tokens written as protected payloads to durable dict — confirm no plaintext journal fields in follow-up slice. |
-| **B3** No silent credential fallback | **NEEDS SLICE** | Grep + product path review: publish/share must not transfer personal credentials (gate in B slice). |
-| **B4** No hardcode chat+main park | **RESIDUAL** | `McpAuthorizationNeuron.ResolvePrincipalChat` → `NeuronId("chat", owner, PrincipalPartition… "main")`. List as Conversation-extract residual — do not fake done. |
+| **B1** | **DONE tip** | Per-server `mcp` grain + `PrincipalTokenSlot(..., SubjectKey(actor))` → `(serverKey, PrincipalId)`. Auth park slots: `McpAuthorizationNeuron.SlotKey` = `{serverKey}/{principal:N}`. `Integration` is descriptor, not dual token grain. |
+| **B2** | **MOSTLY DONE — residual** | Durable tokens via `IDurablePayloadProtector`; pending stores `ProtectedCodeVerifier`. **Residual:** `BeginMcpAuthorization` still has plaintext `CodeVerifier` on synapse surface — confirm never journaled as secret before claiming B2 green. |
+| **B3** | **DONE tip / no counterexample** | Placeholder credentials refused (`McpOAuthOptions`). No publish/share personal-credential transfer found under Sdk MCP. OAuth `refresh_token` grant ≠ cross-principal credential fallback. |
+| **B4** | **RESIDUAL** | `McpAuthorizationNeuron.ResolvePrincipalChat` → `NeuronId("chat", Id.Owner, PrincipalPartition.InstanceName(actor.PrincipalId, "main"))` when requesting neuron is not chat. Conversation extract blocks clean fix — **do not fake done**. |
 
 ## C. Webhook ingress shape
 
 | ID | Status | Evidence |
 |---|---|---|
-| **C1** Grain key = SubscriptionId | **DONE tip** | `[GrainType("webhook-ingress")]`; handler requires `Id.Name == synapse.SubscriptionId`. |
-| **C2** Emit Accepted\|Duplicate\|Conflict | **DONE tip** | `WebhookIngressNeuron.HandleAsync` Emit path after digest dedupe. |
-| **C3** No Core webhook types | **DONE tip** | Types live under Sdk/Webhook; no Core webhook stack found. |
+| **C1** | **DONE tip** | Handler requires `Id.Name == synapse.SubscriptionId`. |
+| **C2** | **DONE tip** | `VerifiedWebhookDeliveryReceived` → digest dedupe → Emit Accepted\|Duplicate\|Conflict. |
+| **C3** | **DONE tip** | No Core webhook types; no Streams/EH brain-bus substitute found. |
 
 ## D. Proof / gate
 
 | ID | Status | Notes |
 |---|---|---|
-| **D1** `dotnet build DigitalBrain.slnx -warnaserror` | **PENDING** | Run after B/C honesty slices; AppHost FREEZE means don't "fix" build via AppHost hacks. |
-| **D2** PR ownership note + grep evidence | **THIS COMMIT** | Acceptance + this inventory. |
-| **D3** Product Grill Seam 4 smoke | **LATER** | Not re-litigate Seam 1 cookie grill. |
+| **D1** | **PENDING** | Narrow Sdk build then `DigitalBrain.slnx -warnaserror`; no FREEZE hacks. |
+| **D2** | **THIS FILE** | Ownership + grep evidence. |
+| **D3** | **LATER** | Rails ownership + principal-slot smoke; not Seam 1 cookie re-litigation. |
 
-## Ordered implementation slices (remaining)
+## Reproducible greps
 
-1. **A residual:** PR note that Sdk lives under `src/Kernel/DigitalBrain.Sdk` but is Integrations-owned; optional namespace/path move is **non-goal** unless Architect amends.
-2. **B3:** Audit share/publish credential paths; refuse silent fallback (code if tip has a hole).
-3. **B2 confirm:** Prove protected-payload write path; no secret strings in journals.
-4. **B4 residual:** Document Conversation extract dependency; no fake fix.
-5. **D1:** Local `dotnet build DigitalBrain.slnx -warnaserror` green on tip without FREEZE file edits.
-6. **D3:** Short Product Grill rails smoke (slot key + webhook emit) after D1.
+```bash
+rg -n -t cs 'class McpServerNeuron|class PrincipalTokenSlot|class WebhookIngressNeuron|MapOAuthCallback|class McpAuthorizationNeuron' src -g '!**/obj/**' -g '!**/bin/**'
+rg -n -t cs 'McpClient|OAuthPkce|WebhookIngress' src/Modules -g '!**/obj/**' -g '!**/bin/**'
+rg -n -t cs 'Webhook|VerifiedWebhook' src/Kernel/DigitalBrain.Core src/Modules -g '!**/obj/**' -g '!**/bin/**'
+rg -n -t cs 'new ActorContext|HttpActor' src/Kernel/DigitalBrain.Sdk -g '!**/obj/**' -g '!**/bin/**'
+rg -n -t cs 'ResolvePrincipalChat|"main"' src/Kernel/DigitalBrain.Sdk/Mcp/McpAuthorizationNeuron.cs
+rg -n -t cs 'StateProtectionKey|CodeVerifier|ProtectedCodeVerifier' src/Kernel/DigitalBrain.Sdk -g '!**/obj/**' -g '!**/bin/**'
+```
 
-Kernel coordination: none expected beyond existing `MapOAuthCallback` — ping Kernel only if callback mint edge needs change.
+## Ordered remaining slices
+
+1. Confirm B2 (CodeVerifier journal path) — micro-fix only if tip hole.  
+2. Keep B4 residual listed (Conversation extract).  
+3. D1 local builds without FREEZE edits.  
+4. D3 Product Grill rails smoke after D1.
+
+## Kernel ask / non-goals
+
+- **Kernel:** `MapOAuthCallback` only — do not expand Kernel OAuth/PKCE.  
+- **Out of scope:** Gmail MCP parity, X webhook polish, FireRowsAs, dual-catalog, Conversation extract, graph rename, central tests, Behavior Studio, FREEZE files.
