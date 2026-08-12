@@ -79,7 +79,8 @@ internal sealed class Chat : Neuron, IChat, IRemindable
     public async Task Cancel(CancelTurn command)
     {
         ArgumentNullException.ThrowIfNull(command);
-        RequireActor(command.Actor, "cancel-turn");
+        // Host mints via VerifiedActor.Enter; client CancelTurn.Actor is untrusted.
+        command = command with { Actor = RequireVerifiedActor("cancel-turn") };
 
         if (command.CommandId.Value == Guid.Empty)
         {
@@ -806,7 +807,9 @@ internal sealed class Chat : Neuron, IChat, IRemindable
 
     private async Task<TurnAccepted> EnqueueTurnAsync(SendMessage message)
     {
-        RequireActor(message.Actor, "send");
+        // Host mints via VerifiedActor.Enter; client SendMessage.Actor is untrusted.
+        // Overwrite — never fall back to the payload stamp when ambient is missing.
+        message = message with { Actor = RequireVerifiedActor("send") };
         if (!IsUnseenCommand(message))
         {
             var existing = LoadTurns().FirstOrDefault(turn => turn.CommandId == message.CommandId.Value);
@@ -1012,19 +1015,21 @@ internal sealed class Chat : Neuron, IChat, IRemindable
     private void SaveQueue(TurnQueueState queue)
         => _queueState.Value = _queues.SerializeToArray(queue);
 
-    private static void RequireActor(ActorContext? actor, string command)
+    // VerifiedActor.Current is the only trusted Actor inside the Chat grain.
+    // Payload Actor fields are overwritten at the durable-command boundary.
+    private static ActorContext RequireVerifiedActor(string command)
     {
-        if (actor is null)
-        {
-            throw new NeuronAuthorizationException(
-                $"Chat refuses durable owner command '{command}' without an Actor stamp.");
-        }
+        var verified = VerifiedActor.Current
+            ?? throw new NeuronAuthorizationException(
+                $"Chat refuses durable owner command '{command}' without a verified principal.");
 
-        if (string.IsNullOrWhiteSpace(actor.Username))
+        if (string.IsNullOrWhiteSpace(verified.Username))
         {
             throw new NeuronAuthorizationException(
                 $"Chat refuses durable owner command '{command}' with an empty actor username.");
         }
+
+        return verified;
     }
 
     private static void Append(IDurableList<byte[]> entries, byte[] entry, int retained)
