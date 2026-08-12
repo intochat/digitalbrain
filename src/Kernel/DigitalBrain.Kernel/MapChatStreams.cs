@@ -79,7 +79,7 @@ internal static class ChatStreamsHttpMaps
             ProjectTurn,
             cancellationToken);
 
-    private static ChatTurnEvent? ProjectTurn(SynapseDelivery delivery)
+    internal static ChatTurnEvent? ProjectTurn(SynapseDelivery delivery)
     {
         ChatTurnEvent Turn(
             bool fromUser,

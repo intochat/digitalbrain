@@ -2,6 +2,7 @@ using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
+using DigitalBrain.Conversations;
 using DigitalBrain.Client;
 using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
@@ -40,6 +41,27 @@ internal static class OwnerCommandsHttpMaps
                 if (string.IsNullOrWhiteSpace(request.Kind))
                 {
                     http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                    return;
+                }
+
+                if (string.Equals(request.Kind, HttpSurfacePaths.KindConversationSend, StringComparison.Ordinal))
+                {
+                    if (string.IsNullOrWhiteSpace(request.ChatName) || string.IsNullOrWhiteSpace(request.Text))
+                    {
+                        http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                        return;
+                    }
+
+                    if (!TryPrincipalResource(actor.PrincipalId, request.ChatName, out var conversationInstance))
+                    {
+                        http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                        return;
+                    }
+
+                    await SseResponse.WriteAsync(
+                        http.Response,
+                        StreamConversationDeltasAsync(brain, conversationInstance, request.Text, actor, cancellationToken),
+                        cancellationToken).ConfigureAwait(false);
                     return;
                 }
 
@@ -173,6 +195,49 @@ internal static class OwnerCommandsHttpMaps
 
         commandId = new CommandId(id);
         return true;
+    }
+
+
+    private static async IAsyncEnumerable<SseItem<ChatResponseUpdate>> StreamConversationDeltasAsync(
+        IDigitalBrain brain,
+        string conversationInstance,
+        string text,
+        ActorContext actor,
+        [EnumeratorCancellation] CancellationToken requestAborted)
+    {
+        using var budget = new CancellationTokenSource(TurnBudget);
+        var command = CommandId.New();
+        var accepted = await brain.GetGrainProxy<DigitalBrain.Conversations.IConversation>(conversationInstance)
+            .Send(new DigitalBrain.Conversations.SendConversationMessage(command, text, actor))
+            .ConfigureAwait(false);
+
+        using var observer = CancellationTokenSource.CreateLinkedTokenSource(requestAborted, budget.Token);
+        var chatId = NeuronId.For<IChat>(brain.Owner, conversationInstance);
+
+        await foreach (var page in brain.WatchJournalAsync(
+            chatId,
+            JournalKind.Outgoing,
+            afterSequence: 0,
+            observer.Token).ConfigureAwait(false))
+        {
+            foreach (var delivery in page.Delta)
+            {
+                if (delivery.Synapse is Responded responded && responded.CommandId == command)
+                {
+                    yield return new SseItem<ChatResponseUpdate>(
+                        new ChatResponseUpdate(ChatRole.Assistant, responded.Text),
+                        HttpSurfacePaths.ChatDeltaEvent);
+                    yield break;
+                }
+
+                if (delivery.Synapse is TurnLifecycle life
+                    && life.TurnId.Value == accepted.TurnId.Value
+                    && life.Status is ChatTurnStatus.Failed or ChatTurnStatus.Cancelled)
+                {
+                    yield break;
+                }
+            }
+        }
     }
 
     // Observer-only SSE: durable Send starts the Execution; request abort detaches this

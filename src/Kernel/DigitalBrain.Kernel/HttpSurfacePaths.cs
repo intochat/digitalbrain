@@ -4,6 +4,9 @@ internal static class HttpSurfacePaths
 {
     public const string OwnerCommandsPath = "/owner/commands";
     public const string ChatEventsPath = "/chats/{chatName}/events";
+    public const string ConversationEventsPath = "/conversations/{conversationName}/events";
+    public const string ConversationMessagesStreamPath = "/conversations/{conversationName}/messages/stream";
+    public const string ConversationVoicePath = "/conversations/{conversationName}/voice";
     public const string SurfaceEventsPath = "/surfaces/{surfaceName}/events";
     public const string BrainTopologyPath = "/brain/topology";
     public const string GraphEventsPath = "/graph/events";
@@ -25,6 +28,8 @@ internal static class HttpSurfacePaths
     public const string AuthorizationEvent = "authorization";
 
     public const string KindChatSend = "chat.send";
+    public const string KindConversationSend = "conversation.send";
+    public const string KindConversationCancelTurn = "conversation.cancel-turn";
     public const string KindChatCancelTurn = "chat.cancel-turn";
     public const string KindChatButton = "chat.button";
     public const string KindSurfaceOpen = "surface.open";

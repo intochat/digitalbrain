@@ -33,6 +33,7 @@ public static class ProductModules
             typeof(DigitalBrain.Repository.RepositoryNeuron).Assembly,
             typeof(DigitalBrain.Time.TimerNeuron).Assembly,
             typeof(DigitalBrain.UI.UiModule).Assembly,
+            typeof(DigitalBrain.Conversations.ConversationNeuron).Assembly,
             typeof(DigitalBrain.Os.WorkspaceNeuron).Assembly,
             typeof(DigitalBrain.Modules.Sdk.Mcp.McpAuthorizationNeuron).Assembly,
         ]);
