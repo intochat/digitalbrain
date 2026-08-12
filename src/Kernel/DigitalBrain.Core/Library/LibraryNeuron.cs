@@ -312,6 +312,50 @@ public sealed class LibraryNeuron : Neuron, ILibrary
         return score;
     }
 
+
+    // Library 2b (a): shared ForOwner catalog. Publish/discover require Read grant on library/main
+    // (owner grants book), or bootstrap (empty catalog / prior publisher).
+    private async Task<ActorContext> RequireCatalogAccessAsync(
+        string action,
+        CancellationToken cancellationToken)
+    {
+        var actor = VerifiedActor.Current
+            ?? throw new NeuronAuthorizationException(
+                $"Library '{Id}' refuses {action} without a verified principal.");
+
+        if (string.IsNullOrWhiteSpace(actor.Username))
+        {
+            throw new NeuronAuthorizationException(
+                $"Library '{Id}' refuses {action} with an empty actor username.");
+        }
+
+        var grants = GrainFactory.GetGrain<IGrants>(IGrants.ForOwner(Id.Owner).ToGrainId());
+        if (await grants
+                .HasAccess(actor.PrincipalId, Id, GrantKind.Read)
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext))
+        {
+            return actor;
+        }
+
+        var artifacts = Load().Artifacts;
+        if (artifacts.Count == 0)
+        {
+            // Bootstrap: first verified principal may open the shared catalog.
+            return actor;
+        }
+
+        if (artifacts.Any(a => a.Publisher == actor.PrincipalId))
+        {
+            return actor;
+        }
+
+        throw new NeuronAuthorizationException(
+            $"Library '{Id}' refuses {action} for principal '{actor.PrincipalId.Value:N}': "
+            + "no Read grant on the shared catalog. Ask an owner to fire db.grant-access "
+            + "for subject library/main on the owner grants book.");
+    }
+
     private static string ContentHash(string content) => LibraryContent.Hash(content);
 
     private LibraryState Load()
