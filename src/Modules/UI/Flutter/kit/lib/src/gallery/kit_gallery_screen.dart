@@ -5,6 +5,7 @@ import '../components/card/kit_card.dart';
 import '../components/chart/kit_chart.dart';
 import '../components/graph/graph_models.dart';
 import '../components/graph/kit_graph.dart';
+import '../components/view/kit_view.dart';
 import '../models/kit_part.dart';
 import '../theme/kit_theme.dart';
 
@@ -42,6 +43,14 @@ final class KitGalleryScreen extends StatelessWidget {
               const Text(
                 'Components shared by surfaces and chat CustomMessage bubbles.',
                 style: KitType.bodyMuted,
+              ),
+              const SizedBox(height: 28),
+              const Text('View · calculator', style: KitType.title),
+              const SizedBox(height: 12),
+              const KitView(
+                kind: 'calculator',
+                display: '42',
+                phase: 'result',
               ),
               const SizedBox(height: 28),
               const Text('Button', style: KitType.title),

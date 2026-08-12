@@ -10,7 +10,8 @@ builder.Services
     .WithHttpTransport(static options => options.Stateless = true)
     .WithTools<ChatTools>()
     .WithTools<IntrospectionTools>()
-    .WithTools<RegistryTools>();
+    .WithTools<RegistryTools>()
+    .WithTools<TimeTools>();
 
 var app = builder.Build();
 app.MapDefaultEndpoints();

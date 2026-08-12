@@ -9,6 +9,9 @@
   <ItemGroup>
     <ProjectReference Include="../../Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
     <ProjectReference Include="../../Modules/Introspection/Contracts/DigitalBrain.Modules.Introspection.Contracts.csproj" />
+    <ProjectReference Include="../../Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
+    <ProjectReference Include="../DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+    <ProjectReference Include="../DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="../DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <ProjectReference Include="../DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />

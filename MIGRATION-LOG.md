@@ -962,3 +962,46 @@ ConfirmDestructive are unit-of-code repairs covered by the same living stack.
 - Chat turn still subject to ~15s Waiting cancel while the human is in a browser (S13 residual).
 - Server "registry" is DI projection, not owner-authored durable installs of arbitrary MCP URLs.
 - Destructive confirm is a second fire flag, not a full UI one-shot press card yet.
+
+## Session 13 - 2026-08-12 - Waves 5+6: time/memory + kinds surface
+
+### 49. Wave 5 — schedules, catch-up, corpus
+
+- **`schedule` grain** (`ISchedule`): `time.arm-schedule` / `cancel` / `force-schedule-catch-up`
+  - durable next-due, period, OnBehalfOf principal
+  - **due → tick** two-step (`time.schedule-due` then `time.schedule-tick`)
+  - phase-preserving collapse: one tick, `Resolution=Recovered`, `CollapsedPeriods=N`
+  - reminder re-arms to next phase boundary (not "now + period")
+- **`corpus` grain**: watermarked append/read/episode projection; schedule ticks append entries
+- MCP: `arm_schedule`, `force_schedule_catch_up`, `read_schedule`, `read_corpus`
+
+### 50. Wave 5 gate evidence
+
+```
+arm_schedule gate5 period=300s
+force_schedule_catch_up missedPeriods=4
+→ TICK Resolution=Recovered CollapsedPeriods=4
+read_schedule → lastResolution=Recovered lastCollapsedPeriods=4
+read_corpus → #3 [time.schedule-tick] … Resolution=Recovered CollapsedPeriods=4
+```
+
+(Silo resource restart for a true 20-minute wall-clock gap was attempted; Aspire kernel
+did not return healthy after resource-level stop/start. Force catch-up exercises the same
+collapse math. Wall-clock downtime remains the gold standard when the membership plane is stable.)
+
+### 51. Wave 6 — kinds surface
+
+- Cell calculator (Wave 0) remains the living evaluator
+- **`kindregistry`**: durable install/list of kind records (+ built-in calculator)
+- **Flutter `KitView`**: calculator pad widget in kit gallery
+- MCP: `cell_apply`, `cell_reset`
+
+### 52. Wave 6 gate evidence
+
+```
+cell_reset calculator@gate6
+cell_apply 7 * 6 = → display=42 value=42 phase=result
+flutter analyze kit: No issues found
+```
+
+Build: 0 warnings. AppHost living after full restart.

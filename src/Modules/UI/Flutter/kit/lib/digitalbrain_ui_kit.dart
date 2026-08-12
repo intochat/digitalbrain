@@ -8,6 +8,7 @@ export 'src/components/chart/kit_chart.dart';
 export 'src/components/clock/kit_clock.dart';
 export 'src/components/graph/graph_models.dart';
 export 'src/components/graph/kit_graph.dart';
+export 'src/components/view/kit_view.dart';
 export 'src/gallery/kit_gallery_screen.dart';
 export 'src/models/kit_part.dart';
 export 'src/theme/kit_theme.dart';

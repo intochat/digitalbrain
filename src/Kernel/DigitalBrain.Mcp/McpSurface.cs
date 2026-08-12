@@ -15,4 +15,10 @@ internal static class McpSurface
     public const string GrantAccess = "grant_access";
     public const string RevokeAccess = "revoke_access";
     public const string ReadChart = "read_chart";
+    public const string ArmSchedule = "arm_schedule";
+    public const string ForceScheduleCatchUp = "force_schedule_catch_up";
+    public const string ReadSchedule = "read_schedule";
+    public const string ReadCorpus = "read_corpus";
+    public const string CellApply = "cell_apply";
+    public const string CellReset = "cell_reset";
 }
