@@ -7,6 +7,7 @@ namespace DigitalBrain.AI;
 internal static class VoiceToTextHosting
 {
     public const string ModelIdConfigurationKey = "DigitalBrain:AI:Whisper:ModelId";
+    public const string EnabledConfigurationKey = "DigitalBrain:AI:Whisper:Enabled";
 
     internal static void Add(IServiceCollection services, IConfiguration configuration)
     {
@@ -15,7 +16,8 @@ internal static class VoiceToTextHosting
 
         services.TryAddSingleton<IAudioConverter, OggOpusToWavConverter>();
 
-        if (string.IsNullOrWhiteSpace(configuration[ModelIdConfigurationKey]))
+        var enabled = configuration.GetValue(EnabledConfigurationKey, defaultValue: true);
+        if (!enabled || string.IsNullOrWhiteSpace(configuration[ModelIdConfigurationKey]))
         {
             services.TryAddSingleton<IAudioTranscriptionService, UnavailableTranscriptionService>();
             return;

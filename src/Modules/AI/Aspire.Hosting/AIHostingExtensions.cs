@@ -4,6 +4,7 @@ using Aspire.Hosting.OpenAI;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Aspire.Hosting;
+using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.AI.Aspire.Hosting;
 
@@ -35,11 +36,19 @@ public static class AIHostingExtensions
     }
 
     // Local Whisper STT (Foundry Local). Marker types: IWhisperTiny / IWhisperSmall / IWhisperLargeV3Turbo.
+    // Official skip: DigitalBrain:AI:Whisper:Enabled=false (env DigitalBrain__AI__Whisper__Enabled=false)
+    // — no-op at AppHost compose so LIVE grill/dev can run without Foundry packages.
     public static DigitalBrainModuleBuilder<AIModule> WithVoiceToText<TModel>(
         this DigitalBrainModuleBuilder<AIModule> module)
         where TModel : class
     {
         ArgumentNullException.ThrowIfNull(module);
+        var configuration = module.Brain.ApplicationBuilder.Configuration;
+        if (!configuration.GetValue("DigitalBrain:AI:Whisper:Enabled", defaultValue: true))
+        {
+            return module;
+        }
+
         var marker = typeof(TModel);
         var whisper = WhisperModel.FindByMarker(marker)
             ?? throw new NotSupportedException(
