@@ -19,6 +19,11 @@ var responder = NeuronId.For<IGemma4>(brain.Owner, modelName);
 
 await brain.FireAsync<ISynapseGraph>(
     ISynapseGraph.InstanceName,
-    new Connect(ChatRoles.ResponderConnectionId(chat), chat, ChatRoles.Responder, responder));
+    new Connect(
+        ChatRoles.ResponderConnectionId(chat),
+        chat,
+        ChatRoles.Responder,
+        responder,
+        Intent: $"{modelName} answers {chatName}"));
 
 Console.WriteLine($"{chat} now answers through {responder}.");

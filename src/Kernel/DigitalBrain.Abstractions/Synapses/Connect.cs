@@ -9,7 +9,8 @@ public sealed record Connect(
     [property: Id(2)] string SynapseAlias,
     [property: Id(3)] NeuronId Target,
     [property: Id(4)] string? Transform = null,
-    [property: Id(5)] DateTimeOffset? ExpiresAt = null) : RequestSynapse<Connected>;
+    [property: Id(5)] DateTimeOffset? ExpiresAt = null,
+    [property: Id(6)] string? Intent = null) : RequestSynapse<Connected>;
 
 [GenerateSerializer]
 [Alias("db.connected")]

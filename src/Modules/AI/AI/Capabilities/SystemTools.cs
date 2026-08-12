@@ -104,6 +104,15 @@ public sealed class SystemTools(
         }
     }
 
+    // Absence is stated rather than left blank: a wire made before provenance existed is not
+    // the same as a wire whose author declined to say why.
+    private static string DescribeProvenance(Provenance? provenance)
+        => provenance is null
+            ? "intent: unrecorded — wired before provenance was kept"
+            : string.IsNullOrEmpty(provenance.StatedIntent)
+                ? $"intent: none stated — wired by {provenance.Author} at {provenance.At:u}"
+                : $"intent: \"{provenance.StatedIntent}\" — wired by {provenance.Author} at {provenance.At:u}";
+
     private async Task<string> GetNeuronsAsync(CancellationToken cancellationToken, string? grainType = null)
     {
         var activated = await ActivatedAsync(cancellationToken).ConfigureAwait(false);
@@ -126,7 +135,11 @@ public sealed class SystemTools(
         foreach (var connection in connections)
         {
             var transform = connection.Transform is null ? "" : $" via {connection.Transform}";
-            lines.AppendLine($"  {connection.Source} --{connection.SynapseAlias}--> {connection.Target}{transform}");
+            // The id is printed because db.disconnect addresses it: without it the model can
+            // only unwire what it created in the same turn.
+            lines.AppendLine($"  [{connection.ConnectionId}] {connection.Source} "
+                + $"--{connection.SynapseAlias}--> {connection.Target}{transform}");
+            lines.AppendLine($"      {DescribeProvenance(connection.Provenance)}");
         }
 
         return lines.ToString();

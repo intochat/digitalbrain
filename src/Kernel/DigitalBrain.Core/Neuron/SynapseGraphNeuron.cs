@@ -42,12 +42,24 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
             synapse.SynapseAlias,
             synapse.Target,
             synapse.Transform,
-            synapse.ExpiresAt)));
+            synapse.ExpiresAt,
+            StampedProvenance(synapse.Intent))));
 
         return ReplyAsync(
             new Connected(synapse.ConnectionId, synapse.Source, synapse.SynapseAlias, synapse.Target),
             cancellationToken);
     }
+
+    // Only the stated intent comes from the caller. Author, time and correlation are taken from
+    // the delivery, so a wire can never claim an origin it did not have.
+    private Provenance? StampedProvenance(string? statedIntent)
+        => CurrentDeliveryCaller is not { } author || CurrentDeliveryCorrelation is not { } correlation
+            ? null
+            : new Provenance(
+                author,
+                TimeProvider.GetUtcNow(),
+                string.IsNullOrWhiteSpace(statedIntent) ? string.Empty : statedIntent.Trim(),
+                correlation);
 
     public Task HandleAsync(Disconnect synapse, CancellationToken cancellationToken)
     {

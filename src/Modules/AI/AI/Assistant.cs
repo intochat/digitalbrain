@@ -45,8 +45,10 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         A complete wiring call looks like: fire db.connect with arguments
         {"connectionId": "timer-note", "source": "timer:default",
         "synapseAlias": "time.timer-elapsed", "target": "chat:main",
-        "transform": "to:ui.note{Text=Note}"} — every field present, instances from
-        get_neurons, the fact's contract id in synapseAlias.
+        "transform": "to:ui.note{Text=Note}", "intent": "tell me in chat when the
+        timer finishes"} — every field present, instances from get_neurons, the fact's
+        contract id in synapseAlias. Always state an intent: it is what get_neurons
+        shows the owner weeks later when they ask why a wire exists.
 
         Tool results are the only truth. If a tool reported a problem or you did not fire
         something, it did not happen — say what you attempted and what is needed instead of

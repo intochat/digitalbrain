@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Reflection;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -144,6 +146,13 @@ internal sealed class NeuronMessagePipeline(
     internal static bool IsOutcome(Synapse synapse)
         => synapse is RouteOutcome or Unrouted;
 
+    private static readonly ConcurrentDictionary<Type, bool> ProjectionFacts = new();
+
+    private static bool IsJournalProjection(Type synapseType)
+        => ProjectionFacts.GetOrAdd(
+            synapseType,
+            static type => type.GetCustomAttribute<JournalProjectionAttribute>() is not null);
+
     private async Task<SynapseDelivery> FireAsync(
         Synapse synapse,
         NeuronId[] receivers,
@@ -168,7 +177,9 @@ internal sealed class NeuronMessagePipeline(
                 turn.CurrentDepth + 1,
                 Attempts: 0));
         }
-        else if (!IsOutcome(synapse) && SynapseAlias.Of(synapse.GetType()) is { } unroutedAlias)
+        else if (!IsOutcome(synapse)
+            && !IsJournalProjection(synapse.GetType())
+            && SynapseAlias.Of(synapse.GetType()) is { } unroutedAlias)
         {
             StageIncomingOutcome(
                 new Unrouted(delivery.SynapseId, unroutedAlias, neuron.Id, delivery.CorrelationId),

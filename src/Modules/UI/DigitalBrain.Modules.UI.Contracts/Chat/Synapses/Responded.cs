@@ -4,6 +4,7 @@ using DigitalBrain.UI;
 namespace DigitalBrain.Chat;
 
 [GenerateSerializer]
+[JournalProjection]
 [Alias("chat.responded")]
 public sealed record Responded(
     [property: Id(0)] CommandId CommandId,

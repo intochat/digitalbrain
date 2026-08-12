@@ -65,6 +65,10 @@ public abstract class Neuron :
 
     protected SynapseId? CurrentDeliverySynapseId => _turn.Handling?.SynapseId;
 
+    // A handler stamping provenance needs the correlation of the request that asked for it;
+    // the unforgeable half of a provenance record can only come from the delivery.
+    protected CorrelationId? CurrentDeliveryCorrelation => _turn.Handling?.CorrelationId;
+
     protected int CurrentDeliveryDepth => _turn.CurrentDepth;
 
     protected CancellationToken TurnCancellationToken => _turn.CancellationToken;
