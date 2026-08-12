@@ -585,6 +585,18 @@ internal sealed class Chat : Neuron, IChat, IRemindable
             return;
         }
 
+        // A19: OAuth/browser user-action parks outlive WaitingPolicyDeadline — keep Waiting and re-arm.
+        if (IsUserActionBlocker(snapshot.Blocker))
+        {
+            DelayDeactivation(WaitingPolicyDeadline + ReminderPeriod);
+            await this.RegisterOrUpdateReminder(
+                    WaitingDeadlineReminderName,
+                    WaitingPolicyDeadline,
+                    ReminderPeriod)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return;
+        }
+
         // Owner policy: CancelExecution + bridge after park deadline (must not freeze FIFO).
         try
         {
@@ -804,6 +816,11 @@ internal sealed class Chat : Neuron, IChat, IRemindable
 
     private static bool IsExecutionTerminal(ExecutionState state)
         => state is ExecutionState.Succeeded or ExecutionState.Failed or ExecutionState.Cancelled;
+
+    // User-action parks (OAuth/browser tip -> UserActionPending; ApprovalRequired). Tip synapse
+    // UserActionRequired never appears on ExecutionSnapshot.Blocker.
+    private static bool IsUserActionBlocker(ExecutionBlocker? blocker)
+        => blocker is UserActionPending or ApprovalRequired;
 
     private async Task<TurnAccepted> EnqueueTurnAsync(SendMessage message)
     {
