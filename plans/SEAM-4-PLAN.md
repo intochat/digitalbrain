@@ -1,7 +1,7 @@
 # Seam 4 — PLAN (ordered slices)
 
 **Owner:** Integrations · Kernel = `MapOAuthCallback` only · Platform = secrets  
-**Tip base noted at first honesty commit:** `complete-refactoring`  
+**Tip:** `complete-refactoring` · slice-1 code @ `3dbb3e94` · D1 @ `3778fa40`  
 **Freeze:** AppHost.cs / AIHostingExtensions / appsettings.Development.json  
 **Bound to:** `SEAM-4-ACCEPTANCE.md` · tip inventory `SEAM-4-INVENTORY.md`  
 **Folder ownership note:** `src/Kernel/DigitalBrain.Sdk/OWNERSHIP.md`
@@ -28,13 +28,13 @@
 
 | # | Slice | Done when | Status |
 |---|---|---|---|
-| **0** | Honesty docs + tip inventory + acceptance | Acceptance/inventory/plan/ownership match tip | **LANDING** (prior docs + this plan/OWNERSHIP) |
-| **1** | Kill dead dual token API | No `IDurableValue` token ctor/overload; only `PrincipalTokenSlot` | **THIS COMMIT** |
-| **2** | B2 journal confirm | Prove `CodeVerifier` on `BeginMcpAuthorization` never journals plaintext secrets (or micro-fix) | pending |
-| **3** | Webhook verify helper honesty | Document tip gap: ingress assumes pre-verified synapse; add Sdk verify helper **only** if Eng Desk names a provider shape (no invented X/Gmail verify) | pending / hold |
-| **4** | D1 gate | `dotnet build src/Kernel/DigitalBrain.Sdk` then `DigitalBrain.slnx -warnaserror` green locally | in progress |
-| **5** | D2 PR ownership note | Grep evidence no module OAuth/webhook entrypoints (inventory greps) | docs ready |
-| **6** | D3 Product Grill | Rails + principal-slot smoke (not Seam 1 cookie re-litigation) | later |
+| **0** | Honesty docs + tip inventory + acceptance | Acceptance/inventory/plan/ownership match tip | **DONE** (`OWNERSHIP.md` + prior acceptance/inventory) |
+| **1** | Kill dead dual token API | No `IDurableValue` token ctor/overload; only `PrincipalTokenSlot` | **DONE** @ `3dbb3e94` (R10; Sdk build green) |
+| **2** | B2 journal confirm | Prove `CodeVerifier` on `BeginMcpAuthorization` never journals plaintext secrets (or micro-fix) | pending (protect-at-rest tip-clean; synapse-surface confirm) |
+| **3** | Webhook verify helper honesty | Tip gap: ingress assumes pre-verified synapse; add Sdk verify **only** if Eng Desk names provider shape | hold |
+| **4** | D1 gate | Sdk + `DigitalBrain.slnx -warnaserror` green locally | **DONE tip** @ `3778fa40` (see D3 smoke) |
+| **5** | D2 PR ownership note | Grep evidence no module OAuth/webhook entrypoints | docs ready (`OWNERSHIP.md` + inventory greps) |
+| **6** | D3 Product Grill | Rails + principal-slot smoke packet | packet @ `plans/SEAM-4-D3-SMOKE.md` — await Grill |
 | **7** | B4 residual | Keep listed until Conversation extract | residual |
 
 ## Kernel coordination
