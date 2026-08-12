@@ -2,10 +2,11 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Library;
 
 [GrainType(ILibrary.GrainTypeName)]
 public sealed class LibraryNeuron : Neuron, ILibrary

@@ -1,9 +1,10 @@
 using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Corpus;
 
 // Append-only watermarked projection. Not a full journal substitute —
 // entries are explicit (schedules, later sources) and resumable by sequence.

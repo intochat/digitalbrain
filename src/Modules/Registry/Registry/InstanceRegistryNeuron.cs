@@ -1,12 +1,13 @@
 using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Registry;
 
 [GrainType(IRegistry.GrainTypeName)]
-internal sealed class InstanceRegistryNeuron : Neuron, IRegistry
+public sealed class InstanceRegistryNeuron : Neuron, IRegistry
 {
     private const string StateName = "registry.json";
 

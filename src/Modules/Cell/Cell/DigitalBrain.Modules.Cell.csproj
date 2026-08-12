@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Cell module: kind-declared fact cells (calculator and extensions).</Description>
+    <RootNamespace>DigitalBrain.Cell</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+  </ItemGroup>
+</Project>

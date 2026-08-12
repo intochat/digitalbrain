@@ -14,6 +14,14 @@
     <ProjectReference Include="../../Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
     <ProjectReference Include="../../Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
     <ProjectReference Include="../../Modules/SalesForce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
+    <ProjectReference Include="../../Modules/Registry/Registry/DigitalBrain.Modules.Registry.csproj" />
+    <ProjectReference Include="../../Modules/Grants/Grants/DigitalBrain.Modules.Grants.csproj" />
+    <ProjectReference Include="../../Modules/Workspace/Workspace/DigitalBrain.Modules.Workspace.csproj" />
+    <ProjectReference Include="../../Modules/Library/Library/DigitalBrain.Modules.Library.csproj" />
+    <ProjectReference Include="../../Modules/Corpus/Corpus/DigitalBrain.Modules.Corpus.csproj" />
+    <ProjectReference Include="../../Modules/Repository/Repository/DigitalBrain.Modules.Repository.csproj" />
+    <ProjectReference Include="../../Modules/Behavior/Behavior/DigitalBrain.Modules.Behavior.csproj" />
+    <ProjectReference Include="../../Modules/Cell/Cell/DigitalBrain.Modules.Cell.csproj" />
     <ProjectReference Include="../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="../DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../DigitalBrain.Client/DigitalBrain.Client.csproj" />

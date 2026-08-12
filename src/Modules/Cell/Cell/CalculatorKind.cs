@@ -1,10 +1,6 @@
 using System.Globalization;
-using DigitalBrain.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
-using Orleans.Serialization;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Cell;
 
 // Total closed calculator: digits, one pending op, equals, clear.
 // No host APIs — the kind tier's safety story starts here.
@@ -200,4 +196,3 @@ internal sealed class CalculatorKind : ICellKind
         return value.ToString("G15", CultureInfo.InvariantCulture);
     }
 }
-

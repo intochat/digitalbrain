@@ -1,9 +1,10 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Workspace;
 
 [GenerateSerializer]
 [Alias("db.workspace-state")]
@@ -12,7 +13,7 @@ internal sealed record WorkspaceState(
     [property: Id(1)] IReadOnlyList<WorkspaceMember> Members);
 
 [GrainType(IWorkspace.GrainTypeName)]
-internal sealed class WorkspaceNeuron : Neuron, IWorkspace
+public sealed class WorkspaceNeuron : Neuron, IWorkspace
 {
     private const string StateName = "workspace.state";
 

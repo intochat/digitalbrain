@@ -1,10 +1,11 @@
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Behavior;
 
 // Durable repo-review runs: open repo → N file stances → moderator rounds → plan.
 [GrainType(IBehavior.GrainTypeName)]

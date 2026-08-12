@@ -12,7 +12,6 @@ internal static class ComposedModules
             typeof(DigitalBrain.AI.IAssistant).Assembly,
             typeof(DigitalBrain.Introspection.ReadTopologyRequest).Assembly,
             typeof(DigitalBrain.Memory.IVectorMemory).Assembly,
-
             typeof(DigitalBrain.Execution.IExecution).Assembly,
             typeof(DigitalBrain.Time.StartTimer).Assembly,
             typeof(DigitalBrain.Chat.SendMessage).Assembly,
@@ -28,6 +27,14 @@ internal static class ComposedModules
             typeof(DigitalBrain.Time.TimerNeuron).Assembly,
             typeof(DigitalBrain.UI.UiModule).Assembly,
             typeof(DigitalBrain.Modules.Sdk.Mcp.McpAuthorizationNeuron).Assembly,
+            typeof(DigitalBrain.Registry.InstanceRegistryNeuron).Assembly,
+            typeof(DigitalBrain.Grants.GrantsNeuron).Assembly,
+            typeof(DigitalBrain.Workspace.WorkspaceNeuron).Assembly,
+            typeof(DigitalBrain.Library.LibraryNeuron).Assembly,
+            typeof(DigitalBrain.Corpus.CorpusNeuron).Assembly,
+            typeof(DigitalBrain.Repository.RepositoryNeuron).Assembly,
+            typeof(DigitalBrain.Behavior.BehaviorNeuron).Assembly,
+            typeof(DigitalBrain.Cell.CellNeuron).Assembly,
         ]);
 }
 

@@ -1,16 +1,17 @@
 using System.Globalization;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Cell;
 
 // One compiled grain interprets many durable kinds. Identity is the key:
 // owner/{kind}@{instance}. Built-in kinds ship with the palette; later
 // waves load kind records from a registry without a new GrainType.
 [GrainType(ICell.GrainTypeName)]
-internal sealed class CellNeuron : Neuron, ICell
+public sealed class CellNeuron : Neuron, ICell
 {
     private const string StateName = "cell.state";
     private const char KindInstanceSeparator = '@';
@@ -116,4 +117,3 @@ internal sealed class CellNeuron : Neuron, ICell
         }
     }
 }
-

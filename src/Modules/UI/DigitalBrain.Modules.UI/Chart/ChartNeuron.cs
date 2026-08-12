@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
+using DigitalBrain.Grants;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;

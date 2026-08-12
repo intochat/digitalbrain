@@ -1,10 +1,4 @@
-using System.Globalization;
-using DigitalBrain.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
-using Orleans.Serialization;
-
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Cell;
 
 [GenerateSerializer]
 [Alias("db.cell-state")]
@@ -21,4 +15,3 @@ internal sealed record CellState(
     internal static CellState Fresh(string kind, string instance)
         => new(kind, instance, "0", 0, "idle", 0, null, true);
 }
-

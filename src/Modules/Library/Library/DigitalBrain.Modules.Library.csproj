@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Library module: artifact publish, discover, and install.</Description>
+    <RootNamespace>DigitalBrain.Library</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+  </ItemGroup>
+</Project>
