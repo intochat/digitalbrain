@@ -1,15 +1,16 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 using System.Globalization;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Kinds;
 
 // Total closed calculator: digits, one pending op, equals, clear.
 // No host APIs — the kind tier's safety story starts here.
-internal sealed class CalculatorKind : ICellKind
+public sealed class CalculatorKind : ICellKind
 {
-    internal const string KindName = "calculator";
+    public const string KindName = "calculator";
 
-    internal static readonly CalculatorKind Instance = new();
+    public static readonly CalculatorKind Instance = new();
 
     public string Name => KindName;
 

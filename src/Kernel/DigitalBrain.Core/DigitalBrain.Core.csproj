@@ -16,4 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Kinds" />
+  </ItemGroup>
 </Project>

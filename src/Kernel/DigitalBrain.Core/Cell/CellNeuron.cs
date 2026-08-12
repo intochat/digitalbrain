@@ -80,16 +80,7 @@ public sealed class CellNeuron : Neuron, ICell
     }
 
     private static ICellKind ResolveKind(string kind)
-    {
-        if (string.Equals(kind, CalculatorKind.KindName, StringComparison.OrdinalIgnoreCase))
-        {
-            return CalculatorKind.Instance;
-        }
-
-        throw new NeuronAuthorizationException(
-            $"Cell kind '{kind}' is not installed. Built-in kinds: {CalculatorKind.KindName}. "
-            + "Install a kind record (later wave) or use calculator@{{name}}.");
-    }
+        => CellKindCatalog.Resolve(kind);
 
     private CellState LoadOrCreate()
     {

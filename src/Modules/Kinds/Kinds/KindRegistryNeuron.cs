@@ -1,9 +1,10 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Kinds;
 
 [GrainType(IKindRegistry.GrainTypeName)]
 public sealed class KindRegistryNeuron : Neuron, IKindRegistry
