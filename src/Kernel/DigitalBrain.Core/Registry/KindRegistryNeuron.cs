@@ -1,20 +1,14 @@
-using System.Text.Json;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using Orleans.Serialization;
 
 namespace DigitalBrain.Core;
 
 [GrainType(IKindRegistry.GrainTypeName)]
 public sealed class KindRegistryNeuron : Neuron, IKindRegistry
 {
-    private const string StateName = "kinds.json";
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-    };
+    private const string StateName = "kinds.state";
 
     private static readonly KindRecord CalculatorBuiltin = new(
         "calculator",
@@ -24,11 +18,13 @@ public sealed class KindRegistryNeuron : Neuron, IKindRegistry
         DateTimeOffset.UnixEpoch,
         Builtin: true);
 
-    private readonly IDurableValue<string> _json;
+    private readonly IDurableValue<byte[]> _state;
+    private readonly Serializer<KindRegistryState> _states;
 
     public KindRegistryNeuron()
     {
-        _json = ServiceProvider.GetRequiredKeyedService<IDurableValue<string>>(StateName);
+        _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
+        _states = ServiceProvider.GetRequiredService<Serializer<KindRegistryState>>();
     }
 
     public Task HandleAsync(InstallKind synapse, CancellationToken cancellationToken)
@@ -71,7 +67,7 @@ public sealed class KindRegistryNeuron : Neuron, IKindRegistry
             all.Add(record);
         }
 
-        _json.Value = JsonSerializer.Serialize(all.ToArray(), JsonOptions);
+        Stage(new KindRegistryState([.. all]));
         return ReplyAsync(new KindInstalled(synapse.CommandId, record), cancellationToken);
     }
 
@@ -89,13 +85,13 @@ public sealed class KindRegistryNeuron : Neuron, IKindRegistry
     }
 
     private KindRecord[] LoadInstalled()
-    {
-        var text = _json.Value;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return [];
-        }
+        => Load().Installed;
 
-        return JsonSerializer.Deserialize<KindRecord[]>(text, JsonOptions) ?? [];
-    }
+    private KindRegistryState Load()
+        => _state.Value is { Length: > 0 } serialized
+            ? _states.Deserialize(serialized)
+            : KindRegistryState.Empty;
+
+    private void Stage(KindRegistryState state)
+        => _state.Value = _states.SerializeToArray(state);
 }

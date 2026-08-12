@@ -4,25 +4,22 @@ using System.Text.Json;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using Orleans.Serialization;
 
 namespace DigitalBrain.Core;
 
 [GrainType(ILibrary.GrainTypeName)]
 public sealed class LibraryNeuron : Neuron, ILibrary
 {
-    private const string StateName = "library.json";
+    private const string StateName = "library.state";
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-    };
-
-    private readonly IDurableValue<string> _json;
+    private readonly IDurableValue<byte[]> _state;
+    private readonly Serializer<LibraryState> _states;
 
     public LibraryNeuron()
     {
-        _json = ServiceProvider.GetRequiredKeyedService<IDurableValue<string>>(StateName);
+        _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
+        _states = ServiceProvider.GetRequiredService<Serializer<LibraryState>>();
     }
 
     public Task HandleAsync(PublishLibraryArtifact synapse, CancellationToken cancellationToken)
@@ -320,18 +317,12 @@ public sealed class LibraryNeuron : Neuron, ILibrary
     }
 
     private LibraryState Load()
-    {
-        var text = _json.Value;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return new LibraryState();
-        }
-
-        return JsonSerializer.Deserialize<LibraryState>(text, JsonOptions) ?? new LibraryState();
-    }
+        => _state.Value is { Length: > 0 } serialized
+            ? _states.Deserialize(serialized)
+            : new LibraryState();
 
     private void Save(LibraryState state)
-        => _json.Value = JsonSerializer.Serialize(state, JsonOptions);
+        => _state.Value = _states.SerializeToArray(state);
 
     private static void RequireCommand(CommandId commandId)
     {
@@ -339,12 +330,5 @@ public sealed class LibraryNeuron : Neuron, ILibrary
         {
             throw new NeuronAuthorizationException("A library command requires a command id.");
         }
-    }
-
-    private sealed class LibraryState
-    {
-        public List<LibraryArtifact> Artifacts { get; set; } = [];
-
-        public List<LibraryInstall> Installs { get; set; } = [];
     }
 }

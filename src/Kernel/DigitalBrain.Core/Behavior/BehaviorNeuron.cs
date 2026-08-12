@@ -1,8 +1,8 @@
 using System.Text;
-using System.Text.Json;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using Orleans.Serialization;
 
 namespace DigitalBrain.Core;
 
@@ -10,19 +10,15 @@ namespace DigitalBrain.Core;
 [GrainType(IBehavior.GrainTypeName)]
 public sealed class BehaviorNeuron : Neuron, IBehavior
 {
-    private const string StateName = "behavior.runs.json";
+    private const string StateName = "behavior.state";
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-    };
-
-    private readonly IDurableValue<string> _json;
+    private readonly IDurableValue<byte[]> _state;
+    private readonly Serializer<BehaviorState> _states;
 
     public BehaviorNeuron()
     {
-        _json = ServiceProvider.GetRequiredKeyedService<IDurableValue<string>>(StateName);
+        _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
+        _states = ServiceProvider.GetRequiredService<Serializer<BehaviorState>>();
     }
 
     public async Task HandleAsync(StartRepoReview synapse, CancellationToken cancellationToken)
@@ -236,18 +232,12 @@ public sealed class BehaviorNeuron : Neuron, IBehavior
     }
 
     private BehaviorState Load()
-    {
-        var text = _json.Value;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return new BehaviorState();
-        }
-
-        return JsonSerializer.Deserialize<BehaviorState>(text, JsonOptions) ?? new BehaviorState();
-    }
+        => _state.Value is { Length: > 0 } serialized
+            ? _states.Deserialize(serialized)
+            : new BehaviorState();
 
     private void Save(BehaviorState state)
-        => _json.Value = JsonSerializer.Serialize(state, JsonOptions);
+        => _state.Value = _states.SerializeToArray(state);
 
     private static void RequireCommand(CommandId commandId)
     {
@@ -256,15 +246,4 @@ public sealed class BehaviorNeuron : Neuron, IBehavior
             throw new NeuronAuthorizationException("A behavior command requires a command id.");
         }
     }
-
-    private sealed class BehaviorState
-    {
-        public List<StoredRun> Runs { get; set; } = [];
-    }
-
-    private sealed record StoredRun(
-        BehaviorRunSummary Summary,
-        FileStance[] Stances,
-        ModeratorRound[] Rounds,
-        string Plan);
 }

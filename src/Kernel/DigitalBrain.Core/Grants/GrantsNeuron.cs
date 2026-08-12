@@ -1,26 +1,22 @@
-using System.Text.Json;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using Orleans.Serialization;
 
 namespace DigitalBrain.Core;
 
 [GrainType(IGrants.GrainTypeName)]
 public sealed class GrantsNeuron : Neuron, IGrants
 {
-    private const string StateName = "grants.json";
+    private const string StateName = "grants.state";
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-    };
-
-    private readonly IDurableValue<string> _json;
+    private readonly IDurableValue<byte[]> _state;
+    private readonly Serializer<GrantsState> _states;
 
     public GrantsNeuron()
     {
-        _json = ServiceProvider.GetRequiredKeyedService<IDurableValue<string>>(StateName);
+        _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
+        _states = ServiceProvider.GetRequiredService<Serializer<GrantsState>>();
     }
 
     public Task HandleAsync(GrantAccess synapse, CancellationToken cancellationToken)
@@ -147,15 +143,15 @@ public sealed class GrantsNeuron : Neuron, IGrants
     }
 
     private GrantRecord[] LoadAll()
-    {
-        var text = _json.Value;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return [];
-        }
+        => Load().Grants;
 
-        return JsonSerializer.Deserialize<GrantRecord[]>(text, JsonOptions) ?? [];
-    }
+    private GrantsState Load()
+        => _state.Value is { Length: > 0 } serialized
+            ? _states.Deserialize(serialized)
+            : GrantsState.Empty;
+
+    private void Stage(GrantsState state)
+        => _state.Value = _states.SerializeToArray(state);
 
     private void Upsert(GrantRecord record)
     {
@@ -173,7 +169,7 @@ public sealed class GrantsNeuron : Neuron, IGrants
             all.Add(record);
         }
 
-        _json.Value = JsonSerializer.Serialize(all.ToArray(), JsonOptions);
+        Stage(new GrantsState([.. all]));
     }
 
     private bool Remove(
@@ -190,7 +186,7 @@ public sealed class GrantsNeuron : Neuron, IGrants
             && g.Grantor == grantor) > 0;
         if (removed)
         {
-            _json.Value = JsonSerializer.Serialize(all.ToArray(), JsonOptions);
+            Stage(new GrantsState([.. all]));
         }
 
         return removed;

@@ -1,27 +1,23 @@
-using System.Text.Json;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using Orleans.Serialization;
 
 namespace DigitalBrain.Core;
 
 [GrainType(IRepository.GrainTypeName)]
 public sealed class RepositoryNeuron : Neuron, IRepository
 {
-    private const string StateName = "repository.json";
+    private const string StateName = "repository.state";
     private const int MaxEnumerate = 5000;
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-    };
-
-    private readonly IDurableValue<string> _json;
+    private readonly IDurableValue<byte[]> _state;
+    private readonly Serializer<RepoState> _states;
 
     public RepositoryNeuron()
     {
-        _json = ServiceProvider.GetRequiredKeyedService<IDurableValue<string>>(StateName);
+        _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
+        _states = ServiceProvider.GetRequiredService<Serializer<RepoState>>();
     }
 
     public Task HandleAsync(OpenRepository synapse, CancellationToken cancellationToken)
@@ -150,18 +146,12 @@ public sealed class RepositoryNeuron : Neuron, IRepository
     }
 
     private RepoState? Load()
-    {
-        var text = _json.Value;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return null;
-        }
-
-        return JsonSerializer.Deserialize<RepoState>(text, JsonOptions);
-    }
+        => _state.Value is { Length: > 0 } serialized
+            ? _states.Deserialize(serialized)
+            : null;
 
     private void Stage(RepoState state)
-        => _json.Value = JsonSerializer.Serialize(state, JsonOptions);
+        => _state.Value = _states.SerializeToArray(state);
 
     private static void RequireCommand(CommandId commandId)
     {
@@ -170,6 +160,4 @@ public sealed class RepositoryNeuron : Neuron, IRepository
             throw new NeuronAuthorizationException("A repository command requires a command id.");
         }
     }
-
-    private sealed record RepoState(string RootPath, DateTimeOffset OpenedAt);
 }

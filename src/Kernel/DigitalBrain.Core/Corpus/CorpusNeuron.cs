@@ -1,7 +1,7 @@
-using System.Text.Json;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using Orleans.Serialization;
 
 namespace DigitalBrain.Core;
 
@@ -10,20 +10,16 @@ namespace DigitalBrain.Core;
 [GrainType(ICorpus.GrainTypeName)]
 public sealed class CorpusNeuron : Neuron, ICorpus
 {
-    private const string StateName = "corpus.json";
+    private const string StateName = "corpus.state";
     private const int RetainMax = 4096;
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-    };
-
-    private readonly IDurableValue<string> _json;
+    private readonly IDurableValue<byte[]> _state;
+    private readonly Serializer<CorpusState> _states;
 
     public CorpusNeuron()
     {
-        _json = ServiceProvider.GetRequiredKeyedService<IDurableValue<string>>(StateName);
+        _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
+        _states = ServiceProvider.GetRequiredService<Serializer<CorpusState>>();
     }
 
     public Task HandleAsync(AppendCorpusEntry synapse, CancellationToken cancellationToken)
@@ -107,18 +103,12 @@ public sealed class CorpusNeuron : Neuron, ICorpus
     }
 
     private CorpusState Load()
-    {
-        var text = _json.Value;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return new CorpusState();
-        }
-
-        return JsonSerializer.Deserialize<CorpusState>(text, JsonOptions) ?? new CorpusState();
-    }
+        => _state.Value is { Length: > 0 } serialized
+            ? _states.Deserialize(serialized)
+            : new CorpusState();
 
     private void Save(CorpusState state)
-        => _json.Value = JsonSerializer.Serialize(state, JsonOptions);
+        => _state.Value = _states.SerializeToArray(state);
 
     private static void RequireCommand(CommandId commandId)
     {
@@ -126,12 +116,5 @@ public sealed class CorpusNeuron : Neuron, ICorpus
         {
             throw new NeuronAuthorizationException("A corpus command requires a command id.");
         }
-    }
-
-    private sealed class CorpusState
-    {
-        public long Watermark { get; set; }
-
-        public List<CorpusEntry> Entries { get; set; } = [];
     }
 }
