@@ -14,5 +14,6 @@
     <ProjectReference Include="../../Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Os/DigitalBrain.Os.csproj" />
   </ItemGroup>
 </Project>

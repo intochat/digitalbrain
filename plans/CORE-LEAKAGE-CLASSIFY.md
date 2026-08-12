@@ -32,7 +32,8 @@
 | `Core/Repository/*` | Modules Engineer | Modules | | |
 | `Core/Workspace/*` | Kernel Engineer (host/OS boundary R7) | Kernel host / OS — **not** Core interconnect | contracts stay Abstractions | grants coupling |
 | `Core/Grants/*` | Kernel Engineer (host/OS boundary R7) | Kernel host / OS | contracts stay Abstractions | A18 grants path |
-| `Core/Registry/*` (`InstanceRegistryNeuron`, `KindRegistryNeuron`) | Modules + Kernel split | KindRegistry → with Kinds module; InstanceRegistry → Kernel-OS or Modules after A18 | **Kernel picks InstanceRegistry seat in sign-off** | PrincipalPartition already used |
+| `Core/Registry/InstanceRegistryNeuron*` (+ state) | Kernel Engineer (host/OS R7) | Kernel-OS with Workspace/Grants | live instance identity + PrincipalPartition — not Modules/UI | PrincipalPartition |
+| `Core/Registry/KindRegistryNeuron*` (+ state) | Modules Engineer | Modules/Kinds with CalculatorKind | leave alongside Kind programs | none |
 
 ---
 
@@ -47,7 +48,7 @@ Corpus remains **(b)-shaped**: `ForPrincipal` exists — stage caller flip off `
 ## Execution order (after Kernel sign)
 
 1. Sign this table (Kernel Engineer reply = sign; Architect amends if Kernel vetoes a row).  
-2. One PR per row group (Behavior · CalculatorKind · Library · Corpus · Repository · Workspace+Grants · Registry).  
+2. One PR per row group (Behavior · CalculatorKind+KindRegistry · Library · Corpus · Repository · Workspace+Grants+InstanceRegistry).  
 3. No Seam 3 bulk move parallel to Kernel Chat Actor strip / 2a delivery Principal.
 
 ## Sign-off

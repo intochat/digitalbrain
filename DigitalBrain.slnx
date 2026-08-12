@@ -2,6 +2,7 @@
   <Folder Name="/Kernel/">
     <Project Path="src/Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+    <Project Path="src/Kernel/DigitalBrain.Os/DigitalBrain.Os.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <Project Path="src/Kernel/Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="src/Kernel/Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
