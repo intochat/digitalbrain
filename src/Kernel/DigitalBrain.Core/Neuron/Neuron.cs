@@ -167,6 +167,9 @@ public abstract class Neuron :
     internal SynapseDelivery StageIncomingOutcome(Synapse outcome, SynapseDelivery cause)
         => _messages.StageIncomingOutcome(outcome, cause);
 
+    internal Task NotifyJournalWatchersAsync()
+        => _journal.NotifyWatchersAsync();
+
     protected new IDisposable RegisterTimer(
         Func<object, Task> callback,
         object state,

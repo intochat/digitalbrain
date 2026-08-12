@@ -18,9 +18,43 @@ internal sealed class NeuronDeliveryMemory(
         => _remembered.Contains(delivery.SynapseId);
 
     internal static bool Settles(Exception failure)
-        => SettledFailureTypes.GetOrAdd(
-            failure.GetType(),
-            static type => type.GetCustomAttribute<SettledDeliveryFailureAttribute>() is not null);
+    {
+        for (var cursor = failure; cursor is not null; cursor = cursor.InnerException)
+        {
+            if (cursor is AggregateException aggregate)
+            {
+                foreach (var inner in aggregate.InnerExceptions)
+                {
+                    if (Settles(inner))
+                    {
+                        return true;
+                    }
+                }
+
+                continue;
+            }
+
+            if (SettledFailureTypes.GetOrAdd(
+                cursor.GetType(),
+                static type =>
+                {
+                    for (var walk = type; walk is not null; walk = walk.BaseType)
+                    {
+                        if (walk.GetCustomAttribute<SettledDeliveryFailureAttribute>() is not null)
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     internal void Activate()
     {

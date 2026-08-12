@@ -196,6 +196,11 @@ internal sealed class NeuronOutbox(
         await CommitAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
+        // RequestSynapse callers watch/poll the emitter journal for RouteOutcome.
+        // Without a push after drain, Client watches wait out the token (timeout-only).
+        await neuron.NotifyJournalWatchersAsync()
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
         StopDrainingWhenEmpty();
     }
 

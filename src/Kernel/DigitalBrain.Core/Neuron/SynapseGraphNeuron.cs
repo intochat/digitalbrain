@@ -26,6 +26,9 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
         RequireConnectionId(synapse.ConnectionId);
         RequireConnectable(synapse.Source);
         RequireConnectable(synapse.Target);
+        RequirePrincipalAllowsEndpoint(synapse.Source, "source");
+        RequirePrincipalAllowsEndpoint(synapse.Target, "target");
+        RequireEndpointsSharePrincipal(synapse.Source, synapse.Target);
 
         if (string.IsNullOrWhiteSpace(synapse.SynapseAlias))
         {
@@ -222,6 +225,47 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
         => string.Join(
             ", ",
             synapseType.GetProperties().Select(static property => property.Name));
+
+
+
+    private static void RequireEndpointsSharePrincipal(NeuronId source, NeuronId target)
+    {
+        if (!PrincipalPartition.TryParse(source.Name, out var sourcePrincipal, out _)
+            || !PrincipalPartition.TryParse(target.Name, out var targetPrincipal, out _))
+        {
+            return;
+        }
+
+        if (sourcePrincipal != targetPrincipal)
+        {
+            throw new NeuronAuthorizationException(
+                $"Graph refuses cross-principal Connect {source} → {target}. "
+                + "Wire within one principal partition, or share via grants (Read/Watch).");
+        }
+    }
+
+    // A18: on a principal-scoped graph, partitioned endpoints must be the same principal.
+    // Cross-principal Connect refuses by default (sharing is grants Read/Watch, not edges).
+    private void RequirePrincipalAllowsEndpoint(NeuronId subject, string side)
+    {
+        if (!PrincipalPartition.TryParse(Id.Name, out var graphPrincipal, out _))
+        {
+            return;
+        }
+
+        if (!PrincipalPartition.TryParse(subject.Name, out var endpointPrincipal, out _))
+        {
+            return;
+        }
+
+        if (endpointPrincipal != graphPrincipal)
+        {
+            throw new NeuronAuthorizationException(
+                $"Graph '{Id}' refuses cross-principal Connect on {side} '{subject}'. "
+                + "Wire within one principal partition, or share via grants (Read/Watch) — "
+                + "not by connecting another principal's neurons.");
+        }
+    }
 
     private void RequireConnectionId(Guid connectionId)
     {
