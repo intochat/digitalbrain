@@ -14,6 +14,10 @@ using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+// Forwarded to Kernel + MCP so grill Case B can set DigitalBrain__Auth__AllowLoopbackDev=false
+// on the AppHost process (env / config) and have both surfaces honor it.
+var allowLoopbackDev = builder.Configuration["DigitalBrain:Auth:AllowLoopbackDev"];
+
 // AppHost is the product composition root: brain fabric + modules + runtimes.
 var brain = builder
     .AddDigitalBrain(ProductSurfaceResources.Brain)
@@ -39,6 +43,7 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
         ShellHostingExtensions.DefaultOwner)
+    .WithEnvironment("DigitalBrain__Auth__AllowLoopbackDev", allowLoopbackDev ?? "true")
     .WithHttpEndpoint(
         port: ProductSurfaceResources.UiHttpPort,
         name: ShellHostingExtensions.HttpEndpointName,
@@ -60,6 +65,7 @@ var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
         ShellHostingExtensions.DefaultOwner)
+    .WithEnvironment("DigitalBrain__Auth__AllowLoopbackDev", allowLoopbackDev ?? "true")
     .WithHttpEndpoint(
         port: ProductSurfaceResources.McpHttpPort,
         name: ProductSurfaceResources.McpHttpEndpointName)
