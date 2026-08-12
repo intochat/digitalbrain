@@ -16,10 +16,20 @@ internal static class VoiceToTextHosting
 
         services.TryAddSingleton<IAudioConverter, OggOpusToWavConverter>();
 
+        // Seam 6 #3: fail closed with honest STT-off copy — never register a second STT stack.
         var enabled = configuration.GetValue(EnabledConfigurationKey, defaultValue: true);
-        if (!enabled || string.IsNullOrWhiteSpace(configuration[ModelIdConfigurationKey]))
+        if (!enabled)
         {
-            services.TryAddSingleton<IAudioTranscriptionService, UnavailableTranscriptionService>();
+            services.TryAddSingleton<IAudioTranscriptionService>(_ =>
+                new UnavailableTranscriptionService(UnavailableTranscriptionService.DisabledMessage));
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(configuration[ModelIdConfigurationKey]))
+        {
+            // Grill / AppHost EnableVoiceToText=false skips WithVoiceToText → no ModelId projected.
+            services.TryAddSingleton<IAudioTranscriptionService>(_ =>
+                new UnavailableTranscriptionService(UnavailableTranscriptionService.NotConfiguredMessage));
             return;
         }
 
