@@ -3,7 +3,7 @@ import 'package:graphic/graphic.dart';
 
 import '../brain_theme.dart';
 
-const kitBarChartData = <Map<String, Object>>[
+const shellBarChartData = <Map<String, Object>>[
   {'label': 'Mon', 'value': 42},
   {'label': 'Tue', 'value': 68},
   {'label': 'Wed', 'value': 51},
@@ -56,8 +56,8 @@ const _btcUp = Color(0xFF0ECB81);
 const _btcDown = Color(0xFFF6465D);
 
 /// Bar chart demo via [graphic](https://pub.dev/packages/graphic).
-final class KitBarChart extends StatelessWidget {
-  const KitBarChart({super.key, this.height = 220});
+final class ShellBarChartDemo extends StatelessWidget {
+  const ShellBarChartDemo({super.key, this.height = 220});
 
   final double height;
 
@@ -67,7 +67,7 @@ final class KitBarChart extends StatelessWidget {
       key: const Key('kit_bar_chart'),
       height: height,
       child: Chart(
-        data: kitBarChartData,
+        data: shellBarChartData,
         variables: {
           'label': Variable(accessor: (Map map) => map['label'] as String),
           'value': Variable(

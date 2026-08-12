@@ -49,6 +49,9 @@ final class DigitalBrainUiClient {
   final CookieHttpClient _http;
   final bool _ownsClient;
 
+  /// Shared cookie jar for [BehaviorClient.sharingSession] and other edge clients.
+  CookieHttpClient get cookieClient => _http;
+
   Future<AuthMe>? _session;
   bool _sessionReady = false;
 

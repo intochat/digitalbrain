@@ -4,15 +4,39 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'behavior_models.dart';
+import 'cookie_http_client.dart';
+import 'host_environment.dart';
 import 'sse_behavior_frames.dart';
+import 'ui_client.dart';
 
+/// Behavior host HTTP client. Uses [CookieHttpClient] so it can share the same
+/// authenticated cookie jar as [DigitalBrainUiClient] after [ensureSession].
 final class BehaviorClient {
   BehaviorClient({required this.baseUri, http.Client? httpClient})
-    : _http = httpClient ?? http.Client(),
+    : _http = httpClient is CookieHttpClient
+          ? httpClient
+          : CookieHttpClient(httpClient ?? http.Client()),
       _ownsClient = httpClient == null;
 
+  /// Same base URI + cookie jar as an already-authenticated UI client.
+  factory BehaviorClient.sharingSession(DigitalBrainUiClient ui) {
+    return BehaviorClient(baseUri: ui.baseUri, httpClient: ui.cookieClient);
+  }
+
+  factory BehaviorClient.fromEnvironment({
+    http.Client? httpClient,
+    Map<String, String>? processEnvironment,
+  }) {
+    return BehaviorClient(
+      baseUri: DigitalBrainHostEnv.requireUiBaseUri(
+        processEnvironment: processEnvironment,
+      ),
+      httpClient: httpClient,
+    );
+  }
+
   final Uri baseUri;
-  final http.Client _http;
+  final CookieHttpClient _http;
   final bool _ownsClient;
   final _aborts = <Completer<void>>[];
 

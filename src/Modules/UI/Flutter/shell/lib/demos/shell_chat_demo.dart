@@ -8,16 +8,16 @@ import '../chat/chat_contracts.dart';
 
 /// Product chat chrome (flutter_chat_ui + flyer text bubbles) with fixture turns.
 /// Same packages as [BrainChatScreen], offline for the Kit gallery.
-final class KitChatDemo extends StatefulWidget {
-  const KitChatDemo({super.key, this.height = 360});
+final class ShellChatDemo extends StatefulWidget {
+  const ShellChatDemo({super.key, this.height = 360});
 
   final double height;
 
   @override
-  State<KitChatDemo> createState() => _KitChatDemoState();
+  State<ShellChatDemo> createState() => _ShellChatDemoState();
 }
 
-final class _KitChatDemoState extends State<KitChatDemo> {
+final class _ShellChatDemoState extends State<ShellChatDemo> {
   static const _owner = User(id: ownerUserId, name: 'you');
   static const _assistant = User(id: assistantUserId, name: 'brain');
 

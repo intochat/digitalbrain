@@ -10,10 +10,13 @@ Future<void> main() async {
   final chat = DigitalBrainHostEnv.resolveChat();
 
   DigitalBrainUiClient? client;
+  BehaviorClient? behavior;
   String? status;
   try {
     client = DigitalBrainUiClient.fromEnvironment();
     final me = await client.ensureSession();
+    // Same cookie jar as the UI session — behavior host is not anonymous.
+    behavior = BehaviorClient.sharingSession(client);
     debugPrint(
       'DigitalBrain session: ${me.username} principal=${me.principalId}',
     );
@@ -48,7 +51,7 @@ Future<void> main() async {
               action: action,
             ),
       onOpenSignIn: openExternalUrl,
-      behaviorClient: null,
+      behaviorClient: behavior,
     ),
   );
 }

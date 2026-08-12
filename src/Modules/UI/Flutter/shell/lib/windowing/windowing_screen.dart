@@ -2,7 +2,7 @@ import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 import 'package:flutter/material.dart';
 
 import '../brain_theme.dart';
-import '../kit/kit_chart.dart';
+import '../demos/shell_chart_demo.dart';
 import 'panel_manager.dart';
 
 /// Offline windowing playground — drag, resize, minimize, tidy. No C# / edge.
@@ -363,7 +363,7 @@ final class _PanelBody extends StatelessWidget {
       WindowPanelKind.notes => const _NotesBody(),
       WindowPanelKind.activity => const _ActivityBody(),
       WindowPanelKind.inspector => const _InspectorBody(),
-      WindowPanelKind.chart => const KitBarChart(height: 200),
+      WindowPanelKind.chart => const ShellBarChartDemo(height: 200),
       WindowPanelKind.timeChart => const Padding(
           padding: EdgeInsets.symmetric(horizontal: 4),
           child: KitTimeChart(),

@@ -1,18 +1,18 @@
 import 'dart:async';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
+import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 import 'package:flutter/material.dart';
 
 import '../activity_screen.dart';
 import '../behaviors/behavior_workspace.dart';
 import '../brain_screen.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
-
 import '../user_actions/user_action_card.dart';
 import '../windowing/windowing_screen.dart';
 import 'brain_chat_screen.dart';
 import 'chat_contracts.dart';
 import 'workspace_chrome.dart';
+import 'workspace_session.dart';
 
 final class BrainWorkspace extends StatefulWidget {
   const BrainWorkspace({
@@ -51,159 +51,62 @@ final class BrainWorkspace extends StatefulWidget {
 final class _BrainWorkspaceState extends State<BrainWorkspace> {
   static const _compactBreakpoint = 720.0;
 
-  final _turns = <ChatTurnEvent>[];
-  final _seen = <int>{};
-  final _authorizationEvents = <AuthorizationEvent>[];
-  final _seenAuthorizations = <int>{};
-  List<ChatTurnEvent> _projectedTurns = const [];
-  List<SignInCardProjection> _signInCards = const [];
-  StreamSubscription<ChatTurnEvent>? _subscription;
-  StreamSubscription<AuthorizationEvent>? _authorizationSubscription;
-  StreamSubscription<GraphChangeEvent>? _graphSubscription;
-  GraphChangeEvent? _graphChange;
-  BrainTopologySnapshot? _topology;
+  late final WorkspaceSession _session;
   int _destination = 0;
-  int _topologyLoadEpoch = 0;
-  String? _turnFailure;
-  String? _topologyFailure;
 
   @override
   void initState() {
     super.initState();
-    _listen(widget.turns);
-    _listenAuthorizations(widget.authorizations);
-    _listenGraphChanges(widget.graphChanges);
-    unawaited(_refreshTopology());
+    _session = WorkspaceSession(
+      chatName: widget.chatName,
+      turns: widget.turns,
+      authorizations: widget.authorizations,
+      graphChanges: widget.graphChanges,
+      onLoadTopology: widget.onLoadTopology,
+    )..addListener(_onSession);
+  }
+
+  void _onSession() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   void didUpdateWidget(covariant BrainWorkspace oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.chatName != widget.chatName) {
-      _turns.clear();
-      _seen.clear();
-      _projectedTurns = const [];
-      unawaited(_refreshTopology());
+      _session.updateChatName(widget.chatName);
     }
     if (!identical(oldWidget.turns, widget.turns)) {
-      unawaited(_subscription?.cancel());
-      _listen(widget.turns);
+      _session.listenTurns(widget.turns);
     }
     if (!identical(oldWidget.authorizations, widget.authorizations)) {
-      unawaited(_authorizationSubscription?.cancel());
-      _listenAuthorizations(widget.authorizations);
+      _session.listenAuthorizations(widget.authorizations);
     }
     if (!identical(oldWidget.graphChanges, widget.graphChanges)) {
-      unawaited(_graphSubscription?.cancel());
-      _listenGraphChanges(widget.graphChanges);
+      _session.listenGraphChanges(widget.graphChanges);
     }
     if (!identical(oldWidget.onLoadTopology, widget.onLoadTopology)) {
-      unawaited(_refreshTopology());
+      _session.onLoadTopology = widget.onLoadTopology;
+      unawaited(_session.refreshTopology());
     }
   }
-
-  void _listen(Stream<ChatTurnEvent>? turns) {
-    _turnFailure = null;
-    _subscription = turns?.listen(
-      (turn) {
-        if (!mounted || !_seen.add(turn.sequence)) {
-          return;
-        }
-        setState(() {
-          _turns.add(turn);
-          _turns.sort((a, b) => a.sequence.compareTo(b.sequence));
-          _projectedTurns = List<ChatTurnEvent>.unmodifiable(_turns);
-        });
-        unawaited(_refreshTopology());
-      },
-      onError: (Object error) {
-        if (mounted) {
-          setState(() => _turnFailure = '$error');
-        }
-      },
-    );
-  }
-
-  void _listenAuthorizations(Stream<AuthorizationEvent>? authorizations) {
-    _authorizationSubscription = authorizations?.listen(
-      (event) {
-        if (!mounted || !_seenAuthorizations.add(event.sequence)) {
-          return;
-        }
-        setState(() {
-          _authorizationEvents.add(event);
-          _signInCards = SignInCardProjection.project(_authorizationEvents);
-        });
-      },
-      onError: (Object error) {
-        if (mounted) {
-          setState(() => _turnFailure = '$error');
-        }
-      },
-    );
-  }
-
-  void _listenGraphChanges(Stream<GraphChangeEvent>? graphChanges) {
-    _graphSubscription = graphChanges?.listen(
-      (change) {
-        if (!mounted) {
-          return;
-        }
-        setState(() => _graphChange = change);
-        unawaited(_refreshTopology());
-      },
-      onError: (Object error) {
-        if (mounted) {
-          setState(() => _topologyFailure = '$error');
-        }
-      },
-    );
-  }
-
-  Future<void> _refreshTopology() async {
-    final load = widget.onLoadTopology;
-    if (load == null) {
-      return;
-    }
-
-    final epoch = ++_topologyLoadEpoch;
-    try {
-      final snapshot = await load();
-      if (!mounted || epoch != _topologyLoadEpoch) {
-        return;
-      }
-      setState(() {
-        _topology = snapshot;
-        _topologyFailure = null;
-      });
-    } on Object catch (error) {
-      if (!mounted || epoch != _topologyLoadEpoch) {
-        return;
-      }
-      setState(() {
-        _topology = null;
-        _topologyFailure = '$error';
-      });
-    }
-  }
-
-  String? get _statusMessage =>
-      widget.statusMessage ?? _turnFailure ?? _topologyFailure;
 
   void _selectDestination(int index) {
     if (_destination != index) {
       setState(() => _destination = index);
     }
     if (index == brainDestinationIndex) {
-      unawaited(_refreshTopology());
+      unawaited(_session.refreshTopology());
     }
   }
 
   @override
   void dispose() {
-    unawaited(_subscription?.cancel());
-    unawaited(_authorizationSubscription?.cancel());
-    unawaited(_graphSubscription?.cancel());
+    _session
+      ..removeListener(_onSession)
+      ..dispose();
     super.dispose();
   }
 
@@ -217,24 +120,24 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
         children: [
           BrainChatScreen(
             chatName: widget.chatName,
-            turns: _projectedTurns,
-            signInCards: _signInCards,
+            turns: _session.projectedTurns,
+            signInCards: _session.signInCards,
             onSend: widget.onSend,
             onStream: widget.onStream,
             onOpenSignIn: widget.onOpenSignIn,
             onActivateButton: widget.onActivateButton,
           ),
           ActivityScreen(
-            turns: _projectedTurns,
+            turns: _session.projectedTurns,
             userActions: widget.userActions,
             onOpenUserAction: widget.onOpenSignIn,
           ),
           BrainScreen(
             chatName: widget.chatName,
-            turns: _projectedTurns,
-            topology: _topology,
-            graphChange: _graphChange,
-            statusMessage: _statusMessage,
+            turns: _session.projectedTurns,
+            topology: _session.topology,
+            graphChange: _session.graphChange,
+            statusMessage: _session.statusMessage(widget.statusMessage),
           ),
           BehaviorWorkspace(
             client: widget.behaviorClient,
@@ -268,6 +171,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
 
   @override
   Widget build(BuildContext context) {
+    final status = _session.statusMessage(widget.statusMessage);
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < _compactBreakpoint;
@@ -276,7 +180,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
             WorkspaceStatusBar(
               chatName: widget.chatName,
               section: workspaceSectionName(_destination),
-              message: _statusMessage,
+              message: status,
             ),
             Expanded(child: _destinationPage()),
           ],
