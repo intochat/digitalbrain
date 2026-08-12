@@ -1,12 +1,15 @@
 <Solution>
   <Folder Name="/Kernel/">
     <Project Path="src/Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+    <Project Path="src/Kernel/DigitalBrain.Abstractions.Tests/DigitalBrain.Abstractions.Tests.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+    <Project Path="src/Kernel/DigitalBrain.Core.Tests/DigitalBrain.Core.Tests.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <Project Path="src/Kernel/Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="src/Kernel/Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
     <Project Path="src/Kernel/Aspire/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+    <Project Path="src/Kernel/DigitalBrain.Mcp.Tests/DigitalBrain.Mcp.Tests.csproj" />
   </Folder>
   <Folder Name="/Modules/" />
   <Folder Name="/Modules/AI/">
@@ -40,11 +43,13 @@
   </Folder>
   <Folder Name="/Modules/Execution/">
     <Project Path="src/Modules/Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
+    <Project Path="src/Modules/Execution/Contracts.Tests/DigitalBrain.Modules.Execution.Contracts.Tests.csproj" />
     <Project Path="src/Modules/Execution/Execution/DigitalBrain.Modules.Execution.csproj" />
   </Folder>
   <Folder Name="/Modules/Time/">
     <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
+    <Project Path="src/Modules/Time/Time.Tests/DigitalBrain.Modules.Time.Tests.csproj" />
   </Folder>
   <Project Path="src/Kernel/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
   <Project Path="src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />

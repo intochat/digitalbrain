@@ -9,4 +9,7 @@
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Time.Tests" />
+  </ItemGroup>
 </Project>

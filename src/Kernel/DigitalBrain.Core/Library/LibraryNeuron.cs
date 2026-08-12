@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -310,11 +308,7 @@ public sealed class LibraryNeuron : Neuron, ILibrary
         return score;
     }
 
-    private static string ContentHash(string content)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(content));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
+    private static string ContentHash(string content) => LibraryContent.Hash(content);
 
     private LibraryState Load()
         => _state.Value is { Length: > 0 } serialized

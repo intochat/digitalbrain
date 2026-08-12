@@ -206,19 +206,12 @@ public sealed class ScheduleNeuron : Neuron, ISchedule, IRemindable
             return null;
         }
 
-        // How many period boundaries have been crossed inclusive of the original next-due.
-        var late = observedAt - data.NextDue;
-        var collapsed = (int)(late.Ticks / periodTicks) + 1;
-        if (collapsed < 1)
-        {
-            collapsed = 1;
-        }
-
         var dueAt = data.NextDue;
-        var nextDue = dueAt + TimeSpan.FromTicks(periodTicks * collapsed);
-        var resolution = collapsed > 1 || observedAt > dueAt + ReminderPeriod
-            ? ScheduleResolution.Recovered
-            : ScheduleResolution.OnTime;
+        var (collapsed, nextDue, resolution) = ScheduleCatchUp.Compute(
+            dueAt,
+            observedAt,
+            data.Period,
+            ReminderPeriod);
 
         ActorContext? onBehalf = data.OnBehalfOfPrincipal is { } guid
             ? new ActorContext(new PrincipalId(guid), data.OnBehalfOfUsername ?? "_schedule")
