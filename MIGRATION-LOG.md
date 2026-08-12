@@ -702,3 +702,62 @@ Ghost receivers are addressed `type:owner/{correlation}`, so no *named* neuron c
 broadcast; the tier looks like pure cost. That reasoning is strong but not proof, and this session
 already produced one wide-blast-radius change that compiled clean and broke every reply in the
 product. It needs a session with room to verify, not the tail of one.
+
+## Session 7 — 2026-08-12 — Wave 0 decision + interpreted cell tier lands
+
+### 32. Wave 0 decision: kinds become data — YES
+
+Recorded before Wave 2 work, per `plans/GROK-BUILD-BRIEF.md` §3 and Session 3 §12–16.
+
+**Decision: the interpreted cell tier ships in this run.**
+
+- One compiled grain `[GrainType("cell")]` interprets durable kind records.
+- Address form: `cell:{owner}/{kind}@{name}` (`@` in the name part — never `/`).
+- Connection validation, capability index, and `fire` gain a second resolution path
+  over declared kinds; compiled palette neurons remain the reviewed release surface.
+- Building the connection record, wire language, read rail, and capability surface
+  against compiled types only would force a rewrite when the kind tier landed.
+
+Evidence: Session 3 third-axis diagnosis (kinds are C#; Orleans grain types fixed at
+silo start); 50-scenario matrix components `cell`/`kind`; brief §3 fork.
+
+### 33. Four Stage-0 facts — status at implementation start
+
+| Fact | Status | Notes |
+|---|---|---|
+| Aspire project-resource restart rebuilds | Deferred to live ops | rebuilder resources exist (`kernel-rebuilder`); restart path used for this deploy |
+| Runtime-loaded assembly grain types at startup | Settled by design | kinds live in the **key**, not a loaded GrainType — no runtime GrainType registration required for cells |
+| Orleans.Journaling keyed durables | Settled by production | every Neuron already uses `GetRequiredKeyedService<IDurable*>`; cell reuses the same pattern |
+| `@` grain key survives Azurite/Tables/clustering | Settled by this deploy | `calculator@main` activated, state journaled, MCP-verified |
+
+### 34. What this session implements
+
+- `ICell` + `db.cell-apply` / `db.cell-reset` / `db.cell-snapshot` / `db.datum`
+- `CellNeuron` with built-in `calculator` kind (closed total evaluator)
+- Living verification through `digitalbrain-mcp` user simulation
+
+
+### 35. Runtime evidence (digitalbrain-mcp user simulation)
+
+AppHost restarted with the cell tier. MCP user simulation:
+
+1. `send_chat_message` (hello) → Gemma4 reply intact (reply rail).
+2. User script: fire `db.cell-reset` then apply `7 * 6 =` on `calculator@main`.
+   - Assistant returned: `{"Kind":"calculator","Instance":"main","Display":"42","Value":42,"Phase":"result"}`
+3. Second instance: `calculator@desk` with `5 + 3 =` → Display `8`.
+4. `list_active_neurons` includes `cell / dev/calculator@main`.
+5. `read_neuron_journal(cell, calculator@main, incoming)` shows:
+   - seq 27 CellReset
+   - seq 28–31 CellApply (four keys)
+6. Kernel resource **restarted gracefully**; fire `=` on `calculator@main` still returned Display `42` — `@` key + journaling durable across silo restart.
+
+### 36. What is NOT done (honest scope)
+
+- Broadcast opt-in (Wave 1) — ghosts still exist (`chart:dev/30f31fda-…`).
+- Durable kind registry / install verb for arbitrary kinds (only built-in `calculator`).
+- `db.datum` EffectiveAlias routing at the five sites (carrier type exists; wire path deferred).
+- Principal partition, MCP repair, schedules, library, behaviors (Waves 3–8).
+- Flutter `KitView` for pressing keys on screen (exercise was via `fire` / chat).
+
+Wave 0 gate for the kind decision is closed. Cell tier is living and MCP-verified for the calculator path.
+
