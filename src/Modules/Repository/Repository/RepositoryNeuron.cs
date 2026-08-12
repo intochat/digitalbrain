@@ -1,9 +1,10 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Repository;
 
 [GrainType(IRepository.GrainTypeName)]
 public sealed class RepositoryNeuron : Neuron, IRepository

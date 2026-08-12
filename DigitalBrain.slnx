@@ -41,6 +41,9 @@
     <Project Path="src/Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
     <Project Path="src/Modules/UI/DigitalBrain.Modules.UI.Aspire.Hosting/DigitalBrain.Modules.UI.Aspire.Hosting.csproj" />
   </Folder>
+  <Folder Name="/Modules/Repository/">
+    <Project Path="src/Modules/Repository/Repository/DigitalBrain.Modules.Repository.csproj" />
+  </Folder>
   <Folder Name="/Modules/Library/">
     <Project Path="src/Modules/Library/Library/DigitalBrain.Modules.Library.csproj" />
   </Folder>

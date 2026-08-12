@@ -29,6 +29,7 @@ public static class ProductModules
             typeof(DigitalBrain.Kinds.KindsModule).Assembly,
             typeof(DigitalBrain.Library.LibraryNeuron).Assembly,
             typeof(DigitalBrain.Corpus.CorpusNeuron).Assembly,
+            typeof(DigitalBrain.Repository.RepositoryNeuron).Assembly,
             typeof(DigitalBrain.Time.TimerNeuron).Assembly,
             typeof(DigitalBrain.UI.UiModule).Assembly,
             typeof(DigitalBrain.Os.WorkspaceNeuron).Assembly,

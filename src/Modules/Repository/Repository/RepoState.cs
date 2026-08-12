@@ -1,4 +1,5 @@
-namespace DigitalBrain.Core;
+using DigitalBrain.Core;
+namespace DigitalBrain.Repository;
 
 [GenerateSerializer]
 [Alias("db.repository-state")]
