@@ -5,8 +5,11 @@ namespace DigitalBrain.Kernel;
 internal sealed class LoopbackDevAuthMiddleware(
     RequestDelegate next,
     LoopbackDevAuthOptions options,
-    IHostEnvironment environment)
+    IHostEnvironment environment,
+    ILogger<LoopbackDevAuthMiddleware> log)
 {
+    private int _missingOwnerWarned;
+
     public async Task InvokeAsync(HttpContext context, IAccountDirectory accounts)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -26,6 +29,12 @@ internal sealed class LoopbackDevAuthMiddleware(
                 identity.AddClaim(new Claim(AuthOptions.PrincipalIdClaimType, owner.PrincipalId.ToString("N")));
                 identity.AddClaim(new Claim(AuthOptions.BootstrapOwnerClaimType, "1"));
                 context.User = new ClaimsPrincipal(identity);
+            }
+            else if (Interlocked.Exchange(ref _missingOwnerWarned, 1) == 0)
+            {
+                log.LogWarning(
+                    "Loopback dev auth is on but no bootstrap owner exists yet — "
+                    + "Flutter product endpoints will 401 until DevelopmentBootstrapSeeder or POST /auth/bootstrap.");
             }
         }
 

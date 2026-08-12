@@ -1,5 +1,6 @@
 export 'src/ui_models.dart';
 export 'src/ui_client.dart';
+export 'src/cookie_http_client.dart';
 export 'src/behavior_models.dart';
 export 'src/behavior_client.dart';
 export 'src/host_environment.dart';

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'chat_screen.dart';
 import 'open_url_io.dart' if (dart.library.html) 'open_url_web.dart' as open_url;
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final chat = DigitalBrainHostEnv.resolveChat();
@@ -13,8 +13,13 @@ void main() {
   String? status;
   try {
     client = DigitalBrainUiClient.fromEnvironment();
+    final me = await client.ensureSession();
+    debugPrint(
+      'DigitalBrain session: ${me.username} principal=${me.principalId}',
+    );
   } on Object catch (error) {
     status = error.toString();
+    debugPrint('DigitalBrain session failed: $error');
   }
 
   final edge = client;

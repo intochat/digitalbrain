@@ -76,6 +76,7 @@ internal static class AuthHostingExtensions
             return new LoopbackDevAuthOptions(
                 AuthOptions.ResolveAllowLoopbackDev(configuration, environment));
         });
+        builder.Services.AddHostedService<DevelopmentBootstrapSeeder>();
 
         return builder;
     }

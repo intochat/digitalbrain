@@ -21,6 +21,12 @@ internal static class GraphStreamsHttpMaps
                 ArgumentNullException.ThrowIfNull(sessionJournal);
                 cancellationToken.ThrowIfCancellationRequested();
 
+                if (!HttpActor.TryGet(http, out var actor))
+                {
+                    http.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return;
+                }
+
                 var cursor = afterSequence.GetValueOrDefault();
                 if (cursor < 0)
                 {
@@ -30,7 +36,7 @@ internal static class GraphStreamsHttpMaps
 
                 await SseResponse.WriteAsync(
                     http.Response,
-                    WatchGraphChangesAsync(sessionJournal, cursor, cancellationToken),
+                    WatchGraphChangesAsync(sessionJournal, actor.PrincipalId, cursor, cancellationToken),
                     cancellationToken).ConfigureAwait(false);
             });
 
@@ -39,10 +45,11 @@ internal static class GraphStreamsHttpMaps
 
     private static IAsyncEnumerable<SseItem<GraphEvent>> WatchGraphChangesAsync(
         OwnerSessionJournal sessionJournal,
+        PrincipalId principal,
         long afterSequence,
         CancellationToken cancellationToken)
         => JournalProjection.WatchAsync(
-            token => sessionJournal.WatchGraphOutgoingAsync(afterSequence, token),
+            token => sessionJournal.WatchGraphOutgoingAsync(principal, afterSequence, token),
             HttpSurfacePaths.GraphChangeEvent,
             ProjectChange,
             cancellationToken);

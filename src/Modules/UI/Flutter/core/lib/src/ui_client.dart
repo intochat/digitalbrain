@@ -1,20 +1,29 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'ui_models.dart';
 import 'package:http/http.dart' as http;
 
+import 'cookie_http_client.dart';
 import 'host_environment.dart';
 import 'sse_authorization_frames.dart';
 import 'sse_chat_delta_frames.dart';
 import 'sse_chat_frames.dart';
 import 'sse_frames.dart';
 import 'sse_graph_frames.dart';
+import 'ui_models.dart';
 
 final class DigitalBrainUiClient {
-  DigitalBrainUiClient({required this.baseUri, http.Client? httpClient})
-    : _http = httpClient ?? http.Client(),
-      _ownsClient = httpClient == null;
+  DigitalBrainUiClient({
+    required this.baseUri,
+    http.Client? httpClient,
+    String? username,
+    String? password,
+  }) : username = username ?? DigitalBrainHostEnv.defaultUsername,
+       password = password ?? DigitalBrainHostEnv.defaultPassword,
+       _http = httpClient is CookieHttpClient
+           ? httpClient
+           : CookieHttpClient(httpClient ?? http.Client()),
+       _ownsClient = httpClient == null;
 
   factory DigitalBrainUiClient.fromEnvironment({
     http.Client? httpClient,
@@ -25,12 +34,160 @@ final class DigitalBrainUiClient {
         processEnvironment: processEnvironment,
       ),
       httpClient: httpClient,
+      username: DigitalBrainHostEnv.resolveUsername(
+        processEnvironment: processEnvironment,
+      ),
+      password: DigitalBrainHostEnv.resolvePassword(
+        processEnvironment: processEnvironment,
+      ),
     );
   }
 
   final Uri baseUri;
-  final http.Client _http;
+  final String username;
+  final String password;
+  final CookieHttpClient _http;
   final bool _ownsClient;
+
+  Future<AuthMe>? _session;
+  bool _sessionReady = false;
+
+  /// Establish an authenticated principal before product streams/commands.
+  /// Uses loopback bootstrap owner when present; otherwise bootstrap then login.
+  Future<AuthMe> ensureSession() {
+    final existing = _session;
+    if (existing != null) {
+      return existing;
+    }
+
+    final started = _establishSession();
+    _session = started;
+    return started;
+  }
+
+  Future<AuthMe> _establishSession() async {
+    try {
+      final me = await readMe();
+      if (me != null) {
+        _sessionReady = true;
+        return me;
+      }
+
+      await _tryBootstrap();
+      final afterBootstrap = await readMe();
+      if (afterBootstrap != null) {
+        _sessionReady = true;
+        return afterBootstrap;
+      }
+
+      await login(username: username, password: password);
+      final afterLogin = await readMe();
+      if (afterLogin != null) {
+        _sessionReady = true;
+        return afterLogin;
+      }
+
+      throw StateError(
+        'DigitalBrain auth failed: /auth/me still unauthorized after '
+        'bootstrap/login as "$username". Check kernel identity tables and '
+        'loopback/cookie path.',
+      );
+    } catch (error) {
+      _session = null;
+      _sessionReady = false;
+      rethrow;
+    }
+  }
+
+  Future<AuthMe?> readMe() async {
+    final uri = baseUri.replace(path: '/auth/me');
+    final response = await _http.get(uri);
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      return null;
+    }
+    if (response.statusCode != 200) {
+      throw StateError('auth/me failed: ${response.statusCode} ${response.body}');
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw const FormatException('auth/me response is not an object');
+    }
+    return AuthMe.fromJson(Map<String, Object?>.from(decoded));
+  }
+
+  Future<void> _tryBootstrap() async {
+    final uri = baseUri.replace(path: '/auth/bootstrap');
+    final response = await _http.post(
+      uri,
+      headers: {'content-type': 'application/json'},
+      body: jsonEncode({'username': username, 'password': password}),
+    );
+    // 200 created, 409 already exists — either is fine for ensureSession.
+    if (response.statusCode == 200 || response.statusCode == 409) {
+      return;
+    }
+    if (response.statusCode == 400) {
+      // Password policy / validation — fall through to login.
+      return;
+    }
+    throw StateError(
+      'auth/bootstrap failed: ${response.statusCode} ${response.body}',
+    );
+  }
+
+  Future<AuthMe> login({
+    required String username,
+    required String password,
+  }) async {
+    final uri = baseUri.replace(path: '/auth/login');
+    final response = await _http.post(
+      uri,
+      headers: {'content-type': 'application/json'},
+      body: jsonEncode({'username': username, 'password': password}),
+    );
+    if (response.statusCode != 200) {
+      throw StateError(
+        'auth/login failed: ${response.statusCode} ${response.body}',
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw const FormatException('auth/login response is not an object');
+    }
+    final me = AuthMe.fromJson(Map<String, Object?>.from(decoded));
+    _sessionReady = true;
+    _session = Future.value(me);
+    return me;
+  }
+
+  Future<void> _requireSession() async {
+    if (_sessionReady) {
+      return;
+    }
+    await ensureSession();
+  }
+
+  Future<http.StreamedResponse> _sendAuthed(http.BaseRequest request) async {
+    await _requireSession();
+    var response = await _http.send(request);
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      // Session lost or seed raced; clear and retry once.
+      _session = null;
+      _sessionReady = false;
+      await ensureSession();
+      final retry = http.Request(request.method, request.url);
+      request.headers.forEach((key, value) {
+        retry.headers.putIfAbsent(key, () => value);
+      });
+      if (request is http.Request && request.bodyBytes.isNotEmpty) {
+        retry.bodyBytes = request.bodyBytes;
+      }
+      response = await _http.send(retry);
+    }
+    return response;
+  }
 
   Future<void> openScene({
     required String shellName,
@@ -38,16 +195,16 @@ final class DigitalBrainUiClient {
     required String title,
   }) async {
     final uri = baseUri.replace(path: '/owner/commands');
-    final response = await _http.post(
-      uri,
-      headers: {'content-type': 'application/json'},
-      body: jsonEncode({
+    final request = http.Request('POST', uri)
+      ..headers['content-type'] = 'application/json'
+      ..body = jsonEncode({
         'kind': 'surface.open',
         'surfaceName': shellName,
         'surfaceKey': sceneKey,
         'title': title,
-      }),
-    );
+      });
+    final streamed = await _sendAuthed(request);
+    final response = await http.Response.fromStream(streamed);
     if (response.statusCode != 202) {
       throw StateError(
         'surface.open failed: ${response.statusCode} ${response.body}',
@@ -62,17 +219,17 @@ final class DigitalBrainUiClient {
     required String action,
   }) async {
     final uri = baseUri.replace(path: '/owner/commands');
-    final response = await _http.post(
-      uri,
-      headers: {'content-type': 'application/json'},
-      body: jsonEncode({
+    final request = http.Request('POST', uri)
+      ..headers['content-type'] = 'application/json'
+      ..body = jsonEncode({
         'kind': 'chat.button',
         'chatName': chatName,
         'offerCommandId': offerCommandId,
         'buttonId': buttonId,
         'action': action,
-      }),
-    );
+      });
+    final streamed = await _sendAuthed(request);
+    final response = await http.Response.fromStream(streamed);
     if (response.statusCode != 202) {
       throw StateError(
         'chat.button failed: ${response.statusCode} ${response.body}',
@@ -88,8 +245,7 @@ final class DigitalBrainUiClient {
       path: '/surfaces/$shellName/events',
       queryParameters: {'afterSequence': '$afterSequence'},
     );
-    final request = http.Request('GET', uri);
-    final response = await _http.send(request);
+    final response = await _sendAuthed(http.Request('GET', uri));
     if (response.statusCode != 200) {
       throw StateError('shell events failed: ${response.statusCode}');
     }
@@ -121,11 +277,9 @@ final class DigitalBrainUiClient {
         'chatName': chatName,
         'text': text,
       });
-    final response = await _http.send(request);
+    final response = await _sendAuthed(request);
     if (response.statusCode != 200) {
-      throw StateError(
-        'chat.send failed: ${response.statusCode}',
-      );
+      throw StateError('chat.send failed: ${response.statusCode}');
     }
 
     final lines = response.stream
@@ -151,8 +305,7 @@ final class DigitalBrainUiClient {
       path: '/chats/$chatName/events',
       queryParameters: {'afterSequence': '$afterSequence'},
     );
-    final request = http.Request('GET', uri);
-    final response = await _http.send(request);
+    final response = await _sendAuthed(http.Request('GET', uri));
     if (response.statusCode != 200) {
       throw StateError('chat events failed: ${response.statusCode}');
     }
@@ -179,8 +332,7 @@ final class DigitalBrainUiClient {
       path: '/graph/events',
       queryParameters: {'afterSequence': '$afterSequence'},
     );
-    final request = http.Request('GET', uri);
-    final response = await _http.send(request);
+    final response = await _sendAuthed(http.Request('GET', uri));
     if (response.statusCode != 200) {
       throw StateError('graph events failed: ${response.statusCode}');
     }
@@ -207,8 +359,7 @@ final class DigitalBrainUiClient {
       path: '/authorizations/events',
       queryParameters: {'afterSequence': '$afterSequence'},
     );
-    final request = http.Request('GET', uri);
-    final response = await _http.send(request);
+    final response = await _sendAuthed(http.Request('GET', uri));
     if (response.statusCode != 200) {
       throw StateError('authorization events failed: ${response.statusCode}');
     }
@@ -231,6 +382,7 @@ final class DigitalBrainUiClient {
   Future<BrainTopologySnapshot> readBrainTopology({
     Duration requestTimeout = const Duration(seconds: 5),
   }) async {
+    await _requireSession();
     final uri = baseUri.replace(path: '/brain/topology');
     final abort = Completer<void>();
     final operation = () async {
@@ -249,6 +401,24 @@ final class DigitalBrainUiClient {
         throw http.RequestAbortedException(uri);
       },
     );
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      _session = null;
+      _sessionReady = false;
+      await ensureSession();
+      final retry = await _http.get(uri);
+      if (retry.statusCode != 200) {
+        throw StateError(
+          'brain-topology failed: ${retry.statusCode} ${retry.body}',
+        );
+      }
+      final decodedRetry = jsonDecode(retry.body);
+      if (decodedRetry is! Map) {
+        throw const FormatException('brain-topology response is not an object');
+      }
+      return BrainTopologySnapshot.fromJson(
+        Map<String, Object?>.from(decodedRetry),
+      );
+    }
     if (response.statusCode != 200) {
       throw StateError(
         'brain-topology failed: ${response.statusCode} ${response.body}',
@@ -267,5 +437,25 @@ final class DigitalBrainUiClient {
     if (_ownsClient) {
       _http.close();
     }
+  }
+}
+
+final class AuthMe {
+  const AuthMe({
+    required this.username,
+    required this.principalId,
+    required this.isBootstrapOwner,
+  });
+
+  final String username;
+  final String principalId;
+  final bool isBootstrapOwner;
+
+  factory AuthMe.fromJson(Map<String, Object?> json) {
+    return AuthMe(
+      username: json['username'] as String? ?? '',
+      principalId: json['principalId'] as String? ?? '',
+      isBootstrapOwner: json['isBootstrapOwner'] as bool? ?? false,
+    );
   }
 }

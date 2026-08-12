@@ -896,3 +896,21 @@ Build: `dotnet build DigitalBrain.slnx -warnaserror` → 0 warnings. AppHost liv
 - Full two-browser cookie logins not exercised; MCP principal simulation is the verified gate.
 
 Wave 3 isolation + grant/revoke gate closed for product path.
+
+## Session 11 - 2026-08-12 - Flutter connect: auth cold-start fix
+
+### Root cause
+Flutter product endpoints require an authenticated principal (FallbackPolicy).
+Development loopback auth only mints one when a **bootstrap owner** exists in
+identity tables. Cold Azurite left the table empty → every `/chats/*/events`,
+`/graph/events`, `/brain/topology`, `/owner/commands` returned **401** → shell
+status bar "not connected". Flutter had no bootstrap/login path and no cookies.
+
+### Fix
+- `DevelopmentBootstrapSeeder`: Development + loopback → seed `owner`/`ownerowner` when empty (retries until tables/Orleans ready).
+- Flutter `ensureSession()`: `/auth/me` → bootstrap → login; `CookieHttpClient` holds the auth cookie; product calls re-auth once on 401.
+- Graph SSE requires principal and watches **principal-partitioned** graph (A18).
+
+### Gate
+Loopback (no cookie): `/auth/me`, chat events, graph events, topology → **200**.
+Login cookie path also **200**. Flutter analyze core+shell clean. Flutter resource restarted healthy.
