@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 namespace DigitalBrain.Core;
 
-internal interface ICellKind
+public interface ICellKind
 {
     string Name { get; }
 
