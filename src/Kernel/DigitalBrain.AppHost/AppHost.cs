@@ -65,11 +65,12 @@ mcp.WithMcpServer(
     ProductSurfaceResources.McpHttpEndpointName);
 #pragma warning restore ASPIREMCP001
 
+// Do not WaitFor(kernel): membership prune must run against Azurite before a new silo
+// can join if a prior force-kill left an Active row. The probe waits on /health itself.
 builder.AddProject<Projects.DigitalBrain_Scripting>(ProductSurfaceResources.Scripting)
     .WithReference(brain.AsClient())
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
-        ShellHostingExtensions.DefaultOwner)
-    .WaitFor(kernel);
+        ShellHostingExtensions.DefaultOwner);
 
 builder.Build().Run();

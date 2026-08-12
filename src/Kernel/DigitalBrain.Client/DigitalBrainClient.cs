@@ -181,7 +181,11 @@ public sealed class DigitalBrainClient : IDigitalBrain
 
         var sessionId = ISessionNeuron.ForOwner(Owner);
         var session = Session();
-        var cursor = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, afterSequence: 0).ConfigureAwait(false);
+        // long.MaxValue: only the resume cursor — do not deserialize the whole journal history
+        // (polymorphic Synapse entries can fail client-side if any fact type is missing).
+        var cursor = await session
+            .ReadNeuronJournal(sessionId, JournalKind.Incoming, afterSequence: long.MaxValue)
+            .ConfigureAwait(false);
 
         if (!TryCreateJournalObserver(JournalKind.Incoming, out var observer, out var reference))
         {

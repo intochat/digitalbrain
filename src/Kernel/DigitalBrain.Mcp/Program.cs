@@ -9,7 +9,8 @@ builder.Services
     .AddMcpServer()
     .WithHttpTransport(static options => options.Stateless = true)
     .WithTools<ChatTools>()
-    .WithTools<IntrospectionTools>();
+    .WithTools<IntrospectionTools>()
+    .WithTools<RegistryTools>();
 
 var app = builder.Build();
 app.MapDefaultEndpoints();

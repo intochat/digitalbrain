@@ -37,7 +37,7 @@ public sealed class SystemTools(
             AIFunctionFactory.Create(FindCapabilitiesAsync, FindCapabilities,
                 "Search the system's contracts for what can be done. Returns requests you can fire (with their signatures) and facts you can route with db.connect."),
             AIFunctionFactory.Create(GetNeuronsAsync, GetNeurons,
-                "List the live neuron instances (type:owner/name) and the current connections of the synapse graph. Optionally filter instances by grain type."),
+                "List registered instances (including cold/disabled), live activations (type:owner/name), and synapse-graph connections. Optionally filter by grain type."),
             AIFunctionFactory.Create(FireAsync, Fire,
                 "Send a request synapse and return its reply. 'contract' is a contract id from find_capabilities; 'arguments' are its fields (commandId is filled for you); 'target' overrides the default instance — a grain type ('timer'), an instance name ('main'), or type:name."),
         ];
@@ -116,13 +116,80 @@ public sealed class SystemTools(
     private async Task<string> GetNeuronsAsync(CancellationToken cancellationToken, string? grainType = null)
     {
         var activated = await ActivatedAsync(cancellationToken).ConfigureAwait(false);
-        var listed = string.IsNullOrWhiteSpace(grainType)
+        var liveFilter = string.IsNullOrWhiteSpace(grainType)
             ? activated
             : [.. activated.Where(neuron => string.Equals(neuron.Type, grainType.Trim(), StringComparison.OrdinalIgnoreCase))];
 
         var lines = new StringBuilder();
-        lines.AppendLine(listed.Count == 0 ? "No live instances match." : "Live instances:");
-        foreach (var neuron in listed)
+
+        // Registry is durable: cold charts, idle schedules, disabled bundle members.
+        RegisteredInstance[] registered = [];
+        try
+        {
+            var session = grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(owner).ToGrainId());
+            var registryId = IRegistry.ForOwner(owner);
+            var opened = await session
+                .ReadNeuronJournal(ISessionNeuron.ForOwner(owner), JournalKind.Incoming, long.MaxValue)
+                .ConfigureAwait(false);
+            var cursor = opened.ResumeSequence;
+            var listRequest = new ListInstances(CommandId.New());
+            var delivery = await session.Fire(registryId, listRequest).ConfigureAwait(false);
+            var abandon = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(8);
+            while (DateTimeOffset.UtcNow < abandon)
+            {
+                var page = await session
+                    .ReadNeuronJournal(ISessionNeuron.ForOwner(owner), JournalKind.Incoming, cursor)
+                    .ConfigureAwait(false);
+                foreach (var entry in page.Delta)
+                {
+                    if (entry.CorrelationId == delivery.CorrelationId
+                        && entry.Synapse is InstancesListed listed)
+                    {
+                        registered = listed.Items;
+                        goto RegistryLoaded;
+                    }
+                }
+
+                cursor = page.ResumeSequence;
+                await Task.Delay(25, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (Exception)
+        {
+            // Registry unavailable — live list still works.
+        }
+
+    RegistryLoaded:
+
+        if (registered.Length > 0)
+        {
+            RegisteredInstance[] filtered = string.IsNullOrWhiteSpace(grainType)
+                ? registered
+                : [.. registered.Where(entry =>
+                    string.Equals(entry.Subject.Type, grainType.Trim(), StringComparison.OrdinalIgnoreCase))];
+
+            lines.AppendLine(filtered.Length == 0
+                ? "Registered instances: (none match filter)"
+                : "Registered instances (exist even when cold):");
+            var liveKeys = activated.Select(static n => n.ToString()).ToHashSet(StringComparer.Ordinal);
+            foreach (var entry in filtered.OrderBy(static e => e.Subject.ToString(), StringComparer.Ordinal))
+            {
+                var heat = liveKeys.Contains(entry.Subject.ToString()) ? "live" : "cold";
+                var enabled = entry.Enabled ? "enabled" : "disabled";
+                var bundle = entry.Bundle is null ? "" : $" bundle={entry.Bundle}";
+                var note = entry.Note is null ? "" : $" note={entry.Note}";
+                lines.AppendLine(
+                    $"  {entry.Subject} role={entry.Role} [{heat}, {enabled}]{bundle}{note}");
+            }
+        }
+        else
+        {
+            lines.AppendLine(
+                "Registered instances: (none — fire db.register-instance or db.install-bundle)");
+        }
+
+        lines.AppendLine(liveFilter.Count == 0 ? "Live (activated) instances: (none match)" : "Live (activated) instances:");
+        foreach (var neuron in liveFilter)
         {
             lines.AppendLine($"  {neuron}");
         }

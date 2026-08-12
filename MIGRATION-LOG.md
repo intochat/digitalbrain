@@ -811,3 +811,38 @@ ship in this change — the catalog is empty.
   and chat tools worked — recorded, not bisected here.
 - No synapse currently carries `[Broadcast]`; re-introduce only with a named product reason.
 
+
+## Session 9 — 2026-08-12 — Wave 2: registry, retire, connect validation
+
+### 41. What landed
+
+- **`IRegistry`** grain `registry:{owner}/main` — durable JSON state of registered instances
+  (exist when cold): `db.register-instance`, `db.retire-instance`, `db.set-instance-enabled`,
+  `db.install-bundle`, `db.list-instances`.
+- **`get_neurons`** merges registry (cold/disabled) + live activations + connections.
+- **Connect-time validation** on `SynapseGraphNeuron`: known endpoint grain types, target
+  handles the *delivered* alias (after morph), duplicate route refusal.
+- **MCP tools** `list_registry`, `register_instance`, `install_bundle` for product/ops use.
+- **Client fix**: `SendRequestAsync` opens the session journal at `long.MaxValue` so reply
+  polls do not deserialize the entire polymorphic history (FieldTypeMissingException).
+- **Membership prune** scripting helper + AppHost no longer WaitFor(kernel) on scripting so
+  dead Active silos can be pruned before join.
+
+### 42. Gate evidence (digitalbrain-mcp HTTP tools/call)
+
+```
+register_instance chart:sales-cold role=chart → chart:dev/sales-cold enabled=true note=cold chart
+register_instance timer:nightly role=schedule → timer:dev/nightly enabled=true note=idle schedule
+install_bundle wave2-board → memberCount=2 enabled=false
+list_registry:
+  chart:dev/board-kpi  role=chart bundle=wave2-board enabled=false
+  chart:dev/sales-cold role=chart enabled=true note=cold chart
+  timer:dev/bundle-tick role=schedule bundle=wave2-board enabled=false
+  timer:dev/nightly role=schedule enabled=true note=idle schedule
+```
+
+Walk-through names: **idle schedule** `timer:dev/nightly`, **disabled bundle** `wave2-board`,
+**cold chart** `chart:dev/sales-cold`.
+
+Build: 0 warnings. AppHost living after prune.
+
