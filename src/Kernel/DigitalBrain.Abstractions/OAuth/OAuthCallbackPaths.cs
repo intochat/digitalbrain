@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Abstractions.OAuth;
 
 public static class OAuthCallbackPaths
 {

@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Abstractions.Neurons;
 
 [GenerateSerializer]
 [Alias("db.authorization-error")]

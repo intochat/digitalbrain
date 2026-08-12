@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Abstractions.Neurons;
 
 [ClientEntryPoint]
 [Alias("DigitalBrain.Abstractions.IDigitalBrainNeuron")]

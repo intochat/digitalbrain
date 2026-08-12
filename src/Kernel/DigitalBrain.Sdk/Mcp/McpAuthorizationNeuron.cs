@@ -20,7 +20,7 @@ public sealed class McpAuthorizationNeuron :
 
     private const string PendingName = "mcp.authorization.pending";
     private const string CommandsName = "mcp.authorization.commands";
-    // Wave 4: (serverKey, PrincipalId) → PKCE state so regenerated CommandIds still join.
+    // Wave 4: (serverKey, PrincipalId) ΓåÆ PKCE state so regenerated CommandIds still join.
     private const string SlotsName = "mcp.authorization.slots";
     private const string CodeProtectionPurposePrefix = "mcp/authorization/code";
     private const string VerifierProtectionPurposePrefix = "mcp/authorization/verifier";
@@ -683,48 +683,3 @@ public sealed class McpAuthorizationNeuron :
             pending.ExpiresAt,
             pending.Consumed);
 }
-
-[GenerateSerializer]
-[Alias("db.mcp.pending-authorization")]
-internal sealed record PendingAuthorization(
-    [property: Id(0)] CommandId CommandId,
-    [property: Id(1)] string ServerKey,
-    [property: Id(2)] string ServerDisplayName,
-    [property: Id(3)] Uri SignInUrl,
-    [property: Id(4)] string State,
-    [property: Id(5)] PendingAuthorizationOutcome Outcome,
-    [property: Id(6)] string? Code,
-    [property: Id(7)] string? Iss,
-    [property: Id(8)] NeuronId? CompletionTarget,
-    [property: Id(9)] bool CompletionNotified,
-    [property: Id(10)] NeuronId? RequestingNeuron,
-    [property: Id(11)] ActorContext Actor,
-    [property: Id(12)] string? CodeChallenge = null,
-    [property: Id(13)] string? ProtectedCodeVerifier = null,
-    [property: Id(14)] DateTimeOffset ExpiresAt = default,
-    [property: Id(15)] bool Consumed = false);
-
-[GenerateSerializer]
-[Alias("db.mcp.pending-authorization-outcome")]
-internal enum PendingAuthorizationOutcome
-{
-    Open = 0,
-    Completed = 1,
-    Denied = 2,
-}
-
-[GenerateSerializer]
-[Alias("db.mcp.command-authorization-record")]
-internal sealed record CommandAuthorizationRecord(
-    [property: Id(0)] CommandId CommandId,
-    [property: Id(1)] string ServerKey,
-    [property: Id(2)] string ServerDisplayName,
-    [property: Id(3)] Uri SignInUrl,
-    [property: Id(4)] string State,
-    [property: Id(5)] PendingAuthorizationOutcome Outcome,
-    [property: Id(6)] NeuronId? CompletionTarget = null,
-    [property: Id(7)] bool CompletionNotified = false,
-    [property: Id(8)] NeuronId? RequestingNeuron = null,
-    [property: Id(9)] ActorContext? Actor = null,
-    [property: Id(10)] DateTimeOffset ExpiresAt = default,
-    [property: Id(11)] bool Consumed = false);

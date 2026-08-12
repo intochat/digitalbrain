@@ -7,7 +7,7 @@ internal static class HttpSurfacePaths
     public const string SurfaceEventsPath = "/surfaces/{surfaceName}/events";
     public const string BrainTopologyPath = "/brain/topology";
     public const string GraphEventsPath = "/graph/events";
-    public const string McpOAuthCallbackPath = DigitalBrain.Abstractions.OAuthCallbackPaths.RelativePath;
+    public const string McpOAuthCallbackPath = DigitalBrain.Abstractions.OAuth.OAuthCallbackPaths.RelativePath;
     public const string AuthorizationEventsPath = "/authorizations/events";
 
     public const string AuthBootstrapPath = "/auth/bootstrap";

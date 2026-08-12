@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Abstractions.Capabilities;
 
 public sealed record CapabilityManifest(
     ModuleId ModuleId,

@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Abstractions.Identity;
 
 // Neuron names cannot contain '/' (owner/name separator). Per-principal resources
 // use "{principal:N}.{local}" so chat, chart, graph, and registry isolate by principal.

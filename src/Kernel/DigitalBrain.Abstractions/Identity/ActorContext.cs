@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Abstractions.Identity;
 
 [GenerateSerializer]
 [Alias("db.actor-context")]

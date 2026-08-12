@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Abstractions.Integrations;
 
 // External-system credential binding (not a ConnectionGraph edge). Tokens are never
 // journaled ΓÇö only this record's ProtectedTokenReference (protector purpose) is.

@@ -1,6 +1,6 @@
 using Orleans.Concurrency;
 
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Abstractions.Neurons;
 
 [Alias("DigitalBrain.Abstractions.INeuron")]
 public interface INeuron : IGrainWithStringKey

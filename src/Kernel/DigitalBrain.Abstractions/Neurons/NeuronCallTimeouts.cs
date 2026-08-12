@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Abstractions.Neurons;
 
 public static class NeuronCallTimeouts
 {

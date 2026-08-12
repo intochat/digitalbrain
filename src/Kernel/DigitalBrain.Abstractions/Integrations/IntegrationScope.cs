@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Abstractions.Integrations;
 
 [GenerateSerializer]
 [Alias("db.integration-scope")]

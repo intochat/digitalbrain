@@ -234,20 +234,4 @@ internal sealed class RegistryTools(IDigitalBrain brain)
             return $"ERROR {ex.GetType().Name}: {ex.Message}";
         }
     }
-
-    private sealed record BundleMemberDto(string? GrainType, string? Name, string? Role, string? Note);
 }
-
-internal sealed record RegistryEntry(
-    string Identity,
-    string Role,
-    string? Bundle,
-    bool Enabled,
-    string? Note,
-    DateTimeOffset RegisteredAt);
-
-internal sealed record BundleInstallResult(
-    string Name,
-    int MemberCount,
-    int WireCount,
-    bool Enabled);

@@ -12,7 +12,7 @@ internal static class SynapseTelemetry
 
     internal static readonly ActivitySource Source = new("DigitalBrain");
 
-    internal static void WatcherDropped(DigitalBrain.Abstractions.NeuronId watched, Exception unreachable)
+    internal static void WatcherDropped(DigitalBrain.Abstractions.Identity.NeuronId watched, Exception unreachable)
     {
         using var dropped = Source.StartActivity("db.watcher-dropped");
 
@@ -20,7 +20,7 @@ internal static class SynapseTelemetry
         dropped?.SetTag("db.watcher-dropped", unreachable.GetType().Name);
     }
 
-    internal static void RetractionUncommitted(DigitalBrain.Abstractions.NeuronId neuron, Exception uncommitted)
+    internal static void RetractionUncommitted(DigitalBrain.Abstractions.Identity.NeuronId neuron, Exception uncommitted)
     {
         using var retraction = Source.StartActivity("db.retraction-uncommitted");
 

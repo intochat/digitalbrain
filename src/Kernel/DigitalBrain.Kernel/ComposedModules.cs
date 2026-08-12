@@ -8,7 +8,7 @@ internal static class ComposedModules
 {
     internal static ModuleAssemblies Assemblies { get; } = new(
         [
-            typeof(DigitalBrain.Abstractions.ISynapseGraph).Assembly,
+            typeof(DigitalBrain.Abstractions.Graph.ISynapseGraph).Assembly,
             typeof(DigitalBrain.AI.IAssistant).Assembly,
             typeof(DigitalBrain.Introspection.ReadTopologyRequest).Assembly,
             typeof(DigitalBrain.Memory.IVectorMemory).Assembly,

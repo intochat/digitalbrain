@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Abstractions.Journals;
 
 [GenerateSerializer]
 [Alias("db.journal-tally")]

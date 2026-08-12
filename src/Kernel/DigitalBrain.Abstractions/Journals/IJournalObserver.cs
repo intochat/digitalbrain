@@ -1,6 +1,6 @@
 using Orleans.Concurrency;
 
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Abstractions.Journals;
 
 [Alias("db.journal-observer")]
 public interface IJournalObserver : IGrainObserver

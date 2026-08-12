@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Abstractions.Identity;
 
 [GenerateSerializer]
 [Alias("db.principal-id")]
