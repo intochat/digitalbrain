@@ -650,3 +650,55 @@ Stage 1 as specified also calls for a per-owner refusals **inbox** neuron and a 
 were dropped on evidence (see §23) and belong with the instance-registry work. Stages 2–10 are
 untouched. The `outcome-probe.cs` scripting probe is committed but cannot run standalone until the
 client bootstrap is solved; the MCP surface carried the verification instead.
+
+---
+
+## Session 6 — 2026-08-12 — provenance, projection facts, and an operational lesson
+
+### 29. Two corrections the live Stage 1 run demanded
+
+**`chat.responded` is a journal projection, not a delivery.** The UI reads it from the chat's outgoing
+feed, so its zero-receiver emission is normal — and Stage 1 was reporting `db.unrouted` on *every*
+assistant reply. Left alone that noise would have taught the model to ignore the signal. A
+`[JournalProjection]` marker now suppresses it. **Verified:** after the fix the reply's correlation
+produces no `Unrouted`, where before the fix it did (seq 9, correlation `cef58a0f…`).
+
+This is worth stating as an architectural fact, because none of the 19 amendments contain it:
+**the product has two delivery models** — graph/outbox delivery, and journal projection that the HTTP
+and SSE surfaces read directly. The outcome rail can only see the first. Every fact must therefore
+declare which model it belongs to, or the rail lies.
+
+**Connections now carry provenance.** `Provenance(Author, At, StatedIntent, Correlation)` on
+`SynapseConnection`, `Intent` on `Connect`, both at trailing `[Id(6)]` so stored connections keep
+deserializing and read back as "intent: unrecorded". Only `StatedIntent` comes from the caller —
+author, time and correlation are composed by the kernel from the delivery, so a wire cannot claim an
+origin it did not have. `get_neurons` now prints the `ConnectionId` (without it the model can only
+unwire what it created in the same turn) and states intent-absence explicitly rather than leaving it
+blank. The assistant prompt and `connect-chat-responder.cs` now state an intent.
+
+### 30. Operational lesson: never force-kill AppHost
+
+Force-killing the AppHost process leaves the silo's membership row **Active** in
+`OrleansSiloInstances`, and the next silo then refuses to join —
+`OrleansClusterConnectivityCheckFailedException: failed to get ping responses from 1 of 1 active
+silos` — pointing at an endpoint that no longer exists. The kernel resource reports `Finished` while
+MCP stays up, so the symptom looks like a code regression and is not one. I lost a cycle to this.
+
+`scratchpad/silos.cs --prune` removes only rows whose proxy port refuses a TCP connection, keeps
+`VersionRow`, and touches nothing else — Orleans membership is Orleans' own state, not product state.
+The same script is how the Aspire-generated ClusterId is discovered, which a standalone client cannot
+guess.
+
+### 31. Where this stops, and what comes next
+
+Committed and verified on `stage1-outcome-rail`: the outcome rail, the projection marker, and
+connection provenance. Build is 0 warnings; a simulated user turn through `digitalbrain-mcp` returns a
+real Gemma4 reply with the reply rail intact.
+
+**Not started: broadcast opt-in**, which the review rates fatal and for which there is now live
+evidence — `chart:dev/f1a35f68-…`, a ghost minted per correlation. It is the right next change and it
+is a routing-semantics change across all **48** synapse types that currently declare `IHandle<T>`.
+Ghost receivers are addressed `type:owner/{correlation}`, so no *named* neuron can ever receive a
+broadcast; the tier looks like pure cost. That reasoning is strong but not proof, and this session
+already produced one wide-blast-radius change that compiled clean and broke every reply in the
+product. It needs a session with room to verify, not the tail of one.
