@@ -378,3 +378,142 @@ whether behaviors compile at create-time into a stored artifact (so the SDK-less
 assembly instead of shelling out), and whether the wire language gains literals and predicates at all
 — if it does not, §D must say plainly that the architecture expresses routing as data and computation
 as code.
+
+---
+
+## Session 3 — 2026-08-12 — the third axis, and a programme that carries the vision
+
+Owner reframed the goal: the brain should be able to compose *anything* — "build me a calculator
+inside DigitalBrain", "one agent per source file that deliberate and compose a feature", "if one user
+solves a problem every other user's brain knows it" — and share it with anyone. And asked the
+fundamental question: what actually stops this, given Orleans is a capable actor framework?
+
+### 12. The diagnosis: two axes are data, the third is code
+
+DigitalBrain has three axes. Instances are data (`chart:vlad/sales`). Connections are data (the graph).
+**Kinds are C#** — verified: 20 `[GrainType(...)]` attributes in `src/**`, zero runtime type creation
+(`Activator.CreateInstance` appears only for DI module hooks and the dead `Participant`), and
+`ModuleReflection` reflecting over compiled assemblies only. Twenty kinds of thing can ever exist.
+
+Everything the owner wants lives on that third axis. A calculator is not new wiring between existing
+cells; it is a new *kind* of cell with its own state shape, handlers and view. **Cortex does not fix
+this either** — its behaviors are stateless programs that run and exit, so a behavior cannot *be* a
+calculator. Cortex made routing, origination and computation into data and left kinds as code.
+
+### 13. What Orleans actually permits (doc-verified this session)
+
+Three independent mechanisms all close at silo start, each confirmed in Microsoft's docs:
+`GrainTypeAttribute` is `AllowMultiple = false` ("each grain can only have one grain type name");
+`GrainClassMap` is built from an `ImmutableDictionary` exposing only `TryGetGrainClass`; and
+`GrainManifest` is `[GenerateSerializer][Immutable]` with `LocalGrainManifest` get-only and no
+republish API. **A grain type cannot be added to a running silo** — not by aliasing, not by a
+placement director, not by loading an assembly.
+
+So the kind cannot live in the grain *type*. It lives in the grain **key**: one registered
+`[GrainType("cell")]` grain, N keys, `cell:{owner}/{kind}@{name}`. This is idiomatic rather than a
+workaround — identity is type + key, and the key is where a logical instance is named. Placement,
+directory and versioning are untouched, and the product-facing `NeuronId` address stays exactly as it
+is; only `NeuronId.ToGrainId()` becomes a resolver (~10 call sites). The separator is `@`, not `/`:
+`NeuronId.FromGrainKey` splits at the first `/` and `IdentityPart.Validated` throws on `/` in a name,
+so the design's original three-segment key would have thrown on every activation.
+
+### 14. A second compiled axis nobody had noticed
+
+The review found what the Session 2 framing missed: **the vocabulary is compiled too.** A `Synapse` is
+a CLR record serialized by build-time codegen and dispatched by CLR type, so a new kind cannot invent
+a new *fact* either. Fix: one compiled carrier `db.datum(Kind, Fields)` plus an `EffectiveAlias` rule
+applied at exactly five sites (routing, relay transform target, `RequireWorkingTransform`, telemetry,
+corpus), so the wire vocabulary stops being closed. Manifests become two-source: compiled manifests
+reflected, kind manifests durable data.
+
+The same gap explains a finding I made by hand: **the model is not on the wire.** `ILLM`/`IAgent`
+expose only grain methods taking `IReadOnlyList<ChatMessage>`, and there are zero `RequestSynapse`
+types in the AI contracts. So `fire` cannot ask the model anything and nothing can be wired to it —
+which is precisely what "one agent per file, deliberating" requires.
+
+### 15. Owner input, and where it moved the line
+
+The owner's position — "the redeploy can be done via aspire restart resource" — was tested and
+**survives, but not for the stated reason.** Restart genuinely is cheap here (AppHost runs one silo,
+so rolling/heterogeneity never arises; journals survive in Blob, reminders in Tables, undelivered
+outbox entries recover via the `db-outbox-wakeup` reminder). It is the wrong tool because it is
+cluster-wide and all-users, so **it can never carry a solution from one person's brain to another's.**
+
+Consequences, all recorded as deliberate kills:
+
+- **Tier B (compiled kinds) is killed as a sharing mechanism.** A compiled kind cannot reach another
+  person's brain without that operator deploying it; .NET has no in-process sandbox; `Neuron` hands
+  its subclass the `ServiceProvider`; cluster membership *is* the authority boundary. Authoring
+  compiled code equals deployment authority. Compiled code becomes **the palette** — new effects, new
+  leaf widgets, new integration rails — shipped as an ordinary reviewed release.
+- **In-silo Roslyn demoted to validation only.** Registration needs a restart regardless of where the
+  DLL was produced, so compiling in-silo buys nothing. (Roslyn genuinely needs no SDK — it is an
+  ordinary library — so the capability is real, just not useful here.)
+- **"Automatically knows the solution" killed as a design target.** Auto-install would arm schedules,
+  spend the installer's OAuth tokens and rewrite their graph without consent. The honest deliverable
+  is **automatic discovery plus deliberate install**.
+- **Reducer cells, arithmetic and the `when` predicate are removed from the connection morph** — a
+  reversal of part of a Session 2 fatal amendment. A cell beats a transform on every axis
+  (addressable, journaled, readable, provenance-bearing, rollback-enlisting, replaceable without
+  touching the wire). Kept on the wire: quoted literals and `MinInterval`. **This needs the owner's
+  explicit ruling.**
+- **`ui.chart-card` dropped** in favour of a general `ui.view-card`; `Responded.Charts` (Id 4, zero
+  producers, four dead consumers) is deleted and `Views` added at a fresh id, never recycling Id 4.
+- **The team/convene stack is killed outright** — it is N models at ONE name, not N perspectives at N
+  names, it is dead with only Gemma4 provisioned, and while it ships `convene_model_team` and
+  `ask_llama` are a fourth and fifth tool falsifying "three tools, forever" at HEAD.
+- **`assembly` is renamed.** It collides head-on with .NET assembly semantics already load-bearing in
+  `src` (`ModuleAssemblies`, `ModuleReflection.ManifestOf(Assembly)`); shipping `assembly.import`
+  beside a compiled-assembly import would produce exactly one catastrophic model misunderstanding.
+
+### 16. The programme: 11 stages, and it is two programmes
+
+Stages 0–6 are the absorption and its seventeen amendments (be told no · two people one brain ·
+everything can be named and un-made · wires that cannot lie · the outside world works · time and
+memory). Stages 7–10 are the third axis (kinds become data · you can press it · one brain's solution
+every brain's · code where code is needed). Stage 0 is a small spike settling four one-way doors.
+
+**The sequencing rule that matters most:** four amendments — the connection record, the wire language,
+the read rail and the capability surface — **fork on the kind decision** and will be built twice if
+they land before it. That is the single most expensive mistake available here.
+
+**Honest sizing: stages 7–10 are the larger programme, not an addendum.** They need a new grain, a
+durable kind registry, an expression language with an install-time cost analyzer, a
+versioning-and-pinning story with no migration machinery to build on, a two-source catalog touching
+find/fire/connect-validation/get_neurons, a view document format, a Flutter renderer, and a
+share/install lifecycle with a trust model.
+
+### 17. What is not reachable
+
+- **Vision target 2 (5,000 self-implementing per-file agents) is not reachable as asked.** Three
+  independent walls: the brain has no filesystem at all (zero matches for `FileSystemWatcher` /
+  `Directory.GetFiles` / `File.ReadAllText` in `src`); 40 agents × 5 rounds is 200 12B inferences
+  against one GPU, which Orleans parallelizes and the GPU serializes; and "properly" has no acceptance
+  criterion inside the system because the central test project was deleted by owner amendment. The
+  reachable form is a ~40-cell working set, three rounds, producing a **plan** with per-file stances
+  and provenance — implementation handed to a human or an external coding agent. A repository rail is
+  needed as a first-class integration, not as a behavior or a script.
+- **Fixes do not propagate.** Installs copy rather than reference, which is exactly what stops one bad
+  publish breaking forty installs — and exactly what leaves forty installs broken when the author
+  fixes a real bug. The product cannot have both; this plan chooses containment.
+- **There is no sandbox beneath the interpreter.** Tier A's whole safety story is that its instruction
+  set is closed, total, and cannot name an actor or an arbitrary send target. Every future primitive
+  request ("let templates read config") is a privilege-escalation change wearing a feature costume.
+- **Continuous interaction is permanently out.** A slider at 60 Hz is 60 turns per second into a
+  non-reentrant grain. Views carry discrete events only.
+- **Per-tap latency is unmeasured** and is the largest threat to the calculator feeling like one:
+  one delivery + one turn + one `WriteStateAsync` over Blob + one SSE hop. Above ~80 ms the
+  interaction model must change to client-side accumulation.
+- **Depth 16 is a real ceiling** — roughly seven external question/resume hops, or seven deliberation
+  rounds before a hierarchical fold.
+- **Reminder ticks due while the cluster is down are permanently missed** (verified on Learn), so
+  every restart — including every palette release — is an outage schedules must collapse around.
+
+### 18. Four facts still unverified — Stage 0 exists to settle them
+
+Whether an Aspire project-resource restart re-builds; whether a runtime-loaded assembly's grain types
+can register at startup (`Assembly.LoadFrom` + `AddSerializer` + `GrainTypeOptions.Classes` — both
+APIs exist, no doc confirms the combination); whether `Microsoft.Orleans.Journaling` (an **alpha
+prerelease** that is the only durable record in the system) resolves keyed durable services the way
+production assumes; and whether an `@`-bearing grain key survives Azurite blobs plus Tables reminders
+and clustering end to end. Nothing on the critical path may depend on these until Stage 0 answers them.
