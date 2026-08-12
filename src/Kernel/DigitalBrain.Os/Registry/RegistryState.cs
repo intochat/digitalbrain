@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Os;
 
 [GenerateSerializer]
 [Alias("db.registry-state")]

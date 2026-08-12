@@ -1,9 +1,10 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Os;
 
 [GrainType(IRegistry.GrainTypeName)]
 public sealed class InstanceRegistryNeuron : Neuron, IRegistry
