@@ -1,5 +1,5 @@
 using DigitalBrain.AI.Ollama;
-using DigitalBrain.Security;
+using DigitalBrain.Modules.Sdk;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;

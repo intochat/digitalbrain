@@ -4,7 +4,7 @@
     <AssemblyName>DigitalBrain.Modules.Sdk</AssemblyName>
     <PackageId>DigitalBrain.Modules.Sdk</PackageId>
     <IsPackable>true</IsPackable>
-    <Description>Shared infrastructure for DigitalBrain modules: southbound MCP rail and webhook ingress.</Description>
+    <Description>Reusable module infrastructure on Core: MCP rail, webhook ingress, durable payload protection.</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
@@ -15,6 +15,5 @@
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
     <ProjectReference Include="../DigitalBrain.Core/DigitalBrain.Core.csproj" />
-    <ProjectReference Include="../DigitalBrain.Security/DigitalBrain.Security.csproj" />
   </ItemGroup>
 </Project>

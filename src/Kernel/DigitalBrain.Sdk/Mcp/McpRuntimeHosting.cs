@@ -1,4 +1,4 @@
-using DigitalBrain.Security;
+using DigitalBrain.Modules.Sdk;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 

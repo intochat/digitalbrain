@@ -1,7 +1,7 @@
 using System.Text;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
-using DigitalBrain.Security;
+using DigitalBrain.Modules.Sdk;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;

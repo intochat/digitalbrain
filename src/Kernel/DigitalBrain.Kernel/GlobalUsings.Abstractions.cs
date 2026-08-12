@@ -16,4 +16,3 @@ global using DigitalBrain.Abstractions.Registry;
 global using DigitalBrain.Abstractions.Repository;
 global using DigitalBrain.Abstractions.Security;
 global using DigitalBrain.Abstractions.Workspace;
-global using DigitalBrain.Security;

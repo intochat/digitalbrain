@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 using Orleans.Runtime;
 
-namespace DigitalBrain.Security;
+namespace DigitalBrain.Core;
 
 // Ambient verified principal for the current authenticated turn. Uses Orleans
 // RequestContext so it propagates Chat → Agent grain calls (AsyncLocal does not).

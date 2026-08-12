@@ -1,6 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Security;
+using DigitalBrain.Modules.Sdk;
 using ModelContextProtocol.Authentication;
 using Orleans.Journaling;
 

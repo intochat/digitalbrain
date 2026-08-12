@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace DigitalBrain.Security;
+namespace DigitalBrain.Modules.Sdk;
 
 internal sealed class DurablePayloadProtector : IDurablePayloadProtector
 {
