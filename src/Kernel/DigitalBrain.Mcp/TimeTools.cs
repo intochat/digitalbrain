@@ -105,8 +105,9 @@ internal sealed class TimeTools(IDigitalBrain brain, IHttpContextAccessor httpCo
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(Bound);
 
+        var corpusInstance = McpActor.Partition(actor, ICorpus.InstanceName);
         var page = await brain
-            .Get<ICorpus>(ICorpus.InstanceName)
+            .Get<ICorpus>(corpusInstance)
             .FireAsync<CorpusPage>(
                 new ReadCorpus(CommandId.New(), afterSequence, limit),
                 timeout.Token)

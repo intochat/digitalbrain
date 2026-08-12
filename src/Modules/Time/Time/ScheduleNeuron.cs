@@ -73,10 +73,15 @@ public sealed class ScheduleNeuron : Neuron, ISchedule, IRemindable
                 $"Schedule '{Id}' is already armed; cancel it before re-arming.");
         }
 
-        var actor = synapse.OnBehalfOf
-            ?? VerifiedActor.Current
-            ?? throw new NeuronAuthorizationException(
-                $"Schedule '{Id}' requires OnBehalfOf or a verified principal at arm time.");
+        // Host mints via VerifiedActor.Enter; ArmSchedule.OnBehalfOf is untrusted.
+        // Ambient verified principal wins; a mismatched claim is spoof and refused.
+        var actor = RequireVerifiedActor("arm");
+        if (synapse.OnBehalfOf is { } claimed
+            && claimed.PrincipalId != actor.PrincipalId)
+        {
+            throw new NeuronAuthorizationException(
+                $"Schedule '{Id}' refuses OnBehalfOf that does not match the verified principal.");
+        }
 
         var generation = (current?.Generation ?? 0) + 1;
         var period = TimeSpan.FromSeconds(synapse.PeriodSeconds);
@@ -249,9 +254,15 @@ public sealed class ScheduleNeuron : Neuron, ISchedule, IRemindable
                 await EmitAsync(tick)
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-                // Corpus projection (owner-scoped watermark rail).
+                // Corpus projection into the on-behalf principal partition (A18).
+                if (onBehalf is null)
+                {
+                    throw new NeuronAuthorizationException(
+                        $"Schedule '{Id}' refuses corpus projection without an on-behalf principal.");
+                }
+
                 await SendAsync(
-                    ICorpus.ForOwner(Id.Owner),
+                    ICorpus.ForPrincipal(Id.Owner, onBehalf.PrincipalId),
                     new AppendCorpusEntry(
                         CommandId.New(),
                         Kind: "time.schedule-tick",
@@ -290,6 +301,23 @@ public sealed class ScheduleNeuron : Neuron, ISchedule, IRemindable
         => _state.Value is { } serialized ? serialized.ToArray() : [];
 
     private void RestoreState(byte[] serialized) => _state.Value = serialized;
+
+    // VerifiedActor.Current is the only trusted Actor at arm time.
+    // Payload OnBehalfOf may match it or be null; never overrides ambient.
+    private static ActorContext RequireVerifiedActor(string command)
+    {
+        var verified = VerifiedActor.Current
+            ?? throw new NeuronAuthorizationException(
+                $"Schedule refuses '{command}' without a verified principal.");
+
+        if (string.IsNullOrWhiteSpace(verified.Username))
+        {
+            throw new NeuronAuthorizationException(
+                $"Schedule refuses '{command}' with an empty actor username.");
+        }
+
+        return verified;
+    }
 
     private static void RequireCommand(CommandId commandId)
     {

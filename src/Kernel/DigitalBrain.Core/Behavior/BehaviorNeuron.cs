@@ -75,9 +75,12 @@ public sealed class BehaviorNeuron : Neuron, IBehavior
 
         Save(state);
 
-        // Project into corpus for later episode reads.
+        // Project into the verified principal's corpus partition (A18).
+        var actor = VerifiedActor.Current
+            ?? throw new NeuronAuthorizationException(
+                $"Behavior '{Id}' refuses corpus projection without a verified principal.");
         await SendAsync(
-            ICorpus.ForOwner(Id.Owner),
+            ICorpus.ForPrincipal(Id.Owner, actor.PrincipalId),
             new AppendCorpusEntry(
                 CommandId.New(),
                 Kind: "behavior.repo-review",
