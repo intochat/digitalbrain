@@ -579,3 +579,74 @@ hardcoded webhook in model-authored source reaches the outside world without tou
 Feedback lands but nothing puts it in front of the model next time (S45).
 
 Interactive artifact with all 50 traces playable: 462 trace steps across 17 components.
+
+---
+
+## Session 5 — 2026-08-12 — Stage 1 implemented, on branch `stage1-outcome-rail`
+
+First production code of the absorption. The plan (`plans/stage1-outcome-rail.md`) was grilled by
+five lenses against real source before a line was written; five blockers came back and all were
+adopted. Implementation, build (0 warnings) and runtime verification through `digitalbrain-mcp`.
+
+### 23. What the pre-code grilling caught
+
+- **The design would never have matched a correlation.** The outcome is journaled under its own
+  envelope, whose `CorrelationId` is fresh — so every reply-matching loop, which filters on the
+  envelope, would have found nothing and still spun to 15 s. Correlation now rides the **payload**.
+- **Routing outcomes through the pipeline's directed send would have caused N+1 `WriteStateAsync`
+  per drain** plus watcher pushes mid-flush. Replaced by a staging-only path.
+- **The `IInbox` neuron was dropped entirely.** It needed `FrameworkInterfaces` + `[ClientEntryPoint]`
+  registration, `Core` is not in the composed implementations list, and nothing read it — it would
+  have shipped as a write-only log.
+- **`FixPath` was dropped.** Nothing produces one; the existing refusal messages already embed the fix
+  in prose, and a constant-empty field teaches the model to ignore it. `Reason` is capped at 2 KB.
+- **The stated justification was wrong.** Settled failures do not "retry 1000×/30 min" — the receiver
+  already settles and remembers, so the sender retries once and reports delivered. The change is still
+  right; the reason had to match the code.
+
+### 24. The design that survived
+
+An outcome is **journaled into the firing neuron's incoming feed, never delivered.** That one decision
+removes the self-send, the relay-injection hazard, and the possibility of an outcome-of-an-outcome —
+and it lands exactly where every caller already polls. Outcomes stage into a list during the drain and
+flush only after the loop, because `DrainAsync` indexes and mutates `entries` while iterating.
+
+### 25. A regression I introduced, and what it taught
+
+I opportunistically made the base `OnUnboundSynapseAsync` a settled refusal — the grill had recommended
+it — to get a deterministic probe. **It broke every request/reply in the product**: `ReplyAsync`
+addresses the caller, and callers routinely have no `IHandle<T>` for the reply type, so the session
+never received its replies. The build was green; only the live run caught it.
+
+Reverted. It belongs to the turn-and-delivery hardening amendment with a proper reply-sink accept-list,
+not to this slice. `SessionNeuron` keeps an explicit override documenting that it accepts anything,
+because it is the universal reply sink.
+
+### 26. Runtime evidence (via `digitalbrain-mcp`, live AppHost)
+
+A simulated user turn (`send_chat_message`) returned a real Gemma4 answer — reply rail intact — and
+`read_neuron_journal(chat/main, incoming)` then showed `Unrouted` records, one carrying the **exact
+correlation of that reply**. Before this slice that emission was journaled and dropped with no record.
+
+### 27. Findings the live run surfaced
+
+- **`chat.responded` has no handler anywhere**, so every assistant reply is a zero-receiver emission
+  and now produces an `Unrouted` record. This is *truthful but noisy*: the UI receives `Responded` by
+  **journal projection**, not by delivery. The product therefore has two delivery models, and the
+  outcome rail can only see one. A neuron needs a way to declare a fact projection-only, or `Unrouted`
+  will train the model to ignore it. **This is new, and it is not in any of the 19 amendments.**
+- **A broadcast ghost is live in production right now**: `chart:dev/f1a35f68-…`, minted per-correlation
+  by the scripting resource's `ChartPoint` emission. Trap 8 and amendment "broadcast becomes opt-in",
+  observed rather than theorised.
+- **The Aspire cluster id is generated** (`uxtps7dxsxgdwqg1072c1x0tb`), so a standalone scripting client
+  cannot be configured by guessing; it must be read from `OrleansSiloInstances`. The scripting resource
+  works only because it inherits Aspire's environment.
+- **The file-based-app `PublishAot` trap is real and still bites** — reflection JSON dies silently
+  without `PublishAot=false`, exactly as `poc/FINDINGS.md` recorded.
+
+### 28. What is NOT done
+
+Stage 1 as specified also calls for a per-owner refusals **inbox** neuron and a read verb for it; both
+were dropped on evidence (see §23) and belong with the instance-registry work. Stages 2–10 are
+untouched. The `outcome-probe.cs` scripting probe is committed but cannot run standalone until the
+client bootstrap is solved; the MCP surface carried the verification instead.
