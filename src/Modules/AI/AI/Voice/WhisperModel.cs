@@ -6,13 +6,14 @@ public abstract class WhisperModel
     public abstract string DisplayName { get; }
     public abstract int Priority { get; }
 
-    private static readonly Lazy<IReadOnlyList<WhisperModel>> AllLazy = new(static () =>
-        [.. typeof(WhisperModel).Assembly.GetTypes()
-            .Where(static t => t is { IsClass: true, IsAbstract: false } && t.IsSubclassOf(typeof(WhisperModel)))
-            .Select(static t => (WhisperModel)Activator.CreateInstance(t)!)
-            .OrderByDescending(static m => m.Priority)]);
-
-    public static IReadOnlyList<WhisperModel> All => AllLazy.Value;
+    // Explicit catalog — Assembly.GetTypes() loads FoundryLocalTranscriptionService and
+    // then Microsoft.AI.Foundry.Local, which AppHost must not pull (PrivateAssets + RID).
+    public static IReadOnlyList<WhisperModel> All { get; } =
+    [
+        new WhisperLargeV3Turbo(),
+        new WhisperSmall(),
+        new WhisperTiny(),
+    ];
 
     public static WhisperModel? FindById(string id)
         => All.FirstOrDefault(m => string.Equals(m.Id, id, StringComparison.OrdinalIgnoreCase));
