@@ -13,6 +13,7 @@ import 'package:record/record.dart';
 import 'package:uuid/uuid.dart';
 
 import '../brain_theme.dart';
+import 'brain_chat_composer.dart';
 import 'chat_contracts.dart';
 import 'stream_state_store.dart';
 import 'voice_file_io.dart' if (dart.library.html) 'voice_file_web.dart'
@@ -27,6 +28,7 @@ final class BrainChatScreen extends StatefulWidget {
     this.onSend,
     this.onStream,
     this.onStreamVoice,
+    this.onAttachmentTap,
     this.onOpenSignIn,
     this.onActivateButton,
   });
@@ -37,6 +39,7 @@ final class BrainChatScreen extends StatefulWidget {
   final SendMessage? onSend;
   final StreamMessage? onStream;
   final StreamVoice? onStreamVoice;
+  final VoidCallback? onAttachmentTap;
   final OpenUrl? onOpenSignIn;
   final ActivateChatButton? onActivateButton;
 
@@ -52,14 +55,13 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
 
   final _controller = InMemoryChatController();
   final _streamStates = StreamStateStore();
+  final _voice = VoiceComposerController();
   final _appliedSequences = <int>{};
   final _recorder = AudioRecorder();
   String? _pendingUserMessageId;
   String? _pendingUserText;
   String? _activeStreamId;
   String? _failure;
-  bool _recording = false;
-  bool _voiceBusy = false;
 
   @override
   void initState() {
@@ -220,11 +222,11 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
 
   Future<void> _toggleVoice() async {
     final streamVoice = widget.onStreamVoice;
-    if (streamVoice == null || _voiceBusy) {
+    if (streamVoice == null || _voice.busy) {
       return;
     }
 
-    if (_recording) {
+    if (_voice.recording) {
       await _stopAndSendVoice(streamVoice);
       return;
     }
@@ -234,6 +236,9 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
 
   Future<void> _startRecording() async {
     try {
+      if (await _recorder.isRecording()) {
+        await _recorder.stop();
+      }
       if (!await _recorder.hasPermission()) {
         if (mounted) {
           setState(() => _failure = 'Microphone permission denied.');
@@ -264,12 +269,11 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
       );
 
       if (mounted) {
-        setState(() {
-          _recording = true;
-          _failure = null;
-        });
+        _voice.update(recording: true);
+        setState(() => _failure = null);
       }
     } on Object catch (error) {
+      _voice.update(recording: false, busy: false);
       if (mounted) {
         setState(() => _failure = 'Record failed: $error');
       }
@@ -277,15 +281,16 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
   }
 
   Future<void> _stopAndSendVoice(StreamVoice streamVoice) async {
-    setState(() {
-      _recording = false;
-      _voiceBusy = true;
-      _failure = null;
-    });
+    _voice.update(recording: false, busy: true);
+    if (mounted) {
+      setState(() => _failure = null);
+    }
 
     String? path;
     try {
-      path = await _recorder.stop();
+      if (await _recorder.isRecording()) {
+        path = await _recorder.stop();
+      }
       if (path == null || path.isEmpty) {
         throw StateError('Recording produced no audio file.');
       }
@@ -307,6 +312,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
         ),
       );
 
+      _voice.update(busy: false);
       await _drainStream(streamVoice(bytes, fileName: 'voice.wav'));
     } on Object catch (error) {
       if (mounted) {
@@ -320,9 +326,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
           // best-effort temp cleanup
         }
       }
-      if (mounted) {
-        setState(() => _voiceBusy = false);
-      }
+      _voice.update(recording: false, busy: false);
     }
   }
 
@@ -368,6 +372,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
     unawaited(_recorder.dispose());
     _controller.dispose();
     _streamStates.dispose();
+    _voice.dispose();
     super.dispose();
   }
 
@@ -385,46 +390,55 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
               cards: widget.signInCards,
               onOpenSignIn: widget.onOpenSignIn,
             ),
-          if (_recording || _voiceBusy)
-            Material(
-              color: _recording
-                  ? BrainPalette.signal.withValues(alpha: 0.12)
-                  : BrainPalette.surfaceRaised,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _recording ? Icons.mic : Icons.hourglass_top,
-                      size: 18,
-                      color: _recording
-                          ? BrainPalette.signal
-                          : BrainPalette.textMuted,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _recording
-                            ? 'Recording… tap 📎 to stop and send'
-                            : 'Transcribing voice…',
-                        style: BrainType.meta.copyWith(
-                          color: _recording
-                              ? BrainPalette.signal
-                              : BrainPalette.textMuted,
+          ListenableBuilder(
+            listenable: _voice,
+            builder: (context, _) {
+              if (!_voice.recording && !_voice.busy) {
+                return const SizedBox.shrink();
+              }
+              return Material(
+                color: _voice.recording
+                    ? BrainPalette.signal.withValues(alpha: 0.12)
+                    : BrainPalette.surfaceRaised,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _voice.recording ? Icons.mic : Icons.hourglass_top,
+                        size: 18,
+                        color: _voice.recording
+                            ? BrainPalette.signal
+                            : BrainPalette.textMuted,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _voice.recording
+                              ? 'Recording… tap the mic to stop and send'
+                              : 'Sending voice…',
+                          style: BrainType.meta.copyWith(
+                            color: _voice.recording
+                                ? BrainPalette.signal
+                                : BrainPalette.textMuted,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
+          ),
           Expanded(
             child: ChangeNotifierProvider.value(
               value: _streamStates,
-              child: Chat(
+              child: ChangeNotifierProvider.value(
+                value: _voice,
+                child: Chat(
                 key: const Key('chat_surface'),
                 chatController: _controller,
                 currentUserId: ownerUserId,
@@ -435,8 +449,12 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
                 },
                 theme: BrainChatTheme.dark(),
                 onMessageSend: canSend ? _handleSend : null,
-                onAttachmentTap: canVoice ? () => unawaited(_toggleVoice()) : null,
+                onAttachmentTap: widget.onAttachmentTap,
                 builders: Builders(
+                  composerBuilder: (context) => BrainChatComposer(
+                    canVoice: canVoice,
+                    onVoiceTap: () => unawaited(_toggleVoice()),
+                  ),
                   textMessageBuilder:
                       (
                         context,
@@ -488,6 +506,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
                             ? null
                             : _onKitButton,
                       ),
+                ),
                 ),
               ),
             ),

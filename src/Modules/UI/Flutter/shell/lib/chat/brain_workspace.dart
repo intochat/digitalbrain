@@ -25,6 +25,7 @@ final class BrainWorkspace extends StatefulWidget {
     this.onSend,
     this.onStream,
     this.onStreamVoice,
+    this.onAttachmentTap,
     this.onOpenSignIn,
     this.onActivateButton,
     this.behaviorClient,
@@ -40,6 +41,7 @@ final class BrainWorkspace extends StatefulWidget {
   final SendMessage? onSend;
   final StreamMessage? onStream;
   final StreamVoice? onStreamVoice;
+  final VoidCallback? onAttachmentTap;
   final OpenUrl? onOpenSignIn;
   final ActivateChatButton? onActivateButton;
   final BehaviorClient? behaviorClient;
@@ -127,6 +129,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
             onSend: widget.onSend,
             onStream: widget.onStream,
             onStreamVoice: widget.onStreamVoice,
+            onAttachmentTap: widget.onAttachmentTap,
             onOpenSignIn: widget.onOpenSignIn,
             onActivateButton: widget.onActivateButton,
           ),
