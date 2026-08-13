@@ -2,6 +2,9 @@ using DigitalBrain.UI;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.UI.Aspire.Hosting;
 
@@ -110,10 +113,72 @@ public static class ShellHostingExtensions
                 .WithEnvironment(ShellEnvironmentVariable, shell)
                 .WithEnvironment(ChatEnvironmentVariable, chat);
 
+            if (appHost.ExecutionContext.IsRunMode && kind is FlutterHostKind.Window or FlutterHostKind.Web)
+            {
+                ArmHotReload(host, launch.WorkingDirectory);
+            }
+
             _flutterHost = host;
             _flutterKind = kind;
             _pendingShell = shell;
             _pendingChat = chat;
+        }
+
+        private static void ArmHotReload(IResourceBuilder<ExecutableResource> host, string workingDirectory)
+        {
+            var ddsPort = ShellNames.FlutterDdsPort;
+            var watchRoots = ResolveWatchRoots(workingDirectory);
+            host
+                .WithArgs(
+                    $"--dds-port={ddsPort}",
+                    $"--host-vmservice-port={ShellNames.FlutterVmServicePort}",
+                    "--disable-service-auth-codes")
+                .WithUrl("http://127.0.0.1:" + ddsPort + "/devtools", "DevTools")
+                .WithCommand(
+                    "hot-reload",
+                    "Hot Reload",
+                    async context =>
+                    {
+                        try
+                        {
+                            await FlutterVmService.ReloadAsync(ddsPort, context.CancellationToken)
+                                .ConfigureAwait(false);
+                            return CommandResults.Success();
+                        }
+                        catch (Exception ex)
+                        {
+                            return CommandResults.Failure(ex.Message);
+                        }
+                    },
+                    new CommandOptions
+                    {
+                        IconName = "ArrowSync",
+                        UpdateState = static context =>
+                            string.Equals(context.ResourceSnapshot.State?.Text, "Running", StringComparison.Ordinal)
+                                ? ResourceCommandState.Enabled
+                                : ResourceCommandState.Disabled,
+                    });
+
+            host.OnResourceReady((resource, @event, _) =>
+            {
+                var logger = @event.Services
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("DigitalBrain.FlutterHotReload");
+                var lifetime = @event.Services.GetRequiredService<IHostApplicationLifetime>();
+                FlutterHotReloadWatch.Start(watchRoots, ddsPort, logger, lifetime.ApplicationStopping);
+                return Task.CompletedTask;
+            });
+        }
+
+        private static string[] ResolveWatchRoots(string workingDirectory)
+        {
+            var family = Path.GetFullPath(Path.Combine(workingDirectory, ".."));
+            return
+            [
+                Path.Combine(workingDirectory, "lib"),
+                Path.Combine(family, "kit", "lib"),
+                Path.Combine(family, "core", "lib"),
+            ];
         }
 
         private string _pendingShell = DefaultShellName;

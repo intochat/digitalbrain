@@ -17,4 +17,8 @@ public static class ShellNames
     public const string DefaultWebDeviceTarget = "chrome";
     public const string WebPlatformDirectoryName = "web";
     public const string HttpEndpointName = "http";
+
+    // Local-only DDS so AppHost can hot-reload without scraping a new URI each run.
+    public const int FlutterDdsPort = 54721;
+    public const int FlutterVmServicePort = 54722;
 }
