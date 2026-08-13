@@ -92,4 +92,5 @@ Packet named Synapse. Broadcast ghosts from `IHandle<T>`. String morphs. Weights
 
 Exit: a typed Synapse can be installed, rewired, found as a Wiring, and applied for another Principal without copying private state.
 
-Scenarios that must stay speakable: [COREV2-SCENARIOS.md](COREV2-SCENARIOS.md).
+Scenarios that must stay speakable: [COREV2-SCENARIOS.md](COREV2-SCENARIOS.md).  
+Pseudocode for 2 and 5: [pseudocode.md](pseudocode.md).
