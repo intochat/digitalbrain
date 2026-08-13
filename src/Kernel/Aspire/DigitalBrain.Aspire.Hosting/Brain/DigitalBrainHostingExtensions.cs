@@ -1,15 +1,13 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Aspire.Hosting;
 
 public static class DigitalBrainHostingExtensions
 {
-    public static string JournalConnectionName => DigitalBrainResourceNames.JournalConnectionName;
+    public static string JournalConnectionName => DigitalBrainNames.JournalConnection;
 
-    public static string StateProtectionKeyConfigurationKey
-        => DigitalBrainResourceNames.StateProtectionKeyConfigurationKey;
+    public static string StateProtectionKeyConfigurationKey => DigitalBrainNames.StateProtectionKey;
 
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name)
     {
@@ -17,21 +15,21 @@ public static class DigitalBrainHostingExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         var storage = builder
-            .AddAzureStorage(DigitalBrainResourceNames.Storage)
+            .AddAzureStorage(DigitalBrainNames.Storage)
             .RunAsEmulator(static emulator => emulator
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent));
-        var clustering = storage.AddTables(DigitalBrainResourceNames.Clustering);
-        var reminders = storage.AddTables(DigitalBrainResourceNames.Reminders);
-        var journal = storage.AddBlobs(DigitalBrainResourceNames.JournalResource);
-        var streams = storage.AddQueues(DigitalBrainResourceNames.Streams);
-        var pubSub = storage.AddTables(DigitalBrainResourceNames.PubSub);
+        var clustering = storage.AddTables(DigitalBrainNames.Clustering);
+        var reminders = storage.AddTables(DigitalBrainNames.Reminders);
+        var journal = storage.AddBlobs(DigitalBrainNames.Journal);
+        var streams = storage.AddQueues(DigitalBrainNames.Streams);
+        var pubSub = storage.AddTables(DigitalBrainNames.PubSub);
         var orleans = builder
             .AddOrleans(name)
             .WithClustering(clustering)
             .WithReminders(reminders)
-            .WithGrainStorage(DigitalBrainResourceNames.PubSubStoreName, pubSub)
-            .WithStreaming(DigitalBrainResourceNames.StreamProviderName, streams);
+            .WithGrainStorage(DigitalBrainNames.PubSubStore, pubSub)
+            .WithStreaming(DigitalBrainNames.StreamProvider, streams);
         var brain = new DigitalBrainBuilder(builder, name, orleans, journal, streams, pubSub);
 
         // Silo and clients WaitUntilHealthy for the full fabric before starting.
@@ -89,7 +87,7 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(brain);
 
         builder.WithReference(brain.Orleans);
-        builder.WithReference(brain.Journal, DigitalBrainResourceNames.JournalConnectionName);
+        builder.WithReference(brain.Journal, DigitalBrainNames.JournalConnection);
         builder.WithReference(brain.Streams);
         builder.WithReference(brain.PubSub);
 
@@ -98,7 +96,7 @@ public static class DigitalBrainHostingExtensions
         if (brain.StateProtectionKey is not null)
         {
             builder.WithEnvironment(
-                ConfigurationEnvironment(DigitalBrainResourceNames.StateProtectionKeyConfigurationKey),
+                ConfigurationEnvironment(DigitalBrainNames.StateProtectionKey),
                 brain.StateProtectionKey);
         }
 
@@ -146,7 +144,7 @@ public static class DigitalBrainHostingExtensions
         if (brain.StateProtectionKey is not null)
         {
             builder.WithEnvironment(
-                ConfigurationEnvironment(DigitalBrainResourceNames.StateProtectionKeyConfigurationKey),
+                ConfigurationEnvironment(DigitalBrainNames.StateProtectionKey),
                 brain.StateProtectionKey);
         }
 

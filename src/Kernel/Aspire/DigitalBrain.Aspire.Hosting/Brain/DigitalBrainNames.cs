@@ -1,19 +1,17 @@
-using DigitalBrain.Abstractions;
-
 namespace DigitalBrain.Aspire.Hosting;
 
-// AppHost-facing aliases over Abstractions resource names (single product vocabulary).
+// Must stay aligned with DigitalBrain.Aspire.DigitalBrainResourceNames — Hosting cannot reference that package.
 public static class DigitalBrainNames
 {
-    public const string DefaultBrain = DigitalBrainResourceNames.DefaultBrainName;
-    public const string Storage = DigitalBrainResourceNames.Storage;
-    public const string Clustering = DigitalBrainResourceNames.Clustering;
-    public const string Reminders = DigitalBrainResourceNames.Reminders;
-    public const string Journal = DigitalBrainResourceNames.JournalResource;
-    public const string Streams = DigitalBrainResourceNames.Streams;
-    public const string PubSub = DigitalBrainResourceNames.PubSub;
-    public const string JournalConnection = DigitalBrainResourceNames.JournalConnectionName;
-    public const string StreamProvider = DigitalBrainResourceNames.StreamProviderName;
-    public const string PubSubStore = DigitalBrainResourceNames.PubSubStoreName;
-    public const string StateProtectionKey = DigitalBrainResourceNames.StateProtectionKeyConfigurationKey;
+    public const string DefaultBrain = "brain";
+    public const string Storage = "storage";
+    public const string Clustering = "clustering";
+    public const string Reminders = "reminders";
+    public const string Journal = "journal";
+    public const string Streams = "streams";
+    public const string PubSub = "pubsub";
+    public const string JournalConnection = "journal";
+    public const string StreamProvider = "DigitalBrain";
+    public const string PubSubStore = "PubSubStore";
+    public const string StateProtectionKey = "DigitalBrain:Security:StateProtectionKey";
 }

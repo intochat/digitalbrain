@@ -1,5 +1,6 @@
-namespace DigitalBrain.Abstractions;
+namespace DigitalBrain.Aspire;
 
+// Must stay aligned with DigitalBrain.Aspire.Hosting.DigitalBrainNames — the silo/client package cannot reference Hosting.
 public static class DigitalBrainResourceNames
 {
     public const string DefaultBrainName = "brain";

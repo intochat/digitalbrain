@@ -1,5 +1,5 @@
 using Azure.Data.Tables;
-using DigitalBrain.Abstractions;
+using DigitalBrain.Aspire;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
