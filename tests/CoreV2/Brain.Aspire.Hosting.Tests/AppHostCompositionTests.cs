@@ -16,6 +16,7 @@ public sealed class AppHostCompositionTests
         Assert.Contains("runtime", resources.Keys);
         Assert.Contains("product", resources.Keys);
         Assert.Contains("flutter", resources.Keys);
+        Assert.Single(resources["product"].Annotations.OfType<McpServerEndpointAnnotation>());
         Assert.Contains(
             resources["product"].Annotations.OfType<WaitAnnotation>(),
             annotation => annotation.Resource.Name == "runtime");

@@ -19,6 +19,7 @@ builder
     .AddProject<Projects.DigitalBrain_ProductHost>(ProductResources.Product)
     .WithReference(brain.AsClient())
     .WithHttpEndpoint(name: ProductResources.HttpEndpoint)
+    .WithMcpServer("/mcp", endpointName: ProductResources.HttpEndpoint)
     .WithHttpHealthCheck("/health", endpointName: ProductResources.HttpEndpoint)
     .WaitFor(runtime);
 

@@ -2,6 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);ASPIREMCP001</NoWarn>
     <UserSecretsId>digitalbrain-corev2-apphost-5d79b5c8-c54e-4f65-895f-e7e3b8a709b4</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
