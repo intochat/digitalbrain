@@ -243,7 +243,7 @@ public sealed class AuthorityBoundaryTests
     }
 
     [Fact]
-    public void Product_host_remains_a_library_only_open_source_container_when_catalog_is_added()
+    public void Product_host_is_promoted_to_the_open_source_executable_composition_root()
     {
         var root = RepositoryRoot();
         var productHostDirectory = Path.Combine(root, "src", "CoreV2", "DigitalBrain.ProductHost");
@@ -258,15 +258,15 @@ public sealed class AuthorityBoundaryTests
                 && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
-        Assert.Equal("Microsoft.NET.Sdk", (string?)project.Root?.Attribute("Sdk"));
-        Assert.DoesNotContain(project.Descendants("OutputType"), static element => element.Value == "Exe");
+        Assert.Equal("Microsoft.NET.Sdk.Web", (string?)project.Root?.Attribute("Sdk"));
+        Assert.Contains(project.Descendants("OutputType"), static element => element.Value == "Exe");
         Assert.Equal(
             [
                 "../Brain.Product.Abstractions/Brain.Product.Abstractions.csproj",
                 "../Brain.Core/Brain.Core.csproj",
             ],
             projectReferences);
-        Assert.DoesNotContain(sourceFiles, static path => Path.GetFileName(path).Equals("Program.cs", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(sourceFiles, static path => Path.GetFileName(path).Equals("Program.cs", StringComparison.OrdinalIgnoreCase));
         Assert.All(sourceFiles, path => Assert.DoesNotContain("IntoChat", File.ReadAllText(path), StringComparison.OrdinalIgnoreCase));
     }
 
