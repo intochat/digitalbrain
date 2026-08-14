@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-14
 
-**Status:** Approved for autonomous implementation
+**Status:** Superseded by `2026-08-14-corev2-journal-chat-design.md`
 
 ## Outcome
 
