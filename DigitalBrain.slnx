@@ -7,6 +7,7 @@
     <Project Path="src/CoreV2/Brain.Testing/Brain.Testing.csproj" />
     <Project Path="src/CoreV2/Aspire/Brain.ServiceDefaults/Brain.ServiceDefaults.csproj" />
     <Project Path="src/CoreV2/Aspire/Brain.Aspire.Hosting/Brain.Aspire.Hosting.csproj" />
+    <Project Path="src/CoreV2/Aspire/Brain.Aspire/Brain.Aspire.csproj" />
     <Project Path="src/CoreV2/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
     <Project Path="src/CoreV2/Modules/Proof.Contracts/Brain.Modules.Proof.Contracts.csproj" />
     <Project Path="src/CoreV2/Modules/Proof/Brain.Modules.Proof.csproj" />

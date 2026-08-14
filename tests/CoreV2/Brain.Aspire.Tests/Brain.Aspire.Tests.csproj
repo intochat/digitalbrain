@@ -11,6 +11,7 @@
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../../src/CoreV2/Aspire/Brain.Aspire/Brain.Aspire.csproj" />
     <ProjectReference Include="../../../src/CoreV2/Aspire/Brain.ServiceDefaults/Brain.ServiceDefaults.csproj" />
   </ItemGroup>
 </Project>
