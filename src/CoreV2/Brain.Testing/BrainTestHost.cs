@@ -26,12 +26,13 @@ using Brain.Core.Wiring;
 using Brain.Modules.Proof;
 using Brain.Modules.Proof.Contracts;
 using Brain.Testing.Fixtures;
+using Orleans.TestingHost;
 using TestCapability = Brain.Testing.Fakes.DeterministicCapability;
 using TestCapabilityInput = Brain.Testing.Fakes.ProofCapabilityInput;
 
 namespace Brain.Testing;
 
-public sealed class BrainTestHost : IAsyncDisposable, IActivityPayloadReader
+public sealed class BrainTestHost : IAsyncDisposable, IActivityPayloadReader, IProofRouteService, IProofActivityCompletion, IProofDeliveryPump
 {
     private readonly WorkspaceFixture _callers = new();
     private readonly ModuleSet _modules;
@@ -43,16 +44,18 @@ public sealed class BrainTestHost : IAsyncDisposable, IActivityPayloadReader
     private readonly ConcurrentDictionary<EndpointAddress, ProofReceiverNeuron> _receivers = new();
     private readonly ConcurrentDictionary<EndpointAddress, InMemoryOutboxStore<int>> _stores = new();
     private readonly ConcurrentDictionary<string, SynapseKey> _routes = new();
+    private readonly ConcurrentDictionary<DeliveryId, ActivityContext> _deliveryActivities = new();
     private readonly InMemoryFiringPayloadStore _payloads;
     private readonly ReshapeRegistry _reshapes;
     private readonly DeliveryDispatcher _deliveries;
     private readonly TestCapability _capability = new();
     private readonly CapabilityBroker _capabilities;
     private readonly OperationGateway _operations;
-    private BrainActivityId _deliveringActivity;
+    private readonly TestCluster _cluster;
 
-    private BrainTestHost()
+    private BrainTestHost(TestCluster cluster)
     {
+        _cluster = cluster ?? throw new ArgumentNullException(nameof(cluster));
         var classifierModule = new ModuleManifest(
             new ModuleId("proof.classifier"), new ModuleVersion(1, 0, 0), [], [], [], [], [], [],
             [ProofContracts.ClassifierCapability], []);
@@ -89,7 +92,12 @@ public sealed class BrainTestHost : IAsyncDisposable, IActivityPayloadReader
 
     public IReadOnlyList<string> RewireEvidence { get; private set; } = [];
 
-    public static Task<BrainTestHost> StartAsync() => Task.FromResult(new BrainTestHost());
+    public static async Task<BrainTestHost> StartAsync()
+    {
+        var cluster = new TestClusterBuilder(1).Build();
+        await cluster.DeployAsync();
+        return new BrainTestHost(cluster);
+    }
 
     public WorkspaceContext Caller(string workspace, string principal) => _callers.Caller(workspace, principal);
 
@@ -118,7 +126,7 @@ public sealed class BrainTestHost : IAsyncDisposable, IActivityPayloadReader
             : throw new KeyNotFoundException("No typed result is available for this activity reference.");
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync() => _cluster.DisposeAsync();
 
     private async Task DispatchRunAsync(
         EndpointAddress endpoint,
@@ -126,23 +134,11 @@ public sealed class BrainTestHost : IAsyncDisposable, IActivityPayloadReader
         ActivityContext context,
         CancellationToken cancellationToken)
     {
-        await EnsureRouteAsync(context, "summary", cancellationToken);
         var source = Endpoint(ProofContracts.SourceRole, invocation.Caller);
-        var entry = new ProofEntryNeuron(endpoint, Store(endpoint), new GraphResolver(_graph, _modules, _policy), Time);
-        await entry.AcceptAsync(invocation.Input, source, context, cancellationToken);
-
-        var classified = await _capabilities.UseAsync<ProofCapabilityInput, ProofCapabilityResult>(
-            ProofContracts.ClassifierCapability,
-            new CapabilityUseName("proof-classification"),
-            new ProofCapabilityInput(invocation.Input.Value),
-            new ActivityContext(context.Workspace, context.Principal, context.Activity, context.Correlation, new Delegation([], [ProofContracts.Classifier])),
-            cancellationToken);
-        var sourceNeuron = new ProofSourceNeuron(source, Store(source), new GraphResolver(_graph, _modules, _policy), Time);
-        await sourceNeuron.EmitAsync(new ProofInput(classified.Route), context, cancellationToken);
-        var emission = Store(source).Emissions[^1];
-        _payloads.Record(emission.Firing, emission.EventContract, emission.Source, new ProofProduced(classified.Route));
-        _deliveringActivity = context.Activity;
-        await _deliveries.DispatchAsync(emission, cancellationToken);
+        var resolver = new GraphResolver(_graph, _modules, _policy);
+        var sourceNeuron = new ProofSourceNeuron(source, Store(source), resolver, this, Time);
+        var entry = new ProofEntryNeuron(endpoint, Store(endpoint), resolver, _capabilities, this, sourceNeuron, Time);
+        await entry.AcceptAsync(invocation.Input, context, cancellationToken);
     }
 
     private async Task<ProofCapabilityResult> InvokeClassifierAsync(ProofCapabilityInput input, CancellationToken cancellationToken)
@@ -157,15 +153,24 @@ public sealed class BrainTestHost : IAsyncDisposable, IActivityPayloadReader
         ActivityContext context,
         CancellationToken cancellationToken)
     {
-        _ = endpoint;
-        if (invocation.Input.RequestedRoute is not ("summary" or "assessment"))
-        {
-            throw new ArgumentException("The requested proof route is not supported.", nameof(invocation));
-        }
+        var correction = new ProofCorrectionEntryNeuron(
+            endpoint,
+            Store(endpoint),
+            new GraphResolver(_graph, _modules, _policy),
+            this,
+            this,
+            Time);
+        await correction.AcceptAsync(invocation.Input, context, cancellationToken);
+    }
 
-        await EnsureRouteAsync(context, invocation.Input.RequestedRoute, cancellationToken, replace: true);
-        RewireEvidence = [.. RewireEvidence, "proof-rewire:" + invocation.Input.RequestedRoute];
-        Complete(context.Activity, new CorrectionResult(invocation.Input.RequestedRoute), ProofContracts.CorrectionResult);
+    async Task IProofRouteService.EnsureInitialAsync(ActivityContext context, CancellationToken cancellationToken)
+        => await EnsureRouteAsync(context, "summary", cancellationToken);
+
+    async Task<CorrectionResult> IProofRouteService.ReplaceAsync(ActivityContext context, string requestedRoute, CancellationToken cancellationToken)
+    {
+        await EnsureRouteAsync(context, requestedRoute, cancellationToken, replace: true);
+        RewireEvidence = [.. RewireEvidence, "proof-rewire:" + requestedRoute];
+        return new CorrectionResult(requestedRoute);
     }
 
     private async Task EnsureRouteAsync(ActivityContext context, string requestedRoute, CancellationToken cancellationToken, bool replace = false)
@@ -201,6 +206,26 @@ public sealed class BrainTestHost : IAsyncDisposable, IActivityPayloadReader
     private InMemoryOutboxStore<int> Store(EndpointAddress endpoint)
         => _stores.GetOrAdd(endpoint, _ => new InMemoryOutboxStore<int>(0));
 
+    Task IProofActivityCompletion.CompleteAsync(ActivityContext context, object result, ContractId contract)
+    {
+        Complete(context.Activity, result, contract);
+        return Task.CompletedTask;
+    }
+
+    async Task IProofDeliveryPump.DispatchAsync(OutboxEntry entry, ProofProduced payload, CancellationToken cancellationToken)
+    {
+        _payloads.Record(entry.Firing, entry.EventContract, entry.Source, payload);
+        foreach (var snapshot in entry.Deliveries)
+        {
+            if (!_deliveryActivities.TryAdd(snapshot.Delivery, entry.Activity))
+            {
+                throw new InvalidOperationException("A proof delivery must preserve one immutable activity identity.");
+            }
+        }
+
+        await _deliveries.DispatchAsync(entry, cancellationToken);
+    }
+
     private void Complete(BrainActivityId activity, object result, ContractId contract)
     {
         var reference = new ActivityPayloadReference("result/" + activity.Value.ToString("N"));
@@ -208,10 +233,14 @@ public sealed class BrainTestHost : IAsyncDisposable, IActivityPayloadReader
         new BrainActivityGrain(_activities, activity).Complete(new ActivityResultReference(contract, reference));
     }
 
-    private Task CompleteFromReceiverAsync(ProofResult result)
+    private Task CompleteDeliveryAsync(DeliverySnapshot snapshot, ProofResult result)
     {
-        Complete(_deliveringActivity, result, ProofContracts.Result);
-        return Task.CompletedTask;
+        if (!_deliveryActivities.TryRemove(snapshot.Delivery, out var context))
+        {
+            throw new InvalidOperationException("No immutable activity context was associated with the proof delivery.");
+        }
+
+        return ((IProofActivityCompletion)this).CompleteAsync(context, result, ProofContracts.Result);
     }
 
     private static ReshapeId ReshapeIdForProducedAssessment()
@@ -246,7 +275,7 @@ public sealed class BrainTestHost : IAsyncDisposable, IActivityPayloadReader
         public IDeliveryReceiver Resolve(EndpointAddress target) => receivers.GetOrAdd(target, endpoint =>
         {
             var assessment = endpoint.Role == ProofContracts.AssessmentRole;
-            return new ProofReceiverNeuron(endpoint, assessment ? ProofContracts.Assessed : ProofContracts.Produced, assessment ? "assessment" : "summary", host.CompleteFromReceiverAsync);
+            return new ProofReceiverNeuron(endpoint, assessment ? ProofContracts.Assessed : ProofContracts.Produced, assessment ? "assessment" : "summary", host.CompleteDeliveryAsync);
         });
     }
 

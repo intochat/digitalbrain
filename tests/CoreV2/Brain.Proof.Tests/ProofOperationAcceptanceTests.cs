@@ -82,6 +82,24 @@ public sealed class ProofOperationAcceptanceTests
 
         Assert.Equal("assessment", result.Route);
     }
+
+    [Fact]
+    public async Task concurrent_callers_observe_their_own_terminal_results()
+    {
+        await using var host = await BrainTestHost.StartAsync();
+        var alice = host.Caller("workspace/proof", "principal/alice");
+        var bob = host.Caller("workspace/proof", "principal/bob");
+
+        var accepted = await Task.WhenAll(
+            host.Operations.InvokeAsync<ProofInput, ProofResult>(ProofContracts.Run, new ProofInput("alice"), alice, new IdempotencyKey("proof/alice"), TestContext.Current.CancellationToken),
+            host.Operations.InvokeAsync<ProofInput, ProofResult>(ProofContracts.Run, new ProofInput("bob"), bob, new IdempotencyKey("proof/bob"), TestContext.Current.CancellationToken));
+
+        var aliceView = await host.Operations.ObserveAsync(accepted[0].Activity, alice, TestContext.Current.CancellationToken);
+        var bobView = await host.Operations.ObserveAsync(accepted[1].Activity, bob, TestContext.Current.CancellationToken);
+
+        Assert.Equal("summary", (await host.ReadResultAsync<ProofResult>(aliceView, alice)).Route);
+        Assert.Equal("summary", (await host.ReadResultAsync<ProofResult>(bobView, bob)).Route);
+    }
 }
 
 #pragma warning restore IDE1006

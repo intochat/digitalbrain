@@ -10,9 +10,9 @@ namespace Brain.Modules.Proof;
 internal sealed class ProofReceiverNeuron : IDeliveryReceiver
 {
     private readonly InMemoryReceiverDeliveryStore<ProofResult?> _store = new(null);
-    private readonly Func<ProofResult, Task> _complete;
+    private readonly Func<DeliverySnapshot, ProofResult, Task> _complete;
 
-    internal ProofReceiverNeuron(EndpointAddress endpoint, ContractId acceptedContract, string route, Func<ProofResult, Task> complete)
+    internal ProofReceiverNeuron(EndpointAddress endpoint, ContractId acceptedContract, string route, Func<DeliverySnapshot, ProofResult, Task> complete)
     {
         Endpoint = endpoint;
         AcceptedContract = acceptedContract;
@@ -37,7 +37,7 @@ internal sealed class ProofReceiverNeuron : IDeliveryReceiver
         var applied = await _store.DeliverAsync(snapshot, domainEvent, new Handler(result), cancellationToken);
         if (applied.Applied)
         {
-            await _complete(result);
+            await _complete(snapshot, result);
         }
 
         return applied;

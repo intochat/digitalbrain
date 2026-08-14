@@ -10,13 +10,16 @@ internal sealed class ProofSourceNeuron(
     EndpointAddress endpoint,
     InMemoryOutboxStore<int> store,
     IGraphRouteResolver routes,
+    IProofDeliveryPump deliveries,
     TimeProvider clock)
     : BrainNeuron<int>(endpoint, store, routes, clock)
 {
-    internal Task EmitAsync(ProofInput input, ActivityContext activity, CancellationToken cancellationToken)
+    internal EndpointAddress Address { get; } = endpoint;
+
+    internal async Task EmitAsync(ProofInput input, ActivityContext activity, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(input);
-        return ExecuteTurnAsync(
+        await ExecuteTurnAsync(
             activity,
             async turn =>
             {
@@ -25,5 +28,6 @@ internal sealed class ProofSourceNeuron(
                 return 0;
             },
             cancellationToken);
+        await deliveries.DispatchAsync(store.Emissions[^1], new ProofProduced(input.Value), cancellationToken);
     }
 }
