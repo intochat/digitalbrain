@@ -19,31 +19,17 @@ abstract interface class DigitalBrainProductApi {
 }
 
 final class DigitalBrainProductClient implements DigitalBrainProductApi {
-  DigitalBrainProductClient({
-    required this.baseUri,
-    http.Client? httpClient,
-    this.workspace = 'local',
-    this.principal = 'owner',
-  }) : _http = httpClient ?? http.Client(),
-       _ownsClient = httpClient == null;
+  DigitalBrainProductClient({required this.baseUri, http.Client? httpClient})
+    : _http = httpClient ?? http.Client(),
+      _ownsClient = httpClient == null;
 
   final Uri baseUri;
-  final String workspace;
-  final String principal;
   final http.Client _http;
   final bool _ownsClient;
 
-  Map<String, String> get _callerHeaders => {
-    'X-DigitalBrain-Workspace': workspace,
-    'X-DigitalBrain-Principal': principal,
-  };
-
   @override
   Future<List<ProductModule>> getModules() async {
-    final response = await _http.get(
-      _uri('/v2/modules'),
-      headers: _callerHeaders,
-    );
+    final response = await _http.get(_uri('/v2/modules'));
     final values = _requireList(response, 'module discovery');
     return values
         .map(
@@ -55,10 +41,7 @@ final class DigitalBrainProductClient implements DigitalBrainProductApi {
 
   @override
   Future<List<ProductOperation>> getOperations() async {
-    final response = await _http.get(
-      _uri('/v2/operations'),
-      headers: _callerHeaders,
-    );
+    final response = await _http.get(_uri('/v2/operations'));
     final values = _requireList(response, 'operation discovery');
     return values
         .map(
@@ -79,7 +62,6 @@ final class DigitalBrainProductClient implements DigitalBrainProductApi {
     final response = await _http.post(
       _uri('/v2/operations/$encoded:invoke'),
       headers: {
-        ..._callerHeaders,
         'content-type': 'application/json',
         'Idempotency-Key': idempotencyKey,
       },
@@ -95,10 +77,7 @@ final class DigitalBrainProductClient implements DigitalBrainProductApi {
 
   @override
   Future<ProductActivity> getActivity(String activityId) async {
-    final response = await _http.get(
-      _uri('/v2/activities/$activityId'),
-      headers: _callerHeaders,
-    );
+    final response = await _http.get(_uri('/v2/activities/$activityId'));
     return ProductActivity.fromJson(_requireObject(response, 'activity read'));
   }
 
@@ -107,10 +86,10 @@ final class DigitalBrainProductClient implements DigitalBrainProductApi {
     String activityId, {
     int afterSequence = 0,
   }) async* {
-    final request =
-        http.Request('GET', _uri('/v2/activities/$activityId/events'))
-          ..headers.addAll(_callerHeaders)
-          ..headers['accept'] = 'text/event-stream';
+    final request = http.Request(
+      'GET',
+      _uri('/v2/activities/$activityId/events'),
+    )..headers['accept'] = 'text/event-stream';
     if (afterSequence > 0) {
       request.headers['Last-Event-ID'] = '$afterSequence';
     }

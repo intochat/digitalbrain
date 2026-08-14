@@ -31,6 +31,8 @@ public sealed class ProductProtocolEndpointTests
             Content = JsonContent.Create(new { input = new { value = "hello" } }),
         };
         request.Headers.Add("Idempotency-Key", "request-1");
+        request.Headers.Add("X-DigitalBrain-Workspace", "attacker-workspace");
+        request.Headers.Add("X-DigitalBrain-Principal", "attacker-principal");
         var invoked = await client.SendAsync(request, cancellationToken);
         var activity = await client.GetFromJsonAsync<RuntimeActivitySnapshot>(
             $"/v2/activities/{activityId:N}", cancellationToken);

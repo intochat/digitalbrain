@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 
 namespace DigitalBrain.ProductHost.Protocol;
@@ -7,24 +8,21 @@ public sealed record ProductCaller(string Workspace, string Principal)
     public static ProductCaller From(HttpContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var workspace = HeaderOrDefault(context, "X-DigitalBrain-Workspace", "local");
-        var principal = HeaderOrDefault(context, "X-DigitalBrain-Principal", "owner");
+        if (context.User.Identity?.IsAuthenticated != true)
+        {
+            return new ProductCaller("local", "owner");
+        }
+
+        var workspace = context.User.FindFirstValue("brain_workspace");
+        var principal = context.User.FindFirstValue("sub")
+            ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(workspace) || string.IsNullOrWhiteSpace(principal))
+        {
+            throw new BadHttpRequestException(
+                "The authenticated caller has no DigitalBrain workspace or subject claim.",
+                StatusCodes.Status401Unauthorized);
+        }
+
         return new ProductCaller(workspace, principal);
-    }
-
-    private static string HeaderOrDefault(HttpContext context, string name, string fallback)
-    {
-        var value = context.Request.Headers[name].ToString().Trim();
-        if (value.Length == 0)
-        {
-            return fallback;
-        }
-
-        if (value.Length > 128 || value.Any(char.IsControl))
-        {
-            throw new BadHttpRequestException($"Header '{name}' is invalid.");
-        }
-
-        return value;
     }
 }
