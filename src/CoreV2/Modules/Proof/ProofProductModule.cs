@@ -32,8 +32,10 @@ public sealed class ProofProductModule : IRuntimeProductModule
     public Task<string> ExecuteAsync(
         string operationId,
         string inputJson,
+        RuntimeModuleExecutionContext context,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
         if (!string.Equals(operationId, ProofContracts.Run.Id.Value, StringComparison.Ordinal))
         {

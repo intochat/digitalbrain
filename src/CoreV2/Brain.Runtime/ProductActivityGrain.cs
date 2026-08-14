@@ -81,7 +81,15 @@ public sealed class ProductActivityGrain(
         try
         {
             _state.State.ResultJson = await _operations[_state.State.OperationId]
-                .ExecuteAsync(_state.State.OperationId, _state.State.InputJson, CancellationToken.None);
+                .ExecuteAsync(
+                    _state.State.OperationId,
+                    _state.State.InputJson,
+                    new RuntimeModuleExecutionContext(
+                        this.GetPrimaryKey(),
+                        _state.State.Workspace,
+                        _state.State.Principal,
+                        _state.State.IdempotencyKey),
+                    CancellationToken.None);
             _state.State.Status = RuntimeActivityStatus.Completed;
             _state.State.Problem = null;
         }

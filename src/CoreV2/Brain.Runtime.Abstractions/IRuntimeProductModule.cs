@@ -6,5 +6,9 @@ public interface IRuntimeProductModule
 
     IReadOnlyList<RuntimeOperationDescriptor> Operations { get; }
 
-    Task<string> ExecuteAsync(string operationId, string inputJson, CancellationToken cancellationToken);
+    Task<string> ExecuteAsync(
+        string operationId,
+        string inputJson,
+        RuntimeModuleExecutionContext context,
+        CancellationToken cancellationToken);
 }
