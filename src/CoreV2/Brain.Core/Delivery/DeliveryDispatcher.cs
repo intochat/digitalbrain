@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Brain.Abstractions.Contracts;
 using Brain.Abstractions.Events;
 using Brain.Core.Endpoints;
+using Brain.Core.Modules;
 using Brain.Core.Outbox;
 using Brain.Core.Reshapes;
 
@@ -9,21 +10,31 @@ namespace Brain.Core.Delivery;
 
 internal interface IFiringPayloadStore
 {
-    void Record<TEvent>(FiringId firing, ContractId contract, TEvent domainEvent)
+    void Record<TEvent>(FiringId firing, ContractId contract, EndpointAddress source, TEvent domainEvent)
         where TEvent : IDomainEvent;
 
     IDomainEvent Read(FiringId firing, ContractId contract);
 }
 
-internal sealed class InMemoryFiringPayloadStore : IFiringPayloadStore
+internal sealed class InMemoryFiringPayloadStore(ModuleSet modules) : IFiringPayloadStore
 {
+    private readonly ModuleSet _modules = modules ?? throw new ArgumentNullException(nameof(modules));
     private readonly ConcurrentDictionary<FiringPayloadKey, IDomainEvent> _payloads = new();
 
-    public void Record<TEvent>(FiringId firing, ContractId contract, TEvent domainEvent)
+    public void Record<TEvent>(FiringId firing, ContractId contract, EndpointAddress source, TEvent domainEvent)
         where TEvent : IDomainEvent
     {
         ArgumentNullException.ThrowIfNull(domainEvent);
+        RuntimeRecordValidation.Endpoint(source, nameof(source));
         RuntimeRecordValidation.Contract(contract, nameof(contract));
+        var declared = _modules.EventIndex.TryGetValue(contract.Value, out var descriptor)
+            ? descriptor
+            : throw new InvalidOperationException($"No declared event matches payload contract '{contract}'.");
+        if (descriptor.EventType != typeof(TEvent) || descriptor.Owner != source.Module)
+        {
+            throw new InvalidOperationException("A firing payload must match its declared event CLR type and source owner.");
+        }
+
         if (!_payloads.TryAdd(new FiringPayloadKey(firing, contract), domainEvent))
         {
             throw new InvalidOperationException("A firing payload is immutable once recorded for its declared contract.");
@@ -52,9 +63,7 @@ internal interface IDeliveryReceiver
 
     ContractId AcceptedContract { get; }
 
-    IDeliveryReceiverState DeliveryState { get; }
-
-    Task ApplyAsync(DeliverySnapshot snapshot, IDomainEvent domainEvent, CancellationToken cancellationToken);
+    Task<ReceiverDeliveryResult> DeliverAsync(DeliverySnapshot snapshot, IDomainEvent domainEvent, CancellationToken cancellationToken);
 }
 
 internal readonly record struct DeliveryDispatchResult(int DeliveredCount, int DuplicateCount)
@@ -114,26 +123,12 @@ internal sealed class DeliveryDispatcher(
             throw new InvalidOperationException("A delivery without a reshape must preserve its input contract.");
         }
 
-        if (!receiver.DeliveryState.TryBegin(snapshot.Delivery))
-        {
-            return new DeliveryDispatchResult(0, 1);
-        }
-
-        try
-        {
-            var delivered = snapshot.Reshape is { }
-                ? _reshapes.Transform(snapshot, payload)
-                : payload;
-            await receiver.ApplyAsync(snapshot, delivered, cancellationToken).ConfigureAwait(false);
-            receiver.DeliveryState.Complete(snapshot.Delivery);
-            return new DeliveryDispatchResult(1, 0);
-        }
-        catch
-        {
-            // Receiver application and delivery marker must commit together. The in-memory
-            // seam has no partial receiver effect on failure, so its reservation is released.
-            receiver.DeliveryState.Abandon(snapshot.Delivery);
-            throw;
-        }
+        var delivered = snapshot.Reshape is { }
+            ? _reshapes.Transform(snapshot, payload)
+            : payload;
+        var result = await receiver.DeliverAsync(snapshot, delivered, cancellationToken).ConfigureAwait(false);
+        return result.Applied
+            ? new DeliveryDispatchResult(1, 0)
+            : new DeliveryDispatchResult(0, 1);
     }
 }

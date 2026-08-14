@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Brain.Abstractions.Context;
 using Brain.Abstractions.Contracts;
 using Brain.Abstractions.Events;
@@ -65,11 +64,6 @@ internal abstract class BrainNeuron<TState>
             .ConfigureAwait(false);
         ArgumentNullException.ThrowIfNull(routes);
 
-        var snapshots = routes.Select(static route =>
-        {
-            ArgumentNullException.ThrowIfNull(route);
-            return route.ToDeliverySnapshot();
-        }).ToImmutableArray();
-        return turn.StageEmission(eventContract, snapshots);
+        return turn.StageEmission(eventContract, routes);
     }
 }

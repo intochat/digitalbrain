@@ -43,15 +43,20 @@ internal sealed class GraphRoute
 
     public ReshapeId? Reshape { get; set; }
 
-    internal DeliverySnapshot ToDeliverySnapshot()
-        => new(
-            DeliveryId.New(),
-            ValidTarget(),
-            ValidSynapse(),
-            ValidRevision(),
+    internal DeliverySnapshot ToDeliverySnapshot(FiringId firing)
+    {
+        var target = ValidTarget();
+        var synapse = ValidSynapse();
+        var revision = ValidRevision();
+        return new DeliverySnapshot(
+            DeliveryId.Derive(firing, synapse, revision),
+            target,
+            synapse,
+            revision,
             ValidInputContract(),
             ValidOutputContract(),
             ValidReshape());
+    }
 
     private EndpointAddress ValidTarget()
     {
@@ -162,16 +167,22 @@ internal sealed class NeuronTurn<TState>
 
     internal EmissionOutcome StageEmission(
         ContractId eventContract,
-        ImmutableArray<DeliverySnapshot> deliveries,
+        IReadOnlyList<GraphRoute> routes,
         FiringId? causeFiring = null)
     {
         RuntimeRecordValidation.Contract(eventContract, nameof(eventContract));
+        ArgumentNullException.ThrowIfNull(routes);
+        var firing = FiringId.New();
+        var deliveries = routes.Select(route =>
+        {
+            ArgumentNullException.ThrowIfNull(route);
+            return route.ToDeliverySnapshot(firing);
+        }).ToImmutableArray();
         foreach (var delivery in deliveries)
         {
             delivery.EnsureValid();
         }
 
-        var firing = FiringId.New();
         var eventId = EventId.New();
         var timestamp = Clock.GetUtcNow();
         _journal.Add(new JournalEntry(

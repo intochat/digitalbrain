@@ -2,12 +2,17 @@ using System.Collections.Immutable;
 using Brain.Abstractions.Context;
 using Brain.Abstractions.Contracts;
 using Brain.Abstractions.Events;
+using Brain.Abstractions.Graph;
 using Brain.Abstractions.Identity;
 using Brain.Abstractions.Modules;
+using Brain.Abstractions.Policy;
 using Brain.Core.Delivery;
 using Brain.Core.Endpoints;
+using Brain.Core.Graph;
+using Brain.Core.Modules;
 using Brain.Core.Neurons;
 using Brain.Core.Outbox;
+using Brain.Core.Policy;
 using Brain.Core.Reshapes;
 using Xunit;
 
@@ -29,19 +34,6 @@ public sealed class DeliveryDispatcherTests
     }
 
     [Fact]
-    public async Task Rewire_after_emit_cannot_reroute_the_staged_snapshot()
-    {
-        var fixture = new Fixture();
-        var entry = fixture.Entry(fixture.SummaryTarget, fixture.Produced, fixture.Produced);
-        fixture.Directory.ReplaceRoute(fixture.SummaryTarget, fixture.AssessmentTarget);
-
-        await fixture.Dispatcher.DispatchAsync(entry, TestContext.Current.CancellationToken);
-
-        Assert.Equal(1, fixture.Summary.CommitCount);
-        Assert.Equal(0, fixture.Assessment.CommitCount);
-    }
-
-    [Fact]
     public async Task Zero_route_has_no_receiver_effect_and_never_creates_a_refusal()
     {
         var fixture = new Fixture();
@@ -54,13 +46,54 @@ public sealed class DeliveryDispatcherTests
     }
 
     [Fact]
-    public void Snapshot_delivery_ids_are_distinct_for_the_same_firing_when_revisions_differ()
+    public void Snapshot_delivery_id_is_stable_for_the_same_firing_and_route_revision()
     {
         var fixture = new Fixture();
+        var firing = FiringId.New();
+        var route = new GraphRoute(fixture.SummaryTarget, SynapseKey.New(), 1, fixture.Produced, fixture.Produced, null);
+
+        Assert.Equal(route.ToDeliverySnapshot(firing).Delivery, route.ToDeliverySnapshot(firing).Delivery);
+    }
+
+    [Fact]
+    public void Snapshot_delivery_id_changes_when_firing_synapse_or_revision_changes()
+    {
+        var fixture = new Fixture();
+        var firing = FiringId.New();
         var route = new GraphRoute(fixture.SummaryTarget, SynapseKey.New(), 1, fixture.Produced, fixture.Produced, null);
         var revised = new GraphRoute(fixture.SummaryTarget, route.Synapse, 2, fixture.Produced, fixture.Produced, null);
+        var otherSynapse = new GraphRoute(fixture.SummaryTarget, SynapseKey.New(), 1, fixture.Produced, fixture.Produced, null);
 
-        Assert.NotEqual(route.ToDeliverySnapshot().Delivery, revised.ToDeliverySnapshot().Delivery);
+        var original = route.ToDeliverySnapshot(firing).Delivery;
+        Assert.NotEqual(original, revised.ToDeliverySnapshot(firing).Delivery);
+        Assert.NotEqual(original, otherSynapse.ToDeliverySnapshot(firing).Delivery);
+        Assert.NotEqual(original, route.ToDeliverySnapshot(FiringId.New()).Delivery);
+    }
+
+    [Fact]
+    public void Outbox_rejects_a_delivery_id_that_is_not_derived_from_its_firing_and_snapshot()
+    {
+        var fixture = new Fixture();
+        var firing = FiringId.New();
+        var synapse = SynapseKey.New();
+        var delivery = new DeliverySnapshot(
+            new DeliveryId(Guid.NewGuid()),
+            fixture.SummaryTarget,
+            synapse,
+            1,
+            fixture.Produced,
+            fixture.Produced,
+            null);
+
+        Assert.Throws<ArgumentException>(() => new OutboxEntry(
+            firing,
+            EventId.New(),
+            fixture.Produced,
+            new ActivityContext(fixture.Source.Workspace, new PrincipalId("principal/alice"), BrainActivityId.New(), new CorrelationId("correlation/invalid-delivery")),
+            null,
+            fixture.Source,
+            DateTimeOffset.UtcNow,
+            [delivery]));
     }
 
     [Fact]
@@ -79,9 +112,18 @@ public sealed class DeliveryDispatcherTests
     {
         var fixture = new Fixture();
         var firing = FiringId.New();
-        fixture.Payloads.Record(firing, fixture.Produced, new Produced("one"));
+        fixture.Payloads.Record(firing, fixture.Produced, fixture.Source, new Produced("one"));
 
         Assert.Throws<KeyNotFoundException>(() => fixture.Payloads.Read(firing, fixture.Assessed));
+    }
+
+    [Fact]
+    public void Payload_store_rejects_an_event_clr_type_that_does_not_match_its_declared_contract()
+    {
+        var fixture = new Fixture();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            fixture.Payloads.Record(FiringId.New(), fixture.Assessed, fixture.Source, new Produced("wrong-contract")));
     }
 
     [Fact]
@@ -89,7 +131,8 @@ public sealed class DeliveryDispatcherTests
     {
         var fixture = new Fixture();
         var firing = FiringId.New();
-        fixture.Payloads.Record(firing, fixture.Produced, new Produced("payload"));
+        fixture.Payloads.Record(firing, fixture.Produced, fixture.Source, new Produced("payload"));
+        var synapse = SynapseKey.New();
         var entry = new OutboxEntry(
             firing,
             EventId.New(),
@@ -98,7 +141,7 @@ public sealed class DeliveryDispatcherTests
             null,
             fixture.Source,
             DateTimeOffset.UtcNow,
-            [new DeliverySnapshot(DeliveryId.New(), fixture.SummaryTarget, SynapseKey.New(), 1, fixture.Assessed, fixture.Assessed, null)]);
+            [new DeliverySnapshot(DeliveryId.Derive(firing, synapse, 1), fixture.SummaryTarget, synapse, 1, fixture.Assessed, fixture.Assessed, null)]);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Dispatcher.DispatchAsync(entry, TestContext.Current.CancellationToken));
 
@@ -118,6 +161,48 @@ public sealed class DeliveryDispatcherTests
         Assert.Equal(1, fixture.Summary.CommitCount);
         Assert.Equal(1, retried.DeliveredCount);
         Assert.Equal(1, duplicate.DuplicateCount);
+    }
+
+    [Fact]
+    public async Task Concurrent_duplicate_waits_for_the_receiver_owned_transaction_then_reports_the_committed_duplicate()
+    {
+        var receiver = new BlockingReceiver();
+        var fixture = new Fixture(receiver);
+        var entry = fixture.Entry(fixture.SummaryTarget, fixture.Produced, fixture.Produced);
+
+        var first = fixture.Dispatcher.DispatchAsync(entry, TestContext.Current.CancellationToken);
+        await receiver.ApplicationStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var duplicate = fixture.Dispatcher.DispatchAsync(entry, TestContext.Current.CancellationToken);
+
+        Assert.False(duplicate.IsCompleted);
+        receiver.ReleaseApplication.SetResult();
+        var firstResult = await first;
+        var duplicateResult = await duplicate;
+
+        Assert.Equal(1, firstResult.DeliveredCount);
+        Assert.Equal(1, duplicateResult.DuplicateCount);
+        Assert.Equal(1, fixture.Summary.CommitCount);
+    }
+
+    [Fact]
+    public async Task Real_graph_rewire_after_staging_does_not_change_the_captured_receiver()
+    {
+        var fixture = new GraphRewireFixture();
+        var installed = await fixture.Graph.InstallAsync(fixture.Request);
+        var routes = (await fixture.Graph.ResolveAsync(fixture.Source, fixture.Produced)).Deliveries
+            .Select(route => new GraphRoute(route.Target, route.SynapseKey, route.SynapseRevision, route.InputContract, route.OutputContract, route.Reshape))
+            .ToArray();
+        var turn = new NeuronTurn<int>(new NeuronStateSnapshot<int>(0, 0), fixture.Source, fixture.Context, TimeProvider.System);
+        turn.StageEmission(fixture.Produced, routes);
+        var entry = Assert.Single(turn.Commit().Emissions);
+        fixture.Payloads.Record(entry.Firing, fixture.Produced, fixture.Source, new Produced("payload"));
+
+        await fixture.Graph.ReplaceAsync(installed.Key, fixture.Request with { Target = fixture.AssessmentTarget });
+        var result = await fixture.Dispatcher.DispatchAsync(entry, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, result.DeliveredCount);
+        Assert.Equal(1, fixture.Summary.CommitCount);
+        Assert.Equal(0, fixture.Assessment.CommitCount);
     }
 
     [Fact]
@@ -152,7 +237,13 @@ public sealed class DeliveryDispatcherTests
             Source = new EndpointAddress(new WorkspaceId("workspace/one"), new ModuleId("proof"), new NeuronRoleId("proof.source"), "workspace");
             SummaryTarget = new EndpointAddress(Source.Workspace, new ModuleId("summary"), new NeuronRoleId("summary.target"), "workspace");
             AssessmentTarget = new EndpointAddress(Source.Workspace, new ModuleId("assessment"), new NeuronRoleId("assessment.target"), "workspace");
-            Payloads = new InMemoryFiringPayloadStore();
+            Modules = ManifestValidator.Validate(
+            [
+                new ModuleManifest(Source.Module, new ModuleVersion(1, 0, 0), [], [], [],
+                    [new EventDescriptor(Produced, Source.Module, typeof(Produced), EventVisibility.Published), new EventDescriptor(Assessed, Source.Module, typeof(Assessed), EventVisibility.Published)],
+                    [Produced, Assessed], [], [], []),
+            ]);
+            Payloads = new InMemoryFiringPayloadStore(Modules);
             Summary = receiver ?? new RecordingReceiver(SummaryTarget, Produced);
             Assessment = new RecordingReceiver(AssessmentTarget, Produced);
             Directory = new ReceiverDirectory(Summary, Assessment);
@@ -164,6 +255,7 @@ public sealed class DeliveryDispatcherTests
         public EndpointAddress Source { get; }
         public EndpointAddress SummaryTarget { get; }
         public EndpointAddress AssessmentTarget { get; }
+        public ModuleSet Modules { get; }
         public InMemoryFiringPayloadStore Payloads { get; }
         public RecordingReceiver Summary { get; }
         public RecordingReceiver Assessment { get; }
@@ -173,10 +265,24 @@ public sealed class DeliveryDispatcherTests
         public OutboxEntry Entry(EndpointAddress? target = null, ContractId? input = null, ContractId? output = null, ImmutableArray<DeliverySnapshot> deliveries = default)
         {
             var firing = FiringId.New();
-            Payloads.Record(firing, Produced, new Produced("payload"));
-            var snapshots = deliveries.IsDefault
-                ? [new DeliverySnapshot(DeliveryId.New(), target ?? SummaryTarget, SynapseKey.New(), 1, input ?? Produced, output ?? Produced, null)]
-                : deliveries;
+            Payloads.Record(firing, Produced, Source, new Produced("payload"));
+            ImmutableArray<DeliverySnapshot> snapshots;
+            if (deliveries.IsDefault)
+            {
+                var synapse = SynapseKey.New();
+                snapshots = [new DeliverySnapshot(
+                    DeliveryId.Derive(firing, synapse, 1),
+                    target ?? SummaryTarget,
+                    synapse,
+                    1,
+                    input ?? Produced,
+                    output ?? Produced,
+                    null)];
+            }
+            else
+            {
+                snapshots = deliveries;
+            }
             return new OutboxEntry(
                 firing,
                 EventId.New(),
@@ -196,22 +302,22 @@ public sealed class DeliveryDispatcherTests
         public IDeliveryReceiver Resolve(EndpointAddress target)
             => _receivers.TryGetValue(target, out var receiver) ? receiver : throw new KeyNotFoundException();
 
-        public void ReplaceRoute(EndpointAddress oldTarget, EndpointAddress newTarget)
-        {
-            // Models a graph rewire external to this dispatcher. Existing snapshots still name oldTarget.
-            _ = oldTarget;
-            _ = newTarget;
-        }
     }
 
     private class RecordingReceiver(EndpointAddress endpoint, ContractId acceptedContract) : IDeliveryReceiver
     {
         public EndpointAddress Endpoint { get; } = endpoint;
         public ContractId AcceptedContract { get; } = acceptedContract;
-        public IDeliveryReceiverState DeliveryState { get; } = new InMemoryDeliveryReceiverState();
+        private readonly IDeliveryReceiverTransaction _transaction = new InMemoryDeliveryReceiverTransaction();
         public int CommitCount { get; private set; }
 
-        public virtual Task ApplyAsync(DeliverySnapshot snapshot, IDomainEvent domainEvent, CancellationToken cancellationToken)
+        public Task<ReceiverDeliveryResult> DeliverAsync(DeliverySnapshot snapshot, IDomainEvent domainEvent, CancellationToken cancellationToken)
+            => _transaction.ApplyOnceAsync(
+                snapshot.Delivery,
+                token => ApplyEffectAsync(snapshot, domainEvent, token),
+                cancellationToken);
+
+        protected virtual Task ApplyEffectAsync(DeliverySnapshot snapshot, IDomainEvent domainEvent, CancellationToken cancellationToken)
         {
             CommitCount++;
             return Task.CompletedTask;
@@ -222,17 +328,32 @@ public sealed class DeliveryDispatcherTests
         new EndpointAddress(new WorkspaceId("workspace/one"), new ModuleId("summary"), new NeuronRoleId("summary.target"), "workspace"),
         new ContractId("proof/produced@1"))
     {
-        public override Task ApplyAsync(DeliverySnapshot snapshot, IDomainEvent domainEvent, CancellationToken cancellationToken)
+        protected override Task ApplyEffectAsync(DeliverySnapshot snapshot, IDomainEvent domainEvent, CancellationToken cancellationToken)
         {
             if (Attempts++ == 0)
             {
                 throw new InvalidOperationException("application failed before its effect committed");
             }
 
-            return base.ApplyAsync(snapshot, domainEvent, cancellationToken);
+            return base.ApplyEffectAsync(snapshot, domainEvent, cancellationToken);
         }
 
         private int Attempts { get; set; }
+    }
+
+    private sealed class BlockingReceiver() : RecordingReceiver(
+        new EndpointAddress(new WorkspaceId("workspace/one"), new ModuleId("summary"), new NeuronRoleId("summary.target"), "workspace"),
+        new ContractId("proof/produced@1"))
+    {
+        public TaskCompletionSource ApplicationStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseApplication { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        protected override async Task ApplyEffectAsync(DeliverySnapshot snapshot, IDomainEvent domainEvent, CancellationToken cancellationToken)
+        {
+            ApplicationStarted.SetResult();
+            await ReleaseApplication.Task.WaitAsync(cancellationToken);
+            await base.ApplyEffectAsync(snapshot, domainEvent, cancellationToken);
+        }
     }
 
     private sealed class NoReshapes : IReshapeRegistry
@@ -242,4 +363,50 @@ public sealed class DeliveryDispatcherTests
     }
 
     private sealed record Produced(string Value) : IDomainEvent;
+    private sealed record Assessed(string Value) : IDomainEvent;
+
+    private sealed class GraphRewireFixture
+    {
+        public GraphRewireFixture()
+        {
+            Produced = new ContractId("proof/produced@1");
+            Source = new EndpointAddress(new WorkspaceId("workspace/one"), new ModuleId("proof"), new NeuronRoleId("proof.source"), "workspace");
+            SummaryTarget = new EndpointAddress(Source.Workspace, new ModuleId("summary"), new NeuronRoleId("summary.target"), "workspace");
+            AssessmentTarget = new EndpointAddress(Source.Workspace, new ModuleId("assessment"), new NeuronRoleId("assessment.target"), "workspace");
+            Context = new ActivityContext(Source.Workspace, new PrincipalId("principal/alice"), BrainActivityId.New(), new CorrelationId("correlation/graph"));
+            var modules = ManifestValidator.Validate(
+            [
+                new ModuleManifest(Source.Module, new ModuleVersion(1, 0, 0), [], [new NeuronRoleDescriptor(Source.Role, NeuronScope.Workspace, Source.Module)], [], [new EventDescriptor(Produced, Source.Module, typeof(Produced), EventVisibility.Published)], [Produced], [], [], []),
+                new ModuleManifest(SummaryTarget.Module, new ModuleVersion(1, 0, 0), [], [new NeuronRoleDescriptor(SummaryTarget.Role, NeuronScope.Workspace, SummaryTarget.Module)], [], [], [Produced], [], [], []),
+                new ModuleManifest(AssessmentTarget.Module, new ModuleVersion(1, 0, 0), [], [new NeuronRoleDescriptor(AssessmentTarget.Role, NeuronScope.Workspace, AssessmentTarget.Module)], [], [], [Produced], [], [], []),
+            ]);
+            Graph = new GraphShardDirectory(new GraphShardResolver()).Open(Source, modules, new AllowGraphChanges());
+            Request = new SynapseChangeRequest(Source, Produced, SummaryTarget, "workspace", new WiringSlotId("proof-produced"), null, Context);
+            Payloads = new InMemoryFiringPayloadStore(modules);
+            Summary = new RecordingReceiver(SummaryTarget, Produced);
+            Assessment = new RecordingReceiver(AssessmentTarget, Produced);
+            Dispatcher = new DeliveryDispatcher(Payloads, new ReceiverDirectory(Summary, Assessment), new NoReshapes());
+        }
+
+        public ContractId Produced { get; }
+        public EndpointAddress Source { get; }
+        public EndpointAddress SummaryTarget { get; }
+        public EndpointAddress AssessmentTarget { get; }
+        public ActivityContext Context { get; }
+        public BrainGraphShardGrain Graph { get; }
+        public SynapseChangeRequest Request { get; }
+        public InMemoryFiringPayloadStore Payloads { get; }
+        public RecordingReceiver Summary { get; }
+        public RecordingReceiver Assessment { get; }
+        public DeliveryDispatcher Dispatcher { get; }
+    }
+
+    private sealed class AllowGraphChanges : IWorkspacePolicyEvaluator
+    {
+        public PolicyDecision AuthorizeOperation(WorkspaceContext caller, Brain.Abstractions.Operations.OperationDescriptor operation)
+            => PolicyDecision.Allowed;
+
+        public PolicyDecision AuthorizeGraphChange(ActivityContext context, GraphChangeRequest request)
+            => PolicyDecision.Allowed;
+    }
 }

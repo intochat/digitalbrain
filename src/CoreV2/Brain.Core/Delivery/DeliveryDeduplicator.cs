@@ -1,35 +1,46 @@
-using System.Collections.Concurrent;
 using Brain.Core.Outbox;
 
 namespace Brain.Core.Delivery;
 
-// This is the rehydratable receiver-state seam. A production receiver persists the same
-// claim before applying its state transition; this in-memory implementation is test-only.
-internal interface IDeliveryReceiverState
+// A receiver owns this boundary so its state effect, journal/outbox work, and committed
+// delivery marker can share one transaction in production. The in-memory version serializes
+// the full receiver application and records the marker only after the application succeeds.
+internal interface IDeliveryReceiverTransaction
 {
-    bool TryBegin(DeliveryId delivery);
-
-    void Complete(DeliveryId delivery);
-
-    void Abandon(DeliveryId delivery);
+    Task<ReceiverDeliveryResult> ApplyOnceAsync(
+        DeliveryId delivery,
+        Func<CancellationToken, Task> application,
+        CancellationToken cancellationToken);
 }
 
-internal sealed class InMemoryDeliveryReceiverState : IDeliveryReceiverState
+internal readonly record struct ReceiverDeliveryResult(bool Applied);
+
+internal sealed class InMemoryDeliveryReceiverTransaction : IDeliveryReceiverTransaction
 {
-    private const byte InFlight = 0;
-    private const byte Committed = 1;
-    private readonly ConcurrentDictionary<DeliveryId, byte> _states = new();
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly HashSet<DeliveryId> _committed = [];
 
-    public bool TryBegin(DeliveryId delivery)
-        => _states.TryAdd(delivery, InFlight);
-
-    public void Complete(DeliveryId delivery)
+    public async Task<ReceiverDeliveryResult> ApplyOnceAsync(
+        DeliveryId delivery,
+        Func<CancellationToken, Task> application,
+        CancellationToken cancellationToken)
     {
-        if (!_states.TryUpdate(delivery, Committed, InFlight))
+        ArgumentNullException.ThrowIfNull(application);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            throw new InvalidOperationException("A delivery can only complete after it has begun.");
+            if (_committed.Contains(delivery))
+            {
+                return new ReceiverDeliveryResult(false);
+            }
+
+            await application(cancellationToken).ConfigureAwait(false);
+            _committed.Add(delivery);
+            return new ReceiverDeliveryResult(true);
+        }
+        finally
+        {
+            _gate.Release();
         }
     }
-
-    public void Abandon(DeliveryId delivery) => _states.TryRemove(delivery, out _);
 }

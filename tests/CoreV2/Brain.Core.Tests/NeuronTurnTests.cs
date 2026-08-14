@@ -99,15 +99,15 @@ public sealed class NeuronTurnTests
             fixture.TargetEndpoint, SynapseKey.New(), 1, input, output, new ReshapeId()));
 
         Assert.Throws<ArgumentNullException>(() => new DeliverySnapshot(
-            DeliveryId.New(), null!, SynapseKey.New(), 1, input, output, reshape: null));
+            DeliveryId.Derive(FiringId.New(), SynapseKey.New(), 1), null!, SynapseKey.New(), 1, input, output, reshape: null));
         Assert.Throws<ArgumentException>(() => new DeliverySnapshot(
-            DeliveryId.New(), fixture.TargetEndpoint, default, 1, input, output, reshape: null));
+            DeliveryId.Derive(FiringId.New(), SynapseKey.New(), 1), fixture.TargetEndpoint, default, 1, input, output, reshape: null));
         Assert.Throws<ArgumentOutOfRangeException>(() => new DeliverySnapshot(
-            DeliveryId.New(), fixture.TargetEndpoint, SynapseKey.New(), 0, input, output, reshape: null));
+            DeliveryId.Derive(FiringId.New(), SynapseKey.New(), 1), fixture.TargetEndpoint, SynapseKey.New(), 0, input, output, reshape: null));
         Assert.Throws<ArgumentException>(() => new DeliverySnapshot(
-            DeliveryId.New(), fixture.TargetEndpoint, SynapseKey.New(), 1, default, output, reshape: null));
+            DeliveryId.Derive(FiringId.New(), SynapseKey.New(), 1), fixture.TargetEndpoint, SynapseKey.New(), 1, default, output, reshape: null));
         Assert.Throws<ArgumentException>(() => new DeliverySnapshot(
-            DeliveryId.New(), fixture.TargetEndpoint, SynapseKey.New(), 1, input, output, new ReshapeId()));
+            DeliveryId.Derive(FiringId.New(), SynapseKey.New(), 1), fixture.TargetEndpoint, SynapseKey.New(), 1, input, output, new ReshapeId()));
     }
 
     [Fact]

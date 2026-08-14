@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Buffers.Binary;
+using System.Security.Cryptography;
 using Brain.Abstractions.Context;
 using Brain.Abstractions.Contracts;
 using Brain.Abstractions.Identity;
@@ -54,7 +56,23 @@ internal readonly record struct DeliveryId
 
     public Guid Value { get; }
 
-    public static DeliveryId New() => new(Guid.NewGuid());
+    internal static DeliveryId Derive(FiringId firing, SynapseKey synapse, long synapseRevision)
+    {
+        if (firing.Value == Guid.Empty)
+        {
+            throw new ArgumentException("A delivery id requires a firing id.", nameof(firing));
+        }
+
+        RuntimeRecordValidation.Synapse(synapse, nameof(synapse));
+        RuntimeRecordValidation.Revision(synapseRevision, nameof(synapseRevision));
+        Span<byte> material = stackalloc byte[40];
+        firing.Value.TryWriteBytes(material[..16]);
+        synapse.Value.TryWriteBytes(material.Slice(16, 16));
+        BinaryPrimitives.WriteInt64BigEndian(material.Slice(32, 8), synapseRevision);
+        var hash = SHA256.HashData(material);
+        var derived = new Guid(hash.AsSpan(0, 16));
+        return new DeliveryId(derived == Guid.Empty ? new Guid(hash.AsSpan(16, 16)) : derived);
+    }
 }
 
 internal readonly record struct DirectedMessageId
@@ -165,6 +183,10 @@ internal sealed class OutboxEntry
     {
         ArgumentNullException.ThrowIfNull(activity);
         ArgumentNullException.ThrowIfNull(source);
+        if (firing.Value == Guid.Empty)
+        {
+            throw new ArgumentException("An outbox entry requires a firing id.", nameof(firing));
+        }
         if (string.IsNullOrWhiteSpace(eventContract.Value))
         {
             throw new ArgumentException("An outbox entry requires an event contract.", nameof(eventContract));
@@ -178,6 +200,16 @@ internal sealed class OutboxEntry
         Source = source;
         StagedAt = stagedAt;
         Deliveries = deliveries.IsDefault ? ImmutableArray<DeliverySnapshot>.Empty : deliveries;
+        foreach (var delivery in Deliveries)
+        {
+            delivery.EnsureValid();
+            if (delivery.Delivery != DeliveryId.Derive(Firing, delivery.Synapse, delivery.SynapseRevision))
+            {
+                throw new ArgumentException(
+                    "An outbox delivery id must be derived from its firing and exact synapse revision.",
+                    nameof(deliveries));
+            }
+        }
     }
 
     public FiringId Firing { get; }

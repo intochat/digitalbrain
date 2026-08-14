@@ -91,14 +91,18 @@ public sealed class ReshapeRegistryTests
         public ReshapeRegistry Registry { get; }
 
         public DeliverySnapshot Snapshot(ContractId? input = null, ContractId? output = null, ModuleId? targetModule = null)
-            => new(
-                DeliveryId.New(),
+        {
+            var firing = FiringId.New();
+            var synapse = SynapseKey.New();
+            return new DeliverySnapshot(
+                DeliveryId.Derive(firing, synapse, 1),
                 new EndpointAddress(new WorkspaceId("workspace/one"), targetModule ?? Owner, new NeuronRoleId("proof.target"), "workspace"),
-                SynapseKey.New(),
+                synapse,
                 1,
                 input ?? Produced,
                 output ?? Assessed,
                 ReshapeId);
+        }
     }
 
     private sealed class PrefixReshape : IReshape<Produced, Assessed>
